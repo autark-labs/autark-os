@@ -1,4 +1,4 @@
-import { Check, ShieldCheck } from 'lucide-react';
+import { Check, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -12,13 +12,20 @@ export function AppImage({ app, size = 'default' }: { app: MarketplaceApp; size?
   );
 }
 
-export function VerifiedBadge({ label }: { label: string }) {
+export function CatalogConfidenceBadge({ app }: { app: MarketplaceApp }) {
+  const verified = catalogVerified(app);
   return (
-    <Badge className="gap-1 border-emerald-400/30 bg-emerald-500/10 text-emerald-200" variant="outline">
-      <ShieldCheck className="size-3" />
-      {label}
+    <Badge className={cn('gap-1', verified ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200' : 'border-amber-400/30 bg-amber-500/10 text-amber-200')} variant="outline">
+      {verified ? <ShieldCheck className="size-3" /> : <TriangleAlert className="size-3" />}
+      {verified ? 'Verified' : 'Validation needed'}
     </Badge>
   );
+}
+
+export function catalogVerified(app: MarketplaceApp) {
+  return app.supportLevel === 'Ready'
+    && app.smokeTests.length > 0
+    && app.smokeTests.every((test) => ['Passed', 'Not applicable'].includes(test.status));
 }
 
 export function SupportBadge({ level }: { level: string }) {

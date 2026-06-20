@@ -5,9 +5,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,6 +33,10 @@ public class ProjectOsJobService {
     }
 
     public ProjectOsJob start(String type, String subjectId, List<ProjectOsJobStep> steps, Supplier<ProjectOsJobOutcome> operation) {
+        return startWithJob(type, subjectId, steps, ignored -> operation.get());
+    }
+
+    public ProjectOsJob startWithJob(String type, String subjectId, List<ProjectOsJobStep> steps, Function<ProjectOsJob, ProjectOsJobOutcome> operation) {
         Optional<ProjectOsJob> active = repository.activeFor(type, subjectId);
         if (active.isPresent()) {
             return active.get();
@@ -56,6 +63,10 @@ public class ProjectOsJobService {
         return repository.findById(jobId);
     }
 
+    public ProjectOsJob recordProgress(String jobId, List<ProjectOsJobStep> steps) {
+        return repository.recordProgress(jobId, steps);
+    }
+
     public Optional<ProjectOsJob> cancel(String jobId) {
         queuedTasks.remove(jobId);
         return repository.findById(jobId).map(job -> {
@@ -66,17 +77,26 @@ public class ProjectOsJobService {
         });
     }
 
+    @EventListener(ApplicationReadyEvent.class)
+    public void reconcileInterruptedJobs() {
+        repository.activeJobs().forEach(job -> repository.fail(
+                job.jobId(),
+                "job_interrupted",
+                interruptedMessage(job),
+                java.util.Map.of("previousStatus", job.status())));
+    }
+
     public void runQueuedJobsNow() {
         List<Runnable> tasks = new ArrayList<>(queuedTasks.values());
         queuedTasks.clear();
         tasks.forEach(Runnable::run);
     }
 
-    private void run(ProjectOsJob job, Supplier<ProjectOsJobOutcome> operation) {
+    private void run(ProjectOsJob job, Function<ProjectOsJob, ProjectOsJobOutcome> operation) {
         try {
             String firstStepId = job.steps().isEmpty() ? "" : job.steps().getFirst().id();
             repository.markRunning(job.jobId(), firstStepId);
-            ProjectOsJobOutcome outcome = operation.get();
+            ProjectOsJobOutcome outcome = operation.apply(job);
             if ("failed".equals(outcome.status())) {
                 repository.fail(job.jobId(), "job_failed", outcome.message(), java.util.Map.of());
             } else {
@@ -85,6 +105,14 @@ public class ProjectOsJobService {
         } catch (RuntimeException exception) {
             repository.fail(job.jobId(), "job_failed", safeMessage(exception), java.util.Map.of("exception", exception.getClass().getSimpleName()));
         }
+    }
+
+    private String interruptedMessage(ProjectOsJob job) {
+        return switch (job.type()) {
+            case "install_app" -> "This app install was interrupted when Project OS stopped. Review My Apps, then retry the install if needed.";
+            case "backup" -> "This backup was interrupted when Project OS stopped. Rerun the backup to create a fresh restore point.";
+            default -> "This job was interrupted when Project OS stopped. Start it again if it is still needed.";
+        };
     }
 
     private String safeMessage(RuntimeException exception) {

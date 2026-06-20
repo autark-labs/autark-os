@@ -1,9 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { AdminSecurityAPIClient, type AdminSecurityStatus } from './api/AdminSecurityAPIClient';
 import { SystemAPIClient } from './api/SystemAPIClient';
 import { ProjectSettingsProvider } from './contexts/ProjectSettingsContext';
 import AppShell from './layout/AppShell';
 import { routeAliases } from './layout/navigationModel';
+import { readAdminToken } from './lib/adminSecuritySession';
+import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
 
 const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage/ApplicationsPage'));
@@ -35,15 +38,30 @@ function App() {
 
 function AppContent() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [securityStatus, setSecurityStatus] = useState<AdminSecurityStatus | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    SystemAPIClient.onboarding()
+    AdminSecurityAPIClient.status()
+      .then((status) => {
+        setSecurityStatus(status);
+        setAuthenticated(!status.authRequired || status.devMode || Boolean(readAdminToken()));
+        return SystemAPIClient.onboarding();
+      })
       .then((state) => setOnboardingComplete(state.status === 'complete'))
-      .catch(() => setOnboardingComplete(true));
+      .catch(() => {
+        setSecurityStatus({ devMode: false, claimed: true, authRequired: false, message: '', setupCode: '' });
+        setAuthenticated(true);
+        setOnboardingComplete(true);
+      });
   }, []);
 
-  if (onboardingComplete === null) {
+  if (onboardingComplete === null || securityStatus === null) {
     return <PageFallback />;
+  }
+
+  if (securityStatus.authRequired && !securityStatus.devMode && !authenticated) {
+    return <AdminSecurityGate onAuthenticated={() => setAuthenticated(true)} status={securityStatus} />;
   }
 
   if (!onboardingComplete) {

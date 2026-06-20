@@ -55,7 +55,6 @@ test('marketplaceVisibleApps applies supported sort modes', () => {
   ];
 
   assert.deepEqual(marketplaceVisibleApps({ apps, sortBy: 'Easiest to install' }).map((item) => item.id), ['easy', 'moderate', 'advanced']);
-  assert.deepEqual(marketplaceVisibleApps({ apps, sortBy: 'Most popular' }).map((item) => item.id), ['advanced', 'moderate', 'easy']);
   assert.deepEqual(marketplaceVisibleApps({ apps, sortBy: 'Recently updated' }).map((item) => item.id), ['easy', 'moderate', 'advanced']);
 });
 

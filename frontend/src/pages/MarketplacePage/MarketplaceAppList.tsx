@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Clock3, Info, MoreHorizontal, SlidersHorizontal, Sparkles, Star } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Clock3, Info, MoreHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { MarketplaceApp } from '@/types/marketplace';
 import { sortOptions } from './extensions/MarketplacePage.constants';
-import { AppImage, SupportBadge, VerifiedBadge } from './MarketplacePage.shared';
+import { AppImage, CatalogConfidenceBadge, SupportBadge } from './MarketplacePage.shared';
 
 type MarketplaceAppListProps = {
   apps: MarketplaceApp[];
@@ -77,7 +77,7 @@ function AppStoreCard({ app, installed, isSelected, onSelect }: { app: Marketpla
             <span className="flex flex-wrap items-center gap-2">
               <strong className="truncate text-base text-white">{app.name}</strong>
               {installed && <Badge className="border-emerald-300/25 bg-emerald-500/10 text-emerald-100" variant="outline">Installed</Badge>}
-              <VerifiedBadge label={app.badge} />
+              <CatalogConfidenceBadge app={app} />
             </span>
             <span className="mt-1 block text-xs text-slate-400">{app.category} · {serviceKindLabel(app.usage.kind)}</span>
           </span>
@@ -102,11 +102,8 @@ function AppStoreCard({ app, installed, isSelected, onSelect }: { app: Marketpla
 
       <div className="relative z-10 mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3 text-xs text-slate-400">
-          <span className="inline-flex items-center gap-1">
-            <Star className="size-3 fill-yellow-300 text-yellow-300" />
-            {app.rating}
-          </span>
-          <span>{app.downloads} downloads</span>
+          <span>{app.smokeTests.filter((test) => test.status === 'Passed').length}/{app.smokeTests.length} checks passed</span>
+          <span>{app.source} template</span>
         </div>
         <Button className={cn('h-8 px-3 text-xs', installed ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15' : poButtonClass('primary'))} onClick={onSelect} type="button" variant={installed ? 'outline' : 'default'}>
           {installed ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}

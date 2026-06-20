@@ -1,10 +1,13 @@
 import axios from 'axios';
+import { applyAdminAuthHeader } from '@/lib/adminSecuritySession';
 
 export const httpClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+httpClient.interceptors.request.use((config) => applyAdminAuthHeader(config));
 
 export function apiErrorMessage(error: unknown, fallback = 'Something went wrong.') {
   if (axios.isAxiosError(error)) {

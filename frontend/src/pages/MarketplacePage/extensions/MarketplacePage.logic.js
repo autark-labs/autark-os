@@ -102,8 +102,6 @@ export function sortMarketplaceApps(apps, sortBy) {
   switch (sortBy) {
     case 'Easiest to install':
       return sorted.sort((left, right) => marketplaceDifficultyRank(left.difficulty) - marketplaceDifficultyRank(right.difficulty) || left.name.localeCompare(right.name));
-    case 'Most popular':
-      return sorted.sort((left, right) => numericMarketplacePopularity(right.downloads) - numericMarketplacePopularity(left.downloads) || left.name.localeCompare(right.name));
     case 'Recently updated':
       return sorted.sort((left, right) => marketplaceUpdateRank(left.lastUpdated) - marketplaceUpdateRank(right.lastUpdated) || left.name.localeCompare(right.name));
     default:
@@ -120,16 +118,6 @@ export function marketplaceDifficultyRank(difficulty) {
 
 export function isLightweightMarketplaceApp(app) {
   return marketplaceDifficultyRank(app.difficulty) === 0 || app.installTime.toLowerCase().includes('2-3');
-}
-
-export function numericMarketplacePopularity(downloads) {
-  const match = downloads.toLowerCase().match(/([\d.]+)\s*([mk])?/);
-  if (!match) {
-    return 0;
-  }
-  const value = Number(match[1]);
-  const multiplier = match[2] === 'm' ? 1_000_000 : match[2] === 'k' ? 1_000 : 1;
-  return value * multiplier;
 }
 
 export function marketplaceUpdateRank(lastUpdated) {

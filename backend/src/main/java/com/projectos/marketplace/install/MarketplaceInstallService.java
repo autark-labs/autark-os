@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -86,13 +87,19 @@ public class MarketplaceInstallService {
     }
 
     public InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options) {
+        return install(manifest, options, ignored -> {
+        });
+    }
+
+    public InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options, Consumer<InstallStep> progressSink) {
         List<InstallStep> steps = new ArrayList<>();
         List<String> logs = new ArrayList<>();
+        Consumer<InstallStep> sink = progressSink == null ? ignored -> { } : progressSink;
         InstallPlan plan = installPlanService.generatePlan(manifest, options);
         ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
         InstalledApp existingApp = installedAppRepository.findById(manifest.id()).orElse(null);
         if (existingApp != null && (options == null || !options.reinstallRequested())) {
-            steps.add(InstallStep.completed("Already installed", manifest.name() + " is already managed by Project OS."));
+            recordStep(steps, sink, InstallStep.completed("Already installed", manifest.name() + " is already managed by Project OS."));
             return new InstallResult(
                     manifest.id(),
                     manifest.name(),
@@ -109,44 +116,44 @@ public class MarketplaceInstallService {
             String appInstanceId = newAppInstanceId();
             String composeProject = composeProject(manifest);
             activityInfo("install_started", "Installing " + manifest.name(), "Project OS is preparing storage, networking, and containers for " + manifest.name() + ".", manifest.id());
-            steps.add(InstallStep.completed("Preparing app", "Validated manifest and generated install plan."));
+            recordStep(steps, sink, InstallStep.completed("Preparing app", "Validated manifest and generated install plan."));
             Path appRoot = directoryManager.prepare(manifest);
-            steps.add(InstallStep.completed("Creating safe storage", appRoot.toString()));
+            recordStep(steps, sink, InstallStep.completed("Creating safe storage", appRoot.toString()));
 
             packageCopier.copyManifest(manifest, appRoot);
             Path composeFile = composeRenderer.render(manifest, appRoot, runtimeConfiguration, appInstanceId, composeProject);
             AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
-            steps.add(InstallStep.completed("Configuring private access", "Rendered Compose file with Project-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
+            recordStep(steps, sink, InstallStep.completed("Configuring private access", "Rendered Compose file with Project-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
 
             DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, composeProject);
             logs.addAll(composeResult.output());
             if (!composeResult.successful()) {
-                steps.add(InstallStep.failed("Starting services", "Docker Compose exited with code " + composeResult.exitCode()));
+                recordStep(steps, sink, InstallStep.failed("Starting services", "Docker Compose exited with code " + composeResult.exitCode()));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", String.join("\n", composeResult.output()));
                 activityWarning("install_failed", "Install failed for " + manifest.name(), "Docker Compose could not start the app containers.", manifest.id());
                 return new InstallResult(manifest.id(), manifest.name(), "failed", "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
             }
-            steps.add(InstallStep.completed("Starting services", "Docker Compose started the managed services."));
+            recordStep(steps, sink, InstallStep.completed("Starting services", "Docker Compose started the managed services."));
             StartupCheck startupCheck = waitForStartup(composeFile, composeProject, manifest.health());
             logs.addAll(startupCheck.logs());
             if (!startupCheck.ready()) {
-                steps.add(InstallStep.failed("Checking app health", startupCheck.detail()));
+                recordStep(steps, sink, InstallStep.failed("Checking app health", startupCheck.detail()));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", startupCheck.detail());
                 activityWarning("install_failed", "Install needs attention for " + manifest.name(), startupCheck.detail(), manifest.id());
                 return new InstallResult(manifest.id(), manifest.name(), "failed", startupCheck.detail(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
             }
-            steps.add(InstallStep.completed("Checking app health", startupCheck.detail()));
+            recordStep(steps, sink, InstallStep.completed("Checking app health", startupCheck.detail()));
             TailscaleServeResult privateAccess = configurePrivateAccess(manifest, runtimeConfiguration);
             logs.addAll(privateAccess.output());
             if (privateAccess.configured()) {
-                steps.add(InstallStep.completed("Creating private HTTPS link", privateAccess.privateUrl()));
+                recordStep(steps, sink, InstallStep.completed("Creating private HTTPS link", privateAccess.privateUrl()));
             } else if (manifest.usage().privateHttpsRequired()) {
-                steps.add(InstallStep.failed("Creating private HTTPS link", privateAccess.message()));
+                recordStep(steps, sink, InstallStep.failed("Creating private HTTPS link", privateAccess.message()));
             } else if (runtimeConfiguration.tailscaleEnabled()) {
-                steps.add(InstallStep.completed("Creating private HTTPS link", privateAccess.message()));
+                recordStep(steps, sink, InstallStep.completed("Creating private HTTPS link", privateAccess.message()));
             }
             PostInstallProvisioningResult provisioningResult = postInstallProvisioner.provision(manifest, runtimeConfiguration.accessUrl());
-            steps.addAll(provisioningResult.steps());
+            provisioningResult.steps().forEach(step -> recordStep(steps, sink, step));
             logs.addAll(provisioningResult.logs());
             PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult);
 
@@ -167,11 +174,11 @@ public class MarketplaceInstallService {
                     runtimeConfiguration.backup()));
             installedAppRepository.recordEvent(manifest.id(), "installed", manifest.name() + " installed successfully.");
             activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Project OS.", manifest.id());
-            steps.add(InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl())));
+            recordStep(steps, sink, InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl())));
 
             return new InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Project-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
         } catch (RuntimeException exception) {
-            steps.add(InstallStep.failed("Install failed", exception.getMessage()));
+            recordStep(steps, sink, InstallStep.failed("Install failed", exception.getMessage()));
             try {
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", exception.getMessage());
             } catch (RuntimeException ignored) {
@@ -180,6 +187,11 @@ public class MarketplaceInstallService {
             activityError("install_failed", "Install failed for " + manifest.name(), exception.getMessage(), manifest.id(), exception);
             return new InstallResult(manifest.id(), manifest.name(), "failed", exception.getMessage(), manifest.accessUrl(), plan, steps, logs, null, setupGuide(manifest, manifest.accessUrl(), null, PostInstallProvisioningResult.empty()));
         }
+    }
+
+    private void recordStep(List<InstallStep> steps, Consumer<InstallStep> sink, InstallStep step) {
+        steps.add(step);
+        sink.accept(step);
     }
 
     private String composeProject(ApplicationManifest manifest) {

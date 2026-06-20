@@ -2,6 +2,8 @@ package com.projectos.marketplace.api;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.Collections;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -63,7 +65,14 @@ public class MarketplaceController {
     @PostMapping("/{id}/install")
     public ResponseEntity<ProjectOsJob> install(@PathVariable String id, @RequestBody(required = false) InstallOptionsRequest options) {
         return catalogService.findById(id)
-                .map(manifest -> jobService.start("install_app", manifest.id(), installJobSteps(manifest.name()), () -> installOutcome(marketplaceInstallService.install(manifest, options))))
+                .map(manifest -> jobService.startWithJob("install_app", manifest.id(), installJobSteps(manifest.name()), job -> {
+                    List<ProjectOsJobStep> liveSteps = Collections.synchronizedList(new ArrayList<>());
+                    InstallResult result = marketplaceInstallService.install(manifest, options, step -> {
+                        liveSteps.add(installStep(step));
+                        jobService.recordProgress(job.jobId(), List.copyOf(liveSteps));
+                    });
+                    return installOutcome(result);
+                }))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

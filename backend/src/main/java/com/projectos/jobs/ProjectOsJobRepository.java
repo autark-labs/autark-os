@@ -113,8 +113,31 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
         }
     }
 
+    public List<ProjectOsJob> activeJobs() {
+        migrate();
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("""
+                select * from project_os_jobs
+                where status in ('queued', 'running')
+                order by created_at asc
+                """)) {
+            ResultSet resultSet = statement.executeQuery();
+            List<ProjectOsJob> jobs = new ArrayList<>();
+            while (resultSet.next()) {
+                jobs.add(job(resultSet));
+            }
+            return jobs;
+        } catch (SQLException exception) {
+            throw new InstallationException("Unable to list active Project OS jobs.", exception);
+        }
+    }
+
     public ProjectOsJob markRunning(String jobId, String stepId) {
         return update(jobId, "running", stepId, markStep(jobId, stepId, "running", "Started.", true), null, null, Map.of());
+    }
+
+    public ProjectOsJob recordProgress(String jobId, List<ProjectOsJobStep> steps) {
+        String currentStep = steps == null || steps.isEmpty() ? currentStep(jobId) : steps.getLast().id();
+        return update(jobId, "running", currentStep, steps == null ? List.of() : steps, null, null, Map.of());
     }
 
     public ProjectOsJob completeStep(String jobId, String stepId, String message) {

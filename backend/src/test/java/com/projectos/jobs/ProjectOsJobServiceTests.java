@@ -58,6 +58,40 @@ class ProjectOsJobServiceTests {
         assertThat(failed.error().message()).isEqualTo("Docker daemon is not reachable.");
     }
 
+    @Test
+    void marksInterruptedQueuedAndRunningJobsAsFailedOnStartup() {
+        ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
+        properties.setRuntimeRoot(runtimeRoot.toString());
+        ProjectOsJobRepository repository = new ProjectOsJobRepository(new RuntimeLayout(properties), () -> Instant.parse("2026-06-20T12:00:00Z"));
+        ProjectOsJobService previousProcess = new ProjectOsJobService(repository, Runnable::run, false);
+        ProjectOsJob queued = previousProcess.start("install_app", "vaultwarden", List.of(ProjectOsJobStep.pending("download", "Downloading app")), () -> ProjectOsJobOutcome.succeeded("Installed."));
+        ProjectOsJob running = previousProcess.start("backup", "vaultwarden", List.of(ProjectOsJobStep.pending("copy", "Copying app data")), () -> ProjectOsJobOutcome.succeeded("Backed up."));
+        repository.markRunning(running.jobId(), "copy");
+
+        ProjectOsJobService restarted = new ProjectOsJobService(repository, Runnable::run, false);
+        restarted.reconcileInterruptedJobs();
+
+        assertThat(restarted.findById(queued.jobId()).orElseThrow().status()).isEqualTo("failed");
+        assertThat(restarted.findById(queued.jobId()).orElseThrow().error().code()).isEqualTo("job_interrupted");
+        ProjectOsJob interruptedRunning = restarted.findById(running.jobId()).orElseThrow();
+        assertThat(interruptedRunning.status()).isEqualTo("failed");
+        assertThat(interruptedRunning.steps()).extracting(ProjectOsJobStep::status).containsExactly("failed");
+        assertThat(interruptedRunning.error().message()).contains("interrupted");
+    }
+
+    @Test
+    void recordsLiveProgressWhileJobIsRunning() {
+        ProjectOsJobService service = service();
+        ProjectOsJob job = service.start("install_app", "vaultwarden", List.of(ProjectOsJobStep.pending("validate_host", "Checking this device")), () -> ProjectOsJobOutcome.succeeded("Installed."));
+
+        service.recordProgress(job.jobId(), List.of(ProjectOsJobStep.succeeded("prepare", "Preparing app", "Manifest validated.")));
+
+        ProjectOsJob running = service.findById(job.jobId()).orElseThrow();
+        assertThat(running.status()).isEqualTo("running");
+        assertThat(running.currentStep()).isEqualTo("prepare");
+        assertThat(running.steps()).extracting(ProjectOsJobStep::label).containsExactly("Preparing app");
+    }
+
     private ProjectOsJobService service() {
         ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

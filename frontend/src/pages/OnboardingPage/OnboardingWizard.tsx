@@ -91,6 +91,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         recommendedApps: selectedApps,
         completedSteps: ['device', 'doctor', 'tailscale', 'storage', 'backups', 'apps'],
       });
+      await persistSetupProgress(privateAccessChoice);
       await SystemAPIClient.completeOnboarding();
       onComplete();
     } catch (saveError) {
@@ -310,6 +311,21 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       </section>
     </main>
   );
+}
+
+async function persistSetupProgress(privateAccessChoice: PrivateAccessChoice) {
+  await SystemAPIClient.completeSetupStep('welcome');
+  await SystemAPIClient.completeSetupStep('host_check');
+  await SystemAPIClient.completeSetupStep('docker_check');
+  await SystemAPIClient.completeSetupStep('access_choice');
+  if (privateAccessChoice === 'local-only') {
+    await SystemAPIClient.skipSetupStep('tailscale_connect');
+  } else {
+    await SystemAPIClient.completeSetupStep('tailscale_connect');
+  }
+  await SystemAPIClient.completeSetupStep('starter_apps');
+  await SystemAPIClient.skipSetupStep('first_backup');
+  await SystemAPIClient.completeSetupStep('done');
 }
 
 function WizardCard({ children, icon: Icon, text, title }: { children: ReactNode; icon: typeof ServerCog; text: string; title: string }) {

@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, Star, TriangleAlert } from 'lucide-react';
+import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import type { AppRuntimeView } from '@/types/app';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp } from '@/types/marketplace';
 import { InstallWizard, TechnicalPlanCard } from './MarketplaceInstallWizard';
-import { AppImage, Config, InfoCard, Stat, SupportBadge, VerifiedBadge } from './MarketplacePage.shared';
+import { AppImage, CatalogConfidenceBadge, Config, InfoCard, Stat, SupportBadge } from './MarketplacePage.shared';
 
 type AppDetailProps = {
   app: MarketplaceApp;
@@ -62,14 +62,10 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
               <h3 className="text-2xl font-bold text-white">{app.name}</h3>
               {isInstalled && <Badge className="border-emerald-300/25 bg-emerald-500/10 text-emerald-100" variant="outline">Installed</Badge>}
               <SupportBadge level={app.supportLevel} />
-              <VerifiedBadge label={app.badge} />
+              <CatalogConfidenceBadge app={app} />
             </div>
             <p className="mt-2 text-sm text-slate-300">{app.description}</p>
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
-              <span className="inline-flex items-center gap-1">
-                <Star className="size-3 fill-yellow-300 text-yellow-300" />
-                {app.rating} rating
-              </span>
               <span>{app.category}</span>
               <span>{app.difficulty}</span>
               <span>{app.installTime}</span>
@@ -185,9 +181,7 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
             <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="overview">Overview</TabsTrigger>
             <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="setup">Setup</TabsTrigger>
             <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="details">Details</TabsTrigger>
-            <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="screenshots">Screenshots</TabsTrigger>
             <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="settings">Settings</TabsTrigger>
-            <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="reviews">Reviews</TabsTrigger>
             <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="changelog">Changelog</TabsTrigger>
           </TabsList>
 
@@ -263,8 +257,7 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
 
           <TabsContent className="grid gap-4" value="details">
             <section className="grid gap-4 rounded-lg border border-slate-700/30 bg-slate-950/30 p-4 sm:grid-cols-2">
-              <Stat label="Downloads" value={app.downloads} />
-              <Stat label="Last updated" value={app.lastUpdated} />
+              <Stat label="Catalog updated" value={app.lastUpdated} />
               <Stat label="Size" value={app.size} />
               <Stat label="Maintainer" value={app.maintainer} />
               <Stat label="Source" value={app.source} />
@@ -282,29 +275,14 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
             </section>
           </TabsContent>
 
-          <TabsContent value="screenshots">
-            <section className="grid gap-3 rounded-lg border border-slate-700/30 bg-slate-950/30 p-4">
-              <h4 className="font-bold text-white">Preview</h4>
-              <img alt={`${app.name} preview`} className="h-48 w-full rounded-lg object-cover" src={app.image} />
-              <p className="text-sm text-slate-400">More screenshots will appear here as app templates add them.</p>
-            </section>
-          </TabsContent>
-
           <TabsContent value="settings">
             <InfoCard title="Choices you can review before install" items={['Where the app keeps its data', 'How you open it', 'Whether backups are on', 'Whether private remote access is requested']} />
-          </TabsContent>
-
-          <TabsContent value="reviews">
-            <section className="rounded-lg border border-slate-700/30 bg-slate-950/30 p-4">
-              <h4 className="font-bold text-white">Community signal</h4>
-              <p className="mt-2 text-sm text-slate-400">Rated {app.rating} by homelab users. Full reviews will appear here later.</p>
-            </section>
           </TabsContent>
 
           <TabsContent value="changelog">
             <section className="rounded-lg border border-slate-700/30 bg-slate-950/30 p-4">
               <h4 className="font-bold text-white">Latest template update</h4>
-              <p className="mt-2 text-sm text-slate-400">Version {app.version} was refreshed {app.lastUpdated}. Install behavior is now connected to the local installer.</p>
+              <p className="mt-2 text-sm text-slate-400">Template version {app.version} was refreshed {app.lastUpdated}. Install behavior is connected to the local installer and catalog confidence is based on the checks above.</p>
             </section>
           </TabsContent>
         </Tabs>
