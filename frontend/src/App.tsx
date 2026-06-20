@@ -3,11 +3,11 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { SystemAPIClient } from './api/SystemAPIClient';
 import { ProjectSettingsProvider } from './contexts/ProjectSettingsContext';
 import AppShell from './layout/AppShell';
+import { routeAliases } from './layout/navigationModel';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
 
 const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage/ApplicationsPage'));
 const BackupsPage = lazy(() => import('./pages/BackupsPage/BackupsPage'));
-const DevicesPage = lazy(() => import('./pages/DevicesPage/DevicesPage'));
 const MarketplacePage = lazy(() => import('./pages/MarketplacePage/MarketplacePage'));
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage/MonitoringPage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage/NetworkPage'));
@@ -16,7 +16,6 @@ const AutomationPreviewPage = lazy(() => import('./pages/AutomationPage/Automati
 const SettingsPage = lazy(() => import('./pages/SettingsPage/SettingsPage'));
 const StoragePage = lazy(() => import('./pages/StoragePage/StoragePage'));
 const SupportPage = lazy(() => import('./pages/SupportPage/SupportPage'));
-const UpdatesPage = lazy(() => import('./pages/UpdatesPage/UpdatesPage'));
 
 function PageFallback() {
   return (
@@ -54,19 +53,20 @@ function AppContent() {
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<Navigate replace to="/overview" />} />
-        <Route path="/overview" element={<Suspense fallback={<PageFallback />}><OverviewPage /></Suspense>} />
-        <Route path="/applications" element={<Suspense fallback={<PageFallback />}><ApplicationsPage /></Suspense>} />
-        <Route path="/updates" element={<Suspense fallback={<PageFallback />}><UpdatesPage /></Suspense>} />
-        <Route path="/marketplace" element={<Suspense fallback={<PageFallback />}><MarketplacePage /></Suspense>} />
-        <Route path="/devices" element={<Suspense fallback={<PageFallback />}><DevicesPage /></Suspense>} />
-        <Route path="/network" element={<Suspense fallback={<PageFallback />}><NetworkPage /></Suspense>} />
+        <Route index element={<Navigate replace to="/home" />} />
+        {Object.entries(routeAliases).map(([from, to]) => (
+          <Route element={<Navigate replace to={to} />} key={from} path={from} />
+        ))}
+        <Route path="/home" element={<Suspense fallback={<PageFallback />}><OverviewPage /></Suspense>} />
+        <Route path="/apps" element={<Suspense fallback={<PageFallback />}><ApplicationsPage /></Suspense>} />
+        <Route path="/discover" element={<Suspense fallback={<PageFallback />}><MarketplacePage /></Suspense>} />
+        <Route path="/access" element={<Suspense fallback={<PageFallback />}><NetworkPage /></Suspense>} />
         <Route path="/storage" element={<Suspense fallback={<PageFallback />}><StoragePage /></Suspense>} />
         <Route path="/backups" element={<Suspense fallback={<PageFallback />}><BackupsPage /></Suspense>} />
-        <Route path="/monitoring" element={<Suspense fallback={<PageFallback />}><MonitoringPage /></Suspense>} />
+        <Route path="/activity" element={<Suspense fallback={<PageFallback />}><MonitoringPage /></Suspense>} />
         <Route path="/automation" element={<Suspense fallback={<PageFallback />}><AutomationPreviewPage /></Suspense>} />
         <Route path="/settings" element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} />
-        <Route path="/terminal" element={<Suspense fallback={<PageFallback />}><SupportPage /></Suspense>} />
+        <Route path="/diagnostics" element={<Suspense fallback={<PageFallback />}><SupportPage /></Suspense>} />
       </Route>
     </Routes>
   );

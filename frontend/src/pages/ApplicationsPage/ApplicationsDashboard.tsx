@@ -187,29 +187,15 @@ export function ApplicationsDashboard({ accessByAppId, actionLoading, apps, heal
 
 function BasicApplicationsView({ accessByAppId, actionLoading, apps, healthByAppId, onAction, onManage, onRollback, onSearch, onSelect, onUninstall, onUpdate, reconciliation, search, selectedId, summary, telemetryByAppId, updateCount, updatesByAppId }: ApplicationsDashboardProps & { updateCount: number }) {
   const reconciliationByAppId = new Map((reconciliation?.apps || []).map((item) => [item.appId, item]));
-  const spotlight = selectSpotlightApp(apps, telemetryByAppId, accessByAppId, healthByAppId, reconciliationByAppId);
 
   return (
     <div className="grid gap-5">
-      {spotlight && (
-        <ApplicationSpotlight
-          access={accessByAppId[spotlight.appId]}
-          actionLoading={actionLoading}
-          app={spotlight}
-          health={healthByAppId[spotlight.appId] || spotlight.healthSnapshot}
-          onAction={onAction}
-          onManage={onManage}
-          reconciliation={reconciliationByAppId.get(spotlight.appId) || null}
-          telemetry={telemetryByAppId[spotlight.appId] || spotlight.telemetry}
-        />
-      )}
-
       <Card className="overflow-hidden border-white/10 bg-slate-950/45 py-0 text-slate-100 shadow-po-panel backdrop-blur-xl">
         <CardHeader className="border-b border-white/10 p-0">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4">
             <div>
               <h3 className="text-lg font-black text-white">Installed apps</h3>
-              <p className="mt-1 text-sm text-slate-400">Open what you use, or manage an app when something needs attention.</p>
+              <p className="mt-1 text-sm text-slate-400">Open what is ready. Use Manage for repair, backup, update, and advanced details.</p>
             </div>
             <div className="flex gap-2">
               <GlowCount label="Updates" value={updateCount} />
@@ -229,10 +215,6 @@ function BasicApplicationsView({ accessByAppId, actionLoading, apps, healthByApp
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
               <Input className="h-10 border-slate-800 bg-slate-950/60 pl-9 text-sm text-slate-100 placeholder:text-slate-600" onChange={(event) => onSearch(event.target.value)} placeholder="Search your apps..." type="search" value={search} />
             </label>
-            <Button className="h-10 border-slate-800 bg-slate-950/60 text-slate-300 hover:bg-slate-900 hover:text-white" type="button" variant="outline">
-              <Filter className="size-4" />
-              Filter
-            </Button>
           </div>
         </CardHeader>
 
@@ -276,53 +258,6 @@ function BasicApplicationsView({ accessByAppId, actionLoading, apps, healthByApp
   );
 }
 
-function ApplicationSpotlight({ access, actionLoading, app, health, onAction, onManage, reconciliation, telemetry }: Pick<AppActionProps, 'actionLoading' | 'onAction' | 'onManage'> & { access?: AppAccessCheck; app: AppRuntimeView; health?: AppHealthSnapshot | null; reconciliation?: PrivateAccessReconciliationItem | null; telemetry?: AppTelemetry | null }) {
-  const status = displayStatus(app, health);
-  const notice = appNotice(app, telemetry, access, health, reconciliation);
-  const reason = statusReason(app, telemetry, access, health, reconciliation);
-  const link = app.accessUrl || app.settings?.privateAccessUrl || app.settings?.accessUrl;
-  const busy = Boolean(actionLoading);
-
-  return (
-    <section className="relative overflow-hidden rounded-2xl border border-violet-300/18 bg-po-hero-app-spotlight p-5 shadow-po-brand-glow">
-      <div className="absolute right-8 top-4 size-40 rounded-full bg-violet-400/10 blur-3xl" />
-      <div className="relative z-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="flex min-w-0 gap-4">
-          <AppIcon app={app} large />
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-normal text-violet-200">App spotlight</p>
-            <h3 className="mt-1 truncate text-2xl font-black text-white">{spotlightHeadline(app, status)}</h3>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{notice || reason || app.description}</p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              <StatusPill status={status} />
-              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">{appTypeLabel(app)}</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300">Last backup {app.lastBackup || 'not recorded'}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 lg:justify-end">
-          {link && (
-            <Button asChild className="bg-violet-500 text-white hover:bg-violet-400">
-              <a href={link} rel="noreferrer" target="_blank">
-                <ExternalLink className="size-4" />
-                Open
-              </a>
-            </Button>
-          )}
-          <Button className="border-violet-300/25 bg-violet-950/40 text-violet-100 hover:bg-violet-900/60" onClick={() => onManage(app.appId)} type="button" variant="outline">
-            <Settings2 className="size-4" />
-            Manage
-          </Button>
-          <Button className="border-slate-600/60 bg-slate-950/40 text-slate-100 hover:bg-slate-900" disabled={busy} onClick={() => onAction(app.appId, 'restart')} type="button" variant="outline">
-            {actionLoading === 'restart' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
-            Restart
-          </Button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function ApplicationCard({ access, actionLoading, app, health, isSelected, onAction, onManage, onRollback, onSelect, onUninstall, onUpdate, reconciliation, telemetry, update }: AppActionProps & { access?: AppAccessCheck; health?: AppHealthSnapshot | null; isSelected: boolean; reconciliation?: PrivateAccessReconciliationItem | null; telemetry?: AppTelemetry | null; update?: AppUpdateStatus | null; onSelect: (appId: string) => void }) {
   const status = displayStatus(app, health);
   const notice = appNotice(app, telemetry, access, health, reconciliation);
@@ -347,8 +282,8 @@ function ApplicationCard({ access, actionLoading, app, health, isSelected, onAct
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <MiniMetric label="App link" value={accessLabel(access)} />
-        <MiniMetric label="Memory" value={memoryUsed(telemetry?.memoryUsage)} />
+        <MiniMetric label="Access" value={accessSummary(app, access)} />
+        <MiniMetric label="Backup" value={app.lastBackup || 'Not configured'} />
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -368,10 +303,6 @@ function ApplicationCard({ access, actionLoading, app, health, isSelected, onAct
         <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onManage(app.appId)} size="sm" type="button" variant="outline">
           <Settings2 className="size-4" />
           Manage
-        </Button>
-        <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={busy} onClick={() => onAction(app.appId, 'restart')} size="sm" type="button" variant="outline">
-          {actionLoading === 'restart' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
-          Restart
         </Button>
         <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onSelect(app.appId)} size="icon" type="button" variant="outline">
           <MoreHorizontal className="size-4" />
@@ -396,43 +327,20 @@ function GlowCount({ label, value, warning = false }: { label: string; value: nu
   );
 }
 
-function selectSpotlightApp(apps: AppRuntimeView[], telemetryByAppId: Record<string, AppTelemetry>, accessByAppId: Record<string, AppAccessCheck>, healthByAppId: Record<string, AppHealthSnapshot>, reconciliationByAppId: Map<string, PrivateAccessReconciliationItem>) {
-  if (!apps.length) {
-    return null;
+function accessSummary(app: AppRuntimeView, access?: AppAccessCheck) {
+  if (app.canonicalAccessState === 'private_ready') {
+    return 'Private link ready';
   }
-  const attentionApp = [...apps]
-    .sort((left, right) => appPriority(left, telemetryByAppId[left.appId], accessByAppId[left.appId], healthByAppId[left.appId] || left.healthSnapshot) - appPriority(right, telemetryByAppId[right.appId], accessByAppId[right.appId], healthByAppId[right.appId] || right.healthSnapshot))
-    .find((app) => {
-      const priority = appPriority(app, telemetryByAppId[app.appId], accessByAppId[app.appId], healthByAppId[app.appId] || app.healthSnapshot);
-      const reconciliation = reconciliationByAppId.get(app.appId);
-      return priority <= 2 || Boolean(reconciliation && !['healthy', 'waiting'].includes(reconciliation.status));
-    });
-  if (attentionApp) {
-    return attentionApp;
+  if (app.canonicalAccessState === 'local_ready') {
+    return 'Local link ready';
   }
-  const recentPrivateApp = [...apps]
-    .filter((app) => app.settings?.tailscaleEnabled || app.desiredAccess?.privateAccessRecommended || app.desiredAccess?.privateAccessRequired)
-    .sort((left, right) => new Date(right.installedAt).getTime() - new Date(left.installedAt).getTime())[0];
-  if (recentPrivateApp) {
-    return recentPrivateApp;
+  if (access?.status === 'reachable') {
+    return 'Responding';
   }
-  return [...apps].sort((left, right) => new Date(right.installedAt).getTime() - new Date(left.installedAt).getTime())[0];
-}
-
-function spotlightHeadline(app: AppRuntimeView, status: string) {
-  if (status === 'Needs attention' || status === 'Unavailable') {
-    return `${app.appName} needs attention`;
+  if (access?.status === 'unreachable') {
+    return 'Not responding';
   }
-  if (status === 'Starting') {
-    return `${app.appName} is starting`;
-  }
-  if (status === 'Paused') {
-    return `${app.appName} is paused`;
-  }
-  if (app.settings?.tailscaleEnabled || app.desiredAccess?.privateAccessRecommended || app.desiredAccess?.privateAccessRequired) {
-    return `${app.appName} is available privately`;
-  }
-  return `${app.appName} is ready`;
+  return 'Not ready';
 }
 
 export function EmptyState() {
@@ -443,9 +351,9 @@ export function EmptyState() {
           <Archive className="size-7" />
         </div>
         <h3 className="mt-5 text-2xl font-bold text-white">No apps yet</h3>
-        <p className="mt-2 text-slate-400">Choose an app from the Marketplace and it will show up here with quick actions, status, and settings.</p>
+        <p className="mt-2 text-slate-400">Choose an app from Discover and it will show up here with quick actions, status, and settings.</p>
         <Button asChild className="mt-5 bg-violet-600 text-white hover:bg-violet-500">
-          <Link to="/marketplace">Browse apps</Link>
+            <Link to="/discover">Browse apps</Link>
         </Button>
       </div>
     </div>
@@ -505,7 +413,7 @@ function ExpandedAppManagement({ access, app, actionLoading, health, onAction, o
             Restart
           </Button>
           <Button asChild className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" variant="outline">
-            <Link to="/network">Manage access</Link>
+            <Link to="/access">Manage access</Link>
           </Button>
           <Button asChild className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" variant="outline">
             <Link to="/backups">Backups</Link>

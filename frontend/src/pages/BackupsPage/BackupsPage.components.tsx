@@ -100,7 +100,7 @@ export function ActionCard({ busy, description, disabled = false, icon: Icon, la
 
 export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRestore, onVerify, points, running }: { apps: AppBackupStatus[]; latestRestore: RestorePoint | null; nextRun: string | null; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; points: RestorePoint[]; running: string | null }) {
   if (!points.length) {
-    return <EmptyState title="No routine restore points yet" message="Run a routine backup to create the first visual timeline point." />;
+    return <EmptyState title="No restore points yet" message="Run a routine backup after installing an app to create the first restore point." />;
   }
   return (
     <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900/35 p-4">

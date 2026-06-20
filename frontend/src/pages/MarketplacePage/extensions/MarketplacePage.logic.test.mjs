@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   marketplaceVisibleApps,
   optionsFromInstalledSettings,
+  starterCatalogForDiscover,
   starterAppsForMarketplace,
 } from './MarketplacePage.logic.js';
 
@@ -79,6 +80,19 @@ test('starterAppsForMarketplace marks blocked and storage-review recommendations
   assert.equal(recommendations[1].app.id, 'jellyfin');
   assert.equal(recommendations[1].readiness, 'review');
   assert.match(recommendations[1].notes.join(' '), /Storage is tight/);
+});
+
+test('starterCatalogForDiscover keeps the basic catalog focused on ready starter apps', () => {
+  const apps = [
+    app({ id: 'advanced', name: 'Advanced App', difficulty: 'Advanced', supportLevel: 'Advanced' }),
+    app({ id: 'vaultwarden', name: 'Vaultwarden', category: 'Security', supportLevel: 'Ready' }),
+    app({ id: 'jellyfin', name: 'Jellyfin', supportLevel: 'Ready' }),
+    app({ id: 'homepage', name: 'Homepage', category: 'Utilities', supportLevel: 'Ready' }),
+    app({ id: 'immich', name: 'Immich', supportLevel: 'Needs testing' }),
+    app({ id: 'easy-ready', name: 'Easy Ready', supportLevel: 'Ready' }),
+  ];
+
+  assert.deepEqual(starterCatalogForDiscover(apps).map((item) => item.id), ['vaultwarden', 'jellyfin', 'homepage', 'immich', 'easy-ready']);
 });
 
 test('optionsFromInstalledSettings preserves installed app choices for reinstall', () => {

@@ -92,9 +92,9 @@ export function MarketplaceAppDetail({ app, installedApp, installLocked, install
         <div className="flex flex-wrap gap-2">
           {isInstalled ? (
             <Button asChild className="bg-emerald-500 text-slate-950 hover:bg-emerald-400">
-              <Link to="/applications">
+              <Link to="/apps">
                 <CheckCircle2 className="size-4" />
-                View in Applications
+                View in My Apps
               </Link>
             </Button>
           ) : (
@@ -361,7 +361,7 @@ function InstalledAppNotice({ app }: { app: AppRuntimeView | null }) {
         <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" />
         <div className="min-w-0">
           <h4 className="font-bold text-white">Already installed</h4>
-          <p className="mt-1 text-sm text-emerald-100/80">{app.appName} is already managed by Project OS. Use Applications for day-to-day settings, repairs, and app status.</p>
+          <p className="mt-1 text-sm text-emerald-100/80">{app.appName} is already managed by Project OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {app.accessUrl && (
               <Button asChild className="bg-emerald-500 text-slate-950 hover:bg-emerald-400" size="sm">
@@ -369,7 +369,7 @@ function InstalledAppNotice({ app }: { app: AppRuntimeView | null }) {
               </Button>
             )}
             <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
-              <Link to="/applications">Manage in Applications</Link>
+              <Link to="/apps">Manage in My Apps</Link>
             </Button>
           </div>
         </div>
@@ -412,7 +412,7 @@ function InlineInstallStatus({ installing, result }: { installing: boolean; resu
               </Button>
             )}
             <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
-              <Link to="/applications">View in Applications</Link>
+              <Link to="/apps">View in My Apps</Link>
             </Button>
           </div>
         </div>

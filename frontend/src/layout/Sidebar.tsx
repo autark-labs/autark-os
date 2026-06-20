@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react';
 import {
   Archive,
-  Bot,
   Boxes,
   ChevronLeft,
   ChevronRight,
   CircleGauge,
   Database,
-  HardDrive,
   MonitorDot,
   Network,
   Settings,
   SquareTerminal,
   StoreIcon,
-  UploadCloud,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -22,11 +19,12 @@ import { ViewModeToggle } from '@/components/project-os/ProjectOSComponents';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import type { ProjectVersionInfo, SystemSetupStatus } from '@/types/system';
+import { navigationGroups } from './navigationModel';
 
 type NavItem = {
   label: string;
   to: string;
-  icon: LucideIcon;
+  icon: string;
   activePaths?: string[];
 };
 
@@ -35,44 +33,17 @@ type NavGroup = {
   items: NavItem[];
 };
 
-const navGroups: NavGroup[] = [
-  {
-    items: [
-      { label: 'Home', to: '/overview', icon: CircleGauge },
-    ],
-  },
-  {
-    label: 'My Homelab',
-    items: [
-      { label: 'Applications', to: '/applications', icon: Boxes },
-      { label: 'Marketplace', to: '/marketplace', icon: StoreIcon },
-      { label: 'Files & Storage', to: '/storage', icon: Database },
-      { label: 'Devices', to: '/devices', icon: HardDrive },
-      { label: 'Access Map', to: '/network', icon: Network },
-    ],
-  },
-  {
-    label: 'Protection',
-    items: [
-      { label: 'Backups', to: '/backups', icon: Archive },
-      { label: 'Updates', to: '/updates', icon: UploadCloud },
-    ],
-  },
-  {
-    label: 'Automation',
-    items: [
-      { label: 'Automation', to: '/automation', icon: Bot },
-      { label: 'System Activity', to: '/monitoring', icon: MonitorDot },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { label: 'Settings', to: '/settings', icon: Settings },
-      { label: 'Safe Diagnostics', to: '/terminal', icon: SquareTerminal },
-    ],
-  },
-];
+const navIcons: Record<string, LucideIcon> = {
+  access: Network,
+  activity: MonitorDot,
+  apps: Boxes,
+  backups: Archive,
+  diagnostics: SquareTerminal,
+  discover: StoreIcon,
+  home: CircleGauge,
+  settings: Settings,
+  storage: Database,
+};
 
 type SidebarProps = {
   collapsed: boolean;
@@ -112,13 +83,14 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const deviceName = settings?.deviceName || setup?.runAsUser || 'Project OS';
   const versionLabel = version?.version ? `v${version.version}` : 'Version unknown';
   const updateCurrent = version?.updateStatus === 'current' || !version?.updateStatus;
+  const navGroups = navigationGroups(viewMode) as NavGroup[];
 
   return (
     <aside className={cn(
-      'sticky top-0 flex h-auto flex-col border-r border-po-border bg-po-sidebar shadow-po-sidebar backdrop-blur-xl transition-[padding] duration-300 lg:h-screen',
-      collapsed ? 'items-center p-2' : 'p-3',
+      'z-30 flex h-auto flex-col border-b border-po-border bg-po-sidebar shadow-po-sidebar backdrop-blur-xl transition-[padding] duration-300 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r',
+      collapsed ? 'lg:items-center p-2' : 'p-3',
     )}>
-      <div className={cn('mb-4 flex w-full items-center gap-3', collapsed ? 'justify-center px-0' : 'px-1')}>
+      <div className={cn('mb-3 flex w-full items-center gap-3 lg:mb-4', collapsed ? 'lg:justify-center px-0' : 'px-1')}>
         <div className={cn('grid place-items-center rounded-po-md bg-po-brand-gradient font-black text-white shadow-po-brand-glow', collapsed ? 'size-9 text-sm' : 'size-10')}>
           P
         </div>
@@ -131,7 +103,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       <button
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className={cn(
-          'mb-4 inline-flex items-center justify-center rounded-po-sm border border-po-border bg-po-surface-inset text-po-text-muted transition hover:border-po-border-accent hover:bg-po-surface-hover hover:text-po-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand',
+          'mb-4 hidden items-center justify-center rounded-po-sm border border-po-border bg-po-surface-inset text-po-text-muted transition hover:border-po-border-accent hover:bg-po-surface-hover hover:text-po-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand lg:inline-flex',
           collapsed ? 'size-9' : 'h-8 w-full gap-2',
         )}
         onClick={onToggleCollapse}
@@ -142,12 +114,12 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {!collapsed && <span className="text-xs font-semibold">Collapse</span>}
       </button>
 
-      <nav className={cn('grid overflow-y-auto', collapsed ? 'gap-2 px-0' : 'gap-4 pr-1')} aria-label="Primary navigation">
+      <nav className={cn('flex gap-2 overflow-x-auto pb-1 lg:grid lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0', collapsed ? 'lg:gap-2 lg:px-0' : 'lg:gap-4 lg:pr-1')} aria-label="Primary navigation">
         {navGroups.map((group, groupIndex) => (
-          <div className={cn('grid', collapsed ? 'gap-2' : 'gap-1.5')} key={group.label || `group-${groupIndex}`}>
-            {!collapsed && group.label && <p className="mb-1 px-3 text-[0.68rem] font-bold uppercase tracking-normal text-po-text-disabled">{group.label}</p>}
+          <div className={cn('contents lg:grid', collapsed ? 'lg:gap-2' : 'lg:gap-1.5')} key={group.label || `group-${groupIndex}`}>
+            {!collapsed && group.label && <p className="mb-1 hidden px-3 text-[0.68rem] font-bold uppercase tracking-normal text-po-text-disabled lg:block">{group.label}</p>}
             {group.items.map((item) => {
-              const Icon = item.icon;
+              const Icon = navIcons[item.icon] || CircleGauge;
               const isActive = item.activePaths?.includes(location.pathname);
 
               return (
@@ -155,8 +127,8 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   aria-label={item.label}
                   className={({ isActive: navActive }) =>
                     cn(
-                      'group flex min-h-9 items-center rounded-po-sm text-sm font-medium text-po-text-secondary no-underline transition hover:bg-po-surface-hover hover:text-po-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand',
-                      collapsed ? 'w-10 justify-center px-0' : 'gap-3 px-3',
+                      'group flex min-h-9 shrink-0 items-center rounded-po-sm text-sm font-medium text-po-text-secondary no-underline transition hover:bg-po-surface-hover hover:text-po-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand',
+                      collapsed ? 'lg:w-10 lg:justify-center lg:px-0 gap-2 px-3' : 'gap-3 px-3',
                       (navActive || isActive) &&
                         'bg-po-brand-gradient text-white shadow-po-brand-glow',
                     )
@@ -176,7 +148,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                       >
                         <Icon className="size-4" />
                       </span>
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      <span className={cn('truncate', collapsed && 'lg:hidden')}>{item.label}</span>
                     </>
                   )}
                 </NavLink>
@@ -187,7 +159,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       </nav>
 
       {collapsed ? (
-        <div className="mt-6 grid gap-3 lg:mt-auto">
+        <div className="mt-6 hidden gap-3 lg:mt-auto lg:grid">
           <button
             aria-label={`Switch to ${viewMode === 'advanced' ? 'Basic' : 'Advanced'} view`}
             className="grid size-9 place-items-center rounded-po-sm border border-po-border bg-po-surface-inset text-[0.68rem] font-bold text-po-text-secondary transition hover:border-po-border-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand"
@@ -199,7 +171,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           </button>
           <div className={cn('mx-auto size-2 rounded-full', setupReady ? 'bg-po-success shadow-po-success-glow' : 'bg-po-warning shadow-po-warning-glow')} title={setupReady ? 'Ready for your apps' : 'Setup needs attention'} />
         </div>
-      ) : <div className="mt-6 rounded-po-lg border border-po-border bg-po-surface p-3 shadow-po-sm lg:mt-auto">
+      ) : <div className="mt-6 hidden rounded-po-lg border border-po-border bg-po-surface p-3 shadow-po-sm lg:mt-auto lg:block">
         <div className="flex items-start gap-3">
           <div className="grid size-9 shrink-0 place-items-center rounded-po-sm bg-po-info/10 text-po-info">
             <SquareTerminal className="size-4" />

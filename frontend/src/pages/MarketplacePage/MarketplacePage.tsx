@@ -19,6 +19,7 @@ import { MarketplaceAPIClient } from '@/api/MarketplaceAPIClient';
 import { MarketplaceInstallClient } from '@/api/MarketplaceInstallClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { poButtonClass, poCardClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
@@ -32,6 +33,7 @@ import {
   formatMarketplaceActivityTime,
   marketplaceActivityTone,
   marketplaceVisibleApps,
+  starterCatalogForDiscover,
   optionsFromInstalledSettings,
   starterAppsForMarketplace,
 } from './extensions/MarketplacePage.logic';
@@ -46,6 +48,7 @@ type StarterRecommendation = {
 };
 
 function MarketplacePage() {
+  const { showAdvancedMetrics } = useProjectSettings();
   const [searchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedAppId, setSelectedAppId] = useState('vaultwarden');
@@ -65,10 +68,11 @@ function MarketplacePage() {
   const [installResult, setInstallResult] = useState<InstallResult | null>(null);
   const [marketplaceActivity, setMarketplaceActivity] = useState<ActivityLog[]>([]);
   const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
-  const selectedApp = useMemo(() => apps.find((app) => app.id === selectedAppId) ?? apps[0], [apps, selectedAppId]);
   const recoveryAppId = searchParams.get('app');
   const recoveryMode = searchParams.get('mode');
   const installedById = useMemo(() => new Map(installedApps.map((app) => [app.appId, app])), [installedApps]);
+  const catalogApps = useMemo(() => showAdvancedMetrics ? apps : starterCatalogForDiscover(apps), [apps, showAdvancedMetrics]);
+  const selectedApp = useMemo(() => apps.find((app) => app.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, selectedAppId]);
   const selectedInstalledApp = selectedApp ? installedById.get(selectedApp.id) ?? null : null;
 
   const loadApps = useCallback(async () => {
@@ -139,6 +143,13 @@ function MarketplacePage() {
   }, [apps, recoveryAppId]);
 
   useEffect(() => {
+    if (!showAdvancedMetrics) {
+      setSelectedCategory('All');
+      setSelectedAppId((currentAppId) => catalogApps.some((app) => app.id === currentAppId) ? currentAppId : catalogApps[0]?.id ?? currentAppId);
+    }
+  }, [catalogApps, showAdvancedMetrics]);
+
+  useEffect(() => {
     setInstallPlan(null);
     setInstallResult(null);
     const app = apps.find((nextApp) => nextApp.id === selectedAppId);
@@ -192,7 +203,7 @@ function MarketplacePage() {
   }
 
   const visibleApps = marketplaceVisibleApps({
-    apps,
+    apps: catalogApps,
     hideInstalled,
     installedAppIds: new Set(installedById.keys()),
     searchQuery,
@@ -223,7 +234,7 @@ function MarketplacePage() {
     return (
       <PageShell>
         {marketplaceError ? (
-          <PageErrorState message={marketplaceError} onRetry={loadApps} title="Marketplace catalog could not load" />
+          <PageErrorState message={marketplaceError} onRetry={loadApps} title="Discover catalog could not load" />
         ) : (
           <PageLoadingState label="Loading marketplace" sublabel="Checking the catalog, installed apps, and recent marketplace activity." />
         )}
@@ -240,8 +251,10 @@ function MarketplacePage() {
             <Sparkles className="size-6" />
           </span>
           <div>
-          <h2 className="text-4xl font-bold leading-none text-white md:text-5xl">Marketplace</h2>
-          <p className="mt-3 max-w-3xl text-slate-300">Add useful self-hosted apps by what they help you do. Project OS keeps the normal install simple and leaves advanced choices available when you need them.</p>
+          <h2 className="text-3xl font-bold leading-none text-white md:text-4xl">Discover</h2>
+          <p className="mt-3 max-w-3xl text-slate-300">
+            Start with a short list of ready self-hosted apps. Advanced mode shows the broader catalog when you want more choices.
+          </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
@@ -257,11 +270,11 @@ function MarketplacePage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72 border-slate-700 bg-slate-950 text-slate-100">
-              <DropdownMenuLabel>Marketplace activity</DropdownMenuLabel>
+              <DropdownMenuLabel>Discover activity</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-800" />
               <div className="grid max-h-80 gap-2 overflow-y-auto px-2 py-1.5 text-sm">
                 <div className="rounded-md border border-slate-800 bg-slate-900/60 p-2 text-xs text-slate-400">
-                  {apps.length} apps ready - Last checked {lastRefreshAt ? lastRefreshAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not yet'}
+                  {catalogApps.length} apps shown - Last checked {lastRefreshAt ? lastRefreshAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not yet'}
                 </div>
                 {marketplaceActivity.length ? marketplaceActivity.map((event) => (
                   <div className="rounded-md border border-slate-800 bg-slate-900/50 p-2" key={event.id}>
@@ -274,7 +287,7 @@ function MarketplacePage() {
                   </div>
                 )) : (
                   <div className="rounded-md border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-400">
-                    No marketplace activity has been recorded yet.
+                    No Discover activity has been recorded yet.
                   </div>
                 )}
               </div>
@@ -284,7 +297,7 @@ function MarketplacePage() {
         </div>
       </header>
 
-      {marketplaceError && <PageErrorState className="mb-5" message={marketplaceError} onRetry={loadApps} title="Marketplace action needs attention" />}
+      {marketplaceError && <PageErrorState className="mb-5" message={marketplaceError} onRetry={loadApps} title="Discover action needs attention" />}
       <InstallJobBanner installJob={installJob} selectedAppId={selectedApp.id} />
 
       {starterRecommendations.length > 0 && (
@@ -299,12 +312,12 @@ function MarketplacePage() {
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
           <Input className="h-13 border-slate-700/40 bg-slate-900/70 pl-11 text-white placeholder:text-slate-500 focus-visible:border-violet-300 focus-visible:ring-violet-700/30" onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name, purpose, or category..." type="search" value={searchQuery} />
         </label>
-        <div aria-label="Marketplace categories" className="flex flex-wrap items-center gap-2">
+        <div aria-label="Discover filters" className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 text-sm text-slate-500">
             <Filter className="size-4" />
-            Show
+            {showAdvancedMetrics ? 'Show' : 'Starter catalog'}
           </span>
-          {categories.map((category) => (
+          {showAdvancedMetrics && categories.map((category) => (
             <Button className={cn('h-9 border-slate-700/40 bg-slate-900/65 px-4 text-slate-300 hover:bg-slate-800 hover:text-white', selectedCategory === category && 'border-violet-300/40 bg-violet-600/20 text-violet-200 hover:bg-violet-600/25')} key={category} onClick={() => setSelectedCategory(category)} type="button" variant="outline">
               {category}
             </Button>
@@ -316,7 +329,7 @@ function MarketplacePage() {
       </div>
 
       <div className="grid items-start gap-6 2xl:grid-cols-[minmax(620px,1fr)_minmax(420px,560px)]">
-        <MarketplaceAppList apps={visibleApps} installedAppIds={new Set(installedById.keys())} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
+        <MarketplaceAppList apps={visibleApps} installedAppIds={new Set(installedById.keys())} modeLabel={showAdvancedMetrics ? 'All apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
         <MarketplaceAppDetail app={selectedApp} installLocked={selectedAppInstallLocked} installOptions={installOptions ?? defaultInstallOptions(selectedApp)} installResult={installResult} installStatusMessage={installStatusMessage} installing={selectedAppInstalling} installPlan={installPlan} installedApp={selectedInstalledApp} onBack={() => { setSearchQuery(''); setSelectedCategory('All'); }} onInstall={(options) => installApp(selectedApp.id, options)} onOptionsChange={setInstallOptions} onReinstallCurrent={reinstallWithCurrentSettings} onRequestPlan={(options) => requestPlan(selectedApp.id, options)} onResetReinstall={resetAndReinstall} planLoading={planLoading} recoveryMode={recoveryAppId === selectedApp.id ? recoveryMode : null} />
       </div>
     </PageShell>

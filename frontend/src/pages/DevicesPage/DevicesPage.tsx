@@ -168,7 +168,7 @@ function DevicesPage() {
               <h2 className="font-black text-white">Connect Tailscale to see trusted devices</h2>
               <p className="mt-1 text-sm text-amber-100/80">Project OS uses Tailscale to know which personal devices can reach private app links.</p>
               <Button asChild className="mt-4 border-amber-300/30 bg-slate-950/50 text-amber-100 hover:bg-slate-900" variant="outline">
-                <Link to="/network">Open network setup <ChevronRight className="size-4" /></Link>
+                <Link to="/access">Open Access setup <ChevronRight className="size-4" /></Link>
               </Button>
             </div>
           </div>

@@ -143,7 +143,7 @@ export function PrivateAccessManager({
               </div>
             ))
           )}
-          {localApps.length > 5 && <p className="text-xs text-slate-500">{localApps.length - 5} more app(s) can be managed from Applications.</p>}
+          {localApps.length > 5 && <p className="text-xs text-slate-500">{localApps.length - 5} more app(s) can be managed from My Apps.</p>}
           {!tailscale?.connected && <p className="text-xs text-amber-200">Connect Project OS to Tailscale before enabling private app links.</p>}
         </CardContent>
       </Card>

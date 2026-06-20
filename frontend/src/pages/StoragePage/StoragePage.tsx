@@ -115,7 +115,7 @@ function StoragePage() {
           <div className="flex min-w-0 flex-col justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-normal text-emerald-300">Storage</p>
-              <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-5xl">{storageHero.title}</h1>
+              <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">{storageHero.title}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 md:text-base">{storageHero.summary}</p>
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -186,7 +186,9 @@ function StoragePage() {
               <SurfacePanel>
                 <SectionHeader compact icon={Info} title="Needs attention" />
                 <div className="mt-4 grid gap-3">
-                  {report.recommendations.map((recommendation) => <RecommendationCard key={recommendation.id} recommendation={recommendation} />)}
+                  {report.recommendations.length ? report.recommendations.map((recommendation) => <RecommendationCard key={recommendation.id} recommendation={recommendation} />) : (
+                    <EmptyState compact title="No storage issues" message="Project OS did not find anything that needs storage cleanup right now." />
+                  )}
                 </div>
               </SurfacePanel>
 

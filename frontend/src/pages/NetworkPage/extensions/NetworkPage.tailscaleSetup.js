@@ -53,7 +53,7 @@ export function tailscaleSetupTasks({ tailscale, setup = null, reconciliation = 
       title: 'Install Tailscale',
       detail: 'Private app links need Tailscale installed on this Project OS host.',
       primaryAction: { label: 'Install Tailscale', href: 'https://tailscale.com/download' },
-      secondaryAction: { label: 'Set up later', href: '/network' },
+      secondaryAction: { label: 'Set up later', href: '/access' },
     });
     return tasks;
   }
@@ -65,7 +65,7 @@ export function tailscaleSetupTasks({ tailscale, setup = null, reconciliation = 
       title: 'Connect Project OS to Tailscale',
       detail: tailscale.message || 'Sign in or create a Tailscale account to enable private app links from trusted devices.',
       primaryAction: { label: 'Create or sign in', href: 'https://login.tailscale.com/start' },
-      secondaryAction: { label: 'Set up later', href: '/network' },
+      secondaryAction: { label: 'Set up later', href: '/access' },
     });
     return tasks;
   }
@@ -75,7 +75,7 @@ export function tailscaleSetupTasks({ tailscale, setup = null, reconciliation = 
     status: 'ok',
     title: tailscale.loginName ? `Signed in as ${tailscale.loginName}` : 'Tailscale is connected',
     detail: tailscale.dnsName || tailscale.deviceName || 'This Project OS host is connected to your private network.',
-    primaryAction: { label: 'View devices', href: '/network' },
+    primaryAction: { label: 'View devices', href: '/access' },
   });
 
   tasks.push({
@@ -104,7 +104,7 @@ export function tailscaleSetupTasks({ tailscale, setup = null, reconciliation = 
       status: 'neutral',
       title: 'Review stale private links',
       detail: `${staleCount} Tailscale Serve ${staleCount === 1 ? 'mapping no longer matches' : 'mappings no longer match'} an app that wants private access.`,
-      primaryAction: { label: 'Review stale links', href: '/network' },
+      primaryAction: { label: 'Review stale links', href: '/access' },
     });
   }
 

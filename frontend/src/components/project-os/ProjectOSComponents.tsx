@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, Sparkles, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/collapsible';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
+import type { ProjectOsAction, ProjectOsIssue } from '@/types/app';
 
 type Tone = 'brand' | 'success' | 'warning' | 'danger' | 'info' | 'teal' | 'neutral';
 type PageAccent =
@@ -255,6 +256,154 @@ export function StatusPulse({
       </span>
     </div>
   );
+}
+
+export function StatusPill({
+  children,
+  className,
+  tone = 'neutral',
+}: {
+  children: ReactNode;
+  className?: string;
+  tone?: Tone;
+}) {
+  return (
+    <span className={cn('inline-flex min-h-7 items-center rounded-po-full border px-2.5 py-1 text-xs font-semibold', toneClasses[tone].badge, className)}>
+      {children}
+    </span>
+  );
+}
+
+export function ProjectOsActionButton({
+  action,
+  className,
+  fallbackRoute,
+  variant = 'default',
+}: {
+  action?: ProjectOsAction | null;
+  className?: string;
+  fallbackRoute?: string;
+  variant?: 'default' | 'outline' | 'secondary';
+}) {
+  if (!action && !fallbackRoute) {
+    return null;
+  }
+  const label = typeof action?.label === 'string' ? action.label : 'Open';
+  const route = typeof action?.route === 'string' ? action.route : fallbackRoute;
+  const href = typeof action?.href === 'string' ? action.href : undefined;
+  if (route) {
+    return (
+      <Button asChild className={className} size="sm" variant={variant}>
+        <Link to={route}>{label}</Link>
+      </Button>
+    );
+  }
+  if (href) {
+    return (
+      <Button asChild className={className} size="sm" variant={variant}>
+        <a href={href} rel="noreferrer" target={href.startsWith('http') ? '_blank' : undefined}>{label}</a>
+      </Button>
+    );
+  }
+  return (
+    <Button className={className} disabled size="sm" type="button" variant={variant}>
+      {label}
+    </Button>
+  );
+}
+
+export function IssueBanner({
+  className,
+  issue,
+}: {
+  className?: string;
+  issue: ProjectOsIssue;
+}) {
+  const tone = issueTone(issue.severity);
+  const Icon = issueIcon(issue.severity);
+  return (
+    <div className={cn('flex flex-col gap-3 rounded-po-md border p-3 sm:flex-row sm:items-start sm:justify-between', toneClasses[tone].badge, className)}>
+      <div className="flex min-w-0 gap-3">
+        <div className={cn('grid size-9 shrink-0 place-items-center rounded-po-sm', toneClasses[tone].icon)}>
+          <Icon className="size-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="m-0 text-sm font-bold">{issue.title}</p>
+          <p className="m-0 mt-1 text-sm leading-5 opacity-80">{issue.summary}</p>
+        </div>
+      </div>
+      {issue.primaryAction && (
+        <div className="shrink-0">
+          <ProjectOsActionButton action={issue.primaryAction} variant="secondary" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function PrimaryActionCard({
+  action,
+  body,
+  className,
+  dismissible = false,
+  severity = 'info',
+  title,
+}: {
+  action?: ProjectOsAction | null;
+  body: ReactNode;
+  className?: string;
+  dismissible?: boolean;
+  severity?: string;
+  title: ReactNode;
+}) {
+  const tone = issueTone(severity);
+  const Icon = issueIcon(severity);
+  return (
+    <SoftCard className={cn('relative overflow-hidden', toneClasses[tone].glow, className)}>
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="flex min-w-0 gap-3">
+          <div className={cn('grid size-11 shrink-0 place-items-center rounded-po-md', toneClasses[tone].icon)}>
+            <Icon className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="m-0 text-base font-bold text-po-text">{title}</p>
+            <p className="m-0 mt-1 text-sm leading-6 text-po-text-muted">{body}</p>
+            {dismissible && <p className="m-0 mt-1 text-xs text-po-text-disabled">You can dismiss this after reviewing it.</p>}
+          </div>
+        </div>
+        <ProjectOsActionButton action={action} className="w-full sm:w-auto" />
+      </div>
+    </SoftCard>
+  );
+}
+
+function issueTone(severity?: string): Tone {
+  if (severity === 'success') {
+    return 'success';
+  }
+  if (severity === 'critical') {
+    return 'danger';
+  }
+  if (severity === 'warning') {
+    return 'warning';
+  }
+  if (severity === 'info') {
+    return 'info';
+  }
+  return 'neutral';
+}
+
+function issueIcon(severity?: string): LucideIcon {
+  if (severity === 'success') {
+    return CheckCircle2;
+  }
+  if (severity === 'critical') {
+    return XCircle;
+  }
+  if (severity === 'warning') {
+    return AlertTriangle;
+  }
+  return Info;
 }
 
 export function GlowBadge({

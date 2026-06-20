@@ -192,7 +192,7 @@ function BackupsPage() {
           <div className="flex min-w-0 flex-col justify-between">
             <div>
               <p className="text-xs font-black uppercase tracking-normal text-violet-300">Backups</p>
-              <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-5xl">{protectionHero.title}</h1>
+              <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">{protectionHero.title}</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 md:text-base">{protectionHero.summary}</p>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
@@ -200,10 +200,10 @@ function BackupsPage() {
                 {running === 'routine' ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
                 Run routine backup
               </Button>
-              <Button className="border-violet-300/30 bg-slate-950/50 text-violet-100 hover:bg-slate-900" disabled={running === 'full'} onClick={() => void runFullBackup()} type="button" variant="outline">
+              {showAdvancedMetrics && <Button className="border-violet-300/30 bg-slate-950/50 text-violet-100 hover:bg-slate-900" disabled={running === 'full'} onClick={() => void runFullBackup()} type="button" variant="outline">
                 {running === 'full' ? <Loader2 className="size-4 animate-spin" /> : <Layers3 className="size-4" />}
                 Full checkpoint
-              </Button>
+              </Button>}
               <RefreshStatus intervalLabel={restorePoint || running ? 'Auto-update paused' : 'Auto-updates every 30s'} onRefresh={() => void load(true)} refreshing={refreshing} updatedAt={updatedAt} />
             </div>
           </div>
@@ -220,7 +220,7 @@ function BackupsPage() {
             <SurfacePanel>
               <SectionHeader icon={DatabaseBackup} title="Create a manual backup" description="Choose the smallest backup that matches what you are about to do." />
               <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                <ActionCard
+                {showAdvancedMetrics && <ActionCard
                   busy={running === 'full'}
                   description="One restore point for every supported installed app."
                   icon={Layers3}
@@ -228,7 +228,7 @@ function BackupsPage() {
                   onClick={() => void runFullBackup()}
                   title="Back up everything"
                   tone="violet"
-                />
+                />}
                 <ActionCard
                   busy={false}
                   description="Use an app card below when you only need one app."
@@ -300,7 +300,7 @@ function BackupsPage() {
             <SurfacePanel>
               <SectionHeader compact icon={AlertTriangle} title="Needs attention" />
               <div className="mt-4 grid gap-3">
-                {needsAttention.length ? needsAttention.map((app) => <AttentionCard app={app} key={app.appId} />) : <EmptyState compact title="All protected" message="Installed apps have backup protection enabled." />}
+                {needsAttention.length ? needsAttention.map((app) => <AttentionCard app={app} key={app.appId} />) : <EmptyState compact title={report.totalApps ? 'All protected' : 'No apps installed'} message={report.totalApps ? 'Installed apps have backup protection enabled.' : 'Install an app before backup protection can begin.'} />}
               </div>
             </SurfacePanel>
           </aside>

@@ -21,18 +21,19 @@ import { AppImage, SupportBadge, VerifiedBadge } from './MarketplacePage.shared'
 type MarketplaceAppListProps = {
   apps: MarketplaceApp[];
   installedAppIds: Set<string>;
+  modeLabel?: string;
   selectedAppId: string;
   sortBy: string;
   onSelect: (appId: string) => void;
   onSortChange: (value: string) => void;
 };
 
-export function MarketplaceAppList({ apps, installedAppIds, selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
+export function MarketplaceAppList({ apps, installedAppIds, modeLabel = 'All apps', selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
   return (
     <Card className="rounded-lg border-white/10 bg-slate-900/55 py-0 text-slate-100 shadow-po-panel">
       <CardHeader className="flex flex-row items-center justify-between gap-4 p-5">
         <div>
-          <CardTitle className="text-lg font-bold text-white">All apps</CardTitle>
+          <CardTitle className="text-lg font-bold text-white">{modeLabel}</CardTitle>
           <p className="mt-1 text-sm text-slate-400">{apps.length} available</p>
         </div>
         <DropdownMenu>

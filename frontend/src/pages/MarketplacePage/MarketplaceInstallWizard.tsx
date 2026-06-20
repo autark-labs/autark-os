@@ -291,7 +291,7 @@ function expectedSetupText(app: MarketplaceApp) {
   if (app.health.type === 'no-web-ui' || app.health.type === 'container') {
     return 'Project OS will check that the background service is running; there may not be a normal web page to open.';
   }
-  return 'Project OS will start the app, check its local link, and keep watching it from Applications.';
+  return 'Project OS will start the app, check its local link, and keep watching it from My Apps.';
 }
 
 function privateHttpsFailed(result: InstallResult) {

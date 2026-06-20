@@ -149,7 +149,7 @@ export function OnboardingCard({ steps }: { steps: string[] }) {
         ))}
       </ol>
       <Button asChild className="mt-4 w-full border-cyan-300/25 bg-slate-950/50 text-cyan-100 hover:bg-slate-900" variant="outline">
-        <Link to="/network">Open network setup <ChevronRight className="size-4" /></Link>
+        <Link to="/access">Open Access setup <ChevronRight className="size-4" /></Link>
       </Button>
     </SurfacePanel>
   );
@@ -164,7 +164,7 @@ export function PrivateAppsCard({ apps, reconciliation }: { apps: AppRuntimeView
           <p className="mt-1 text-sm text-slate-400">Apps your trusted devices should be able to reach.</p>
         </div>
         <Button asChild className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" variant="outline">
-          <Link to="/network">Manage <ExternalLink className="size-3.5" /></Link>
+          <Link to="/access">Manage <ExternalLink className="size-3.5" /></Link>
         </Button>
       </div>
       <div className="mt-4 grid gap-3">

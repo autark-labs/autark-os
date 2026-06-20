@@ -219,8 +219,8 @@ function SupportPage() {
             <div className="mt-4 grid gap-2">
               <RelatedLink to="/monitoring" title="Monitoring" detail="Activity timeline, stability, and resource graphs." />
               <RelatedLink to="/settings" title="Settings" detail="Host setup checks and service-user guidance." />
-              <RelatedLink to="/applications" title="Applications" detail="App health, repair actions, and connection details." />
-              <RelatedLink to="/network" title="Network" detail="Tailscale, private links, and network issues." />
+              <RelatedLink to="/apps" title="My Apps" detail="App health, repair actions, and connection details." />
+              <RelatedLink to="/access" title="Access" detail="Tailscale, private links, and network issues." />
             </div>
           </SurfacePanel>
         </aside>

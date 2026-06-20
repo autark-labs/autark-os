@@ -226,7 +226,7 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
                   <div className="grid gap-2 rounded-lg border border-slate-700/30 bg-slate-950/45 p-3">
                     <span>
                       <span className="block text-sm font-semibold text-white">Private access</span>
-                      <span className="block text-xs text-slate-500">{settings.tailscaleEnabled ? 'Managed from Network.' : 'Local access only right now.'}</span>
+                      <span className="block text-xs text-slate-500">{settings.tailscaleEnabled ? 'Managed from Access.' : 'Local access only right now.'}</span>
                     </span>
                   </div>
                   <div className="grid gap-3 rounded-lg border border-violet-300/20 bg-violet-500/10 p-3 sm:col-span-2">
@@ -234,15 +234,15 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
                       <span className="min-w-0">
                         <span className="flex items-center gap-2 text-sm font-semibold text-white">
                           <ShieldCheck className="size-4 text-violet-200" />
-                          Network owns private links
+                          Access owns private links
                         </span>
-                        <span className="mt-1 block text-xs text-slate-400">Use Network to turn private access on or off, repair Tailscale links, copy private URLs, and review exposure.</span>
+                        <span className="mt-1 block text-xs text-slate-400">Use Access to turn private access on or off, repair Tailscale links, copy private URLs, and review exposure.</span>
                         {settings.privateAccessUrl && <span className="mt-2 block break-all text-xs text-violet-100">{settings.privateAccessUrl}</span>}
                       </span>
                       <Button asChild className="border-violet-300/30 bg-slate-950/50 text-violet-100 hover:bg-slate-900" type="button" variant="outline">
-                        <Link to="/network">
+                        <Link to="/access">
                           <ExternalLink className="size-4" />
-                          Open Network
+                          Open Access
                         </Link>
                       </Button>
                     </div>

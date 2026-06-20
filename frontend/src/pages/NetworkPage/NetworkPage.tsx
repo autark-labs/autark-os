@@ -3,7 +3,6 @@ import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
@@ -93,7 +92,7 @@ function NetworkPage() {
   const issues = useMemo(() => buildNetworkIssues(diagnostics, reconciliation), [diagnostics, reconciliation]);
   const privateAppAccess = useMemo(() => buildPrivateAppAccess(privateApps, tailscale, reconciliation), [privateApps, reconciliation, tailscale]);
   const defaultTab = posture.counts.issues > 0 ? 'issues' : 'private-apps';
-  const selectedTab = activeTab ?? defaultTab;
+  const selectedTab = !showAdvancedMetrics && activeTab && !['private-apps', 'issues'].includes(activeTab) ? defaultTab : activeTab ?? defaultTab;
 
   const selectedNode = useMemo(
     () => getNodeDetails(selectedNodeId, { apps, devices, exposureGroups, privateAppAccess, reconciliation, runningApps, tailscale }),
@@ -141,39 +140,26 @@ function NetworkPage() {
     <PageShell>
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold leading-none text-white md:text-3xl">Access Map</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-400">See who can reach your apps: the wider internet, your trusted devices, your home network, or only this server.</p>
+          <h2 className="text-2xl font-bold leading-none text-white md:text-3xl">Access</h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-400">Open local links, review private Tailscale links, and fix access issues from one place.</p>
         </div>
         <RefreshStatus intervalLabel="Auto-updates every 5s" onRefresh={() => loadNetwork({ background: true })} refreshing={refreshing} updatedAt={updatedAt} />
       </header>
 
-      {error && <PageErrorState message={error} onRetry={() => loadNetwork({ background: false })} title="Access Map could not load" />}
+      {error && <PageErrorState message={error} onRetry={() => loadNetwork({ background: false })} title="Access status could not load" />}
 
       {loading ? (
-        <PageLoadingState label="Loading Access Map" sublabel="Checking trusted devices, private app links, and local network status." />
+        <PageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : (
         <>
           <NetworkPostureHeader posture={posture} />
           <PrivateAccessSetupPath reconciliation={reconciliation} setup={setupStatus} tailscale={tailscale} />
-          <NetworkMapWorkspace
-            apps={apps}
-            exposureGroups={exposureGroups}
-            onReviewPrivateLinks={() => setActiveTab('private-apps')}
-            onSelectNode={setSelectedNodeId}
-            privateApps={privateApps}
-            runningApps={runningApps}
-            selectedNode={selectedNode}
-            selectedNodeId={selectedNodeId}
-            showAdvancedMetrics={showAdvancedMetrics}
-            tailnetDevices={tailnetDevices}
-            tailscale={tailscale}
-          />
           <Tabs className="gap-5" onValueChange={setActiveTab} value={selectedTab}>
             <TabsList className="w-full justify-start overflow-x-auto border-b border-slate-700/30 bg-transparent p-0" variant="line">
               <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="private-apps">Private app links</TabsTrigger>
-              <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="devices">Trusted devices</TabsTrigger>
               <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="issues">Issues</TabsTrigger>
-              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="advanced">Advanced</TabsTrigger>}
+              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="devices">Trusted devices</TabsTrigger>}
+              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="advanced">Map and diagnostics</TabsTrigger>}
             </TabsList>
             <TabsContent value="private-apps">
               <PrivateAccessManager
@@ -190,25 +176,31 @@ function NetworkPage() {
                 tailscale={tailscale}
               />
             </TabsContent>
-            <TabsContent value="devices">
-              <NetworkDevicesPanel devices={devices} />
-            </TabsContent>
             <TabsContent value="issues">
               <NetworkIssuesPanel issues={issues} />
             </TabsContent>
-            {showAdvancedMetrics ? <TabsContent value="advanced">
+            {showAdvancedMetrics && <TabsContent value="devices">
+              <NetworkDevicesPanel devices={devices} />
+            </TabsContent>}
+            {showAdvancedMetrics && <TabsContent value="advanced">
               <div className="grid gap-5">
+                <NetworkMapWorkspace
+                  apps={apps}
+                  exposureGroups={exposureGroups}
+                  onReviewPrivateLinks={() => setActiveTab('private-apps')}
+                  onSelectNode={setSelectedNodeId}
+                  privateApps={privateApps}
+                  runningApps={runningApps}
+                  selectedNode={selectedNode}
+                  selectedNodeId={selectedNodeId}
+                  showAdvancedMetrics={showAdvancedMetrics}
+                  tailnetDevices={tailnetDevices}
+                  tailscale={tailscale}
+                />
                 <HostSetupPanel setup={setupStatus} />
                 <NetworkAdvancedPanel diagnostics={diagnostics} guide={guide} tailscale={tailscale} />
               </div>
-            </TabsContent> : (
-              <div className="rounded-lg border border-violet-300/20 bg-violet-500/10 p-4 text-sm text-violet-100">
-                Advanced network details are hidden in Basic mode. The Access Map, private app links, trusted devices, and issue list still show the important actions.
-                <Button asChild className="ml-0 mt-3 border-violet-300/30 bg-slate-950/50 text-violet-100 hover:bg-slate-900 sm:ml-3 sm:mt-0" size="sm" type="button" variant="outline">
-                  <a href="/settings">Open Settings</a>
-                </Button>
-              </div>
-            )}
+            </TabsContent>}
           </Tabs>
         </>
       )}

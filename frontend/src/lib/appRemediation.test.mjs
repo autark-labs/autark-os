@@ -22,7 +22,7 @@ test('describes broken local links as restart or URL updates without reset optio
   assert.deepEqual(remediation.dangerousActions, []);
 });
 
-test('routes private-link remediation to Network instead of generic restart guidance', () => {
+test('routes private-link remediation to Access instead of generic restart guidance', () => {
   const remediation = buildAppRemediation({
     app,
     reconciliation: { status: 'mismatched', message: 'Wrong port', detail: 'Tailscale routes to another port.' },
@@ -30,7 +30,7 @@ test('routes private-link remediation to Network instead of generic restart guid
 
   assert.equal(remediation.cause, 'private-access');
   assert.equal(remediation.safeAction.kind, 'link');
-  assert.equal(remediation.safeAction.to, '/network');
+  assert.equal(remediation.safeAction.to, '/access');
   assert.doesNotMatch(remediation.nextStep, /restart first/i);
 });
 
@@ -55,12 +55,12 @@ test('normalizes reliability issues into the same private-link model for Overvie
     status: 'missing',
     message: 'Private link is missing.',
     detail: 'No Tailscale Serve route was found.',
-    suggestedAction: 'Repair private app links from Network.',
+    suggestedAction: 'Repair private app links from Access.',
     repairAvailable: true,
     checkedAt: '2026-06-20T12:00:00Z',
   });
 
   assert.equal(remediation.cause, 'private-access');
-  assert.equal(remediation.safeAction.to, '/network');
+  assert.equal(remediation.safeAction.to, '/access');
   assert.equal(remediation.title, 'Private access needs repair');
 });

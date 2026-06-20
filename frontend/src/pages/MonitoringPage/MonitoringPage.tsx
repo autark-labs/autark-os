@@ -380,7 +380,7 @@ function HighlightedIssueCard({ issue }: { issue: AppReliabilityIssue | null }) 
     );
   }
   const remediation = buildAppRemediationFromIssue(issue);
-  const destination = remediation?.safeAction.kind === 'link' ? remediation.safeAction.to : '/applications';
+  const destination = remediation?.safeAction.kind === 'link' ? remediation.safeAction.to : '/apps';
   return (
     <section className="rounded-lg border border-amber-300/20 bg-amber-500/10 p-5 text-amber-100 shadow-po-panel">
       <div className="flex gap-3">

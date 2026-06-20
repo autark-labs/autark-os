@@ -43,6 +43,23 @@ export function starterAppsForMarketplace(apps, recommendedApps, installedById, 
     .sort((left, right) => Number(right.readiness === 'ready') - Number(left.readiness === 'ready') || Number(isLightweightMarketplaceApp(right.app)) - Number(isLightweightMarketplaceApp(left.app)) || left.app.name.localeCompare(right.app.name));
 }
 
+export function starterCatalogForDiscover(apps) {
+  const starterIds = ['vaultwarden', 'jellyfin', 'homepage', 'immich', 'adguard-home', 'home-assistant', 'nextcloud'];
+  const byId = new Map(apps.map((app) => [app.id, app]));
+  const starterApps = starterIds.map((appId) => byId.get(appId)).filter(Boolean);
+  const readyApps = apps.filter((app) => app.supportLevel === 'Ready' || app.badge === 'Official' || marketplaceDifficultyRank(app.difficulty) === 0);
+  const catalog = [];
+  for (const app of [...starterApps, ...readyApps]) {
+    if (!catalog.some((candidate) => candidate.id === app.id) && app.supportLevel !== 'Advanced' && app.supportLevel !== 'Experimental') {
+      catalog.push(app);
+    }
+    if (catalog.length >= 6) {
+      break;
+    }
+  }
+  return catalog;
+}
+
 export function starterAppNotes(app, context) {
   const notes = [];
   if (context.appInstallsBlocked) {

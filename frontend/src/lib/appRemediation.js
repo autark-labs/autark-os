@@ -107,8 +107,8 @@ function privateAccessRemediation({ summary }) {
     tone: 'amber',
     title: 'Private access needs repair',
     summary,
-    nextStep: 'Repair the private link from Network, then reopen this app from a private device.',
-    safeAction: { kind: 'link', to: '/network', label: 'Open Network' },
+    nextStep: 'Repair the private link from Access, then reopen this app from a private device.',
+    safeAction: { kind: 'link', to: '/access', label: 'Open Access' },
     checklist: ['Tailscale must be connected.', 'This app should stay installed.', 'No app data is removed when repairing a private link.'],
     dangerousActions: [],
   };
@@ -140,12 +140,12 @@ function recoveryActions(appId) {
     {
       label: 'Reinstall with current settings',
       warning: backupSafetyWarning('reinstall'),
-      target: `/marketplace?app=${encodeURIComponent(appId)}&mode=reinstall`,
+      target: `/discover?app=${encodeURIComponent(appId)}&mode=reinstall`,
     },
     {
       label: 'Reset and reinstall',
       warning: backupSafetyWarning('reset'),
-      target: `/marketplace?app=${encodeURIComponent(appId)}&mode=reset-reinstall`,
+      target: `/discover?app=${encodeURIComponent(appId)}&mode=reset-reinstall`,
     },
   ];
 }

@@ -27,6 +27,6 @@ test('prioritizes private access repair when Tailscale mapping is wrong', () => 
     reconciliation: { status: 'mismatched', message: 'Wrong port', detail: 'Tailscale routes to another port.' },
   });
 
-  assert.equal(guidance.safeAction.to, '/network');
+  assert.equal(guidance.safeAction.to, '/access');
   assert.equal(guidance.title, 'Private access needs repair');
 });

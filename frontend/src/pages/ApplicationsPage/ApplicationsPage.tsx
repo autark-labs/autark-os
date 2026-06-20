@@ -287,13 +287,13 @@ function ApplicationsPage() {
     <PageShell>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold leading-none text-white md:text-3xl">Applications</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-400">Watch what is running, open an app, or expand a row for management tools.</p>
+          <h2 className="text-2xl font-bold leading-none text-white md:text-3xl">My Apps</h2>
+          <p className="mt-2 max-w-2xl text-sm text-slate-400">Open apps, review issues, and manage safe repair actions from one place.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <RefreshStatus intervalLabel="Auto-updates every 2s" onRefresh={() => loadApps({ background: apps.length > 0, showRefreshing: true })} refreshing={refreshing} updatedAt={updatedAt} />
           <Button asChild className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500">
-            <Link to="/marketplace">Add app</Link>
+            <Link to="/discover">Add app</Link>
           </Button>
         </div>
       </div>

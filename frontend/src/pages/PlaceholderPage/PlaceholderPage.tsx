@@ -14,7 +14,7 @@ function PlaceholderPage({ title }: PlaceholderPageProps) {
       <p className="mt-3 max-w-2xl text-slate-400">This area is ready, but we have not added controls here yet.</p>
       {title === 'Applications' && (
         <Button asChild className="mt-6 w-fit bg-violet-600 text-white hover:bg-violet-500">
-          <Link to="/marketplace">Browse apps</Link>
+          <Link to="/discover">Browse apps</Link>
         </Button>
       )}
     </PageShell>
