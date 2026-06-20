@@ -22,6 +22,7 @@ import com.projectos.marketplace.install.InstallSettings;
 import com.projectos.marketplace.install.InstalledApp;
 import com.projectos.marketplace.install.InstalledAppRepository;
 import com.projectos.marketplace.runtime.RuntimeLayout;
+import com.projectos.system.api.RuntimeMigrationPlan;
 
 @Service
 public class StorageService {
@@ -129,6 +130,70 @@ public class StorageService {
             activityLogService.error("system", "storage_cleanup", "Storage cleanup failed", exception.getMessage(), null, exception);
             throw new com.projectos.marketplace.install.InstallationException("Project OS could not clean up that folder.", exception);
         }
+    }
+
+    public RuntimeMigrationPlan migrationPlan(String targetPath) {
+        Path source = runtimeLayout.runtimeRoot().toAbsolutePath().normalize();
+        Path target = targetPath == null || targetPath.isBlank() ? Path.of("") : Path.of(targetPath).toAbsolutePath().normalize();
+        java.util.ArrayList<String> blocked = new java.util.ArrayList<>();
+        java.util.ArrayList<String> warnings = new java.util.ArrayList<>();
+
+        if (targetPath == null || targetPath.isBlank()) {
+            blocked.add("Choose an absolute target path before Project OS can plan a migration.");
+        } else if (!Path.of(targetPath).isAbsolute()) {
+            blocked.add("Migration target must be an absolute path.");
+        }
+        if (target.equals(source)) {
+            blocked.add("Migration target is already the current runtime path.");
+        }
+        if (target.startsWith(source) && !target.equals(source)) {
+            blocked.add("Migration target cannot be inside the current runtime folder.");
+        }
+        if (source.startsWith(target)) {
+            blocked.add("Migration target cannot be a parent of the current runtime folder.");
+        }
+
+        ensure(source);
+        long sourceUsedBytes = fileOperations.directorySize(source);
+        StorageUsage targetDisk = diskUsage("Migration target disk", target.getParent() == null ? target : target.getParent());
+        long targetUsableBytes = targetDisk.usableBytes();
+        if (targetUsableBytes > 0 && targetUsableBytes < sourceUsedBytes) {
+            blocked.add("Migration target does not have enough usable space for the current runtime data.");
+        }
+        if (Files.exists(target) && !Files.isDirectory(target)) {
+            blocked.add("Migration target exists but is not a directory.");
+        }
+        if (Files.exists(target) && Files.isDirectory(target)) {
+            try (Stream<Path> children = Files.list(target)) {
+                if (children.findAny().isPresent()) {
+                    warnings.add("Migration target is not empty. Project OS should use an empty folder or a folder dedicated to Project OS data.");
+                }
+            } catch (IOException exception) {
+                warnings.add("Project OS could not inspect whether the target folder is empty: " + exception.getMessage());
+            }
+        }
+
+        boolean executable = blocked.isEmpty();
+        String status = executable ? (warnings.isEmpty() ? "ready" : "review") : "blocked";
+        return new RuntimeMigrationPlan(
+                status,
+                executable ? "Runtime data can be moved after confirmation" : "Runtime migration needs changes first",
+                executable
+                        ? "Project OS can prepare a guarded migration plan for this target. Execution still requires an explicit confirmation and privileged helper."
+                        : "Project OS found issues that must be fixed before runtime data can be moved.",
+                executable,
+                source.toString(),
+                target.toString(),
+                sourceUsedBytes,
+                targetUsableBytes,
+                mountDescription(source),
+                mountDescription(target.getParent() == null ? target : target.getParent()),
+                affectedPaths(source),
+                warnings,
+                blocked,
+                migrationSteps(target),
+                rollbackGuidance(source),
+                Instant.now());
     }
 
     private AppStorageUsage appStorage(InstalledApp app) {
@@ -298,6 +363,42 @@ public class StorageService {
                         "Mount the SSD with a stable UUID entry in /etc/fstab.",
                         "Rerun the installer with --runtime-dir /path/on/ssd.",
                         "Start Project OS and confirm apps, backups, and storage paths before deleting the old copy."));
+    }
+
+    private List<String> affectedPaths(Path source) {
+        return List.of(
+                source.toString(),
+                source.resolve("apps").toString(),
+                source.resolve("backups").toString(),
+                source.resolve("project-os.db").toString());
+    }
+
+    private List<RuntimeMigrationPlan.Step> migrationSteps(Path target) {
+        return List.of(
+                new RuntimeMigrationPlan.Step("backup", "Create pre-migration checkpoint", "Create or select a fresh restore point before changing runtime storage.", false),
+                new RuntimeMigrationPlan.Step("stop-service", "Stop Project OS service", "Stop project-os.service so runtime files do not change during copy.", true),
+                new RuntimeMigrationPlan.Step("sync-data", "Copy runtime data", "Copy Project OS runtime data to " + target + " while preserving file metadata.", true),
+                new RuntimeMigrationPlan.Step("validate-copy", "Validate copied data", "Confirm expected folders, database, and copied byte counts before switching paths.", true),
+                new RuntimeMigrationPlan.Step("update-env", "Update runtime configuration", "Update /etc/project-os/project-os.env with the new runtime path.", true),
+                new RuntimeMigrationPlan.Step("fix-permissions", "Repair ownership and permissions", "Ensure the projectos service user can read and write the moved runtime data.", true),
+                new RuntimeMigrationPlan.Step("restart-service", "Restart Project OS service", "Start project-os.service using the new runtime location.", true),
+                new RuntimeMigrationPlan.Step("verify", "Verify Project OS state", "Confirm apps, backups, and storage reporting before old data is removed.", false));
+    }
+
+    private List<String> rollbackGuidance(Path source) {
+        return List.of(
+                "Keep the original runtime folder at " + source + " until Project OS verifies the new location.",
+                "If verification fails, stop project-os.service, restore PROJECT_OS_RUNTIME_DIR to " + source + ", and start the service again.",
+                "Do not delete the original runtime folder until apps, backups, and support status are healthy.");
+    }
+
+    private String mountDescription(Path path) {
+        try {
+            FileStore store = Files.getFileStore(path);
+            return store.name() + " (" + store.type() + ")";
+        } catch (IOException exception) {
+            return "unavailable: " + exception.getMessage();
+        }
     }
 
     private String safeOrphanName(String name) {

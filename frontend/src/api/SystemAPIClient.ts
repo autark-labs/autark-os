@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectVersionInfo, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus } from '@/types/system';
+import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectVersionInfo, RuntimeMigrationPlan, RuntimeMigrationPlanRequest, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus } from '@/types/system';
 
 export const SystemAPIClient = {
   async setupStatus() {
@@ -44,6 +44,11 @@ export const SystemAPIClient = {
 
   async cleanupOrphan(name: string) {
     const response = await httpClient.post<StorageCleanupResult>(`/api/system/storage/orphans/${encodeURIComponent(name)}/cleanup`);
+    return response.data;
+  },
+
+  async runtimeMigrationPlan(request: RuntimeMigrationPlanRequest) {
+    const response = await httpClient.post<RuntimeMigrationPlan>('/api/system/storage/migration/plan', request);
     return response.data;
   },
 

@@ -9,6 +9,8 @@ import com.projectos.backups.api.RestoreRequest;
 import com.projectos.marketplace.api.InstallOptionsRequest;
 import com.projectos.network.api.DeviceTrustUpdateRequest;
 import com.projectos.system.api.OnboardingUpdateRequest;
+import com.projectos.system.api.RuntimeMigrationPlan;
+import com.projectos.system.api.RuntimeMigrationPlanRequest;
 import com.projectos.system.api.SupportBundle;
 import com.projectos.system.api.SupportCommand;
 import com.projectos.system.api.SupportDomainSummary;
@@ -26,6 +28,13 @@ class ApiRequestPackageTests {
         assertThat(InstallOptionsRequest.class.getPackageName()).isEqualTo("com.projectos.marketplace.api");
         assertThat(DeviceTrustUpdateRequest.class.getPackageName()).isEqualTo("com.projectos.network.api");
         assertThat(OnboardingUpdateRequest.class.getPackageName()).isEqualTo("com.projectos.system.api");
+        assertThat(RuntimeMigrationPlanRequest.class.getPackageName()).isEqualTo("com.projectos.system.api");
+    }
+
+    @Test
+    void storageMigrationResponsesLiveAtTheApiBoundary() {
+        assertThat(RuntimeMigrationPlan.class.getPackageName()).isEqualTo("com.projectos.system.api");
+        assertThat(RuntimeMigrationPlan.Step.class.getPackageName()).isEqualTo("com.projectos.system.api");
     }
 
     @Test

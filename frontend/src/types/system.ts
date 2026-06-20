@@ -207,6 +207,36 @@ export type RuntimeMigrationGuidance = {
   steps: string[];
 };
 
+export type RuntimeMigrationPlanStep = {
+  id: string;
+  label: string;
+  detail: string;
+  privileged: boolean;
+};
+
+export type RuntimeMigrationPlan = {
+  status: 'ready' | 'review' | 'blocked' | string;
+  headline: string;
+  summary: string;
+  executable: boolean;
+  sourcePath: string;
+  targetPath: string;
+  sourceUsedBytes: number;
+  targetUsableBytes: number;
+  sourceMount: string;
+  targetMount: string;
+  affectedPaths: string[];
+  warnings: string[];
+  blockedReasons: string[];
+  steps: RuntimeMigrationPlanStep[];
+  rollbackGuidance: string[];
+  plannedAt: string;
+};
+
+export type RuntimeMigrationPlanRequest = {
+  targetPath: string;
+};
+
 export type StorageCleanupResult = {
   status: 'completed' | 'failed' | string;
   message: string;

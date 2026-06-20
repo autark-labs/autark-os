@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Progress } from '@/components/ui/progress';
 import { backupSafetyChecklist } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
-import type { AppStorageUsage, OrphanedStorage, StorageRecommendation, StorageReport, StorageUsage } from '@/types/system';
+import type { AppStorageUsage, OrphanedStorage, RuntimeMigrationPlan, StorageRecommendation, StorageReport, StorageUsage } from '@/types/system';
 
 function StoragePage() {
   const { showAdvancedMetrics } = useProjectSettings();
@@ -27,6 +27,9 @@ function StoragePage() {
   const [cleanupTarget, setCleanupTarget] = useState<OrphanedStorage | null>(null);
   const [cleanupConfirmation, setCleanupConfirmation] = useState('');
   const [cleaning, setCleaning] = useState(false);
+  const [migrationTarget, setMigrationTarget] = useState('');
+  const [migrationPlan, setMigrationPlan] = useState<RuntimeMigrationPlan | null>(null);
+  const [planningMigration, setPlanningMigration] = useState(false);
 
   async function load(background = false) {
     if (background) {
@@ -78,6 +81,18 @@ function StoragePage() {
       setError(apiErrorMessage(cleanupError, 'Unused data could not be cleaned up.'));
     } finally {
       setCleaning(false);
+    }
+  }
+
+  async function previewMigrationPlan() {
+    setPlanningMigration(true);
+    setError(null);
+    try {
+      setMigrationPlan(await SystemAPIClient.runtimeMigrationPlan({ targetPath: migrationTarget }));
+    } catch (planError) {
+      setError(apiErrorMessage(planError, 'Runtime migration plan could not be created.'));
+    } finally {
+      setPlanningMigration(false);
     }
   }
 
@@ -186,6 +201,21 @@ function StoragePage() {
                     <ol className="space-y-2 pl-5 text-sm text-slate-300">
                       {report.migrationGuidance.steps.map((step) => <li className="list-decimal" key={step}>{step}</li>)}
                     </ol>
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/45 p-3">
+                      <label className="text-xs font-bold uppercase text-slate-500" htmlFor="runtime-migration-target">Target folder</label>
+                      <input
+                        className="mt-2 h-10 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 outline-none focus:border-emerald-300/50"
+                        id="runtime-migration-target"
+                        onChange={(event) => setMigrationTarget(event.target.value)}
+                        placeholder="/mnt/ssd/project-os"
+                        value={migrationTarget}
+                      />
+                      <Button className="mt-3 w-full border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={planningMigration || !migrationTarget.trim()} onClick={() => void previewMigrationPlan()} size="sm" type="button" variant="outline">
+                        {planningMigration ? <Loader2 className="size-3.5 animate-spin" /> : <Info className="size-3.5" />}
+                        Preview migration plan
+                      </Button>
+                    </div>
+                    {migrationPlan && <RuntimeMigrationPlanPreview plan={migrationPlan} />}
                   </div>
                 </SurfacePanel>
               )}
@@ -367,6 +397,42 @@ function OrphanedRow({ onCleanup, orphan, showAdvancedMetrics }: { onCleanup: (o
           Review
         </Button>
       </div>
+    </div>
+  );
+}
+
+function RuntimeMigrationPlanPreview({ plan }: { plan: RuntimeMigrationPlan }) {
+  const tone = plan.executable ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100' : 'border-amber-300/20 bg-amber-500/10 text-amber-100';
+  return (
+    <div className={cn('rounded-lg border p-3 text-sm', tone)}>
+      <p className="font-bold text-white">{plan.headline}</p>
+      <p className="mt-1 text-current/80">{plan.summary}</p>
+      <div className="mt-3 grid gap-2">
+        <FactRow label="Target" value={plan.targetPath} />
+        <FactRow label="Target free" value={formatBytes(plan.targetUsableBytes)} />
+      </div>
+      {plan.blockedReasons.length > 0 && (
+        <InfoList title="Blocked reasons" values={plan.blockedReasons} />
+      )}
+      {plan.warnings.length > 0 && (
+        <InfoList title="Warnings" values={plan.warnings} />
+      )}
+      <InfoList title="Planned steps" values={plan.steps.map((step) => `${step.label}${step.privileged ? ' (requires service helper)' : ''}`)} />
+      <InfoList title="Rollback guidance" values={plan.rollbackGuidance} />
+      <Button className="mt-3 w-full bg-slate-800 text-slate-300" disabled type="button">
+        Execution helper not enabled yet
+      </Button>
+    </div>
+  );
+}
+
+function InfoList({ title, values }: { title: string; values: string[] }) {
+  return (
+    <div className="mt-3">
+      <p className="text-xs font-bold uppercase text-current/70">{title}</p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-current/80">
+        {values.map((value) => <li key={value}>{value}</li>)}
+      </ul>
     </div>
   );
 }
