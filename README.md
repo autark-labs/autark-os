@@ -63,7 +63,7 @@ From a checked-out repository:
 
 ```bash
 git clone <project-os-repo-url>
-cd project-os-v2
+cd project-os
 ./scripts/bootstrap-project-os.sh
 ```
 
