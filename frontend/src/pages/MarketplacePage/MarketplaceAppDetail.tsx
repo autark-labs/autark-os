@@ -24,6 +24,8 @@ type AppDetailProps = {
   installOptions: InstallOptions;
   installPlan: InstallPlan | null;
   installResult: InstallResult | null;
+  installLocked: boolean;
+  installStatusMessage: string;
   installing: boolean;
   installedApp: AppRuntimeView | null;
   onBack: () => void;
@@ -36,7 +38,7 @@ type AppDetailProps = {
   recoveryMode?: string | null;
 };
 
-export function MarketplaceAppDetail({ app, installedApp, installOptions, installPlan, installResult, installing, onBack, onInstall, onOptionsChange, onReinstallCurrent, onRequestPlan, onResetReinstall, planLoading, recoveryMode }: AppDetailProps) {
+export function MarketplaceAppDetail({ app, installedApp, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onBack, onInstall, onOptionsChange, onReinstallCurrent, onRequestPlan, onResetReinstall, planLoading, recoveryMode }: AppDetailProps) {
   const isInstalled = Boolean(installedApp);
   const showFreshInstallResult = installResult?.appId === app.id && (installResult.status === 'installed' || installResult.status === 'already_installed');
   return (
@@ -94,12 +96,12 @@ export function MarketplaceAppDetail({ app, installedApp, installOptions, instal
               </Link>
             </Button>
           ) : (
-            <Button className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500" disabled={installing} onClick={() => onInstall(installOptions)} type="button">
+            <Button className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500" disabled={installing || installLocked} onClick={() => onInstall(installOptions)} type="button">
               {installing ? <Loader2 className="size-4 animate-spin" /> : installResult?.status === 'installed' ? <CheckCircle2 className="size-4" /> : null}
-              {installing ? 'Installing...' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Install after review' : 'Install'}
+              {installing ? 'Installing...' : installLocked ? 'Install blocked' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Install after review' : 'Install'}
             </Button>
           )}
-          {!isInstalled && <InstallWizard app={app} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installing={installing} onInstall={onInstall} onOptionsChange={onOptionsChange} onRequestPlan={onRequestPlan} planLoading={planLoading} />}
+          {!isInstalled && <InstallWizard app={app} installLocked={installLocked} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installStatusMessage={installStatusMessage} installing={installing} onInstall={onInstall} onOptionsChange={onOptionsChange} onRequestPlan={onRequestPlan} planLoading={planLoading} />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" type="button" variant="outline">
@@ -117,11 +119,11 @@ export function MarketplaceAppDetail({ app, installedApp, installOptions, instal
               {isInstalled && (
                 <>
                   <DropdownMenuSeparator className="bg-slate-800" />
-                  <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" onSelect={onReinstallCurrent}>
+                  <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled={installLocked || installing} onSelect={onReinstallCurrent}>
                     Reinstall with current settings
                     <span className="ml-auto text-xs text-amber-300">Advanced</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" onSelect={onResetReinstall}>
+                  <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled={installLocked || installing} onSelect={onResetReinstall}>
                     Reset and reinstall
                     <span className="ml-auto text-xs text-red-300">Advanced</span>
                   </DropdownMenuItem>
@@ -160,9 +162,11 @@ export function MarketplaceAppDetail({ app, installedApp, installOptions, instal
           </DropdownMenu>
         </div>
 
+        {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
         {isInstalled && !showFreshInstallResult && <InstalledAppNotice app={installedApp} />}
         {isInstalled && recoveryMode && (
           <RecoveryInstallNotice
+            disabled={installLocked || installing}
             mode={recoveryMode}
             onReinstallCurrent={onReinstallCurrent}
             onResetReinstall={onResetReinstall}
@@ -303,7 +307,21 @@ export function MarketplaceAppDetail({ app, installedApp, installOptions, instal
   );
 }
 
-function RecoveryInstallNotice({ mode, onReinstallCurrent, onResetReinstall }: { mode: string; onReinstallCurrent: () => void | Promise<void>; onResetReinstall: () => void | Promise<void> }) {
+function InstallBlockedNotice({ message }: { message: string }) {
+  return (
+    <section className="rounded-lg border border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+      <div className="flex items-start gap-3">
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-200" />
+        <div>
+          <h4 className="font-bold text-white">Another install is active</h4>
+          <p className="mt-1 leading-6 text-amber-100/80">{message}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function RecoveryInstallNotice({ disabled, mode, onReinstallCurrent, onResetReinstall }: { disabled: boolean; mode: string; onReinstallCurrent: () => void | Promise<void>; onResetReinstall: () => void | Promise<void> }) {
   const resetMode = mode === 'reset-reinstall';
   return (
     <section className={cn('rounded-lg border p-4', resetMode ? 'border-red-300/25 bg-red-500/10' : 'border-amber-300/25 bg-amber-500/10')}>
@@ -321,7 +339,7 @@ function RecoveryInstallNotice({ mode, onReinstallCurrent, onResetReinstall }: {
                 Open Backups
               </Link>
             </Button>
-            <Button className={resetMode ? 'bg-red-500 text-white hover:bg-red-400' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'} onClick={resetMode ? onResetReinstall : onReinstallCurrent} size="sm" type="button">
+            <Button className={resetMode ? 'bg-red-500 text-white hover:bg-red-400' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'} disabled={disabled} onClick={resetMode ? onResetReinstall : onReinstallCurrent} size="sm" type="button">
               {resetMode ? 'I backed up, reset and reinstall' : 'I backed up, reinstall'}
             </Button>
           </div>

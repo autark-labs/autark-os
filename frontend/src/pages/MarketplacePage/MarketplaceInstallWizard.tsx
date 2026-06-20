@@ -21,9 +21,11 @@ import { Config, FriendlyStat } from './MarketplacePage.shared';
 
 type InstallWizardProps = {
   app: MarketplaceApp;
+  installLocked: boolean;
   installOptions: InstallOptions;
   installPlan: InstallPlan | null;
   installResult: InstallResult | null;
+  installStatusMessage: string;
   installing: boolean;
   onInstall: (options: InstallOptions) => Promise<void>;
   onOptionsChange: Dispatch<SetStateAction<InstallOptions | null>>;
@@ -31,7 +33,7 @@ type InstallWizardProps = {
   planLoading: boolean;
 };
 
-export function InstallWizard({ app, installOptions, installPlan, installResult, installing, onInstall, onOptionsChange, onRequestPlan, planLoading }: InstallWizardProps) {
+export function InstallWizard({ app, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onInstall, onOptionsChange, onRequestPlan, planLoading }: InstallWizardProps) {
   const [open, setOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const hasResult = Boolean(installResult);
@@ -58,6 +60,7 @@ export function InstallWizard({ app, installOptions, installPlan, installResult,
 
         <div className="grid gap-5 overflow-y-auto pr-1">
           <WizardSteps currentStep={currentStep} />
+          {installLocked && <InstallBlockedCard message={installStatusMessage} />}
           {requiresInstallCaution(app) && <InstallCaution app={app} />}
 
           <section className="rounded-lg border border-slate-700/40 bg-slate-900/70 p-4">
@@ -141,12 +144,26 @@ export function InstallWizard({ app, installOptions, installPlan, installResult,
           <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onRequestPlan(installOptions)} type="button" variant="outline">
             {planLoading ? 'Checking...' : 'Preview'}
           </Button>
-          <Button className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500" disabled={installing} onClick={startInstall} type="button">
-            {installing ? 'Installing...' : hasResult ? 'Install again' : 'Install with choices'}
+          <Button className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500" disabled={installing || installLocked} onClick={startInstall} type="button">
+            {installing ? 'Installing...' : installLocked ? 'Install blocked' : hasResult ? 'Install again' : 'Install with choices'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function InstallBlockedCard({ message }: { message: string }) {
+  return (
+    <section className="rounded-lg border border-amber-300/25 bg-amber-500/10 p-4">
+      <div className="flex items-start gap-3">
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-200" />
+        <div>
+          <h4 className="font-bold text-white">Install waiting</h4>
+          <p className="mt-1 text-sm leading-6 text-amber-100/80">{message}</p>
+        </div>
+      </div>
+    </section>
   );
 }
 
