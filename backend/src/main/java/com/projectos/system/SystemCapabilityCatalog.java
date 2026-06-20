@@ -2,6 +2,8 @@ package com.projectos.system;
 
 import java.util.List;
 
+import com.projectos.system.api.SystemSetupCheck;
+
 public final class SystemCapabilityCatalog {
 
     public static final String SERVICE_USER = "service-user";

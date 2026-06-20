@@ -1,6 +1,9 @@
 package com.projectos.system;
 
+import com.projectos.system.api.OnboardingState;
 import com.projectos.system.api.OnboardingUpdateRequest;
+import com.projectos.system.api.SystemDoctorStatus;
+import com.projectos.system.api.SystemSetupStatus;
 import com.projectos.system.api.RuntimeMigrationPlan;
 import com.projectos.system.api.RuntimeMigrationPlanRequest;
 import com.projectos.system.api.SupportBundle;

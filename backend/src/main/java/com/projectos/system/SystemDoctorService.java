@@ -11,6 +11,11 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.projectos.marketplace.runtime.RuntimeLayout;
+import com.projectos.system.api.SystemDoctorStatus;
+import com.projectos.system.api.SystemReadinessGroup;
+import com.projectos.system.api.SystemReadinessStatus;
+import com.projectos.system.api.SystemSetupCheck;
+import com.projectos.system.api.SystemSetupStatus;
 
 @Service
 public class SystemDoctorService {

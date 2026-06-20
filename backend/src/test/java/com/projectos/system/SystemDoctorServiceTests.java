@@ -10,6 +10,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
 import com.projectos.marketplace.runtime.RuntimeLayout;
+import com.projectos.system.api.SystemDoctorStatus;
+import com.projectos.system.api.SystemSetupCheck;
+import com.projectos.system.api.SystemSetupStatus;
 
 class SystemDoctorServiceTests {
 

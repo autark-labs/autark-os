@@ -1,9 +1,12 @@
 package com.projectos.system;
 
-import com.projectos.system.api.OnboardingUpdateRequest;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import com.projectos.system.api.OnboardingUpdateRequest;
+import com.projectos.system.api.OnboardingState;
+import com.projectos.system.api.SystemDoctorStatus;
+import com.projectos.system.api.SystemReadinessStatus;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

@@ -6,7 +6,6 @@ import java.util.List;
 import com.projectos.activity.ActivityLog;
 import com.projectos.system.ProjectVersionInfo;
 import com.projectos.system.SystemMetrics;
-import com.projectos.system.SystemSetupStatus;
 
 public record SupportBundle(
         String status,

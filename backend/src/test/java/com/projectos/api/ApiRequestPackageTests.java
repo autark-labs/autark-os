@@ -9,6 +9,7 @@ import com.projectos.backups.api.RestoreRequest;
 import com.projectos.marketplace.api.InstallOptionsRequest;
 import com.projectos.network.api.DeviceTrustUpdateRequest;
 import com.projectos.system.api.OnboardingUpdateRequest;
+import com.projectos.system.api.OnboardingState;
 import com.projectos.system.api.RuntimeMigrationPlan;
 import com.projectos.system.api.RuntimeMigrationPlanRequest;
 import com.projectos.system.api.SupportBundle;
@@ -18,6 +19,11 @@ import com.projectos.system.api.SupportFinding;
 import com.projectos.system.api.SupportLogLine;
 import com.projectos.system.api.SupportRedactionRule;
 import com.projectos.system.api.SupportSummary;
+import com.projectos.system.api.SystemDoctorStatus;
+import com.projectos.system.api.SystemReadinessGroup;
+import com.projectos.system.api.SystemReadinessStatus;
+import com.projectos.system.api.SystemSetupCheck;
+import com.projectos.system.api.SystemSetupStatus;
 
 class ApiRequestPackageTests {
 
@@ -35,6 +41,16 @@ class ApiRequestPackageTests {
     void storageMigrationResponsesLiveAtTheApiBoundary() {
         assertThat(RuntimeMigrationPlan.class.getPackageName()).isEqualTo("com.projectos.system.api");
         assertThat(RuntimeMigrationPlan.Step.class.getPackageName()).isEqualTo("com.projectos.system.api");
+    }
+
+    @Test
+    void systemSetupAndOnboardingResponsesLiveAtTheApiBoundary() {
+        assertThat(OnboardingState.class.getPackageName()).isEqualTo("com.projectos.system.api");
+        assertThat(SystemDoctorStatus.class.getPackageName()).isEqualTo("com.projectos.system.api");
+        assertThat(SystemReadinessGroup.class.getPackageName()).isEqualTo("com.projectos.system.api");
+        assertThat(SystemReadinessStatus.class.getPackageName()).isEqualTo("com.projectos.system.api");
+        assertThat(SystemSetupCheck.class.getPackageName()).isEqualTo("com.projectos.system.api");
+        assertThat(SystemSetupStatus.class.getPackageName()).isEqualTo("com.projectos.system.api");
     }
 
     @Test

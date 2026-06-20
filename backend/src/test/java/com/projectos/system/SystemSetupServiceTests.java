@@ -12,6 +12,7 @@ import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
 import com.projectos.marketplace.runtime.RuntimeLayout;
 import com.projectos.network.tailscale.TailscaleService;
 import com.projectos.network.tailscale.TailscaleStatus;
+import com.projectos.system.api.SystemSetupStatus;
 
 class SystemSetupServiceTests {
 

@@ -1,7 +1,5 @@
 package com.projectos.system;
 
-import com.projectos.system.api.OnboardingUpdateRequest;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +14,8 @@ import org.springframework.stereotype.Service;
 import com.projectos.marketplace.runtime.RuntimeLayout;
 import com.projectos.marketplace.install.InstallationException;
 import com.projectos.network.tailscale.TailscaleService;
+import com.projectos.system.api.OnboardingState;
+import com.projectos.system.api.OnboardingUpdateRequest;
 
 @Service
 public class OnboardingService {

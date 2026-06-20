@@ -27,6 +27,7 @@ import com.projectos.system.api.SupportFinding;
 import com.projectos.system.api.SupportLogLine;
 import com.projectos.system.api.SupportRedactionRule;
 import com.projectos.system.api.SupportSummary;
+import com.projectos.system.api.SystemSetupStatus;
 
 @Service
 public class SystemSupportService {
