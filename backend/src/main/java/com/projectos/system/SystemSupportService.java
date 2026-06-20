@@ -20,6 +20,13 @@ import com.projectos.marketplace.install.AppLifecycleService;
 import com.projectos.marketplace.install.AppReliabilitySummary;
 import com.projectos.marketplace.install.PrivateAccessReconciliationReport;
 import com.projectos.marketplace.install.PrivateAccessReconciliationService;
+import com.projectos.system.api.SupportBundle;
+import com.projectos.system.api.SupportCommand;
+import com.projectos.system.api.SupportDomainSummary;
+import com.projectos.system.api.SupportFinding;
+import com.projectos.system.api.SupportLogLine;
+import com.projectos.system.api.SupportRedactionRule;
+import com.projectos.system.api.SupportSummary;
 
 @Service
 public class SystemSupportService {

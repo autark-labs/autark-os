@@ -1,4 +1,4 @@
-package com.projectos.system;
+package com.projectos.system.api;
 
 public record SupportFinding(
         String id,

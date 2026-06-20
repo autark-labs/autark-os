@@ -1,6 +1,9 @@
 package com.projectos.system;
 
 import com.projectos.system.api.OnboardingUpdateRequest;
+import com.projectos.system.api.SupportBundle;
+import com.projectos.system.api.SupportLogLine;
+import com.projectos.system.api.SupportSummary;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

@@ -1,7 +1,9 @@
-package com.projectos.system;
+package com.projectos.system.api;
 
 import java.time.Instant;
 import java.util.List;
+
+import com.projectos.system.ProjectVersionInfo;
 
 public record SupportSummary(
         String status,
