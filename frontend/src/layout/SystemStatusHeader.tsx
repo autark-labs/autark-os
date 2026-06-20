@@ -12,6 +12,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { tailscaleHeaderStatus } from '@/pages/NetworkPage/extensions/NetworkPage.tailscaleSetup';
 import type { SystemDoctorStatus, SystemSetupCheck } from '@/types/system';
 
 const statusPollMs = 15_000;
@@ -142,12 +143,16 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
   const healthy = service.check?.status === 'ok';
   const unavailable = !service.check;
   const Icon = service.icon;
-  const StatusIcon = healthy ? CheckCircle2 : CircleAlert;
-  const toneClass = healthy
+  const tailscaleStatus = service.id === 'tailscale' ? tailscaleHeaderStatus(service.check) : null;
+  const statusTone = tailscaleStatus?.tone || (healthy ? 'green' : 'red');
+  const StatusIcon = statusTone === 'green' ? CheckCircle2 : CircleAlert;
+  const toneClass = statusTone === 'green'
     ? 'border-po-success/30 bg-po-success/10 text-po-success hover:bg-po-success/15'
-    : 'border-po-danger/35 bg-po-danger/10 text-po-danger hover:bg-po-danger/15';
-  const statusLabel = healthy ? service.healthyLabel : service.needsAttentionLabel;
-  const summary = healthy ? service.healthySummary : service.needsAttentionSummary;
+    : statusTone === 'amber'
+      ? 'border-po-warning/35 bg-po-warning/10 text-po-warning hover:bg-po-warning/15'
+      : 'border-po-danger/35 bg-po-danger/10 text-po-danger hover:bg-po-danger/15';
+  const statusLabel = tailscaleStatus?.label || (healthy ? service.healthyLabel : service.needsAttentionLabel);
+  const summary = tailscaleStatus?.summary || (healthy ? service.healthySummary : service.needsAttentionSummary);
 
   return (
     <Popover>
@@ -159,7 +164,7 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
           type="button"
           variant="outline"
         >
-          <span className={cn('size-2 rounded-full', healthy ? 'bg-po-success shadow-po-success-glow' : 'bg-po-danger shadow-po-danger-glow')} />
+          <span className={cn('size-2 rounded-full', statusTone === 'green' && 'bg-po-success shadow-po-success-glow', statusTone === 'amber' && 'bg-po-warning shadow-po-warning-glow', statusTone === 'red' && 'bg-po-danger shadow-po-danger-glow')} />
           <Icon data-icon="inline-start" />
           <span className="hidden font-semibold sm:inline">{service.label}</span>
           <span className="font-semibold">{loading && unavailable ? 'Checking' : statusLabel}</span>
@@ -168,7 +173,7 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
       <PopoverContent align="end" className="w-80 gap-3 border-po-border bg-po-surface-elevated p-3 text-po-text shadow-po-md">
         <PopoverHeader>
           <PopoverTitle className="flex items-center gap-2 text-sm">
-            <StatusIcon className={cn('size-4', healthy ? 'text-po-success' : 'text-po-danger')} />
+            <StatusIcon className={cn('size-4', statusTone === 'green' && 'text-po-success', statusTone === 'amber' && 'text-po-warning', statusTone === 'red' && 'text-po-danger')} />
             {service.label} {statusLabel.toLowerCase()}
           </PopoverTitle>
           <PopoverDescription className="text-xs text-po-text-muted">

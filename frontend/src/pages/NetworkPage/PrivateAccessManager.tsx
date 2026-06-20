@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView } from '@/types/app';
 import type { PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';
-import { tailscaleSetupGuidance } from './extensions/NetworkPage.tailscaleSetup';
+import { tailscaleSetupGuidance, tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
 import { statusTone } from './extensions/NetworkPage.theme';
 import type { PrivateAppAccess } from './extensions/NetworkPage.types';
 import { AccessLine, EmptyState } from './NetworkPage.shared';
@@ -48,6 +48,7 @@ export function PrivateAccessManager({
 }) {
   const localApps = installedApps.filter((app) => app.desiredAccess?.mode !== 'private' && app.desiredAccess?.mode !== 'local-and-private' && !app.settings?.tailscaleEnabled);
   const tailscaleGuidance = tailscaleSetupGuidance(tailscale);
+  const tailscaleTasks = tailscaleSetupTasks({ tailscale, reconciliation });
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
       <Card className="border-white/10 bg-slate-950/55 py-0 text-slate-100">
@@ -122,7 +123,7 @@ export function PrivateAccessManager({
           <p className="mt-1 text-sm text-slate-400">Pick local apps that should be easy to reach from your own devices.</p>
         </CardHeader>
         <CardContent className="grid gap-3 p-5">
-          <TailscaleSetupCard guidance={tailscaleGuidance} />
+          <TailscaleSetupCard guidance={tailscaleGuidance} tasks={tailscaleTasks} />
           {localApps.length === 0 ? (
             <EmptyState icon={CheckCircle2} title="All apps reviewed" text="Every installed app is already marked for private access or there are no local apps yet." />
           ) : (
@@ -202,7 +203,7 @@ export function PrivateAccessManager({
   );
 }
 
-function TailscaleSetupCard({ guidance }: { guidance: ReturnType<typeof tailscaleSetupGuidance> }) {
+function TailscaleSetupCard({ guidance, tasks }: { guidance: ReturnType<typeof tailscaleSetupGuidance>; tasks: ReturnType<typeof tailscaleSetupTasks> }) {
   const tone = guidance.tone === 'green'
     ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100'
     : guidance.tone === 'red'
@@ -232,6 +233,19 @@ function TailscaleSetupCard({ guidance }: { guidance: ReturnType<typeof tailscal
               </Button>
             </div>
           )}
+          <div className="mt-3 grid gap-2">
+            {tasks.slice(0, guidance.goodState ? 3 : 1).map((task) => (
+              <div className="rounded-md border border-white/10 bg-slate-950/35 px-3 py-2" key={task.id}>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-white">{task.title}</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-[0.68rem] font-bold uppercase', task.status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : task.status === 'warning' ? 'bg-amber-500/15 text-amber-100' : 'bg-slate-700/70 text-slate-200')}>
+                    {task.status === 'ok' ? 'Ready' : task.status === 'warning' ? 'To do' : 'Review'}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-current/70">{task.detail}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

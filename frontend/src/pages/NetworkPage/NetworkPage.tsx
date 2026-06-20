@@ -26,6 +26,7 @@ import {
   buildPrivateAppAccess,
   getNodeDetails,
 } from './extensions/NetworkPage.logic';
+import { tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
 
 function NetworkPage() {
   const { showAdvancedMetrics } = useProjectSettings();
@@ -153,7 +154,7 @@ function NetworkPage() {
       ) : (
         <>
           <NetworkPostureHeader posture={posture} />
-          <PrivateAccessSetupPath setup={setupStatus} tailscale={tailscale} />
+          <PrivateAccessSetupPath reconciliation={reconciliation} setup={setupStatus} tailscale={tailscale} />
           <NetworkMapWorkspace
             apps={apps}
             exposureGroups={exposureGroups}
@@ -215,13 +216,11 @@ function NetworkPage() {
   );
 }
 
-function PrivateAccessSetupPath({ setup, tailscale }: { setup: SystemSetupStatus | null; tailscale: TailscaleStatus | null }) {
-  const tailscaleCheck = setup?.checks.find((check) => check.id === 'tailscale') ?? null;
-  const operatorCheck = setup?.checks.find((check) => check.id === 'tailscale-operator') ?? null;
+function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconciliation: PrivateAccessReconciliationReport | null; setup: SystemSetupStatus | null; tailscale: TailscaleStatus | null }) {
+  const tasks = tailscaleSetupTasks({ reconciliation, setup, tailscale });
+  const blockingTask = tasks.find((task) => task.status === 'warning');
+  const statusLabel = blockingTask ? blockingTask.title : 'Private access ready';
   const connected = Boolean(tailscale?.connected);
-  const serveReady = operatorCheck?.status === 'ok';
-  const status = connected && serveReady ? 'ready' : connected ? 'needs-permission' : 'needs-connection';
-  const statusLabel = status === 'ready' ? 'Private access ready' : status === 'needs-permission' ? 'Tailscale Serve permission needed' : 'Tailscale setup needed';
 
   return (
     <section className="rounded-lg border border-white/10 bg-slate-950/60 p-5">
@@ -238,24 +237,15 @@ function PrivateAccessSetupPath({ setup, tailscale }: { setup: SystemSetupStatus
         </Badge>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <SetupStep
-          detail={tailscaleCheck?.detail || tailscale?.message || 'Run tailscale up on this device when you want private access.'}
-          label="Connect Tailscale"
-          status={connected ? 'ok' : 'warning'}
-          action={tailscaleCheck?.actionCommand || 'tailscale up'}
-        />
-        <SetupStep
-          detail={operatorCheck?.detail || 'Project OS needs permission before it can create Tailscale Serve links.'}
-          label="Tailscale Serve permission"
-          status={operatorCheck?.status || 'neutral'}
-          action={operatorCheck?.actionCommand || 'Connect Tailscale first'}
-        />
-        <SetupStep
-          detail={tailscale?.dnsName ? tailscale.dnsName : 'Enable MagicDNS and HTTPS certificates in Tailscale for friendly secure names.'}
-          label="MagicDNS and HTTPS"
-          status={tailscale?.dnsName ? 'ok' : 'neutral'}
-          action={tailscale?.dnsName ? 'Ready' : 'Open Tailscale admin'}
-        />
+        {tasks.map((task) => (
+          <SetupStep
+            action={task.primaryAction.command || task.primaryAction.label}
+            detail={task.detail}
+            key={task.id}
+            label={task.title}
+            status={task.status}
+          />
+        ))}
       </div>
     </section>
   );
