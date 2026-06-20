@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -33,6 +34,10 @@ class ProjectOsDatabaseTests {
             assertThat(tableExists(statement, "activity_logs")).isTrue();
             assertThat(tableExists(statement, "installed_apps")).isTrue();
             assertThat(tableExists(statement, "project_settings")).isTrue();
+            assertThat(columnExists(statement, "installed_app_settings", "private_access_url")).isTrue();
+            assertThat(columnExists(statement, "installed_app_settings", "auto_repair_enabled")).isTrue();
+            assertThat(columnExists(statement, "app_health", "startup_grace")).isTrue();
+            assertThat(columnExists(statement, "app_backups", "restore_confidence")).isTrue();
         }
     }
 
@@ -51,9 +56,30 @@ class ProjectOsDatabaseTests {
                 });
     }
 
+    @Test
+    void projectOsDatabaseDoesNotRepairSchemaOutsideFlyway() throws Exception {
+        Path source = Path.of("src/main/java/com/projectos/database/ProjectOsDatabase.java");
+        String databaseSource = Files.readString(source).toLowerCase(Locale.ROOT);
+
+        assertThat(databaseSource)
+                .doesNotContain("ensurecolumn")
+                .doesNotContain("alter table");
+    }
+
     private boolean tableExists(Statement statement, String tableName) throws Exception {
         try (ResultSet resultSet = statement.executeQuery("select name from sqlite_master where type = 'table' and name = '" + tableName + "'")) {
             return resultSet.next();
+        }
+    }
+
+    private boolean columnExists(Statement statement, String tableName, String columnName) throws Exception {
+        try (ResultSet resultSet = statement.executeQuery("pragma table_info(" + tableName + ")")) {
+            while (resultSet.next()) {
+                if (columnName.equals(resultSet.getString("name"))) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 
