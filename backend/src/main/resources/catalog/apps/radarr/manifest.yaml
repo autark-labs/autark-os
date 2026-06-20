@@ -1,0 +1,179 @@
+id: radarr
+metadata:
+  name: Radarr
+  category: Media
+  description: Movie library manager for monitoring, organizing, and automating films.
+  shortValue: Keep movie libraries organized and ready for your media server.
+  badge: Verified
+  downloads: 2.1M
+  rating: '4.8'
+  image: /app-images/radarr.svg
+  version: latest
+  lastUpdated: Recently
+  size: 210 MB
+  maintainer: Radarr Community
+  source: GitHub
+  sourceUrl: https://github.com/Radarr/Radarr
+  documentationUrl: https://wiki.servarr.com/radarr
+  installTime: 3-5 minutes
+  difficulty: Advanced
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:7878
+  tags:
+    - Movies
+    - Media automation
+    - Library management
+    - Arr stack
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Organizing movie libraries
+    - Tracking wanted movies
+    - Pairing with download tools
+  highlights:
+    - Movie monitoring
+    - Rename and organize files
+    - Integrates with indexers and download clients
+  plainLanguage: Radarr helps advanced media users organize movie libraries and can connect to download tools when you choose to configure that workflow.
+technical:
+  summary: Deploys Radarr with persistent configuration, movies and downloads folders, local dashboard access, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Media storage folders
+    - Optional indexer and download client
+  includes:
+    - Radarr dashboard
+    - Configuration storage
+    - Movies library mount
+    - Downloads mount
+  configuration:
+    - label: Container name
+      value: radarr
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 7878:7878
+    - label: Data storage
+      value: /var/lib/project-os/apps/radarr/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access should stay private because it can control media workflows.
+    - Project OS should eventually autowire this with Prowlarr and qBittorrent.
+usage:
+  kind: companion-service
+  primaryAction: open-dashboard
+  openUrlLabel: Open Radarr
+  headline: Set up movie library automation
+  summary: Project OS starts Radarr and prepares folders. You connect indexers, download clients, and library paths in Radarr.
+  setupSteps:
+    - Open Radarr.
+    - Add your movie library path.
+    - Connect Prowlarr for indexers if installed.
+    - Connect qBittorrent or another download client if desired.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - This is a power-user media tool. It is not required for Jellyfin playback.
+setup:
+  kind: media-stack
+  automation: planned
+  copyableFields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+  integrations:
+    - id: radarr-prowlarr
+      name: Connect Prowlarr indexers
+      targetAppId: prowlarr
+      description: Use Prowlarr as the central indexer source for Radarr.
+      requiresApproval: true
+      plannedActions:
+        - Confirm Prowlarr is installed and reachable.
+        - Ask for approval before creating a Radarr app entry in Prowlarr.
+        - Ask for approval before adding Prowlarr as a Radarr indexer source.
+    - id: radarr-qbittorrent
+      name: Connect qBittorrent downloads
+      targetAppId: qbittorrent
+      description: Let Radarr send approved movie downloads to qBittorrent.
+      requiresApproval: true
+      plannedActions:
+        - Confirm qBittorrent is installed and reachable.
+        - Ask for approval before adding qBittorrent as a Radarr download client.
+        - Keep download paths inside Project OS managed folders.
+  userSteps:
+    - Review media folders before enabling automated downloads.
+    - Approve each connection before Project OS changes Radarr.
+  automationCapabilities:
+    - Can detect whether Prowlarr and qBittorrent are installed.
+    - Can propose indexer and download-client wiring.
+    - Will require approval before changing Radarr or companion apps.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: Movie manager is ready
+  startingLabel: Starting movie manager
+  failureLabel: Radarr is not responding
+  description: Project OS checks that the Radarr dashboard answers before calling it ready.
+runtime:
+  containerName: radarr
+  composeProject: project-os-radarr
+  image: lscr.io/linuxserver/radarr:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/radarr
+  ports:
+    - 7878:7878
+  volumes:
+    - /var/lib/project-os/apps/radarr/config:/config
+    - /var/lib/project-os/apps/radarr/movies:/movies
+    - /var/lib/project-os/apps/radarr/downloads:/downloads
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=radarr
+    - project-os.version=latest
+  backupPaths:
+    - config
+  privileged: false

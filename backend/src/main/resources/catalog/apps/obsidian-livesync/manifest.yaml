@@ -1,0 +1,200 @@
+id: obsidian-livesync
+metadata:
+  name: Obsidian LiveSync
+  category: Productivity
+  description: Private sync backend for Obsidian vaults using the LiveSync plugin.
+  shortValue: Keep Obsidian notes synced between devices without using a public sync account.
+  badge: Verified
+  downloads: 540K
+  rating: '4.6'
+  image: /app-images/obsidian-livesync.svg
+  version: '3'
+  lastUpdated: Recently
+  size: 190 MB
+  maintainer: Apache CouchDB
+  source: Docker Hub
+  sourceUrl: https://github.com/vrtmrz/obsidian-livesync
+  documentationUrl: https://github.com/vrtmrz/obsidian-livesync/blob/main/docs/00_basic.md
+  installTime: 3-5 minutes
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: Promising catalog entry that needs deeper end-to-end testing before beginner use.
+  accessUrl: http://localhost:5984
+  tags:
+    - Obsidian
+    - Notes
+    - Sync
+    - Knowledge base
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Syncing Obsidian vaults
+    - Keeping notes private
+    - Using Obsidian across laptop, desktop, and phone
+  highlights:
+    - Private sync server
+    - Works with the Obsidian LiveSync community plugin
+    - Keeps vault data under your control
+  plainLanguage: Obsidian LiveSync prepares a private sync service for your Obsidian notes. You still use the Obsidian app, while Project OS hosts the sync backend.
+technical:
+  summary: Deploys CouchDB as a private Obsidian LiveSync backend with persistent database storage, local access, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Obsidian LiveSync community plugin
+    - Tailscale connected on Project OS and each Obsidian device
+    - Tailscale HTTPS certificates enabled for mobile devices
+  includes:
+    - CouchDB sync backend
+    - Persistent database storage
+    - Local CouchDB admin endpoint
+    - Private HTTPS sync endpoint through Tailscale Serve
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: obsidian-livesync
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 5984:5984
+    - label: Data storage
+      value: /var/lib/project-os/apps/obsidian-livesync/data
+    - label: Backup
+      value: Vault sync data daily
+    - label: Access
+      value: Tailscale strongly recommended
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - This is the sync backend, not the Obsidian desktop application.
+    - Keep this private because it stores note sync data and credentials.
+    - External devices must use the HTTPS Tailscale sync URL, not the local admin URL.
+usage:
+  kind: companion-service
+  primaryAction: connect-client
+  openUrlLabel: Open local CouchDB
+  headline: Connect Obsidian to your private sync service
+  summary: Project OS prepares CouchDB locally and exposes it privately over HTTPS with Tailscale Serve. Use the HTTPS sync URL inside Obsidian on each trusted device.
+  privateHttpsRequired: true
+  setupSteps:
+    - Install and sign in to Tailscale on this Project OS host and on each Obsidian device.
+    - In Tailscale, enable MagicDNS and HTTPS certificates for your tailnet.
+    - Open Obsidian on a device and install the Self-hosted LiveSync community plugin.
+    - In the plugin setup, choose your own CouchDB server and use the HTTPS Sync URL shown here.
+    - Run the plugin connection check, then repeat this setup on your other trusted devices.
+  fields:
+    - label: HTTPS Sync URL
+      value: "{privateAccessUrl}"
+      sensitive: false
+      qr: true
+    - label: Local admin URL
+      value: "{localAccessUrl}"
+      sensitive: false
+      qr: false
+    - label: Username
+      value: "{username}"
+      sensitive: false
+      qr: false
+    - label: Password
+      value: "{password}"
+      sensitive: true
+      qr: false
+    - label: Database
+      value: "{database}"
+      sensitive: false
+      qr: false
+  notes:
+    - This service is a private sync backend, not the Obsidian notes app itself.
+    - Phones, tablets, and laptops should use the HTTPS Sync URL while connected to the same tailnet.
+    - The local admin URL is only useful from the Project OS host for troubleshooting.
+setup:
+  kind: companion
+  automation: guided
+  generatedValues:
+    - label: Username
+      value: "{username}"
+      sensitive: false
+      recoverable: true
+    - label: Password
+      value: "{password}"
+      sensitive: true
+      recoverable: true
+    - label: Database
+      value: "{database}"
+      sensitive: false
+      recoverable: true
+  copyableFields:
+    - label: Local admin URL
+      value: "{localAccessUrl}"
+      sensitive: false
+  qrFields:
+    - label: HTTPS Sync URL
+      value: "{privateAccessUrl}"
+      sensitive: false
+  userSteps:
+    - Install the Self-hosted LiveSync plugin inside Obsidian on each trusted device.
+    - Use the HTTPS Sync URL, username, password, and database shown here.
+    - Run the plugin connection check before enabling sync on a second device.
+  automationCapabilities:
+    - Creates the CouchDB sync database.
+    - Enables CouchDB single-node mode and browser access settings.
+    - Keeps the setup values recoverable from Applications after install.
+health:
+  type: no-web-ui
+  startupGraceSeconds: 240
+  successLabel: Ready to connect
+  startingLabel: Preparing sync service
+  failureLabel: Sync service needs attention
+  description: Obsidian LiveSync is a sync backend, not an app you browse. Project OS checks that CouchDB is running and then shows the HTTPS sync details for your devices.
+runtime:
+  containerName: obsidian-livesync
+  composeProject: project-os-obsidian-livesync
+  image: couchdb:3
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/obsidian-livesync
+  ports:
+    - 5984:5984
+  volumes:
+    - /var/lib/project-os/apps/obsidian-livesync/data:/opt/couchdb/data
+    - /var/lib/project-os/apps/obsidian-livesync/config:/opt/couchdb/etc/local.d
+  environment:
+    - COUCHDB_USER=projectos
+    - COUCHDB_PASSWORD=projectos-change-me
+    - COUCHDB_SECRET=project-os-obsidian-livesync
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=obsidian-livesync
+    - project-os.version=3
+  backupPaths:
+    - data
+    - config
+  privileged: false

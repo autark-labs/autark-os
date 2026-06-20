@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-label="Jellyfin service image">
+  <rect width="160" height="120" rx="18" fill="#111827"/>
+  <path d="M80 17l51 88H29L80 17z" fill="#7c3aed"/>
+  <path d="M80 39l31 54H49l31-54z" fill="#a855f7"/>
+  <path d="M80 61l18 31H62l18-31z" fill="#f8fafc"/>
+</svg>

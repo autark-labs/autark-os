@@ -1,0 +1,114 @@
+id: vaultwarden
+metadata:
+  name: Vaultwarden
+  category: Security
+  description: A private password vault that works with Bitwarden apps.
+  shortValue: Store family or team passwords safely without relying on a cloud account.
+  badge: Official
+  downloads: 1.2M
+  rating: '4.9'
+  image: /app-images/vaultwarden.svg
+  version: 1.32.0
+  lastUpdated: 2 days ago
+  size: 72 MB
+  maintainer: Vaultwarden Community
+  source: GitHub
+  sourceUrl: https://github.com/dani-garcia/vaultwarden
+  documentationUrl: https://github.com/dani-garcia/vaultwarden/wiki
+  installTime: 2-3 minutes
+  difficulty: Easy
+  supportLevel: Ready
+  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  accessUrl: http://localhost:8090
+  tags:
+    - Passwords
+    - Security
+    - Bitwarden
+    - Family sharing
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Password vaults
+    - Secure notes
+    - Sharing logins with trusted users
+  highlights:
+    - Works with Bitwarden browser and mobile apps
+    - Encrypted vault storage
+    - Optional admin dashboard
+  plainLanguage: Vaultwarden gives you a private password manager that feels familiar if you have used Bitwarden before. Project-OS prepares storage, networking, backups, and private access so the install is approachable.
+technical:
+  summary: Deploys a Vaultwarden container with persistent data, reverse proxy labels, Tailscale access, daily encrypted backups, and a Project-OS managed network.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Persistent storage volume
+    - HTTPS or Tailscale access recommended
+  includes:
+    - Container image
+    - SQLite database
+    - Reverse proxy labels
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: vaultwarden
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8090:80
+    - label: Data storage
+      value: /var/lib/project-os/apps/vaultwarden/data
+    - label: Backup
+      value: Daily encrypted snapshot
+    - label: Access
+      value: Tailscale enabled
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is recommended because this stores sensitive credentials.
+    - First-run setup creates the first vault account and admin preferences.
+runtime:
+  containerName: vaultwarden
+  composeProject: project-os-vaultwarden
+  image: vaultwarden/server:1.32.0
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/vaultwarden
+  ports:
+    - 8090:80
+  volumes:
+    - /var/lib/project-os/apps/vaultwarden/data:/data
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=vaultwarden
+    - project-os.version=1.32.0
+  backupPaths:
+    - data
+  privileged: false

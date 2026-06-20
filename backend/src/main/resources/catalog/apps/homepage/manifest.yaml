@@ -1,0 +1,161 @@
+id: homepage
+metadata:
+  name: Homepage
+  category: Utilities
+  description: A fast dashboard for links, service status, and homelab widgets.
+  shortValue: One clean start page for everything running in your home lab.
+  badge: Verified
+  downloads: 900K
+  rating: '4.8'
+  image: /app-images/homepage.svg
+  version: latest
+  lastUpdated: Recently
+  size: 180 MB
+  maintainer: Homepage Community
+  source: GitHub
+  sourceUrl: https://github.com/gethomepage/homepage
+  documentationUrl: https://gethomepage.dev/latest/
+  installTime: 2-3 minutes
+  difficulty: Easy
+  supportLevel: Ready
+  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  accessUrl: http://localhost:3003
+  tags:
+    - Dashboard
+    - Start page
+    - Widgets
+    - Bookmarks
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Homelab landing page
+    - App bookmarks
+    - Service visibility
+  highlights:
+    - Clean dashboard UI
+    - Widgets for common services
+    - Easy bookmark organization
+  plainLanguage: Homepage gives your home server one friendly start page where family or admins can find the apps that matter.
+technical:
+  summary: Deploys Homepage with managed configuration storage and a local web dashboard.
+  requirements:
+    - 1 CPU core
+    - 256 MB RAM
+    - Configuration storage
+  includes:
+    - Dashboard web app
+    - Managed config folder
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: homepage
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 3003:3000
+    - label: Data storage
+      value: /var/lib/project-os/apps/homepage/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: false
+  notes:
+    - Private access is useful if you want a single dashboard while away from home.
+    - Project OS should eventually autowire installed apps into this dashboard.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Homepage
+  headline: Open your homelab dashboard
+  summary: Project OS starts Homepage. Add the apps and links you want to see from its configuration files.
+  setupSteps:
+    - Open Homepage.
+    - Add services, bookmarks, and widgets.
+    - Keep private access enabled if the dashboard lists sensitive internal links.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: true
+  notes:
+    - Future Project OS autowire work should populate this dashboard automatically.
+setup:
+  kind: dashboard
+  automation: planned
+  copyableFields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+  integrations:
+    - id: homepage-project-os-apps
+      name: List Project OS apps
+      targetAppId: ""
+      description: Let Homepage display apps managed by Project OS so users have one friendly launch page.
+      requiresApproval: true
+      plannedActions:
+        - Read installed app names, icons, and links from Project OS.
+        - Write a Homepage services configuration after user approval.
+        - Keep Homepage entries in sync when apps are installed or removed.
+  userSteps:
+    - Open Homepage after install.
+    - Approve app-list wiring when Project OS offers it in a future release.
+  automationCapabilities:
+    - Can discover installed Project OS apps.
+    - Can prepare a Homepage services list.
+    - Will ask before changing Homepage configuration.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 180
+  successLabel: Dashboard is ready
+  startingLabel: Starting dashboard
+  failureLabel: Homepage is not responding
+  description: Project OS checks that the Homepage dashboard answers before calling it ready.
+runtime:
+  containerName: homepage
+  composeProject: project-os-homepage
+  image: ghcr.io/gethomepage/homepage:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/homepage
+  ports:
+    - 3003:3000
+  volumes:
+    - /var/lib/project-os/apps/homepage/config:/app/config
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=homepage
+    - project-os.version=latest
+  backupPaths:
+    - config
+  privileged: false

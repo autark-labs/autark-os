@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: project-os-backend
+
+server:
+  port: 8082
+
+project-os:
+  runtime-root: ../runtime/project-os
+  guardian:
+    enabled: true
+    initial-delay-ms: 10000
+    interval-ms: 15000
+  backups:
+    scheduler:
+      enabled: true
+      initial-delay-ms: 30000
+      interval-ms: 60000

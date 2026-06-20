@@ -1,0 +1,115 @@
+id: jellyfin
+metadata:
+  name: Jellyfin
+  category: Media
+  description: Stream movies, shows, music, and home videos from your server.
+  shortValue: Your own Netflix-style media library with no subscription.
+  badge: Official
+  downloads: 2.4M
+  rating: '4.7'
+  image: /app-images/jellyfin.svg
+  version: 10.10.3
+  lastUpdated: 5 days ago
+  size: 390 MB
+  maintainer: Jellyfin Project
+  source: GitHub
+  sourceUrl: https://github.com/jellyfin/jellyfin
+  documentationUrl: https://jellyfin.org/docs/
+  installTime: 3-5 minutes
+  difficulty: Easy
+  supportLevel: Ready
+  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  accessUrl: http://localhost:8096
+  tags:
+    - Movies
+    - Music
+    - Streaming
+    - Media library
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Movies and TV
+    - Music libraries
+    - Streaming around the house
+  highlights:
+    - No paid account required
+    - User profiles
+    - Hardware transcoding support
+  plainLanguage: Jellyfin organizes your media and makes it easy to stream from TVs, phones, tablets, and browsers around your home.
+technical:
+  summary: Deploys a Jellyfin container with mapped media directories, config storage, optional GPU device passthrough, and private network access.
+  requirements:
+    - 1 CPU core
+    - 1 GB RAM
+    - Media storage location
+    - Optional GPU for transcoding
+  includes:
+    - Jellyfin server
+    - Config volume
+    - Media mounts
+    - Optional hardware profile
+  configuration:
+    - label: Container name
+      value: jellyfin
+    - label: Network
+      value: project-os-media
+    - label: Ports
+      value: 8096:8096
+    - label: Data storage
+      value: /var/lib/project-os/apps/jellyfin/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: Local network and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Local access is useful for TVs and streaming boxes at home.
+    - Private access helps phones and laptops stream while away without opening a public port.
+runtime:
+  containerName: jellyfin
+  composeProject: project-os-jellyfin
+  image: jellyfin/jellyfin:10.10.3
+  network: project-os-media
+  runtimeRoot: /var/lib/project-os/apps/jellyfin
+  ports:
+    - 8096:8096
+  volumes:
+    - /var/lib/project-os/apps/jellyfin/config:/config
+    - /var/lib/project-os/apps/jellyfin/cache:/cache
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=jellyfin
+    - project-os.version=10.10.3
+  backupPaths:
+    - config
+  privileged: false

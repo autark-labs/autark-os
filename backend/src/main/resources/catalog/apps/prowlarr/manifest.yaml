@@ -1,0 +1,173 @@
+id: prowlarr
+metadata:
+  name: Prowlarr
+  category: Media
+  description: Indexer manager for Sonarr, Radarr, and other media automation tools.
+  shortValue: Manage media indexers once and share them with compatible apps.
+  badge: Verified
+  downloads: 1.1M
+  rating: '4.7'
+  image: /app-images/prowlarr.svg
+  version: latest
+  lastUpdated: Recently
+  size: 190 MB
+  maintainer: Prowlarr Community
+  source: GitHub
+  sourceUrl: https://github.com/Prowlarr/Prowlarr
+  documentationUrl: https://wiki.servarr.com/prowlarr
+  installTime: 3-5 minutes
+  difficulty: Advanced
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:9696
+  tags:
+    - Indexers
+    - Media automation
+    - Arr stack
+    - Advanced
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Managing indexers
+    - Connecting Sonarr and Radarr
+    - Reducing repeated media setup
+  highlights:
+    - Central indexer management
+    - Sonarr and Radarr sync
+    - Advanced media workflows
+  plainLanguage: Prowlarr helps advanced media users connect indexers to Sonarr, Radarr, and similar tools from one place.
+technical:
+  summary: Deploys Prowlarr with persistent configuration, local dashboard access, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Compatible media automation apps
+  includes:
+    - Prowlarr dashboard
+    - Indexer configuration storage
+    - App integration settings
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: prowlarr
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 9696:9696
+    - label: Data storage
+      value: /var/lib/project-os/apps/prowlarr/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access should stay private because it stores indexer and app credentials.
+    - Project OS should eventually autowire Prowlarr to Sonarr and Radarr.
+usage:
+  kind: companion-service
+  primaryAction: open-dashboard
+  openUrlLabel: Open Prowlarr
+  headline: Centralize media indexers
+  summary: Project OS starts Prowlarr. Add indexers and connect compatible media apps from the dashboard.
+  setupSteps:
+    - Open Prowlarr.
+    - Add indexers you are allowed to use.
+    - Connect Sonarr, Radarr, or other compatible apps.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Prowlarr is an advanced companion service, not a media player.
+setup:
+  kind: media-stack
+  automation: planned
+  copyableFields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+  integrations:
+    - id: prowlarr-sonarr
+      name: Share indexers with Sonarr
+      targetAppId: sonarr
+      description: Let Prowlarr provide approved TV indexers to Sonarr.
+      requiresApproval: true
+      plannedActions:
+        - Confirm Sonarr is installed and reachable.
+        - Ask for approval before writing app connection settings.
+    - id: prowlarr-radarr
+      name: Share indexers with Radarr
+      targetAppId: radarr
+      description: Let Prowlarr provide approved movie indexers to Radarr.
+      requiresApproval: true
+      plannedActions:
+        - Confirm Radarr is installed and reachable.
+        - Ask for approval before writing app connection settings.
+  userSteps:
+    - Add only indexers you are allowed to use.
+    - Approve each media-app connection before Project OS changes Prowlarr.
+  automationCapabilities:
+    - Can detect Sonarr and Radarr.
+    - Can propose app connection wiring.
+    - Will require approval before changing Prowlarr.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: Indexer manager is ready
+  startingLabel: Starting indexer manager
+  failureLabel: Prowlarr is not responding
+  description: Project OS checks that the Prowlarr dashboard answers before calling it ready.
+runtime:
+  containerName: prowlarr
+  composeProject: project-os-prowlarr
+  image: lscr.io/linuxserver/prowlarr:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/prowlarr
+  ports:
+    - 9696:9696
+  volumes:
+    - /var/lib/project-os/apps/prowlarr/config:/config
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=prowlarr
+    - project-os.version=latest
+  backupPaths:
+    - config
+  privileged: false

@@ -1,0 +1,319 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  color: #eef2ff;
+  background: #070a12;
+  font-family:
+    Geist Variable, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+
+  /* Project OS design tokens */
+  --po-bg-app: #070a12;
+  --po-bg-page: #080d19;
+  --po-bg-page-soft: #0b1220;
+  --po-bg-mesh:
+    radial-gradient(circle at 20% -10%, rgb(139 92 246 / 0.18), transparent 30rem),
+    radial-gradient(circle at 88% 0%, rgb(56 189 248 / 0.1), transparent 24rem),
+    radial-gradient(circle at 50% 100%, rgb(20 184 166 / 0.07), transparent 34rem),
+    linear-gradient(135deg, #070a12 0%, #101827 45%, #080a11 100%);
+  --po-bg-sidebar: rgb(5 8 18 / 0.88);
+  --po-hero-automation:
+    radial-gradient(circle at top left, rgb(124 58 237 / 0.28), transparent 34%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.96), rgb(2 6 23 / 0.98));
+  --po-hero-backups:
+    radial-gradient(circle at top left, rgb(139 92 246 / 0.22), transparent 32%),
+    radial-gradient(circle at top right, rgb(20 184 166 / 0.15), transparent 30%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.96));
+  --po-hero-devices:
+    radial-gradient(circle at top left, rgb(34 211 238 / 0.2), transparent 30%),
+    radial-gradient(circle at top right, rgb(16 185 129 / 0.18), transparent 28%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.96));
+  --po-hero-monitoring:
+    radial-gradient(circle at top left, rgb(124 58 237 / 0.24), transparent 34%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.96));
+  --po-hero-marketplace:
+    linear-gradient(135deg, rgb(88 28 135 / 0.28), rgb(15 23 42 / 0.74) 45%, rgb(14 116 144 / 0.18));
+  --po-hero-marketplace-handoff:
+    linear-gradient(135deg, rgb(6 78 59 / 0.28), rgb(15 23 42 / 0.78) 48%, rgb(88 28 135 / 0.18));
+  --po-hero-app-spotlight:
+    linear-gradient(135deg, rgb(88 28 135 / 0.28), rgb(15 23 42 / 0.72) 42%, rgb(8 47 73 / 0.26));
+  --po-hero-settings:
+    radial-gradient(circle at top left, rgb(139 92 246 / 0.2), transparent 30%),
+    radial-gradient(circle at top right, rgb(14 165 233 / 0.12), transparent 28%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.96));
+  --po-hero-storage:
+    radial-gradient(circle at top left, rgb(16 185 129 / 0.18), transparent 30%),
+    radial-gradient(circle at top right, rgb(245 158 11 / 0.14), transparent 28%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.96));
+  --po-hero-support:
+    radial-gradient(circle at top left, rgb(14 165 233 / 0.2), transparent 32%),
+    radial-gradient(circle at top right, rgb(124 58 237 / 0.2), transparent 28%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.96));
+  --po-overview-side-overlay: linear-gradient(90deg, rgb(4 9 22 / 0.56) 0%, rgb(4 9 22 / 0.16) 46%, rgb(4 9 22 / 0.3) 100%);
+  --po-overview-vertical-overlay: linear-gradient(180deg, rgb(4 9 22 / 0.04) 0%, rgb(4 9 22 / 0) 40%, rgb(4 9 22 / 0.5) 100%);
+  --po-overview-bottom-fade: linear-gradient(180deg, transparent, #050b18 90%);
+  --po-card-amber-gradient: linear-gradient(135deg, #261809, #0d1830);
+  --po-card-purple-gradient: linear-gradient(135deg, #211244, #0d1830);
+  --po-card-red-gradient: linear-gradient(135deg, #2a1018, #0d1830);
+
+  --po-surface-base: rgb(15 23 42 / 0.72);
+  --po-surface-soft: rgb(15 23 42 / 0.52);
+  --po-surface-elevated: rgb(17 24 39 / 0.82);
+  --po-surface-inset: rgb(2 6 23 / 0.58);
+  --po-surface-hover: rgb(30 41 59 / 0.62);
+
+  --po-border-subtle: rgb(255 255 255 / 0.1);
+  --po-border-strong: rgb(148 163 184 / 0.32);
+  --po-border-accent: rgb(167 139 250 / 0.34);
+
+  --po-text-primary: #f5f7ff;
+  --po-text-secondary: #c8d2e3;
+  --po-text-muted: #8794aa;
+  --po-text-disabled: #556174;
+
+  --po-brand: #8b5cf6;
+  --po-brand-strong: #a78bfa;
+  --po-brand-soft: rgb(139 92 246 / 0.14);
+  --po-brand-gradient: linear-gradient(135deg, #8b5cf6 0%, #6d5dfc 52%, #38bdf8 100%);
+
+  --po-success: #10b981;
+  --po-success-soft: rgb(16 185 129 / 0.12);
+  --po-success-border: rgb(52 211 153 / 0.28);
+  --po-warning: #f59e0b;
+  --po-warning-soft: rgb(245 158 11 / 0.13);
+  --po-warning-border: rgb(251 191 36 / 0.3);
+  --po-danger: #ef4444;
+  --po-danger-soft: rgb(239 68 68 / 0.13);
+  --po-danger-border: rgb(248 113 113 / 0.3);
+  --po-info: #38bdf8;
+  --po-info-soft: rgb(56 189 248 / 0.12);
+  --po-info-border: rgb(56 189 248 / 0.28);
+  --po-teal: #14b8a6;
+  --po-teal-soft: rgb(20 184 166 / 0.12);
+  --po-teal-border: rgb(45 212 191 / 0.28);
+
+  --po-accent-overview: #8b5cf6;
+  --po-accent-applications: #38bdf8;
+  --po-accent-marketplace: #a78bfa;
+  --po-accent-network: #14b8a6;
+  --po-accent-storage: #2dd4bf;
+  --po-accent-backups: #22c55e;
+  --po-accent-monitoring: #f59e0b;
+  --po-accent-automation: #60a5fa;
+  --po-accent-settings: #94a3b8;
+  --po-accent-support: #38bdf8;
+
+  --po-radius-xs: 0.375rem;
+  --po-radius-sm: 0.5rem;
+  --po-radius-md: 0.75rem;
+  --po-radius-lg: 1rem;
+  --po-radius-xl: 1.25rem;
+  --po-radius-full: 9999px;
+
+  --po-shadow-sm: 0 8px 24px rgb(0 0 0 / 0.18);
+  --po-shadow-md: 0 18px 54px rgb(0 0 0 / 0.24);
+  --po-shadow-lg: 0 28px 90px rgb(0 0 0 / 0.34);
+  --po-shadow-frame: 0 24px 80px rgb(0 0 0 / 0.22);
+  --po-shadow-panel: 0 18px 60px rgb(0 0 0 / 0.2);
+  --po-shadow-card: 0 18px 50px rgb(0 0 0 / 0.18);
+  --po-shadow-sidebar: 10px 0 42px rgb(0 0 0 / 0.28);
+  --po-glow-brand: 0 0 0 1px rgb(167 139 250 / 0.24), 0 18px 55px rgb(124 58 237 / 0.28);
+  --po-glow-success: 0 0 0 1px rgb(52 211 153 / 0.18), 0 14px 42px rgb(16 185 129 / 0.18);
+  --po-glow-warning: 0 0 0 1px rgb(251 191 36 / 0.2), 0 14px 42px rgb(245 158 11 / 0.16);
+  --po-glow-danger: 0 0 0 1px rgb(248 113 113 / 0.22), 0 14px 42px rgb(239 68 68 / 0.16);
+  --po-glow-info: 0 0 0 1px rgb(56 189 248 / 0.2), 0 14px 42px rgb(56 189 248 / 0.14);
+  --po-glow-teal: 0 0 0 1px rgb(45 212 191 / 0.18), 0 14px 42px rgb(20 184 166 / 0.14);
+  --po-pulse-brand: 0 0 0 5px rgb(139 92 246 / 0.16);
+  --po-pulse-success: 0 0 0 5px rgb(16 185 129 / 0.16);
+  --po-pulse-warning: 0 0 0 5px rgb(245 158 11 / 0.16);
+  --po-pulse-danger: 0 0 0 5px rgb(239 68 68 / 0.16);
+  --po-pulse-info: 0 0 0 5px rgb(56 189 248 / 0.16);
+  --po-pulse-teal: 0 0 0 5px rgb(20 184 166 / 0.16);
+  --po-pulse-neutral: 0 0 0 5px rgb(135 148 170 / 0.12);
+
+  --po-space-page-x: clamp(1.25rem, 2vw, 2rem);
+  --po-space-page-y: clamp(1.25rem, 2vw, 2rem);
+  --po-space-section: 1.25rem;
+  --po-space-card: 1.25rem;
+
+  --po-type-hero: clamp(2.25rem, 4vw, 4rem);
+  --po-type-h1: clamp(2rem, 3vw, 3rem);
+  --po-type-h2: 1.5rem;
+  --po-type-body: 0.9375rem;
+  --po-type-small: 0.8125rem;
+  --po-type-caption: 0.75rem;
+
+  --background: oklch(0.12 0.025 265);
+  --foreground: oklch(0.98 0.005 260);
+  --card: oklch(0.18 0.03 265);
+  --card-foreground: oklch(0.98 0.005 260);
+  --popover: oklch(0.16 0.03 265);
+  --popover-foreground: oklch(0.98 0.005 260);
+  --primary: oklch(0.59 0.22 292);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.23 0.03 265);
+  --secondary-foreground: oklch(0.95 0.01 260);
+  --muted: oklch(0.23 0.03 265);
+  --muted-foreground: oklch(0.68 0.02 260);
+  --accent: oklch(0.27 0.06 285);
+  --accent-foreground: oklch(0.96 0.02 285);
+  --destructive: oklch(0.62 0.22 25);
+  --border: oklch(0.34 0.03 265);
+  --input: oklch(0.28 0.03 265);
+  --ring: oklch(0.66 0.2 292);
+  --chart-1: oklch(0.66 0.2 292);
+  --chart-2: oklch(0.69 0.17 250);
+  --chart-3: oklch(0.72 0.16 160);
+  --chart-4: oklch(0.78 0.16 80);
+  --chart-5: oklch(0.68 0.19 25);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.15 0.03 265);
+  --sidebar-foreground: oklch(0.94 0.01 260);
+  --sidebar-primary: oklch(0.59 0.22 292);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.23 0.03 265);
+  --sidebar-accent-foreground: oklch(0.95 0.01 260);
+  --sidebar-border: oklch(0.34 0.03 265);
+  --sidebar-ring: oklch(0.66 0.2 292);
+}
+
+@theme inline {
+  --color-po-bg: var(--po-bg-app);
+  --color-po-page: var(--po-bg-page);
+  --color-po-page-soft: var(--po-bg-page-soft);
+  --color-po-sidebar: var(--po-bg-sidebar);
+  --color-po-surface: var(--po-surface-base);
+  --color-po-surface-soft: var(--po-surface-soft);
+  --color-po-surface-elevated: var(--po-surface-elevated);
+  --color-po-surface-inset: var(--po-surface-inset);
+  --color-po-surface-hover: var(--po-surface-hover);
+  --color-po-brand-soft: var(--po-brand-soft);
+  --color-po-success-soft: var(--po-success-soft);
+  --color-po-success-border: var(--po-success-border);
+  --color-po-warning-soft: var(--po-warning-soft);
+  --color-po-warning-border: var(--po-warning-border);
+  --color-po-danger-soft: var(--po-danger-soft);
+  --color-po-danger-border: var(--po-danger-border);
+  --color-po-info-soft: var(--po-info-soft);
+  --color-po-info-border: var(--po-info-border);
+  --color-po-teal-soft: var(--po-teal-soft);
+  --color-po-teal-border: var(--po-teal-border);
+  --color-po-border: var(--po-border-subtle);
+  --color-po-border-strong: var(--po-border-strong);
+  --color-po-border-accent: var(--po-border-accent);
+  --color-po-text: var(--po-text-primary);
+  --color-po-text-secondary: var(--po-text-secondary);
+  --color-po-text-muted: var(--po-text-muted);
+  --color-po-text-disabled: var(--po-text-disabled);
+  --color-po-brand: var(--po-brand);
+  --color-po-brand-strong: var(--po-brand-strong);
+  --color-po-success: var(--po-success);
+  --color-po-warning: var(--po-warning);
+  --color-po-danger: var(--po-danger);
+  --color-po-info: var(--po-info);
+  --color-po-teal: var(--po-teal);
+  --color-po-overview: var(--po-accent-overview);
+  --color-po-applications: var(--po-accent-applications);
+  --color-po-marketplace: var(--po-accent-marketplace);
+  --color-po-network: var(--po-accent-network);
+  --color-po-storage: var(--po-accent-storage);
+  --color-po-backups: var(--po-accent-backups);
+  --color-po-monitoring: var(--po-accent-monitoring);
+  --color-po-automation: var(--po-accent-automation);
+  --color-po-settings: var(--po-accent-settings);
+  --color-po-support: var(--po-accent-support);
+  --background-image-po-bg-mesh: var(--po-bg-mesh);
+  --background-image-po-brand-gradient: var(--po-brand-gradient);
+  --background-image-po-hero-automation: var(--po-hero-automation);
+  --background-image-po-hero-backups: var(--po-hero-backups);
+  --background-image-po-hero-devices: var(--po-hero-devices);
+  --background-image-po-hero-monitoring: var(--po-hero-monitoring);
+  --background-image-po-hero-marketplace: var(--po-hero-marketplace);
+  --background-image-po-hero-marketplace-handoff: var(--po-hero-marketplace-handoff);
+  --background-image-po-hero-app-spotlight: var(--po-hero-app-spotlight);
+  --background-image-po-hero-settings: var(--po-hero-settings);
+  --background-image-po-hero-storage: var(--po-hero-storage);
+  --background-image-po-hero-support: var(--po-hero-support);
+  --background-image-po-overview-side-overlay: var(--po-overview-side-overlay);
+  --background-image-po-overview-vertical-overlay: var(--po-overview-vertical-overlay);
+  --background-image-po-overview-bottom-fade: var(--po-overview-bottom-fade);
+  --background-image-po-card-amber: var(--po-card-amber-gradient);
+  --background-image-po-card-purple: var(--po-card-purple-gradient);
+  --background-image-po-card-red: var(--po-card-red-gradient);
+  --radius-po-xs: var(--po-radius-xs);
+  --radius-po-sm: var(--po-radius-sm);
+  --radius-po-md: var(--po-radius-md);
+  --radius-po-lg: var(--po-radius-lg);
+  --radius-po-xl: var(--po-radius-xl);
+  --shadow-po-sm: var(--po-shadow-sm);
+  --shadow-po-md: var(--po-shadow-md);
+  --shadow-po-lg: var(--po-shadow-lg);
+  --shadow-po-frame: var(--po-shadow-frame);
+  --shadow-po-panel: var(--po-shadow-panel);
+  --shadow-po-card: var(--po-shadow-card);
+  --shadow-po-sidebar: var(--po-shadow-sidebar);
+  --shadow-po-brand-glow: var(--po-glow-brand);
+  --shadow-po-success-glow: var(--po-glow-success);
+  --shadow-po-warning-glow: var(--po-glow-warning);
+  --shadow-po-danger-glow: var(--po-glow-danger);
+  --shadow-po-info-glow: var(--po-glow-info);
+  --shadow-po-teal-glow: var(--po-glow-teal);
+  --shadow-po-pulse-brand: var(--po-pulse-brand);
+  --shadow-po-pulse-success: var(--po-pulse-success);
+  --shadow-po-pulse-warning: var(--po-pulse-warning);
+  --shadow-po-pulse-danger: var(--po-pulse-danger);
+  --shadow-po-pulse-info: var(--po-pulse-info);
+  --shadow-po-pulse-teal: var(--po-pulse-teal);
+  --shadow-po-pulse-neutral: var(--po-pulse-neutral);
+  --container-po-page: 92.5rem;
+  --container-po-page-wide: 93.75rem;
+  --text-po-hero: var(--po-type-hero);
+  --text-po-h1: var(--po-type-h1);
+  --text-po-h2: var(--po-type-h2);
+  --text-po-body: var(--po-type-body);
+  --text-po-small: var(--po-type-small);
+  --text-po-caption: var(--po-type-caption);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--po-bg-app);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--po-bg-app);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(139 92 246 / 0.35);
+  color: var(--po-text-primary);
+}
+
+.po-page-tall {
+  min-height: calc(100vh - 2.5rem);
+}
+
+@media (min-width: 48rem) {
+  .po-page-tall {
+    min-height: calc(100vh - 4rem);
+  }
+}

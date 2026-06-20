@@ -1,0 +1,138 @@
+id: actual-budget
+metadata:
+  name: Actual Budget
+  category: Productivity
+  description: Private envelope budgeting and personal finance tracking.
+  shortValue: Run a private budgeting app for household finances.
+  badge: Verified
+  downloads: 520K
+  rating: '4.7'
+  image: /app-images/actual-budget.svg
+  version: latest
+  lastUpdated: Recently
+  size: 190 MB
+  maintainer: Actual Budget Community
+  source: GitHub
+  sourceUrl: https://github.com/actualbudget/actual
+  documentationUrl: https://actualbudget.org/docs/
+  installTime: 2-4 minutes
+  difficulty: Easy
+  supportLevel: Ready
+  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  accessUrl: http://localhost:5006
+  tags:
+    - Budgeting
+    - Finance
+    - Household
+    - Privacy
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Household budgets
+    - Expense tracking
+    - Private finance records
+  highlights:
+    - Envelope-style budgeting
+    - Private local data
+    - Sync server for clients
+  plainLanguage: Actual Budget gives you a private place to manage household budgets and spending without putting finance records in a public cloud.
+technical:
+  summary: Deploys Actual Budget with persistent server files, local web access, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 256 MB RAM
+    - Persistent storage volume
+  includes:
+    - Actual Budget server
+    - Budget files storage
+    - Local dashboard
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: actual-budget
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 5006:5006
+    - label: Data storage
+      value: /var/lib/project-os/apps/actual-budget/data
+    - label: Backup
+      value: Budget data daily
+    - label: Access
+      value: Private
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is recommended because this stores financial information.
+    - First-run setup creates or imports a budget file.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Actual Budget
+  headline: Start a private household budget
+  summary: Project OS starts Actual Budget and prepares storage. Create or import your first budget in the app.
+  setupSteps:
+    - Open Actual Budget.
+    - Create or import a budget.
+    - Keep private access enabled for use away from home.
+  fields:
+    - label: Budget URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: true
+  notes:
+    - Backups are important because this stores finance records.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 180
+  successLabel: Budget app is ready
+  startingLabel: Starting budget app
+  failureLabel: Actual Budget is not responding
+  description: Project OS checks that the Actual Budget app answers before calling it ready.
+runtime:
+  containerName: actual-budget
+  composeProject: project-os-actual-budget
+  image: actualbudget/actual-server:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/actual-budget
+  ports:
+    - 5006:5006
+  volumes:
+    - /var/lib/project-os/apps/actual-budget/data:/data
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=actual-budget
+    - project-os.version=latest
+  backupPaths:
+    - data
+  privileged: false

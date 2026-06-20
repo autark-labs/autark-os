@@ -1,0 +1,2 @@
+# Placeholder compose file for obsidian-livesync. Project OS renders the runtime compose file from manifest.yaml.
+services: {}

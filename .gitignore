@@ -1,0 +1,42 @@
+# System
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Java / Spring
+backend/target/
+backend/build/
+backend/bin/
+backend/.gradle/
+*.class
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env.local
+frontend/.env.*.local
+
+# Release bundles and generated installers
+release/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local Project OS runtime data
+runtime/
+runtime/**/*
+runtime/project-os/project-os.db
+*.db
+*.db-shm
+*.db-wal
+
+# Local screenshots and smoke-test captures
+screenshots/

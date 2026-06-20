@@ -1,0 +1,2 @@
+# Placeholder compose file for jellyfin. Story 1 only validates manifests and generates install plans.
+services: {}

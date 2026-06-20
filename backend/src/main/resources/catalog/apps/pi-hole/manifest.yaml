@@ -1,0 +1,149 @@
+id: pi-hole
+metadata:
+  name: Pi-hole
+  category: Network
+  description: Network-wide DNS filtering for ads, trackers, and unwanted domains.
+  shortValue: Block ads and trackers for devices on your home network.
+  badge: Official
+  downloads: 3.8M
+  rating: '4.8'
+  image: /app-images/pi-hole.svg
+  version: latest
+  lastUpdated: Recently
+  size: 220 MB
+  maintainer: Pi-hole Community
+  source: GitHub
+  sourceUrl: https://github.com/pi-hole/pi-hole
+  documentationUrl: https://docs.pi-hole.net/
+  installTime: 3-5 minutes
+  difficulty: Moderate
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:8081
+  tags:
+    - DNS
+    - Ad blocking
+    - Privacy
+    - Network
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Whole-home ad blocking
+    - DNS query visibility
+    - Reducing trackers
+  highlights:
+    - DNS sinkhole filtering
+    - Query dashboard
+    - Blocklist management
+  plainLanguage: Pi-hole filters DNS requests so phones, TVs, and computers on your network can avoid many ads and trackers.
+technical:
+  summary: Deploys Pi-hole with persistent DNS configuration, web dashboard, and mapped DNS ports on alternate host ports to avoid conflict with existing DNS services.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Router or device DNS configuration
+  includes:
+    - DNS filtering service
+    - Web dashboard
+    - Persistent blocklists
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: pi-hole
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 5353:53/tcp, 5353:53/udp, 8081:80
+    - label: Data storage
+      value: /var/lib/project-os/apps/pi-hole/etc-pihole
+    - label: Backup
+      value: DNS settings daily
+    - label: Access
+      value: Local network DNS, private dashboard
+access:
+  kind: multi-port
+  defaultMode: local
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access should stay private because it controls DNS filtering.
+    - DNS service needs router or device configuration before it affects your network.
+usage:
+  kind: infrastructure
+  primaryAction: open-dashboard
+  openUrlLabel: Open Pi-hole dashboard
+  headline: Configure network-wide DNS filtering
+  summary: Project OS starts Pi-hole. Point devices or your router at the DNS port when you are ready to use it.
+  setupSteps:
+    - Open the Pi-hole dashboard.
+    - Set the admin password if prompted.
+    - Configure your router or devices to use the Project OS host for DNS.
+    - Keep dashboard access private.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+    - label: DNS Port
+      value: "5353"
+      sensitive: false
+      qr: false
+  notes:
+    - This manifest uses host port 5353 to avoid conflicting with AdGuard Home on port 53.
+health:
+  type: http
+  path: /admin/
+  startupGraceSeconds: 240
+  successLabel: DNS dashboard is ready
+  startingLabel: Starting DNS filtering
+  failureLabel: Pi-hole dashboard is not responding
+  description: Project OS checks that the Pi-hole dashboard answers before calling it ready.
+runtime:
+  containerName: pi-hole
+  composeProject: project-os-pi-hole
+  image: pihole/pihole:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/pi-hole
+  ports:
+    - 5353:53/tcp
+    - 5353:53/udp
+    - 8081:80
+  volumes:
+    - /var/lib/project-os/apps/pi-hole/etc-pihole:/etc/pihole
+    - /var/lib/project-os/apps/pi-hole/etc-dnsmasq:/etc/dnsmasq.d
+  environment:
+    - TZ=UTC
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=pi-hole
+    - project-os.version=latest
+  backupPaths:
+    - etc-pihole
+    - etc-dnsmasq
+  privileged: false

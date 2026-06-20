@@ -1,0 +1,179 @@
+id: qbittorrent
+metadata:
+  name: qBittorrent
+  category: Utilities
+  description: Web-managed BitTorrent client for downloads and media workflows.
+  shortValue: Manage downloads from a private web dashboard.
+  badge: Verified
+  downloads: 2.4M
+  rating: '4.7'
+  image: /app-images/qbittorrent.svg
+  version: latest
+  lastUpdated: Recently
+  size: 180 MB
+  maintainer: LinuxServer.io
+  source: GitHub
+  sourceUrl: https://github.com/qbittorrent/qBittorrent
+  documentationUrl: https://github.com/qbittorrent/qBittorrent/wiki
+  installTime: 3-5 minutes
+  difficulty: Advanced
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:8085
+  tags:
+    - Downloads
+    - Torrents
+    - Media automation
+    - Web UI
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Private download management
+    - Media automation companion workflows
+    - Remote download dashboard
+  highlights:
+    - Web dashboard
+    - Download folder management
+    - Integrates with media tools
+  plainLanguage: qBittorrent provides a private web dashboard for managing downloads. Use it only for content you are legally allowed to download.
+technical:
+  summary: Deploys qBittorrent with persistent configuration, downloads storage, web dashboard, and mapped transfer ports.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Download storage
+    - Responsible/legal content usage
+  includes:
+    - qBittorrent web UI
+    - Download storage folder
+    - Transfer ports
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: qbittorrent
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8085:8080, 6881:6881
+    - label: Data storage
+      value: /var/lib/project-os/apps/qbittorrent/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: Private dashboard
+access:
+  kind: multi-port
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access should stay private because it controls downloads.
+    - Use this only for lawful downloads and local workflows.
+usage:
+  kind: companion-service
+  primaryAction: open-dashboard
+  openUrlLabel: Open qBittorrent
+  headline: Manage downloads privately
+  summary: Project OS starts qBittorrent and prepares folders. Configure credentials and download behavior in the dashboard.
+  setupSteps:
+    - Open the qBittorrent web UI.
+    - Change default credentials if prompted.
+    - Choose download folders and connection settings.
+    - Connect Sonarr or Radarr only if desired.
+  fields:
+    - label: Web UI
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Project OS should eventually warn clearly before enabling any public transfer ports.
+setup:
+  kind: media-stack
+  automation: planned
+  copyableFields:
+    - label: Web UI
+      value: "{accessUrl}"
+      sensitive: false
+  integrations:
+    - id: qbittorrent-sonarr
+      name: Receive Sonarr downloads
+      targetAppId: sonarr
+      description: Let Sonarr send approved TV downloads to this qBittorrent instance.
+      requiresApproval: true
+      plannedActions:
+        - Confirm Sonarr is installed and reachable.
+        - Ask before adding qBittorrent as a Sonarr download client.
+    - id: qbittorrent-radarr
+      name: Receive Radarr downloads
+      targetAppId: radarr
+      description: Let Radarr send approved movie downloads to this qBittorrent instance.
+      requiresApproval: true
+      plannedActions:
+        - Confirm Radarr is installed and reachable.
+        - Ask before adding qBittorrent as a Radarr download client.
+  userSteps:
+    - Review download folders and credentials in qBittorrent.
+    - Approve media-app connections before Project OS changes anything.
+  automationCapabilities:
+    - Can detect Sonarr and Radarr.
+    - Can propose download-client wiring.
+    - Will require approval before changing qBittorrent or media apps.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: Download dashboard is ready
+  startingLabel: Starting download client
+  failureLabel: qBittorrent is not responding
+  description: Project OS checks that the qBittorrent web UI answers before calling it ready.
+runtime:
+  containerName: qbittorrent
+  composeProject: project-os-qbittorrent
+  image: lscr.io/linuxserver/qbittorrent:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/qbittorrent
+  ports:
+    - 8085:8080
+    - 6881:6881/tcp
+    - 6881:6881/udp
+  volumes:
+    - /var/lib/project-os/apps/qbittorrent/config:/config
+    - /var/lib/project-os/apps/qbittorrent/downloads:/downloads
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+    - WEBUI_PORT=8080
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=qbittorrent
+    - project-os.version=latest
+  backupPaths:
+    - config
+  privileged: false

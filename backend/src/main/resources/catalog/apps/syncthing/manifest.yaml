@@ -1,0 +1,145 @@
+id: syncthing
+metadata:
+  name: Syncthing
+  category: Productivity
+  description: Keep folders synchronized across computers, phones, and servers.
+  shortValue: Private file sync without a cloud storage account.
+  badge: Official
+  downloads: 1.6M
+  rating: '4.8'
+  image: /app-images/syncthing.svg
+  version: latest
+  lastUpdated: Recently
+  size: 95 MB
+  maintainer: Syncthing Foundation
+  source: GitHub
+  sourceUrl: https://github.com/syncthing/syncthing
+  documentationUrl: https://docs.syncthing.net/
+  installTime: 3-5 minutes
+  difficulty: Moderate
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:8384
+  tags:
+    - File sync
+    - Backups
+    - Devices
+    - Peer-to-peer
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Syncing documents between devices
+    - Keeping laptop folders backed up
+    - Sharing family files privately
+  highlights:
+    - No central cloud account
+    - Device-to-device sync
+    - Per-folder permissions
+  plainLanguage: Syncthing keeps selected folders matched across your devices so files stay available without sending them through a third-party cloud drive.
+technical:
+  summary: Deploys Syncthing with a persistent config folder, web dashboard, sync ports, discovery port, and Project-OS managed backup metadata.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Folder storage for synced files
+    - Device pairing during first setup
+  includes:
+    - Syncthing service
+    - Web management dashboard
+    - Sync and discovery ports
+    - Config backup profile
+  configuration:
+    - label: Container name
+      value: syncthing
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8384:8384, 22000, 21027/udp
+    - label: Data storage
+      value: /var/lib/project-os/apps/syncthing/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: LAN and Tailscale dashboard
+access:
+  kind: multi-port
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - The dashboard should stay private because it controls synced folders and devices.
+    - Sync and discovery ports are useful on the local network for device pairing.
+usage:
+  kind: companion-service
+  primaryAction: pair-devices
+  openUrlLabel: Open Syncthing dashboard
+  headline: Pair your devices with Syncthing
+  summary: Project OS starts the sync service. You choose which devices and folders are allowed to sync from the Syncthing dashboard.
+  setupSteps:
+    - Open the Syncthing dashboard.
+    - Add each trusted phone, laptop, or desktop by scanning or copying its device ID.
+    - Choose the folders you want to sync and confirm the share on the other device.
+    - Keep the dashboard private because it controls synced folders.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: true
+  notes:
+    - Syncthing intentionally requires device approval so files are not shared by accident.
+    - Project OS can start the service, but you still choose which devices and folders are trusted.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: Ready to pair devices
+  startingLabel: Starting sync dashboard
+  failureLabel: Sync dashboard is not responding
+  description: Project OS checks that the Syncthing dashboard answers before calling it ready.
+runtime:
+  containerName: syncthing
+  composeProject: project-os-syncthing
+  image: syncthing/syncthing:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/syncthing
+  ports:
+    - 8384:8384
+    - 22000:22000/tcp
+    - 22000:22000/udp
+    - 21027:21027/udp
+  volumes:
+    - /var/lib/project-os/apps/syncthing/config:/var/syncthing/config
+    - /var/lib/project-os/apps/syncthing/data:/var/syncthing/data
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=syncthing
+    - project-os.version=latest
+  backupPaths:
+    - config
+  privileged: false

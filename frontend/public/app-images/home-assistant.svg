@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-label="Home Assistant service image">
+  <rect width="160" height="120" rx="18" fill="#111827"/>
+  <path d="M32 61l48-39 48 39v44a7 7 0 0 1-7 7H39a7 7 0 0 1-7-7V61z" fill="#0ea5e9"/>
+  <path d="M56 112V74h48v38" fill="#38bdf8"/>
+  <circle cx="62" cy="56" r="7" fill="#e0f2fe"/>
+  <circle cx="98" cy="56" r="7" fill="#e0f2fe"/>
+  <path d="M62 56h36M80 56v18" stroke="#e0f2fe" stroke-width="6" stroke-linecap="round"/>
+</svg>

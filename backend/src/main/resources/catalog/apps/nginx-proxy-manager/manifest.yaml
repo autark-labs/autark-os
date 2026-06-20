@@ -1,0 +1,142 @@
+id: nginx-proxy-manager
+metadata:
+  name: Nginx Proxy Manager
+  category: Network
+  description: Friendly reverse proxy management for HTTP services and certificates.
+  shortValue: Manage proxy hosts and certificates from a web UI.
+  badge: Verified
+  downloads: 2.5M
+  rating: '4.7'
+  image: /app-images/nginx-proxy-manager.svg
+  version: latest
+  lastUpdated: Recently
+  size: 330 MB
+  maintainer: Nginx Proxy Manager Community
+  source: GitHub
+  sourceUrl: https://github.com/NginxProxyManager/nginx-proxy-manager
+  documentationUrl: https://nginxproxymanager.com/guide/
+  installTime: 3-5 minutes
+  difficulty: Moderate
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:8181
+  tags:
+    - Proxy
+    - Certificates
+    - Network
+    - Advanced
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Reverse proxy management
+    - Local domain routing
+    - Certificate workflows
+  highlights:
+    - Web-based proxy host setup
+    - Certificate support
+    - Access lists
+  plainLanguage: Nginx Proxy Manager helps advanced users route friendly names to home services without hand-writing Nginx configuration.
+technical:
+  summary: Deploys Nginx Proxy Manager with admin UI, HTTP and HTTPS listener ports, persistent config, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Network ports for proxy traffic
+  includes:
+    - Admin web UI
+    - HTTP listener
+    - HTTPS listener
+    - Configuration backup profile
+  configuration:
+    - label: Container name
+      value: nginx-proxy-manager
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8181:81, 8088:80, 8443:443
+    - label: Data storage
+      value: /var/lib/project-os/apps/nginx-proxy-manager/data
+    - label: Backup
+      value: Proxy config daily
+    - label: Access
+      value: Local admin, advanced networking
+access:
+  kind: multi-port
+  defaultMode: local
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - This is an advanced networking tool and should not be exposed publicly by default.
+    - First-run setup changes the default admin credentials.
+usage:
+  kind: admin-service
+  primaryAction: open-dashboard
+  openUrlLabel: Open proxy manager
+  headline: Configure advanced service routing
+  summary: Project OS starts the proxy manager. Use it when you intentionally want custom routing beyond Project OS private links.
+  setupSteps:
+    - Open the admin UI.
+    - Change the default login immediately.
+    - Add proxy hosts only for services you intend to expose.
+  fields:
+    - label: Admin URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Prefer Project OS private links for normal apps. Use this for advanced routing.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: Proxy manager is ready
+  startingLabel: Starting proxy manager
+  failureLabel: Proxy manager is not responding
+  description: Project OS checks that the admin UI answers before calling it ready.
+runtime:
+  containerName: nginx-proxy-manager
+  composeProject: project-os-nginx-proxy-manager
+  image: jc21/nginx-proxy-manager:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/nginx-proxy-manager
+  ports:
+    - 8181:81
+    - 8088:80
+    - 8443:443
+  volumes:
+    - /var/lib/project-os/apps/nginx-proxy-manager/data:/data
+    - /var/lib/project-os/apps/nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=nginx-proxy-manager
+    - project-os.version=latest
+  backupPaths:
+    - data
+    - letsencrypt
+  privileged: false

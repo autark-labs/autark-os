@@ -1,0 +1,2 @@
+# Placeholder compose file for home-assistant. Story 1 only validates manifests and generates install plans.
+services: {}

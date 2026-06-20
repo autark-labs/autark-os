@@ -1,0 +1,140 @@
+id: freshrss
+metadata:
+  name: FreshRSS
+  category: Productivity
+  description: Private RSS reader and feed aggregator.
+  shortValue: Follow blogs, news, and releases from one private reader.
+  badge: Official
+  downloads: 760K
+  rating: '4.7'
+  image: /app-images/freshrss.svg
+  version: latest
+  lastUpdated: Recently
+  size: 160 MB
+  maintainer: FreshRSS Community
+  source: GitHub
+  sourceUrl: https://github.com/FreshRSS/FreshRSS
+  documentationUrl: https://freshrss.github.io/FreshRSS/
+  installTime: 2-4 minutes
+  difficulty: Easy
+  supportLevel: Ready
+  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  accessUrl: http://localhost:8086
+  tags:
+    - RSS
+    - Reader
+    - News
+    - Feeds
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Following blogs and news
+    - Tracking release feeds
+    - Private reading lists
+  highlights:
+    - Web RSS reader
+    - Feed organization
+    - Mobile reader integrations
+  plainLanguage: FreshRSS collects updates from sites you care about so you can read them in one private place.
+technical:
+  summary: Deploys FreshRSS with persistent feed storage, local web access, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 256 MB RAM
+    - Persistent storage volume
+  includes:
+    - FreshRSS web app
+    - Feed database storage
+    - Extensions folder
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: freshrss
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8086:80
+    - label: Data storage
+      value: /var/lib/project-os/apps/freshrss/data
+    - label: Backup
+      value: Feed data daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is useful for reading feeds away from home.
+    - First-run setup creates the admin account and feed preferences.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open FreshRSS
+  headline: Set up private feed reading
+  summary: Project OS starts FreshRSS. Create an account and add feeds from the web setup.
+  setupSteps:
+    - Open FreshRSS.
+    - Create the first user.
+    - Add RSS feeds or import an OPML file.
+  fields:
+    - label: Reader URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: true
+  notes:
+    - FreshRSS can also work with compatible mobile RSS reader apps.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: RSS reader is ready
+  startingLabel: Starting RSS reader
+  failureLabel: FreshRSS is not responding
+  description: Project OS checks that the FreshRSS web app answers before calling it ready.
+runtime:
+  containerName: freshrss
+  composeProject: project-os-freshrss
+  image: freshrss/freshrss:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/freshrss
+  ports:
+    - 8086:80
+  volumes:
+    - /var/lib/project-os/apps/freshrss/data:/var/www/FreshRSS/data
+    - /var/lib/project-os/apps/freshrss/extensions:/var/www/FreshRSS/extensions
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=freshrss
+    - project-os.version=latest
+  backupPaths:
+    - data
+    - extensions
+  privileged: false

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Actual Budget">
+  <rect width="96" height="96" rx="22" fill="#08170e"/>
+  <rect x="23" y="18" width="50" height="60" rx="10" fill="#16a34a"/>
+  <path d="M34 35h28M34 48h28M34 61h16" stroke="#dcfce7" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="64" cy="62" r="12" fill="#bbf7d0"/>
+  <text x="58" y="68" fill="#166534" font-family="Arial, sans-serif" font-size="16" font-weight="700">$</text>
+</svg>

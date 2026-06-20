@@ -1,0 +1,141 @@
+id: nextcloud
+metadata:
+  name: Nextcloud
+  category: Productivity
+  description: Private file sync, sharing, calendar, contacts, and collaboration.
+  shortValue: A personal cloud for files, photos, calendars, and household documents.
+  badge: Verified
+  downloads: 3.2M
+  rating: '4.7'
+  image: /app-images/nextcloud.svg
+  version: stable
+  lastUpdated: Recently
+  size: 650 MB
+  maintainer: Nextcloud Community
+  source: GitHub
+  sourceUrl: https://github.com/nextcloud/server
+  documentationUrl: https://docs.nextcloud.com/
+  installTime: 5-8 minutes
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: Promising catalog entry that needs deeper end-to-end testing before beginner use.
+  accessUrl: http://localhost:8084
+  tags:
+    - Files
+    - Sync
+    - Calendar
+    - Contacts
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Private file sync
+    - Family document storage
+    - Calendar and contacts
+  highlights:
+    - Web file manager
+    - Desktop and mobile sync clients
+    - Share links and collaboration tools
+  plainLanguage: Nextcloud gives you a private cloud drive for household files, photos, calendars, and contacts without relying on a public storage account.
+technical:
+  summary: Deploys Nextcloud with persistent app storage, user data storage, local web access, and backup metadata.
+  requirements:
+    - 2 CPU cores
+    - 2 GB RAM
+    - Persistent storage for user files
+    - HTTPS or Tailscale access recommended
+  includes:
+    - Nextcloud web app
+    - App configuration storage
+    - User data folder
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: nextcloud
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8084:80
+    - label: Data storage
+      value: /var/lib/project-os/apps/nextcloud/data
+    - label: Backup
+      value: Config and files daily
+    - label: Access
+      value: Tailscale recommended
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is recommended because Nextcloud often stores personal documents.
+    - First-run setup creates the admin account and storage preferences.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Nextcloud
+  headline: Create your private cloud
+  summary: Project OS starts Nextcloud and prepares storage. You create the first admin account in the web setup.
+  setupSteps:
+    - Open Nextcloud.
+    - Create the first admin account.
+    - Add mobile or desktop sync clients if desired.
+  fields:
+    - label: Web URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: true
+  notes:
+    - Use private HTTPS access before syncing devices away from home.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 420
+  successLabel: Cloud dashboard is ready
+  startingLabel: Starting private cloud
+  failureLabel: Nextcloud is not responding
+  description: Project OS checks that the Nextcloud web setup answers before calling it ready.
+runtime:
+  containerName: nextcloud
+  composeProject: project-os-nextcloud
+  image: nextcloud:stable
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/nextcloud
+  ports:
+    - 8084:80
+  volumes:
+    - /var/lib/project-os/apps/nextcloud/html:/var/www/html
+    - /var/lib/project-os/apps/nextcloud/data:/var/www/html/data
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=nextcloud
+    - project-os.version=stable
+  backupPaths:
+    - html
+    - data
+  privileged: false

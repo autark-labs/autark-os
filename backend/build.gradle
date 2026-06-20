@@ -1,0 +1,67 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.projectos'
+version = '0.0.1-SNAPSHOT'
+description = 'Spring Boot backend for project-os-v2'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+def frontendDir = file('../frontend')
+def frontendDistDir = file('../frontend/dist')
+def generatedFrontendResources = layout.buildDirectory.dir('generated/frontend-resources')
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-database-nc-sqlite:12.4.0'
+	implementation 'org.yaml:snakeyaml:2.5'
+	implementation 'org.xerial:sqlite-jdbc:3.50.3.0'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+tasks.register('buildFrontend', Exec) {
+	group = 'build'
+	description = 'Build the Project OS frontend for inclusion in the production backend jar.'
+	workingDir frontendDir
+	commandLine 'yarn', 'build'
+	inputs.files(fileTree(frontendDir) {
+		exclude 'node_modules/**'
+		exclude 'dist/**'
+	})
+	outputs.dir frontendDistDir
+}
+
+tasks.register('copyFrontendAssets', Copy) {
+	group = 'build'
+	description = 'Copy frontend build output into Spring Boot static resources.'
+	dependsOn tasks.named('buildFrontend')
+	from frontendDistDir
+	into generatedFrontendResources.map { it.dir('static') }
+}
+
+tasks.named('bootJar') {
+	dependsOn tasks.named('copyFrontendAssets')
+	from(generatedFrontendResources) {
+		into 'BOOT-INF/classes'
+	}
+}

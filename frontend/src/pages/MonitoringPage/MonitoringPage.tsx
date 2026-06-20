@@ -1,0 +1,1017 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Clock3, Cpu, Database, Download, Filter, HardDrive, HeartPulse, Loader2, MemoryStick, Server, ShieldCheck, Wrench } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { ActivityAPIClient } from '@/api/ActivityAPIClient';
+import { apiErrorMessage } from '@/api/httpClient';
+import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
+import { MonitoringAPIClient } from '@/api/MonitoringAPIClient';
+import { SystemAPIClient } from '@/api/SystemAPIClient';
+import { RefreshStatus } from '@/components/RefreshStatus';
+import { PageErrorState } from '@/components/project-os/PageState';
+import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
+import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { cn } from '@/lib/utils';
+import type { ActivityLog } from '@/types/activity';
+import type { AppReliabilityIssue, AppReliabilitySummary, AppTelemetry } from '@/types/app';
+import type { AppMetricSample, HostMetricSample, MonitoringHistory } from '@/types/monitoring';
+import type { SystemMetrics } from '@/types/system';
+
+const levelFilters = ['all', 'error', 'warning', 'success', 'info'];
+const categoryFilters = ['all', 'install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
+
+type MonitoringState = {
+  activity: ActivityLog[];
+  reliability: AppReliabilitySummary | null;
+  metrics: SystemMetrics | null;
+  telemetryByAppId: Record<string, AppTelemetry>;
+  history: MonitoringHistory | null;
+};
+
+type ChartPoint = {
+  label: string;
+  count: number;
+};
+
+type ResourcePoint = {
+  label: string;
+  cpu: number;
+  memory: number;
+};
+
+type HostTrendPoint = {
+  label: string;
+  cpu: number;
+  memory: number;
+  disk: number;
+};
+
+type AppTrendPoint = {
+  label: string;
+  cpu: number;
+  memory: number;
+};
+
+function MonitoringPage() {
+  const { showAdvancedMetrics } = useProjectSettings();
+  const [state, setState] = useState<MonitoringState>({ activity: [], reliability: null, metrics: null, telemetryByAppId: {}, history: null });
+  const [level, setLevel] = useState('all');
+  const [category, setCategory] = useState('all');
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const filters = useMemo(() => ({
+    level: level === 'all' ? undefined : level,
+    category: category === 'all' ? undefined : category,
+    limit: 120,
+  }), [category, level]);
+
+  async function load(silent = false) {
+    if (silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+    try {
+      const [activity, reliability, metrics, telemetryByAppId, history] = await Promise.all([
+        ActivityAPIClient.recent(filters),
+        InstalledAppsAPIClient.reliabilitySummary(),
+        SystemAPIClient.metrics(),
+        InstalledAppsAPIClient.telemetry(),
+        MonitoringAPIClient.history(60),
+      ]);
+      setState({ activity, reliability, metrics, telemetryByAppId, history });
+      setUpdatedAt(new Date());
+    } catch (loadError) {
+      setError(apiErrorMessage(loadError, 'Monitoring data could not be loaded.'));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, [filters]);
+
+  async function exportDiagnostics() {
+    setExporting(true);
+    setError(null);
+    try {
+      const diagnostics = await MonitoringAPIClient.diagnostics(60);
+      const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `project-os-monitoring-${new Date().toISOString().replaceAll(':', '-')}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (exportError) {
+      setError(apiErrorMessage(exportError, 'Monitoring diagnostics could not be exported.'));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void load(true);
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [filters]);
+
+  const recentFailures = state.activity.filter((event) => event.level === 'error' || event.outcome === 'failed');
+  const recentFixes = state.activity.filter((event) => event.category === 'repair' && event.level === 'success');
+  const reliability = state.reliability;
+  const categoryData = useMemo(() => buildCategoryData(state.activity), [state.activity]);
+  const levelData = useMemo(() => buildLevelData(state.activity), [state.activity]);
+  const resourceData = useMemo(() => buildResourceData(state.telemetryByAppId), [state.telemetryByAppId]);
+  const hostTrendData = useMemo(() => buildHostTrendData(state.history?.hostSamples ?? []), [state.history]);
+  const appTrendData = useMemo(() => buildAppTrendData(state.history?.appSamples ?? []), [state.history]);
+  const highlightedIssue = reliability?.issues[0] ?? null;
+
+  return (
+    <PageShell className="po-page-tall">
+      <SurfaceFrame>
+        <div className="border-b border-white/10 bg-po-hero-monitoring p-6 md:p-7">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-normal text-violet-300">Monitoring</p>
+              <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">System Activity</h1>
+              <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
+                See what Project OS is checking, fixing, and waiting on in the background.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {showAdvancedMetrics && <Button className="border-violet-300/20 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20" disabled={exporting} onClick={() => void exportDiagnostics()} type="button" variant="outline">
+                {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                Export diagnostics
+              </Button>}
+              <RefreshStatus intervalLabel="Auto-updates every 5s" onRefresh={() => void load(true)} refreshing={refreshing} tone="violet" updatedAt={updatedAt} />
+            </div>
+          </div>
+        </div>
+
+        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void load(true)} title="Monitoring data could not refresh" />}
+
+        <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+          <SignalCard
+            icon={postureIcon(reliability?.posture)}
+            label="System posture"
+            value={reliability?.headline || (loading ? 'Checking' : 'No apps yet')}
+            detail={reliability?.summary || 'Project OS will summarize app stability here.'}
+            tone={postureTone(reliability?.posture)}
+          />
+          <SignalCard
+            icon={HeartPulse}
+            label="Healthy apps"
+            value={reliability ? `${reliability.readyApps}/${reliability.totalApps}` : '0/0'}
+            detail={reliability ? `${reliability.needsAttentionApps + reliability.unavailableApps} need attention.` : 'Install apps to begin health tracking.'}
+            tone="green"
+          />
+          <SignalCard
+            icon={Wrench}
+            label="Automatic fixes"
+            value={`${reliability?.recentSuccessfulRepairs ?? recentFixes.length}`}
+            detail={`${reliability?.recentFailedRepairs ?? recentFailures.length} items still need review.`}
+            tone={(reliability?.recentFailedRepairs ?? recentFailures.length) > 0 ? 'amber' : 'violet'}
+          />
+          <SignalCard
+            icon={AlertTriangle}
+            label="Needs attention"
+            value={`${recentFailures.length}`}
+            detail={recentFailures[0]?.title || 'No recent activity needs attention.'}
+            tone={recentFailures.length > 0 ? 'red' : 'slate'}
+          />
+        </div>
+      </SurfaceFrame>
+
+      <SystemActivitySummary highlightedIssue={highlightedIssue} recentFixes={recentFixes} recentEvents={state.activity.slice(0, 5)} reliability={reliability} />
+
+      {showAdvancedMetrics && (
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+          <ProjectOsMetricsPanel
+            categoryData={categoryData}
+            levelData={levelData}
+            reliability={reliability}
+            resourceData={resourceData}
+            appTrendData={appTrendData}
+            history={state.history}
+          />
+          <DeviceInstrumentationPanel hostTrendData={hostTrendData} history={state.history} metrics={state.metrics} />
+        </div>
+      )}
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <SurfacePanel>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Activity className="size-5 text-violet-300" />
+                <h2 className="text-xl font-black text-white">Recent activity</h2>
+              </div>
+              <p className="mt-1 text-sm text-slate-400">{showAdvancedMetrics ? 'Install progress, health checks, repairs, private access changes, and backend warnings.' : 'The latest visible work Project OS has done for apps, backups, access, and repairs.'}</p>
+            </div>
+            <Badge className="border-slate-700 bg-slate-900 text-slate-300">{state.activity.length} events</Badge>
+          </div>
+
+          {showAdvancedMetrics && <SurfaceInset className="mt-5 grid gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+              <Filter className="size-3.5" />
+              Filters
+            </div>
+            <FilterBar label="Level" options={levelFilters} value={level} onChange={setLevel} />
+            <FilterBar label="Category" options={categoryFilters} value={category} onChange={setCategory} />
+          </SurfaceInset>}
+
+          <div className="mt-5 max-h-[680px] space-y-3 overflow-y-auto pr-2 [scrollbar-color:rgba(139,92,246,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
+            {loading ? (
+              <EmptyState title="Loading activity" message="Project OS is checking recent events." />
+            ) : state.activity.length ? (
+              state.activity.map((event) => (
+                <ActivityRow
+                  event={event}
+                  expanded={expandedId === event.id}
+                  key={event.id}
+                  onToggle={() => setExpandedId((current) => current === event.id ? null : event.id)}
+                  showAdvancedMetrics={showAdvancedMetrics}
+                />
+              ))
+            ) : (
+              <EmptyState title="No activity found" message="Try another filter, or install an app to start recording activity." />
+            )}
+          </div>
+        </SurfacePanel>
+
+        <aside className="space-y-5">
+          <SurfacePanel>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-white">Needs attention</h2>
+                <p className="mt-1 text-sm text-slate-400">Apps Project OS cannot fully fix on its own.</p>
+              </div>
+              <Badge className={cn('border', (reliability?.issues.length ?? 0) > 0 ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
+                {reliability?.issues.length ?? 0}
+              </Badge>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {reliability?.issues.length ? reliability.issues.map((issue) => <IssueCard issue={issue} key={`${issue.appId}-${issue.status}`} />) : (
+                <EmptyState title="No active issues" message="Project OS has not found any app stability issues." compact />
+              )}
+            </div>
+          </SurfacePanel>
+
+          <SurfacePanel>
+            <h2 className="text-lg font-black text-white">What gets logged</h2>
+            <div className="mt-4 grid gap-3 text-sm text-slate-300">
+              <GuideRow icon={CheckCircle2} title="Successful work" text="Installs, repairs, access updates, and app checks that completed." />
+              <GuideRow icon={AlertTriangle} title="Needs attention" text="Problems Project OS detected or could not safely repair." />
+              <GuideRow icon={ShieldCheck} title="Background repair" text="Safe restart and private-link repair attempts performed by the guardian." />
+              <GuideRow icon={Clock3} title="Timing" text="This page refreshes automatically every few seconds while it is open." />
+            </div>
+          </SurfacePanel>
+        </aside>
+      </div>
+    </PageShell>
+  );
+}
+
+function SystemActivitySummary({ highlightedIssue, recentEvents, recentFixes, reliability }: { highlightedIssue: AppReliabilityIssue | null; recentEvents: ActivityLog[]; recentFixes: ActivityLog[]; reliability: AppReliabilitySummary | null }) {
+  return (
+    <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <SurfacePanel>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <Activity className="size-5 text-violet-300" />
+              <h2 className="text-xl font-black text-white">What Project OS is doing</h2>
+            </div>
+            <p className="mt-1 text-sm text-slate-400">Recent checks, background repairs, and app activity in plain language.</p>
+          </div>
+          <Badge className="border-violet-300/20 bg-violet-500/10 text-violet-100">{recentEvents.length} recent</Badge>
+        </div>
+        <div className="mt-5 grid gap-3">
+          {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} />) : (
+            <EmptyState compact title="No recent activity" message="Project OS has not logged visible work for the current filters yet." />
+          )}
+        </div>
+      </SurfacePanel>
+
+      <div className="grid gap-5">
+        <SurfacePanel>
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg border border-emerald-300/20 bg-emerald-500/10 text-emerald-200">
+              <HeartPulse className="size-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-black text-white">App health summary</h2>
+              <p className="mt-1 text-sm text-slate-400">{reliability?.summary || 'Health checks appear here after apps are installed.'}</p>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <MiniCount label="Ready" tone="green" value={`${reliability?.readyApps ?? 0}`} />
+            <MiniCount label="Starting" tone="amber" value={`${reliability?.startingApps ?? 0}`} />
+            <MiniCount label="Review" tone="red" value={`${(reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)}`} />
+          </div>
+        </SurfacePanel>
+
+        <SurfacePanel>
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 place-items-center rounded-lg border border-violet-300/20 bg-violet-500/10 text-violet-200">
+              <Wrench className="size-5" />
+            </span>
+            <div>
+              <h2 className="text-lg font-black text-white">Automatic fixes</h2>
+              <p className="mt-1 text-sm text-slate-400">{recentFixes.length ? 'Recent safe repairs Project OS completed.' : 'No automatic repairs were needed recently.'}</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-2">
+            {recentFixes.slice(0, 3).map((event) => <CompactActivityItem event={event} key={event.id} />)}
+            {!recentFixes.length && <EmptyState compact title="Quiet is good" message="Project OS will list safe repair work here when it happens." />}
+          </div>
+        </SurfacePanel>
+
+        <HighlightedIssueCard issue={highlightedIssue} />
+      </div>
+    </section>
+  );
+}
+
+function CompactActivityItem({ event }: { event: ActivityLog }) {
+  const Icon = eventIcon(event);
+  return (
+    <div className={cn('flex gap-3 rounded-lg border bg-slate-900/45 p-3 text-sm', eventTone(event))}>
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-slate-950/70">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="truncate font-semibold text-white">{event.title}</p>
+        <p className="mt-1 line-clamp-2 text-slate-300">{event.message}</p>
+        <p className="mt-1 text-xs text-slate-500">{formatDate(event.createdAt)}</p>
+      </div>
+    </div>
+  );
+}
+
+function HighlightedIssueCard({ issue }: { issue: AppReliabilityIssue | null }) {
+  if (!issue) {
+    return (
+      <section className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-5 text-emerald-100 shadow-po-panel">
+        <div className="flex gap-3">
+          <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <h2 className="font-black text-white">No highlighted issue</h2>
+            <p className="mt-1 text-sm text-emerald-100/80">Project OS has not found an app issue that needs action right now.</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  return (
+    <section className="rounded-lg border border-amber-300/20 bg-amber-500/10 p-5 text-amber-100 shadow-po-panel">
+      <div className="flex gap-3">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+        <div>
+          <h2 className="font-black text-white">Review {issue.appName}</h2>
+          <p className="mt-1 text-sm text-amber-100/80">{issue.message}</p>
+          <p className="mt-2 text-xs text-amber-100/70">{issue.suggestedAction}</p>
+          <Button asChild className="mt-4 border-amber-300/30 bg-slate-950/50 text-amber-100 hover:bg-slate-900" size="sm" variant="outline">
+            <Link to="/applications">Open Applications <ChevronRight className="size-4" /></Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MiniCount({ label, tone, value }: { label: string; tone: 'green' | 'amber' | 'red'; value: string }) {
+  const tones = {
+    amber: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
+    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
+    red: 'border-red-300/20 bg-red-500/10 text-red-100',
+  };
+  return (
+    <div className={cn('rounded-lg border p-3', tones[tone])}>
+      <p className="text-xl font-black text-white">{value}</p>
+      <p className="mt-1 text-xs font-bold uppercase text-current/70">{label}</p>
+    </div>
+  );
+}
+
+function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData, reliability, resourceData }: { appTrendData: AppTrendPoint[]; categoryData: ChartPoint[]; history: MonitoringHistory | null; levelData: ChartPoint[]; reliability: AppReliabilitySummary | null; resourceData: ResourcePoint[] }) {
+  const healthTotal = Math.max(1, reliability?.totalApps ?? 0);
+  const healthyPercent = ((reliability?.readyApps ?? 0) / healthTotal) * 100;
+  const startingPercent = ((reliability?.startingApps ?? 0) / healthTotal) * 100;
+  const attentionPercent = (((reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)) / healthTotal) * 100;
+
+  return (
+    <SurfacePanel>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <BarChart3 className="size-5 text-violet-300" />
+            <h2 className="text-xl font-black text-white">Project OS metrics</h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-400">A quick read on system activity, app health, and managed app resource usage.</p>
+        </div>
+        <Badge className="border-violet-300/20 bg-violet-500/10 text-violet-100">{history?.windowLabel || 'Last 60 minutes'}</Badge>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="grid gap-4">
+          <SurfaceInset className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase text-slate-500">App health mix</p>
+                <p className="mt-1 text-sm text-slate-300">{reliability?.headline || 'Waiting for app health data'}</p>
+              </div>
+              <span className="text-2xl font-black text-white">{reliability?.totalApps ?? 0}</span>
+            </div>
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-950">
+              <div className="flex h-full">
+                <span className="bg-emerald-400" style={{ width: `${healthyPercent}%` }} />
+                <span className="bg-amber-300" style={{ width: `${startingPercent}%` }} />
+                <span className="bg-red-400" style={{ width: `${attentionPercent}%` }} />
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
+              <LegendDot color="bg-emerald-400" label={`${reliability?.readyApps ?? 0} ready`} />
+              <LegendDot color="bg-amber-300" label={`${reliability?.startingApps ?? 0} starting`} />
+              <LegendDot color="bg-red-400" label={`${(reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)} issues`} />
+            </div>
+          </SurfaceInset>
+
+          <SurfaceInset className="p-4">
+            <p className="text-xs font-bold uppercase text-slate-500">Event tone</p>
+            <ChartContainer
+              className="mt-3 h-[190px] w-full aspect-auto"
+              config={{
+                count: { label: 'Events', color: '#8b5cf6' },
+              }}
+            >
+              <AreaChart data={levelData} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="eventToneFill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.75} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={24} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area dataKey="count" type="monotone" stroke="#a78bfa" fill="url(#eventToneFill)" strokeWidth={2} />
+              </AreaChart>
+            </ChartContainer>
+          </SurfaceInset>
+        </div>
+
+        <div className="grid gap-4">
+          <SurfaceInset className="p-4">
+            <p className="text-xs font-bold uppercase text-slate-500">Activity by area</p>
+            <ChartContainer
+              className="mt-3 h-[220px] w-full aspect-auto"
+              config={{
+                count: { label: 'Events', color: '#22d3ee' },
+              }}
+            >
+              <BarChart data={categoryData} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={24} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="count" fill="#22d3ee" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </SurfaceInset>
+
+          <SurfaceInset className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-bold uppercase text-slate-500">Managed app resources</p>
+              <span className="text-xs text-slate-500">{resourceData.length ? 'Current top apps' : 'No current sample'}</span>
+            </div>
+            {resourceData.length ? (
+              <ChartContainer
+                className="mt-3 h-[220px] w-full aspect-auto"
+                config={{
+                  cpu: { label: 'CPU %', color: '#34d399' },
+                  memory: { label: 'Memory %', color: '#fbbf24' },
+                }}
+              >
+                <BarChart data={resourceData} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                  <YAxis tickLine={false} axisLine={false} width={28} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="cpu" fill="#34d399" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="memory" fill="#fbbf24" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ChartContainer>
+            ) : (
+              <EmptyState title="No app resource samples" message="App CPU and memory charts appear after telemetry is collected." compact />
+            )}
+          </SurfaceInset>
+
+          <SurfaceInset className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-bold uppercase text-slate-500">App resource trend</p>
+              <span className="text-xs text-slate-500">{history?.windowLabel || 'Last 60 minutes'}</span>
+            </div>
+            {appTrendData.length > 1 ? (
+              <ChartContainer
+                className="mt-3 h-[220px] w-full aspect-auto"
+                config={{
+                  cpu: { label: 'Avg CPU %', color: '#34d399' },
+                  memory: { label: 'Avg Memory %', color: '#fbbf24' },
+                }}
+              >
+                <AreaChart data={appTrendData} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="appCpuTrendFill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="#34d399" stopOpacity={0.55} />
+                      <stop offset="95%" stopColor="#34d399" stopOpacity={0.04} />
+                    </linearGradient>
+                    <linearGradient id="appMemoryTrendFill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.45} />
+                      <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.04} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={18} />
+                  <YAxis tickLine={false} axisLine={false} width={28} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area dataKey="cpu" type="monotone" stroke="#34d399" fill="url(#appCpuTrendFill)" strokeWidth={2} />
+                  <Area dataKey="memory" type="monotone" stroke="#fbbf24" fill="url(#appMemoryTrendFill)" strokeWidth={2} />
+                </AreaChart>
+              </ChartContainer>
+            ) : (
+              <EmptyState title="Trend is still warming up" message="Keep Monitoring open briefly to collect enough app samples for a trend." compact />
+            )}
+          </SurfaceInset>
+        </div>
+      </div>
+    </SurfacePanel>
+  );
+}
+
+function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { history: MonitoringHistory | null; hostTrendData: HostTrendPoint[]; metrics: SystemMetrics | null }) {
+  const memoryUsedBytes = metrics ? metrics.totalMemoryBytes - metrics.freeMemoryBytes : 0;
+  const runtimeUsedBytes = metrics ? metrics.runtimeTotalBytes - metrics.runtimeUsableBytes : 0;
+  return (
+    <SurfacePanel>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <Server className="size-5 text-cyan-300" />
+            <h2 className="text-xl font-black text-white">Device instrumentation</h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-400">Current host readings for the device running Project OS. Memory uses Linux available memory so cache does not look like active app usage.</p>
+        </div>
+        <Badge className="border-cyan-300/20 bg-cyan-500/10 text-cyan-100">{metrics ? formatDate(metrics.checkedAt) : 'Waiting'}</Badge>
+      </div>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+        <MetricRing icon={Cpu} label="Device CPU" value={metrics?.systemCpuPercent ?? -1} detail={metrics ? `${metrics.availableProcessors} cores available` : 'No sample yet'} tone="cyan" />
+        <MetricRing icon={MemoryStick} label="Memory" value={metrics?.usedMemoryPercent ?? -1} detail={metrics ? `${formatBytes(memoryUsedBytes)} used of ${formatBytes(metrics.totalMemoryBytes)}` : 'No sample yet'} tone="violet" />
+        <MetricRing icon={HardDrive} label="Project OS disk" value={metrics?.runtimeUsedPercent ?? -1} detail={metrics ? `${formatBytes(runtimeUsedBytes)} used of ${formatBytes(metrics.runtimeTotalBytes)}` : 'No sample yet'} tone="amber" />
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <MetricDetail icon={Server} label="Device" value={metrics?.deviceName || 'Project OS device'} />
+        <MetricDetail icon={Cpu} label="OS" value={metrics ? `${metrics.osName} ${metrics.osVersion}` : 'Not reported'} />
+        <MetricDetail icon={MemoryStick} label="Available memory" value={metrics ? `${formatBytes(metrics.freeMemoryBytes)} available` : 'Not reported'} />
+        <MetricDetail icon={Activity} label="System load" value={metrics ? loadLabel(metrics.systemLoadAverage, metrics.availableProcessors) : 'Not reported'} />
+        <MetricDetail icon={Database} label="Runtime" value={metrics?.runtimeRoot || 'Not reported'} />
+        <MetricDetail icon={Activity} label="Backend CPU" value={percentLabel(metrics?.processCpuPercent)} />
+      </div>
+
+      <SurfaceInset className="mt-5 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-bold uppercase text-slate-500">Device trends</p>
+          <span className="text-xs text-slate-500">{history?.windowLabel || 'Last 60 minutes'}</span>
+        </div>
+        {hostTrendData.length > 1 ? (
+          <ChartContainer
+            className="mt-3 h-[240px] w-full aspect-auto"
+            config={{
+              cpu: { label: 'CPU %', color: '#22d3ee' },
+              memory: { label: 'Memory %', color: '#a78bfa' },
+              disk: { label: 'Disk %', color: '#fbbf24' },
+            }}
+          >
+            <AreaChart data={hostTrendData} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
+              <defs>
+                <linearGradient id="hostCpuTrendFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.55} />
+                  <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.04} />
+                </linearGradient>
+                <linearGradient id="hostMemoryTrendFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.45} />
+                  <stop offset="95%" stopColor="#a78bfa" stopOpacity={0.04} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} minTickGap={18} />
+              <YAxis tickLine={false} axisLine={false} width={28} />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Area dataKey="cpu" type="monotone" stroke="#22d3ee" fill="url(#hostCpuTrendFill)" strokeWidth={2} />
+              <Area dataKey="memory" type="monotone" stroke="#a78bfa" fill="url(#hostMemoryTrendFill)" strokeWidth={2} />
+              <Area dataKey="disk" type="monotone" stroke="#fbbf24" fill="transparent" strokeWidth={2} />
+            </AreaChart>
+          </ChartContainer>
+        ) : (
+          <EmptyState title="Trend is still warming up" message="Project OS needs at least two retained host samples before drawing this trend." compact />
+        )}
+      </SurfaceInset>
+    </SurfacePanel>
+  );
+}
+
+function MetricRing({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'cyan' | 'violet' | 'amber'; value: number }) {
+  const colors = {
+    cyan: '#22d3ee',
+    violet: '#a78bfa',
+    amber: '#fbbf24',
+  };
+  const safeValue = value < 0 ? 0 : clamp(value);
+  return (
+    <SurfaceInset className="p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
+        <Icon className="size-4 text-slate-400" />
+      </div>
+      <div className="mt-4 flex items-center gap-4">
+        <div
+          className="grid size-20 shrink-0 place-items-center rounded-full"
+          style={{ background: `conic-gradient(${colors[tone]} ${safeValue * 3.6}deg, rgba(30,41,59,0.95) 0deg)` }}
+        >
+          <div className="grid size-14 place-items-center rounded-full bg-slate-950 text-sm font-black text-white">
+            {value < 0 ? 'N/A' : `${Math.round(value)}%`}
+          </div>
+        </div>
+        <p className="text-sm text-slate-400">{detail}</p>
+      </div>
+    </SurfaceInset>
+  );
+}
+
+function MetricDetail({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+  return (
+    <SurfaceInset className="flex min-w-0 gap-3">
+      <Icon className="mt-0.5 size-4 shrink-0 text-slate-500" />
+      <div className="min-w-0">
+        <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
+        <p className="mt-1 truncate text-sm text-slate-200" title={value}>{value}</p>
+      </div>
+    </SurfaceInset>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={cn('size-2 rounded-full', color)} />
+      {label}
+    </span>
+  );
+}
+
+function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'amber' | 'red' | 'slate' | 'violet'; value: string; }) {
+  const tones = {
+    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-200',
+    amber: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
+    red: 'border-red-300/20 bg-red-500/10 text-red-100',
+    slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
+    violet: 'border-violet-300/20 bg-violet-500/10 text-violet-100',
+  };
+  return (
+    <div className={cn('rounded-lg border p-4', tones[tone])}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase text-current/70">{label}</p>
+        <Icon className="size-4" />
+      </div>
+      <p className="mt-3 line-clamp-2 text-xl font-black text-white">{value}</p>
+      <p className="mt-1 line-clamp-2 text-xs text-current/75">{detail}</p>
+    </div>
+  );
+}
+
+function FilterBar({ label, onChange, options, value }: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-16 text-xs font-semibold text-slate-500">{label}</span>
+      {options.map((option) => (
+        <button
+          className={cn(
+            'rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70',
+            value === option
+              ? 'border-violet-300/30 bg-violet-500/20 text-violet-100'
+              : 'border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-600 hover:text-slate-200',
+          )}
+          key={option}
+          onClick={() => onChange(option)}
+          type="button"
+        >
+          {option.replace('_', ' ')}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics }: { event: ActivityLog; expanded: boolean; onToggle: () => void; showAdvancedMetrics: boolean }) {
+  const Icon = eventIcon(event);
+  return (
+    <article className={cn('rounded-lg border bg-slate-900/45 transition', eventTone(event))}>
+      <button className="grid w-full gap-3 rounded-lg p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70 sm:grid-cols-[auto_minmax(0,1fr)_130px_auto] sm:items-start" onClick={onToggle} type="button">
+        <span className="grid size-10 place-items-center rounded-lg border border-white/10 bg-slate-950/70">
+          <Icon className="size-4" />
+        </span>
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-white">{event.title}</span>
+            <Badge className={cn('border text-[11px] capitalize', badgeTone(event.level))}>{event.category}</Badge>
+            {event.appId && <Badge className="border-slate-700 bg-slate-950 text-slate-300">{event.appId}</Badge>}
+          </span>
+          <span className="mt-1 block text-sm text-slate-300">{event.message}</span>
+        </span>
+        <span className="text-xs text-slate-500 sm:text-right">{formatDate(event.createdAt)}</span>
+        <span className="text-slate-400">{expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
+      </button>
+      {expanded && showAdvancedMetrics && (
+        <div className="border-t border-white/10 px-4 py-3 text-sm">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Detail label="Action" value={event.action} />
+            <Detail label="Outcome" value={humanize(event.outcome)} />
+            <Detail label="Level" value={humanize(event.level)} />
+          </div>
+          {event.details && (
+            <pre className="mt-3 max-h-48 overflow-auto rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs text-slate-300">{event.details}</pre>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function IssueCard({ issue }: { issue: AppReliabilityIssue }) {
+  return (
+    <div className="rounded-lg border border-amber-300/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-bold text-white">{issue.appName}</p>
+          <p className="mt-1">{issue.message}</p>
+        </div>
+        <Badge className="border-amber-300/20 bg-amber-500/10 text-amber-100">{issue.status}</Badge>
+      </div>
+      <p className="mt-3 text-xs text-amber-100/75">{issue.suggestedAction}</p>
+      {issue.detail && <p className="mt-2 text-xs text-amber-100/60">{issue.detail}</p>}
+    </div>
+  );
+}
+
+function GuideRow({ icon: Icon, text, title }: { icon: typeof Activity; text: string; title: string }) {
+  return (
+    <SurfaceInset className="flex gap-3">
+      <Icon className="mt-0.5 size-4 text-violet-300" />
+      <div>
+        <p className="font-bold text-white">{title}</p>
+        <p className="mt-1 text-xs text-slate-400">{text}</p>
+      </div>
+    </SurfaceInset>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-950/45 p-3">
+      <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
+      <p className="mt-1 break-words text-slate-200">{value || 'None'}</p>
+    </div>
+  );
+}
+
+function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
+  return (
+    <div className={cn('rounded-lg border border-slate-800 bg-slate-900/40 text-center', compact ? 'p-4' : 'p-8')}>
+      <p className="font-bold text-white">{title}</p>
+      <p className="mt-1 text-sm text-slate-400">{message}</p>
+    </div>
+  );
+}
+
+function postureIcon(posture?: string) {
+  if (posture === 'healthy') {
+    return CheckCircle2;
+  }
+  if (posture === 'critical') {
+    return AlertTriangle;
+  }
+  return ShieldCheck;
+}
+
+function postureTone(posture?: string): 'green' | 'amber' | 'red' | 'slate' | 'violet' {
+  if (posture === 'healthy') {
+    return 'green';
+  }
+  if (posture === 'critical') {
+    return 'red';
+  }
+  if (posture === 'warning') {
+    return 'amber';
+  }
+  return 'violet';
+}
+
+function eventIcon(event: ActivityLog) {
+  if (event.level === 'error') {
+    return AlertTriangle;
+  }
+  if (event.category === 'repair') {
+    return Wrench;
+  }
+  if (event.category === 'health') {
+    return HeartPulse;
+  }
+  if (event.level === 'success') {
+    return CheckCircle2;
+  }
+  return Activity;
+}
+
+function eventTone(event: ActivityLog) {
+  if (event.level === 'error' || event.outcome === 'failed') {
+    return 'border-red-300/20 text-red-100';
+  }
+  if (event.level === 'warning' || event.outcome === 'needs_attention') {
+    return 'border-amber-300/20 text-amber-100';
+  }
+  if (event.level === 'success') {
+    return 'border-emerald-300/20 text-emerald-100';
+  }
+  return 'border-slate-800 text-slate-300';
+}
+
+function badgeTone(level: string) {
+  if (level === 'error') {
+    return 'border-red-300/20 bg-red-500/10 text-red-100';
+  }
+  if (level === 'warning') {
+    return 'border-amber-300/20 bg-amber-500/10 text-amber-100';
+  }
+  if (level === 'success') {
+    return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
+  }
+  return 'border-slate-700 bg-slate-950 text-slate-300';
+}
+
+function humanize(value: string) {
+  return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return 'Not recorded';
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function buildCategoryData(events: ActivityLog[]): ChartPoint[] {
+  const categories = ['install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
+  return categories.map((category) => ({
+    label: humanize(category),
+    count: events.filter((event) => event.category === category).length,
+  })).filter((point) => point.count > 0).slice(0, 7);
+}
+
+function buildLevelData(events: ActivityLog[]): ChartPoint[] {
+  return ['error', 'warning', 'success', 'info'].map((level) => ({
+    label: humanize(level),
+    count: events.filter((event) => event.level === level).length,
+  }));
+}
+
+function buildResourceData(telemetryByAppId: Record<string, AppTelemetry>): ResourcePoint[] {
+  return Object.entries(telemetryByAppId)
+    .map(([appId, telemetry]) => ({
+      label: shortAppLabel(appId),
+      cpu: clamp(parsePercent(telemetry.cpuPercent)),
+      memory: clamp(parsePercent(telemetry.memoryPercent)),
+    }))
+    .filter((point) => point.cpu > 0 || point.memory > 0)
+    .sort((left, right) => (right.cpu + right.memory) - (left.cpu + left.memory))
+    .slice(0, 6);
+}
+
+function buildHostTrendData(samples: HostMetricSample[]): HostTrendPoint[] {
+  return bucketSamples(samples, (bucket) => ({
+    label: formatTime(bucket[0].sampledAt),
+    cpu: average(bucket.map((sample) => sample.systemCpuPercent)),
+    memory: average(bucket.map((sample) => sample.usedMemoryPercent)),
+    disk: average(bucket.map((sample) => sample.runtimeUsedPercent)),
+  }));
+}
+
+function buildAppTrendData(samples: AppMetricSample[]): AppTrendPoint[] {
+  return bucketSamples(samples, (bucket) => ({
+    label: formatTime(bucket[0].sampledAt),
+    cpu: average(bucket.map((sample) => sample.cpuPercent)),
+    memory: average(bucket.map((sample) => sample.memoryPercent)),
+  }));
+}
+
+function bucketSamples<T extends { sampledAt: string }, R>(samples: T[], mapper: (bucket: T[]) => R): R[] {
+  if (!samples.length) {
+    return [];
+  }
+  const bucketSize = Math.max(1, Math.ceil(samples.length / 18));
+  const buckets: T[][] = [];
+  samples.forEach((sample, index) => {
+    const bucketIndex = Math.floor(index / bucketSize);
+    buckets[bucketIndex] = buckets[bucketIndex] || [];
+    buckets[bucketIndex].push(sample);
+  });
+  return buckets.filter(Boolean).map(mapper);
+}
+
+function average(values: number[]) {
+  const valid = values.filter((value) => Number.isFinite(value));
+  if (!valid.length) {
+    return 0;
+  }
+  return Math.round((valid.reduce((total, value) => total + value, 0) / valid.length) * 10) / 10;
+}
+
+function shortAppLabel(appId: string) {
+  return appId
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+    .slice(0, 14);
+}
+
+function formatTime(value?: string | null) {
+  if (!value) {
+    return '';
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function parsePercent(value: string) {
+  const parsed = Number.parseFloat(value.replace('%', '').trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function clamp(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function percentLabel(value?: number | null) {
+  if (value == null || value < 0) {
+    return 'Not reported';
+  }
+  return `${Math.round(value)}%`;
+}
+
+function loadLabel(value: number, cores: number) {
+  if (!Number.isFinite(value) || value < 0) {
+    return 'Not reported';
+  }
+  const normalized = cores > 0 ? `, ${(value / cores).toFixed(2)} per core` : '';
+  return `${value.toFixed(2)} load average${normalized}`;
+}
+
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0 B';
+  }
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = value;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size >= 10 || unitIndex === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unitIndex]}`;
+}
+
+export default MonitoringPage;

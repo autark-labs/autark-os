@@ -1,0 +1,121 @@
+package com.projectos.system;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.file.Path;
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
+import com.projectos.marketplace.runtime.RuntimeLayout;
+
+class SystemDoctorServiceTests {
+
+    @TempDir
+    Path runtimeRoot;
+
+    @Test
+    void readinessAllowsAdvancedCompletionWhenOnlyDockerAndPrivateAccessNeedSetup() {
+        SystemDoctorService service = service(List.of(
+                ok("service-user"),
+                ok("runtime-root"),
+                warn("docker", "Docker", "Docker is not installed.", "Install Docker"),
+                warn("tailscale", "Tailscale", "Tailscale is not connected.", "tailscale up"),
+                neutral("tailscale-operator"),
+                ok("systemd")));
+
+        SystemDoctorStatus status = service.status();
+
+        assertThat(status.readiness().status()).isEqualTo("apps_need_docker");
+        assertThat(status.readiness().canCompleteOnboarding()).isTrue();
+        assertThat(status.readiness().finishAnywayRequiresAdvanced()).isTrue();
+        assertThat(status.readiness().groups())
+                .anySatisfy(group -> {
+                    assertThat(group.id()).isEqualTo("app-installs");
+                    assertThat(group.status()).isEqualTo("warning");
+                })
+                .anySatisfy(group -> {
+                    assertThat(group.id()).isEqualTo("private-access");
+                    assertThat(group.status()).isEqualTo("warning");
+                });
+    }
+
+    @Test
+    void readinessBlocksCompletionWhenRuntimeStorageIsNotUsable() {
+        SystemDoctorService service = service(List.of(
+                ok("service-user"),
+                warn("runtime-root", "Runtime storage", "Project OS cannot write to storage.", "Repair permissions"),
+                ok("docker"),
+                ok("tailscale"),
+                ok("tailscale-operator"),
+                ok("systemd")));
+
+        SystemDoctorStatus status = service.status();
+
+        assertThat(status.readiness().status()).isEqualTo("storage_needs_review");
+        assertThat(status.readiness().canCompleteOnboarding()).isFalse();
+        assertThat(status.readiness().finishAnywayRequiresAdvanced()).isFalse();
+    }
+
+    private SystemDoctorService service(List<SystemSetupCheck> setupChecks) {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        ProjectSettingsRepository repository = new ProjectSettingsRepository(runtimeLayout);
+        return new SystemDoctorService(new FakeSystemSetupService(setupChecks), repository, runtimeLayout);
+    }
+
+    private RuntimeLayout runtimeLayout() {
+        ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
+        properties.setRuntimeRoot(runtimeRoot.toString());
+        return new RuntimeLayout(properties);
+    }
+
+    private static SystemSetupCheck ok(String id) {
+        return new SystemSetupCheck(id, label(id), "ok", label(id) + " is ready.", "", null, null);
+    }
+
+    private static SystemSetupCheck warn(String id, String label, String message, String actionCommand) {
+        return new SystemSetupCheck(id, label, "warning", message, "", "Fix " + label, actionCommand);
+    }
+
+    private static SystemSetupCheck neutral(String id) {
+        return new SystemSetupCheck(id, label(id), "neutral", label(id) + " is waiting.", "", null, null);
+    }
+
+    private static String label(String id) {
+        return switch (id) {
+            case "runtime-root" -> "Runtime storage";
+            case "tailscale-operator" -> "Tailscale Serve permission";
+            default -> id;
+        };
+    }
+
+    private static class FakeSystemSetupService extends SystemSetupService {
+        private final List<SystemSetupCheck> checks;
+
+        private FakeSystemSetupService(List<SystemSetupCheck> checks) {
+            super(null, null, command -> new CommandResult(0, ""));
+            this.checks = checks;
+        }
+
+        @Override
+        public SystemSetupStatus status() {
+            return new SystemSetupStatus(
+                    "needs_admin_setup",
+                    "Project OS needs host setup",
+                    "Review setup.",
+                    "jack",
+                    "projectos",
+                    false,
+                    "default",
+                    "8082",
+                    "/",
+                    "not installed",
+                    "not installed",
+                    "sudo install-project-os-service.sh",
+                    checks,
+                    java.time.Instant.now());
+        }
+    }
+}

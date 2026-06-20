@@ -1,0 +1,115 @@
+id: gitea
+metadata:
+  name: Gitea
+  category: Development
+  description: Host private Git repositories, issues, releases, and project notes.
+  shortValue: A lightweight private GitHub-style home for your code.
+  badge: Official
+  downloads: 1.9M
+  rating: '4.7'
+  image: /app-images/gitea.svg
+  version: latest
+  lastUpdated: Recently
+  size: 250 MB
+  maintainer: Gitea
+  source: GitHub
+  sourceUrl: https://github.com/go-gitea/gitea
+  documentationUrl: https://docs.gitea.com/
+  installTime: 3-5 minutes
+  difficulty: Moderate
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:3002
+  tags:
+    - Git
+    - Code hosting
+    - Issues
+    - Development
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Private Git repositories
+    - Homelab scripts
+    - Small team code projects
+  highlights:
+    - Web Git interface
+    - Issues and releases
+    - SSH and HTTP Git access
+  plainLanguage: Gitea gives you a private place to store code, scripts, and project history without relying on a public code hosting account.
+technical:
+  summary: Deploys Gitea with persistent repository storage, web access, SSH Git access, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 1 GB RAM
+    - Persistent storage volume
+    - Optional SSH access for Git clients
+  includes:
+    - Gitea web app
+    - Git repository storage
+    - SSH access port
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: gitea
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 3002:3000, 2222:22
+    - label: Data storage
+      value: /var/lib/project-os/apps/gitea/data
+    - label: Backup
+      value: Repositories daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: multi-port
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is recommended for the web UI and private repositories.
+    - SSH Git access can stay local or be used privately through trusted network paths.
+runtime:
+  containerName: gitea
+  composeProject: project-os-gitea
+  image: gitea/gitea:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/gitea
+  ports:
+    - 3002:3000
+    - "2222:22"
+  volumes:
+    - /var/lib/project-os/apps/gitea/data:/data
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=gitea
+    - project-os.version=latest
+  backupPaths:
+    - data
+  privileged: false

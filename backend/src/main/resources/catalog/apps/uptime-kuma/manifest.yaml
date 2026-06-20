@@ -1,0 +1,113 @@
+id: uptime-kuma
+metadata:
+  name: Uptime Kuma
+  category: Monitoring
+  description: Friendly status checks for websites, apps, and home services.
+  shortValue: Know when a service is down before someone else notices.
+  badge: Verified
+  downloads: 2.8M
+  rating: '4.8'
+  image: /app-images/uptime-kuma.svg
+  version: '1'
+  lastUpdated: Recently
+  size: 310 MB
+  maintainer: Uptime Kuma Community
+  source: GitHub
+  sourceUrl: https://github.com/louislam/uptime-kuma
+  documentationUrl: https://github.com/louislam/uptime-kuma/wiki
+  installTime: 2-4 minutes
+  difficulty: Easy
+  supportLevel: Ready
+  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  accessUrl: http://localhost:3001
+  tags:
+    - Monitoring
+    - Alerts
+    - Status pages
+    - Health checks
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Checking app availability
+    - Simple status pages
+    - Alerts when something stops responding
+  highlights:
+    - Simple web dashboard
+    - Many monitor types
+    - Notification integrations
+  plainLanguage: Uptime Kuma watches the services you care about and can alert you when a site, app, or device stops responding.
+technical:
+  summary: Deploys Uptime Kuma with persistent monitor storage, local dashboard access, and a Project-OS backup profile.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Network access to monitored services
+  includes:
+    - Monitoring dashboard
+    - SQLite data storage
+    - Notification configuration
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: uptime-kuma
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 3001:3001
+    - label: Data storage
+      value: /var/lib/project-os/apps/uptime-kuma/data
+    - label: Backup
+      value: Monitor data daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is recommended because monitor names and notification settings may reveal internal services.
+    - First-run setup creates the admin account and notification preferences.
+runtime:
+  containerName: uptime-kuma
+  composeProject: project-os-uptime-kuma
+  image: louislam/uptime-kuma:1
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/uptime-kuma
+  ports:
+    - 3001:3001
+  volumes:
+    - /var/lib/project-os/apps/uptime-kuma/data:/app/data
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=uptime-kuma
+    - project-os.version=1
+  backupPaths:
+    - data
+  privileged: false

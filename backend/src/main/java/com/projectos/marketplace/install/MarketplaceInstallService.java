@@ -1,0 +1,370 @@
+package com.projectos.marketplace.install;
+
+import com.projectos.marketplace.api.InstallOptionsRequest;
+
+import java.nio.file.Path;
+import java.net.URI;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.projectos.activity.ActivityLogService;
+import com.projectos.marketplace.model.ApplicationManifest;
+import com.projectos.marketplace.model.HealthManifest;
+import com.projectos.marketplace.plan.InstallPlan;
+import com.projectos.marketplace.plan.InstallPlanService;
+import com.projectos.network.tailscale.TailscaleServeResult;
+import com.projectos.network.tailscale.TailscaleService;
+
+@Service
+public class MarketplaceInstallService {
+
+    private final InstallPlanService installPlanService;
+    private final RuntimeDirectoryManager directoryManager;
+    private final CatalogPackageCopier packageCopier;
+    private final ComposeRenderer composeRenderer;
+    private final DockerComposeExecutor dockerComposeExecutor;
+    private final InstalledAppRepository installedAppRepository;
+    private final InstallCustomizationResolver customizationResolver;
+    private final PostInstallProvisioner postInstallProvisioner;
+    private final PostInstallGuideBuilder postInstallGuideBuilder;
+    private final TailscaleService tailscaleService;
+    private final ActivityLogService activityLogService;
+
+    @Autowired
+    public MarketplaceInstallService(
+            InstallPlanService installPlanService,
+            RuntimeDirectoryManager directoryManager,
+            CatalogPackageCopier packageCopier,
+            ComposeRenderer composeRenderer,
+            DockerComposeExecutor dockerComposeExecutor,
+            InstalledAppRepository installedAppRepository,
+            InstallCustomizationResolver customizationResolver,
+            PostInstallProvisioner postInstallProvisioner,
+            PostInstallGuideBuilder postInstallGuideBuilder,
+            TailscaleService tailscaleService,
+            ActivityLogService activityLogService) {
+        this.installPlanService = installPlanService;
+        this.directoryManager = directoryManager;
+        this.packageCopier = packageCopier;
+        this.composeRenderer = composeRenderer;
+        this.dockerComposeExecutor = dockerComposeExecutor;
+        this.installedAppRepository = installedAppRepository;
+        this.customizationResolver = customizationResolver;
+        this.postInstallProvisioner = postInstallProvisioner;
+        this.postInstallGuideBuilder = postInstallGuideBuilder;
+        this.tailscaleService = tailscaleService;
+        this.activityLogService = activityLogService;
+    }
+
+    public MarketplaceInstallService(
+            InstallPlanService installPlanService,
+            RuntimeDirectoryManager directoryManager,
+            CatalogPackageCopier packageCopier,
+            ComposeRenderer composeRenderer,
+            DockerComposeExecutor dockerComposeExecutor,
+            InstalledAppRepository installedAppRepository,
+            InstallCustomizationResolver customizationResolver,
+            PostInstallProvisioner postInstallProvisioner,
+            PostInstallGuideBuilder postInstallGuideBuilder,
+            TailscaleService tailscaleService) {
+        this(installPlanService, directoryManager, packageCopier, composeRenderer, dockerComposeExecutor, installedAppRepository, customizationResolver, postInstallProvisioner, postInstallGuideBuilder, tailscaleService, null);
+    }
+
+    public InstallResult install(ApplicationManifest manifest) {
+        return install(manifest, InstallOptionsRequest.defaults());
+    }
+
+    public InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options) {
+        List<InstallStep> steps = new ArrayList<>();
+        List<String> logs = new ArrayList<>();
+        InstallPlan plan = installPlanService.generatePlan(manifest, options);
+        ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
+        InstalledApp existingApp = installedAppRepository.findById(manifest.id()).orElse(null);
+        if (existingApp != null && (options == null || !options.reinstallRequested())) {
+            steps.add(InstallStep.completed("Already installed", manifest.name() + " is already managed by Project OS."));
+            return new InstallResult(
+                    manifest.id(),
+                    manifest.name(),
+                    "already_installed",
+                    manifest.name() + " is already installed. Open it from Applications, or use an explicit reinstall option from Marketplace.",
+                    existingApp.accessUrl(),
+                    plan,
+                    steps,
+                    logs,
+                    null,
+                    setupGuide(manifest, existingApp.accessUrl(), null, PostInstallProvisioningResult.empty()));
+        }
+        try {
+            activityInfo("install_started", "Installing " + manifest.name(), "Project OS is preparing storage, networking, and containers for " + manifest.name() + ".", manifest.id());
+            steps.add(InstallStep.completed("Preparing app", "Validated manifest and generated install plan."));
+            Path appRoot = directoryManager.prepare(manifest);
+            steps.add(InstallStep.completed("Creating safe storage", appRoot.toString()));
+
+            packageCopier.copyManifest(manifest, appRoot);
+            Path composeFile = composeRenderer.render(manifest, appRoot, runtimeConfiguration);
+            steps.add(InstallStep.completed("Configuring private access", "Rendered Compose file with Project-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
+
+            DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, manifest.runtime().composeProject());
+            logs.addAll(composeResult.output());
+            if (!composeResult.successful()) {
+                steps.add(InstallStep.failed("Starting services", "Docker Compose exited with code " + composeResult.exitCode()));
+                installedAppRepository.recordEvent(manifest.id(), "install_failed", String.join("\n", composeResult.output()));
+                activityWarning("install_failed", "Install failed for " + manifest.name(), "Docker Compose could not start the app containers.", manifest.id());
+                return new InstallResult(manifest.id(), manifest.name(), "failed", "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            }
+            steps.add(InstallStep.completed("Starting services", "Docker Compose started the managed services."));
+            StartupCheck startupCheck = waitForStartup(composeFile, manifest.runtime().composeProject(), manifest.health());
+            logs.addAll(startupCheck.logs());
+            if (!startupCheck.ready()) {
+                steps.add(InstallStep.failed("Checking app health", startupCheck.detail()));
+                installedAppRepository.recordEvent(manifest.id(), "install_failed", startupCheck.detail());
+                activityWarning("install_failed", "Install needs attention for " + manifest.name(), startupCheck.detail(), manifest.id());
+                return new InstallResult(manifest.id(), manifest.name(), "failed", startupCheck.detail(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            }
+            steps.add(InstallStep.completed("Checking app health", startupCheck.detail()));
+            TailscaleServeResult privateAccess = configurePrivateAccess(manifest, runtimeConfiguration);
+            logs.addAll(privateAccess.output());
+            if (privateAccess.configured()) {
+                steps.add(InstallStep.completed("Creating private HTTPS link", privateAccess.privateUrl()));
+            } else if (manifest.usage().privateHttpsRequired()) {
+                steps.add(InstallStep.failed("Creating private HTTPS link", privateAccess.message()));
+            } else if (runtimeConfiguration.tailscaleEnabled()) {
+                steps.add(InstallStep.completed("Creating private HTTPS link", privateAccess.message()));
+            }
+            PostInstallProvisioningResult provisioningResult = postInstallProvisioner.provision(manifest, runtimeConfiguration.accessUrl());
+            steps.addAll(provisioningResult.steps());
+            logs.addAll(provisioningResult.logs());
+            PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult);
+
+            installedAppRepository.save(new InstalledApp(
+                    manifest.id(),
+                    manifest.name(),
+                    startupCheck.warmingUp() ? "Starting" : "Ready",
+                    appRoot.toString(),
+                    manifest.runtime().composeProject(),
+                    runtimeConfiguration.accessUrl(),
+                    Instant.now()));
+            installedAppRepository.saveSettings(manifest.id(), new InstallSettings(
+                    runtimeConfiguration.accessUrl(),
+                    privateAccess.privateUrl(),
+                    runtimeConfiguration.tailscaleEnabled() || manifest.usage().privateHttpsRequired(),
+                    runtimeConfiguration.storageSubfolders(),
+                    runtimeConfiguration.backup()));
+            installedAppRepository.recordEvent(manifest.id(), "installed", manifest.name() + " installed successfully.");
+            activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Project OS.", manifest.id());
+            steps.add(InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl())));
+
+            return new InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Project-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
+        } catch (RuntimeException exception) {
+            steps.add(InstallStep.failed("Install failed", exception.getMessage()));
+            try {
+                installedAppRepository.recordEvent(manifest.id(), "install_failed", exception.getMessage());
+            } catch (RuntimeException ignored) {
+                // Preserve the original install failure for the API response.
+            }
+            activityError("install_failed", "Install failed for " + manifest.name(), exception.getMessage(), manifest.id(), exception);
+            return new InstallResult(manifest.id(), manifest.name(), "failed", exception.getMessage(), manifest.accessUrl(), plan, steps, logs, null, setupGuide(manifest, manifest.accessUrl(), null, PostInstallProvisioningResult.empty()));
+        }
+    }
+
+    private AppSetupGuide setupGuide(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, PostInstallProvisioningResult provisioningResult) {
+        return postInstallGuideBuilder.buildSetupGuide(
+                manifest,
+                accessUrl,
+                privateAccessUrl,
+                provisioningResult,
+                installedAppRepository.findAll().stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    private TailscaleServeResult configurePrivateAccess(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {
+        boolean requested = runtimeConfiguration.tailscaleEnabled() || manifest.usage().privateHttpsRequired();
+        if (!requested) {
+            return new TailscaleServeResult(false, null, "Private HTTPS access was not requested.", List.of());
+        }
+        Integer hostPort = portFromAccessUrl(runtimeConfiguration.accessUrl());
+        if (hostPort == null) {
+            return new TailscaleServeResult(false, null, "This app does not expose a local HTTP port for Tailscale Serve.", List.of());
+        }
+        return tailscaleService.serveHttps(hostPort, hostPort);
+    }
+
+    private Integer portFromAccessUrl(String accessUrl) {
+        if (accessUrl == null || accessUrl.isBlank()) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(accessUrl);
+            if (uri.getPort() > 0) {
+                return uri.getPort();
+            }
+            if ("http".equalsIgnoreCase(uri.getScheme())) {
+                return 80;
+            }
+            if ("https".equalsIgnoreCase(uri.getScheme())) {
+                return 443;
+            }
+            return null;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private void activityInfo(String action, String title, String message, String appId) {
+        if (activityLogService != null) {
+            activityLogService.info("marketplace", action, title, message, appId);
+        }
+    }
+
+    private void activitySuccess(String action, String title, String message, String appId) {
+        if (activityLogService != null) {
+            activityLogService.success("marketplace", action, title, message, appId);
+        }
+    }
+
+    private void activityWarning(String action, String title, String message, String appId) {
+        if (activityLogService != null) {
+            activityLogService.warning("marketplace", action, title, message, appId);
+        }
+    }
+
+    private void activityError(String action, String title, String message, String appId, RuntimeException exception) {
+        if (activityLogService != null) {
+            activityLogService.error("marketplace", action, title, message, appId, exception);
+        }
+    }
+
+    private StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health) {
+        List<String> lastStatus = List.of();
+        List<DockerContainerStatus> lastContainers = List.of();
+        for (int attempt = 1; attempt <= 20; attempt++) {
+            List<DockerContainerStatus> containers = dockerComposeExecutor.containers(composeFile, composeProject);
+            lastContainers = containers;
+            StartupCheck check = evaluateStartup(containers, health);
+            lastStatus = check.logs();
+            if (check.ready() || check.failed()) {
+                return check;
+            }
+            sleep();
+        }
+        if (lastContainers.stream().anyMatch(this::running) && lastContainers.stream().noneMatch(this::failed)) {
+            return StartupCheck.warmingUp("The service is running and still finishing startup checks. Project OS will keep watching it from Applications.", lastStatus);
+        }
+        String detail = "The app did not report ready within 20 seconds. Last container state: " + String.join("; ", lastStatus);
+        return StartupCheck.failed(detail, lastStatus);
+    }
+
+    private StartupCheck evaluateStartup(List<DockerContainerStatus> containers, HealthManifest health) {
+        if (containers.isEmpty()) {
+            return StartupCheck.pending("Waiting for Docker to report the app container.", List.of("No containers reported yet."));
+        }
+        List<String> statusLines = containers.stream()
+                .map(this::statusLine)
+                .toList();
+        List<String> failedContainers = containers.stream()
+                .filter(this::failed)
+                .map(this::statusLine)
+                .toList();
+        if (!failedContainers.isEmpty()) {
+            return StartupCheck.failed("The app container stopped or reported unhealthy: " + String.join("; ", failedContainers), statusLines);
+        }
+        boolean starting = containers.stream().anyMatch(this::starting);
+        boolean running = containers.stream().anyMatch(this::running);
+        if (running && !starting) {
+            return StartupCheck.ready(readinessDetail(health), statusLines);
+        }
+        return StartupCheck.pending(health.startingLabel(), statusLines);
+    }
+
+    private String readinessDetail(HealthManifest health) {
+        if (health == null) {
+            return "The app container is running.";
+        }
+        if (List.of("container", "no-web-ui", "none").contains(health.type())) {
+            return health.description();
+        }
+        if ("tcp".equals(health.type())) {
+            return "The service container is running. Project OS will keep checking the service port from Applications.";
+        }
+        return "The app container is running. Project OS will keep checking the app link from Applications.";
+    }
+
+    private String readyDetail(ApplicationManifest manifest, String accessUrl, String privateAccessUrl) {
+        if (manifest.usage().privateHttpsRequired() && privateAccessUrl != null && !privateAccessUrl.isBlank()) {
+            return privateAccessUrl;
+        }
+        if ("companion-service".equals(manifest.usage().kind())) {
+            return "Connection details are available in Applications.";
+        }
+        return accessUrl == null || accessUrl.isBlank() ? "Ready." : accessUrl;
+    }
+
+    private boolean running(DockerContainerStatus container) {
+        String state = lower(container.state());
+        String status = lower(container.status());
+        return state.equals("running") || status.startsWith("up ");
+    }
+
+    private boolean starting(DockerContainerStatus container) {
+        String state = lower(container.state());
+        String health = lower(container.health());
+        String status = lower(container.status());
+        return state.equals("created")
+                || state.equals("restarting")
+                || health.equals("starting")
+                || status.contains("starting");
+    }
+
+    private boolean failed(DockerContainerStatus container) {
+        String state = lower(container.state());
+        String health = lower(container.health());
+        String status = lower(container.status());
+        return state.equals("exited")
+                || state.equals("dead")
+                || health.equals("unhealthy")
+                || status.contains("exited")
+                || status.contains("unhealthy");
+    }
+
+    private String statusLine(DockerContainerStatus container) {
+        return "%s state=%s health=%s status=%s".formatted(
+                container.name(),
+                container.state(),
+                container.health(),
+                container.status());
+    }
+
+    private String lower(String value) {
+        return value == null ? "" : value.toLowerCase();
+    }
+
+    private void sleep() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new InstallationException("Interrupted while waiting for the app to start.", exception);
+        }
+    }
+
+    private record StartupCheck(boolean ready, boolean failed, boolean warmingUp, String detail, List<String> logs) {
+        private static StartupCheck ready(String detail, List<String> logs) {
+            return new StartupCheck(true, false, false, detail, logs);
+        }
+
+        private static StartupCheck warmingUp(String detail, List<String> logs) {
+            return new StartupCheck(true, false, true, detail, logs);
+        }
+
+        private static StartupCheck pending(String detail, List<String> logs) {
+            return new StartupCheck(false, false, false, detail, logs);
+        }
+
+        private static StartupCheck failed(String detail, List<String> logs) {
+            return new StartupCheck(false, true, false, detail, logs);
+        }
+    }
+}

@@ -1,0 +1,145 @@
+id: bazarr
+metadata:
+  name: Bazarr
+  category: Media
+  description: Subtitle companion for Sonarr and Radarr libraries.
+  shortValue: Manage subtitles for TV and movie libraries.
+  badge: Verified
+  downloads: 880K
+  rating: '4.6'
+  image: /app-images/bazarr.svg
+  version: latest
+  lastUpdated: Recently
+  size: 190 MB
+  maintainer: Bazarr Community
+  source: GitHub
+  sourceUrl: https://github.com/morpheus65535/bazarr
+  documentationUrl: https://wiki.bazarr.media/
+  installTime: 3-5 minutes
+  difficulty: Advanced
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:6767
+  tags:
+    - Subtitles
+    - Media automation
+    - Movies
+    - TV
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Finding subtitles
+    - Sonarr and Radarr companion setup
+    - Improving media accessibility
+  highlights:
+    - Subtitle management
+    - Sonarr and Radarr integrations
+    - Language preferences
+  plainLanguage: Bazarr helps advanced media users manage subtitles for movie and TV libraries after Sonarr and Radarr are configured.
+technical:
+  summary: Deploys Bazarr with persistent configuration and shared media folders for subtitle management.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Existing media library paths
+    - Sonarr or Radarr recommended
+  includes:
+    - Bazarr dashboard
+    - Configuration storage
+    - TV and movie folder mounts
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: bazarr
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 6767:6767
+    - label: Data storage
+      value: /var/lib/project-os/apps/bazarr/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access should stay private because it can modify media library metadata.
+    - Project OS should eventually autowire Bazarr to Sonarr and Radarr.
+usage:
+  kind: companion-service
+  primaryAction: open-dashboard
+  openUrlLabel: Open Bazarr
+  headline: Add subtitle management
+  summary: Project OS starts Bazarr and prepares folders. Connect Sonarr and Radarr from the Bazarr dashboard.
+  setupSteps:
+    - Open Bazarr.
+    - Connect Sonarr and Radarr if installed.
+    - Choose subtitle languages and providers.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Bazarr is most useful after Sonarr or Radarr are already configured.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: Subtitle manager is ready
+  startingLabel: Starting subtitle manager
+  failureLabel: Bazarr is not responding
+  description: Project OS checks that the Bazarr dashboard answers before calling it ready.
+runtime:
+  containerName: bazarr
+  composeProject: project-os-bazarr
+  image: lscr.io/linuxserver/bazarr:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/bazarr
+  ports:
+    - 6767:6767
+  volumes:
+    - /var/lib/project-os/apps/bazarr/config:/config
+    - /var/lib/project-os/apps/bazarr/movies:/movies
+    - /var/lib/project-os/apps/bazarr/tv:/tv
+  environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=UTC
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=bazarr
+    - project-os.version=latest
+  backupPaths:
+    - config
+  privileged: false

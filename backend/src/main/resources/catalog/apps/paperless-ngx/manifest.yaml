@@ -1,0 +1,224 @@
+id: paperless-ngx
+metadata:
+  name: Paperless-ngx
+  category: Productivity
+  description: Document management with OCR, tags, correspondents, and search.
+  shortValue: Turn scanned papers and PDFs into a searchable private archive.
+  badge: Verified
+  downloads: 1.4M
+  rating: '4.8'
+  image: /app-images/paperless-ngx.svg
+  version: latest
+  lastUpdated: Recently
+  size: 820 MB
+  maintainer: Paperless-ngx Community
+  source: GitHub
+  sourceUrl: https://github.com/paperless-ngx/paperless-ngx
+  documentationUrl: https://docs.paperless-ngx.com/
+  installTime: 5-8 minutes
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: Promising catalog entry that needs deeper end-to-end testing before beginner use.
+  accessUrl: http://localhost:8010
+  tags:
+    - Documents
+    - OCR
+    - Archive
+    - Search
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Scanned household documents
+    - Receipts and warranties
+    - Searchable PDF archives
+  highlights:
+    - OCR text extraction
+    - Tags and correspondents
+    - Inbox-style consume folder
+  plainLanguage: Paperless-ngx helps you store bills, letters, receipts, and PDFs in a searchable private document archive.
+technical:
+  summary: Deploys Paperless-ngx with a web service, Redis broker, PostgreSQL database, managed document folders, and backup paths.
+  requirements:
+    - 2 CPU cores
+    - 2 GB RAM
+    - Document storage volume
+    - OCR processing time for large imports
+  includes:
+    - Paperless-ngx web app
+    - PostgreSQL database
+    - Redis broker
+    - Document storage
+    - Consume folder
+    - Backup profile
+  configuration:
+    - label: Containers
+      value: Web, Redis broker, PostgreSQL database
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8010:8000
+    - label: Data storage
+      value: /var/lib/project-os/apps/paperless-ngx/data, media, consume, export, postgres
+    - label: Backup
+      value: Documents and metadata daily
+    - label: Access
+      value: Private
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is strongly recommended because this stores sensitive household documents.
+    - First-run setup creates the admin account and document processing preferences.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Paperless-ngx
+  headline: Build a private document archive
+  summary: Project OS starts Paperless-ngx and prepares storage. Create the first admin account and begin adding documents.
+  setupSteps:
+    - Open Paperless-ngx.
+    - Create the first admin account if prompted.
+    - Upload PDFs or place files into the consume folder.
+    - Configure tags, correspondents, and document types.
+  fields:
+    - label: Document archive URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: true
+  notes:
+    - Keep backups enabled because this service can become a primary document archive.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 420
+  successLabel: Document archive is ready
+  startingLabel: Starting document archive
+  failureLabel: Paperless-ngx is not responding
+  description: Project OS checks that the Paperless-ngx web app answers before calling it ready.
+runtime:
+  containerName: paperless-ngx
+  composeProject: project-os-paperless-ngx
+  image: ghcr.io/paperless-ngx/paperless-ngx:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/paperless-ngx
+  ports:
+    - 8010:8000
+  volumes:
+    - /var/lib/project-os/apps/paperless-ngx/data:/usr/src/paperless/data
+    - /var/lib/project-os/apps/paperless-ngx/media:/usr/src/paperless/media
+    - /var/lib/project-os/apps/paperless-ngx/export:/usr/src/paperless/export
+    - /var/lib/project-os/apps/paperless-ngx/consume:/usr/src/paperless/consume
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=paperless-ngx
+    - project-os.version=latest
+  backupPaths:
+    - data
+    - media
+    - export
+    - consume
+    - postgres
+  privileged: false
+  services:
+    - name: web
+      containerName: project-os-paperless-ngx-web
+      image: ghcr.io/paperless-ngx/paperless-ngx:latest
+      ports:
+        - 8010:8000
+      volumes:
+        - /var/lib/project-os/apps/paperless-ngx/data:/usr/src/paperless/data
+        - /var/lib/project-os/apps/paperless-ngx/media:/usr/src/paperless/media
+        - /var/lib/project-os/apps/paperless-ngx/export:/usr/src/paperless/export
+        - /var/lib/project-os/apps/paperless-ngx/consume:/usr/src/paperless/consume
+      environment:
+        - PAPERLESS_REDIS=redis://broker:6379
+        - PAPERLESS_DBHOST=db
+        - PAPERLESS_DBNAME=paperless
+        - PAPERLESS_DBUSER=paperless
+        - PAPERLESS_DBPASS=projectos-paperless-change-me
+        - PAPERLESS_SECRET_KEY=project-os-paperless-change-me
+        - PAPERLESS_TIME_ZONE=Etc/UTC
+        - PAPERLESS_OCR_LANGUAGE=eng
+      dependsOn:
+        - broker
+        - db
+      labels:
+        - project-os.service=web
+      health:
+        type: http
+        path: /
+        startupGraceSeconds: 420
+        successLabel: Document archive is ready
+        startingLabel: Starting document archive
+        failureLabel: Paperless-ngx is not responding
+        description: Project OS checks that the Paperless-ngx web app answers before calling it ready.
+      privileged: false
+    - name: broker
+      containerName: project-os-paperless-ngx-broker
+      image: docker.io/library/redis:7-alpine
+      ports: []
+      volumes:
+        - /var/lib/project-os/apps/paperless-ngx/redis:/data
+      environment: []
+      dependsOn: []
+      labels:
+        - project-os.service=broker
+      health:
+        type: tcp
+        path: ''
+        startupGraceSeconds: 120
+        successLabel: Redis broker is ready
+        startingLabel: Starting Redis broker
+        failureLabel: Redis broker is not responding
+        description: Project OS expects the Redis broker container to keep running.
+      privileged: false
+    - name: db
+      containerName: project-os-paperless-ngx-db
+      image: docker.io/library/postgres:16-alpine
+      ports: []
+      volumes:
+        - /var/lib/project-os/apps/paperless-ngx/postgres:/var/lib/postgresql/data
+      environment:
+        - POSTGRES_DB=paperless
+        - POSTGRES_USER=paperless
+        - POSTGRES_PASSWORD=projectos-paperless-change-me
+      dependsOn: []
+      labels:
+        - project-os.service=db
+      health:
+        type: tcp
+        path: ''
+        startupGraceSeconds: 180
+        successLabel: Database is ready
+        startingLabel: Starting database
+        failureLabel: Database is not responding
+        description: Project OS expects the PostgreSQL database container to keep running.
+      privileged: false

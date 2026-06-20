@@ -1,0 +1,116 @@
+id: immich
+metadata:
+  name: Immich
+  category: Media
+  description: Automatic photo and video backup for phones and cameras.
+  shortValue: A private Google Photos-style library for your home server.
+  badge: Verified
+  downloads: 820K
+  rating: '4.8'
+  image: /app-images/immich.svg
+  version: 1.125.7
+  lastUpdated: 1 week ago
+  size: 1.4 GB
+  maintainer: Immich Team
+  source: GitHub
+  sourceUrl: https://github.com/immich-app/immich
+  documentationUrl: https://immich.app/docs/overview/introduction
+  installTime: 6-8 minutes
+  difficulty: Moderate
+  supportLevel: Needs testing
+  supportSummary: Promising catalog entry that needs deeper end-to-end testing before beginner use.
+  accessUrl: https://photos.home
+  tags:
+    - Photos
+    - Videos
+    - Mobile backup
+    - Albums
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Phone photo backups
+    - Private albums
+    - Searching family photos
+  highlights:
+    - Mobile app backup
+    - Face and object search
+    - Shared albums
+  plainLanguage: Immich keeps your photos and videos on your own storage while still giving you a polished mobile backup and browsing experience.
+technical:
+  summary: Deploys web, server, machine-learning, PostgreSQL, and Redis services with mapped media storage and scheduled backup checks.
+  requirements:
+    - 2 CPU cores
+    - 4 GB RAM recommended
+    - Large media storage volume
+    - Optional GPU acceleration
+  includes:
+    - Application services
+    - PostgreSQL database
+    - Redis cache
+    - Media library volume
+  configuration:
+    - label: Stack name
+      value: immich
+    - label: Network
+      value: project-os-media
+    - label: Ports
+      value: 2283:2283
+    - label: Data storage
+      value: /var/lib/project-os/apps/immich/data
+    - label: Backup
+      value: Database daily, media weekly
+    - label: Access
+      value: Tailscale enabled
+access:
+  kind: web
+  defaultMode: private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is recommended for personal photos and videos.
+    - First-run setup connects mobile apps and admin account preferences.
+runtime:
+  containerName: immich-server
+  composeProject: project-os-immich
+  image: ghcr.io/immich-app/immich-server:v1.125.7
+  network: project-os-media
+  runtimeRoot: /var/lib/project-os/apps/immich
+  ports:
+    - 2283:2283
+  volumes:
+    - /var/lib/project-os/apps/immich/data:/usr/src/app/upload
+    - /var/lib/project-os/apps/immich/postgres:/var/lib/postgresql/data
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=immich
+    - project-os.version=1.125.7
+  backupPaths:
+    - data
+    - postgres
+  privileged: false

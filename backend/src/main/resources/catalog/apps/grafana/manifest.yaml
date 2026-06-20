@@ -1,0 +1,164 @@
+id: grafana
+metadata:
+  name: Grafana
+  category: Monitoring
+  description: Dashboards and visualizations for metrics, logs, and service data.
+  shortValue: Build dashboards for your home server and services.
+  badge: Official
+  downloads: 4.1M
+  rating: '4.8'
+  image: /app-images/grafana.svg
+  version: latest
+  lastUpdated: Recently
+  size: 390 MB
+  maintainer: Grafana Labs
+  source: GitHub
+  sourceUrl: https://github.com/grafana/grafana
+  documentationUrl: https://grafana.com/docs/grafana/latest/
+  installTime: 3-5 minutes
+  difficulty: Moderate
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:3004
+  tags:
+    - Dashboards
+    - Metrics
+    - Monitoring
+    - Visualization
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Server dashboards
+    - Visualizing metrics
+    - Monitoring trends
+  highlights:
+    - Flexible dashboards
+    - Many data source integrations
+    - Alerting options
+  plainLanguage: Grafana turns metrics into charts and dashboards so you can see how your home server is behaving over time.
+technical:
+  summary: Deploys Grafana with persistent dashboard storage, local web access, and backup metadata.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Metrics source such as Prometheus for useful dashboards
+  includes:
+    - Grafana web UI
+    - Dashboard storage
+    - Data source configuration
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: grafana
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 3004:3000
+    - label: Data storage
+      value: /var/lib/project-os/apps/grafana/data
+    - label: Backup
+      value: Dashboards daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Private access is recommended because dashboards may reveal internal hostnames and service names.
+    - First-run setup changes the admin password and adds data sources.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Grafana
+  headline: Build monitoring dashboards
+  summary: Project OS starts Grafana. Add Prometheus, Netdata, or another data source to begin building dashboards.
+  setupSteps:
+    - Open Grafana.
+    - Change the default admin password if prompted.
+    - Add a data source such as Prometheus.
+    - Import or create dashboards.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Grafana is most useful when paired with a metrics source.
+setup:
+  kind: dashboard
+  automation: planned
+  copyableFields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+  integrations:
+    - id: grafana-prometheus
+      name: Connect Prometheus metrics
+      targetAppId: prometheus
+      description: Add Prometheus as a Grafana data source so dashboards can show Project OS and device metrics.
+      requiresApproval: true
+      plannedActions:
+        - Confirm Prometheus is installed and reachable from Grafana.
+        - Create or update a Prometheus data source in Grafana.
+        - Offer starter dashboards after the data source is connected.
+  userSteps:
+    - Open Grafana and finish the first login.
+    - Change the default admin password when prompted.
+    - Approve data-source wiring when Project OS offers it in a future release.
+  automationCapabilities:
+    - Detects whether Prometheus is installed.
+    - Can propose a safe data-source connection before changing Grafana.
+    - Will require approval before writing to Grafana settings.
+health:
+  type: http
+  path: /login
+  startupGraceSeconds: 240
+  successLabel: Dashboard service is ready
+  startingLabel: Starting dashboards
+  failureLabel: Grafana is not responding
+  description: Project OS checks that the Grafana login page answers before calling it ready.
+runtime:
+  containerName: grafana
+  composeProject: project-os-grafana
+  image: grafana/grafana-oss:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/grafana
+  ports:
+    - 3004:3000
+  volumes:
+    - /var/lib/project-os/apps/grafana/data:/var/lib/grafana
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=grafana
+    - project-os.version=latest
+  backupPaths:
+    - data
+  privileged: false

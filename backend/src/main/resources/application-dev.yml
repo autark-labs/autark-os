@@ -1,0 +1,6 @@
+project-os:
+  dev-mode: true
+  guardian:
+    enabled: true
+    initial-delay-ms: 10000
+    interval-ms: 15000

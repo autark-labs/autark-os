@@ -1,0 +1,140 @@
+id: prometheus
+metadata:
+  name: Prometheus
+  category: Monitoring
+  description: Metrics collection and time-series storage for infrastructure monitoring.
+  shortValue: Collect metrics that Grafana and alerts can use.
+  badge: Official
+  downloads: 3.5M
+  rating: '4.8'
+  image: /app-images/prometheus.svg
+  version: latest
+  lastUpdated: Recently
+  size: 280 MB
+  maintainer: Prometheus Authors
+  source: GitHub
+  sourceUrl: https://github.com/prometheus/prometheus
+  documentationUrl: https://prometheus.io/docs/
+  installTime: 3-5 minutes
+  difficulty: Advanced
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:9090
+  tags:
+    - Metrics
+    - Monitoring
+    - Time series
+    - Alerts
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Collecting service metrics
+    - Feeding Grafana dashboards
+    - Advanced alerting workflows
+  highlights:
+    - Time-series metrics
+    - Scrape-based monitoring
+    - Works well with Grafana
+  plainLanguage: Prometheus collects metrics from services so advanced users can build dashboards and alerts around their home server.
+technical:
+  summary: Deploys Prometheus with persistent metrics storage and a managed configuration folder.
+  requirements:
+    - 1 CPU core
+    - 1 GB RAM
+    - Metrics targets to scrape
+  includes:
+    - Prometheus web UI
+    - Metrics database storage
+    - Configuration folder
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: prometheus
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 9090:9090
+    - label: Data storage
+      value: /var/lib/project-os/apps/prometheus/data
+    - label: Backup
+      value: Config daily
+    - label: Access
+      value: Local dashboard
+access:
+  kind: web
+  defaultMode: local
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Dashboard access should stay private because metrics may reveal internal services.
+    - Project OS should eventually autowire scrape targets for managed apps.
+usage:
+  kind: infrastructure
+  primaryAction: open-dashboard
+  openUrlLabel: Open Prometheus
+  headline: Collect service metrics
+  summary: Project OS starts Prometheus. Add scrape targets or pair it with Grafana for dashboards.
+  setupSteps:
+    - Open Prometheus.
+    - Review the default targets.
+    - Add exporters or app metrics endpoints when available.
+    - Connect Grafana if installed.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Prometheus is an advanced monitoring component.
+health:
+  type: http
+  path: /-/ready
+  startupGraceSeconds: 240
+  successLabel: Metrics collector is ready
+  startingLabel: Starting metrics collector
+  failureLabel: Prometheus is not responding
+  description: Project OS checks the Prometheus readiness endpoint before calling it ready.
+runtime:
+  containerName: prometheus
+  composeProject: project-os-prometheus
+  image: prom/prometheus:latest
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/prometheus
+  ports:
+    - 9090:9090
+  volumes:
+    - /var/lib/project-os/apps/prometheus/config:/etc/prometheus
+    - /var/lib/project-os/apps/prometheus/data:/prometheus
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=prometheus
+    - project-os.version=latest
+  backupPaths:
+    - config
+  privileged: false

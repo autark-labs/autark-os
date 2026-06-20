@@ -1,0 +1,140 @@
+id: netdata
+metadata:
+  name: Netdata
+  category: Monitoring
+  description: Real-time host and container metrics with a ready-made dashboard.
+  shortValue: See live CPU, memory, disk, and network activity immediately.
+  badge: Verified
+  downloads: 2.8M
+  rating: '4.7'
+  image: /app-images/netdata.svg
+  version: stable
+  lastUpdated: Recently
+  size: 420 MB
+  maintainer: Netdata
+  source: GitHub
+  sourceUrl: https://github.com/netdata/netdata
+  documentationUrl: https://learn.netdata.cloud/docs/
+  installTime: 3-5 minutes
+  difficulty: Easy
+  supportLevel: Ready
+  supportSummary: Good default candidate for normal users; template is simple and low-risk.
+  accessUrl: http://localhost:19999
+  tags:
+    - Metrics
+    - Host monitoring
+    - Containers
+    - Real-time
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Live host metrics
+    - Troubleshooting slowdowns
+    - Seeing resource usage quickly
+  highlights:
+    - Ready-made charts
+    - Real-time metrics
+    - Container and host visibility
+  plainLanguage: Netdata gives you an immediate live dashboard for CPU, memory, disks, network, and containers without building charts first.
+technical:
+  summary: Deploys Netdata with persistent configuration and dashboard access. Host-level depth may require future privileged/capability support.
+  requirements:
+    - 1 CPU core
+    - 512 MB RAM
+    - Host metrics access
+  includes:
+    - Netdata dashboard
+    - Configuration storage
+    - Metrics cache folder
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: netdata
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 19999:19999
+    - label: Data storage
+      value: /var/lib/project-os/apps/netdata/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: Local and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: false
+  notes:
+    - Private access is recommended because live metrics reveal host details.
+    - This initial manifest avoids privileged mode, so some host-level metrics may be limited.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Netdata
+  headline: View live server metrics
+  summary: Project OS starts Netdata with safe defaults. Open the dashboard to view live host and container metrics.
+  setupSteps:
+    - Open Netdata.
+    - Review CPU, memory, disk, and network charts.
+    - Keep the dashboard private.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Future Project OS work can add an advanced full-host metrics mode.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: Metrics dashboard is ready
+  startingLabel: Starting metrics dashboard
+  failureLabel: Netdata is not responding
+  description: Project OS checks that the Netdata dashboard answers before calling it ready.
+runtime:
+  containerName: netdata
+  composeProject: project-os-netdata
+  image: netdata/netdata:stable
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/netdata
+  ports:
+    - 19999:19999
+  volumes:
+    - /var/lib/project-os/apps/netdata/config:/etc/netdata
+    - /var/lib/project-os/apps/netdata/lib:/var/lib/netdata
+    - /var/lib/project-os/apps/netdata/cache:/var/cache/netdata
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=netdata
+    - project-os.version=stable
+  backupPaths:
+    - config
+  privileged: false

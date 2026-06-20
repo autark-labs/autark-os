@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-label="Vaultwarden service image">
+  <rect width="160" height="120" rx="18" fill="#111827"/>
+  <path d="M30 26h100v68a12 12 0 0 1-12 12H42a12 12 0 0 1-12-12V26z" fill="#1e293b"/>
+  <path d="M80 18l47 14c-4 38-20 61-47 75-27-14-43-37-47-75l47-14z" fill="#2563eb"/>
+  <path d="M80 31l31 9c-4 25-14 40-31 50-17-10-27-25-31-50l31-9z" fill="#60a5fa"/>
+  <circle cx="80" cy="58" r="12" fill="#eff6ff"/>
+  <path d="M76 67h8v18h-8z" fill="#eff6ff"/>
+</svg>

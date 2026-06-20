@@ -1,0 +1,41 @@
+package com.projectos.marketplace.model;
+
+import java.util.List;
+
+public record ApplicationManifest(
+        String id,
+        String name,
+        String category,
+        String description,
+        String shortValue,
+        String badge,
+        String downloads,
+        String rating,
+        String image,
+        String version,
+        String lastUpdated,
+        String size,
+        String maintainer,
+        String source,
+        String sourceUrl,
+        String documentationUrl,
+        String installTime,
+        String difficulty,
+        String supportLevel,
+        String supportSummary,
+        String accessUrl,
+        List<String> tags,
+        List<String> bestFor,
+        List<String> highlights,
+        String plainLanguage,
+        String technicalSummary,
+        List<String> requirements,
+        List<String> includes,
+        List<ConfigurationItem> configuration,
+        AccessManifest access,
+        UsageManifest usage,
+        SetupManifest setup,
+        HealthManifest health,
+        List<CatalogSmokeTest> smokeTests,
+        RuntimeManifest runtime) {
+}

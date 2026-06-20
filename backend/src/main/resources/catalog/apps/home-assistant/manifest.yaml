@@ -1,0 +1,114 @@
+id: home-assistant
+metadata:
+  name: Home Assistant
+  category: Home Automation
+  description: Control lights, sensors, automations, and smart home devices.
+  shortValue: A private control center for your smart home.
+  badge: Official
+  downloads: 3.1M
+  rating: '4.9'
+  image: /app-images/home-assistant.svg
+  version: '2026.6'
+  lastUpdated: Today
+  size: 1.1 GB
+  maintainer: Open Home Foundation
+  source: GitHub
+  sourceUrl: https://github.com/home-assistant/core
+  documentationUrl: https://www.home-assistant.io/docs/
+  installTime: 5-7 minutes
+  difficulty: Moderate
+  supportLevel: Advanced
+  supportSummary: Best for users comfortable reviewing network, media, or monitoring choices before install.
+  accessUrl: http://localhost:8123
+  tags:
+    - Smart home
+    - Automation
+    - Sensors
+    - Dashboards
+testing:
+  smokeTests:
+    - label: Install plan generated
+      status: Passed
+      detail: Manifest loads and produces a Project OS install plan.
+    - label: x86_64 image pull
+      status: Needs end-to-end test
+      detail: Image source is documented; pull still needs verification on a clean x86_64 host.
+    - label: arm64 image pull
+      status: Needs hardware test
+      detail: Needs Raspberry Pi or other arm64 validation before being marked fully ready.
+    - label: Container starts
+      status: Needs end-to-end test
+      detail: Needs clean-host install validation with Docker Compose.
+    - label: Local URL responds
+      status: Needs end-to-end test
+      detail: Needs browser smoke test after install.
+    - label: Tailscale link works
+      status: Needs end-to-end test
+      detail: Needs private-link validation on a tailnet.
+    - label: Backup path exists
+      status: Passed
+      detail: Manifest declares managed backup paths under the Project OS app folder.
+    - label: Uninstall safety checkpoint
+      status: Needs end-to-end test
+      detail: Needs install, backup checkpoint, and uninstall validation on a real host.
+
+user:
+  bestFor:
+    - Smart home control
+    - Automations
+    - Energy monitoring
+  highlights:
+    - Thousands of integrations
+    - Local-first automation
+    - Custom dashboards
+  plainLanguage: Home Assistant ties smart devices together so routines like lights, climate, alerts, and energy tracking can run from one private dashboard.
+technical:
+  summary: Deploys Home Assistant with persistent config, a Project-OS managed network, local port access, and backup metadata.
+  requirements:
+    - 2 CPU cores
+    - 2 GB RAM
+    - Local network access to the published port
+    - Optional USB/Zigbee device access
+  includes:
+    - Home Assistant core
+    - Config volume
+    - Discovery settings
+    - Backup profile
+  configuration:
+    - label: Container name
+      value: home-assistant
+    - label: Network
+      value: project-os-apps
+    - label: Ports
+      value: 8123:8123
+    - label: Data storage
+      value: /var/lib/project-os/apps/home-assistant/config
+    - label: Backup
+      value: Configuration daily
+    - label: Access
+      value: LAN and Tailscale
+access:
+  kind: web
+  defaultMode: local-and-private
+  privateAccessRecommended: true
+  requiresFirstRunSetup: true
+  notes:
+    - Local network access helps smart home discovery and dashboards.
+    - Private access is recommended for managing your home while away.
+runtime:
+  containerName: home-assistant
+  composeProject: project-os-home-assistant
+  image: ghcr.io/home-assistant/home-assistant:2026.6
+  network: project-os-apps
+  runtimeRoot: /var/lib/project-os/apps/home-assistant
+  ports:
+    - 8123:8123
+  volumes:
+    - /var/lib/project-os/apps/home-assistant/config:/config
+  labels:
+    - project-os.managed=true
+    - project-os.app-id=home-assistant
+    - project-os.version=2026.6
+  backupPaths:
+    - config
+  privileged: false
