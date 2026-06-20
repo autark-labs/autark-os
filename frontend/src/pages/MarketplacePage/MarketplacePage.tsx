@@ -28,8 +28,22 @@ import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types
 import { categories } from './extensions/MarketplacePage.constants';
 import { defaultInstallOptions } from './extensions/MarketplacePage.installation';
 import { activeInstallMessage, canStartInstall, completeInstallJob, failInstallJob, modeLabel, startInstallJob } from './extensions/MarketplacePage.installQueue';
+import {
+  formatMarketplaceActivityTime,
+  marketplaceActivityTone,
+  marketplaceVisibleApps,
+  optionsFromInstalledSettings,
+  starterAppsForMarketplace,
+} from './extensions/MarketplacePage.logic';
 import { MarketplaceAppDetail } from './MarketplaceAppDetail';
 import { MarketplaceAppList } from './MarketplaceAppList';
+
+type StarterRecommendation = {
+  app: MarketplaceApp;
+  installed: boolean;
+  notes: string[];
+  readiness: 'ready' | 'blocked' | 'review';
+};
 
 function MarketplacePage() {
   const [searchParams] = useSearchParams();
@@ -177,15 +191,19 @@ function MarketplacePage() {
     return installApp(selectedApp.id, { ...defaultInstallOptions(selectedApp), reinstall: true }, 'reset-reinstall');
   }
 
-  const visibleApps = sortApps(
-    apps.filter((app) => (selectedCategory === 'All' || app.category === selectedCategory) && (!hideInstalled || !installedById.has(app.id)) && matchesSearch(app, searchQuery)),
+  const visibleApps = marketplaceVisibleApps({
+    apps,
+    hideInstalled,
+    installedAppIds: new Set(installedById.keys()),
+    searchQuery,
+    selectedCategory,
     sortBy,
-  );
+  }) as MarketplaceApp[];
   const selectedAppInstalling = installJob.status === 'active' && installJob.active.appId === selectedApp?.id;
   const selectedAppInstallLocked = Boolean(selectedApp && !canStartInstall(installJob, selectedApp.id));
   const installStatusMessage = selectedApp ? activeInstallMessage(installJob, selectedApp.id) : '';
   const starterRecommendations = useMemo(
-    () => onboarding?.status === 'complete' ? starterAppsForMarketplace(apps, onboarding.recommendedApps, installedById, doctor, storage) : [],
+    () => onboarding?.status === 'complete' ? starterAppsForMarketplace(apps, onboarding.recommendedApps, installedById, doctor, storage) as StarterRecommendation[] : [],
     [apps, doctor, installedById, onboarding?.recommendedApps, onboarding?.status, storage],
   );
 
@@ -248,8 +266,8 @@ function MarketplacePage() {
                 {marketplaceActivity.length ? marketplaceActivity.map((event) => (
                   <div className="rounded-md border border-slate-800 bg-slate-900/50 p-2" key={event.id}>
                     <div className="flex items-center justify-between gap-2">
-                      <span className={cn('text-xs font-semibold uppercase tracking-wide', activityTone(event.level))}>{event.outcome.replace('_', ' ')}</span>
-                      <span className="text-xs text-slate-500">{formatActivityTime(event.createdAt)}</span>
+                      <span className={cn('text-xs font-semibold uppercase tracking-wide', marketplaceActivityTone(event.level))}>{event.outcome.replace('_', ' ')}</span>
+                      <span className="text-xs text-slate-500">{formatMarketplaceActivityTime(event.createdAt)}</span>
                     </div>
                     <p className="mt-1 font-medium text-slate-100">{event.title}</p>
                     {event.message && <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{event.message}</p>}
@@ -333,13 +351,6 @@ function InstallJobBanner({ installJob, selectedAppId }: { installJob: any; sele
   return null;
 }
 
-type StarterRecommendation = {
-  app: MarketplaceApp;
-  installed: boolean;
-  notes: string[];
-  readiness: 'ready' | 'blocked' | 'review';
-};
-
 function StarterAppHandoff({ onSelect, recommendations }: { onSelect: (appId: string) => void; recommendations: StarterRecommendation[] }) {
   const blocked = recommendations.some((recommendation) => recommendation.readiness === 'blocked');
   return (
@@ -389,167 +400,6 @@ function StarterAppHandoff({ onSelect, recommendations }: { onSelect: (appId: st
       </div>
     </section>
   );
-}
-
-function starterAppsForMarketplace(apps: MarketplaceApp[], recommendedApps: string[], installedById: Map<string, AppRuntimeView>, doctor: SystemDoctorStatus | null, storage: StorageReport | null): StarterRecommendation[] {
-  const selectedIds = recommendedApps.length ? recommendedApps : ['vaultwarden', 'jellyfin', 'homepage'];
-  const appInstallsBlocked = doctor?.readiness.groups.find((group) => group.id === 'app-installs')?.status === 'warning';
-  const privateAccessBlocked = doctor?.readiness.groups.find((group) => group.id === 'private-access')?.status === 'warning';
-  const limitedStorage = storage?.status === 'warning' || storage?.status === 'critical' || (storage?.runtimeDisk.usedPercent ?? 0) >= 75;
-  return selectedIds
-    .map((appId) => apps.find((app) => app.id === appId))
-    .filter((app): app is MarketplaceApp => Boolean(app))
-    .map((app) => {
-      const notes = starterAppNotes(app, { appInstallsBlocked, privateAccessBlocked, limitedStorage });
-      const readiness: StarterRecommendation['readiness'] = appInstallsBlocked ? 'blocked' : limitedStorage && !isLightweight(app) ? 'review' : 'ready';
-      return {
-        app,
-        installed: installedById.has(app.id),
-        notes,
-        readiness,
-      };
-    })
-    .sort((left, right) => Number(right.readiness === 'ready') - Number(left.readiness === 'ready') || Number(isLightweight(right.app)) - Number(isLightweight(left.app)) || left.app.name.localeCompare(right.app.name));
-}
-
-function starterAppNotes(app: MarketplaceApp, context: { appInstallsBlocked: boolean; privateAccessBlocked: boolean; limitedStorage: boolean }) {
-  const notes = [];
-  if (context.appInstallsBlocked) {
-    notes.push('Docker setup is needed first. Review host readiness before installing apps.');
-  } else {
-    notes.push('Opens the existing install wizard for explicit confirmation.');
-  }
-  if (context.privateAccessBlocked && app.access.privateAccessRecommended) {
-    notes.push('Private access can wait. This app can start with local access until Tailscale is ready.');
-  }
-  if (context.limitedStorage) {
-    notes.push(isLightweight(app) ? 'Recommended as a lightweight first install while storage is tight.' : 'Storage is tight; review space before installing this larger app.');
-  }
-  if (!notes.length) {
-    notes.push('Ready to review as a first Project OS app.');
-  }
-  return notes;
-}
-
-function matchesSearch(app: MarketplaceApp, searchQuery: string) {
-  const query = searchQuery.trim().toLowerCase();
-  if (!query) {
-    return true;
-  }
-  return [
-    app.name,
-    app.category,
-    app.description,
-    app.shortValue,
-    app.plainLanguage,
-    app.usage.kind,
-    ...app.tags,
-    ...app.bestFor,
-    ...app.highlights,
-  ].some((value) => value.toLowerCase().includes(query));
-}
-
-function sortApps(apps: MarketplaceApp[], sortBy: string) {
-  const sorted = [...apps];
-  switch (sortBy) {
-    case 'Easiest to install':
-      return sorted.sort((left, right) => difficultyRank(left.difficulty) - difficultyRank(right.difficulty) || left.name.localeCompare(right.name));
-    case 'Most popular':
-      return sorted.sort((left, right) => numericPopularity(right.downloads) - numericPopularity(left.downloads) || left.name.localeCompare(right.name));
-    case 'Recently updated':
-      return sorted.sort((left, right) => updateRank(left.lastUpdated) - updateRank(right.lastUpdated) || left.name.localeCompare(right.name));
-    default:
-      return sorted.sort((left, right) => Number(right.badge === 'Official') - Number(left.badge === 'Official') || Number(right.access.privateAccessRecommended) - Number(left.access.privateAccessRecommended) || left.name.localeCompare(right.name));
-  }
-}
-
-function difficultyRank(difficulty: string) {
-  const normalized = difficulty.toLowerCase();
-  if (normalized.includes('easy')) return 0;
-  if (normalized.includes('moderate')) return 1;
-  return 2;
-}
-
-function isLightweight(app: MarketplaceApp) {
-  return difficultyRank(app.difficulty) === 0 || app.installTime.toLowerCase().includes('2-3');
-}
-
-function numericPopularity(downloads: string) {
-  const match = downloads.toLowerCase().match(/([\d.]+)\s*([mk])?/);
-  if (!match) {
-    return 0;
-  }
-  const value = Number(match[1]);
-  const multiplier = match[2] === 'm' ? 1_000_000 : match[2] === 'k' ? 1_000 : 1;
-  return value * multiplier;
-}
-
-function updateRank(lastUpdated: string) {
-  const value = lastUpdated.toLowerCase();
-  if (value.includes('today') || value.includes('recent')) return 0;
-  if (value.includes('day')) return 1;
-  if (value.includes('week')) return 2;
-  if (value.includes('month')) return 3;
-  return 4;
-}
-
-function activityTone(level: string) {
-  switch (level) {
-    case 'success':
-      return 'text-emerald-300';
-    case 'warning':
-      return 'text-amber-300';
-    case 'error':
-      return 'text-red-300';
-    default:
-      return 'text-sky-300';
-  }
-}
-
-function formatActivityTime(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return 'recently';
-  }
-  return parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function optionsFromInstalledSettings(settings: InstallSettings | null, fallback: InstallOptions): InstallOptions {
-  if (!settings) {
-    return fallback;
-  }
-  return {
-    ports: { hostPort: settings.expectedLocalPort ?? portFromUrl(settings.accessUrl) ?? fallback.ports.hostPort },
-    access: { tailscaleEnabled: settings.tailscaleEnabled },
-    storage: { subfolders: settings.storageSubfolders ?? fallback.storage.subfolders },
-    backup: {
-      enabled: settings.backup?.enabled ?? fallback.backup.enabled,
-      frequency: settings.backup?.frequency ?? fallback.backup.frequency,
-      retention: settings.backup?.retention ?? fallback.backup.retention,
-    },
-    reinstall: true,
-  };
-}
-
-function portFromUrl(value: string | null) {
-  if (!value) {
-    return null;
-  }
-  try {
-    const parsed = new URL(value);
-    if (parsed.port) {
-      return Number(parsed.port);
-    }
-    if (parsed.protocol === 'http:') {
-      return 80;
-    }
-    if (parsed.protocol === 'https:') {
-      return 443;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 export default MarketplacePage;
