@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ApplicationsSetupGuide } from '@/pages/ApplicationsPage/ApplicationsSetupGuide';
+import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp, MarketplaceUsageField, PostInstallGuide } from '@/types/marketplace';
 import { defaultHostPort, type InstallOptionsUpdater } from './extensions/MarketplacePage.installation';
@@ -49,7 +50,7 @@ export function InstallWizard({ app, installLocked, installOptions, installPlan,
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => setOpen(true)} type="button" variant="outline">
+      <Button className={poButtonClass('quiet')} onClick={() => setOpen(true)} type="button" variant="outline">
         Customize
       </Button>
       <DialogContent className="max-h-[88vh] overflow-y-auto border-slate-700 bg-slate-950 text-slate-100 sm:max-w-2xl">
@@ -93,7 +94,7 @@ export function InstallWizard({ app, installLocked, installOptions, installPlan,
                 <h4 className="font-bold text-white">Choices</h4>
                 <p className="mt-1 text-sm text-slate-400">Leave these alone for the normal one-click setup, or change them for a specific port, folder, or backup plan.</p>
               </div>
-              <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => setShowAdvanced((value) => !value)} type="button" variant="outline">
+              <Button className={poButtonClass('quiet')} onClick={() => setShowAdvanced((value) => !value)} type="button" variant="outline">
                 {showAdvanced ? 'Hide choices' : 'Show choices'}
               </Button>
             </div>
@@ -141,10 +142,10 @@ export function InstallWizard({ app, installLocked, installOptions, installPlan,
         </div>
 
         <DialogFooter className="border-slate-800 bg-slate-900/80">
-          <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onRequestPlan(installOptions)} type="button" variant="outline">
+          <Button className={poButtonClass('quiet')} onClick={() => onRequestPlan(installOptions)} type="button" variant="outline">
             {planLoading ? 'Checking...' : 'Preview'}
           </Button>
-          <Button className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500" disabled={installing || installLocked} onClick={startInstall} type="button">
+          <Button className={poButtonClass('primary')} disabled={installing || installLocked} onClick={startInstall} type="button">
             {installing ? 'Installing...' : installLocked ? 'Install blocked' : hasResult ? 'Install again' : 'Install with choices'}
           </Button>
         </DialogFooter>
@@ -360,7 +361,7 @@ function PostInstallGuideCard({ guide, accessUrl }: { guide: PostInstallGuide; a
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-300">{guide.summary}</p>
         </div>
         {hasOpenUrl && (
-          <Button asChild className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" type="button" variant="outline">
+          <Button asChild className={poButtonClass('quiet')} type="button" variant="outline">
             <a href={accessUrl} rel="noreferrer" target="_blank">
               {openLabel}
               <ExternalLink className="size-4" />
@@ -413,11 +414,11 @@ function SetupValueCard({ value }: { value: MarketplaceUsageField }) {
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{value.label}</span>
         <div className="flex items-center gap-1">
           {value.sensitive && (
-            <Button className="size-8 border-slate-700/50 bg-slate-950/50 text-slate-300 hover:bg-slate-800" onClick={() => setVisible((current) => !current)} size="icon" type="button" variant="outline">
+            <Button className={poButtonClass('quietIcon')} onClick={() => setVisible((current) => !current)} size="icon" type="button" variant="outline">
               {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </Button>
           )}
-          <Button className="size-8 border-slate-700/50 bg-slate-950/50 text-slate-300 hover:bg-slate-800" onClick={copy} size="icon" type="button" variant="outline">
+          <Button className={poButtonClass('quietIcon')} onClick={copy} size="icon" type="button" variant="outline">
             <Copy className="size-4" />
           </Button>
         </div>

@@ -35,6 +35,7 @@ import { PageErrorState, PageLoadingState } from '@/components/project-os/PageSt
 import { PageShell, surfaceFrameClass, surfacePanelClass } from '@/components/project-os/ProjectOSComponents';
 import { Switch } from '@/components/ui/switch';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { poButtonClass, poCardClass, poNavItemClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
@@ -249,11 +250,11 @@ function SettingsPage() {
           <Badge className={cn('border', dirty ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
             {dirty ? 'Unsaved changes' : 'Saved'}
           </Badge>
-          <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={refreshing} onClick={() => void load(true)} type="button" variant="outline">
+          <Button className={poButtonClass('quiet')} disabled={refreshing} onClick={() => void load(true)} type="button" variant="outline">
             <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
             Refresh
           </Button>
-          <Button className="bg-violet-600 text-white hover:bg-violet-500" disabled={!dirty || saving} onClick={() => void save()} type="button">
+          <Button className={poButtonClass('primary')} disabled={!dirty || saving} onClick={() => void save()} type="button">
             {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             {saving ? 'Saving' : 'Save changes'}
           </Button>
@@ -276,10 +277,7 @@ function SettingsPage() {
           const active = activeGroupId === group.id;
           return (
             <button
-              className={cn(
-                'flex min-h-16 items-start gap-3 rounded-lg px-3 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70',
-                active ? 'bg-gradient-to-br from-violet-600 to-indigo-600/75 text-white shadow-po-brand-glow' : 'text-slate-400 hover:bg-slate-900/70 hover:text-slate-100',
-              )}
+              className={poNavItemClass(active)}
               key={group.id}
               onClick={() => setActiveGroup(groupId)}
               type="button"
@@ -296,7 +294,7 @@ function SettingsPage() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <main className={cn(surfacePanelClass, 'bg-slate-950/60 shadow-po-panel')}>
-          <div className="mb-5 rounded-lg border border-white/10 bg-slate-900/40 p-4">
+          <div className={poCardClass('normal', 'mb-5 bg-slate-900/40')}>
             <div className="flex items-start gap-3">
               <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-violet-300/20 bg-violet-500/10 text-violet-200">
                 <ActiveGroupIcon className="size-4" />
@@ -596,7 +594,7 @@ function SettingsGroup({ children, description, title }: { children: ReactNode; 
         <h2 className="text-xl font-black text-white">{title}</h2>
         <p className="mt-2 text-sm text-slate-400">{description}</p>
       </div>
-      <div className="divide-y divide-white/10 rounded-lg border border-white/10 bg-slate-950/35">
+      <div className={poCardClass('normal', 'divide-y divide-white/10 p-0')}>
         {children}
       </div>
     </section>
@@ -650,7 +648,7 @@ function SetupCheckRow({ check, copied, onCopy }: { check: SystemSetupCheck; cop
           <p className="mt-1 text-sm text-slate-300">{check.message}</p>
           {check.detail && <p className="mt-2 break-words text-xs text-slate-500">{check.detail}</p>}
           {check.actionCommand && (
-            <Button className="mt-3 w-fit border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onCopy(check.actionCommand || '', check.id)} size="sm" type="button" variant="outline">
+            <Button className={poButtonClass('quiet', 'mt-3 w-fit')} onClick={() => onCopy(check.actionCommand || '', check.id)} size="sm" type="button" variant="outline">
               <Copy className="size-3.5" />
               {copied === check.id ? 'Copied' : check.actionLabel || 'Copy command'}
             </Button>

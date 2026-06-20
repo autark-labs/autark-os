@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { MarketplaceApp } from '@/types/marketplace';
 import { sortOptions } from './extensions/MarketplacePage.constants';
@@ -36,7 +37,7 @@ export function MarketplaceAppList({ apps, installedAppIds, selectedAppId, sortB
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" type="button" variant="outline">
+            <Button className={poButtonClass('quiet')} type="button" variant="outline">
               <SlidersHorizontal className="size-4" />
               {sortBy}
               <ChevronDown className="size-4" />
@@ -67,7 +68,7 @@ export function MarketplaceAppList({ apps, installedAppIds, selectedAppId, sortB
 function AppStoreCard({ app, installed, isSelected, onSelect }: { app: MarketplaceApp; installed: boolean; isSelected: boolean; onSelect: () => void }) {
   return (
     <div className={cn('group relative overflow-hidden rounded-2xl border border-slate-700/25 bg-slate-950/48 p-4 text-slate-100 shadow-po-card transition hover:-translate-y-0.5 hover:border-violet-300/45 hover:bg-slate-900/70', isSelected && 'border-violet-300/55 bg-violet-950/20 shadow-po-brand-glow')}>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+      <div className="absolute inset-0 bg-po-card-hover-sheen opacity-0 transition group-hover:opacity-100" />
       <button className="relative z-10 grid w-full gap-4 text-left" onClick={onSelect} type="button">
         <span className="flex items-start gap-3">
           <AppImage app={app} />
@@ -106,13 +107,13 @@ function AppStoreCard({ app, installed, isSelected, onSelect }: { app: Marketpla
           </span>
           <span>{app.downloads} downloads</span>
         </div>
-        <Button className={cn('h-8 px-3 text-xs', installed ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15' : 'bg-violet-600 text-white hover:bg-violet-500')} onClick={onSelect} type="button" variant={installed ? 'outline' : 'default'}>
+        <Button className={cn('h-8 px-3 text-xs', installed ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15' : poButtonClass('primary'))} onClick={onSelect} type="button" variant={installed ? 'outline' : 'default'}>
           {installed ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
           {installed ? 'Manage' : 'Install'}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-label={`${app.name} actions`} className="size-8 border-slate-700/40 bg-slate-950/40 text-slate-300 hover:bg-slate-800" size="icon" type="button" variant="outline">
+            <Button aria-label={`${app.name} actions`} className={poButtonClass('quietIcon')} size="icon" type="button" variant="outline">
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>

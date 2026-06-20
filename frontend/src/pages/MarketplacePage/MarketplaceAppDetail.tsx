@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView } from '@/types/app';
 import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp } from '@/types/marketplace';
@@ -44,7 +45,7 @@ export function MarketplaceAppDetail({ app, installedApp, installLocked, install
   return (
     <Card className="rounded-lg border-white/10 bg-slate-900/55 text-slate-100 shadow-po-panel">
       <CardContent className="grid gap-5 p-5">
-        <Button className="w-fit border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={onBack} type="button" variant="outline">
+        <Button className={poButtonClass('quiet', 'w-fit')} onClick={onBack} type="button" variant="outline">
           <ArrowLeft className="size-4" />
           Back to apps
         </Button>
@@ -96,7 +97,7 @@ export function MarketplaceAppDetail({ app, installedApp, installLocked, install
               </Link>
             </Button>
           ) : (
-            <Button className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500" disabled={installing || installLocked} onClick={() => onInstall(installOptions)} type="button">
+            <Button className={poButtonClass('primary')} disabled={installing || installLocked} onClick={() => onInstall(installOptions)} type="button">
               {installing ? <Loader2 className="size-4 animate-spin" /> : installResult?.status === 'installed' ? <CheckCircle2 className="size-4" /> : null}
               {installing ? 'Installing...' : installLocked ? 'Install blocked' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Install after review' : 'Install'}
             </Button>
@@ -104,7 +105,7 @@ export function MarketplaceAppDetail({ app, installedApp, installLocked, install
           {!isInstalled && <InstallWizard app={app} installLocked={installLocked} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installStatusMessage={installStatusMessage} installing={installing} onInstall={onInstall} onOptionsChange={onOptionsChange} onRequestPlan={onRequestPlan} planLoading={planLoading} />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" type="button" variant="outline">
+              <Button className={poButtonClass('quiet')} type="button" variant="outline">
                 More
                 <ChevronDown className="size-4" />
               </Button>
@@ -333,7 +334,7 @@ function RecoveryInstallNotice({ disabled, mode, onReinstallCurrent, onResetRein
             Create a backup before continuing. {resetMode ? 'Reset and reinstall can remove app state and should only be used when you are ready to rebuild the app.' : 'Reinstalling with current settings should keep configured data folders, but a backup gives you a restore point if anything goes wrong.'}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button asChild className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" type="button" variant="outline">
+            <Button asChild className={poButtonClass('quiet')} size="sm" type="button" variant="outline">
               <Link to="/backups">
                 <Archive className="size-3.5" />
                 Open Backups
@@ -366,7 +367,7 @@ function InstalledAppNotice({ app }: { app: AppRuntimeView | null }) {
                 <a href={app.accessUrl} rel="noreferrer" target="_blank">Open app</a>
               </Button>
             )}
-            <Button asChild className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" variant="outline">
+            <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
               <Link to="/applications">Manage in Applications</Link>
             </Button>
           </div>
@@ -409,7 +410,7 @@ function InlineInstallStatus({ installing, result }: { installing: boolean; resu
                 <a href={result.accessUrl} rel="noreferrer" target="_blank">Open app</a>
               </Button>
             )}
-            <Button asChild className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" variant="outline">
+            <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
               <Link to="/applications">View in Applications</Link>
             </Button>
           </div>

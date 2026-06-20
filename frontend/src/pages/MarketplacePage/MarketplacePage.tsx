@@ -19,6 +19,7 @@ import { MarketplaceAPIClient } from '@/api/MarketplaceAPIClient';
 import { MarketplaceInstallClient } from '@/api/MarketplaceInstallClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { poButtonClass, poCardClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ActivityLog } from '@/types/activity';
@@ -226,14 +227,14 @@ function MarketplacePage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
-          <Button className="border-slate-700/50 bg-slate-900/80 text-slate-100 hover:bg-slate-800" onClick={loadApps} type="button" variant="outline">
+          <Button className={poButtonClass('quiet', 'bg-slate-900/80 text-slate-100')} onClick={loadApps} type="button" variant="outline">
             <RefreshCw className="size-4" />
             Refresh
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button aria-label="Notifications" className="border-slate-700/50 bg-slate-900/80 text-slate-100 hover:bg-slate-800" size="icon" type="button" variant="outline">
+              <Button aria-label="Notifications" className={poButtonClass('quietIcon', 'bg-slate-900/80 text-slate-100')} size="icon" type="button" variant="outline">
                 <Bell className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -357,7 +358,7 @@ function StarterAppHandoff({ onSelect, recommendations }: { onSelect: (appId: st
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {recommendations.map((recommendation) => (
-          <article className="rounded-lg border border-white/10 bg-slate-950/55 p-4" key={recommendation.app.id}>
+          <article className={poCardClass('normal', 'bg-slate-950/55')} key={recommendation.app.id}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h4 className="font-bold text-white">{recommendation.app.name}</h4>
@@ -379,7 +380,7 @@ function StarterAppHandoff({ onSelect, recommendations }: { onSelect: (appId: st
                 </div>
               ))}
             </div>
-            <Button className="mt-4 w-full bg-violet-600 text-white hover:bg-violet-500" disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} type="button">
+            <Button className={poButtonClass('primary', 'mt-4 w-full')} disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} type="button">
               <Sparkles className="size-4" />
               {recommendation.installed ? 'Already installed' : 'Review install'}
             </Button>

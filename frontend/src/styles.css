@@ -63,6 +63,7 @@
   --po-card-amber-gradient: linear-gradient(135deg, #261809, #0d1830);
   --po-card-purple-gradient: linear-gradient(135deg, #211244, #0d1830);
   --po-card-red-gradient: linear-gradient(135deg, #2a1018, #0d1830);
+  --po-card-hover-sheen: linear-gradient(135deg, rgb(255 255 255 / 0.05), transparent 48%, transparent);
 
   --po-surface-base: rgb(15 23 42 / 0.72);
   --po-surface-soft: rgb(15 23 42 / 0.52);
@@ -248,6 +249,7 @@
   --background-image-po-card-amber: var(--po-card-amber-gradient);
   --background-image-po-card-purple: var(--po-card-purple-gradient);
   --background-image-po-card-red: var(--po-card-red-gradient);
+  --background-image-po-card-hover-sheen: var(--po-card-hover-sheen);
   --radius-po-xs: var(--po-radius-xs);
   --radius-po-sm: var(--po-radius-sm);
   --radius-po-md: var(--po-radius-md);
