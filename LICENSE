@@ -1,0 +1,218 @@
+Autark Community License v1.0
+
+Copyright (c) 2026 Autark Labs. All rights reserved.
+
+This license governs use of the software project known as Project OS, including
+its source code, documentation, configuration files, scripts, build files,
+interfaces, and related materials distributed with this repository
+(collectively, the "Software").
+
+1. Purpose
+
+Project OS is made available so individuals can inspect, learn from, run,
+self-host, customize, and improve the Software for personal, educational,
+research, and other non-commercial purposes.
+
+This license is intended to preserve broad personal freedom while reserving
+commercial rights to Autark Labs.
+
+2. Definitions
+
+"Autark Labs" means the copyright holder or authorized legal entity controlling
+commercial rights to the Software.
+
+"You" means any individual or entity exercising permissions under this license.
+
+"Personal Use" means use by an individual for that individual's own private,
+household, hobby, educational, or non-commercial purposes.
+
+"Non-Commercial Use" means use that is not primarily intended for commercial
+advantage, monetary compensation, revenue generation, customer delivery,
+internal business operations, resale, managed services, hosted services, or
+commercial product development.
+
+"Commercial Use" includes, but is not limited to:
+
+- selling, licensing, sublicensing, leasing, or renting the Software;
+- selling, licensing, sublicensing, leasing, or renting derivative works based on
+  the Software;
+- offering the Software or derivative works as a hosted service, managed
+  service, appliance service, support service, or software-as-a-service offering;
+- bundling, preinstalling, embedding, or distributing the Software with hardware
+  or other commercial products;
+- using the Software to provide paid services to third parties;
+- using the Software as part of a commercial product, platform, marketplace, or
+  service offering;
+- rebranding, white-labeling, or redistributing the Software or derivative works
+  for commercial purposes; or
+- using the Software in a manner that competes with Autark Labs' commercial
+  offerings.
+
+"Derivative Work" means any modification, adaptation, translation,
+customization, extension, fork, or other work based on the Software.
+
+3. Permissions
+
+Subject to the restrictions in this license, Autark Labs grants you a limited,
+non-exclusive, non-transferable, revocable, royalty-free license to:
+
+- view, study, and inspect the Software;
+- run the Software for Personal Use or other Non-Commercial Use;
+- copy the Software for Personal Use or other Non-Commercial Use;
+- create private modifications, private forks, and private Derivative Works for
+  Personal Use or other Non-Commercial Use;
+- use the Software for education, research, experimentation, and evaluation;
+- submit patches, bug fixes, documentation improvements, issues, pull requests,
+  or other contributions to the official Autark Labs project repositories.
+
+4. Restrictions
+
+You may not, without prior written permission from Autark Labs:
+
+- use the Software or any Derivative Work for Commercial Use;
+- sell, rent, lease, sublicense, or otherwise commercialize the Software or any
+  Derivative Work;
+- offer the Software or any Derivative Work as a hosted service, managed service,
+  cloud service, support service, or software-as-a-service product;
+- bundle, preinstall, embed, or distribute the Software or any Derivative Work
+  with commercial hardware or other commercial products;
+- redistribute modified versions, forks, or Derivative Works under a different
+  name, brand, company, or project identity;
+- remove, alter, or obscure copyright notices, license notices, attribution
+  notices, or branding included in the Software;
+- use Autark Labs names, logos, trademarks, service marks, product names, or
+  branding except as necessary to identify the Software truthfully and without
+  implying endorsement;
+- use the Software to build, market, or operate a competing commercial product,
+  hosted service, appliance, marketplace, or platform; or
+- assist any third party in doing anything prohibited by this license.
+
+5. Redistribution
+
+You may not publicly redistribute modified versions, forks, or Derivative Works
+without prior written permission from Autark Labs.
+
+You may share unmodified copies of the Software for Non-Commercial Use only if:
+
+- this LICENSE file is included in full;
+- all copyright, attribution, and license notices remain intact;
+- the Software is not sold, bundled with commercial products, or used as part of
+  a commercial offering; and
+- the redistribution does not imply endorsement by Autark Labs.
+
+For public collaboration, you are encouraged to submit contributions to the
+official Autark Labs project repositories rather than distributing separate
+modified versions.
+
+6. Contributions
+
+By submitting a contribution to an official Autark Labs project repository, you
+represent that you have the right to submit the contribution and that the
+contribution does not violate any third-party rights.
+
+Unless a separate written contributor agreement states otherwise, you grant
+Autark Labs a perpetual, worldwide, non-exclusive, irrevocable, royalty-free
+license to use, reproduce, modify, distribute, sublicense, commercialize, and
+otherwise exploit your contribution as part of the Software or related products
+and services.
+
+You retain ownership of your own contributions, subject to the license granted
+above.
+
+7. Commercial Licensing
+
+All commercial rights are reserved by Autark Labs.
+
+Commercial licenses, reseller rights, hardware bundling rights, hosted service
+rights, managed service rights, enterprise use rights, and other commercial
+permissions may be available under a separate written agreement.
+
+For commercial licensing inquiries, contact:
+
+licensing@autarklabs.com
+
+8. Ownership
+
+Autark Labs and its licensors retain all rights, title, and interest in and to
+the Software, including all intellectual property rights not expressly granted by
+this license.
+
+No rights are granted except as expressly stated in this license.
+
+9. Trademarks
+
+This license does not grant permission to use the trade names, trademarks,
+service marks, logos, domain names, product names, or branding of Autark Labs,
+Project OS, or any related products, except as necessary for truthful,
+non-misleading identification of the Software.
+
+10. Third-Party Software
+
+The Software may include or depend on third-party software, libraries, packages,
+containers, images, or services. Those third-party components are licensed under
+their own licenses and are not relicensed under this license.
+
+You are responsible for complying with all applicable third-party licenses.
+
+11. Compliance with Laws
+
+You are responsible for using the Software in compliance with applicable laws,
+regulations, export controls, privacy laws, data protection laws, and other legal
+requirements.
+
+12. Termination
+
+Any violation of this license automatically terminates the permissions granted to
+you under this license.
+
+Upon termination, you must stop using, copying, modifying, distributing, hosting,
+or otherwise exercising rights in the Software and any Derivative Works.
+
+Sections concerning ownership, restrictions, commercial rights, contributions,
+warranty disclaimers, limitation of liability, and termination survive any
+termination of this license.
+
+13. No Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT,
+SECURITY, RELIABILITY, AVAILABILITY, OR ERROR-FREE OPERATION.
+
+AUTARK LABS DOES NOT WARRANT THAT THE SOFTWARE WILL MEET YOUR REQUIREMENTS, THAT
+THE SOFTWARE WILL BE SECURE OR ERROR-FREE, OR THAT DEFECTS WILL BE CORRECTED.
+
+14. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, AUTARK LABS AND ITS CONTRIBUTORS,
+LICENSORS, OFFICERS, EMPLOYEES, CONTRACTORS, AND AFFILIATES WILL NOT BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR
+PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, LOSS OF DATA,
+LOSS OF GOODWILL, BUSINESS INTERRUPTION, COMPUTER FAILURE, SECURITY BREACH,
+SERVICE OUTAGE, OR PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, ARISING OUT OF
+OR RELATING TO THE SOFTWARE OR THIS LICENSE, WHETHER BASED ON CONTRACT, TORT,
+NEGLIGENCE, STRICT LIABILITY, OR ANY OTHER LEGAL THEORY, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+15. No Support Obligation
+
+This license does not require Autark Labs to provide support, maintenance,
+updates, upgrades, bug fixes, documentation, hosting, warranties, or any other
+services.
+
+16. Changes to the License
+
+Autark Labs may publish new versions of this license from time to time. Each
+copy or release of the Software is governed by the license version distributed
+with that copy or release, unless Autark Labs expressly states otherwise in
+writing.
+
+17. Entire License
+
+This license is the entire agreement between you and Autark Labs regarding the
+permissions granted for the Software, unless you have entered into a separate
+written agreement with Autark Labs.
+
+If any provision of this license is held unenforceable, the remaining provisions
+will remain in effect to the maximum extent permitted by law.
+
