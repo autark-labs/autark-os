@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Clock3, Info, MoreHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Info, MoreHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,15 +14,31 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
-import type { HostInventoryResource } from '@/types/host';
 import type { MarketplaceApp } from '@/types/marketplace';
 import { sortOptions } from './extensions/MarketplacePage.constants';
-import { AppImage, CatalogConfidenceBadge, SupportBadge } from './MarketplacePage.shared';
+import { AppImage } from './MarketplacePage.shared';
+
+type DiscoverAppCardView = {
+  app: MarketplaceApp;
+  categoryLabel: string;
+  description: string;
+  difficulty: string;
+  estimatedInstallTime: string;
+  foundResource: unknown | null;
+  id: string;
+  installed: boolean;
+  name: string;
+  primaryAction: 'review_setup' | 'open' | 'manage' | 'resolve' | 'unavailable' | string;
+  primaryActionLabel: string;
+  serviceKindLabel: string;
+  state: 'available' | 'installed' | 'found_on_server' | 'managed_elsewhere' | 'blocked' | 'coming_soon' | string;
+  stateDescription: string;
+  stateLabel: string;
+  summary: string;
+};
 
 type MarketplaceAppListProps = {
-  apps: MarketplaceApp[];
-  foundResourcesByAppId?: Map<string, HostInventoryResource>;
-  installedAppIds: Set<string>;
+  apps: DiscoverAppCardView[];
   modeLabel?: string;
   selectedAppId: string;
   sortBy: string;
@@ -30,7 +46,7 @@ type MarketplaceAppListProps = {
   onSortChange: (value: string) => void;
 };
 
-export function MarketplaceAppList({ apps, foundResourcesByAppId = new Map(), installedAppIds, modeLabel = 'All apps', selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
+export function MarketplaceAppList({ apps, modeLabel = 'All apps', selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
   return (
     <Card className="rounded-lg border-white/10 bg-slate-900/55 py-0 text-slate-100 shadow-po-panel">
       <CardHeader className="flex flex-row items-center justify-between gap-4 p-5">
@@ -60,7 +76,7 @@ export function MarketplaceAppList({ apps, foundResourcesByAppId = new Map(), in
         </DropdownMenu>
       </CardHeader>
       <CardContent className="grid gap-4 p-5 pt-0 md:grid-cols-2 2xl:grid-cols-3">
-        {apps.length ? apps.map((app) => <AppStoreCard app={app} foundResource={foundResourcesByAppId.get(app.id) ?? null} installed={installedAppIds.has(app.id)} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
+        {apps.length ? apps.map((app) => <AppStoreCard app={app} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
           <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-8 text-center text-sm text-slate-400">No apps match this view.</div>
         )}
       </CardContent>
@@ -68,50 +84,40 @@ export function MarketplaceAppList({ apps, foundResourcesByAppId = new Map(), in
   );
 }
 
-function AppStoreCard({ app, foundResource, installed, isSelected, onSelect }: { app: MarketplaceApp; foundResource: HostInventoryResource | null; installed: boolean; isSelected: boolean; onSelect: () => void }) {
-  const foundLabel = foundResource ? marketplaceFoundLabel(foundResource) : '';
+function AppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppCardView; isSelected: boolean; onSelect: () => void }) {
+  const actionVariant = app.primaryAction === 'review_setup' ? 'default' : 'outline';
   return (
     <div className={cn('group relative overflow-hidden rounded-2xl border border-slate-700/25 bg-slate-950/48 p-4 text-slate-100 shadow-po-card transition hover:-translate-y-0.5 hover:border-violet-300/45 hover:bg-slate-900/70', isSelected && 'border-violet-300/55 bg-violet-950/20 shadow-po-brand-glow')}>
       <div className="absolute inset-0 bg-po-card-hover-sheen opacity-0 transition group-hover:opacity-100" />
       <button className="relative z-10 grid w-full gap-4 text-left" onClick={onSelect} type="button">
         <span className="flex items-start gap-3">
-          <AppImage app={app} />
+          <AppImage app={app.app} />
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
               <strong className="truncate text-base text-white">{app.name}</strong>
-              {installed && <Badge className="border-emerald-300/25 bg-emerald-500/10 text-emerald-100" variant="outline">Installed</Badge>}
-              {!installed && foundResource && <Badge className="border-amber-300/25 bg-amber-500/10 text-amber-100" variant="outline">{foundLabel}</Badge>}
-              <CatalogConfidenceBadge app={app} />
+              <Badge className={stateBadgeClass(app.state)} variant="outline">{app.stateLabel}</Badge>
             </span>
-            <span className="mt-1 block text-xs text-slate-400">{app.category} · {serviceKindLabel(app.usage.kind)}</span>
+            <span className="mt-1 block text-xs text-slate-400">{app.categoryLabel} · {app.estimatedInstallTime} · {app.difficulty}</span>
           </span>
         </span>
 
         <span>
-          <span className="block text-lg font-black leading-tight text-white">{outcomeCopy(app)}</span>
-          <span className="mt-2 line-clamp-2 block min-h-10 text-sm leading-5 text-slate-300">{app.plainLanguage || app.description}</span>
+          <span className="block text-lg font-black leading-tight text-white">{outcomeCopy(app.app)}</span>
+          <span className="mt-2 line-clamp-2 block min-h-10 text-sm leading-5 text-slate-300">{app.description}</span>
         </span>
 
-        <span className="flex flex-wrap gap-2">
-          <Badge className="border-violet-300/20 bg-violet-500/10 text-violet-100" variant="outline">
-            <Clock3 className="mr-1 size-3" />
-            {app.installTime}
-          </Badge>
-          <Badge className={cn('border text-xs', app.difficulty.toLowerCase().includes('easy') ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100' : 'border-amber-300/20 bg-amber-500/10 text-amber-100')} variant="outline">
-            {app.difficulty}
-          </Badge>
-          <SupportBadge level={app.supportLevel} />
-        </span>
+        {app.primaryAction === 'resolve' && (
+          <span className="line-clamp-2 rounded-lg border border-amber-300/20 bg-amber-500/10 p-3 text-sm leading-5 text-amber-100/85">
+            {app.stateDescription}
+          </span>
+        )}
       </button>
 
       <div className="relative z-10 mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3 text-xs text-slate-400">
-          <span>{app.smokeTests.filter((test) => test.status === 'Passed').length}/{app.smokeTests.length} checks passed</span>
-          <span>{app.source} template</span>
-        </div>
-        <Button className={cn('h-8 px-3 text-xs', installed ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15' : foundResource ? 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15' : poButtonClass('primary'))} onClick={onSelect} type="button" variant={installed || foundResource ? 'outline' : 'default'}>
-          {installed ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
-          {installed ? 'Manage' : foundResource ? 'Resolve' : 'Install'}
+        <div className="min-w-0 text-xs text-slate-400">{app.serviceKindLabel}</div>
+        <Button className={cn('h-8 px-3 text-xs', app.primaryAction === 'review_setup' && poButtonClass('primary'), app.primaryAction === 'manage' && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15', app.primaryAction === 'resolve' && 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15')} disabled={app.primaryAction === 'unavailable'} onClick={onSelect} type="button" variant={actionVariant}>
+          {app.primaryAction === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
+          {app.primaryActionLabel}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -123,7 +129,7 @@ function AppStoreCard({ app, foundResource, installed, isSelected, onSelect }: {
             <DropdownMenuLabel>{app.name}</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-slate-800" />
             <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" onSelect={onSelect}>
-              View details
+              View setup
               <Info className="ml-auto size-4 text-slate-500" />
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -133,11 +139,17 @@ function AppStoreCard({ app, foundResource, installed, isSelected, onSelect }: {
   );
 }
 
-function marketplaceFoundLabel(resource: HostInventoryResource) {
-  if (resource.ownershipState === 'foreign_project_os') return 'Owned by another Project OS';
-  if (resource.ownershipState === 'legacy_project_os') return 'Recoverable';
-  if (resource.ownershipState === 'unknown_conflict') return 'Blocked';
-  return 'Found on server';
+function stateBadgeClass(state: string) {
+  if (state === 'installed') {
+    return 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100';
+  }
+  if (state === 'found_on_server' || state === 'managed_elsewhere' || state === 'blocked') {
+    return 'border-amber-300/25 bg-amber-500/10 text-amber-100';
+  }
+  if (state === 'coming_soon') {
+    return 'border-slate-600 bg-slate-800/60 text-slate-300';
+  }
+  return 'border-sky-300/25 bg-sky-500/10 text-sky-100';
 }
 
 function outcomeCopy(app: MarketplaceApp) {
@@ -153,15 +165,4 @@ function outcomeCopy(app: MarketplaceApp) {
     vaultwarden: 'Protect your passwords',
   };
   return known[app.id] || app.shortValue || app.plainLanguage || app.description;
-}
-
-function serviceKindLabel(kind: string) {
-  const labels: Record<string, string> = {
-    'web-app': 'App',
-    'companion-service': 'Connect service',
-    'admin-service': 'Setup tool',
-    'background-service': 'Background',
-    infrastructure: 'Infrastructure',
-  };
-  return labels[kind] || kind.replaceAll('-', ' ');
 }

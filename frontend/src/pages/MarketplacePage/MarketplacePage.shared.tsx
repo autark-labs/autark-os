@@ -7,7 +7,11 @@ import type { MarketplaceApp } from '@/types/marketplace';
 export function AppImage({ app, size = 'default' }: { app: MarketplaceApp; size?: 'default' | 'large' }) {
   return (
     <span className={cn('grid shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-slate-950 shadow-po-card', size === 'large' ? 'size-22' : 'size-14')}>
-      <img alt="" className="h-full w-full object-cover" src={app.image} />
+      {app.image ? (
+        <img alt="" className="h-full w-full object-cover" src={app.image} />
+      ) : (
+        <span className="text-lg font-bold text-violet-100">{app.name.slice(0, 1)}</span>
+      )}
     </span>
   );
 }

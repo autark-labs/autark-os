@@ -23,7 +23,7 @@ import type { HostInventoryResource } from '@/types/host';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp } from '@/types/marketplace';
 import { InstallWizard, TechnicalPlanCard } from './MarketplaceInstallWizard';
-import { AppImage, CatalogConfidenceBadge, Config, InfoCard, Stat, SupportBadge } from './MarketplacePage.shared';
+import { AppImage, Config, InfoCard, Stat, SupportBadge } from './MarketplacePage.shared';
 
 type AppDetailProps = {
   app: MarketplaceApp;
@@ -51,6 +51,7 @@ type AppDetailProps = {
 export function MarketplaceAppDetail({ app, backupJob, foundResource = null, installJob, installedApp, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onBack, onCreateBackup, onInstall, onOptionsChange, onReinstallCurrent, onRequestPlan, onResetReinstall, planLoading, recoveryMode }: AppDetailProps) {
   const [conflictOpen, setConflictOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
+  const [technicalValidationOpen, setTechnicalValidationOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
   const installBlockedByFoundResource = Boolean(foundResource && !isInstalled);
   const showFreshInstallResult = installResult?.appId === app.id && (installResult.status === 'installed' || installResult.status === 'already_installed');
@@ -80,7 +81,6 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
               {isInstalled && <Badge className="border-emerald-300/25 bg-emerald-500/10 text-emerald-100" variant="outline">Installed</Badge>}
               {installBlockedByFoundResource && <Badge className="border-amber-300/25 bg-amber-500/10 text-amber-100" variant="outline">{foundResourceLabel(foundResource)}</Badge>}
               <SupportBadge level={app.supportLevel} />
-              <CatalogConfidenceBadge app={app} />
             </div>
             <p className="mt-2 text-sm text-slate-300">{app.description}</p>
             <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
@@ -136,6 +136,10 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
                 Refresh install check
                 <span className="ml-auto text-xs text-slate-500">{planLoading ? 'Checking' : 'Preview'}</span>
               </DropdownMenuItem>
+              <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" onSelect={() => setTechnicalValidationOpen(true)}>
+                Technical validation
+                <span className="ml-auto text-xs text-slate-500">Advanced</span>
+              </DropdownMenuItem>
               {isInstalled && (
                 <>
                   <DropdownMenuSeparator className="bg-slate-800" />
@@ -185,6 +189,7 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
         {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
         {installBlockedByFoundResource && <FoundResourceNotice resource={foundResource} />}
         {foundResource && <FoundResourceConflictDialog appName={app.name} open={conflictOpen} resource={foundResource} onOpenChange={setConflictOpen} />}
+        <TechnicalValidationDialog app={app} installPlan={installPlan} open={technicalValidationOpen} onOpenChange={setTechnicalValidationOpen} />
         {isInstalled && !showFreshInstallResult && <InstalledAppNotice app={installedApp} />}
         {isInstalled && recoveryMode && (
           <RecoveryInstallNotice
@@ -456,6 +461,51 @@ function InstalledAppNotice({ app }: { app: AppRuntimeView | null }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function TechnicalValidationDialog({
+  app,
+  installPlan,
+  onOpenChange,
+  open,
+}: {
+  app: MarketplaceApp;
+  installPlan: InstallPlan | null;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+}) {
+  const checksPassed = app.smokeTests.filter((test) => test.status === 'Passed').length;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[86vh] overflow-y-auto border-slate-700 bg-slate-950 text-slate-100 sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Technical validation for {app.name}</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Advanced details for install confidence and troubleshooting. Normal installs do not require reviewing this information.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4">
+          <section className="rounded-lg border border-slate-700/30 bg-slate-900/45 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 className="font-bold text-white">Project OS checks</h4>
+                <p className="mt-1 text-sm leading-6 text-slate-400">{checksPassed}/{app.smokeTests.length} checks are marked passed in the catalog.</p>
+              </div>
+              <Badge className={requiresInstallCaution(app) ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100'} variant="outline">
+                {requiresInstallCaution(app) ? 'Needs review' : 'Ready to install'}
+              </Badge>
+            </div>
+          </section>
+          <CatalogConfidenceCard app={app} />
+          {installPlan ? <TechnicalPlanCard plan={installPlan} /> : (
+            <section className="rounded-lg border border-slate-700/30 bg-slate-900/45 p-4 text-sm text-slate-400">
+              Generate an install preview to see the technical plan for this app.
+            </section>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
