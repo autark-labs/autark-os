@@ -147,7 +147,7 @@ export type MarketplaceApp = {
 export type InstallOptions = {
   ports: { hostPort: number | null };
   access: { tailscaleEnabled: boolean };
-  storage: { subfolders: Record<string, string> };
+  storage: { subfolders: Record<string, string>; hostPaths?: Record<string, string> };
   backup: { enabled: boolean; frequency: string; retention: number };
   reinstall?: boolean;
 };
@@ -174,6 +174,7 @@ export type InstallPlan = {
     accessUrl: string;
     tailscaleEnabled: boolean;
     storageSubfolders?: Record<string, string>;
+    storageHostPaths?: Record<string, string>;
     backup?: { enabled: boolean; frequency: string; retention: number };
   };
 };

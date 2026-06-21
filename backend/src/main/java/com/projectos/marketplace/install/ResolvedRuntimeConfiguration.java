@@ -9,11 +9,12 @@ public record ResolvedRuntimeConfiguration(
         String accessUrl,
         String privateAccessUrl,
         Map<String, String> storageSubfolders,
+        Map<String, String> storageHostPaths,
         boolean tailscaleEnabled,
         BackupPolicy backup) {
 
     public ResolvedRuntimeConfiguration(List<String> ports, String accessUrl) {
-        this(ports, Map.of(), accessUrl, null, Map.of(), false, BackupPolicy.defaults());
+        this(ports, Map.of(), accessUrl, null, Map.of(), Map.of(), false, BackupPolicy.defaults());
     }
 
     public List<String> portsFor(String serviceName) {

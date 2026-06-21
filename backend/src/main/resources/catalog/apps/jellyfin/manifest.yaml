@@ -106,6 +106,7 @@ runtime:
   volumes:
     - /var/lib/project-os/apps/jellyfin/config:/config
     - /var/lib/project-os/apps/jellyfin/cache:/cache
+    - /var/lib/project-os/apps/jellyfin/media:/media
   labels:
     - project-os.managed=true
     - project-os.app-id=jellyfin

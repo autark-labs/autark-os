@@ -211,6 +211,9 @@ public class ComposeRenderer {
         while (relative.startsWith("/")) {
             relative = relative.substring(1);
         }
+        if (runtimeConfiguration.storageHostPaths().containsKey(relative)) {
+            return runtimeConfiguration.storageHostPaths().get(relative) + ":" + containerPath;
+        }
         relative = runtimeConfiguration.storageSubfolders().getOrDefault(relative, relative);
         return runtimeLayout.appPath(manifest.id(), relative) + ":" + containerPath;
     }

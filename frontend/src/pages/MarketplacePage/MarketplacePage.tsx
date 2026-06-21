@@ -23,42 +23,31 @@ import {
 import { Input } from '@/components/ui/input';
 import { ActivityAPIClient } from '@/api/ActivityAPIClient';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
-import { HostInventoryAPIClient } from '@/api/HostInventoryAPIClient';
-import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
+import { DiscoverAPIClient } from '@/api/DiscoverAPIClient';
 import { JobsAPIClient } from '@/api/JobsAPIClient';
-import { MarketplaceAPIClient } from '@/api/MarketplaceAPIClient';
-import { MarketplaceInstallClient } from '@/api/MarketplaceInstallClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { poButtonClass, poCardClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
-import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ActivityLog } from '@/types/activity';
-import type { HostInventoryResource } from '@/types/host';
+import type { DiscoverAppView, DiscoverInstallPreview } from '@/types/discover';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
 import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
 import { categories } from './extensions/MarketplacePage.constants';
-import { defaultInstallOptions } from './extensions/MarketplacePage.installation';
 import {
   START_HERE_DISMISSAL_KEY,
-  discoverAppCardView,
   formatMarketplaceActivityTime,
   marketplaceActivityTone,
   marketplaceVisibleApps,
   starterCatalogForDiscover,
-  optionsFromInstalledSettings,
   shouldShowStartHereSection,
   starterAppsForMarketplace,
 } from './extensions/MarketplacePage.logic';
-import {
-  defaultSetupAnswers,
-  installOptionsFromSetupAnswers,
-  setupPreviewForApp,
-} from './extensions/MarketplacePage.setup';
 import { MarketplaceAppDetail } from './MarketplaceAppDetail';
 import { MarketplaceAppList } from './MarketplaceAppList';
+import { defaultAnswersFromSchema } from './MarketplaceSetupPanel';
 
 type StarterRecommendation = {
   app: MarketplaceApp;
@@ -74,9 +63,7 @@ function MarketplacePage() {
   const [selectedAppId, setSelectedAppId] = useState('vaultwarden');
   const [sortBy, setSortBy] = useState('Recommended');
   const [searchQuery, setSearchQuery] = useState('');
-  const [apps, setApps] = useState<MarketplaceApp[]>([]);
-  const [installedApps, setInstalledApps] = useState<AppRuntimeView[]>([]);
-  const [hostInventory, setHostInventory] = useState<HostInventoryResource[]>([]);
+  const [apps, setApps] = useState<DiscoverAppView[]>([]);
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
   const [doctor, setDoctor] = useState<SystemDoctorStatus | null>(null);
   const [storage, setStorage] = useState<StorageReport | null>(null);
@@ -84,6 +71,7 @@ function MarketplacePage() {
   const [marketplaceError, setMarketplaceError] = useState('');
   const [installPlan, setInstallPlan] = useState<InstallPlan | null>(null);
   const [installOptions, setInstallOptions] = useState<InstallOptions | null>(null);
+  const [installPreview, setInstallPreview] = useState<DiscoverInstallPreview | null>(null);
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [planLoading, setPlanLoading] = useState(false);
   const [installJob, setInstallJob] = useState<ProjectOsJob | null>(null);
@@ -93,23 +81,30 @@ function MarketplacePage() {
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
   const recoveryAppId = searchParams.get('app');
   const recoveryMode = searchParams.get('mode');
-  const installedById = useMemo(() => new Map(installedApps.map((app) => [app.appId, app])), [installedApps]);
+  const installedById = useMemo(() => new Map(apps.filter((app) => app.installedApp).map((app) => [app.id, app.installedApp])), [apps]);
   const installedAppIds = useMemo(() => new Set(installedById.keys()), [installedById]);
-  const foundResourcesByAppId = useMemo(() => new Map(hostInventory
-    .filter((resource) => resource.catalogAppId && resource.ownershipState !== 'owned_managed' && !resource.ignored)
-    .map((resource) => [resource.catalogAppId, resource])), [hostInventory]);
-  const catalogApps = useMemo(() => showAdvancedMetrics ? apps : starterCatalogForDiscover(apps), [apps, showAdvancedMetrics]);
-  const selectedApp = useMemo(() => apps.find((app) => app.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, selectedAppId]);
-  const selectedInstalledApp = selectedApp ? installedById.get(selectedApp.id) ?? null : null;
-  const selectedSetupPreview = useMemo(() => selectedApp ? setupPreviewForApp(selectedApp, setupAnswers) : null, [selectedApp, setupAnswers]);
+  const catalogApps = useMemo(() => {
+    if (showAdvancedMetrics) {
+      return apps;
+    }
+    const starterIds = new Set(starterCatalogForDiscover(apps.map((view) => view.app)).map((app) => app.id));
+    return apps.filter((view) => starterIds.has(view.id));
+  }, [apps, showAdvancedMetrics]);
+  const selectedView = useMemo(() => apps.find((app) => app.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, selectedAppId]);
+  const selectedApp = selectedView?.app;
+  const selectedInstalledApp = selectedView?.installedApp ?? null;
+  const fallbackInstallOptions: InstallOptions = {
+    ports: { hostPort: null },
+    access: { tailscaleEnabled: false },
+    storage: { subfolders: {}, hostPaths: {} },
+    backup: { enabled: true, frequency: 'daily', retention: 7 },
+  };
 
   const loadApps = useCallback(async () => {
     try {
-      const [nextApps, nextInstalledApps, nextActivity, nextHostInventory] = await Promise.all([
-        MarketplaceAPIClient.listApps(),
-        InstalledAppsAPIClient.listApps(),
+      const [nextApps, nextActivity] = await Promise.all([
+        DiscoverAPIClient.listApps(),
         ActivityAPIClient.recent({ category: 'marketplace', limit: 8 }),
-        HostInventoryAPIClient.list(false),
       ]);
       const [nextOnboarding, nextDoctor, nextStorage] = await Promise.all([
         SystemAPIClient.onboarding().catch((error) => {
@@ -126,8 +121,6 @@ function MarketplacePage() {
         }),
       ]);
       setApps(nextApps);
-      setInstalledApps(nextInstalledApps);
-      setHostInventory(nextHostInventory);
       setOnboarding(nextOnboarding);
       setDoctor(nextDoctor);
       setStorage(nextStorage);
@@ -145,20 +138,30 @@ function MarketplacePage() {
     }
   }, []);
 
-  const requestPlan = useCallback(async (appId = selectedApp?.id, options: InstallOptions | null = null) => {
+  const loadInstallPreview = useCallback(async (appId: string, answers: Record<string, unknown>) => {
     if (!appId) {
       return;
     }
     setPlanLoading(true);
     try {
-      setInstallPlan(await MarketplaceInstallClient.plan(appId, options ?? {}));
+      const preview = await DiscoverAPIClient.installPreview(appId, answers);
+      setInstallPreview(preview);
+      setInstallPlan(preview.technicalDetails);
+      setInstallOptions(preview.installOptions);
       setMarketplaceError('');
     } catch (error) {
       setMarketplaceError(apiErrorMessage(error));
     } finally {
       setPlanLoading(false);
     }
-  }, [selectedApp?.id]);
+  }, []);
+
+  const requestPlan = useCallback(async (appId = selectedApp?.id, _options: InstallOptions | null = null) => {
+    if (!appId) {
+      return;
+    }
+    await loadInstallPreview(appId, setupAnswers);
+  }, [loadInstallPreview, selectedApp?.id, setupAnswers]);
 
   useEffect(() => {
     loadApps();
@@ -181,15 +184,15 @@ function MarketplacePage() {
 
   useEffect(() => {
     setInstallPlan(null);
-    const app = apps.find((nextApp) => nextApp.id === selectedAppId);
-    if (app) {
-      const nextSetupAnswers = defaultSetupAnswers(app);
-      const defaults = installOptionsFromSetupAnswers(app, nextSetupAnswers, defaultInstallOptions(app));
+    setInstallPreview(null);
+    const view = apps.find((nextApp) => nextApp.id === selectedAppId);
+    if (view) {
+      const nextSetupAnswers = defaultAnswersFromSchema(view.setupSchema);
       setSetupAnswers(nextSetupAnswers);
-      setInstallOptions(defaults);
-      requestPlan(selectedAppId, defaults);
+      setInstallOptions(null);
+      loadInstallPreview(selectedAppId, nextSetupAnswers);
     }
-  }, [apps, requestPlan, selectedAppId]);
+  }, [apps, loadInstallPreview, selectedAppId]);
 
   useEffect(() => {
     if (!installJob || terminalJob(installJob)) {
@@ -200,7 +203,7 @@ function MarketplacePage() {
         const nextJob = await JobsAPIClient.get(installJob.jobId);
         setInstallJob(nextJob);
         if (terminalJob(nextJob)) {
-          setInstalledApps(await InstalledAppsAPIClient.listApps());
+          setApps(await DiscoverAPIClient.listApps());
           setMarketplaceActivity(await ActivityAPIClient.recent({ category: 'marketplace', limit: 8 }));
         }
       } catch (error) {
@@ -219,7 +222,7 @@ function MarketplacePage() {
         const nextJob = await JobsAPIClient.get(backupJob.jobId);
         setBackupJob(nextJob);
         if (terminalJob(nextJob)) {
-          setInstalledApps(await InstalledAppsAPIClient.listApps());
+          setApps(await DiscoverAPIClient.listApps());
         }
       } catch (error) {
         setMarketplaceError(apiErrorMessage(error, 'Backup progress could not be refreshed.'));
@@ -228,18 +231,18 @@ function MarketplacePage() {
     return () => window.clearInterval(interval);
   }, [backupJob]);
 
-  async function installApp(appId = selectedApp?.id, options = installOptions, mode: 'install' | 'reinstall' | 'reset-reinstall' = 'install') {
+  async function installApp(appId = selectedApp?.id, _options = installOptions, mode: 'install' | 'reinstall' = 'install') {
     if (!appId) {
       return;
     }
     const app = apps.find((candidate) => candidate.id === appId);
-    const foundResource = foundResourcesByAppId.get(appId);
+    const foundResource = app?.foundResource;
     if (foundResource) {
       setMarketplaceError(`${app?.name || appId} already exists on this server but is not managed by this Project OS installation. Review existing apps before installing a duplicate.`);
       return;
     }
-    if (mode === 'install' && appId === selectedApp?.id && selectedSetupPreview && !selectedSetupPreview.ready) {
-      setMarketplaceError(selectedSetupPreview.blockers[0]?.message || 'Finish setup choices before installing.');
+    if (mode === 'install' && appId === selectedApp?.id && installPreview && !installPreview.valid) {
+      setMarketplaceError(installPreview.blockingIssues[0]?.message || 'Finish setup choices before installing.');
       return;
     }
     if (installJob && !terminalJob(installJob) && installJob.subjectId !== appId) {
@@ -247,7 +250,7 @@ function MarketplacePage() {
       return;
     }
     try {
-      setInstallJob(await MarketplaceInstallClient.install(appId, options ?? {}));
+      setInstallJob(await DiscoverAPIClient.install(appId, setupAnswers, mode !== 'install'));
       setMarketplaceError('');
     } catch (error) {
       const message = apiErrorMessage(error);
@@ -268,30 +271,22 @@ function MarketplacePage() {
     if (!selectedApp || !selectedInstalledApp) {
       return;
     }
-    return installApp(selectedApp.id, { ...optionsFromInstalledSettings(selectedInstalledApp.settings, installOptions ?? defaultInstallOptions(selectedApp)), reinstall: true }, 'reinstall');
-  }
-
-  function resetAndReinstall() {
-    if (!selectedApp) {
-      return;
-    }
-    return installApp(selectedApp.id, { ...defaultInstallOptions(selectedApp), reinstall: true }, 'reset-reinstall');
+    return installApp(selectedApp.id, installOptions ?? undefined, 'reinstall');
   }
 
   const visibleApps = useMemo(() => marketplaceVisibleApps({
-    apps: catalogApps,
+    apps: catalogApps.map((view) => view.app),
     hideInstalled,
     installedAppIds,
     searchQuery,
     selectedCategory,
     sortBy,
-  }) as MarketplaceApp[], [catalogApps, hideInstalled, installedAppIds, searchQuery, selectedCategory, sortBy]);
-  const discoverCardViews = useMemo(() => visibleApps.map((app) => discoverAppCardView(app, { foundResourcesByAppId, installedById })), [foundResourcesByAppId, installedById, visibleApps]);
+  }).map((app) => catalogApps.find((view) => view.id === app.id)).filter(Boolean) as DiscoverAppView[], [catalogApps, hideInstalled, installedAppIds, searchQuery, selectedCategory, sortBy]);
   const selectedAppInstalling = Boolean(installJob && !terminalJob(installJob) && installJob.subjectId === selectedApp?.id);
   const selectedAppInstallLocked = Boolean(selectedApp && installJob && !terminalJob(installJob) && installJob.subjectId !== selectedApp.id);
   const installStatusMessage = selectedAppInstallLocked && installJob ? `${appNameForJob(installJob, apps)} is installing. Finish that install before starting another app.` : '';
   const starterRecommendations = useMemo(
-    () => apps.length ? starterAppsForMarketplace(apps, onboarding?.recommendedApps ?? [], installedById, doctor, storage) as StarterRecommendation[] : [],
+    () => apps.length ? starterAppsForMarketplace(apps.map((view) => view.app), onboarding?.recommendedApps ?? [], installedById, doctor, storage) as StarterRecommendation[] : [],
     [apps, doctor, installedById, onboarding?.recommendedApps, storage],
   );
   const showStartHere = shouldShowStartHereSection(starterRecommendations, startHereDismissed);
@@ -301,13 +296,12 @@ function MarketplacePage() {
     setSearchQuery('');
     setSelectedCategory('All');
     setSelectedAppId(appId);
-    const app = apps.find((candidate) => candidate.id === appId);
-    if (app) {
-      const nextSetupAnswers = defaultSetupAnswers(app);
-      const defaults = installOptionsFromSetupAnswers(app, nextSetupAnswers, defaultInstallOptions(app));
+    const view = apps.find((candidate) => candidate.id === appId);
+    if (view) {
+      const nextSetupAnswers = defaultAnswersFromSchema(view.setupSchema);
       setSetupAnswers(nextSetupAnswers);
-      setInstallOptions(defaults);
-      requestPlan(appId, defaults);
+      setInstallOptions(null);
+      loadInstallPreview(appId, nextSetupAnswers);
     }
   }
 
@@ -315,10 +309,10 @@ function MarketplacePage() {
     if (!selectedApp) {
       return;
     }
-    const nextOptions = installOptionsFromSetupAnswers(selectedApp, nextAnswers, defaultInstallOptions(selectedApp));
     setSetupAnswers(nextAnswers);
-    setInstallOptions(nextOptions);
     setInstallPlan(null);
+    setInstallPreview(null);
+    loadInstallPreview(selectedApp.id, nextAnswers);
   }
 
   function dismissStartHere() {
@@ -390,14 +384,14 @@ function MarketplacePage() {
       </div>
 
       <div className="grid items-start gap-6 2xl:grid-cols-[minmax(620px,1fr)_minmax(420px,560px)]">
-        <MarketplaceAppList apps={discoverCardViews} modeLabel={showAdvancedMetrics ? 'All apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
-        <MarketplaceAppDetail app={selectedApp} backupJob={backupJob?.subjectId === selectedApp.id ? backupJob : null} foundResource={foundResourcesByAppId.get(selectedApp.id) ?? null} installJob={installJob?.subjectId === selectedApp.id ? installJob : null} installLocked={selectedAppInstallLocked} installOptions={installOptions ?? defaultInstallOptions(selectedApp)} installResult={null} installStatusMessage={installStatusMessage} installing={selectedAppInstalling} installPlan={installPlan} installedApp={selectedInstalledApp} onBack={() => { setSearchQuery(''); setSelectedCategory('All'); }} onCreateBackup={createFirstBackup} onInstall={(options) => installApp(selectedApp.id, options)} onReinstallCurrent={reinstallWithCurrentSettings} onRequestPlan={(options) => requestPlan(selectedApp.id, options)} onResetReinstall={resetAndReinstall} onSetupAnswersChange={changeSetupAnswers} planLoading={planLoading} recoveryMode={recoveryAppId === selectedApp.id ? recoveryMode : null} setupAnswers={setupAnswers} setupReady={selectedSetupPreview?.ready ?? true} />
+        <MarketplaceAppList apps={visibleApps} modeLabel={showAdvancedMetrics ? 'All apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
+        <MarketplaceAppDetail app={selectedApp} backupJob={backupJob?.subjectId === selectedApp.id ? backupJob : null} foundResource={selectedView?.foundResource ?? null} installJob={installJob?.subjectId === selectedApp.id ? installJob : null} installLocked={selectedAppInstallLocked} installOptions={installOptions ?? fallbackInstallOptions} installPreview={installPreview} installResult={null} installStatusMessage={installStatusMessage} installing={selectedAppInstalling} installPlan={installPlan} installedApp={selectedInstalledApp} onBack={() => { setSearchQuery(''); setSelectedCategory('All'); }} onCreateBackup={createFirstBackup} onInstall={(options) => installApp(selectedApp.id, options)} onReinstallCurrent={reinstallWithCurrentSettings} onRequestPlan={(options) => requestPlan(selectedApp.id, options)} onSetupAnswersChange={changeSetupAnswers} planLoading={planLoading} recoveryMode={recoveryAppId === selectedApp.id ? recoveryMode : null} setupAnswers={setupAnswers} setupReady={installPreview?.valid ?? true} setupSchema={selectedView.setupSchema} />
       </div>
     </PageShell>
   );
 }
 
-function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: MarketplaceApp[]; installJob: ProjectOsJob | null; selectedAppId: string }) {
+function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverAppView[]; installJob: ProjectOsJob | null; selectedAppId: string }) {
   if (!installJob || installJob.subjectId !== selectedAppId) {
     return null;
   }
@@ -606,6 +600,6 @@ function currentJobStep(job: ProjectOsJob) {
   return step.message || step.label;
 }
 
-function appNameForJob(job: ProjectOsJob, apps: MarketplaceApp[]) {
+function appNameForJob(job: ProjectOsJob, apps: DiscoverAppView[]) {
   return apps.find((app) => app.id === job.subjectId)?.name || job.subjectId || 'this app';
 }

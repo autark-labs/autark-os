@@ -17,7 +17,7 @@ import {
 import { backupSafetyWarning } from '@/lib/backupSafety';
 import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
-import type { AppRuntimeView } from '@/types/app';
+import type { DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { HostInventoryResource } from '@/types/host';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp } from '@/types/marketplace';
@@ -35,22 +35,23 @@ type AppDetailProps = {
   installLocked: boolean;
   installStatusMessage: string;
   installing: boolean;
-  installedApp: AppRuntimeView | null;
+  installedApp: DiscoverInstalledAppSummary | null;
+  installPreview: DiscoverInstallPreview | null;
   foundResource?: HostInventoryResource | null;
   onBack: () => void;
   onCreateBackup: (appId: string) => Promise<void>;
   onInstall: (options: InstallOptions) => Promise<void>;
   onReinstallCurrent: () => void | Promise<void>;
   onRequestPlan: (options: InstallOptions) => Promise<void>;
-  onResetReinstall: () => void | Promise<void>;
   onSetupAnswersChange: (answers: Record<string, unknown>) => void;
   planLoading: boolean;
   recoveryMode?: string | null;
   setupAnswers: Record<string, unknown>;
   setupReady: boolean;
+  setupSchema: DiscoverSetupSchema;
 };
 
-export function MarketplaceAppDetail({ app, backupJob, foundResource = null, installJob, installedApp, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onBack, onCreateBackup, onInstall, onReinstallCurrent, onRequestPlan, onResetReinstall, onSetupAnswersChange, planLoading, recoveryMode, setupAnswers, setupReady }: AppDetailProps) {
+export function MarketplaceAppDetail({ app, backupJob, foundResource = null, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installResult, installStatusMessage, installing, onBack, onCreateBackup, onInstall, onReinstallCurrent, onRequestPlan, onSetupAnswersChange, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
   const [conflictOpen, setConflictOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const [technicalValidationOpen, setTechnicalValidationOpen] = useState(false);
@@ -123,7 +124,7 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
               {installing ? 'Installing...' : installLocked ? 'Install blocked' : installBlockedByFoundResource ? 'Resolve conflict' : !setupReady ? 'Finish setup' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Review install' : 'Review install'}
             </Button>
           )}
-          {!isInstalled && !installBlockedByFoundResource && <InstallWizard app={app} installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installStatusMessage={!setupReady ? 'Finish the required setup choices before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onRequestPlan={onRequestPlan} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} triggerLabel="Customize" />}
+          {!isInstalled && !installBlockedByFoundResource && <InstallWizard app={app} installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installResult={installResult} installStatusMessage={!setupReady ? 'Finish the required setup choices before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onRequestPlan={onRequestPlan} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} setupSchema={setupSchema} triggerLabel="Customize" />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className={poButtonClass('quiet')} type="button" variant="outline">
@@ -148,10 +149,6 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
                   <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled={installLocked || installing} onSelect={onReinstallCurrent}>
                     Reinstall with current settings
                     <span className="ml-auto text-xs text-amber-300">Advanced</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled={installLocked || installing} onSelect={onResetReinstall}>
-                    Reset and reinstall
-                    <span className="ml-auto text-xs text-red-300">Advanced</span>
                   </DropdownMenuItem>
                 </>
               )}
@@ -193,12 +190,11 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
         {foundResource && <FoundResourceConflictDialog appName={app.name} open={conflictOpen} resource={foundResource} onOpenChange={setConflictOpen} />}
         <TechnicalValidationDialog app={app} installPlan={installPlan} open={technicalValidationOpen} onOpenChange={setTechnicalValidationOpen} />
         {isInstalled && !showFreshInstallResult && <InstalledAppNotice app={installedApp} />}
-        {isInstalled && recoveryMode && (
+        {isInstalled && recoveryMode && recoveryMode !== 'reset-reinstall' && (
           <RecoveryInstallNotice
             disabled={installLocked || installing}
             mode={recoveryMode}
             onReinstallCurrent={onReinstallCurrent}
-            onResetReinstall={onResetReinstall}
           />
         )}
         {(installJob || backupJob || installing || installResult) && <InlineInstallStatus app={app} backupJob={backupJob} installedApp={installedApp} installing={installing} job={installJob} onCreateBackup={onCreateBackup} result={installResult} />}
@@ -214,8 +210,8 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
             <InfoCard title="Best for" items={app.bestFor} />
           </div>
 
-          <MarketplaceSetupPanel app={app} answers={setupAnswers} onAnswersChange={onSetupAnswersChange} />
-          <InstallPlanPreview app={app} answers={setupAnswers} />
+          <MarketplaceSetupPanel app={app} answers={setupAnswers} preview={installPreview} schema={setupSchema} onAnswersChange={onSetupAnswersChange} />
+          <InstallPlanPreview preview={installPreview} />
 
           <section className="rounded-lg border border-slate-700/30 bg-slate-950/30 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -335,16 +331,15 @@ function InstallBlockedNotice({ message }: { message: string }) {
   );
 }
 
-function RecoveryInstallNotice({ disabled, mode, onReinstallCurrent, onResetReinstall }: { disabled: boolean; mode: string; onReinstallCurrent: () => void | Promise<void>; onResetReinstall: () => void | Promise<void> }) {
-  const resetMode = mode === 'reset-reinstall';
+function RecoveryInstallNotice({ disabled, mode: _mode, onReinstallCurrent }: { disabled: boolean; mode: string; onReinstallCurrent: () => void | Promise<void> }) {
   return (
-    <section className={cn('rounded-lg border p-4', resetMode ? 'border-red-300/25 bg-red-500/10' : 'border-amber-300/25 bg-amber-500/10')}>
+    <section className="rounded-lg border border-amber-300/25 bg-amber-500/10 p-4">
       <div className="flex items-start gap-3">
-        <TriangleAlert className={cn('mt-0.5 size-5 shrink-0', resetMode ? 'text-red-200' : 'text-amber-200')} />
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-200" />
         <div className="min-w-0">
-          <h4 className="font-bold text-white">{resetMode ? 'Reset and reinstall requested' : 'Reinstall requested'}</h4>
-          <p className={cn('mt-1 text-sm leading-6', resetMode ? 'text-red-100/80' : 'text-amber-100/80')}>
-            {backupSafetyWarning(resetMode ? 'reset' : 'reinstall')}
+          <h4 className="font-bold text-white">Reinstall requested</h4>
+          <p className="mt-1 text-sm leading-6 text-amber-100/80">
+            {backupSafetyWarning('reinstall')}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button asChild className={poButtonClass('quiet')} size="sm" type="button" variant="outline">
@@ -353,8 +348,8 @@ function RecoveryInstallNotice({ disabled, mode, onReinstallCurrent, onResetRein
                 Open Backups
               </Link>
             </Button>
-            <Button className={resetMode ? 'bg-red-500 text-white hover:bg-red-400' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'} disabled={disabled} onClick={resetMode ? onResetReinstall : onReinstallCurrent} size="sm" type="button">
-              {resetMode ? 'I backed up, reset and reinstall' : 'I backed up, reinstall'}
+            <Button className="bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={disabled} onClick={onReinstallCurrent} size="sm" type="button">
+              I backed up, reinstall
             </Button>
           </div>
         </div>
@@ -363,7 +358,7 @@ function RecoveryInstallNotice({ disabled, mode, onReinstallCurrent, onResetRein
   );
 }
 
-function InstalledAppNotice({ app }: { app: AppRuntimeView | null }) {
+function InstalledAppNotice({ app }: { app: DiscoverInstalledAppSummary | null }) {
   if (!app) {
     return null;
   }
@@ -446,7 +441,7 @@ function InlineInstallStatus({
 }: {
   app: MarketplaceApp;
   backupJob: ProjectOsJob | null;
-  installedApp: AppRuntimeView | null;
+  installedApp: DiscoverInstalledAppSummary | null;
   installing: boolean;
   job: ProjectOsJob | null;
   onCreateBackup: (appId: string) => Promise<void>;
@@ -569,14 +564,8 @@ function currentJobStep(job: ProjectOsJob) {
   return step?.message || step?.label || 'Project OS is working on this job.';
 }
 
-function shouldOfferFirstBackup(app: AppRuntimeView) {
-  if (app.canonicalBackupState === 'protected_by_restore_point') {
-    return false;
-  }
-  if (app.canonicalBackupState) {
-    return app.canonicalBackupState !== 'backup_disabled';
-  }
-  return Boolean(app.settings?.backup?.enabled);
+function shouldOfferFirstBackup(_app: DiscoverInstalledAppSummary) {
+  return true;
 }
 
 function CatalogConfidenceCard({ app }: { app: MarketplaceApp }) {

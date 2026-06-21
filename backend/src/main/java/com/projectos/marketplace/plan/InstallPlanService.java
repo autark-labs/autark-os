@@ -58,6 +58,7 @@ public class InstallPlanService {
                         runtimeConfiguration.accessUrl(),
                         runtimeConfiguration.tailscaleEnabled(),
                         runtimeConfiguration.storageSubfolders(),
+                        runtimeConfiguration.storageHostPaths(),
                         runtimeConfiguration.backup()),
                 warnings(manifest, runtimeConfiguration));
     }
@@ -103,6 +104,9 @@ public class InstallPlanService {
         String relative = parts[0].replace(manifest.runtime().runtimeRoot(), "");
         while (relative.startsWith("/")) {
             relative = relative.substring(1);
+        }
+        if (runtimeConfiguration.storageHostPaths().containsKey(relative)) {
+            return runtimeConfiguration.storageHostPaths().get(relative) + ":" + parts[1];
         }
         relative = runtimeConfiguration.storageSubfolders().getOrDefault(relative, relative);
         return runtimeLayout.appPath(manifest.id(), relative) + ":" + parts[1];

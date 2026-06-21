@@ -2,6 +2,8 @@ package com.projectos.marketplace.install;
 
 import com.projectos.marketplace.api.InstallOptionsRequest;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +33,7 @@ public class InstallCustomizationResolver {
                 portAllocator.accessUrl(manifest, ports),
                 null,
                 storageSubfolders(options.storage()),
+                storageHostPaths(options.storage()),
                 tailscaleEnabled(options.access()),
                 backupPolicy(options.backup()));
     }
@@ -50,6 +53,19 @@ public class InstallCustomizationResolver {
             safeSubfolders.put(safeKey, safeValue);
         });
         return safeSubfolders;
+    }
+
+    private Map<String, String> storageHostPaths(InstallOptionsRequest.StorageOptions storage) {
+        if (storage == null || storage.hostPaths() == null || storage.hostPaths().isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> safeHostPaths = new LinkedHashMap<>();
+        storage.hostPaths().forEach((key, value) -> {
+            String safeKey = safeName(key, "storage key");
+            String path = hostPath(value);
+            safeHostPaths.put(safeKey, path);
+        });
+        return safeHostPaths;
     }
 
     private BackupPolicy backupPolicy(InstallOptionsRequest.BackupOptions backup) {
@@ -77,5 +93,19 @@ public class InstallCustomizationResolver {
             throw new InstallationException("The " + label + " '" + value + "' is not a safe Project-OS folder name.");
         }
         return normalized;
+    }
+
+    private String hostPath(String value) {
+        if (value == null || value.isBlank()) {
+            throw new InstallationException("A storage host path cannot be blank.");
+        }
+        Path path = Path.of(value.trim()).normalize();
+        if (!path.isAbsolute()) {
+            throw new InstallationException("Storage host paths must be absolute paths.");
+        }
+        if (!Files.isDirectory(path) || !Files.isReadable(path)) {
+            throw new InstallationException("Storage host paths must point to readable folders.");
+        }
+        return path.toString();
     }
 }

@@ -14,31 +14,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
+import type { DiscoverAppView } from '@/types/discover';
 import type { MarketplaceApp } from '@/types/marketplace';
 import { sortOptions } from './extensions/MarketplacePage.constants';
 import { AppImage } from './MarketplacePage.shared';
 
-type DiscoverAppCardView = {
-  app: MarketplaceApp;
-  categoryLabel: string;
-  description: string;
-  difficulty: string;
-  estimatedInstallTime: string;
-  foundResource: unknown | null;
-  id: string;
-  installed: boolean;
-  name: string;
-  primaryAction: 'review_setup' | 'open' | 'manage' | 'resolve' | 'unavailable' | string;
-  primaryActionLabel: string;
-  serviceKindLabel: string;
-  state: 'available' | 'installed' | 'found_on_server' | 'managed_elsewhere' | 'blocked' | 'coming_soon' | string;
-  stateDescription: string;
-  stateLabel: string;
-  summary: string;
-};
-
 type MarketplaceAppListProps = {
-  apps: DiscoverAppCardView[];
+  apps: DiscoverAppView[];
   modeLabel?: string;
   selectedAppId: string;
   sortBy: string;
@@ -84,7 +66,7 @@ export function MarketplaceAppList({ apps, modeLabel = 'All apps', selectedAppId
   );
 }
 
-function AppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppCardView; isSelected: boolean; onSelect: () => void }) {
+function AppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView; isSelected: boolean; onSelect: () => void }) {
   const actionVariant = app.primaryAction === 'review_setup' ? 'default' : 'outline';
   return (
     <div className={cn('group relative overflow-hidden rounded-2xl border border-slate-700/25 bg-slate-950/48 p-4 text-slate-100 shadow-po-card transition hover:-translate-y-0.5 hover:border-violet-300/45 hover:bg-slate-900/70', isSelected && 'border-violet-300/55 bg-violet-950/20 shadow-po-brand-glow')}>

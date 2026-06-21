@@ -15,6 +15,7 @@ import {
 import { ApplicationsSetupGuide } from '@/pages/ApplicationsPage/ApplicationsSetupGuide';
 import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
+import type { DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp, MarketplaceUsageField, PostInstallGuide } from '@/types/marketplace';
 import { Config, FriendlyStat } from './MarketplacePage.shared';
 import { InstallPlanPreview, SetupSummaryList } from './MarketplaceSetupPanel';
@@ -28,16 +29,18 @@ type InstallWizardProps = {
   installResult: InstallResult | null;
   installStatusMessage: string;
   installing: boolean;
+  installPreview: DiscoverInstallPreview | null;
   onInstall: (options: InstallOptions) => Promise<void>;
   onRequestPlan: (options: InstallOptions) => Promise<void>;
   onOpenChange?: (open: boolean) => void;
   open?: boolean;
   planLoading: boolean;
   setupAnswers: Record<string, unknown>;
+  setupSchema: DiscoverSetupSchema;
   triggerLabel?: string;
 };
 
-export function InstallWizard({ app, hideTrigger = false, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onInstall, onOpenChange, onRequestPlan, open: controlledOpen, planLoading, setupAnswers, triggerLabel = 'Customize' }: InstallWizardProps) {
+export function InstallWizard({ app, hideTrigger = false, installLocked, installOptions, installPlan, installPreview, installResult, installStatusMessage, installing, onInstall, onOpenChange, onRequestPlan, open: controlledOpen, planLoading, setupAnswers, setupSchema, triggerLabel = 'Customize' }: InstallWizardProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const hasResult = Boolean(installResult);
@@ -76,11 +79,11 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
               <FriendlyStat label="Ready when" value={app.health.successLabel} />
             </div>
             <div className="mt-4">
-              <SetupSummaryList app={app} answers={setupAnswers} />
+              <SetupSummaryList answers={setupAnswers} schema={setupSchema} />
             </div>
           </section>
 
-          <InstallPlanPreview app={app} answers={setupAnswers} />
+          <InstallPlanPreview preview={installPreview} />
 
           {installPlan && (
             <Collapsible className="rounded-lg border border-slate-700/40 bg-slate-900/70 p-4">
@@ -143,6 +146,7 @@ export function TechnicalPlanCard({ plan }: { plan: InstallPlan }) {
             <Config label="Tailscale" value={plan.customization.tailscaleEnabled ? 'Requested' : 'Not requested'} />
             <Config label="Backup protection" value={plan.customization.backup?.enabled ? 'Included in routine and manual backups' : 'Not included'} />
             <Config label="Storage folders" value={Object.entries(plan.customization.storageSubfolders ?? {}).map(([key, value]) => `${key} -> ${value}`).join(', ') || 'Default folders'} />
+            <Config label="External folders" value={Object.entries(plan.customization.storageHostPaths ?? {}).map(([key, value]) => `${key} -> ${value}`).join(', ') || 'None'} />
           </>
         )}
       </dl>

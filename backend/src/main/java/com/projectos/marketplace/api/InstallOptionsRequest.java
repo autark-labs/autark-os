@@ -27,7 +27,10 @@ public record InstallOptionsRequest(
     public record AccessOptions(Boolean tailscaleEnabled) {
     }
 
-    public record StorageOptions(Map<String, String> subfolders) {
+    public record StorageOptions(Map<String, String> subfolders, Map<String, String> hostPaths) {
+        public StorageOptions(Map<String, String> subfolders) {
+            this(subfolders, Map.of());
+        }
     }
 
     public record BackupOptions(Boolean enabled, String frequency, Integer retention) {
