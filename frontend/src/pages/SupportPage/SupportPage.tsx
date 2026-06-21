@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
-import { notify } from '@/lib/notifications';
+import { toast } from 'sonner';
 import type { HostInventoryResource } from '@/types/host';
 import type { SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemSetupStatus } from '@/types/system';
 import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from './SupportPage.diagnosticsModel';
@@ -63,12 +63,13 @@ function SupportPage() {
       ]);
       setState((current) => ({ ...current, doctor, hostInventory, logs, setup, summary }));
       if (background) {
-        notify({ severity: doctor.status === 'needs_attention' ? 'warning' : 'success', title: doctor.headline, message: doctor.summary });
+        const showToast = doctor.status === 'needs_attention' ? toast.warning : toast.success;
+        showToast(doctor.headline, { description: doctor.summary });
       }
     } catch (err) {
       const message = apiErrorMessage(err, 'Diagnostics could not be loaded.');
       setError(message);
-      notify({ severity: 'error', title: 'Diagnostics failed', message, sticky: true });
+      toast.error('Diagnostics failed', { description: message, duration: Infinity });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -85,9 +86,9 @@ function SupportPage() {
       const bundle = await SystemAPIClient.supportBundle();
       setState((current) => ({ ...current, bundle, summary: summaryFromBundle(bundle), setup: bundle.setup || current.setup, logs: bundle.logs || current.logs }));
       await navigator.clipboard.writeText(bundle.bundleText);
-      notify({ severity: 'success', title: 'Support bundle copied', message: 'Redacted diagnostics are ready to share.' });
+      toast.success('Support bundle copied', { description: 'Redacted diagnostics are ready to share.' });
     } catch (err) {
-      notify({ severity: 'error', title: 'Support bundle failed', message: apiErrorMessage(err, 'Project OS could not generate the support bundle.'), sticky: true });
+      toast.error('Support bundle failed', { description: apiErrorMessage(err, 'Project OS could not generate the support bundle.'), duration: Infinity });
     } finally {
       setBundleBusy(false);
     }
@@ -98,9 +99,9 @@ function SupportPage() {
     try {
       const logs = await SystemAPIClient.supportLogs(160);
       setState((current) => ({ ...current, logs }));
-      notify({ severity: 'info', title: 'Technical logs loaded', message: 'Recent redacted log lines are available below.' });
+      toast.info('Technical logs loaded', { description: 'Recent redacted log lines are available below.' });
     } catch (err) {
-      notify({ severity: 'error', title: 'Logs could not load', message: apiErrorMessage(err), sticky: true });
+      toast.error('Logs could not load', { description: apiErrorMessage(err), duration: Infinity });
     }
   }
 

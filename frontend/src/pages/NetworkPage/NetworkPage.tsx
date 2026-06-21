@@ -10,7 +10,7 @@ import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { notify } from '@/lib/notifications';
+import { toast } from 'sonner';
 import type { AppRuntimeView } from '@/types/app';
 import type { ExternalService } from '@/types/host';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleConnectGuide, TailscaleDevice, TailscaleStatus } from '@/types/network';
@@ -102,7 +102,7 @@ function NetworkPage() {
   const copyPrivateLink = useCallback(async (appId: string, url: string | null) => {
     if (!url) return;
     await navigator.clipboard.writeText(url);
-    notify({ severity: 'success', title: 'Link copied', message: url });
+    toast.success('Link copied', { description: url });
     setCopiedAppId(appId);
     window.setTimeout(() => setCopiedAppId((current) => current === appId ? null : current), 1600);
   }, []);

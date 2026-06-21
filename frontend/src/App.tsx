@@ -8,7 +8,7 @@ import { routeAliases } from './layout/navigationModel';
 import { readAdminToken } from './lib/adminSecuritySession';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
-import { GlobalNotifications } from './components/project-os/GlobalNotifications';
+import { Toaster } from './components/ui/sonner';
 
 const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage/ApplicationsPage'));
 const BackupsPage = lazy(() => import('./pages/BackupsPage/BackupsPage'));
@@ -34,7 +34,7 @@ function App() {
   return (
     <ProjectSettingsProvider>
       <AppContent />
-      <GlobalNotifications />
+      <Toaster closeButton position="top-right" richColors />
     </ProjectSettingsProvider>
   );
 }

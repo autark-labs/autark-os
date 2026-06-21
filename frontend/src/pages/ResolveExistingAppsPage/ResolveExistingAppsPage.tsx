@@ -10,9 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { notify } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import type { HostInventoryResource, HostResourceCleanupPlan, HostResourceDataDeletionPlan, HostResourceRecoveryPlan } from '@/types/host';
+import { toast } from 'sonner';
 
 type ActionDialogState =
   | { type: 'cleanup'; resource: HostInventoryResource; plan: HostResourceCleanupPlan; confirmation: string }
@@ -68,16 +68,16 @@ function ResolveExistingAppsPage() {
   async function toggleIgnore(resource: HostInventoryResource) {
     if (fixtureMode) {
       setResources((current) => current.map((item) => item.id === resource.id ? { ...item, ignored: !item.ignored } : item));
-      notify({ severity: 'info', title: resource.ignored ? 'Fixture resource restored' : 'Fixture resource ignored' });
+      showToast('info', resource.ignored ? 'Fixture resource restored' : 'Fixture resource ignored');
       return;
     }
     setBusyId(resource.id);
     try {
       const result = resource.ignored ? await HostInventoryAPIClient.unignore(resource.id) : await HostInventoryAPIClient.ignore(resource.id);
-      notify({ severity: notificationSeverity(result.severity), title: result.title, message: result.message });
+      showToast(result.severity, result.title, result.message);
       await load();
     } catch (ignoreError) {
-      notify({ severity: 'error', title: 'Existing app action failed', message: apiErrorMessage(ignoreError), sticky: true });
+      showToast('error', 'Existing app action failed', apiErrorMessage(ignoreError), true);
     } finally {
       setBusyId(null);
     }
@@ -85,7 +85,7 @@ function ResolveExistingAppsPage() {
 
   async function openAction(resource: HostInventoryResource, type: 'cleanup' | 'delete-data' | 'recover') {
     if (fixtureMode) {
-      notify({ severity: 'info', title: 'Fixture mode', message: 'Plans are not available for fixture resources.' });
+      showToast('info', 'Fixture mode', 'Plans are not available for fixture resources.');
       return;
     }
     setBusyId(resource.id);
@@ -98,7 +98,7 @@ function ResolveExistingAppsPage() {
         setActionDialog({ type, resource, plan: await HostInventoryAPIClient.recoveryPlan(resource.id), confirmation: '' });
       }
     } catch (planError) {
-      notify({ severity: 'error', title: 'Action plan could not load', message: apiErrorMessage(planError), sticky: true });
+      showToast('error', 'Action plan could not load', apiErrorMessage(planError), true);
     } finally {
       setBusyId(null);
     }
@@ -113,13 +113,13 @@ function ResolveExistingAppsPage() {
         : actionDialog.type === 'delete-data'
           ? await HostInventoryAPIClient.deleteData(actionDialog.resource.id, actionDialog.confirmation)
           : await HostInventoryAPIClient.recover(actionDialog.resource.id, actionDialog.confirmation);
-      notify({ severity: notificationSeverity(result.severity), title: result.title, message: result.message, sticky: !result.ok });
+      showToast(result.severity, result.title, result.message, !result.ok);
       if (result.ok) {
         setActionDialog(null);
         await load();
       }
     } catch (actionError) {
-      notify({ severity: 'error', title: 'Existing app action failed', message: apiErrorMessage(actionError), sticky: true });
+      showToast('error', 'Existing app action failed', apiErrorMessage(actionError), true);
     } finally {
       setBusyId(null);
     }
@@ -127,12 +127,12 @@ function ResolveExistingAppsPage() {
 
   async function addLinkedService(resource: HostInventoryResource) {
     if (fixtureMode) {
-      notify({ severity: 'info', title: 'Fixture mode', message: 'Linked services are not saved in fixture mode.' });
+      showToast('info', 'Fixture mode', 'Linked services are not saved in fixture mode.');
       return;
     }
     const url = resource.accessUrls[0];
     if (!url) {
-      notify({ severity: 'warning', title: 'No URL found', message: 'Project OS needs a reachable URL before it can add a linked service.' });
+      showToast('warning', 'No URL found', 'Project OS needs a reachable URL before it can add a linked service.');
       return;
     }
     setBusyId(resource.id);
@@ -144,10 +144,10 @@ function ResolveExistingAppsPage() {
         accessScope: 'LAN',
         healthCheckEnabled: true,
       });
-      notify({ severity: 'success', title: 'Linked service added', message: `${service.name} will appear as a linked external service.` });
+      showToast('success', 'Linked service added', `${service.name} will appear as a linked external service.`);
       setLinkedName('');
     } catch (linkError) {
-      notify({ severity: 'error', title: 'Linked service could not be added', message: apiErrorMessage(linkError), sticky: true });
+      showToast('error', 'Linked service could not be added', apiErrorMessage(linkError), true);
     } finally {
       setBusyId(null);
     }
@@ -486,6 +486,20 @@ function stateTone(resource: HostInventoryResource): 'success' | 'warning' | 'da
   if (resource.ownershipState === 'legacy_project_os') return 'warning';
   if (resource.ownershipState === 'external_docker') return 'info';
   return 'neutral';
+}
+
+function showToast(severity: string, title: string, description?: string, sticky = false) {
+  const options = { description, duration: sticky ? Infinity : undefined };
+  const normalizedSeverity = notificationSeverity(severity);
+  if (normalizedSeverity === 'success') {
+    toast.success(title, options);
+  } else if (normalizedSeverity === 'warning') {
+    toast.warning(title, options);
+  } else if (normalizedSeverity === 'error') {
+    toast.error(title, options);
+  } else {
+    toast.info(title, options);
+  }
 }
 
 function notificationSeverity(severity: string): 'success' | 'info' | 'warning' | 'error' {

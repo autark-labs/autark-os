@@ -11,9 +11,9 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { notify } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { tailscaleControlActions, tailscaleControlView } from './TailscaleControlPopover.logic.js';
+import { toast } from 'sonner';
 import type { PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';
 import type { SystemSetupCheck } from '@/types/system';
 
@@ -41,7 +41,9 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
       setStatus(nextStatus);
       setReconciliation(nextReconciliation);
     } catch (error) {
-      notify({ severity: 'warning', title: 'Tailscale status unavailable', message: error instanceof Error ? error.message : 'Project OS could not refresh Tailscale status.' });
+      toast.warning('Tailscale status unavailable', {
+        description: error instanceof Error ? error.message : 'Project OS could not refresh Tailscale status.',
+      });
     } finally {
       setRefreshing(false);
     }
@@ -61,14 +63,14 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
     if (!hostname) return;
     await navigator.clipboard.writeText(hostname);
     setCopied(true);
-    notify({ severity: 'success', title: 'Hostname copied', message: hostname });
+    toast.success('Hostname copied', { description: hostname });
     window.setTimeout(() => setCopied(false), 1600);
   }
 
   async function copySetupCommand() {
     const command = check?.actionCommand || 'sudo tailscale up';
     await navigator.clipboard.writeText(command);
-    notify({ severity: 'success', title: 'Tailscale command copied', message: command });
+    toast.success('Tailscale command copied', { description: command });
   }
 
   return (
