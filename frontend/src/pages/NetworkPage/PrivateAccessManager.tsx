@@ -67,52 +67,14 @@ export function PrivateAccessManager({
           {privateAppAccess.length === 0 ? (
             <EmptyState icon={Lock} title="No private apps yet" text="Choose which apps should be available away from home. Project OS will create private links after Tailscale is connected." />
           ) : (
-            privateAppAccess.map((access) => (
-              <div className="grid gap-3 rounded-lg border border-white/10 bg-slate-900/45 p-4 md:grid-cols-[minmax(0,1fr)_auto]" key={access.app.appId}>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-white">{access.app.appName}</h3>
-                    <Badge className={cn('border', statusTone(access.status, 'badge'))} variant="outline">{access.statusLabel}</Badge>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-sm">
-                    <AccessLine label="Private link" value={access.privateUrl || 'Connect Tailscale to create this link'} />
-                    <AccessLine label="At home" value={access.localUrl || 'No local link yet'} />
-                    {access.reconciliation?.verifiedAt && <AccessLine label="Verified by Tailscale" value={new Date(access.reconciliation.verifiedAt).toLocaleString()} />}
-                    {access.reconciliation?.desiredMapping && <AccessLine label="Expected route" value={access.reconciliation.desiredMapping} />}
-                    {access.reconciliation?.target && <AccessLine label="Tailscale routes to" value={access.reconciliation.target} />}
-                    {access.reconciliation?.matchReason && <p className="rounded-md border border-slate-700/30 bg-slate-950/35 px-3 py-2 text-xs text-slate-400">{access.reconciliation.matchReason}</p>}
-                    {access.reconciliation && access.reconciliation.status !== 'healthy' && <p className="rounded-md border border-amber-300/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{access.reconciliation.detail}</p>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 md:justify-end">
-                  <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={loadingAppId === access.app.appId} onClick={() => onRepairPrivateAccess(access.app)} type="button" variant="outline">
-                    <Wrench className={cn('size-4', loadingAppId === access.app.appId && 'animate-pulse')} />
-                    Repair private link
-                  </Button>
-                  <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={loadingAppId === access.app.appId} onClick={() => onTurnOffPrivateAccess(access.app)} type="button" variant="outline">
-                    <ShieldOff className={cn('size-4', loadingAppId === access.app.appId && 'animate-pulse')} />
-                    Turn off private access
-                  </Button>
-                  <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!access.privateUrl} onClick={() => onCopyPrivateLink(access.app.appId, access.privateUrl)} type="button" variant="outline">
-                    {copiedAppId === access.app.appId ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
-                    {copiedAppId === access.app.appId ? 'Copied' : 'Copy'}
-                  </Button>
-                  {access.privateUrl ? (
-                    <Button asChild className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" variant="outline">
-                      <a href={access.privateUrl} rel="noreferrer" target="_blank">
-                        <ExternalLink className="size-4" />
-                        Open
-                      </a>
-                    </Button>
-                  ) : (
-                    <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled type="button" variant="outline">
-                      <ExternalLink className="size-4" />
-                      Open
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))
+            <PrivateLinksTable
+              copiedAppId={copiedAppId}
+              loadingAppId={loadingAppId}
+              onCopyPrivateLink={onCopyPrivateLink}
+              onRepairPrivateAccess={onRepairPrivateAccess}
+              onTurnOffPrivateAccess={onTurnOffPrivateAccess}
+              privateAppAccess={privateAppAccess}
+            />
           )}
         </CardContent>
       </Card>
@@ -199,6 +161,82 @@ export function PrivateAccessManager({
           </CardContent>
         </Card>
       ) : null}
+    </div>
+  );
+}
+
+function PrivateLinksTable({
+  copiedAppId,
+  loadingAppId,
+  onCopyPrivateLink,
+  onRepairPrivateAccess,
+  onTurnOffPrivateAccess,
+  privateAppAccess,
+}: {
+  copiedAppId: string | null;
+  loadingAppId: string | null;
+  onCopyPrivateLink: (appId: string, url: string | null) => void;
+  onRepairPrivateAccess: (app: AppRuntimeView) => void;
+  onTurnOffPrivateAccess: (app: AppRuntimeView) => void;
+  privateAppAccess: PrivateAppAccess[];
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-white/10">
+      <div className="hidden grid-cols-[minmax(150px,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_120px_190px] gap-3 border-b border-white/10 bg-slate-950/60 px-4 py-2 text-xs font-bold uppercase tracking-normal text-slate-500 lg:grid">
+        <span>App</span>
+        <span>Local URL</span>
+        <span>Private URL</span>
+        <span>Status</span>
+        <span className="text-right">Actions</span>
+      </div>
+      <div className="divide-y divide-white/5">
+        {privateAppAccess.map((access) => (
+          <div className="grid gap-3 bg-slate-900/35 p-4 lg:grid-cols-[minmax(150px,1fr)_minmax(180px,1.2fr)_minmax(180px,1.2fr)_120px_190px] lg:items-center" key={access.app.appId}>
+            <div className="min-w-0">
+              <p className="m-0 truncate font-semibold text-white">{access.app.appName}</p>
+              {access.reconciliation && access.reconciliation.status !== 'healthy' && <p className="mt-1 line-clamp-2 text-xs text-amber-100">{access.reconciliation.detail}</p>}
+            </div>
+            <CompactUrl label="Local" value={access.localUrl || 'No local link yet'} />
+            <CompactUrl label="Private" value={access.privateUrl || 'Connect Tailscale to create this link'} />
+            <Badge className={cn('w-fit border', statusTone(access.status, 'badge'))} variant="outline">{access.statusLabel}</Badge>
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              {access.privateUrl ? (
+                <Button asChild className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" variant="outline">
+                  <a href={access.privateUrl} rel="noreferrer" target="_blank">
+                    <ExternalLink className="size-3.5" />
+                    Open
+                  </a>
+                </Button>
+              ) : (
+                <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled size="sm" type="button" variant="outline">
+                  <ExternalLink className="size-3.5" />
+                  Open
+                </Button>
+              )}
+              <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!access.privateUrl} onClick={() => onCopyPrivateLink(access.app.appId, access.privateUrl)} size="sm" type="button" variant="outline">
+                {copiedAppId === access.app.appId ? <CheckCircle2 className="size-3.5" /> : <Copy className="size-3.5" />}
+                {copiedAppId === access.app.appId ? 'Copied' : 'Copy'}
+              </Button>
+              <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={loadingAppId === access.app.appId} onClick={() => onRepairPrivateAccess(access.app)} size="sm" type="button" variant="outline">
+                <Wrench className={cn('size-3.5', loadingAppId === access.app.appId && 'animate-pulse')} />
+                Check
+              </Button>
+              <Button aria-label={`Turn off private access for ${access.app.appName}`} className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={loadingAppId === access.app.appId} onClick={() => onTurnOffPrivateAccess(access.app)} size="icon-sm" type="button" variant="outline">
+                <ShieldOff className={cn('size-3.5', loadingAppId === access.app.appId && 'animate-pulse')} />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CompactUrl({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="m-0 text-xs font-bold uppercase tracking-normal text-slate-500 lg:hidden">{label}</p>
+      <p className="m-0 truncate text-sm text-slate-300" title={value}>{value}</p>
     </div>
   );
 }

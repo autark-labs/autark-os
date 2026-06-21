@@ -6,11 +6,12 @@ import { PageErrorState, PageLoadingState } from '@/components/project-os/PageSt
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
 import { FoundResourcesBanner } from '@/components/project-os/FoundResourcesBanner';
+import { ExternalServiceAPIClient } from '@/api/ExternalServiceAPIClient';
 import { HostInventoryAPIClient } from '@/api/HostInventoryAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppRuntimeView, AppTelemetry, AppUpdateResult, AppUpdateStatus, InstallSettings } from '@/types/app';
-import type { HostInventoryResource } from '@/types/host';
+import type { ExternalService, HostInventoryResource } from '@/types/host';
 import type { PrivateAccessReconciliationReport } from '@/types/network';
 import { ApplicationsDashboard, EmptyState } from './ApplicationsDashboard';
 import { ManageAppDialog } from './ApplicationsPageModal';
@@ -36,6 +37,7 @@ function ApplicationsPage() {
   const [healthByAppId, setHealthByAppId] = useState<Record<string, AppHealthSnapshot>>({});
   const [updates, setUpdates] = useState<AppUpdateStatus[]>([]);
   const [hostInventory, setHostInventory] = useState<HostInventoryResource[]>([]);
+  const [linkedServices, setLinkedServices] = useState<ExternalService[]>([]);
   const [reconciliation, setReconciliation] = useState<PrivateAccessReconciliationReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<AppActionResult | null>(null);
@@ -79,7 +81,12 @@ function ApplicationsPage() {
     try {
       const data = await InstalledAppsAPIClient.listAppInstances();
       setApps(data.map(appInstanceToRuntimeView));
-      setHostInventory(await HostInventoryAPIClient.list(false));
+      const [inventory, externalServices] = await Promise.all([
+        HostInventoryAPIClient.list(false),
+        ExternalServiceAPIClient.list().catch(() => []),
+      ]);
+      setHostInventory(inventory);
+      setLinkedServices(externalServices);
       setUpdatedAt(new Date());
       setSelectedId((current) => current && !data.some((app) => app.catalogAppId === current) ? null : current);
     } catch (err) {
@@ -323,7 +330,7 @@ function ApplicationsPage() {
 
       {loading ? (
         <PageLoadingState label="Loading your apps" sublabel="Checking installed apps, health, private access, and available actions." />
-      ) : apps.length === 0 ? (
+      ) : apps.length === 0 && linkedServices.length === 0 ? (
         <EmptyState />
       ) : (
         <ApplicationsDashboard
@@ -341,6 +348,7 @@ function ApplicationsPage() {
           selectedId={selectedId}
           summary={appSummary}
           healthByAppId={healthByAppId}
+          linkedServices={linkedServices}
           reconciliation={reconciliation}
           telemetryByAppId={telemetryByAppId}
           updatesByAppId={updatesByAppId}

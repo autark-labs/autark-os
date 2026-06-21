@@ -22,6 +22,7 @@ import { Config, FriendlyStat } from './MarketplacePage.shared';
 
 type InstallWizardProps = {
   app: MarketplaceApp;
+  hideTrigger?: boolean;
   installLocked: boolean;
   installOptions: InstallOptions;
   installPlan: InstallPlan | null;
@@ -31,14 +32,19 @@ type InstallWizardProps = {
   onInstall: (options: InstallOptions) => Promise<void>;
   onOptionsChange: Dispatch<SetStateAction<InstallOptions | null>>;
   onRequestPlan: (options: InstallOptions) => Promise<void>;
+  onOpenChange?: (open: boolean) => void;
+  open?: boolean;
   planLoading: boolean;
+  triggerLabel?: string;
 };
 
-export function InstallWizard({ app, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onInstall, onOptionsChange, onRequestPlan, planLoading }: InstallWizardProps) {
-  const [open, setOpen] = useState(false);
+export function InstallWizard({ app, hideTrigger = false, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onInstall, onOpenChange, onOptionsChange, onRequestPlan, open: controlledOpen, planLoading, triggerLabel = 'Customize' }: InstallWizardProps) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
   const hasResult = Boolean(installResult);
   const currentStep = installing ? 2 : hasResult ? 3 : 1;
+  const setOpen = onOpenChange ?? setUncontrolledOpen;
 
   async function startInstall() {
     await onInstall(installOptions);
@@ -50,13 +56,15 @@ export function InstallWizard({ app, installLocked, installOptions, installPlan,
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button className={poButtonClass('quiet')} onClick={() => setOpen(true)} type="button" variant="outline">
-        Customize
-      </Button>
+      {!hideTrigger && (
+        <Button className={poButtonClass('quiet')} onClick={() => setOpen(true)} type="button" variant="outline">
+          {triggerLabel}
+        </Button>
+      )}
       <DialogContent className="max-h-[88vh] overflow-y-auto border-slate-700 bg-slate-950 text-slate-100 sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl text-white">Customize {app.name}</DialogTitle>
-          <DialogDescription className="text-slate-400">The default install is ready. Review or change specific choices before Project OS starts the app.</DialogDescription>
+          <DialogTitle className="text-xl text-white">Install {app.name}</DialogTitle>
+          <DialogDescription className="text-slate-400">Review what Project OS will do before it starts this app.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 overflow-y-auto pr-1">
@@ -78,14 +86,26 @@ export function InstallWizard({ app, installLocked, installOptions, installPlan,
 
           {installPlan && (
             <section className="rounded-lg border border-slate-700/40 bg-slate-900/70 p-4">
-              <h4 className="font-bold text-white">What will happen</h4>
+              <h4 className="font-bold text-white">Project OS will</h4>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <MiniList title="Create" items={installPlan.friendly.willCreate} />
                 <MiniList title="Expose" items={installPlan.friendly.willExpose} />
                 <MiniList title="Configure" items={installPlan.friendly.willConfigure} />
                 <MiniList title="Back up" items={installPlan.friendly.willBackUp} />
               </div>
+              <p className="mt-3 rounded-md border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-xs leading-5 text-emerald-100">
+                After install, create a first backup from Backups or My Apps.
+              </p>
             </section>
+          )}
+
+          {installPlan && (
+            <details className="rounded-lg border border-slate-700/40 bg-slate-900/70 p-4">
+              <summary className="cursor-pointer font-bold text-white">Technical details</summary>
+              <div className="mt-4">
+                <TechnicalPlanCard plan={installPlan} />
+              </div>
+            </details>
           )}
 
           <section className="rounded-lg border border-slate-700/40 bg-slate-900/70 p-4">
@@ -146,7 +166,7 @@ export function InstallWizard({ app, installLocked, installOptions, installPlan,
             {planLoading ? 'Checking...' : 'Preview'}
           </Button>
           <Button className={poButtonClass('primary')} disabled={installing || installLocked} onClick={startInstall} type="button">
-            {installing ? 'Installing...' : installLocked ? 'Install blocked' : hasResult ? 'Install again' : 'Install with choices'}
+            {installing ? 'Installing...' : installLocked ? 'Install blocked' : hasResult ? 'Install again' : `Install ${app.name}`}
           </Button>
         </DialogFooter>
       </DialogContent>

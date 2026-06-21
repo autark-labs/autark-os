@@ -21,6 +21,7 @@ import {
 } from '@/components/project-os/ProjectOSComponents';
 import { FoundResourcesBanner } from '@/components/project-os/FoundResourcesBanner';
 import { Button } from '@/components/ui/button';
+import { homeMajorActivity } from './extensions/OverviewPage.activity';
 import type { ActivityLog } from '@/types/activity';
 import type { AppInstanceView } from '@/types/app';
 import type { ExternalService, HostInventoryResource } from '@/types/host';
@@ -89,6 +90,7 @@ function OverviewPage() {
   }, []);
 
   const readyApps = useMemo(() => state.apps.filter((app) => app.userStatus === 'Ready'), [state.apps]);
+  const majorActivity = useMemo(() => homeMajorActivity(state.activity, 5) as ActivityLog[], [state.activity]);
   const primaryAction = state.recommendedAction?.id === 'no-action-needed' ? null : state.recommendedAction;
   const deviceName = state.summary?.deviceName || 'Project OS';
 
@@ -96,12 +98,16 @@ function OverviewPage() {
     <PageShell maxWidth="max-w-7xl">
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start">
         <div className="grid gap-5">
-          <SoftCard className="bg-po-surface-elevated">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <SoftCard className="overflow-hidden border-violet-300/20 bg-po-hero-overview shadow-po-brand-glow">
+            <div className="flex min-h-[180px] flex-col justify-between gap-5 sm:flex-row sm:items-start">
               <div>
-                <h1 className="m-0 text-3xl font-bold text-po-text md:text-4xl">{timeGreeting()}, {shortName(deviceName)}.</h1>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-po-text-muted">
-                  Open your apps, check access, and handle the next important Project OS task.
+                <p className="m-0 text-sm font-bold uppercase tracking-normal text-violet-200">Project OS</p>
+                <h1 className="m-0 mt-3 text-4xl font-black text-white md:text-5xl">{timeGreeting()}, {shortName(deviceName)}.</h1>
+                <p className="mt-3 max-w-2xl text-lg font-semibold text-slate-100">
+                  {state.summary?.issues.length ? 'Your server needs a quick look.' : 'Your server is ready.'}
+                </p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                  Open apps, handle the next setup step, and keep your home server calm.
                 </p>
               </div>
               <StatusPill tone={state.summary?.issues.length ? 'warning' : 'success'}>
@@ -210,7 +216,7 @@ function OverviewPage() {
           >
             <ActivityTimeline
               emptyText={loading ? 'Loading recent activity.' : 'No recent activity recorded.'}
-              items={state.activity.map((item) => ({
+              items={majorActivity.map((item) => ({
                 id: item.id,
                 title: item.title || item.message,
                 detail: item.message,

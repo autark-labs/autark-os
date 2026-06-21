@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry, AppUpdateStatus } from '@/types/app';
+import type { ExternalService } from '@/types/host';
 import type { PrivateAccessReconciliationItem, PrivateAccessReconciliationReport } from '@/types/network';
 import { AppIcon } from './ApplicationsPage.shared';
 import { ApplicationsSetupGuide } from './ApplicationsSetupGuide';
@@ -39,6 +40,7 @@ import {
   telemetryValue,
   uptimeLabel,
 } from './extensions/ApplicationsPage.logic';
+import { appCardPrimaryUrl, linkedServiceCard } from './extensions/ApplicationsPage.cardModel';
 import type { AppAction } from './extensions/ApplicationsPage.types';
 
 type ApplicationsDashboardProps = {
@@ -62,11 +64,12 @@ type ApplicationsDashboardProps = {
   accessByAppId: Record<string, AppAccessCheck>;
   telemetryByAppId: Record<string, AppTelemetry>;
   healthByAppId: Record<string, AppHealthSnapshot>;
+  linkedServices: ExternalService[];
   updatesByAppId: Record<string, AppUpdateStatus>;
   reconciliation: PrivateAccessReconciliationReport | null;
 };
 
-export function ApplicationsDashboard({ accessByAppId, actionLoading, apps, healthByAppId, onAction, onManage, onRollback, onSearch, onSelect, onUninstall, onUpdate, reconciliation, search, selectedId, summary, telemetryByAppId, updatesByAppId }: ApplicationsDashboardProps) {
+export function ApplicationsDashboard({ accessByAppId, actionLoading, apps, healthByAppId, linkedServices, onAction, onManage, onRollback, onSearch, onSelect, onUninstall, onUpdate, reconciliation, search, selectedId, summary, telemetryByAppId, updatesByAppId }: ApplicationsDashboardProps) {
   const { showAdvancedMetrics } = useProjectSettings();
   const reconciliationByAppId = new Map((reconciliation?.apps || []).map((item) => [item.appId, item]));
   const updateCount = Object.values(updatesByAppId).filter((update) => update.updateAvailable).length;
@@ -81,6 +84,7 @@ export function ApplicationsDashboard({ accessByAppId, actionLoading, apps, heal
         actionLoading={actionLoading}
         apps={apps}
         healthByAppId={healthByAppId}
+        linkedServices={linkedServices}
         onAction={onAction}
         onManage={onManage}
         onRollback={onRollback}
@@ -151,7 +155,7 @@ export function ApplicationsDashboard({ accessByAppId, actionLoading, apps, heal
               const isSelected = selectedId === app.appId;
               return (
                 <div key={app.appId}>
-                  <button className={cn('grid w-full items-center px-5 py-3 text-left text-sm transition hover:bg-slate-900/75', gridColumns, isSelected && 'bg-violet-600/10')} onClick={() => onSelect(app.appId)} type="button">
+                  <button className={cn('grid w-full items-center px-5 py-3 text-left text-sm transition hover:bg-slate-900/75', gridColumns, isSelected && 'bg-violet-600/10')} onClick={() => onManage(app.appId)} type="button">
                     <span className="flex min-w-0 items-center gap-3">
                       <AppIcon app={app} />
                       <span className="min-w-0">
@@ -185,7 +189,7 @@ export function ApplicationsDashboard({ accessByAppId, actionLoading, apps, heal
   );
 }
 
-function BasicApplicationsView({ accessByAppId, actionLoading, apps, healthByAppId, onAction, onManage, onRollback, onSearch, onSelect, onUninstall, onUpdate, reconciliation, search, selectedId, summary, telemetryByAppId, updateCount, updatesByAppId }: ApplicationsDashboardProps & { updateCount: number }) {
+function BasicApplicationsView({ accessByAppId, actionLoading, apps, healthByAppId, linkedServices, onAction, onManage, onRollback, onSearch, onSelect, onUninstall, onUpdate, reconciliation, search, selectedId, summary, telemetryByAppId, updateCount, updatesByAppId }: ApplicationsDashboardProps & { updateCount: number }) {
   const reconciliationByAppId = new Map((reconciliation?.apps || []).map((item) => [item.appId, item]));
 
   return (
@@ -219,37 +223,52 @@ function BasicApplicationsView({ accessByAppId, actionLoading, apps, healthByApp
         </CardHeader>
 
         <CardContent className="p-5">
-          {apps.length === 0 ? (
+          {apps.length === 0 && linkedServices.length === 0 ? (
             <div className="rounded-xl border border-white/10 bg-slate-950/45 px-5 py-10 text-center text-sm text-slate-500">No apps match your search.</div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {apps.map((app) => {
-                const telemetry = telemetryByAppId[app.appId] || app.telemetry;
-                const access = accessByAppId[app.appId];
-                const health = healthByAppId[app.appId] || app.healthSnapshot;
-                const reconciliationItem = reconciliationByAppId.get(app.appId) || null;
-                const update = updatesByAppId[app.appId] || null;
-                const isSelected = selectedId === app.appId;
-                return (
-                  <ApplicationCard
-                    access={access}
-                    actionLoading={actionLoading}
-                    app={app}
-                    health={health}
-                    isSelected={isSelected}
-                    key={app.appId}
-                    onAction={onAction}
-                    onManage={onManage}
-                    onRollback={onRollback}
-                    onSelect={onSelect}
-                    onUninstall={onUninstall}
-                    onUpdate={onUpdate}
-                    reconciliation={reconciliationItem}
-                    telemetry={telemetry}
-                    update={update}
-                  />
-                );
-              })}
+            <div className="grid gap-6">
+              {apps.length > 0 && (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {apps.map((app) => {
+                    const telemetry = telemetryByAppId[app.appId] || app.telemetry;
+                    const access = accessByAppId[app.appId];
+                    const health = healthByAppId[app.appId] || app.healthSnapshot;
+                    const reconciliationItem = reconciliationByAppId.get(app.appId) || null;
+                    const update = updatesByAppId[app.appId] || null;
+                    const isSelected = selectedId === app.appId;
+                    return (
+                      <ApplicationCard
+                        access={access}
+                        actionLoading={actionLoading}
+                        app={app}
+                        health={health}
+                        isSelected={isSelected}
+                        key={app.appId}
+                        onAction={onAction}
+                        onManage={onManage}
+                        onRollback={onRollback}
+                        onSelect={onSelect}
+                        onUninstall={onUninstall}
+                        onUpdate={onUpdate}
+                        reconciliation={reconciliationItem}
+                        telemetry={telemetry}
+                        update={update}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {linkedServices.length > 0 && (
+                <section className="grid gap-3">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-normal text-sky-300">Linked services</h4>
+                    <p className="mt-1 text-sm text-slate-500">These are external links Project OS opens but does not install or repair.</p>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {linkedServices.map((service) => <LinkedServiceCard key={service.id} service={service} />)}
+                  </div>
+                </section>
+              )}
             </div>
           )}
         </CardContent>
@@ -262,12 +281,12 @@ function ApplicationCard({ access, actionLoading, app, health, isSelected, onAct
   const status = displayStatus(app, health);
   const notice = appNotice(app, telemetry, access, health, reconciliation);
   const reason = statusReason(app, telemetry, access, health, reconciliation);
-  const link = app.accessUrl || app.settings?.privateAccessUrl || app.settings?.accessUrl;
+  const link = appCardPrimaryUrl(app);
   const busy = Boolean(actionLoading);
 
   return (
     <article className={cn('grid gap-4 rounded-xl border bg-slate-950/48 p-4 shadow-po-card transition', isSelected ? 'border-violet-300/45 bg-violet-950/20' : 'border-white/10 hover:border-violet-300/30 hover:bg-slate-900/55')}>
-      <div className="flex gap-3">
+      <button className="flex gap-3 text-left" onClick={() => onManage(app.appId)} type="button">
         <AppIcon app={app} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
@@ -279,12 +298,12 @@ function ApplicationCard({ access, actionLoading, app, health, isSelected, onAct
           </div>
           <p className={cn('mt-3 line-clamp-2 min-h-10 text-sm leading-5', notice ? 'text-amber-100' : 'text-slate-300')}>{notice || app.description || reason}</p>
         </div>
-      </div>
+      </button>
 
-      <div className="grid grid-cols-2 gap-2">
+      <button className="grid grid-cols-2 gap-2 text-left" onClick={() => onManage(app.appId)} type="button">
         <MiniMetric label="Access" value={accessSummary(app, access)} />
         <MiniMetric label="Backup" value={app.lastBackup || 'Not configured'} />
-      </div>
+      </button>
 
       <div className="flex flex-wrap gap-2">
         {link ? (
@@ -314,6 +333,33 @@ function ApplicationCard({ access, actionLoading, app, health, isSelected, onAct
           <ExpandedAppManagement access={access} actionLoading={actionLoading} app={app} health={health} onAction={onAction} onManage={onManage} onRollback={onRollback} onUninstall={onUninstall} onUpdate={onUpdate} reconciliation={reconciliation} showAdvancedMetrics={false} telemetry={telemetry} update={update} />
         </div>
       )}
+    </article>
+  );
+}
+
+function LinkedServiceCard({ service }: { service: ExternalService }) {
+  const card = linkedServiceCard(service);
+  return (
+    <article className="grid gap-4 rounded-xl border border-sky-300/20 bg-sky-500/8 p-4 shadow-po-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-black text-white">{card.title}</h3>
+          <p className="mt-1 truncate text-sm text-slate-400">{card.subtitle}</p>
+        </div>
+        <span className="rounded-full border border-sky-300/25 bg-sky-500/10 px-2.5 py-1 text-xs font-bold text-sky-100">{card.status}</span>
+      </div>
+      <p className="truncate rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-300" title={card.url}>{card.url}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button asChild className="bg-sky-500 text-slate-950 hover:bg-sky-400" size="sm">
+          <a href={card.url} rel="noreferrer" target="_blank">
+            <ExternalLink className="size-4" />
+            Open
+          </a>
+        </Button>
+        <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled size="sm" type="button" variant="outline">
+          Managed externally
+        </Button>
+      </div>
     </article>
   );
 }

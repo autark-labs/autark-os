@@ -39,6 +39,10 @@
   --po-hero-monitoring:
     radial-gradient(circle at top left, rgb(124 58 237 / 0.24), transparent 34%),
     linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.96));
+  --po-hero-overview:
+    radial-gradient(circle at 15% 0%, rgb(139 92 246 / 0.28), transparent 32%),
+    radial-gradient(circle at 85% 8%, rgb(20 184 166 / 0.18), transparent 28%),
+    linear-gradient(135deg, rgb(15 23 42 / 0.96), rgb(4 9 22 / 0.98));
   --po-hero-marketplace:
     linear-gradient(135deg, rgb(88 28 135 / 0.28), rgb(15 23 42 / 0.74) 45%, rgb(14 116 144 / 0.18));
   --po-hero-marketplace-handoff:
@@ -237,6 +241,7 @@
   --background-image-po-hero-backups: var(--po-hero-backups);
   --background-image-po-hero-devices: var(--po-hero-devices);
   --background-image-po-hero-monitoring: var(--po-hero-monitoring);
+  --background-image-po-hero-overview: var(--po-hero-overview);
   --background-image-po-hero-marketplace: var(--po-hero-marketplace);
   --background-image-po-hero-marketplace-handoff: var(--po-hero-marketplace-handoff);
   --background-image-po-hero-app-spotlight: var(--po-hero-app-spotlight);

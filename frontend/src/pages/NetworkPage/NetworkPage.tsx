@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { PageShell } from '@/components/project-os/ProjectOSComponents';
+import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
+import { PageShell, StatusPill } from '@/components/project-os/ProjectOSComponents';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { ExternalServiceAPIClient } from '@/api/ExternalServiceAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { notify } from '@/lib/notifications';
 import type { AppRuntimeView } from '@/types/app';
+import type { ExternalService } from '@/types/host';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleConnectGuide, TailscaleDevice, TailscaleStatus } from '@/types/network';
 import { HostSetupPanel } from './HostSetupPanel';
 import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';
 import { NetworkIssuesPanel } from './NetworkIssuesPanel';
-import { NetworkMapWorkspace } from './NetworkMapWorkspace';
-import { NetworkPostureHeader } from './NetworkPostureHeader';
 import { PrivateAccessManager } from './PrivateAccessManager';
 import {
   buildDeviceViews,
@@ -23,8 +25,8 @@ import {
   buildNetworkIssues,
   buildNetworkPosture,
   buildPrivateAppAccess,
-  getNodeDetails,
 } from './extensions/NetworkPage.logic';
+import { buildAccessZones } from './extensions/NetworkPage.accessZones';
 import { tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
 
 function NetworkPage() {
@@ -36,11 +38,11 @@ function NetworkPage() {
   const [reconciliation, setReconciliation] = useState<PrivateAccessReconciliationReport | null>(null);
   const [setupStatus, setSetupStatus] = useState<SystemSetupStatus | null>(null);
   const [apps, setApps] = useState<AppRuntimeView[]>([]);
+  const [externalServices, setExternalServices] = useState<ExternalService[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState('project-os');
   const [copiedAppId, setCopiedAppId] = useState<string | null>(null);
   const [appActionLoading, setAppActionLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -53,7 +55,7 @@ function NetworkPage() {
     }
     setError(null);
     try {
-      const [status, devices, diagnosticsReport, connectGuide, hostSetup, reconciliationReport, installedApps] = await Promise.all([
+      const [status, devices, diagnosticsReport, connectGuide, hostSetup, reconciliationReport, installedApps, linkedServices] = await Promise.all([
         NetworkAPIClient.tailscaleStatus(),
         NetworkAPIClient.tailscaleDevices(),
         NetworkAPIClient.diagnostics(),
@@ -61,6 +63,7 @@ function NetworkPage() {
         NetworkAPIClient.setupStatus(),
         NetworkAPIClient.privateAccessReconciliation(),
         InstalledAppsAPIClient.listApps(),
+        ExternalServiceAPIClient.list().catch(() => []),
       ]);
       setTailscale(status);
       setTailnetDevices(devices);
@@ -69,6 +72,7 @@ function NetworkPage() {
       setGuide(connectGuide);
       setSetupStatus(hostSetup);
       setApps(installedApps);
+      setExternalServices(linkedServices);
       setUpdatedAt(new Date());
     } catch (err) {
       setError(apiErrorMessage(err, 'Unable to load network status.'));
@@ -88,20 +92,17 @@ function NetworkPage() {
   const runningApps = useMemo(() => apps.filter((app) => app.friendlyStatus === 'Ready'), [apps]);
   const devices = useMemo(() => buildDeviceViews(tailscale, tailnetDevices), [tailnetDevices, tailscale]);
   const exposureGroups = useMemo(() => buildAppExposureGroups(apps, tailscale, reconciliation), [apps, reconciliation, tailscale]);
+  const accessZones = useMemo(() => buildAccessZones(exposureGroups, externalServices), [exposureGroups, externalServices]);
   const posture = useMemo(() => buildNetworkPosture({ devices, diagnostics, privateApps, reconciliation, tailscale }), [devices, diagnostics, privateApps, reconciliation, tailscale]);
   const issues = useMemo(() => buildNetworkIssues(diagnostics, reconciliation), [diagnostics, reconciliation]);
   const privateAppAccess = useMemo(() => buildPrivateAppAccess(privateApps, tailscale, reconciliation), [privateApps, reconciliation, tailscale]);
   const defaultTab = posture.counts.issues > 0 ? 'issues' : 'private-apps';
   const selectedTab = !showAdvancedMetrics && activeTab && !['private-apps', 'issues'].includes(activeTab) ? defaultTab : activeTab ?? defaultTab;
 
-  const selectedNode = useMemo(
-    () => getNodeDetails(selectedNodeId, { apps, devices, exposureGroups, privateAppAccess, reconciliation, runningApps, tailscale }),
-    [apps, devices, exposureGroups, privateAppAccess, reconciliation, runningApps, selectedNodeId, tailscale],
-  );
-
   const copyPrivateLink = useCallback(async (appId: string, url: string | null) => {
     if (!url) return;
     await navigator.clipboard.writeText(url);
+    notify({ severity: 'success', title: 'Link copied', message: url });
     setCopiedAppId(appId);
     window.setTimeout(() => setCopiedAppId((current) => current === appId ? null : current), 1600);
   }, []);
@@ -152,7 +153,8 @@ function NetworkPage() {
         <PageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : (
         <>
-          <NetworkPostureHeader posture={posture} />
+          <TailscaleAccessCard posture={posture} setup={setupStatus} tailscale={tailscale} />
+          <AccessZoneDiagram zones={accessZones} />
           <PrivateAccessSetupPath reconciliation={reconciliation} setup={setupStatus} tailscale={tailscale} />
           <Tabs className="gap-5" onValueChange={setActiveTab} value={selectedTab}>
             <TabsList className="w-full justify-start overflow-x-auto border-b border-slate-700/30 bg-transparent p-0" variant="line">
@@ -184,19 +186,6 @@ function NetworkPage() {
             </TabsContent>}
             {showAdvancedMetrics && <TabsContent value="advanced">
               <div className="grid gap-5">
-                <NetworkMapWorkspace
-                  apps={apps}
-                  exposureGroups={exposureGroups}
-                  onReviewPrivateLinks={() => setActiveTab('private-apps')}
-                  onSelectNode={setSelectedNodeId}
-                  privateApps={privateApps}
-                  runningApps={runningApps}
-                  selectedNode={selectedNode}
-                  selectedNodeId={selectedNodeId}
-                  showAdvancedMetrics={showAdvancedMetrics}
-                  tailnetDevices={tailnetDevices}
-                  tailscale={tailscale}
-                />
                 <HostSetupPanel setup={setupStatus} />
                 <NetworkAdvancedPanel diagnostics={diagnostics} guide={guide} tailscale={tailscale} />
               </div>
@@ -205,6 +194,61 @@ function NetworkPage() {
         </>
       )}
     </PageShell>
+  );
+}
+
+function TailscaleAccessCard({ posture, setup, tailscale }: { posture: ReturnType<typeof buildNetworkPosture>; setup: SystemSetupStatus | null; tailscale: TailscaleStatus | null }) {
+  const connected = Boolean(tailscale?.connected);
+  const check = setup?.checks.find((item) => item.id === 'tailscale') || null;
+  return (
+    <section className="overflow-hidden rounded-2xl border border-sky-300/18 bg-po-hero-devices p-5 shadow-po-panel">
+      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-normal text-sky-200">Private access</p>
+          <h3 className="mt-2 text-2xl font-black text-white">{connected ? 'Tailscale is connected' : 'Connect Tailscale for private links'}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            {connected ? posture.summary : 'Local app links still work on your home network. Tailscale adds private links for trusted phones, laptops, and other devices.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill tone={connected ? 'success' : 'warning'}>{connected ? 'Private ready' : 'Local-only available'}</StatusPill>
+          <TailscaleControlPopover align="end" check={check} triggerLabel="full" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AccessZoneDiagram({ zones }: { zones: ReturnType<typeof buildAccessZones> }) {
+  return (
+    <section className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/55 p-5 shadow-po-panel">
+      <div>
+        <h3 className="text-lg font-black text-white">Where apps are reachable</h3>
+        <p className="mt-1 text-sm text-slate-400">Project OS keeps public exposure empty by default and favors LAN or private Tailscale links.</p>
+      </div>
+      <div className="grid gap-3 lg:grid-cols-4">
+        {zones.map((zone) => (
+          <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4" key={zone.id}>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="font-bold text-white">{zone.label}</h4>
+              <Badge className={zone.id === 'public' && zone.apps.length > 0 ? 'border-red-300/25 bg-red-500/10 text-red-100' : 'border-slate-600/40 bg-slate-950/50 text-slate-300'} variant="outline">
+                {zone.apps.length}
+              </Badge>
+            </div>
+            <div className="mt-3 grid gap-2">
+              {zone.apps.length ? zone.apps.map((app: { id: string; label: string; linked: boolean; status: string; url: string }) => (
+                <a className="rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-300/35 hover:text-white" href={app.url || undefined} key={app.id} rel="noreferrer" target={app.url ? '_blank' : undefined}>
+                  <span className="block truncate font-semibold">{app.label}</span>
+                  <span className="text-xs text-slate-500">{app.linked ? 'Linked service' : app.status}</span>
+                </a>
+              )) : (
+                <p className="m-0 rounded-lg border border-dashed border-slate-700/60 px-3 py-2 text-sm text-slate-500">{zone.emptyText}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

@@ -49,9 +49,20 @@ type AppDetailProps = {
 
 export function MarketplaceAppDetail({ app, backupJob, foundResource = null, installJob, installedApp, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onBack, onCreateBackup, onInstall, onOptionsChange, onReinstallCurrent, onRequestPlan, onResetReinstall, planLoading, recoveryMode }: AppDetailProps) {
   const [conflictOpen, setConflictOpen] = useState(false);
+  const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
   const installBlockedByFoundResource = Boolean(foundResource && !isInstalled);
   const showFreshInstallResult = installResult?.appId === app.id && (installResult.status === 'installed' || installResult.status === 'already_installed');
+
+  function openInstallReview() {
+    if (installBlockedByFoundResource) {
+      setConflictOpen(true);
+      return;
+    }
+    setInstallReviewOpen(true);
+    void onRequestPlan(installOptions);
+  }
+
   return (
     <Card className="rounded-lg border-white/10 bg-slate-900/55 text-slate-100 shadow-po-panel">
       <CardContent className="grid gap-5 p-5">
@@ -104,12 +115,12 @@ export function MarketplaceAppDetail({ app, backupJob, foundResource = null, ins
               </Link>
             </Button>
           ) : (
-            <Button className={poButtonClass('primary')} disabled={installing || installLocked} onClick={() => installBlockedByFoundResource ? setConflictOpen(true) : onInstall(installOptions)} type="button">
+            <Button className={poButtonClass('primary')} disabled={installing || installLocked} onClick={openInstallReview} type="button">
               {installing ? <Loader2 className="size-4 animate-spin" /> : installResult?.status === 'installed' ? <CheckCircle2 className="size-4" /> : null}
-              {installing ? 'Installing...' : installLocked ? 'Install blocked' : installBlockedByFoundResource ? 'Resolve conflict' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Install after review' : 'Install'}
+              {installing ? 'Installing...' : installLocked ? 'Install blocked' : installBlockedByFoundResource ? 'Resolve conflict' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Review install' : 'Install'}
             </Button>
           )}
-          {!isInstalled && !installBlockedByFoundResource && <InstallWizard app={app} installLocked={installLocked} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installStatusMessage={installStatusMessage} installing={installing} onInstall={onInstall} onOptionsChange={onOptionsChange} onRequestPlan={onRequestPlan} planLoading={planLoading} />}
+          {!isInstalled && !installBlockedByFoundResource && <InstallWizard app={app} installLocked={installLocked} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installStatusMessage={installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onOptionsChange={onOptionsChange} onRequestPlan={onRequestPlan} open={installReviewOpen} planLoading={planLoading} triggerLabel="Customize" />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className={poButtonClass('quiet')} type="button" variant="outline">
