@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ActivityAPIClient } from '@/api/ActivityAPIClient';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
+import { HostInventoryAPIClient } from '@/api/HostInventoryAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { JobsAPIClient } from '@/api/JobsAPIClient';
 import { MarketplaceAPIClient } from '@/api/MarketplaceAPIClient';
@@ -26,6 +27,7 @@ import { poButtonClass, poCardClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ActivityLog } from '@/types/activity';
+import type { HostInventoryResource } from '@/types/host';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
 import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
@@ -58,6 +60,7 @@ function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [apps, setApps] = useState<MarketplaceApp[]>([]);
   const [installedApps, setInstalledApps] = useState<AppRuntimeView[]>([]);
+  const [hostInventory, setHostInventory] = useState<HostInventoryResource[]>([]);
   const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
   const [doctor, setDoctor] = useState<SystemDoctorStatus | null>(null);
   const [storage, setStorage] = useState<StorageReport | null>(null);
@@ -73,16 +76,20 @@ function MarketplacePage() {
   const recoveryAppId = searchParams.get('app');
   const recoveryMode = searchParams.get('mode');
   const installedById = useMemo(() => new Map(installedApps.map((app) => [app.appId, app])), [installedApps]);
+  const foundResourcesByAppId = useMemo(() => new Map(hostInventory
+    .filter((resource) => resource.catalogAppId && resource.ownershipState !== 'owned_managed' && !resource.ignored)
+    .map((resource) => [resource.catalogAppId, resource])), [hostInventory]);
   const catalogApps = useMemo(() => showAdvancedMetrics ? apps : starterCatalogForDiscover(apps), [apps, showAdvancedMetrics]);
   const selectedApp = useMemo(() => apps.find((app) => app.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, selectedAppId]);
   const selectedInstalledApp = selectedApp ? installedById.get(selectedApp.id) ?? null : null;
 
   const loadApps = useCallback(async () => {
     try {
-      const [nextApps, nextInstalledApps, nextActivity] = await Promise.all([
+      const [nextApps, nextInstalledApps, nextActivity, nextHostInventory] = await Promise.all([
         MarketplaceAPIClient.listApps(),
         InstalledAppsAPIClient.listApps(),
         ActivityAPIClient.recent({ category: 'marketplace', limit: 8 }),
+        HostInventoryAPIClient.list(false),
       ]);
       const [nextOnboarding, nextDoctor, nextStorage] = await Promise.all([
         SystemAPIClient.onboarding().catch((error) => {
@@ -100,6 +107,7 @@ function MarketplacePage() {
       ]);
       setApps(nextApps);
       setInstalledApps(nextInstalledApps);
+      setHostInventory(nextHostInventory);
       setOnboarding(nextOnboarding);
       setDoctor(nextDoctor);
       setStorage(nextStorage);
@@ -203,6 +211,11 @@ function MarketplacePage() {
       return;
     }
     const app = apps.find((candidate) => candidate.id === appId);
+    const foundResource = foundResourcesByAppId.get(appId);
+    if (foundResource) {
+      setMarketplaceError(`${app?.name || appId} already exists on this server but is not managed by this Project OS installation. Review existing apps before installing a duplicate.`);
+      return;
+    }
     if (installJob && !terminalJob(installJob) && installJob.subjectId !== appId) {
       setMarketplaceError(`${appNameForJob(installJob, apps)} is installing. Finish that install before starting ${app?.name || appId}.`);
       return;
@@ -366,8 +379,8 @@ function MarketplacePage() {
       </div>
 
       <div className="grid items-start gap-6 2xl:grid-cols-[minmax(620px,1fr)_minmax(420px,560px)]">
-        <MarketplaceAppList apps={visibleApps} installedAppIds={new Set(installedById.keys())} modeLabel={showAdvancedMetrics ? 'All apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
-        <MarketplaceAppDetail app={selectedApp} backupJob={backupJob?.subjectId === selectedApp.id ? backupJob : null} installJob={installJob?.subjectId === selectedApp.id ? installJob : null} installLocked={selectedAppInstallLocked} installOptions={installOptions ?? defaultInstallOptions(selectedApp)} installResult={null} installStatusMessage={installStatusMessage} installing={selectedAppInstalling} installPlan={installPlan} installedApp={selectedInstalledApp} onBack={() => { setSearchQuery(''); setSelectedCategory('All'); }} onCreateBackup={createFirstBackup} onInstall={(options) => installApp(selectedApp.id, options)} onOptionsChange={setInstallOptions} onReinstallCurrent={reinstallWithCurrentSettings} onRequestPlan={(options) => requestPlan(selectedApp.id, options)} onResetReinstall={resetAndReinstall} planLoading={planLoading} recoveryMode={recoveryAppId === selectedApp.id ? recoveryMode : null} />
+        <MarketplaceAppList apps={visibleApps} foundResourcesByAppId={foundResourcesByAppId} installedAppIds={new Set(installedById.keys())} modeLabel={showAdvancedMetrics ? 'All apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
+        <MarketplaceAppDetail app={selectedApp} backupJob={backupJob?.subjectId === selectedApp.id ? backupJob : null} foundResource={foundResourcesByAppId.get(selectedApp.id) ?? null} installJob={installJob?.subjectId === selectedApp.id ? installJob : null} installLocked={selectedAppInstallLocked} installOptions={installOptions ?? defaultInstallOptions(selectedApp)} installResult={null} installStatusMessage={installStatusMessage} installing={selectedAppInstalling} installPlan={installPlan} installedApp={selectedInstalledApp} onBack={() => { setSearchQuery(''); setSelectedCategory('All'); }} onCreateBackup={createFirstBackup} onInstall={(options) => installApp(selectedApp.id, options)} onOptionsChange={setInstallOptions} onReinstallCurrent={reinstallWithCurrentSettings} onRequestPlan={(options) => requestPlan(selectedApp.id, options)} onResetReinstall={resetAndReinstall} planLoading={planLoading} recoveryMode={recoveryAppId === selectedApp.id ? recoveryMode : null} />
       </div>
     </PageShell>
   );

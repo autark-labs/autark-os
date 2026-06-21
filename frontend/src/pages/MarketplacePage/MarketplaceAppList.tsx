@@ -14,12 +14,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
+import type { HostInventoryResource } from '@/types/host';
 import type { MarketplaceApp } from '@/types/marketplace';
 import { sortOptions } from './extensions/MarketplacePage.constants';
 import { AppImage, CatalogConfidenceBadge, SupportBadge } from './MarketplacePage.shared';
 
 type MarketplaceAppListProps = {
   apps: MarketplaceApp[];
+  foundResourcesByAppId?: Map<string, HostInventoryResource>;
   installedAppIds: Set<string>;
   modeLabel?: string;
   selectedAppId: string;
@@ -28,7 +30,7 @@ type MarketplaceAppListProps = {
   onSortChange: (value: string) => void;
 };
 
-export function MarketplaceAppList({ apps, installedAppIds, modeLabel = 'All apps', selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
+export function MarketplaceAppList({ apps, foundResourcesByAppId = new Map(), installedAppIds, modeLabel = 'All apps', selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
   return (
     <Card className="rounded-lg border-white/10 bg-slate-900/55 py-0 text-slate-100 shadow-po-panel">
       <CardHeader className="flex flex-row items-center justify-between gap-4 p-5">
@@ -58,7 +60,7 @@ export function MarketplaceAppList({ apps, installedAppIds, modeLabel = 'All app
         </DropdownMenu>
       </CardHeader>
       <CardContent className="grid gap-4 p-5 pt-0 md:grid-cols-2 2xl:grid-cols-3">
-        {apps.length ? apps.map((app) => <AppStoreCard app={app} installed={installedAppIds.has(app.id)} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
+        {apps.length ? apps.map((app) => <AppStoreCard app={app} foundResource={foundResourcesByAppId.get(app.id) ?? null} installed={installedAppIds.has(app.id)} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
           <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-8 text-center text-sm text-slate-400">No apps match this view.</div>
         )}
       </CardContent>
@@ -66,7 +68,8 @@ export function MarketplaceAppList({ apps, installedAppIds, modeLabel = 'All app
   );
 }
 
-function AppStoreCard({ app, installed, isSelected, onSelect }: { app: MarketplaceApp; installed: boolean; isSelected: boolean; onSelect: () => void }) {
+function AppStoreCard({ app, foundResource, installed, isSelected, onSelect }: { app: MarketplaceApp; foundResource: HostInventoryResource | null; installed: boolean; isSelected: boolean; onSelect: () => void }) {
+  const foundLabel = foundResource ? marketplaceFoundLabel(foundResource) : '';
   return (
     <div className={cn('group relative overflow-hidden rounded-2xl border border-slate-700/25 bg-slate-950/48 p-4 text-slate-100 shadow-po-card transition hover:-translate-y-0.5 hover:border-violet-300/45 hover:bg-slate-900/70', isSelected && 'border-violet-300/55 bg-violet-950/20 shadow-po-brand-glow')}>
       <div className="absolute inset-0 bg-po-card-hover-sheen opacity-0 transition group-hover:opacity-100" />
@@ -77,6 +80,7 @@ function AppStoreCard({ app, installed, isSelected, onSelect }: { app: Marketpla
             <span className="flex flex-wrap items-center gap-2">
               <strong className="truncate text-base text-white">{app.name}</strong>
               {installed && <Badge className="border-emerald-300/25 bg-emerald-500/10 text-emerald-100" variant="outline">Installed</Badge>}
+              {!installed && foundResource && <Badge className="border-amber-300/25 bg-amber-500/10 text-amber-100" variant="outline">{foundLabel}</Badge>}
               <CatalogConfidenceBadge app={app} />
             </span>
             <span className="mt-1 block text-xs text-slate-400">{app.category} · {serviceKindLabel(app.usage.kind)}</span>
@@ -105,9 +109,9 @@ function AppStoreCard({ app, installed, isSelected, onSelect }: { app: Marketpla
           <span>{app.smokeTests.filter((test) => test.status === 'Passed').length}/{app.smokeTests.length} checks passed</span>
           <span>{app.source} template</span>
         </div>
-        <Button className={cn('h-8 px-3 text-xs', installed ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15' : poButtonClass('primary'))} onClick={onSelect} type="button" variant={installed ? 'outline' : 'default'}>
+        <Button className={cn('h-8 px-3 text-xs', installed ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15' : foundResource ? 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15' : poButtonClass('primary'))} onClick={onSelect} type="button" variant={installed || foundResource ? 'outline' : 'default'}>
           {installed ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
-          {installed ? 'Manage' : 'Install'}
+          {installed ? 'Manage' : foundResource ? 'Resolve' : 'Install'}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -127,6 +131,13 @@ function AppStoreCard({ app, installed, isSelected, onSelect }: { app: Marketpla
       </div>
     </div>
   );
+}
+
+function marketplaceFoundLabel(resource: HostInventoryResource) {
+  if (resource.ownershipState === 'foreign_project_os') return 'Owned by another Project OS';
+  if (resource.ownershipState === 'legacy_project_os') return 'Recoverable';
+  if (resource.ownershipState === 'unknown_conflict') return 'Blocked';
+  return 'Found on server';
 }
 
 function outcomeCopy(app: MarketplaceApp) {

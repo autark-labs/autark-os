@@ -5,9 +5,12 @@ import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
+import { FoundResourcesBanner } from '@/components/project-os/FoundResourcesBanner';
+import { HostInventoryAPIClient } from '@/api/HostInventoryAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppRuntimeView, AppTelemetry, AppUpdateResult, AppUpdateStatus, InstallSettings } from '@/types/app';
+import type { HostInventoryResource } from '@/types/host';
 import type { PrivateAccessReconciliationReport } from '@/types/network';
 import { ApplicationsDashboard, EmptyState } from './ApplicationsDashboard';
 import { ManageAppDialog } from './ApplicationsPageModal';
@@ -32,6 +35,7 @@ function ApplicationsPage() {
   const [accessByAppId, setAccessByAppId] = useState<Record<string, AppAccessCheck>>({});
   const [healthByAppId, setHealthByAppId] = useState<Record<string, AppHealthSnapshot>>({});
   const [updates, setUpdates] = useState<AppUpdateStatus[]>([]);
+  const [hostInventory, setHostInventory] = useState<HostInventoryResource[]>([]);
   const [reconciliation, setReconciliation] = useState<PrivateAccessReconciliationReport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<AppActionResult | null>(null);
@@ -75,6 +79,7 @@ function ApplicationsPage() {
     try {
       const data = await InstalledAppsAPIClient.listAppInstances();
       setApps(data.map(appInstanceToRuntimeView));
+      setHostInventory(await HostInventoryAPIClient.list(false));
       setUpdatedAt(new Date());
       setSelectedId((current) => current && !data.some((app) => app.catalogAppId === current) ? null : current);
     } catch (err) {
@@ -299,6 +304,8 @@ function ApplicationsPage() {
       </div>
 
       {error && <PageErrorState message={error} onRetry={() => loadApps({ background: apps.length > 0, showRefreshing: true })} />}
+
+      <FoundResourcesBanner resources={hostInventory} />
 
       {actionResult && (
         <div className="flex items-center gap-3 rounded-lg border border-emerald-400/25 bg-emerald-500/10 p-4 text-sm text-emerald-100">

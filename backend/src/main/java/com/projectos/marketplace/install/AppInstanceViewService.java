@@ -35,8 +35,14 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     public List<AppInstanceView> list() {
         return reconciliationService.reconcile().stream()
+                .filter(this::userFacingManagedApp)
                 .map(this::view)
                 .toList();
+    }
+
+    private boolean userFacingManagedApp(AppReconciliationItem item) {
+        return item.ownership() == DockerResourceOwnership.OWNED
+                && repository.findById(item.appId()).isPresent();
     }
 
     private AppInstanceView view(AppReconciliationItem item) {

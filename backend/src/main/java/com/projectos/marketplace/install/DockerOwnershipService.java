@@ -47,6 +47,10 @@ public class DockerOwnershipService {
         return "projectos_" + safeToken(identity.instanceSlug()) + "_" + safeToken(appId);
     }
 
+    public ProjectOsIdentity currentIdentity() {
+        return identitySupplier.get();
+    }
+
     public Map<String, String> labels(String appId, String appInstanceId, String composeProject) {
         ProjectOsIdentity identity = identitySupplier.get();
         Map<String, String> labels = new LinkedHashMap<>();

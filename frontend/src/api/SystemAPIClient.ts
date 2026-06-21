@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectVersionInfo, RecommendedAction, RuntimeMigrationPlan, RuntimeMigrationPlanRequest, SetupProgress, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
+import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectVersionInfo, RecommendedAction, RuntimeMigrationPlan, RuntimeMigrationPlanRequest, SetupProgress, SetupStatus, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
 
 export const SystemAPIClient = {
   async summary() {
@@ -14,6 +14,11 @@ export const SystemAPIClient = {
 
   async setupProgress() {
     const response = await httpClient.get<SetupProgress>('/api/setup/progress');
+    return response.data;
+  },
+
+  async setupState() {
+    const response = await httpClient.get<SetupStatus>('/api/setup/status');
     return response.data;
   },
 

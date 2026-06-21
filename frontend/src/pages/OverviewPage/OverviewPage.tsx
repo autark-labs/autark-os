@@ -3,6 +3,7 @@ import { Boxes, CheckCircle2, Database, LockKeyhole, ShieldCheck, Sparkles } fro
 import { Link } from 'react-router-dom';
 
 import { ActivityAPIClient } from '@/api/ActivityAPIClient';
+import { HostInventoryAPIClient } from '@/api/HostInventoryAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
@@ -17,14 +18,17 @@ import {
   SoftCard,
   StatusPill,
 } from '@/components/project-os/ProjectOSComponents';
+import { FoundResourcesBanner } from '@/components/project-os/FoundResourcesBanner';
 import { Button } from '@/components/ui/button';
 import type { ActivityLog } from '@/types/activity';
 import type { AppInstanceView } from '@/types/app';
+import type { HostInventoryResource } from '@/types/host';
 import type { RecommendedAction, SystemSummary } from '@/types/system';
 
 type OverviewState = {
   activity: ActivityLog[];
   apps: AppInstanceView[];
+  hostInventory: HostInventoryResource[];
   recommendedAction: RecommendedAction | null;
   summary: SystemSummary | null;
 };
@@ -32,6 +36,7 @@ type OverviewState = {
 const initialState: OverviewState = {
   activity: [],
   apps: [],
+  hostInventory: [],
   recommendedAction: null,
   summary: null,
 };
@@ -46,22 +51,24 @@ function OverviewPage() {
 
     async function loadOverview() {
       setLoading(true);
-      const [summary, recommendedAction, apps, activity] = await Promise.allSettled([
+      const [summary, recommendedAction, apps, activity, hostInventory] = await Promise.allSettled([
         SystemAPIClient.summary(),
         SystemAPIClient.recommendedAction(),
         InstalledAppsAPIClient.listAppInstances(),
         ActivityAPIClient.recent({ limit: 5 }),
+        HostInventoryAPIClient.list(false),
       ]);
 
       if (cancelled) {
         return;
       }
 
-      const rejected = [summary, recommendedAction, apps, activity].find((result) => result.status === 'rejected');
+      const rejected = [summary, recommendedAction, apps, activity, hostInventory].find((result) => result.status === 'rejected');
       setError(rejected?.status === 'rejected' ? apiErrorMessage(rejected.reason, 'Home is missing some live data.') : null);
       setState({
         activity: valueOr(activity, []),
         apps: valueOr(apps, []),
+        hostInventory: valueOr(hostInventory, []),
         recommendedAction: valueOr(recommendedAction, null),
         summary: valueOr(summary, null),
       });
@@ -114,6 +121,8 @@ function OverviewPage() {
               title={state.apps.length ? 'Everything important looks good' : 'Start with Discover'}
             />
           )}
+
+          <FoundResourcesBanner resources={state.hostInventory} />
 
           <PageSection
             action={<Button asChild variant="outline"><Link to="/apps">Manage apps</Link></Button>}

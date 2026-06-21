@@ -17,6 +17,7 @@ import { backupSafetyWarning } from '@/lib/backupSafety';
 import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView } from '@/types/app';
+import type { HostInventoryResource } from '@/types/host';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp } from '@/types/marketplace';
 import { InstallWizard, TechnicalPlanCard } from './MarketplaceInstallWizard';
@@ -33,6 +34,7 @@ type AppDetailProps = {
   installStatusMessage: string;
   installing: boolean;
   installedApp: AppRuntimeView | null;
+  foundResource?: HostInventoryResource | null;
   onBack: () => void;
   onCreateBackup: (appId: string) => Promise<void>;
   onInstall: (options: InstallOptions) => Promise<void>;
@@ -44,8 +46,9 @@ type AppDetailProps = {
   recoveryMode?: string | null;
 };
 
-export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onBack, onCreateBackup, onInstall, onOptionsChange, onReinstallCurrent, onRequestPlan, onResetReinstall, planLoading, recoveryMode }: AppDetailProps) {
+export function MarketplaceAppDetail({ app, backupJob, foundResource = null, installJob, installedApp, installLocked, installOptions, installPlan, installResult, installStatusMessage, installing, onBack, onCreateBackup, onInstall, onOptionsChange, onReinstallCurrent, onRequestPlan, onResetReinstall, planLoading, recoveryMode }: AppDetailProps) {
   const isInstalled = Boolean(installedApp);
+  const installBlockedByFoundResource = Boolean(foundResource && !isInstalled);
   const showFreshInstallResult = installResult?.appId === app.id && (installResult.status === 'installed' || installResult.status === 'already_installed');
   return (
     <Card className="rounded-lg border-white/10 bg-slate-900/55 text-slate-100 shadow-po-panel">
@@ -61,6 +64,7 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
             <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="text-2xl font-bold text-white">{app.name}</h3>
               {isInstalled && <Badge className="border-emerald-300/25 bg-emerald-500/10 text-emerald-100" variant="outline">Installed</Badge>}
+              {installBlockedByFoundResource && <Badge className="border-amber-300/25 bg-amber-500/10 text-amber-100" variant="outline">{foundResourceLabel(foundResource)}</Badge>}
               <SupportBadge level={app.supportLevel} />
               <CatalogConfidenceBadge app={app} />
             </div>
@@ -98,12 +102,12 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
               </Link>
             </Button>
           ) : (
-            <Button className={poButtonClass('primary')} disabled={installing || installLocked} onClick={() => onInstall(installOptions)} type="button">
+            <Button className={poButtonClass('primary')} disabled={installing || installLocked || installBlockedByFoundResource} onClick={() => onInstall(installOptions)} type="button">
               {installing ? <Loader2 className="size-4 animate-spin" /> : installResult?.status === 'installed' ? <CheckCircle2 className="size-4" /> : null}
-              {installing ? 'Installing...' : installLocked ? 'Install blocked' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Install after review' : 'Install'}
+              {installing ? 'Installing...' : installLocked || installBlockedByFoundResource ? 'Install blocked' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Install after review' : 'Install'}
             </Button>
           )}
-          {!isInstalled && <InstallWizard app={app} installLocked={installLocked} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installStatusMessage={installStatusMessage} installing={installing} onInstall={onInstall} onOptionsChange={onOptionsChange} onRequestPlan={onRequestPlan} planLoading={planLoading} />}
+          {!isInstalled && !installBlockedByFoundResource && <InstallWizard app={app} installLocked={installLocked} installOptions={installOptions} installPlan={installPlan} installResult={installResult} installStatusMessage={installStatusMessage} installing={installing} onInstall={onInstall} onOptionsChange={onOptionsChange} onRequestPlan={onRequestPlan} planLoading={planLoading} />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className={poButtonClass('quiet')} type="button" variant="outline">
@@ -165,6 +169,7 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
         </div>
 
         {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
+        {installBlockedByFoundResource && <FoundResourceNotice resource={foundResource} />}
         {isInstalled && !showFreshInstallResult && <InstalledAppNotice app={installedApp} />}
         {isInstalled && recoveryMode && (
           <RecoveryInstallNotice
@@ -289,6 +294,34 @@ export function MarketplaceAppDetail({ app, backupJob, installJob, installedApp,
       </CardContent>
     </Card>
   );
+}
+
+function FoundResourceNotice({ resource }: { resource: HostInventoryResource | null }) {
+  if (!resource) {
+    return null;
+  }
+  return (
+    <section className="rounded-lg border border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+      <div className="flex items-start gap-3">
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-200" />
+        <div>
+          <h4 className="font-bold text-white">{foundResourceLabel(resource)}</h4>
+          <p className="mt-1 leading-6 text-amber-100/80">{resource.summary}</p>
+          <Button asChild className="mt-3" size="sm" variant="outline">
+            <Link to="/apps/found">Resolve existing apps</Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function foundResourceLabel(resource: HostInventoryResource | null) {
+  if (!resource) return 'Found on server';
+  if (resource.ownershipState === 'foreign_project_os') return 'Owned by another Project OS';
+  if (resource.ownershipState === 'legacy_project_os') return 'Recoverable existing app';
+  if (resource.ownershipState === 'unknown_conflict') return 'Blocked by server conflict';
+  return 'Found on server';
 }
 
 function InstallBlockedNotice({ message }: { message: string }) {

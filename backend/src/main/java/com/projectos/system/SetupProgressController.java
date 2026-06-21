@@ -11,14 +11,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class SetupProgressController {
 
     private final SetupProgressService service;
+    private final SetupStatusService statusService;
 
-    public SetupProgressController(SetupProgressService service) {
+    public SetupProgressController(SetupProgressService service, SetupStatusService statusService) {
         this.service = service;
+        this.statusService = statusService;
     }
 
     @GetMapping("/progress")
     public SetupProgress progress() {
         return service.status();
+    }
+
+    @GetMapping("/status")
+    public SetupStatus status() {
+        return statusService.status();
     }
 
     @PostMapping("/progress/complete")

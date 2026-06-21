@@ -64,21 +64,21 @@ class AppInstanceViewServiceTests {
     }
 
     @Test
-    void foreignAppViewHasNoMutatingActions() {
+    void foreignDiscoveredAppsAreExcludedFromUserFacingList() {
         InstalledAppRepository repository = repository();
         AppInstanceViewService service = service(repository, List.of(
                 new ManagedContainer("vaultwarden", "projectos_other_vaultwarden", "Up 2 minutes", DockerResourceOwnership.FOREIGN, "appinst_other", "projectos_other_vaultwarden")));
 
-        AppInstanceView view = service.list().getFirst();
+        assertThat(service.list()).isEmpty();
+    }
 
-        assertThat(view.userStatus()).isEqualTo("Managed elsewhere");
-        assertThat(view.ownershipState()).isEqualTo("foreign");
-        assertThat(view.actions()).extracting(action -> action.id()).contains("view-diagnostics-vaultwarden");
-        assertThat(view.actions()).noneSatisfy(action -> assertThat(action.method()).contains("POST"));
-        assertThat(view.issues()).singleElement().satisfies(issue -> {
-            assertThat(issue.reasonCode()).isEqualTo("app_managed_elsewhere");
-            assertThat(issue.severity()).isEqualTo("warning");
-        });
+    @Test
+    void ownedContainerWithoutDatabaseRowIsExcludedFromUserFacingList() {
+        InstalledAppRepository repository = repository();
+        AppInstanceViewService service = service(repository, List.of(
+                new ManagedContainer("vaultwarden", "projectos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "projectos_homelab-box_vaultwarden")));
+
+        assertThat(service.list()).isEmpty();
     }
 
     @Test

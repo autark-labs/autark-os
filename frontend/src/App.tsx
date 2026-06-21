@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { AdminSecurityAPIClient, type AdminSecurityStatus } from './api/AdminSecurityAPIClient';
 import { SystemAPIClient } from './api/SystemAPIClient';
 import { ProjectSettingsProvider } from './contexts/ProjectSettingsContext';
@@ -8,6 +8,7 @@ import { routeAliases } from './layout/navigationModel';
 import { readAdminToken } from './lib/adminSecuritySession';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
+import { GlobalNotifications } from './components/project-os/GlobalNotifications';
 
 const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage/ApplicationsPage'));
 const BackupsPage = lazy(() => import('./pages/BackupsPage/BackupsPage'));
@@ -15,6 +16,7 @@ const MarketplacePage = lazy(() => import('./pages/MarketplacePage/MarketplacePa
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage/MonitoringPage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage/NetworkPage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage/OverviewPage'));
+const ResolveExistingAppsPage = lazy(() => import('./pages/ResolveExistingAppsPage/ResolveExistingAppsPage'));
 const AutomationPreviewPage = lazy(() => import('./pages/AutomationPage/AutomationPreviewPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage/SettingsPage'));
 const StoragePage = lazy(() => import('./pages/StoragePage/StoragePage'));
@@ -32,6 +34,7 @@ function App() {
   return (
     <ProjectSettingsProvider>
       <AppContent />
+      <GlobalNotifications />
     </ProjectSettingsProvider>
   );
 }
@@ -64,19 +67,18 @@ function AppContent() {
     return <AdminSecurityGate onAuthenticated={() => setAuthenticated(true)} status={securityStatus} />;
   }
 
-  if (!onboardingComplete) {
-    return <OnboardingWizard onComplete={() => setOnboardingComplete(true)} />;
-  }
-
   return (
     <Routes>
       <Route element={<AppShell />}>
-        <Route index element={<Navigate replace to="/home" />} />
+        <Route index element={<Navigate replace to={onboardingComplete ? '/home' : '/setup'} />} />
         {Object.entries(routeAliases).map(([from, to]) => (
           <Route element={<Navigate replace to={to} />} key={from} path={from} />
         ))}
-        <Route path="/home" element={<Suspense fallback={<PageFallback />}><OverviewPage /></Suspense>} />
+        <Route path="/home" element={onboardingComplete ? <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> : <Navigate replace to="/setup" />} />
+        <Route path="/setup" element={<Suspense fallback={<PageFallback />}><SetupRoute onComplete={() => setOnboardingComplete(true)} /></Suspense>} />
         <Route path="/apps" element={<Suspense fallback={<PageFallback />}><ApplicationsPage /></Suspense>} />
+        <Route path="/apps/found" element={<Suspense fallback={<PageFallback />}><ResolveExistingAppsPage /></Suspense>} />
+        <Route path="/resolve-existing-apps" element={<Navigate replace to="/apps/found" />} />
         <Route path="/discover" element={<Suspense fallback={<PageFallback />}><MarketplacePage /></Suspense>} />
         <Route path="/access" element={<Suspense fallback={<PageFallback />}><NetworkPage /></Suspense>} />
         <Route path="/storage" element={<Suspense fallback={<PageFallback />}><StoragePage /></Suspense>} />
@@ -87,6 +89,18 @@ function AppContent() {
         <Route path="/diagnostics" element={<Suspense fallback={<PageFallback />}><SupportPage /></Suspense>} />
       </Route>
     </Routes>
+  );
+}
+
+function SetupRoute({ onComplete }: { onComplete: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <OnboardingWizard
+      onComplete={() => {
+        onComplete();
+        navigate('/home', { replace: true });
+      }}
+    />
   );
 }
 

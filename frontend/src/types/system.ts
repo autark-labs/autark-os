@@ -95,6 +95,12 @@ export type SetupProgress = {
   updatedAt: string;
 };
 
+export type SetupStatus = {
+  setupComplete: boolean;
+  currentStep: 'host_check' | 'existing_apps' | 'tailscale' | 'starter_apps' | 'first_backup' | 'done' | string;
+  message: string;
+};
+
 export type SystemSetupCheck = {
   id: string;
   label: string;

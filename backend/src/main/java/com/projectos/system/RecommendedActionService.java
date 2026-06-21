@@ -36,7 +36,7 @@ public class RecommendedActionService implements RecommendedActionProvider {
                     "warning",
                     "Finish Project OS setup",
                     summary.setup().summary(),
-                    Optional.of(ProjectOsAction.route("open-setup", "Continue setup", "/")),
+                    Optional.of(ProjectOsAction.route("open-setup", "Continue setup", "/setup")),
                     Optional.empty(),
                     List.of(),
                     false);
