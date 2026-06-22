@@ -24,6 +24,8 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 
 ## Story 2: Replace Setup Host Inventory With Observed-Service State
 
+**Status:** Implemented.
+
 **Problem:** Setup still reads `HostInventoryProvider`, keeping a second found-resource interpretation path alive and risking slow host scans during setup.
 
 **Scope:**
@@ -35,6 +37,8 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 - Setup, Home, My Apps, Discover, and Diagnostics agree on recoverable/foreign/conflict state.
 - Setup does not trigger a host inventory scan outside the observed-service refresh path.
 - Host inventory classes are deleted or documented as intentionally internal.
+
+**Implementation Note:** Setup status and setup readiness now read cached `ObservedService` rows. The backend `HostInventoryProvider`, `HostInventoryResource`, `HostInventoryService`, and `HostInventoryIgnoreRepository` classes were deleted after setup consumers migrated.
 
 ## Story 3: Move Discover Loading And Job Polling Into Repositories
 

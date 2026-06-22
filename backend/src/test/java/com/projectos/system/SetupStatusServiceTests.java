@@ -5,12 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.projectos.host.HostInventoryResource;
+import com.projectos.host.ObservedService;
+import com.projectos.host.ObservedServiceSource;
 import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
 import com.projectos.marketplace.runtime.RuntimeLayout;
 
@@ -21,7 +21,7 @@ class SetupStatusServiceTests {
 
     @Test
     void recommendsExistingAppsWhenFoundResourcesExistAndSetupIsIncomplete() {
-        SetupStatusService service = new SetupStatusService(progressService(), ignored -> List.of(foundResource()));
+        SetupStatusService service = new SetupStatusService(progressService(), () -> List.of(observedService("legacy_project_os", "observed")));
 
         SetupStatus status = service.status();
 
@@ -38,7 +38,7 @@ class SetupStatusServiceTests {
         progress.completeStep("docker_check");
         progress.completeStep("access_choice");
 
-        SetupStatusService service = new SetupStatusService(progress, ignored -> List.of());
+        SetupStatusService service = new SetupStatusService(progress, List::of);
 
         assertThat(service.status().currentStep()).isEqualTo("tailscale");
     }
@@ -48,7 +48,7 @@ class SetupStatusServiceTests {
         SetupProgressService progress = progressService();
         progress.completeStep("done");
 
-        SetupStatusService service = new SetupStatusService(progress, ignored -> List.of(foundResource()));
+        SetupStatusService service = new SetupStatusService(progress, () -> List.of(observedService("legacy_project_os", "observed")));
 
         assertThat(service.status().setupComplete()).isTrue();
         assertThat(service.status().currentStep()).isEqualTo("done");
@@ -62,22 +62,26 @@ class SetupStatusServiceTests {
                 () -> Instant.parse("2026-06-20T12:00:00Z"));
     }
 
-    private HostInventoryResource foundResource() {
-        return new HostInventoryResource(
+    private ObservedService observedService(String ownershipState, String userVisibility) {
+        return new ObservedService(
                 "docker:legacy",
-                "legacy",
-                "legacy",
+                ObservedServiceSource.DOCKER,
+                "project-os-legacy",
                 "legacy_project_os",
-                "recoverable",
-                "",
-                "current-instance",
+                "http://localhost:8080",
+                "Apps",
+                "local",
+                "homepage",
+                "label",
+                ownershipState,
+                userVisibility,
                 "running",
-                List.of(),
-                "docker",
-                List.of("view_details", "ignore"),
-                false,
-                "medium",
-                "Existing app found.",
-                Map.of());
+                true,
+                "",
+                Instant.parse("2026-06-20T12:00:00Z"),
+                Instant.parse("2026-06-20T12:00:00Z"),
+                null,
+                null,
+                "{}");
     }
 }

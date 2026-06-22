@@ -1,18 +1,28 @@
 package com.projectos.system;
 
+import java.util.List;
+import java.util.function.Supplier;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.projectos.host.HostInventoryProvider;
+import com.projectos.host.ObservedService;
+import com.projectos.host.ObservedServiceService;
 
 @Service
 public class SetupStatusService {
 
     private final SetupProgressService progressService;
-    private final HostInventoryProvider hostInventoryProvider;
+    private final Supplier<List<ObservedService>> observedServices;
 
-    public SetupStatusService(SetupProgressService progressService, HostInventoryProvider hostInventoryProvider) {
+    @Autowired
+    public SetupStatusService(SetupProgressService progressService, ObservedServiceService observedServiceService) {
+        this(progressService, observedServiceService::observedServices);
+    }
+
+    SetupStatusService(SetupProgressService progressService, Supplier<List<ObservedService>> observedServices) {
         this.progressService = progressService;
-        this.hostInventoryProvider = hostInventoryProvider;
+        this.observedServices = observedServices;
     }
 
     public SetupStatus status() {
@@ -20,8 +30,9 @@ public class SetupStatusService {
         if (progress.setupComplete()) {
             return new SetupStatus(true, "done", "Setup is complete.");
         }
-        boolean hasFoundResources = hostInventoryProvider.inventory(false).stream()
-                .anyMatch(resource -> !"owned_managed".equals(resource.ownershipState()));
+        boolean hasFoundResources = observedServices.get().stream()
+                .filter(service -> !"ignored".equals(service.userVisibility()))
+                .anyMatch(service -> !"owned_managed".equals(service.ownershipState()));
         if (hasFoundResources) {
             return new SetupStatus(false, "existing_apps", "Project OS found existing apps on this server.");
         }

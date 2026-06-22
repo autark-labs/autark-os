@@ -14,8 +14,6 @@ Prune after consumers are migrated:
 - `GET /api/apps` as a user-facing app-list source. Keep lifecycle mutations only until they are moved to an app-instance action namespace.
 - `InstalledAppsAPIClient.listApps()` after Access and Settings no longer need `AppRuntimeView`. Devices and standalone Updates pages have been removed.
 - `HostInventoryAPIClient`, `FoundResourcesBanner`, and `frontend/src/types/host.ts`.
-- `HostInventoryController`, `HostInventoryService`, `HostInventoryProvider`, `HostInventoryIgnoreRepository`, `HostResourceActionService`, `HostInventoryResource`, and `DevHostInventoryController`.
-- Host-inventory usage in `SetupStatusService` and `SystemSetupService`; replace with observed-service conflict/recovery state.
 - `MarketplaceController`, `MarketplaceAPIClient`, and `MarketplaceInstallClient`; Discover is the marketplace API.
 - `foundResource` fields on `AppOwnershipView`, `DiscoverAppView`, and matching frontend types.
 - Activity-log special handling for old `/api/marketplace` and `/api/apps` namespaces once action routes move.
@@ -29,3 +27,5 @@ Already migrated to canonical managed-app state:
 - Home page found/pinned service rendering.
 - Support/Diagnostics found-service rendering.
 - Network pinned external service filtering.
+- Setup existing-install and lean setup status checks.
+- Backend host inventory provider/resource/service/ignore repository deletion.

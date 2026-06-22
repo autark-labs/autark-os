@@ -5,12 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.projectos.host.HostInventoryResource;
+import com.projectos.host.ObservedService;
+import com.projectos.host.ObservedServiceSource;
 import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
 import com.projectos.marketplace.runtime.RuntimeLayout;
 import com.projectos.network.tailscale.TailscaleService;
@@ -119,7 +119,7 @@ class SystemSetupServiceTests {
                 false,
                 null,
                 () -> new ProjectOsIdentity("current-instance", "homelab-box", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
-                ignored -> List.of(foundResource("legacy_project_os", ""), foundResource("foreign_project_os", "other-instance")));
+                () -> List.of(observedService("legacy_project_os", ""), observedService("foreign_project_os", "other-instance")));
 
         SystemSetupStatus status = service.status();
 
@@ -144,7 +144,7 @@ class SystemSetupServiceTests {
                 true,
                 null,
                 () -> new ProjectOsIdentity("current-instance", "dev-box", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
-                ignored -> List.of(foundResource("foreign_project_os", "other-instance")));
+                () -> List.of(observedService("foreign_project_os", "other-instance")));
 
         SystemSetupStatus status = service.status();
 
@@ -161,23 +161,27 @@ class SystemSetupServiceTests {
         return new RuntimeLayout(properties);
     }
 
-    private HostInventoryResource foundResource(String ownershipState, String ownerInstanceId) {
-        return new HostInventoryResource(
+    private ObservedService observedService(String ownershipState, String ownerInstanceId) {
+        return new ObservedService(
                 "docker:" + ownershipState,
+                ObservedServiceSource.DOCKER,
+                "project-os-" + ownershipState,
                 ownershipState,
+                "http://localhost:8080",
+                "Apps",
+                "local",
                 "homepage",
+                "label",
                 ownershipState,
-                "legacy_project_os".equals(ownershipState) ? "recoverable" : "observed",
-                ownerInstanceId,
-                "current-instance",
+                "observed",
                 "running",
-                List.of(),
-                "docker",
-                List.of("view_details", "ignore"),
-                false,
-                "medium",
-                "Found on this server.",
-                Map.of());
+                true,
+                ownerInstanceId,
+                Instant.parse("2026-06-20T12:00:00Z"),
+                Instant.parse("2026-06-20T12:00:00Z"),
+                null,
+                null,
+                "{}");
     }
 
     private static class FakeTailscaleService extends TailscaleService {

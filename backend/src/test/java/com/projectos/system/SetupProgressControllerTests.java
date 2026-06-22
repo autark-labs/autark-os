@@ -19,7 +19,7 @@ class SetupProgressControllerTests {
     @Test
     void returnsAndUpdatesSetupProgress() {
         SetupProgressService service = service();
-        SetupProgressController controller = new SetupProgressController(service, new SetupStatusService(service, ignored -> java.util.List.of()));
+        SetupProgressController controller = new SetupProgressController(service, new SetupStatusService(service, java.util.List::of));
 
         SetupProgress completed = controller.complete(new SetupProgressUpdateRequest("welcome"));
         SetupProgress skipped = controller.skip(new SetupProgressUpdateRequest("tailscale_connect"));

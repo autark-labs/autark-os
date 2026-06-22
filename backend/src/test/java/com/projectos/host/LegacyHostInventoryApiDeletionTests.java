@@ -18,6 +18,14 @@ class LegacyHostInventoryApiDeletionTests {
     }
 
     @Test
+    void hostInventoryProviderAndResourcesAreDeletedAfterSetupUsesObservedServices() {
+        assertMissing("com.projectos.host.HostInventoryProvider");
+        assertMissing("com.projectos.host.HostInventoryResource");
+        assertMissing("com.projectos.host.HostInventoryService");
+        assertMissing("com.projectos.host.HostInventoryIgnoreRepository");
+    }
+
+    @Test
     void appOwnershipAndDiscoverDtosDoNotCarryLegacyHostInventoryResources() {
         assertThat(recordComponentNames(com.projectos.apps.AppOwnershipView.class)).doesNotContain("foundResource");
         assertThat(recordComponentNames(com.projectos.discover.DiscoverAppView.class)).doesNotContain("foundResource");

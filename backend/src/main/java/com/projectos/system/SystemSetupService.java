@@ -16,8 +16,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import com.projectos.marketplace.runtime.RuntimeLayout;
-import com.projectos.host.HostInventoryProvider;
-import com.projectos.host.HostInventoryResource;
+import com.projectos.host.ObservedService;
+import com.projectos.host.ObservedServiceService;
+import com.projectos.host.ObservedServiceView;
 import com.projectos.network.tailscale.TailscaleService;
 import com.projectos.network.tailscale.TailscaleStatus;
 import com.projectos.system.api.SystemSetupAction;
@@ -38,11 +39,11 @@ public class SystemSetupService {
     private final boolean devMode;
     private final Environment environment;
     private final Supplier<ProjectOsIdentity> identitySupplier;
-    private final HostInventoryProvider hostInventoryProvider;
+    private final Supplier<List<ObservedService>> observedServices;
 
     @Autowired
-    public SystemSetupService(RuntimeLayout runtimeLayout, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, Environment environment, InstanceIdentityService identityService, HostInventoryProvider hostInventoryProvider) {
-        this(runtimeLayout, tailscaleService, SystemSetupService::runProcess, devMode, environment, identityService::current, hostInventoryProvider);
+    public SystemSetupService(RuntimeLayout runtimeLayout, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, Environment environment, InstanceIdentityService identityService, ObservedServiceService observedServiceService) {
+        this(runtimeLayout, tailscaleService, SystemSetupService::runProcess, devMode, environment, identityService::current, observedServiceService::observedServices);
     }
 
     SystemSetupService(RuntimeLayout runtimeLayout, TailscaleService tailscaleService, Function<List<String>, CommandResult> commandRunner) {
@@ -54,7 +55,7 @@ public class SystemSetupService {
     }
 
     SystemSetupService(RuntimeLayout runtimeLayout, TailscaleService tailscaleService, Function<List<String>, CommandResult> commandRunner, boolean devMode, Environment environment) {
-        this(runtimeLayout, tailscaleService, commandRunner, devMode, environment, () -> new ProjectOsIdentity("unknown", "project-os", "", "", Instant.EPOCH, 1), ignored -> List.of());
+        this(runtimeLayout, tailscaleService, commandRunner, devMode, environment, () -> new ProjectOsIdentity("unknown", "project-os", "", "", Instant.EPOCH, 1), List::of);
     }
 
     SystemSetupService(
@@ -64,14 +65,14 @@ public class SystemSetupService {
             boolean devMode,
             Environment environment,
             Supplier<ProjectOsIdentity> identitySupplier,
-            HostInventoryProvider hostInventoryProvider) {
+            Supplier<List<ObservedService>> observedServices) {
         this.runtimeLayout = runtimeLayout;
         this.tailscaleService = tailscaleService;
         this.commandRunner = commandRunner;
         this.devMode = devMode;
         this.environment = environment;
         this.identitySupplier = identitySupplier;
-        this.hostInventoryProvider = hostInventoryProvider;
+        this.observedServices = observedServices;
     }
 
     public SystemSetupStatus status() {
@@ -284,10 +285,10 @@ public class SystemSetupService {
     }
 
     private SystemSetupExistingInstallReport existingInstallReport(ProjectOsIdentity identity) {
-        List<SystemSetupExistingInstallResource> resources = hostInventoryProvider.inventory(true).stream()
-                .filter(resource -> !resource.ignored())
+        List<SystemSetupExistingInstallResource> resources = observedServices.get().stream()
+                .filter(service -> !"ignored".equals(service.userVisibility()))
                 .filter(this::isExistingProjectOsResource)
-                .map(resource -> existingResource(resource, identity))
+                .map(service -> existingResource(service, identity))
                 .toList();
         if (resources.isEmpty()) {
             return new SystemSetupExistingInstallReport(
@@ -321,25 +322,26 @@ public class SystemSetupService {
                         new SystemSetupAction("abort", "Abort setup", "/", "secondary")));
     }
 
-    private boolean isExistingProjectOsResource(HostInventoryResource resource) {
-        return "foreign_project_os".equals(resource.ownershipState())
-                || "legacy_project_os".equals(resource.ownershipState())
-                || "unknown_conflict".equals(resource.ownershipState());
+    private boolean isExistingProjectOsResource(ObservedService service) {
+        return "foreign_project_os".equals(service.ownershipState())
+                || "legacy_project_os".equals(service.ownershipState())
+                || "unknown_conflict".equals(service.ownershipState());
     }
 
-    private SystemSetupExistingInstallResource existingResource(HostInventoryResource resource, ProjectOsIdentity identity) {
-        String kind = "legacy_project_os".equals(resource.ownershipState()) ? "recoverable_app" : "project_os_resource";
-        String owner = resource.ownerInstanceId();
+    private SystemSetupExistingInstallResource existingResource(ObservedService service, ProjectOsIdentity identity) {
+        ObservedServiceView view = ObservedServiceService.toView(service);
+        String kind = "legacy_project_os".equals(service.ownershipState()) ? "recoverable_app" : "project_os_resource";
+        String owner = service.projectOsInstanceId();
         if (owner == null || owner.isBlank()) {
             owner = identity.instanceId();
         }
         return new SystemSetupExistingInstallResource(
-                resource.id(),
-                resource.displayName(),
+                view.id(),
+                view.displayName(),
                 kind,
-                resource.ownershipState(),
+                view.ownershipState(),
                 owner,
-                resource.summary(),
+                view.userStatusDescription(),
                 "/resolve-existing-apps");
     }
 
