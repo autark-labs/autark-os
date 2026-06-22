@@ -19,7 +19,7 @@ import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { DiscoverAppView, DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { ProjectOsJob } from '@/types/jobs';
-import type { InstallOptions, InstallPlan, InstallResult, MarketplaceApp } from '@/types/marketplace';
+import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
 import { InstallWizard, TechnicalPlanCard } from './MarketplaceInstallWizard';
 import { AppImage, InfoCard, Stat, SupportBadge } from './MarketplacePage.shared';
 import { InstallPlanPreview, MarketplaceSetupPanel } from './MarketplaceSetupPanel';
@@ -32,7 +32,6 @@ type AppDetailProps = {
   installJob: ProjectOsJob | null;
   installOptions: InstallOptions;
   installPlan: InstallPlan | null;
-  installResult: InstallResult | null;
   installLocked: boolean;
   installStatusMessage: string;
   installing: boolean;
@@ -52,13 +51,12 @@ type AppDetailProps = {
   setupSchema: DiscoverSetupSchema;
 };
 
-export function MarketplaceAppDetail({ app, appView, backupJob, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installResult, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onReinstallCurrent, onRequestPlan, onSetupAnswersChange, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
+export function MarketplaceAppDetail({ app, appView, backupJob, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onReinstallCurrent, onRequestPlan, onSetupAnswersChange, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const [technicalValidationOpen, setTechnicalValidationOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
   const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
-  const showFreshInstallResult = installResult?.appId === app.id && (installResult.status === 'installed' || installResult.status === 'already_installed');
 
   function openInstallReview() {
     setInstallReviewOpen(true);
@@ -144,11 +142,11 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
             </>
           ) : (
             <Button className={poButtonClass('primary')} disabled={installing || installLocked || !setupReady} onClick={openInstallReview} type="button">
-              {installing ? <Loader2 className="size-4 animate-spin" /> : installResult?.status === 'installed' ? <CheckCircle2 className="size-4" /> : null}
-              {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish setup' : installResult?.status === 'installed' ? 'Installed' : requiresInstallCaution(app) ? 'Review install' : 'Review install'}
+              {installing ? <Loader2 className="size-4 animate-spin" /> : null}
+              {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish setup' : requiresInstallCaution(app) ? 'Review install' : 'Review install'}
             </Button>
           )}
-          {!isInstalled && <InstallWizard app={app} hideTrigger={needsExistingServiceReview} installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installResult={installResult} installStatusMessage={!setupReady ? 'Finish the required setup choices before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onRequestPlan={onRequestPlan} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} setupSchema={setupSchema} triggerLabel="Customize" />}
+          {!isInstalled && <InstallWizard app={app} hideTrigger={needsExistingServiceReview} installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installStatusMessage={!setupReady ? 'Finish the required setup choices before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onRequestPlan={onRequestPlan} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} setupSchema={setupSchema} triggerLabel="Customize" />}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className={poButtonClass('quiet')} type="button" variant="outline">
@@ -213,7 +211,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
         {needsExistingServiceReview && <ExistingServiceNotice appView={appView} />}
         <DuplicateInstallWarningDialog appName={app.name} onInstallCopy={acknowledgeDuplicateInstall} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={appView.reviewExistingHref} />
         <TechnicalValidationDialog app={app} installPlan={installPlan} open={technicalValidationOpen} onOpenChange={setTechnicalValidationOpen} />
-        {isInstalled && !showFreshInstallResult && <InstalledAppNotice app={installedApp} />}
+        {isInstalled && <InstalledAppNotice app={installedApp} />}
         {isInstalled && recoveryMode && recoveryMode !== 'reset-reinstall' && (
           <RecoveryInstallNotice
             disabled={installLocked || installing}
@@ -221,7 +219,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
             onReinstallCurrent={onReinstallCurrent}
           />
         )}
-        {(installJob || backupJob || installing || installResult) && <InlineInstallStatus app={app} backupJob={backupJob} installedApp={installedApp} installing={installing} job={installJob} onCreateBackup={onCreateBackup} result={installResult} />}
+        {(installJob || backupJob || installing) && <InlineInstallStatus app={app} backupJob={backupJob} installedApp={installedApp} installing={installing} job={installJob} onCreateBackup={onCreateBackup} />}
 
         <section className="grid gap-4">
           <section className="rounded-lg border border-slate-700/30 bg-slate-950/30 p-4">
@@ -411,7 +409,6 @@ function InlineInstallStatus({
   installing,
   job,
   onCreateBackup,
-  result,
 }: {
   app: MarketplaceApp;
   backupJob: ProjectOsJob | null;
@@ -419,7 +416,6 @@ function InlineInstallStatus({
   installing: boolean;
   job: ProjectOsJob | null;
   onCreateBackup: (appId: string) => Promise<void>;
-  result: InstallResult | null;
 }) {
   if (job) {
     const running = !terminalJob(job);
@@ -483,32 +479,7 @@ function InlineInstallStatus({
     );
   }
 
-  if (!result) {
-    return null;
-  }
-
-  const installed = result.status === 'installed' || result.status === 'already_installed';
-  return (
-    <section className={installed ? 'rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-4' : 'rounded-lg border border-red-300/20 bg-red-500/10 p-4'}>
-      <div className="flex items-start gap-3">
-        {installed ? <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" /> : <TriangleAlert className="mt-0.5 size-5 text-red-200" />}
-        <div className="min-w-0">
-          <h4 className="font-bold text-white">{result.status === 'already_installed' ? 'Already installed' : installed ? 'Installed and ready' : 'Install needs attention'}</h4>
-          <p className={installed ? 'mt-1 text-sm text-emerald-100/80' : 'mt-1 text-sm text-red-100/80'}>{result.message}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {installed && result.accessUrl && (
-              <Button asChild className="bg-emerald-500 text-slate-950 hover:bg-emerald-400" size="sm">
-                <a href={result.accessUrl} rel="noreferrer" target="_blank">Open app</a>
-              </Button>
-            )}
-            <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
-              <Link to="/apps">View in My Apps</Link>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+  return null;
 }
 
 function JobStepList({ job }: { job: ProjectOsJob }) {

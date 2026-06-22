@@ -71,26 +71,6 @@ export type CatalogSmokeTest = {
   detail: string;
 };
 
-export type PostInstallGuide = Omit<MarketplaceUsage, 'fields'> & {
-  values: MarketplaceUsageField[];
-};
-
-export type ResolvedSetupField = MarketplaceSetupField & {
-  qr: boolean;
-  recoverable: boolean;
-};
-
-export type ResolvedSetupIntegration = MarketplaceSetupIntegration & {
-  status: 'ready' | 'missing' | 'available' | string;
-};
-
-export type AppSetupGuide = Omit<MarketplaceSetup, 'generatedValues' | 'copyableFields' | 'qrFields' | 'integrations'> & {
-  generatedValues: ResolvedSetupField[];
-  copyableFields: ResolvedSetupField[];
-  qrFields: ResolvedSetupField[];
-  integrations: ResolvedSetupIntegration[];
-};
-
 export type MarketplaceApp = {
   id: string;
   name: string;
@@ -177,17 +157,4 @@ export type InstallPlan = {
     storageHostPaths?: Record<string, string>;
     backup?: { enabled: boolean; frequency: string; retention: number };
   };
-};
-
-export type InstallResult = {
-  appId: string;
-  appName: string;
-  status: string;
-  message: string;
-  accessUrl: string;
-  logs: string[];
-  steps: Array<{ label: string; status: string; detail: string; timestamp: string }>;
-  plan?: InstallPlan;
-  postInstallGuide?: PostInstallGuide | null;
-  setupGuide?: AppSetupGuide | null;
 };
