@@ -4,9 +4,14 @@ import {
   accessByAppId,
   appNeedsAttentionFromCanonicalState,
   applicationStateUpdatedAt,
+  catalogAppIsManaged,
   displayStatusFromCanonicalState,
   healthByAppId,
   managedRuntimeApps,
+  removeManagedAppFromState,
+  setRuntimeAppInState,
+  setRuntimeAppStatusInState,
+  setObservedServiceAdoptedInState,
   observedServices,
   ownershipViews,
   setObservedServicePinnedInState,
@@ -115,6 +120,58 @@ test('optimistic pinning updates observed-service cache without dropping recover
   assert.equal(pinnedFound.observedServices[1].userStatus, 'pinned_external');
   assert.equal(unpinnedFound.observedServices[1].pinned, false);
   assert.equal(unpinnedFound.observedServices[1].userStatus, 'found_on_server');
+});
+
+test('optimistic adoption moves a recoverable service into managed app views', () => {
+  const state = {
+    runtimeApps: [],
+    managedApps: [],
+    observedServices: [
+      {
+        ...observedService('docker:vaultwarden', 'recoverable', true),
+        displayName: 'Vaultwarden',
+        url: 'http://localhost:8090',
+        runtimeState: 'running',
+      },
+    ],
+    pinnedExternalServices: [],
+    foundServices: [],
+  };
+
+  const adopted = setObservedServiceAdoptedInState(state, 'docker:vaultwarden');
+
+  assert.equal(catalogAppIsManaged(adopted, 'vaultwarden'), true);
+  assert.deepEqual(managedRuntimeApps(adopted).map((app) => [app.appId, app.appName, app.friendlyStatus, app.accessUrl]), [
+    ['vaultwarden', 'Vaultwarden', 'Ready', 'http://localhost:8090'],
+  ]);
+  assert.deepEqual(adopted.managedApps.map((app) => [app.catalogAppId, app.name, app.userStatus]), [
+    ['vaultwarden', 'Vaultwarden', 'Ready'],
+  ]);
+  assert.deepEqual(adopted.observedServices.map((service) => [service.id, service.userStatus, service.managedByThisProjectOs, service.pinned]), [
+    ['docker:vaultwarden', 'installed_managed', true, false],
+  ]);
+});
+
+test('catalogAppIsManaged finds managed runtime and managed instance records', () => {
+  assert.equal(catalogAppIsManaged({ runtimeApps: [runtimeApp('pi-hole', 'Ready')] }, 'pi-hole'), true);
+  assert.equal(catalogAppIsManaged({ managedApps: [{ catalogAppId: 'pi-hole' }] }, 'pi-hole'), true);
+  assert.equal(catalogAppIsManaged({ observedServices: [observedService('docker:pi-hole', 'pinned_external', true)] }, 'pi-hole'), false);
+});
+
+test('runtime app cache helpers update routine management state', () => {
+  const state = {
+    runtimeApps: [runtimeApp('pi-hole', 'Ready')],
+    managedApps: [{ catalogAppId: 'pi-hole', name: 'Pi-hole', userStatus: 'Ready' }],
+  };
+  const starting = setRuntimeAppStatusInState(state, 'pi-hole', 'Starting');
+  const updated = setRuntimeAppInState(starting, { ...runtimeApp('pi-hole', 'Paused'), appName: 'Pi-hole' });
+  const removed = removeManagedAppFromState(updated, 'pi-hole');
+
+  assert.equal(starting.runtimeApps[0].friendlyStatus, 'Starting');
+  assert.equal(starting.managedApps[0].userStatus, 'Starting');
+  assert.equal(updated.runtimeApps[0].friendlyStatus, 'Paused');
+  assert.deepEqual(removed.runtimeApps, []);
+  assert.deepEqual(removed.managedApps, []);
 });
 
 function runtimeApp(appId, friendlyStatus, healthSnapshot = null) {

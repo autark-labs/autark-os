@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
 import { PageShell, StatusPill } from '@/components/project-os/ProjectOSComponents';
@@ -9,9 +10,15 @@ import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import {
+  applicationStateQueryKey,
+  invalidateApplicationState,
+  setRuntimeAppInApplicationStateCache,
+  useApplicationStateRepository,
+} from '@/repositories/applicationStateRepository';
 import { toast } from 'sonner';
 import type { AppRuntimeView } from '@/types/app';
+import type { ApplicationState } from '@/types/applicationState';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleConnectGuide, TailscaleDevice, TailscaleStatus } from '@/types/network';
 import { HostSetupPanel } from './HostSetupPanel';
 import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
@@ -30,6 +37,7 @@ import { tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
 
 function NetworkPage() {
   const { showAdvancedMetrics } = useProjectSettings();
+  const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
   const [tailscale, setTailscale] = useState<TailscaleStatus | null>(null);
   const [guide, setGuide] = useState<TailscaleConnectGuide | null>(null);
@@ -115,21 +123,29 @@ function NetworkPage() {
   }, []);
 
   const updatePrivateAccess = useCallback(async (app: AppRuntimeView, enabled: boolean) => {
+    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
     setAppActionLoading(app.appId);
     setError(null);
+    setRuntimeAppInApplicationStateCache(queryClient, appWithOptimisticPrivateAccess(app, enabled));
     try {
-      if (enabled) {
-        await InstalledAppsAPIClient.repairPrivateAccess(app.appId);
+      const result = enabled
+        ? await InstalledAppsAPIClient.repairPrivateAccess(app.appId)
+        : await InstalledAppsAPIClient.disablePrivateAccess(app.appId);
+      if (result.app) {
+        setRuntimeAppInApplicationStateCache(queryClient, result.app);
       } else {
-        await InstalledAppsAPIClient.disablePrivateAccess(app.appId);
+        void invalidateApplicationState(queryClient);
       }
-      await refreshAll();
+      void loadNetwork({ background: true });
     } catch (err) {
-      setError(apiErrorMessage(err, 'Unable to update private access for this app.'));
+      queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
+      const message = apiErrorMessage(err, 'Unable to update private access for this app.');
+      setError(message);
+      toast.error('Private access update failed', { description: message, duration: Infinity });
     } finally {
       setAppActionLoading(null);
     }
-  }, [refreshAll]);
+  }, [loadNetwork, queryClient]);
 
   const removeStaleMapping = useCallback(async (port: number) => {
     setAppActionLoading(`stale-${port}`);
@@ -202,6 +218,33 @@ function NetworkPage() {
       )}
     </PageShell>
   );
+}
+
+function appWithOptimisticPrivateAccess(app: AppRuntimeView, enabled: boolean): AppRuntimeView {
+  return {
+    ...app,
+    desiredAccess: app.desiredAccess ? {
+      ...app.desiredAccess,
+      mode: enabled ? 'local-and-private' : 'local',
+      label: enabled ? 'Private / Tailscale' : 'This Server',
+      privateUrl: enabled ? app.desiredAccess.privateUrl : null,
+      privateAccessRequirement: enabled ? app.desiredAccess.privateAccessRequirement : 'disabled',
+      privateAccessRequired: enabled ? app.desiredAccess.privateAccessRequired : false,
+      privateAccessRecommended: enabled ? app.desiredAccess.privateAccessRecommended : false,
+    } : app.desiredAccess,
+    observedAccess: app.observedAccess ? {
+      ...app.observedAccess,
+      privateUrl: enabled ? app.observedAccess.privateUrl : null,
+      privateLinkStatus: enabled ? 'configured' : 'not_enabled',
+    } : app.observedAccess,
+    settings: app.settings ? {
+      ...app.settings,
+      tailscaleEnabled: enabled,
+      privateAccessUrl: enabled ? app.settings.privateAccessUrl : null,
+      desiredAccessMode: enabled ? 'local-and-private' : 'local',
+      privateAccessRequirement: enabled ? app.settings.privateAccessRequirement : 'disabled',
+    } : app.settings,
+  };
 }
 
 function TailscaleAccessCard({ posture, setup, tailscale }: { posture: ReturnType<typeof buildNetworkPosture>; setup: SystemSetupStatus | null; tailscale: TailscaleStatus | null }) {

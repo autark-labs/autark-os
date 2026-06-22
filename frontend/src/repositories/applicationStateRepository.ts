@@ -7,11 +7,16 @@ import {
   appNeedsAttentionFromCanonicalState,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
+  catalogAppIsManaged,
   displayStatusFromCanonicalState,
   healthByAppId,
   managedRuntimeApps,
+  removeManagedAppFromState,
+  setObservedServiceAdoptedInState,
   observedServices,
   ownershipViews,
+  setRuntimeAppInState,
+  setRuntimeAppStatusInState,
   setObservedServicePinnedInState,
   telemetryByAppId,
   updatesByAppId,
@@ -25,11 +30,16 @@ export {
   appNeedsAttentionFromCanonicalState,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
+  catalogAppIsManaged,
   displayStatusFromCanonicalState,
   healthByAppId,
   managedRuntimeApps,
+  removeManagedAppFromState,
+  setObservedServiceAdoptedInState,
   observedServices,
   ownershipViews,
+  setRuntimeAppInState,
+  setRuntimeAppStatusInState,
   setObservedServicePinnedInState,
   telemetryByAppId,
   updatesByAppId,
@@ -111,6 +121,22 @@ export function invalidateApplicationState(queryClient: QueryClient) {
 
 export function setObservedServicePinnedInApplicationStateCache(queryClient: QueryClient, serviceId: string, pinned: boolean) {
   queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setObservedServicePinnedInState(current, serviceId, pinned));
+}
+
+export function setObservedServiceAdoptedInApplicationStateCache(queryClient: QueryClient, serviceId: string) {
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setObservedServiceAdoptedInState(current, serviceId));
+}
+
+export function setRuntimeAppInApplicationStateCache(queryClient: QueryClient, app: AppRuntimeView) {
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setRuntimeAppInState(current, app));
+}
+
+export function setRuntimeAppStatusInApplicationStateCache(queryClient: QueryClient, appId: string, status: string) {
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setRuntimeAppStatusInState(current, appId, status));
+}
+
+export function removeManagedAppFromApplicationStateCache(queryClient: QueryClient, appId: string) {
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => removeManagedAppFromState(current, appId));
 }
 
 export function invalidateAppUpdates(queryClient: QueryClient) {

@@ -1,14 +1,27 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { useAppUpdatesQuery, useApplicationStateRepository, updatesByAppId as buildUpdatesByAppId } from '@/repositories/applicationStateRepository';
+import {
+  applicationStateQueryKey,
+  invalidateAppUpdates,
+  invalidateApplicationState,
+  removeManagedAppFromApplicationStateCache,
+  setRuntimeAppInApplicationStateCache,
+  setRuntimeAppStatusInApplicationStateCache,
+  useAppUpdatesQuery,
+  useApplicationStateRepository,
+  updatesByAppId as buildUpdatesByAppId,
+} from '@/repositories/applicationStateRepository';
 import { usePrivateAccessReconciliationQuery } from '@/repositories/networkRepository';
 import type { AppActionResult, AppRuntimeView, AppUpdateResult, InstallSettings } from '@/types/app';
+import type { ApplicationState } from '@/types/applicationState';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ApplicationsDashboard, EmptyState } from './ApplicationsDashboard';
 import { ManageAppDialog } from './ApplicationsPageModal';
@@ -24,6 +37,7 @@ import type { AppAction } from './extensions/ApplicationsPage.types';
 
 function ApplicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
   const updatesQuery = useAppUpdatesQuery();
   const reconciliationQuery = usePrivateAccessReconciliationQuery();
@@ -74,17 +88,37 @@ function ApplicationsPage() {
     ]);
   }, [appState, reconciliationQuery, updatesQuery]);
 
+  const refreshAfterMutation = useCallback((options: { updates?: boolean } = {}) => {
+    void invalidateApplicationState(queryClient);
+    void reconciliationQuery.refetch();
+    if (options.updates) {
+      void invalidateAppUpdates(queryClient);
+    }
+  }, [queryClient, reconciliationQuery]);
+
+  function restoreApplicationState(previousState: ApplicationState | undefined) {
+    queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
+  }
+
   async function runAction(appId: string, action: AppAction) {
+    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
     setActionLoading(action);
     setLocalError(null);
     setActionResult(null);
     setUpdateResult(null);
+    setRuntimeAppStatusInApplicationStateCache(queryClient, appId, optimisticStatusForAction(action));
     try {
       const data = await InstalledAppsAPIClient.runAction(appId, action);
+      if (data.app) {
+        setRuntimeAppInApplicationStateCache(queryClient, data.app);
+      }
       setActionResult(data);
-      await refreshApps();
+      refreshAfterMutation();
     } catch (err) {
-      setLocalError(errorMessage(err));
+      restoreApplicationState(previousState);
+      const message = errorMessage(err);
+      setLocalError(message);
+      toast.error('App action failed', { description: message, duration: Infinity });
     } finally {
       setActionLoading(null);
     }
@@ -97,10 +131,13 @@ function ApplicationsPage() {
     setUpdateResult(null);
     try {
       const data = await InstalledAppsAPIClient.uninstall(appId);
+      removeManagedAppFromApplicationStateCache(queryClient, appId);
       setActionResult(data);
-      await refreshApps();
+      refreshAfterMutation({ updates: true });
     } catch (err) {
-      setLocalError(errorMessage(err));
+      const message = errorMessage(err);
+      setLocalError(message);
+      toast.error('Uninstall failed', { description: message, duration: Infinity });
     } finally {
       setActionLoading(null);
     }
@@ -114,9 +151,11 @@ function ApplicationsPage() {
     try {
       const data = await InstalledAppsAPIClient.updateApp(appId);
       setUpdateResult(data);
-      await refreshApps();
+      refreshAfterMutation({ updates: true });
     } catch (err) {
-      setLocalError(errorMessage(err));
+      const message = errorMessage(err);
+      setLocalError(message);
+      toast.error('Update failed', { description: message, duration: Infinity });
     } finally {
       setActionLoading(null);
     }
@@ -130,20 +169,36 @@ function ApplicationsPage() {
     try {
       const data = await InstalledAppsAPIClient.rollbackApp(appId);
       setUpdateResult(data);
-      await refreshApps();
+      refreshAfterMutation({ updates: true });
     } catch (err) {
-      setLocalError(errorMessage(err));
+      const message = errorMessage(err);
+      setLocalError(message);
+      toast.error('Rollback failed', { description: message, duration: Infinity });
     } finally {
       setActionLoading(null);
     }
   }
 
   async function saveSettings(appId: string, settings: InstallSettings) {
+    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
+    const existingApp = appState.apps.find((app) => app.appId === appId);
     setLocalError(null);
-    const data = await InstalledAppsAPIClient.updateSettings(appId, settings);
-    await refreshApps();
-    setActionResult({ message: data.appName + ' settings were saved.' });
-    return data;
+    if (existingApp) {
+      setRuntimeAppInApplicationStateCache(queryClient, appWithOptimisticSettings(existingApp, settings));
+    }
+    try {
+      const data = await InstalledAppsAPIClient.updateSettings(appId, settings);
+      setRuntimeAppInApplicationStateCache(queryClient, data);
+      refreshAfterMutation();
+      setActionResult({ message: data.appName + ' settings were saved.' });
+      return data;
+    } catch (err) {
+      restoreApplicationState(previousState);
+      const message = errorMessage(err);
+      setLocalError(message);
+      toast.error('Settings were not saved', { description: message, duration: Infinity });
+      throw err;
+    }
   }
 
   async function refreshObservedServices() {
@@ -250,3 +305,21 @@ function ApplicationsPage() {
 }
 
 export default ApplicationsPage;
+
+function optimisticStatusForAction(action: AppAction) {
+  return action === 'stop' ? 'Paused' : 'Starting';
+}
+
+function appWithOptimisticSettings(app: AppRuntimeView, settings: InstallSettings): AppRuntimeView {
+  return {
+    ...app,
+    accessUrl: settings.accessUrl ?? app.accessUrl,
+    observedAccess: app.observedAccess ? {
+      ...app.observedAccess,
+      localUrl: settings.accessUrl ?? app.observedAccess.localUrl,
+      privateUrl: settings.privateAccessUrl ?? app.observedAccess.privateUrl,
+      privateLinkStatus: settings.tailscaleEnabled ? app.observedAccess.privateLinkStatus : 'not_enabled',
+    } : app.observedAccess,
+    settings,
+  };
+}

@@ -180,7 +180,7 @@ public class InstalledAppsController {
     }
 
     private <T> T refreshAfter(T result) {
-        applicationStateService.refreshNow();
+        applicationStateService.refreshInBackground();
         return result;
     }
 

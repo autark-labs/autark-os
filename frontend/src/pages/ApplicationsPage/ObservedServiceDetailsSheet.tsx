@@ -19,7 +19,13 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { applicationStateQueryKey, setObservedServicePinnedInApplicationStateCache } from '@/repositories/applicationStateRepository';
+import {
+  applicationStateQueryKey,
+  catalogAppIsManaged,
+  setObservedServiceAdoptedInApplicationStateCache,
+  setObservedServicePinnedInApplicationStateCache,
+  useApplicationStateRepository,
+} from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan, ObservedServiceView } from '@/types/observedService';
 import { toast } from 'sonner';
 
@@ -33,6 +39,7 @@ type ObservedServiceDetailsSheetProps = {
 
 export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, onRefresh, open, service }: ObservedServiceDetailsSheetProps) {
   const queryClient = useQueryClient();
+  const appState = useApplicationStateRepository();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [matchValue, setMatchValue] = useState('');
   const [plan, setPlan] = useState<ObservedServiceAdoptionPlan | null>(null);
@@ -70,21 +77,25 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
   const canAdopt = Boolean(adoptionAction) && !adoptionAction?.disabled && service.adoptable;
   const installCopyAction = actions.get('install_copy');
   const installCopyHref = installCopyAction?.href || (service.catalogAppId ? `/discover?app=${encodeURIComponent(service.catalogAppId)}` : null);
-  const canInstallCopy = Boolean(installCopyHref);
+  const canInstallCopy = Boolean(installCopyHref) && !catalogAppIsManaged(appState.applicationState, service.catalogAppId);
   const blockedReasons = planList(plan?.blockedReasons);
   const planDisabledReason = typeof plan?.disabledReason === 'string' ? plan.disabledReason : '';
   const planAvailable = plan?.available !== false && !planDisabledReason;
   const confirmationText = typeof plan?.confirmationText === 'string' ? plan.confirmationText : '';
   const adoptDisabled = busyAction !== null || !planAvailable || blockedReasons.length > 0 || (confirmationText.length > 0 && confirmation !== confirmationText);
 
-  async function runMutation(actionId: string, mutation: () => Promise<ObservedServiceActionResult>, options: { optimisticPinned?: boolean; refresh?: boolean } = {}) {
+  async function runMutation(actionId: string, mutation: () => Promise<ObservedServiceActionResult>, options: { optimisticPinned?: boolean; optimisticAdopt?: boolean; refresh?: boolean } = {}) {
     setBusyAction(actionId);
     setLocalError(null);
-    const previousApplicationState = options.optimisticPinned === undefined
+    const shouldUpdateApplicationState = options.optimisticPinned !== undefined || options.optimisticAdopt;
+    const previousApplicationState = !shouldUpdateApplicationState
       ? undefined
       : queryClient.getQueryData(applicationStateQueryKey);
     if (options.optimisticPinned !== undefined) {
       setObservedServicePinnedInApplicationStateCache(queryClient, currentService.id, options.optimisticPinned);
+    }
+    if (options.optimisticAdopt) {
+      setObservedServiceAdoptedInApplicationStateCache(queryClient, currentService.id);
     }
     try {
       const result = await mutation();
@@ -230,7 +241,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                     </div>
                   )}
                   {planAvailable && (
-                    <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={adoptDisabled} onClick={() => runMutation('adopt', () => ObservedServicesAPIClient.adopt(service.id, confirmation))} type="button">
+                    <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={adoptDisabled} onClick={() => runMutation('adopt', () => ObservedServicesAPIClient.adopt(service.id, confirmation), { optimisticAdopt: true, refresh: false })} type="button">
                       {busyAction === 'adopt' ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
                       Adopt service
                     </Button>

@@ -32,6 +32,14 @@ export function updatesByAppId(updates = []) {
   return Object.fromEntries(updates.map((update) => [update.appId, update]));
 }
 
+export function catalogAppIsManaged(state, catalogAppId) {
+  if (!catalogAppId) {
+    return false;
+  }
+  return managedRuntimeApps(state).some((app) => app.appId === catalogAppId)
+    || (state?.managedApps ?? []).some((app) => app.catalogAppId === catalogAppId);
+}
+
 export function displayStatusFromCanonicalState(app, health) {
   if (app?.canonicalUserStatus) {
     return app.canonicalUserStatus;
@@ -75,6 +83,76 @@ export function setObservedServicePinnedInState(state, serviceId, pinned) {
     observedServices,
     pinnedExternalServices: observedServices.filter((service) => service.pinned || service.userStatus === 'pinned_external'),
     foundServices: observedServices.filter((service) => !service.managedByThisProjectOs && !service.pinned && service.userStatus !== 'pinned_external'),
+  };
+}
+
+export function setObservedServiceAdoptedInState(state, serviceId) {
+  if (!state || !Array.isArray(state.observedServices)) {
+    return state;
+  }
+  const service = state.observedServices.find((item) => item.id === serviceId);
+  if (!service?.catalogAppId) {
+    return state;
+  }
+  const runtimeApp = runtimeAppFromObservedService(service);
+  const managedApp = managedAppFromObservedService(service);
+  const observedServices = state.observedServices.map((item) => item.id === serviceId ? observedServiceAsManaged(item) : item);
+  return {
+    ...state,
+    runtimeApps: upsertByKey(state.runtimeApps ?? [], runtimeApp, (app) => app.appId),
+    managedApps: upsertByKey(state.managedApps ?? [], managedApp, (app) => app.catalogAppId),
+    observedServices,
+    pinnedExternalServices: observedServices.filter((item) => item.pinned || item.userStatus === 'pinned_external'),
+    foundServices: observedServices.filter((item) => !item.managedByThisProjectOs && !item.pinned && item.userStatus !== 'pinned_external'),
+  };
+}
+
+export function setRuntimeAppInState(state, app) {
+  if (!state || !app?.appId) {
+    return state;
+  }
+  return {
+    ...state,
+    runtimeApps: upsertByKey(state.runtimeApps ?? [], app, (item) => item.appId),
+    managedApps: (state.managedApps ?? []).map((item) => item.catalogAppId === app.appId ? {
+      ...item,
+      name: app.appName || item.name,
+      userStatus: app.friendlyStatus || item.userStatus,
+      runtimeState: app.technicalStatus || item.runtimeState,
+      localUrl: app.accessUrl || item.localUrl,
+      updatedAt: new Date().toISOString(),
+    } : item),
+  };
+}
+
+export function setRuntimeAppStatusInState(state, appId, status) {
+  if (!state || !appId) {
+    return state;
+  }
+  return {
+    ...state,
+    runtimeApps: (state.runtimeApps ?? []).map((app) => app.appId === appId ? {
+      ...app,
+      friendlyStatus: status,
+      canonicalUserStatus: status,
+    } : app),
+    managedApps: (state.managedApps ?? []).map((app) => app.catalogAppId === appId ? {
+      ...app,
+      userStatus: status,
+      runtimeState: status === 'Ready' ? 'running' : status === 'Paused' || status === 'Stopped' ? 'stopped' : app.runtimeState,
+      updatedAt: new Date().toISOString(),
+    } : app),
+  };
+}
+
+export function removeManagedAppFromState(state, appId) {
+  if (!state || !appId) {
+    return state;
+  }
+  return {
+    ...state,
+    runtimeApps: (state.runtimeApps ?? []).filter((app) => app.appId !== appId),
+    managedApps: (state.managedApps ?? []).filter((app) => app.catalogAppId !== appId),
   };
 }
 
@@ -135,6 +213,90 @@ function serviceWithPinnedState(service, pinned) {
     };
   }
   return next;
+}
+
+function observedServiceAsManaged(service) {
+  return {
+    ...service,
+    userStatus: 'installed_managed',
+    userStatusLabel: 'Managed',
+    userStatusDescription: 'Managed by this Project OS installation.',
+    ownershipState: 'owned_managed',
+    managedByThisProjectOs: true,
+    pinned: false,
+  };
+}
+
+function runtimeAppFromObservedService(service) {
+  return {
+    appId: service.catalogAppId,
+    appName: service.displayName || service.catalogAppId,
+    category: service.category || 'Application',
+    description: 'Recovered by Project OS.',
+    version: '',
+    image: null,
+    friendlyStatus: service.runtimeState === 'running' ? 'Ready' : 'Starting',
+    technicalStatus: service.runtimeState || 'recovering',
+    healthCheck: service.runtimeState || 'recovering',
+    runtimePath: '',
+    composeProject: service.id,
+    accessUrl: service.url || null,
+    desiredAccess: null,
+    observedAccess: {
+      localUrl: service.url || null,
+      privateUrl: null,
+      localPort: null,
+      protocol: service.url?.startsWith('https://') ? 'https' : 'http',
+      privateLinkStatus: 'not_enabled',
+      lastAccessCheckAt: null,
+      lastSuccessfulAccessAt: null,
+      lastRepairAttemptAt: null,
+      lastRepairStatus: null,
+    },
+    installedAt: new Date().toISOString(),
+    lastBackup: 'Backups disabled',
+    settings: null,
+    telemetry: unavailableTelemetry(),
+    healthSnapshot: null,
+    usageGuide: null,
+    setupGuide: null,
+    appConfiguration: [],
+    recentEvents: [],
+    canonicalUserStatus: service.runtimeState === 'running' ? 'Ready' : 'Starting',
+    canonicalRuntimeState: service.runtimeState || 'recovering',
+    canonicalOwnershipState: 'owned',
+    canonicalAccessState: service.url ? 'local_ready' : 'not_ready',
+    canonicalBackupState: 'backup_disabled',
+    canonicalIssues: [],
+    canonicalActions: [],
+  };
+}
+
+function managedAppFromObservedService(service) {
+  return {
+    appInstanceId: `appinst_adopted_${service.catalogAppId}`,
+    catalogAppId: service.catalogAppId,
+    name: service.displayName || service.catalogAppId,
+    category: service.category || 'Application',
+    icon: '',
+    userStatus: service.runtimeState === 'running' ? 'Ready' : 'Starting',
+    installState: 'adopted',
+    runtimeState: service.runtimeState || 'recovering',
+    ownershipState: 'owned',
+    accessState: service.url ? 'local_ready' : 'not_ready',
+    backupState: 'backup_disabled',
+    localUrl: service.url || '',
+    privateUrl: '',
+    issues: [],
+    actions: [],
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function upsertByKey(items, nextItem, keyFor) {
+  const key = keyFor(nextItem);
+  const without = items.filter((item) => keyFor(item) !== key);
+  return [...without, nextItem];
 }
 
 function accessCheckFromApp(app) {

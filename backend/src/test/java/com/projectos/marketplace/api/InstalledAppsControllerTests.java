@@ -24,7 +24,7 @@ import com.projectos.monitoring.MonitoringMetricsService;
 class InstalledAppsControllerTests {
 
     @Test
-    void lifecycleMutationRefreshesCachedApplicationState() {
+    void lifecycleMutationSchedulesCachedApplicationStateRefreshWithoutBlocking() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
         AppUpdateService updateService = mock(AppUpdateService.class);
@@ -39,7 +39,8 @@ class InstalledAppsControllerTests {
 
         controller.start("vaultwarden");
 
-        verify(applicationStateService).refreshNow();
+        verify(applicationStateService).refreshInBackground();
+        verify(applicationStateService, never()).refreshNow();
     }
 
     @Test
