@@ -5,9 +5,14 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.projectos.activity.ActivityLogService;
+import com.projectos.marketplace.install.BackupPolicy;
+import com.projectos.marketplace.install.InstallSettings;
+import com.projectos.marketplace.install.InstalledApp;
+import com.projectos.marketplace.install.InstalledAppRepository;
 
 @Service
 public class ProjectSettingsService {
@@ -20,10 +25,17 @@ public class ProjectSettingsService {
 
     private final ProjectSettingsRepository repository;
     private final ActivityLogService activityLogService;
+    private final InstalledAppRepository installedAppRepository;
 
     public ProjectSettingsService(ProjectSettingsRepository repository, ActivityLogService activityLogService) {
+        this(repository, activityLogService, null);
+    }
+
+    @Autowired
+    public ProjectSettingsService(ProjectSettingsRepository repository, ActivityLogService activityLogService, InstalledAppRepository installedAppRepository) {
         this.repository = repository;
         this.activityLogService = activityLogService;
+        this.installedAppRepository = installedAppRepository;
     }
 
     public ProjectSettings current() {
@@ -42,6 +54,36 @@ public class ProjectSettingsService {
         repository.save(sanitized);
         activityLogService.info("settings", "project_settings_updated", "Project OS settings updated", "Saved Project OS preferences.");
         return sanitized;
+    }
+
+    public ProjectSettingsAppDefaultsResult applyAppDefaults(ProjectSettings settings) {
+        ProjectSettings sanitized = sanitize(settings, current());
+        if (installedAppRepository == null) {
+            return new ProjectSettingsAppDefaultsResult(false, "error", "App defaults unavailable", "Project OS cannot update app defaults in this runtime.", 0, Instant.now());
+        }
+        int updated = 0;
+        BackupPolicy backup = new BackupPolicy(sanitized.automaticBackupsEnabled(), sanitized.backupFrequency(), sanitized.backupRetentionDays());
+        for (InstalledApp app : installedAppRepository.findAll()) {
+            InstallSettings current = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
+            installedAppRepository.saveSettings(app.appId(), new InstallSettings(
+                    current.accessUrl(),
+                    current.privateAccessUrl(),
+                    current.tailscaleEnabled(),
+                    current.storageSubfolders(),
+                    backup,
+                    current.desiredAccessMode(),
+                    current.privateAccessRequirement(),
+                    current.expectedLocalPort(),
+                    current.expectedProtocol(),
+                    current.lastAccessCheckAt(),
+                    current.lastSuccessfulAccessAt(),
+                    current.lastRepairAttemptAt(),
+                    current.lastRepairStatus(),
+                    sanitized.automaticRepairEnabled()));
+            updated++;
+        }
+        activityLogService.info("settings", "app_defaults_applied", "App defaults applied", "Applied backup and repair defaults to " + updated + " app(s).");
+        return new ProjectSettingsAppDefaultsResult(true, "success", "App defaults applied", "Applied backup and repair defaults to " + updated + " app(s).", updated, Instant.now());
     }
 
     private ProjectSettings sanitize(ProjectSettings settings, ProjectSettings fallback) {

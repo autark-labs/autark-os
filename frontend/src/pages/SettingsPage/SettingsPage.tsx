@@ -25,7 +25,6 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
-import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +55,7 @@ import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
+import { shouldApplyProjectSettingsToApps } from './SettingsPage.logic';
 import { defaultSettingsGroup, sectionsForGroup, settingsGroups as topLevelSettingsGroups } from './SettingsPage.sections';
 
 type SettingsState = {
@@ -230,8 +230,8 @@ function SettingsPage() {
     try {
       const previous = state.projectSettings;
       const saved = await SystemAPIClient.updateSettings(draft);
-      if (!previous || previous.automaticRepairEnabled !== saved.automaticRepairEnabled || previous.automaticBackupsEnabled !== saved.automaticBackupsEnabled || previous.backupFrequency !== saved.backupFrequency || previous.backupRetentionDays !== saved.backupRetentionDays) {
-        await applyProjectSettingsToApps(appState.apps, saved);
+      if (shouldApplyProjectSettingsToApps(previous, saved)) {
+        await SystemAPIClient.applyAppDefaults(saved);
         await appState.refresh();
       }
       setState((current) => ({ ...current, projectSettings: saved }));
@@ -681,13 +681,6 @@ function SetupCheckRow({ check, copied, onCopy }: { check: SystemSetupCheck; cop
         </div>
       </div>
     </div>
-  );
-}
-
-async function applyProjectSettingsToApps(apps: AppRuntimeView[], settings: ProjectSettings) {
-  const backup = { enabled: settings.automaticBackupsEnabled, frequency: settings.backupFrequency, retention: settings.backupRetentionDays };
-  return Promise.all(
-    apps.map((app) => InstalledAppsAPIClient.updateSettings(app.appId, { ...settingsForApp(app), autoRepairEnabled: settings.automaticRepairEnabled, backup })),
   );
 }
 

@@ -248,6 +248,15 @@ export type ProjectSettings = {
   updatedAt: string;
 };
 
+export type ProjectSettingsAppDefaultsResult = {
+  ok: boolean;
+  severity: 'success' | 'info' | 'warning' | 'error' | string;
+  title: string;
+  message: string;
+  updatedApps: number;
+  completedAt: string;
+};
+
 export type StorageUsage = {
   label: string;
   path: string;

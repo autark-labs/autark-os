@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.projectos.monitoring.MonitoringMetricsService;
+import com.projectos.apps.ApplicationStateService;
 
 @RestController
 @RequestMapping("/api/system")
@@ -34,8 +35,9 @@ public class SystemController {
     private final MonitoringMetricsService monitoringMetricsService;
     private final SystemDoctorService doctorService;
     private final OnboardingService onboardingService;
+    private final ApplicationStateService applicationStateService;
 
-    public SystemController(SystemSetupService setupService, SystemMetricsService metricsService, StorageService storageService, SystemSupportService supportService, ProjectSettingsService projectSettingsService, ProjectVersionService versionService, MonitoringMetricsService monitoringMetricsService, SystemDoctorService doctorService, OnboardingService onboardingService) {
+    public SystemController(SystemSetupService setupService, SystemMetricsService metricsService, StorageService storageService, SystemSupportService supportService, ProjectSettingsService projectSettingsService, ProjectVersionService versionService, MonitoringMetricsService monitoringMetricsService, SystemDoctorService doctorService, OnboardingService onboardingService, ApplicationStateService applicationStateService) {
         this.setupService = setupService;
         this.metricsService = metricsService;
         this.storageService = storageService;
@@ -45,6 +47,7 @@ public class SystemController {
         this.monitoringMetricsService = monitoringMetricsService;
         this.doctorService = doctorService;
         this.onboardingService = onboardingService;
+        this.applicationStateService = applicationStateService;
     }
 
     @GetMapping("/setup-status")
@@ -112,6 +115,13 @@ public class SystemController {
     @PutMapping("/settings")
     public ProjectSettings updateSettings(@RequestBody ProjectSettings settings) {
         return projectSettingsService.update(settings);
+    }
+
+    @PostMapping("/settings/app-defaults/apply")
+    public ProjectSettingsAppDefaultsResult applyAppDefaults(@RequestBody ProjectSettings settings) {
+        ProjectSettingsAppDefaultsResult result = projectSettingsService.applyAppDefaults(settings);
+        applicationStateService.refreshInBackground();
+        return result;
     }
 
     @GetMapping("/support/summary")
