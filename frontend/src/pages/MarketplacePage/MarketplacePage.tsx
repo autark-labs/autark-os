@@ -21,20 +21,25 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { ActivityAPIClient } from '@/api/ActivityAPIClient';
-import { BackupAPIClient } from '@/api/BackupAPIClient';
-import { DiscoverAPIClient } from '@/api/DiscoverAPIClient';
-import { JobsAPIClient } from '@/api/JobsAPIClient';
-import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { poButtonClass, poCardClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
+import {
+  useDiscoverAppsQuery,
+  useDiscoverBackupMutation,
+  useDiscoverInstallMutation,
+  useDiscoverInstallPreviewQuery,
+  useDiscoverJobQuery,
+  useDiscoverJobsQuery,
+  useDiscoverReadinessQuery,
+  useMarketplaceActivityQuery,
+  latestActiveDiscoverJob,
+} from '@/repositories/discoverRepository';
 import type { ActivityLog } from '@/types/activity';
-import type { DiscoverAppView, DiscoverInstallPreview } from '@/types/discover';
+import type { DiscoverAppView } from '@/types/discover';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
-import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
 import { categories } from './extensions/MarketplacePage.constants';
 import {
   START_HERE_DISMISSAL_KEY,
@@ -63,25 +68,28 @@ function MarketplacePage() {
   const [selectedAppId, setSelectedAppId] = useState('vaultwarden');
   const [sortBy, setSortBy] = useState('Recommended');
   const [searchQuery, setSearchQuery] = useState('');
-  const [apps, setApps] = useState<DiscoverAppView[]>([]);
-  const [onboarding, setOnboarding] = useState<OnboardingState | null>(null);
-  const [doctor, setDoctor] = useState<SystemDoctorStatus | null>(null);
-  const [storage, setStorage] = useState<StorageReport | null>(null);
   const [hideInstalled, setHideInstalled] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState('');
-  const [installPlan, setInstallPlan] = useState<InstallPlan | null>(null);
-  const [installOptions, setInstallOptions] = useState<InstallOptions | null>(null);
-  const [installPreview, setInstallPreview] = useState<DiscoverInstallPreview | null>(null);
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
-  const [planLoading, setPlanLoading] = useState(false);
+  const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
   const [installJob, setInstallJob] = useState<ProjectOsJob | null>(null);
   const [backupJob, setBackupJob] = useState<ProjectOsJob | null>(null);
   const [duplicateAcknowledgedAppId, setDuplicateAcknowledgedAppId] = useState<string | null>(null);
-  const [marketplaceActivity, setMarketplaceActivity] = useState<ActivityLog[]>([]);
-  const [lastRefreshAt, setLastRefreshAt] = useState<Date | null>(null);
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
   const recoveryAppId = searchParams.get('app');
   const recoveryMode = searchParams.get('mode');
+  const appsQuery = useDiscoverAppsQuery();
+  const activityQuery = useMarketplaceActivityQuery();
+  const readinessQuery = useDiscoverReadinessQuery();
+  const jobsQuery = useDiscoverJobsQuery();
+  const installMutation = useDiscoverInstallMutation();
+  const backupMutation = useDiscoverBackupMutation();
+  const apps = appsQuery.data ?? [];
+  const marketplaceActivity = activityQuery.data ?? [];
+  const onboarding = readinessQuery.data?.onboarding ?? null;
+  const doctor = readinessQuery.data?.doctor ?? null;
+  const storage = readinessQuery.data?.storage ?? null;
+  const lastRefreshAt = appsQuery.dataUpdatedAt > 0 ? new Date(appsQuery.dataUpdatedAt) : null;
   const installedById = useMemo(() => new Map(apps.filter((app) => app.state === 'installed_managed' && app.installedApp).map((app) => [app.id, app.installedApp])), [apps]);
   const catalogApps = useMemo(() => {
     if (showAdvancedMetrics) {
@@ -99,73 +107,41 @@ function MarketplacePage() {
     storage: { subfolders: {}, hostPaths: {} },
     backup: { enabled: true, frequency: 'daily', retention: 7 },
   };
+  const previewEnabled = Boolean(selectedApp?.id && setupAnswersAppId === selectedApp.id);
+  const installPreviewQuery = useDiscoverInstallPreviewQuery(selectedApp?.id ?? null, setupAnswers, previewEnabled);
+  const recoveredInstallJob = useMemo(() => latestActiveDiscoverJob(jobsQuery.data ?? [], ['install_app']), [jobsQuery.data]);
+  const recoveredBackupJob = useMemo(() => latestActiveDiscoverJob(jobsQuery.data ?? [], ['backup']), [jobsQuery.data]);
+  const trackedInstallJob = installJob && !terminalJob(installJob) ? installJob : recoveredInstallJob ?? installJob;
+  const trackedBackupJob = backupJob && !terminalJob(backupJob) ? backupJob : recoveredBackupJob ?? backupJob;
+  const activeInstallJobId = trackedInstallJob && !terminalJob(trackedInstallJob) ? trackedInstallJob.jobId : null;
+  const activeBackupJobId = trackedBackupJob && !terminalJob(trackedBackupJob) ? trackedBackupJob.jobId : null;
+  const installJobQuery = useDiscoverJobQuery(activeInstallJobId);
+  const backupJobQuery = useDiscoverJobQuery(activeBackupJobId);
+  const installPreview = installPreviewQuery.data ?? null;
+  const installPlan = installPreview?.technicalDetails ?? null;
+  const installOptions = installPreview?.installOptions ?? null;
+  const planLoading = installPreviewQuery.isFetching;
 
-  const loadApps = useCallback(async () => {
-    try {
-      const [nextApps, nextActivity] = await Promise.all([
-        DiscoverAPIClient.listApps(),
-        ActivityAPIClient.recent({ category: 'marketplace', limit: 8 }),
-      ]);
-      const [nextOnboarding, nextDoctor, nextStorage] = await Promise.all([
-        SystemAPIClient.onboarding().catch((error) => {
-          console.warn('Unable to load starter app recommendations.', error);
-          return null;
-        }),
-        SystemAPIClient.doctor().catch((error) => {
-          console.warn('Unable to load install readiness.', error);
-          return null;
-        }),
-        SystemAPIClient.storage().catch((error) => {
-          console.warn('Unable to load storage readiness.', error);
-          return null;
-        }),
-      ]);
-      setApps(nextApps);
-      setOnboarding(nextOnboarding);
-      setDoctor(nextDoctor);
-      setStorage(nextStorage);
-      setMarketplaceActivity(nextActivity);
-      setLastRefreshAt(new Date());
-      setMarketplaceError('');
-      setSelectedAppId((currentAppId) => {
-        if (nextApps.length > 0 && !nextApps.some((app) => app.id === currentAppId)) {
-          return nextApps[0].id;
-        }
-        return currentAppId;
-      });
-    } catch (error) {
-      setMarketplaceError(apiErrorMessage(error));
-    }
-  }, []);
+  const discoverError = marketplaceError || (appsQuery.error ? apiErrorMessage(appsQuery.error) : '');
 
-  const loadInstallPreview = useCallback(async (appId: string, answers: Record<string, unknown>) => {
+  const refreshDiscover = useCallback(async () => {
+    await Promise.all([
+      appsQuery.refetch(),
+      activityQuery.refetch(),
+      readinessQuery.refetch(),
+    ]);
+  }, [activityQuery.refetch, appsQuery.refetch, readinessQuery.refetch]);
+
+  async function requestPlan(appId = selectedApp?.id, _options: InstallOptions | null = null) {
     if (!appId) {
       return;
     }
-    setPlanLoading(true);
-    try {
-      const preview = await DiscoverAPIClient.installPreview(appId, answers);
-      setInstallPreview(preview);
-      setInstallPlan(preview.technicalDetails);
-      setInstallOptions(preview.installOptions);
-      setMarketplaceError('');
-    } catch (error) {
-      setMarketplaceError(apiErrorMessage(error));
-    } finally {
-      setPlanLoading(false);
-    }
-  }, []);
-
-  const requestPlan = useCallback(async (appId = selectedApp?.id, _options: InstallOptions | null = null) => {
-    if (!appId) {
+    if (appId !== selectedApp?.id) {
+      setSelectedAppId(appId);
       return;
     }
-    await loadInstallPreview(appId, setupAnswers);
-  }, [loadInstallPreview, selectedApp?.id, setupAnswers]);
-
-  useEffect(() => {
-    loadApps();
-  }, [loadApps]);
+    await installPreviewQuery.refetch();
+  }
 
   useEffect(() => {
     if (recoveryAppId && apps.some((app) => app.id === recoveryAppId)) {
@@ -183,54 +159,64 @@ function MarketplacePage() {
   }, [catalogApps, showAdvancedMetrics]);
 
   useEffect(() => {
-    setInstallPlan(null);
-    setInstallPreview(null);
     setDuplicateAcknowledgedAppId(null);
     const view = apps.find((nextApp) => nextApp.id === selectedAppId);
     if (view) {
-      const nextSetupAnswers = defaultAnswersFromSchema(view.setupSchema);
-      setSetupAnswers(nextSetupAnswers);
-      setInstallOptions(null);
-      loadInstallPreview(selectedAppId, nextSetupAnswers);
+      setSetupAnswers(defaultAnswersFromSchema(view.setupSchema));
+      setSetupAnswersAppId(selectedAppId);
     }
-  }, [apps, loadInstallPreview, selectedAppId]);
+  }, [apps, selectedAppId]);
 
   useEffect(() => {
-    if (!installJob || terminalJob(installJob)) {
-      return undefined;
+    if (!recoveredInstallJob || (installJob && !terminalJob(installJob))) {
+      return;
     }
-    const interval = window.setInterval(async () => {
-      try {
-        const nextJob = await JobsAPIClient.get(installJob.jobId);
-        setInstallJob(nextJob);
-        if (terminalJob(nextJob)) {
-          setApps(await DiscoverAPIClient.listApps());
-          setMarketplaceActivity(await ActivityAPIClient.recent({ category: 'marketplace', limit: 8 }));
-        }
-      } catch (error) {
-        setMarketplaceError(apiErrorMessage(error, 'Install progress could not be refreshed.'));
-      }
-    }, 1200);
-    return () => window.clearInterval(interval);
-  }, [installJob]);
+    setInstallJob(recoveredInstallJob);
+    if (recoveredInstallJob.subjectId) {
+      setSelectedAppId(recoveredInstallJob.subjectId);
+    }
+  }, [installJob, recoveredInstallJob]);
 
   useEffect(() => {
-    if (!backupJob || terminalJob(backupJob)) {
-      return undefined;
+    if (!recoveredBackupJob || (backupJob && !terminalJob(backupJob))) {
+      return;
     }
-    const interval = window.setInterval(async () => {
-      try {
-        const nextJob = await JobsAPIClient.get(backupJob.jobId);
-        setBackupJob(nextJob);
-        if (terminalJob(nextJob)) {
-          setApps(await DiscoverAPIClient.listApps());
-        }
-      } catch (error) {
-        setMarketplaceError(apiErrorMessage(error, 'Backup progress could not be refreshed.'));
-      }
-    }, 1200);
-    return () => window.clearInterval(interval);
-  }, [backupJob]);
+    setBackupJob(recoveredBackupJob);
+  }, [backupJob, recoveredBackupJob]);
+
+  useEffect(() => {
+    if (!installJobQuery.data) {
+      return;
+    }
+    setInstallJob(installJobQuery.data);
+    if (terminalJob(installJobQuery.data)) {
+      void refreshDiscover();
+    }
+  }, [installJobQuery.data, refreshDiscover]);
+
+  useEffect(() => {
+    if (!installJobQuery.error) {
+      return;
+    }
+    setMarketplaceError(apiErrorMessage(installJobQuery.error, 'Install progress could not be refreshed.'));
+  }, [installJobQuery.error]);
+
+  useEffect(() => {
+    if (!backupJobQuery.data) {
+      return;
+    }
+    setBackupJob(backupJobQuery.data);
+    if (terminalJob(backupJobQuery.data)) {
+      void refreshDiscover();
+    }
+  }, [backupJobQuery.data, refreshDiscover]);
+
+  useEffect(() => {
+    if (!backupJobQuery.error) {
+      return;
+    }
+    setMarketplaceError(apiErrorMessage(backupJobQuery.error, 'Backup progress could not be refreshed.'));
+  }, [backupJobQuery.error]);
 
   async function installApp(appId = selectedApp?.id, _options = installOptions, mode: 'install' | 'reinstall' = 'install') {
     if (!appId) {
@@ -246,9 +232,13 @@ function MarketplacePage() {
       return;
     }
     try {
-      setInstallJob(await DiscoverAPIClient.install(appId, setupAnswers, {
-        reinstall: mode !== 'install',
-        duplicateAcknowledged: mode === 'install' && duplicateAcknowledgedAppId === appId,
+      setInstallJob(await installMutation.mutateAsync({
+        appId,
+        answers: setupAnswers,
+        options: {
+          reinstall: mode !== 'install',
+          duplicateAcknowledged: mode === 'install' && duplicateAcknowledgedAppId === appId,
+        },
       }));
       setMarketplaceError('');
     } catch (error) {
@@ -259,7 +249,7 @@ function MarketplacePage() {
 
   async function createFirstBackup(appId: string) {
     try {
-      setBackupJob(await BackupAPIClient.run(appId));
+      setBackupJob(await backupMutation.mutateAsync(appId));
       setMarketplaceError('');
     } catch (error) {
       setMarketplaceError(apiErrorMessage(error, 'Backup could not be started.'));
@@ -294,13 +284,6 @@ function MarketplacePage() {
     setSearchQuery('');
     setSelectedCategory('All');
     setSelectedAppId(appId);
-    const view = apps.find((candidate) => candidate.id === appId);
-    if (view) {
-      const nextSetupAnswers = defaultAnswersFromSchema(view.setupSchema);
-      setSetupAnswers(nextSetupAnswers);
-      setInstallOptions(null);
-      loadInstallPreview(appId, nextSetupAnswers);
-    }
   }
 
   function changeSetupAnswers(nextAnswers: Record<string, unknown>) {
@@ -308,9 +291,7 @@ function MarketplacePage() {
       return;
     }
     setSetupAnswers(nextAnswers);
-    setInstallPlan(null);
-    setInstallPreview(null);
-    loadInstallPreview(selectedApp.id, nextAnswers);
+    setSetupAnswersAppId(selectedApp.id);
   }
 
   function dismissStartHere() {
@@ -326,8 +307,8 @@ function MarketplacePage() {
   if (!selectedApp) {
     return (
       <PageShell>
-        {marketplaceError ? (
-          <PageErrorState message={marketplaceError} onRetry={loadApps} title="Discover catalog could not load" />
+        {discoverError ? (
+          <PageErrorState message={discoverError} onRetry={refreshDiscover} title="Discover catalog could not load" />
         ) : (
           <PageLoadingState label="Loading marketplace" sublabel="Checking the catalog, installed apps, and recent marketplace activity." />
         )}
@@ -341,10 +322,10 @@ function MarketplacePage() {
         appCount={catalogApps.length}
         lastRefreshAt={lastRefreshAt}
         marketplaceActivity={marketplaceActivity}
-        onRefresh={loadApps}
+        onRefresh={refreshDiscover}
       />
 
-      {marketplaceError && <PageErrorState className="mb-5" message={marketplaceError} onRetry={loadApps} title="Discover action needs attention" />}
+      {discoverError && <PageErrorState className="mb-5" message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
       <InstallJobBanner apps={apps} installJob={installJob} selectedAppId={selectedApp.id} />
 
       {showStartHere && (

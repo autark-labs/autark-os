@@ -42,6 +42,8 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 
 ## Story 3: Move Discover Loading And Job Polling Into Repositories
 
+**Status:** Implemented.
+
 **Problem:** Discover still performs page-local loading and manual job polling for install and backup jobs.
 
 **Scope:**
@@ -53,6 +55,8 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 - Discover has no direct `setInterval` or page-local API orchestration for routine data.
 - Install and post-install backup progress survives page refresh.
 - Install completion invalidates Discover, app-state, and activity caches once.
+
+**Implementation Note:** Discover now reads catalog, activity, readiness, install preview, install mutations, post-install backup mutations, durable job recovery, and job progress through `discoverRepository`. The page no longer imports API clients directly or owns `setInterval` job polling.
 
 ## Story 4: Move Home Summary Data Into A Repository
 
