@@ -60,6 +60,24 @@ export function privateAccessSummaryFromState(state) {
   return state?.privateAccessSummary ?? null;
 }
 
+export function setObservedServicePinnedInState(state, serviceId, pinned) {
+  if (!state || !Array.isArray(state.observedServices)) {
+    return state;
+  }
+  const observedServices = state.observedServices.map((service) => {
+    if (service.id !== serviceId) {
+      return service;
+    }
+    return serviceWithPinnedState(service, pinned);
+  });
+  return {
+    ...state,
+    observedServices,
+    pinnedExternalServices: observedServices.filter((service) => service.pinned || service.userStatus === 'pinned_external'),
+    foundServices: observedServices.filter((service) => !service.managedByThisProjectOs && !service.pinned && service.userStatus !== 'pinned_external'),
+  };
+}
+
 function appInstanceToRuntimeView(app) {
   return {
     appId: app.catalogAppId,
@@ -96,6 +114,27 @@ function appInstanceToRuntimeView(app) {
     appConfiguration: [],
     recentEvents: [],
   };
+}
+
+function serviceWithPinnedState(service, pinned) {
+  const next = { ...service, pinned };
+  if (pinned && service.userStatus === 'found_on_server') {
+    return {
+      ...next,
+      userStatus: 'pinned_external',
+      userStatusLabel: 'Pinned',
+      userStatusDescription: 'Pinned to My Apps. Project OS can open it but does not manage its runtime.',
+    };
+  }
+  if (!pinned && service.userStatus === 'pinned_external') {
+    return {
+      ...next,
+      userStatus: 'found_on_server',
+      userStatusLabel: 'Found',
+      userStatusDescription: 'Found on this server.',
+    };
+  }
+  return next;
 }
 
 function accessCheckFromApp(app) {

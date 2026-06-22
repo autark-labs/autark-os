@@ -9,6 +9,7 @@ import {
   managedRuntimeApps,
   observedServices,
   ownershipViews,
+  setObservedServicePinnedInState,
   telemetryByAppId,
 } from './applicationStateRepository.logic.js';
 
@@ -94,6 +95,28 @@ test('only explicit unhealthy or unreachable states need attention', () => {
   assert.equal(appNeedsAttentionFromCanonicalState(unreachableApp, unreachableApp.healthSnapshot, accessByAppId({ runtimeApps: [unreachableApp] }).homepage, unreachableApp.telemetry), true);
 });
 
+test('optimistic pinning updates observed-service cache without dropping recoverable state', () => {
+  const state = {
+    observedServices: [
+      observedService('docker:vaultwarden', 'recoverable', false),
+      observedService('docker:gitlab', 'found_on_server', false),
+    ],
+    pinnedExternalServices: [],
+    foundServices: [],
+  };
+
+  const pinnedRecoverable = setObservedServicePinnedInState(state, 'docker:vaultwarden', true);
+  const pinnedFound = setObservedServicePinnedInState(state, 'docker:gitlab', true);
+  const unpinnedFound = setObservedServicePinnedInState(pinnedFound, 'docker:gitlab', false);
+
+  assert.equal(pinnedRecoverable.observedServices[0].pinned, true);
+  assert.equal(pinnedRecoverable.observedServices[0].userStatus, 'recoverable');
+  assert.deepEqual(pinnedRecoverable.pinnedExternalServices.map((service) => service.id), ['docker:vaultwarden']);
+  assert.equal(pinnedFound.observedServices[1].userStatus, 'pinned_external');
+  assert.equal(unpinnedFound.observedServices[1].pinned, false);
+  assert.equal(unpinnedFound.observedServices[1].userStatus, 'found_on_server');
+});
+
 function runtimeApp(appId, friendlyStatus, healthSnapshot = null) {
   return {
     appId,
@@ -141,5 +164,25 @@ function health(status, localAccessStatus) {
     privateAccessStatus: 'not_configured',
     startupGrace: false,
     checkedAt: updatedAt,
+  };
+}
+
+function observedService(id, userStatus, pinned) {
+  return {
+    id,
+    source: 'docker',
+    displayName: id.split(':')[1],
+    url: 'http://localhost',
+    category: 'External',
+    accessScope: 'LAN',
+    catalogAppId: 'vaultwarden',
+    userStatus,
+    userStatusLabel: userStatus === 'recoverable' ? 'Recoverable' : 'Found',
+    userStatusDescription: userStatus === 'recoverable' ? 'Recoverable Project OS app.' : 'Found on this server.',
+    ownershipState: userStatus === 'recoverable' ? 'legacy_project_os' : 'external_docker',
+    runtimeState: 'running',
+    pinned,
+    managedByThisProjectOs: false,
+    availableActions: [],
   };
 }

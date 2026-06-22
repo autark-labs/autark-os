@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ExternalLink, Pin, RefreshCw, ShieldAlert } from 'lucide-react';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
@@ -7,7 +8,7 @@ import { PageErrorState, PageLoadingState } from '@/components/project-os/PageSt
 import { PageSection, PageShell, SoftCard, StatusPill } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import { applicationStateQueryKey, setObservedServicePinnedInApplicationStateCache, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { toast } from 'sonner';
 import { ObservedServiceDetailsSheet } from '../ApplicationsPage/ObservedServiceDetailsSheet';
@@ -19,6 +20,7 @@ import {
 function ResolveExistingAppsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedServiceId = searchParams.get('service') || searchParams.get('resource');
+  const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
   const [selectedId, setSelectedId] = useState<string | null>(requestedServiceId);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -66,11 +68,13 @@ function ResolveExistingAppsPage() {
 
   async function pinService(service: ObservedServiceView) {
     setBusyId(service.id);
+    const previousApplicationState = queryClient.getQueryData(applicationStateQueryKey);
+    setObservedServicePinnedInApplicationStateCache(queryClient, service.id, true);
     try {
       const result = await ObservedServicesAPIClient.pin(service.id);
       showToast(result.severity, result.title, result.message || `${service.displayName} is pinned to My Apps.`);
-      await appState.refresh();
     } catch (pinError) {
+      queryClient.setQueryData(applicationStateQueryKey, previousApplicationState);
       showToast('error', 'Service could not be pinned', apiErrorMessage(pinError), true);
     } finally {
       setBusyId(null);

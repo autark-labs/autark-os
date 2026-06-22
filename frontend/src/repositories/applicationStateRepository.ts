@@ -12,6 +12,7 @@ import {
   managedRuntimeApps,
   observedServices,
   ownershipViews,
+  setObservedServicePinnedInState,
   telemetryByAppId,
   updatesByAppId,
 } from './applicationStateRepository.logic';
@@ -29,6 +30,7 @@ export {
   managedRuntimeApps,
   observedServices,
   ownershipViews,
+  setObservedServicePinnedInState,
   telemetryByAppId,
   updatesByAppId,
 };
@@ -105,6 +107,10 @@ export function setApplicationStateCache(queryClient: QueryClient, state?: Appli
 
 export function invalidateApplicationState(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: applicationStateQueryKey });
+}
+
+export function setObservedServicePinnedInApplicationStateCache(queryClient: QueryClient, serviceId: string, pinned: boolean) {
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setObservedServicePinnedInState(current, serviceId, pinned));
 }
 
 export function invalidateAppUpdates(queryClient: QueryClient) {

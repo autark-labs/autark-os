@@ -2,6 +2,7 @@ package com.projectos.host;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.Instant;
@@ -57,7 +58,7 @@ class ObservedServiceControllerTests {
     }
 
     @Test
-    void pinRefreshesCachedApplicationState() {
+    void pinSchedulesCachedApplicationStateRefreshWithoutBlocking() {
         InMemoryObservedServiceService service = new InMemoryObservedServiceService();
         service.current = observed("obs_service", "observed", null, null);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
@@ -65,7 +66,8 @@ class ObservedServiceControllerTests {
 
         controller.pin("obs_service");
 
-        verify(applicationStateService).refreshNow();
+        verify(applicationStateService).refreshInBackground();
+        verify(applicationStateService, never()).refreshNow();
     }
 
     private static ObservedService observed(String id, String visibility, Instant pinnedAt, String catalogAppId) {

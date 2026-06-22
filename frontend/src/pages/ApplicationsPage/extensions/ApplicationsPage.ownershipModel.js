@@ -71,7 +71,7 @@ export function observedServicesWithoutOwnership(observedServices = [], ownershi
 
 export function pinnedExternalViewsFromObservedServices(observedServices = []) {
   return observedServices
-    .filter((service) => service.userStatus === 'pinned_external')
+    .filter((service) => service.pinned || service.userStatus === 'pinned_external')
     .map((service) => observedServiceOwnershipView(service));
 }
 

@@ -38,11 +38,12 @@ test('pinnedExternalViewsFromObservedServices includes pinned services without c
   const pinned = pinnedExternalViewsFromObservedServices([
     { id: 'manual:gitlab', displayName: 'gitlab', url: 'http://localhost:2224', category: 'External', accessScope: 'LAN', catalogAppId: null, userStatus: 'pinned_external', userStatusLabel: 'Pinned', userStatusDescription: 'Pinned to My Apps.', availableActions: [] },
     { id: 'docker:uptime-kuma', displayName: 'uptime-kuma', url: 'http://localhost:3001', category: 'External', accessScope: 'LAN', catalogAppId: 'uptime-kuma', userStatus: 'pinned_external', userStatusLabel: 'Pinned', userStatusDescription: 'Pinned to My Apps.', availableActions: [] },
-    { id: 'docker:vaultwarden', displayName: 'vaultwarden', catalogAppId: 'vaultwarden', userStatus: 'recoverable', userStatusLabel: 'Recoverable', userStatusDescription: 'Recoverable.', availableActions: [] },
+    { id: 'docker:vaultwarden', displayName: 'vaultwarden', catalogAppId: 'vaultwarden', userStatus: 'recoverable', userStatusLabel: 'Recoverable', userStatusDescription: 'Recoverable.', pinned: true, availableActions: [] },
   ]);
 
   assert.deepEqual(pinned.map((view) => [view.observedService.id, view.name, view.state]), [
     ['manual:gitlab', 'gitlab', 'pinned_external'],
     ['docker:uptime-kuma', 'uptime-kuma', 'pinned_external'],
+    ['docker:vaultwarden', 'vaultwarden', 'recoverable'],
   ]);
 });

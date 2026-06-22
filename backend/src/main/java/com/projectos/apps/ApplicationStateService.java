@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,6 +94,10 @@ public class ApplicationStateService {
 
     public void invalidate() {
         refreshNow();
+    }
+
+    public void refreshInBackground() {
+        CompletableFuture.runAsync(this::refreshNow);
     }
 
     @Scheduled(
