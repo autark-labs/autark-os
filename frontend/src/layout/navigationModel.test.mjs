@@ -18,12 +18,12 @@ test('advanced navigation separates diagnostics and activity log', () => {
   assert.deepEqual(advancedNavigation.map((item) => item.to), ['/diagnostics', '/activity']);
 });
 
-test('old routes have intentional aliases to MVP routes', () => {
+test('old active concepts have intentional aliases to MVP routes', () => {
   assert.equal(routeAliases['/applications'], '/apps');
   assert.equal(routeAliases['/marketplace'], '/discover');
   assert.equal(routeAliases['/network'], '/access');
-  assert.equal(routeAliases['/devices'], '/access');
-  assert.equal(routeAliases['/updates'], '/apps');
+  assert.equal(routeAliases['/devices'], undefined);
+  assert.equal(routeAliases['/updates'], undefined);
 });
 
 test('primary navigation remains within MVP scope', () => {

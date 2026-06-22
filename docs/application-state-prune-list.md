@@ -12,7 +12,7 @@ Canonical surfaces:
 Prune after consumers are migrated:
 
 - `GET /api/apps` as a user-facing app-list source. Keep lifecycle mutations only until they are moved to an app-instance action namespace.
-- `InstalledAppsAPIClient.listApps()` after Devices, Access, Updates, and Settings no longer need `AppRuntimeView`.
+- `InstalledAppsAPIClient.listApps()` after Access and Settings no longer need `AppRuntimeView`. Devices and standalone Updates pages have been removed.
 - `HostInventoryAPIClient`, `FoundResourcesBanner`, and `frontend/src/types/host.ts`.
 - `HostInventoryController`, `HostInventoryService`, `HostInventoryProvider`, `HostInventoryIgnoreRepository`, `HostResourceActionService`, `HostInventoryResource`, and `DevHostInventoryController`.
 - Host-inventory usage in `SetupStatusService` and `SystemSetupService`; replace with observed-service conflict/recovery state.
