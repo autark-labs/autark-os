@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, Archive, CheckCircle2, Copy, Database, FolderSearch, HardDrive, Info, Loader2, PackageOpen, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
-import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
@@ -14,50 +13,23 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { backupSafetyChecklist } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
+import { useCleanupOrphanMutation, useRuntimeMigrationPlanMutation, useStorageReportRepository } from '@/repositories/storageRepository';
 import type { AppStorageUsage, OrphanedStorage, RuntimeMigrationPlan, StorageRecommendation, StorageReport, StorageUsage } from '@/types/system';
 
 function StoragePage() {
   const { showAdvancedMetrics } = useProjectSettings();
-  const [report, setReport] = useState<StorageReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const storage = useStorageReportRepository();
+  const cleanupOrphanMutation = useCleanupOrphanMutation();
+  const migrationPlanMutation = useRuntimeMigrationPlanMutation();
+  const [actionError, setActionError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<OrphanedStorage | null>(null);
   const [cleanupConfirmation, setCleanupConfirmation] = useState('');
-  const [cleaning, setCleaning] = useState(false);
   const [migrationTarget, setMigrationTarget] = useState('');
   const [migrationPlan, setMigrationPlan] = useState<RuntimeMigrationPlan | null>(null);
-  const [planningMigration, setPlanningMigration] = useState(false);
-
-  async function load(background = false) {
-    if (background) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-    try {
-      setReport(await SystemAPIClient.storage());
-      setUpdatedAt(new Date());
-    } catch (loadError) {
-      setError(apiErrorMessage(loadError, 'Storage data could not be loaded.'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, []);
-
-  useEffect(() => {
-    const interval = window.setInterval(() => void load(true), 30000);
-    return () => window.clearInterval(interval);
-  }, []);
+  const report = storage.report;
+  const error = actionError ?? (storage.error ? apiErrorMessage(storage.error, 'Storage data could not be loaded.') : null);
 
   async function copy(value: string, id: string) {
     await navigator.clipboard.writeText(value);
@@ -69,31 +41,24 @@ function StoragePage() {
     if (!cleanupTarget || cleanupConfirmation !== cleanupTarget.name) {
       return;
     }
-    setCleaning(true);
-    setError(null);
+    setActionError(null);
     setMessage(null);
     try {
-      const result = await SystemAPIClient.cleanupOrphan(cleanupTarget.name);
+      const result = await cleanupOrphanMutation.mutateAsync(cleanupTarget.name);
       setMessage(`${result.message} Safety checkpoint: ${result.safetyCheckpointPath}`);
       setCleanupTarget(null);
       setCleanupConfirmation('');
-      await load(true);
     } catch (cleanupError) {
-      setError(apiErrorMessage(cleanupError, 'Unused data could not be cleaned up.'));
-    } finally {
-      setCleaning(false);
+      setActionError(apiErrorMessage(cleanupError, 'Unused data could not be cleaned up.'));
     }
   }
 
   async function previewMigrationPlan() {
-    setPlanningMigration(true);
-    setError(null);
+    setActionError(null);
     try {
-      setMigrationPlan(await SystemAPIClient.runtimeMigrationPlan({ targetPath: migrationTarget }));
+      setMigrationPlan(await migrationPlanMutation.mutateAsync({ targetPath: migrationTarget }));
     } catch (planError) {
-      setError(apiErrorMessage(planError, 'Runtime migration plan could not be created.'));
-    } finally {
-      setPlanningMigration(false);
+      setActionError(apiErrorMessage(planError, 'Runtime migration plan could not be created.'));
     }
   }
 
@@ -103,7 +68,7 @@ function StoragePage() {
   const storageHero = getStorageHero(report);
   const cleanupCandidates = report?.orphanedData.slice(0, 4) ?? [];
 
-  if (loading) {
+  if (storage.isLoading) {
     return (
       <PageLoadingState label="Checking storage" sublabel="Reading disk space, app data, backups, and cleanup candidates." />
     );
@@ -130,13 +95,13 @@ function StoragePage() {
                 <p className="text-sm font-bold text-white">Space at a glance</p>
                 <p className="mt-1 text-xs text-slate-400">Apps, backups, and free space in one view.</p>
               </div>
-              <RefreshStatus intervalLabel="Auto-updates every 30s" onRefresh={() => void load(true)} refreshing={refreshing} tone="emerald" updatedAt={updatedAt} />
+              <RefreshStatus intervalLabel="Auto-updates every 30s" onRefresh={() => void storage.refresh()} refreshing={storage.isFetching} tone="emerald" updatedAt={storage.updatedAt} />
             </div>
             <DiskCapacityGauge usage={report?.hostDisk ?? null} />
           </div>
         </div>
 
-        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void load(true)} title="Storage data could not refresh" />}
+        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void storage.refresh()} title="Storage data could not refresh" />}
         {message && (
           <div className="border-b border-emerald-300/20 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100">{message}</div>
         )}
@@ -213,8 +178,8 @@ function StoragePage() {
                         placeholder="/mnt/ssd/project-os"
                         value={migrationTarget}
                       />
-                      <Button className="mt-3 w-full border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={planningMigration || !migrationTarget.trim()} onClick={() => void previewMigrationPlan()} size="sm" type="button" variant="outline">
-                        {planningMigration ? <Loader2 className="size-3.5 animate-spin" /> : <Info className="size-3.5" />}
+                      <Button className="mt-3 w-full border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={migrationPlanMutation.isPending || !migrationTarget.trim()} onClick={() => void previewMigrationPlan()} size="sm" type="button" variant="outline">
+                        {migrationPlanMutation.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Info className="size-3.5" />}
                         Preview migration plan
                       </Button>
                     </div>
@@ -246,7 +211,7 @@ function StoragePage() {
       )}
       <CleanupDialog
         confirmation={cleanupConfirmation}
-        loading={cleaning}
+        loading={cleanupOrphanMutation.isPending}
         onChange={setCleanupConfirmation}
         onClose={() => {
           setCleanupTarget(null);

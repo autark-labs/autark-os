@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
-import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
-import { JobsAPIClient } from '@/api/JobsAPIClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  useBackupReportRepository,
+  useProjectOsJobQuery,
+  useRestoreBackupMutation,
+  useRestorePlanMutation,
+  useRunAppBackupMutation,
+  useRunFullBackupMutation,
+  useRunRoutineBackupMutation,
+  useVerifyRestorePointMutation,
+} from '@/repositories/backupRepository';
 import type { AppBackupStatus, BackupReport, RestorePlan, RestorePoint } from '@/types/backup';
 import type { ProjectOsJob } from '@/types/jobs';
 import {
@@ -31,10 +39,6 @@ type RestoreView = 'timeline' | 'list';
 
 function BackupsPage() {
   const { showAdvancedMetrics } = useProjectSettings();
-  const [report, setReport] = useState<BackupReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [restorePlan, setRestorePlan] = useState<RestorePlan | null>(null);
   const [restorePoint, setRestorePoint] = useState<RestorePoint | null>(null);
@@ -45,72 +49,51 @@ function BackupsPage() {
   const [activeJob, setActiveJob] = useState<ProjectOsJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  async function load(background = false) {
-    if (background) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-    try {
-      setReport(await BackupAPIClient.report());
-      setUpdatedAt(new Date());
-    } catch (loadError) {
-      setError(apiErrorMessage(loadError, 'Backup status could not be loaded.'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
+  const backupReport = useBackupReportRepository({ paused: Boolean(restorePoint || running) });
+  const runAppBackupMutation = useRunAppBackupMutation();
+  const runFullBackupMutation = useRunFullBackupMutation();
+  const runRoutineBackupMutation = useRunRoutineBackupMutation();
+  const restorePlanMutation = useRestorePlanMutation();
+  const restoreDetailPlanMutation = useRestorePlanMutation();
+  const restoreBackupMutation = useRestoreBackupMutation();
+  const verifyRestorePointMutation = useVerifyRestorePointMutation();
+  const activeJobQuery = useProjectOsJobQuery(activeJob && !terminalJob(activeJob) ? activeJob.jobId : null);
+  const report = backupReport.report;
+  const pageError = error ?? (backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null);
+  const refreshBackupReport = backupReport.refresh;
 
   useEffect(() => {
-    void load();
-  }, []);
-
-  useEffect(() => {
-    if (restorePoint || running) {
-      return undefined;
-    }
-    const interval = window.setInterval(() => void load(true), 30000);
-    return () => window.clearInterval(interval);
-  }, [restorePoint, running]);
-
-  useEffect(() => {
-    if (!activeJob || terminalJob(activeJob)) {
-      return undefined;
-    }
-    const interval = window.setInterval(async () => {
-      try {
-        const nextJob = await JobsAPIClient.get(activeJob.jobId);
-        setActiveJob(nextJob);
-        if (terminalJob(nextJob)) {
-          if (nextJob.status === 'failed') {
-            setError(nextJob.error?.message || 'Backup job failed.');
-          } else if (nextJob.status === 'succeeded') {
-            setMessage(backupJobCompletedMessage(nextJob));
-          }
-          setRunning(null);
-          await load(true);
+    if (activeJobQuery.data) {
+      setActiveJob(activeJobQuery.data);
+      if (terminalJob(activeJobQuery.data)) {
+        if (activeJobQuery.data.status === 'failed') {
+          setError(activeJobQuery.data.error?.message || 'Backup job failed.');
+        } else if (activeJobQuery.data.status === 'succeeded') {
+          setMessage(backupJobCompletedMessage(activeJobQuery.data));
         }
-      } catch (jobError) {
-        setError(apiErrorMessage(jobError, 'Backup job progress could not be refreshed.'));
         setRunning(null);
+        void refreshBackupReport();
       }
-    }, 1200);
-    return () => window.clearInterval(interval);
-  }, [activeJob]);
+    }
+  }, [activeJobQuery.data, refreshBackupReport]);
+
+  useEffect(() => {
+    if (activeJobQuery.error) {
+      setError(apiErrorMessage(activeJobQuery.error, 'Backup job progress could not be refreshed.'));
+      setRunning(null);
+    }
+  }, [activeJobQuery.error]);
 
   async function runManualAppBackup(app: AppBackupStatus) {
-    await runBackup(`app-${app.appId}`, () => BackupAPIClient.run(app.appId));
+    await runBackup(`app-${app.appId}`, () => runAppBackupMutation.mutateAsync(app.appId));
   }
 
   async function runFullBackup() {
-    await runBackup('full', () => BackupAPIClient.runFull());
+    await runBackup('full', () => runFullBackupMutation.mutateAsync());
   }
 
   async function runRoutineBackup() {
-    await runBackup('routine', () => BackupAPIClient.runRoutine());
+    await runBackup('routine', () => runRoutineBackupMutation.mutateAsync());
   }
 
   async function runBackup(id: string, action: () => Promise<ProjectOsJob>) {
@@ -121,7 +104,7 @@ function BackupsPage() {
       const result = await action();
       setActiveJob(result);
       setMessage(result.status === 'failed' ? result.error?.message || 'Backup could not be started.' : backupJobStartedMessage(result));
-      await load(true);
+      await backupReport.refresh();
     } catch (runError) {
       setError(apiErrorMessage(runError, 'Backup could not be started.'));
       setRunning(null);
@@ -133,7 +116,7 @@ function BackupsPage() {
     setRestorePoint(point);
     setRestoreTargetAppId(appId || null);
     try {
-      setRestorePlan(await BackupAPIClient.restorePlan(point.id, appId));
+      setRestorePlan(await restorePlanMutation.mutateAsync({ restorePointId: point.id, appId }));
     } catch (planError) {
       setRestorePoint(null);
       setRestorePlan(null);
@@ -146,7 +129,7 @@ function BackupsPage() {
     setDetailPoint(point);
     setDetailPlan(null);
     try {
-      setDetailPlan(await BackupAPIClient.restorePlan(point.id));
+      setDetailPlan(await restoreDetailPlanMutation.mutateAsync({ restorePointId: point.id }));
     } catch (planError) {
       console.warn('Restore detail plan could not be loaded.', planError);
     }
@@ -160,13 +143,13 @@ function BackupsPage() {
     setError(null);
     setMessage(null);
     try {
-      const result = await BackupAPIClient.restore(restorePoint.id, restoreTargetAppId);
+      const result = await restoreBackupMutation.mutateAsync({ restorePointId: restorePoint.id, appId: restoreTargetAppId });
       setActiveJob(result);
       setMessage(result.status === 'failed' ? result.error?.message || 'Restore could not be started.' : backupJobStartedMessage(result));
       setRestorePoint(null);
       setRestorePlan(null);
       setRestoreTargetAppId(null);
-      await load(true);
+      await backupReport.refresh();
     } catch (restoreError) {
       setError(apiErrorMessage(restoreError, 'Restore could not be completed.'));
       setRunning(null);
@@ -178,10 +161,10 @@ function BackupsPage() {
     setError(null);
     setMessage(null);
     try {
-      const result = await BackupAPIClient.verify(point.id);
+      const result = await verifyRestorePointMutation.mutateAsync(point.id);
       setActiveJob(result);
       setMessage(result.status === 'failed' ? result.error?.message || 'Verification could not be started.' : backupJobStartedMessage(result));
-      await load(true);
+      await backupReport.refresh();
     } catch (verifyError) {
       setError(apiErrorMessage(verifyError, 'Backup verification could not be completed.'));
       setRunning(null);
@@ -204,7 +187,7 @@ function BackupsPage() {
     routineRestorePoints: RestorePoint[];
   };
 
-  if (loading) {
+  if (backupReport.isLoading) {
     return (
       <PageLoadingState label="Checking backups" sublabel="Loading protection status, restore points, and app backup coverage." />
     );
@@ -229,13 +212,13 @@ function BackupsPage() {
                 {running === 'full' ? <Loader2 className="size-4 animate-spin" /> : <Layers3 className="size-4" />}
                 Full checkpoint
               </Button>}
-              <RefreshStatus intervalLabel={restorePoint || running ? 'Auto-update paused' : 'Auto-updates every 30s'} onRefresh={() => void load(true)} refreshing={refreshing} updatedAt={updatedAt} />
+              <RefreshStatus intervalLabel={restorePoint || running ? 'Auto-update paused' : 'Auto-updates every 30s'} onRefresh={() => void backupReport.refresh()} refreshing={backupReport.isFetching || activeJobQuery.isFetching} updatedAt={backupReport.updatedAt} />
             </div>
           </div>
           <ProtectionPanel latestRestore={latestRestore} report={report} />
         </div>
 
-        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void load(true)} title="Backup status could not refresh" />}
+        {pageError && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={pageError} onRetry={() => void backupReport.refresh()} title="Backup status could not refresh" />}
         {activeJob && !terminalJob(activeJob) && <BackupJobBanner job={activeJob} />}
         {message && <div className="border-b border-emerald-300/20 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100">{message}</div>}
       </SurfaceFrame>

@@ -1,13 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Clock3, Cpu, Database, Download, Filter, HardDrive, HeartPulse, Loader2, MemoryStick, Server, ShieldCheck, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import { ActivityAPIClient } from '@/api/ActivityAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
-import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { MonitoringAPIClient } from '@/api/MonitoringAPIClient';
-import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageErrorState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
@@ -18,6 +14,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { buildAppRemediationFromIssue } from '@/lib/appRemediation';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import { useMonitoringDiagnosticsMutation, useMonitoringRepository } from '@/repositories/monitoringRepository';
 import type { ActivityLog } from '@/types/activity';
 import type { AppReliabilityIssue, AppReliabilitySummary, AppTelemetry } from '@/types/app';
 import type { AppMetricSample, HostMetricSample, MonitoringHistory } from '@/types/monitoring';
@@ -25,13 +22,6 @@ import type { SystemMetrics } from '@/types/system';
 
 const levelFilters = ['all', 'error', 'warning', 'success', 'info'];
 const categoryFilters = ['all', 'install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
-
-type MonitoringState = {
-  activity: ActivityLog[];
-  reliability: AppReliabilitySummary | null;
-  metrics: SystemMetrics | null;
-  history: MonitoringHistory | null;
-};
 
 type ChartPoint = {
   label: string;
@@ -60,55 +50,24 @@ type AppTrendPoint = {
 function MonitoringPage() {
   const { showAdvancedMetrics } = useProjectSettings();
   const appState = useApplicationStateRepository();
-  const [state, setState] = useState<MonitoringState>({ activity: [], reliability: null, metrics: null, history: null });
   const [level, setLevel] = useState('all');
   const [category, setCategory] = useState('all');
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const filters = useMemo(() => ({
     level: level === 'all' ? undefined : level,
     category: category === 'all' ? undefined : category,
     limit: 120,
   }), [category, level]);
-
-  async function load(silent = false) {
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-    try {
-      const [activity, reliability, metrics, history] = await Promise.all([
-        ActivityAPIClient.recent(filters),
-        InstalledAppsAPIClient.reliabilitySummary(),
-        SystemAPIClient.metrics(),
-        MonitoringAPIClient.history(60),
-      ]);
-      setState({ activity, reliability, metrics, history });
-      setUpdatedAt(new Date());
-    } catch (loadError) {
-      setError(apiErrorMessage(loadError, 'Monitoring data could not be loaded.'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
-  useEffect(() => {
-    void load();
-  }, [filters]);
+  const monitoring = useMonitoringRepository(filters);
+  const diagnosticsMutation = useMonitoringDiagnosticsMutation();
+  const error = actionError ?? (monitoring.error ? apiErrorMessage(monitoring.error, 'Monitoring data could not be loaded.') : null);
 
   async function exportDiagnostics() {
-    setExporting(true);
-    setError(null);
+    setActionError(null);
     try {
-      const diagnostics = await MonitoringAPIClient.diagnostics(60);
+      const diagnostics = await diagnosticsMutation.mutateAsync(60);
       const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -119,27 +78,18 @@ function MonitoringPage() {
       link.remove();
       URL.revokeObjectURL(url);
     } catch (exportError) {
-      setError(apiErrorMessage(exportError, 'Monitoring diagnostics could not be exported.'));
-    } finally {
-      setExporting(false);
+      setActionError(apiErrorMessage(exportError, 'Monitoring diagnostics could not be exported.'));
     }
   }
 
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      void load(true);
-    }, 5000);
-    return () => window.clearInterval(interval);
-  }, [filters]);
-
-  const recentFailures = state.activity.filter((event) => event.level === 'error' || event.outcome === 'failed');
-  const recentFixes = state.activity.filter((event) => event.category === 'repair' && event.level === 'success');
-  const reliability = state.reliability;
-  const categoryData = useMemo(() => buildCategoryData(state.activity), [state.activity]);
-  const levelData = useMemo(() => buildLevelData(state.activity), [state.activity]);
+  const recentFailures = monitoring.activity.filter((event) => event.level === 'error' || event.outcome === 'failed');
+  const recentFixes = monitoring.activity.filter((event) => event.category === 'repair' && event.level === 'success');
+  const reliability = monitoring.reliability;
+  const categoryData = useMemo(() => buildCategoryData(monitoring.activity), [monitoring.activity]);
+  const levelData = useMemo(() => buildLevelData(monitoring.activity), [monitoring.activity]);
   const resourceData = useMemo(() => buildResourceData(appState.telemetryByAppId), [appState.telemetryByAppId]);
-  const hostTrendData = useMemo(() => buildHostTrendData(state.history?.hostSamples ?? []), [state.history]);
-  const appTrendData = useMemo(() => buildAppTrendData(state.history?.appSamples ?? []), [state.history]);
+  const hostTrendData = useMemo(() => buildHostTrendData(monitoring.history?.hostSamples ?? []), [monitoring.history]);
+  const appTrendData = useMemo(() => buildAppTrendData(monitoring.history?.appSamples ?? []), [monitoring.history]);
   const highlightedIssue = reliability?.issues[0] ?? null;
 
   return (
@@ -155,22 +105,22 @@ function MonitoringPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {showAdvancedMetrics && <Button className="border-violet-300/20 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20" disabled={exporting} onClick={() => void exportDiagnostics()} type="button" variant="outline">
-                {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+              {showAdvancedMetrics && <Button className="border-violet-300/20 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20" disabled={diagnosticsMutation.isPending} onClick={() => void exportDiagnostics()} type="button" variant="outline">
+                {diagnosticsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
                 Export diagnostics
               </Button>}
-              <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([load(true), appState.refresh()])} refreshing={refreshing || appState.isFetching} tone="violet" updatedAt={appState.updatedAt ?? updatedAt} />
+              <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])} refreshing={monitoring.isFetching || appState.isFetching} tone="violet" updatedAt={appState.updatedAt ?? monitoring.updatedAt} />
             </div>
           </div>
         </div>
 
-        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void load(true)} title="Monitoring data could not refresh" />}
+        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void monitoring.refresh()} title="Monitoring data could not refresh" />}
 
         <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
           <SignalCard
             icon={postureIcon(reliability?.posture)}
             label="System posture"
-            value={reliability?.headline || (loading ? 'Checking' : 'No apps yet')}
+            value={reliability?.headline || (monitoring.isLoading ? 'Checking' : 'No apps yet')}
             detail={reliability?.summary || 'Project OS will summarize app stability here.'}
             tone={postureTone(reliability?.posture)}
           />
@@ -198,7 +148,7 @@ function MonitoringPage() {
         </div>
       </SurfaceFrame>
 
-      <SystemActivitySummary highlightedIssue={highlightedIssue} recentFixes={recentFixes} recentEvents={state.activity.slice(0, 5)} reliability={reliability} />
+      <SystemActivitySummary highlightedIssue={highlightedIssue} recentFixes={recentFixes} recentEvents={monitoring.activity.slice(0, 5)} reliability={reliability} />
 
       {showAdvancedMetrics && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
@@ -208,9 +158,9 @@ function MonitoringPage() {
             reliability={reliability}
             resourceData={resourceData}
             appTrendData={appTrendData}
-            history={state.history}
+            history={monitoring.history}
           />
-          <DeviceInstrumentationPanel hostTrendData={hostTrendData} history={state.history} metrics={state.metrics} />
+          <DeviceInstrumentationPanel hostTrendData={hostTrendData} history={monitoring.history} metrics={monitoring.metrics} />
         </div>
       )}
 
@@ -224,7 +174,7 @@ function MonitoringPage() {
               </div>
               <p className="mt-1 text-sm text-slate-400">{showAdvancedMetrics ? 'Install progress, health checks, repairs, private access changes, and backend warnings.' : 'The latest visible work Project OS has done for apps, backups, access, and repairs.'}</p>
             </div>
-            <Badge className="border-slate-700 bg-slate-900 text-slate-300">{state.activity.length} events</Badge>
+            <Badge className="border-slate-700 bg-slate-900 text-slate-300">{monitoring.activity.length} events</Badge>
           </div>
 
           {showAdvancedMetrics && <SurfaceInset className="mt-5 grid gap-3">
@@ -237,10 +187,10 @@ function MonitoringPage() {
           </SurfaceInset>}
 
           <div className="mt-5 max-h-[680px] space-y-3 overflow-y-auto pr-2 [scrollbar-color:rgba(139,92,246,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
-            {loading ? (
+            {monitoring.isLoading ? (
               <EmptyState title="Loading activity" message="Project OS is checking recent events." />
-            ) : state.activity.length ? (
-              state.activity.map((event) => (
+            ) : monitoring.activity.length ? (
+              monitoring.activity.map((event) => (
                 <ActivityRow
                   event={event}
                   expanded={expandedId === event.id}
