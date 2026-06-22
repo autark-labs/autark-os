@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
@@ -7,7 +7,6 @@ import { PageErrorState, PageLoadingState } from '@/components/project-os/PageSt
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import {
@@ -16,10 +15,15 @@ import {
   setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
+import {
+  invalidateNetworkQueries,
+  useAccessNetworkRepository,
+  useRemoveStalePrivateAccessMutation,
+} from '@/repositories/networkRepository';
 import { toast } from 'sonner';
 import type { AppRuntimeView } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
-import type { NetworkDiagnosticsReport, PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleConnectGuide, TailscaleDevice, TailscaleStatus } from '@/types/network';
+import type { PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleStatus } from '@/types/network';
 import { HostSetupPanel } from './HostSetupPanel';
 import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';
@@ -39,78 +43,40 @@ function NetworkPage() {
   const { showAdvancedMetrics } = useProjectSettings();
   const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
-  const [tailscale, setTailscale] = useState<TailscaleStatus | null>(null);
-  const [guide, setGuide] = useState<TailscaleConnectGuide | null>(null);
-  const [tailnetDevices, setTailnetDevices] = useState<TailscaleDevice[]>([]);
-  const [diagnostics, setDiagnostics] = useState<NetworkDiagnosticsReport | null>(null);
-  const [reconciliation, setReconciliation] = useState<PrivateAccessReconciliationReport | null>(null);
-  const [setupStatus, setSetupStatus] = useState<SystemSetupStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const network = useAccessNetworkRepository();
+  const removeStalePrivateAccess = useRemoveStalePrivateAccessMutation();
+  const [actionError, setActionError] = useState<string | null>(null);
   const [copiedAppId, setCopiedAppId] = useState<string | null>(null);
   const [appActionLoading, setAppActionLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const apps = appState.apps;
   const observedServices = appState.observedServices;
-  const pageLoading = loading || appState.isLoading;
-  const pageRefreshing = refreshing || appState.isFetching;
-
-  const loadNetwork = useCallback(async ({ background = false } = {}) => {
-    if (!background) {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
-    setError(null);
-    try {
-      const [status, devices, diagnosticsReport, connectGuide, hostSetup, reconciliationReport] = await Promise.all([
-        NetworkAPIClient.tailscaleStatus(),
-        NetworkAPIClient.tailscaleDevices(),
-        NetworkAPIClient.diagnostics(),
-        NetworkAPIClient.connectGuide(),
-        NetworkAPIClient.setupStatus(),
-        NetworkAPIClient.privateAccessReconciliation(),
-      ]);
-      setTailscale(status);
-      setTailnetDevices(devices);
-      setDiagnostics(diagnosticsReport);
-      setReconciliation(reconciliationReport);
-      setGuide(connectGuide);
-      setSetupStatus(hostSetup);
-      setUpdatedAt(new Date());
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Unable to load network status.'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadNetwork();
-    const interval = window.setInterval(() => loadNetwork({ background: true }), 5000);
-    return () => window.clearInterval(interval);
-  }, [loadNetwork]);
+  const pageLoading = network.isLoading || appState.isLoading;
+  const pageRefreshing = network.isFetching || appState.isFetching;
+  const pageError = actionError ?? (network.error ? apiErrorMessage(network.error, 'Unable to load network status.') : null);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
-      loadNetwork({ background: true }),
+      network.refresh(),
       appState.refresh(),
     ]);
-  }, [appState, loadNetwork]);
+  }, [appState, network]);
 
   const privateApps = useMemo(() => apps.filter((app) => app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private' || app.settings?.tailscaleEnabled), [apps]);
-  const runningApps = useMemo(() => apps.filter((app) => app.friendlyStatus === 'Ready'), [apps]);
-  const devices = useMemo(() => buildDeviceViews(tailscale, tailnetDevices), [tailnetDevices, tailscale]);
-  const exposureGroups = useMemo(() => buildAppExposureGroups(apps, tailscale, reconciliation), [apps, reconciliation, tailscale]);
+  const devices = useMemo(() => buildDeviceViews(network.tailscale, network.tailnetDevices), [network.tailnetDevices, network.tailscale]);
+  const exposureGroups = useMemo(() => buildAppExposureGroups(apps, network.tailscale, network.reconciliation), [apps, network.reconciliation, network.tailscale]);
   const pinnedExternalServices = useMemo(() => observedServices.filter((service) => service.userStatus === 'pinned_external'), [observedServices]);
   const accessZones = useMemo(() => buildAccessZones(exposureGroups, pinnedExternalServices), [exposureGroups, pinnedExternalServices]);
-  const posture = useMemo(() => buildNetworkPosture({ devices, diagnostics, privateApps, reconciliation, tailscale }), [devices, diagnostics, privateApps, reconciliation, tailscale]);
-  const issues = useMemo(() => buildNetworkIssues(diagnostics, reconciliation), [diagnostics, reconciliation]);
-  const privateAppAccess = useMemo(() => buildPrivateAppAccess(privateApps, tailscale, reconciliation), [privateApps, reconciliation, tailscale]);
+  const posture = useMemo(() => buildNetworkPosture({
+    devices,
+    diagnostics: network.diagnostics,
+    privateApps,
+    reconciliation: network.reconciliation,
+    tailscale: network.tailscale,
+  }), [devices, network.diagnostics, network.reconciliation, network.tailscale, privateApps]);
+  const issues = useMemo(() => buildNetworkIssues(network.diagnostics, network.reconciliation), [network.diagnostics, network.reconciliation]);
+  const privateAppAccess = useMemo(() => buildPrivateAppAccess(privateApps, network.tailscale, network.reconciliation), [network.reconciliation, network.tailscale, privateApps]);
   const defaultTab = posture.counts.issues > 0 ? 'issues' : 'private-apps';
   const selectedTab = !showAdvancedMetrics && activeTab && !['private-apps', 'issues'].includes(activeTab) ? defaultTab : activeTab ?? defaultTab;
 
@@ -125,7 +91,7 @@ function NetworkPage() {
   const updatePrivateAccess = useCallback(async (app: AppRuntimeView, enabled: boolean) => {
     const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
     setAppActionLoading(app.appId);
-    setError(null);
+    setActionError(null);
     setRuntimeAppInApplicationStateCache(queryClient, appWithOptimisticPrivateAccess(app, enabled));
     try {
       const result = enabled
@@ -136,29 +102,29 @@ function NetworkPage() {
       } else {
         void invalidateApplicationState(queryClient);
       }
-      void loadNetwork({ background: true });
+      void invalidateNetworkQueries(queryClient);
     } catch (err) {
       queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
       const message = apiErrorMessage(err, 'Unable to update private access for this app.');
-      setError(message);
+      setActionError(message);
       toast.error('Private access update failed', { description: message, duration: Infinity });
     } finally {
       setAppActionLoading(null);
     }
-  }, [loadNetwork, queryClient]);
+  }, [queryClient]);
 
   const removeStaleMapping = useCallback(async (port: number) => {
     setAppActionLoading(`stale-${port}`);
-    setError(null);
+    setActionError(null);
     try {
-      await NetworkAPIClient.removeStalePrivateAccess(port);
+      await removeStalePrivateAccess.mutateAsync(port);
       await refreshAll();
     } catch (err) {
-      setError(apiErrorMessage(err, 'Unable to remove this stale private link.'));
+      setActionError(apiErrorMessage(err, 'Unable to remove this stale private link.'));
     } finally {
       setAppActionLoading(null);
     }
-  }, [refreshAll]);
+  }, [refreshAll, removeStalePrivateAccess]);
 
   return (
     <PageShell>
@@ -167,18 +133,18 @@ function NetworkPage() {
           <h2 className="text-2xl font-bold leading-none text-white md:text-3xl">Access</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">Open local links, review private Tailscale links, and fix access issues from one place.</p>
         </div>
-        <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} updatedAt={appState.updatedAt ?? updatedAt} />
+        <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} updatedAt={appState.updatedAt ?? network.updatedAt} />
       </header>
 
-      {error && <PageErrorState message={error} onRetry={() => loadNetwork({ background: false })} title="Access status could not load" />}
+      {pageError && <PageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
 
       {pageLoading ? (
         <PageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : (
         <>
-          <TailscaleAccessCard posture={posture} setup={setupStatus} tailscale={tailscale} />
+          <TailscaleAccessCard posture={posture} setup={network.setupStatus} tailscale={network.tailscale} />
           <AccessZoneDiagram zones={accessZones} />
-          <PrivateAccessSetupPath reconciliation={reconciliation} setup={setupStatus} tailscale={tailscale} />
+          <PrivateAccessSetupPath reconciliation={network.reconciliation} setup={network.setupStatus} tailscale={network.tailscale} />
           <Tabs className="gap-5" onValueChange={setActiveTab} value={selectedTab}>
             <TabsList className="w-full justify-start overflow-x-auto border-b border-slate-700/30 bg-transparent p-0" variant="line">
               <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="private-apps">Private app links</TabsTrigger>
@@ -197,8 +163,8 @@ function NetworkPage() {
                 onRepairPrivateAccess={(app) => updatePrivateAccess(app, true)}
                 onTurnOffPrivateAccess={(app) => updatePrivateAccess(app, false)}
                 privateAppAccess={privateAppAccess}
-                reconciliation={reconciliation}
-                tailscale={tailscale}
+                reconciliation={network.reconciliation}
+                tailscale={network.tailscale}
               />
             </TabsContent>
             <TabsContent value="issues">
@@ -209,8 +175,8 @@ function NetworkPage() {
             </TabsContent>}
             {showAdvancedMetrics && <TabsContent value="advanced">
               <div className="grid gap-5">
-                <HostSetupPanel setup={setupStatus} />
-                <NetworkAdvancedPanel diagnostics={diagnostics} guide={guide} tailscale={tailscale} />
+                <HostSetupPanel setup={network.setupStatus} />
+                <NetworkAdvancedPanel diagnostics={network.diagnostics} guide={network.guide} tailscale={network.tailscale} />
               </div>
             </TabsContent>}
           </Tabs>
