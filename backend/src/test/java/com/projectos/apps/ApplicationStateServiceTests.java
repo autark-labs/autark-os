@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
@@ -119,6 +120,84 @@ class ApplicationStateServiceTests {
                 .containsExactly("vaultwarden");
     }
 
+    @Test
+    void backgroundRefreshUsesProvidedExecutorInsteadOfRunningInline() {
+        AtomicInteger managedCalls = new AtomicInteger();
+        RecordingExecutor executor = new RecordingExecutor();
+        ApplicationStateService service = new ApplicationStateService(
+                () -> {
+                    managedCalls.incrementAndGet();
+                    return List.of(appInstance());
+                },
+                List::of,
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                executor);
+
+        service.refreshInBackground();
+
+        assertThat(executor.tasks).hasSize(1);
+        assertThat(managedCalls).hasValue(0);
+
+        executor.runNext();
+
+        assertThat(managedCalls).hasValue(1);
+        assertThat(service.snapshot().refreshStatus()).isEqualTo("idle");
+    }
+
+    @Test
+    void backgroundRefreshRequestsCoalesceWhileQueued() {
+        AtomicInteger managedCalls = new AtomicInteger();
+        RecordingExecutor executor = new RecordingExecutor();
+        ApplicationStateService service = new ApplicationStateService(
+                () -> {
+                    managedCalls.incrementAndGet();
+                    return List.of(appInstance());
+                },
+                List::of,
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                executor);
+
+        service.refreshInBackground();
+        service.refreshInBackground();
+        service.refreshInBackground();
+
+        assertThat(executor.tasks).hasSize(1);
+
+        executor.runNext();
+
+        assertThat(managedCalls).hasValue(1);
+    }
+
+    @Test
+    void backgroundRefreshMarksCachedProjectionAsRunningWhileQueued() {
+        RecordingExecutor executor = new RecordingExecutor();
+        ApplicationStateService service = new ApplicationStateService(
+                () -> List.of(appInstance()),
+                List::of,
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                executor);
+        ApplicationState previous = service.refreshNow();
+
+        service.refreshInBackground();
+
+        ApplicationState queued = service.snapshot();
+        assertThat(queued.managedApps()).isEqualTo(previous.managedApps());
+        assertThat(queued.refreshStatus()).isEqualTo("running");
+        assertThat(queued.stale()).isTrue();
+        assertThat(queued.refreshStartedAt()).isEqualTo(Instant.parse("2026-06-21T12:00:00Z"));
+
+        executor.runNext();
+
+        assertThat(service.snapshot().refreshStatus()).isEqualTo("idle");
+        assertThat(service.snapshot().stale()).isFalse();
+    }
+
     private ObservedServiceScanner noScan() {
         return new ObservedServiceScanner(List::of, () -> new com.projectos.system.ProjectOsIdentity("", "project-os", "", "", Instant.EPOCH, 1));
     }
@@ -208,5 +287,18 @@ class ApplicationStateServiceTests {
         ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
         return new RuntimeLayout(properties);
+    }
+
+    private static final class RecordingExecutor implements java.util.concurrent.Executor {
+        private final List<Runnable> tasks = new ArrayList<>();
+
+        @Override
+        public void execute(Runnable command) {
+            tasks.add(command);
+        }
+
+        private void runNext() {
+            tasks.removeFirst().run();
+        }
     }
 }

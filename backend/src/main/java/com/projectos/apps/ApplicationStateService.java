@@ -3,10 +3,15 @@ package com.projectos.apps;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+
+import jakarta.annotation.PreDestroy;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -30,8 +35,11 @@ public class ApplicationStateService {
     private final ObservedServiceService observedServiceService;
     private final AppOwnershipService appOwnershipService;
     private final Supplier<Instant> clock;
+    private final Executor backgroundRefreshExecutor;
+    private final ThreadPoolExecutor ownedBackgroundRefreshExecutor;
     private final AtomicReference<ApplicationState> cached;
     private final AtomicBoolean refreshRunning = new AtomicBoolean(false);
+    private final AtomicBoolean backgroundRefreshQueued = new AtomicBoolean(false);
 
     @Autowired
     public ApplicationStateService(
@@ -39,7 +47,14 @@ public class ApplicationStateService {
             AppLifecycleService appLifecycleService,
             ObservedServiceService observedServiceService,
             AppOwnershipService appOwnershipService) {
-        this(appInstanceViewProvider::list, appLifecycleService::listApps, observedServiceService, appOwnershipService, Instant::now);
+        this(
+                appInstanceViewProvider::list,
+                appLifecycleService::listApps,
+                observedServiceService,
+                appOwnershipService,
+                Instant::now,
+                defaultBackgroundRefreshExecutor(),
+                true);
     }
 
     public ApplicationStateService(
@@ -48,11 +63,34 @@ public class ApplicationStateService {
             ObservedServiceService observedServiceService,
             AppOwnershipService appOwnershipService,
             Supplier<Instant> clock) {
+        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, Runnable::run, false);
+    }
+
+    public ApplicationStateService(
+            Supplier<List<AppInstanceView>> managedApps,
+            Supplier<List<AppRuntimeView>> runtimeApps,
+            ObservedServiceService observedServiceService,
+            AppOwnershipService appOwnershipService,
+            Supplier<Instant> clock,
+            Executor backgroundRefreshExecutor) {
+        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, backgroundRefreshExecutor, false);
+    }
+
+    private ApplicationStateService(
+            Supplier<List<AppInstanceView>> managedApps,
+            Supplier<List<AppRuntimeView>> runtimeApps,
+            ObservedServiceService observedServiceService,
+            AppOwnershipService appOwnershipService,
+            Supplier<Instant> clock,
+            Executor backgroundRefreshExecutor,
+            boolean ownsBackgroundRefreshExecutor) {
         this.managedApps = managedApps;
         this.runtimeApps = runtimeApps;
         this.observedServiceService = observedServiceService;
         this.appOwnershipService = appOwnershipService;
         this.clock = clock;
+        this.backgroundRefreshExecutor = backgroundRefreshExecutor;
+        this.ownedBackgroundRefreshExecutor = ownsBackgroundRefreshExecutor && backgroundRefreshExecutor instanceof ThreadPoolExecutor executor ? executor : null;
         Instant now = clock.get();
         this.cached = new AtomicReference<>(new ApplicationState(
                 List.of(),
@@ -97,7 +135,34 @@ public class ApplicationStateService {
     }
 
     public void refreshInBackground() {
-        CompletableFuture.runAsync(this::refreshNow);
+        if (!backgroundRefreshQueued.compareAndSet(false, true)) {
+            return;
+        }
+        Instant startedAt = clock.get();
+        cached.set(markRunning(cached.get(), startedAt));
+        try {
+            backgroundRefreshExecutor.execute(() -> {
+                try {
+                    refreshNow();
+                } finally {
+                    backgroundRefreshQueued.set(false);
+                }
+            });
+        } catch (RuntimeException exception) {
+            try {
+                cached.set(markFailed(cached.get(), startedAt, exception));
+            } finally {
+                backgroundRefreshQueued.set(false);
+            }
+            throw exception;
+        }
+    }
+
+    @PreDestroy
+    public void shutdownBackgroundRefreshExecutor() {
+        if (ownedBackgroundRefreshExecutor != null) {
+            ownedBackgroundRefreshExecutor.shutdownNow();
+        }
     }
 
     @Scheduled(
@@ -156,11 +221,45 @@ public class ApplicationStateService {
                 completedAt.plus(SNAPSHOT_REFRESH_INTERVAL));
     }
 
+    private ApplicationState markRunning(ApplicationState previous, Instant startedAt) {
+        return new ApplicationState(
+                previous.managedApps(),
+                previous.runtimeApps(),
+                previous.observedServices(),
+                previous.pinnedExternalServices(),
+                previous.foundServices(),
+                previous.ownershipViews(),
+                previous.updatedAt(),
+                "running",
+                startedAt,
+                previous.refreshCompletedAt(),
+                true,
+                "",
+                previous.nextRefreshAt());
+    }
+
     private List<ObservedService> refreshObservedServices() {
         if (observedServiceService == null) {
             return List.of();
         }
         observedServiceService.refresh();
         return observedServiceService.observedServices();
+    }
+
+    private static ThreadPoolExecutor defaultBackgroundRefreshExecutor() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                1,
+                1,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(1),
+                runnable -> {
+                    Thread thread = new Thread(runnable, "project-os-app-state-refresh");
+                    thread.setDaemon(true);
+                    return thread;
+                },
+                new ThreadPoolExecutor.AbortPolicy());
+        executor.prestartAllCoreThreads();
+        return executor;
     }
 }
