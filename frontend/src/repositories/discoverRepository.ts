@@ -11,6 +11,7 @@ import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types
 import { invalidateApplicationState } from './applicationStateRepository';
 import { invalidateBackupQueries } from './backupRepository';
 import { latestActiveDiscoverJob } from './discoverRepository.logic';
+import { useSystemDoctorQuery } from './systemRepository';
 
 export { latestActiveDiscoverJob };
 
@@ -55,16 +56,13 @@ export function useMarketplaceActivityQuery() {
 }
 
 export function useDiscoverReadinessQuery() {
-  return useQuery<DiscoverReadiness>({
+  const doctorQuery = useSystemDoctorQuery();
+  const readinessQuery = useQuery<Omit<DiscoverReadiness, 'doctor'>>({
     queryKey: discoverQueryKeys.readiness,
     queryFn: async () => {
-      const [onboarding, doctor, storage] = await Promise.all([
+      const [onboarding, storage] = await Promise.all([
         SystemAPIClient.onboarding().catch((error) => {
           console.warn('Unable to load starter app recommendations.', error);
-          return null;
-        }),
-        SystemAPIClient.doctor().catch((error) => {
-          console.warn('Unable to load install readiness.', error);
           return null;
         }),
         SystemAPIClient.storage().catch((error) => {
@@ -72,11 +70,26 @@ export function useDiscoverReadinessQuery() {
           return null;
         }),
       ]);
-      return { doctor, onboarding, storage };
+      return { onboarding, storage };
     },
     refetchInterval: 30_000,
     staleTime: 30_000,
   });
+  return {
+    ...readinessQuery,
+    data: {
+      doctor: doctorQuery.data ?? null,
+      onboarding: readinessQuery.data?.onboarding ?? null,
+      storage: readinessQuery.data?.storage ?? null,
+    },
+    error: readinessQuery.error ?? doctorQuery.error,
+    isFetching: readinessQuery.isFetching || doctorQuery.isFetching,
+    isLoading: readinessQuery.isLoading || doctorQuery.isLoading,
+    refetch: async () => {
+      const [readiness] = await Promise.all([readinessQuery.refetch(), doctorQuery.refetch()]);
+      return readiness;
+    },
+  };
 }
 
 export function useDiscoverInstallPreviewQuery(appId: string | null, answers: Record<string, unknown>, enabled = true) {

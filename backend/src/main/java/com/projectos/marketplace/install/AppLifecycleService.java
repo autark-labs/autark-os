@@ -60,6 +60,7 @@ public class AppLifecycleService {
     private final ActivityLogService activityLogService;
     private final BackupRepository backupRepository;
     private final AppInstanceViewProvider appInstanceViewProvider;
+    private final AppTelemetryService appTelemetryService;
     private final AppRuntimeStatusResolver runtimeStatusResolver = new AppRuntimeStatusResolver();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(ACCESS_CHECK_TIMEOUT)
@@ -67,7 +68,7 @@ public class AppLifecycleService {
             .build();
 
     @Autowired
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppInstanceViewProvider appInstanceViewProvider) {
+    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppInstanceViewProvider appInstanceViewProvider, AppTelemetryService appTelemetryService) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -79,6 +80,11 @@ public class AppLifecycleService {
         this.activityLogService = activityLogService;
         this.backupRepository = backupRepository;
         this.appInstanceViewProvider = appInstanceViewProvider;
+        this.appTelemetryService = appTelemetryService;
+    }
+
+    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppInstanceViewProvider appInstanceViewProvider) {
+        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appInstanceViewProvider, new AppTelemetryService(composeExecutor));
     }
 
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository) {
@@ -126,30 +132,11 @@ public class AppLifecycleService {
     }
 
     public AppTelemetry telemetry(String appId) {
-        InstalledApp app = installedApp(appId);
-        List<DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
-        return telemetry(containers);
+        return appTelemetryService.telemetry(installedApp(appId));
     }
 
     public Map<String, AppTelemetry> telemetry() {
-        Map<String, List<String>> containerNamesByAppId = new LinkedHashMap<>();
-        for (InstalledApp app : managedInstalledApps()) {
-            List<String> names = runtimeStatusResolver.containerNames(composeExecutor.containers(composeFile(app), app.composeProject()));
-            containerNamesByAppId.put(app.appId(), names);
-        }
-        List<String> containerNames = containerNamesByAppId.values().stream()
-                .flatMap(List::stream)
-                .toList();
-        Map<String, ContainerTelemetry> telemetryByContainerName = new LinkedHashMap<>();
-        for (ContainerTelemetry telemetry : composeExecutor.stats(containerNames)) {
-            telemetryByContainerName.put(telemetry.containerName(), telemetry);
-        }
-        Map<String, AppTelemetry> telemetryByAppId = new LinkedHashMap<>();
-        containerNamesByAppId.forEach((appId, names) -> telemetryByAppId.put(appId, AppTelemetry.from(names.stream()
-                .map(telemetryByContainerName::get)
-                .filter(java.util.Objects::nonNull)
-                .toList())));
-        return telemetryByAppId;
+        return appTelemetryService.telemetryForApps(managedInstalledApps());
     }
 
     public Map<String, AppAccessCheck> accessChecks() {
@@ -1101,7 +1088,7 @@ public class AppLifecycleService {
     }
 
     private AppTelemetry telemetry(List<DockerContainerStatus> containers) {
-        return AppTelemetry.from(composeExecutor.stats(runtimeStatusResolver.containerNames(containers)));
+        return appTelemetryService.telemetryForContainers(containers);
     }
 
     private AppAccessCheck accessCheck(String appId, String accessUrl) {

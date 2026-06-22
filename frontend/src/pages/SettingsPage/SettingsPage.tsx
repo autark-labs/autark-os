@@ -53,6 +53,7 @@ import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { poButtonClass, poCardClass, poNavItemClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import { useSystemDoctorQuery } from '@/repositories/systemRepository';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
 import { shouldApplyProjectSettingsToApps } from './SettingsPage.logic';
@@ -160,6 +161,7 @@ const settingHelp: Record<string, SettingHelp> = {
 function SettingsPage() {
   const { setProjectSettings } = useProjectSettings();
   const appState = useApplicationStateRepository();
+  const doctorQuery = useSystemDoctorQuery();
   const [activeGroup, setActiveGroup] = useState<SettingsGroupId>('general');
   const [state, setState] = useState<SettingsState>({ backupRoot: null, doctor: null, metrics: null, projectSettings: null, setup: null, version: null });
   const [draft, setDraft] = useState<ProjectSettings | null>(null);
@@ -178,18 +180,17 @@ function SettingsPage() {
     }
     setError(null);
     try {
-      const [setup, metrics, projectSettings, version, doctor, backupReport] = await Promise.all([
+      const [setup, metrics, projectSettings, version, backupReport] = await Promise.all([
         SystemAPIClient.setupStatus(),
         SystemAPIClient.metrics(),
         SystemAPIClient.settings(),
         SystemAPIClient.version(),
-        SystemAPIClient.doctor(),
         BackupAPIClient.report().catch((backupError) => {
           console.warn('Unable to load backup destination for Settings.', backupError);
           return null;
         }),
       ]);
-      setState({ backupRoot: backupReport?.backupRoot ?? null, doctor, metrics, projectSettings, setup, version });
+      setState((current) => ({ ...current, backupRoot: backupReport?.backupRoot ?? null, metrics, projectSettings, setup, version }));
       setDraft(projectSettings);
     } catch (loadError) {
       setError(apiErrorMessage(loadError, 'Settings could not be loaded.'));
@@ -209,6 +210,7 @@ function SettingsPage() {
   const activeGroupMeta = topLevelSettingsGroups.find((group) => group.id === activeGroupId) || topLevelSettingsGroups[0];
   const ActiveGroupIcon = groupIcons[activeGroupId];
   const dirty = Boolean(draft && state.projectSettings && JSON.stringify(draft) !== JSON.stringify(state.projectSettings));
+  const doctor = doctorQuery.data ?? state.doctor;
 
   async function copy(value: string, id: string) {
     await navigator.clipboard.writeText(value);
@@ -264,7 +266,7 @@ function SettingsPage() {
           <Badge className={cn('border', dirty ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
             {dirty ? 'Unsaved changes' : 'Saved'}
           </Badge>
-          <Button className={poButtonClass('quiet')} disabled={refreshing} onClick={() => void load(true)} type="button" variant="outline">
+          <Button className={poButtonClass('quiet')} disabled={refreshing} onClick={() => { void load(true); void doctorQuery.refetch(); }} type="button" variant="outline">
             <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
             Refresh
           </Button>
@@ -281,7 +283,7 @@ function SettingsPage() {
         </div>
       </header>
 
-      {error && <PageErrorState message={error} onRetry={() => void load(true)} title="Settings could not refresh" />}
+      {error && <PageErrorState message={error} onRetry={() => { void load(true); void doctorQuery.refetch(); }} title="Settings could not refresh" />}
       {message && <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{message}</div>}
 
       <nav className={cn(surfacePanelClass, 'grid gap-2 bg-slate-950/55 p-2 sm:grid-cols-2 xl:grid-cols-4')}>
@@ -326,7 +328,7 @@ function SettingsPage() {
                 apps={appState.apps}
                 backupRoot={state.backupRoot}
                 copied={copied}
-                doctor={state.doctor}
+                doctor={doctor}
                 draft={draft}
                 key={sectionId}
                 metrics={state.metrics}

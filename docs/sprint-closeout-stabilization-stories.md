@@ -78,6 +78,8 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 
 ## Story 5: Consolidate Modal Telemetry And Shell Doctor Polling
 
+**Status:** Implemented.
+
 **Problem:** The app management modal and shell header still own direct polling loops, duplicating query cache behavior.
 
 **Scope:**
@@ -90,7 +92,11 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 - Modal telemetry polling stops when the modal closes.
 - Header, Settings, and Discover use compatible doctor cache keys.
 
+**Implementation Note:** Shell doctor status now uses `systemRepository` with a shared `['system', 'doctor']` query key. Discover readiness and Settings reuse that doctor query. App management modal telemetry now uses `appManagementRepository`, keyed by app id and modal open state, so telemetry polling stops when the dialog closes.
+
 ## Story 6: Split The Largest Files Along Stable Boundaries
+
+**Status:** Implemented.
 
 **Problem:** Several files remain large enough that unrelated behavior can regress together.
 
@@ -103,3 +109,5 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 - Each extracted unit has a narrow API and tests for its business rules.
 - Page entry files coordinate data and layout only.
 - Existing user flows remain visually stable.
+
+**Implementation Note:** Monitoring chart/resource/trend view models were extracted into `MonitoringPage.viewModels` with focused tests, leaving `MonitoringPage` to coordinate data and layout. Backend app telemetry aggregation was extracted from `AppLifecycleService` into `AppTelemetryService`, preserving managed-app filtering in lifecycle while moving Docker stats aggregation behind a focused service.

@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Boxes, CheckCircle2, CircleAlert, ExternalLink, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,9 +12,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import type { SystemDoctorStatus, SystemSetupCheck } from '@/types/system';
-
-const statusPollMs = 15_000;
+import { useSystemDoctorQuery } from '@/repositories/systemRepository';
+import type { SystemSetupCheck } from '@/types/system';
 
 type HeaderService = {
   id: 'docker';
@@ -34,43 +32,10 @@ type HeaderService = {
 };
 
 function SystemStatusHeader() {
-  const [doctor, setDoctor] = useState<SystemDoctorStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadStatus() {
-      try {
-        const next = await SystemAPIClient.doctor();
-        if (cancelled) {
-          return;
-        }
-        setDoctor(next);
-        setError(null);
-      } catch (err) {
-        if (cancelled) {
-          return;
-        }
-        setError(err instanceof Error ? err.message : 'Unable to load system health.');
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadStatus();
-    const interval = window.setInterval(loadStatus, statusPollMs);
-    window.addEventListener('focus', loadStatus);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      window.removeEventListener('focus', loadStatus);
-    };
-  }, []);
+  const doctorQuery = useSystemDoctorQuery();
+  const doctor = doctorQuery.data ?? null;
+  const loading = doctorQuery.isLoading;
+  const error = doctorQuery.error;
 
   const checksById = useMemo(() => new Map((doctor?.checks ?? []).map((check) => [check.id, check])), [doctor?.checks]);
   const dockerCheck = checksById.get('docker') ?? null;

@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { useAppTelemetryQuery } from '@/repositories/appManagementRepository';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, InstallSettings } from '@/types/app';
 import type { PrivateAccessReconciliationItem } from '@/types/network';
 import { AppIcon, Diagnostic } from './ApplicationsPage.shared';
@@ -44,7 +45,6 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
   const { showAdvancedMetrics } = useProjectSettings();
   const [settings, setSettings] = useState(() => settingsFromApp(app));
   const [storageRows, setStorageRows] = useState(() => storageRowsFromSettings(app.settings));
-  const [telemetry, setTelemetry] = useState<AppTelemetry | null>(app.telemetry);
   const [changePlan, setChangePlan] = useState<AppSettingsChangePlan | null>(null);
   const [planning, setPlanning] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -62,7 +62,6 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
     initializedAppId.current = app.appId;
     setSettings(settingsFromApp(app));
     setStorageRows(storageRowsFromSettings(app.settings));
-    setTelemetry(app.telemetry);
     setChangePlan(null);
     setError(null);
   }, [app, open]);
@@ -95,33 +94,6 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
       window.clearTimeout(timeout);
     };
   }, [app.appId, open, settings, storageRows]);
-
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-    let cancelled = false;
-
-    async function loadTelemetry() {
-      try {
-        const data = await InstalledAppsAPIClient.appTelemetry(app.appId);
-        if (!cancelled) {
-          setTelemetry(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.warn('Unable to refresh app telemetry.', err);
-        }
-      }
-    }
-
-    loadTelemetry();
-    const interval = window.setInterval(loadTelemetry, 2500);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [app.appId, open]);
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -166,7 +138,8 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
     setStorageRows((current) => current.filter((_, rowIndex) => rowIndex !== index));
   }
 
-  const liveTelemetry = telemetry || app.telemetry;
+  const telemetryQuery = useAppTelemetryQuery(app.appId, open, app.telemetry);
+  const liveTelemetry = telemetryQuery.data || app.telemetry;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
