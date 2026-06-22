@@ -16,7 +16,6 @@ public class SpaController {
             "/storage",
             "/backups",
             "/monitoring",
-            "/automation",
             "/settings",
             "/terminal"
     })

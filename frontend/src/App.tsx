@@ -17,7 +17,6 @@ const MonitoringPage = lazy(() => import('./pages/MonitoringPage/MonitoringPage'
 const NetworkPage = lazy(() => import('./pages/NetworkPage/NetworkPage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage/OverviewPage'));
 const ResolveExistingAppsPage = lazy(() => import('./pages/ResolveExistingAppsPage/ResolveExistingAppsPage'));
-const AutomationPreviewPage = lazy(() => import('./pages/AutomationPage/AutomationPreviewPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage/SettingsPage'));
 const StoragePage = lazy(() => import('./pages/StoragePage/StoragePage'));
 const SupportPage = lazy(() => import('./pages/SupportPage/SupportPage'));
@@ -84,7 +83,6 @@ function AppContent() {
         <Route path="/storage" element={<Suspense fallback={<PageFallback />}><StoragePage /></Suspense>} />
         <Route path="/backups" element={<Suspense fallback={<PageFallback />}><BackupsPage /></Suspense>} />
         <Route path="/activity" element={<Suspense fallback={<PageFallback />}><MonitoringPage /></Suspense>} />
-        <Route path="/automation" element={<Suspense fallback={<PageFallback />}><AutomationPreviewPage /></Suspense>} />
         <Route path="/settings" element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} />
         <Route path="/diagnostics" element={<Suspense fallback={<PageFallback />}><SupportPage /></Suspense>} />
       </Route>
