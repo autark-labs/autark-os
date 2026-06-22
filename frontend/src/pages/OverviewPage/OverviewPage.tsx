@@ -1,11 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { AlertTriangle, Boxes, CheckCircle2, Clock3, Database, Pin, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { ActivityAPIClient } from '@/api/ActivityAPIClient';
-import { apiErrorMessage } from '@/api/httpClient';
-import { SystemAPIClient } from '@/api/SystemAPIClient';
 import {
   ActivityTimeline,
   IssueBanner,
@@ -22,75 +19,29 @@ import overviewBackground from '@/assets/overviewBackground.png';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import { useHomeRepository } from '@/repositories/homeRepository';
 import { managedAppIconUrl, observedServiceIconUrl } from './extensions/OverviewPage.appTiles';
 import { homeMajorActivity } from './extensions/OverviewPage.activity';
 import { shouldShowActivityLogLink } from './extensions/OverviewPage.activityLink';
 import type { ActivityLog } from '@/types/activity';
 import type { AppInstanceView } from '@/types/app';
-import type { RecommendedAction, SystemSummary } from '@/types/system';
-
-type OverviewState = {
-  activity: ActivityLog[];
-  recommendedAction: RecommendedAction | null;
-  summary: SystemSummary | null;
-};
-
-const initialState: OverviewState = {
-  activity: [],
-  recommendedAction: null,
-  summary: null,
-};
+import type { SystemSummary } from '@/types/system';
 
 function OverviewPage() {
   const { viewMode } = useProjectSettings();
   const appState = useApplicationStateRepository();
-  const [state, setState] = useState<OverviewState>(initialState);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadOverview() {
-      setLoading(true);
-      const [summary, recommendedAction, activity] = await Promise.allSettled([
-        SystemAPIClient.summary(),
-        SystemAPIClient.recommendedAction(),
-        ActivityAPIClient.recent({ limit: 5 }),
-      ]);
-
-      if (cancelled) {
-        return;
-      }
-
-      const rejected = [summary, recommendedAction, activity].find((result) => result.status === 'rejected');
-      setError(rejected?.status === 'rejected' ? apiErrorMessage(rejected.reason, 'Home is missing some live data.') : null);
-      setState({
-        activity: valueOr(activity, []),
-        recommendedAction: valueOr(recommendedAction, null),
-        summary: valueOr(summary, null),
-      });
-      setLoading(false);
-    }
-
-    loadOverview();
-    const interval = window.setInterval(loadOverview, 30_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
+  const home = useHomeRepository();
 
   const apps = appState.applicationState?.managedApps ?? [];
   const observedServices = appState.observedServices;
   const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
   const pinnedServices = useMemo(() => observedServices.filter((service) => service.userStatus === 'pinned_external'), [observedServices]);
   const observedNeedingReview = useMemo(() => observedServices.filter((service) => !service.managedByThisProjectOs && service.userStatus !== 'pinned_external'), [observedServices]);
-  const majorActivity = useMemo(() => homeMajorActivity(state.activity, 5) as ActivityLog[], [state.activity]);
+  const majorActivity = useMemo(() => homeMajorActivity(home.activity, 5) as ActivityLog[], [home.activity]);
   const showActivityLogLink = shouldShowActivityLogLink(viewMode, majorActivity);
-  const primaryAction = state.recommendedAction?.id === 'no-action-needed' ? null : state.recommendedAction;
-  const deviceName = state.summary?.deviceName || 'Project OS';
-  const pageLoading = loading || appState.isLoading;
+  const primaryAction = home.recommendedAction?.id === 'no-action-needed' ? null : home.recommendedAction;
+  const deviceName = home.summary?.deviceName || 'Project OS';
+  const pageLoading = home.isLoading || appState.isLoading;
 
   return (
     <PageShell maxWidth="max-w-[90%]">
@@ -99,7 +50,7 @@ function OverviewPage() {
         loading={pageLoading}
         pinnedServices={pinnedServices.length}
         readyApps={readyApps.length}
-        summary={state.summary}
+        summary={home.summary}
       />
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start">
@@ -203,18 +154,18 @@ function OverviewPage() {
         <div className="grid gap-5">
           <PageSection title="System Status">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <MetricStoryCard detail={state.summary?.docker.summary || 'Checking Docker'} icon={Boxes} label="Docker" tone={state.summary?.docker.ready ? 'success' : 'warning'} value={state.summary?.docker.ready ? 'Ready' : 'Needs setup'} />
+              <MetricStoryCard detail={home.summary?.docker.summary || 'Checking Docker'} icon={Boxes} label="Docker" tone={home.summary?.docker.ready ? 'success' : 'warning'} value={home.summary?.docker.ready ? 'Ready' : 'Needs setup'} />
               <MetricStoryCard detail={observedNeedingReview.length ? `${observedNeedingReview.length} observed service${observedNeedingReview.length === 1 ? '' : 's'} to review` : `${pinnedServices.length} pinned external service${pinnedServices.length === 1 ? '' : 's'}`} icon={Pin} label="Pinned" tone="info" value={pinnedServices.length ? 'Available' : 'None'} />
-              <MetricStoryCard detail={state.summary?.access.summary || 'Checking access'} icon={LockKeyhole} label="Access" tone={state.summary?.access.mode === 'private_ready' ? 'success' : 'info'} value={accessModeLabel(state.summary?.access.mode)} />
-              <MetricStoryCard detail={state.summary?.backups.summary || 'Checking backups'} icon={ShieldCheck} label="Backups" tone={state.summary?.backups.state === 'needs_restore_point' ? 'warning' : 'success'} value={backupStateLabel(state.summary?.backups.state)} />
-              <MetricStoryCard detail={state.summary?.storage.summary || 'Checking storage'} icon={Database} label="Storage" tone="teal" value={state.summary?.storage.state || 'Checking'} />
+              <MetricStoryCard detail={home.summary?.access.summary || 'Checking access'} icon={LockKeyhole} label="Access" tone={home.summary?.access.mode === 'private_ready' ? 'success' : 'info'} value={accessModeLabel(home.summary?.access.mode)} />
+              <MetricStoryCard detail={home.summary?.backups.summary || 'Checking backups'} icon={ShieldCheck} label="Backups" tone={home.summary?.backups.state === 'needs_restore_point' ? 'warning' : 'success'} value={backupStateLabel(home.summary?.backups.state)} />
+              <MetricStoryCard detail={home.summary?.storage.summary || 'Checking storage'} icon={Database} label="Storage" tone="teal" value={home.summary?.storage.state || 'Checking'} />
             </div>
           </PageSection>
 
-          {state.summary?.issues.length ? (
+          {home.summary?.issues.length ? (
             <PageSection title="Needs Review">
               <div className="grid gap-2">
-                {state.summary.issues.slice(0, 3).map((issue) => <IssueBanner issue={issue} key={issue.id} />)}
+                {home.summary.issues.slice(0, 3).map((issue) => <IssueBanner issue={issue} key={issue.id} />)}
               </div>
             </PageSection>
           ) : null}
@@ -224,7 +175,7 @@ function OverviewPage() {
             title="Recent Activity"
           >
             <ActivityTimeline
-              emptyText={loading ? 'Loading recent activity.' : 'No recent activity recorded.'}
+              emptyText={home.isLoading ? 'Loading recent activity.' : 'No recent activity recorded.'}
               items={majorActivity.map((item) => ({
                 id: item.id,
                 title: item.title || item.message,
@@ -238,7 +189,7 @@ function OverviewPage() {
         </div>
       </section>
 
-      {error && <IssueBanner issue={{ id: 'home-load-error', scope: 'system', subjectId: '', severity: 'warning', reasonCode: 'home_partial_load', title: 'Some Home data did not load', summary: error, secondaryActions: [], advancedDetails: {} }} />}
+      {home.error && <IssueBanner issue={{ id: 'home-load-error', scope: 'system', subjectId: '', severity: 'warning', reasonCode: 'home_partial_load', title: 'Some Home data did not load', summary: home.error, secondaryActions: [], advancedDetails: {} }} />}
     </PageShell>
   );
 }
@@ -338,10 +289,6 @@ function homeHeroSubtitle(summary: SystemSummary | null, loading: boolean) {
   if (summary?.issues.length) return 'Your server needs a quick look.';
   if (summary?.setup.complete === false) return summary.setup.summary || 'Finish setup to unlock the full Project OS experience.';
   return 'Your digital home is ready.';
-}
-
-function valueOr<T>(result: PromiseSettledResult<T>, fallback: T) {
-  return result.status === 'fulfilled' ? result.value : fallback;
 }
 
 function timeGreeting() {

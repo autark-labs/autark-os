@@ -60,6 +60,8 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 
 ## Story 4: Move Home Summary Data Into A Repository
 
+**Status:** Implemented.
+
 **Problem:** Home still polls summary, recommended action, and activity with local state instead of the frontend repository layer.
 
 **Scope:**
@@ -71,6 +73,8 @@ These stories close the gaps found during the sprint-end review. The goal is to 
 - Home uses repository hooks for all remote data.
 - Background refresh does not blank the page.
 - Recommended action and activity refresh consistently across navigation.
+
+**Implementation Note:** Home now reads system summary, recommended action, and major activity through `homeRepository`. The page no longer imports API clients directly or owns interval polling, so background refreshes use React Query cache updates without clearing the visible Home state.
 
 ## Story 5: Consolidate Modal Telemetry And Shell Doctor Polling
 
