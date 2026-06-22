@@ -105,6 +105,54 @@ export function backupJobCompletedMessage(job) {
   return 'Backup job completed.';
 }
 
+const BACKUP_JOB_TYPES = new Set(['backup', 'backup_verify', 'backup_restore']);
+const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
+
+/**
+ * @param {Array<{ type?: string, status?: string, updatedAt?: string, createdAt?: string }>} jobs
+ * @returns {Array<unknown>}
+ */
+export function activeBackupJobs(jobs) {
+  return (Array.isArray(jobs) ? jobs : [])
+    .filter((job) => BACKUP_JOB_TYPES.has(job?.type) && !TERMINAL_JOB_STATUSES.has(job?.status))
+    .toSorted((left, right) => jobTime(right) - jobTime(left));
+}
+
+/**
+ * @param {Array<{ type?: string, status?: string, updatedAt?: string, createdAt?: string }>} jobs
+ * @returns {unknown | null}
+ */
+export function selectActiveBackupJob(jobs) {
+  return activeBackupJobs(jobs)[0] ?? null;
+}
+
+/**
+ * @param {{ type?: string, subjectId?: string | null } | null | undefined} job
+ * @returns {string}
+ */
+export function backupJobRunningId(job) {
+  const subjectId = job?.subjectId || '';
+  if (job?.type === 'backup_restore') {
+    return `restore-${subjectId.split(':')[0] || subjectId}`;
+  }
+  if (job?.type === 'backup_verify') {
+    return `verify-${subjectId}`;
+  }
+  if (subjectId === '__full__') {
+    return 'full';
+  }
+  if (subjectId === '__routine__') {
+    return 'routine';
+  }
+  return subjectId ? `app-${subjectId}` : 'backup';
+}
+
+function jobTime(job) {
+  const value = job?.updatedAt || job?.createdAt || '';
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 /**
  * @param {unknown} report
  * @param {unknown} latestRestore

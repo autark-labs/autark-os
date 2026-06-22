@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useBackupReportRepository,
+  useBackupJobsQuery,
   useProjectOsJobQuery,
   useRestoreBackupMutation,
   useRestorePlanMutation,
@@ -33,7 +34,7 @@ import {
   RoutineTimeline,
   SectionHeader,
 } from './BackupsPage.components';
-import { backupJobBannerTitle, backupJobCompletedMessage, backupJobStartedMessage, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes } from './BackupsPage.logic';
+import { backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
 
 type RestoreView = 'timeline' | 'list';
 
@@ -49,7 +50,16 @@ function BackupsPage() {
   const [activeJob, setActiveJob] = useState<ProjectOsJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const backupReport = useBackupReportRepository({ paused: Boolean(restorePoint || running) });
+  const backupJobsQuery = useBackupJobsQuery();
+  const recoveredActiveJob = useMemo(() => {
+    const recovered = selectActiveBackupJob(backupJobsQuery.data ?? []) as ProjectOsJob | null;
+    if (activeJob && terminalJob(activeJob) && recovered?.jobId === activeJob.jobId) {
+      return null;
+    }
+    return recovered;
+  }, [activeJob, backupJobsQuery.data]);
+  const currentActiveJob = activeJob && !terminalJob(activeJob) ? activeJob : recoveredActiveJob;
+  const backupReport = useBackupReportRepository({ paused: Boolean(restorePoint || running || currentActiveJob) });
   const runAppBackupMutation = useRunAppBackupMutation();
   const runFullBackupMutation = useRunFullBackupMutation();
   const runRoutineBackupMutation = useRunRoutineBackupMutation();
@@ -57,10 +67,18 @@ function BackupsPage() {
   const restoreDetailPlanMutation = useRestorePlanMutation();
   const restoreBackupMutation = useRestoreBackupMutation();
   const verifyRestorePointMutation = useVerifyRestorePointMutation();
-  const activeJobQuery = useProjectOsJobQuery(activeJob && !terminalJob(activeJob) ? activeJob.jobId : null);
+  const activeJobQuery = useProjectOsJobQuery(currentActiveJob && !terminalJob(currentActiveJob) ? currentActiveJob.jobId : null);
   const report = backupReport.report;
   const pageError = error ?? (backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null);
   const refreshBackupReport = backupReport.refresh;
+
+  useEffect(() => {
+    if (!recoveredActiveJob) {
+      return;
+    }
+    setActiveJob((current) => current && !terminalJob(current) ? current : recoveredActiveJob);
+    setRunning((current) => current ?? backupJobRunningId(recoveredActiveJob));
+  }, [recoveredActiveJob]);
 
   useEffect(() => {
     if (activeJobQuery.data) {
@@ -83,6 +101,12 @@ function BackupsPage() {
       setRunning(null);
     }
   }, [activeJobQuery.error]);
+
+  useEffect(() => {
+    if (backupJobsQuery.error) {
+      setError(apiErrorMessage(backupJobsQuery.error, 'Backup job status could not be refreshed.'));
+    }
+  }, [backupJobsQuery.error]);
 
   async function runManualAppBackup(app: AppBackupStatus) {
     await runBackup(`app-${app.appId}`, () => runAppBackupMutation.mutateAsync(app.appId));
@@ -219,7 +243,7 @@ function BackupsPage() {
         </div>
 
         {pageError && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={pageError} onRetry={() => void backupReport.refresh()} title="Backup status could not refresh" />}
-        {activeJob && !terminalJob(activeJob) && <BackupJobBanner job={activeJob} />}
+        {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
         {message && <div className="border-b border-emerald-300/20 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100">{message}</div>}
       </SurfaceFrame>
 

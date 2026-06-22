@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { backupJobBannerTitle, backupJobCompletedMessage, backupJobStartedMessage, backupPageViewModel } from './BackupsPage.logic.js';
+import { activeBackupJobs, backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, selectActiveBackupJob } from './BackupsPage.logic.js';
 
 const baseReport = {
   apps: [
@@ -75,4 +75,23 @@ test('backup job copy distinguishes backup, verification, and restore jobs', () 
   assert.equal(backupJobCompletedMessage({ type: 'backup' }), 'Backup job completed.');
   assert.equal(backupJobCompletedMessage({ type: 'backup_verify' }), 'Verification job completed.');
   assert.equal(backupJobCompletedMessage({ type: 'backup_restore' }), 'Restore job completed.');
+});
+
+test('activeBackupJobs recovers only in-progress backup jobs in newest order', () => {
+  const jobs = [
+    { jobId: 'install-1', type: 'install_app', status: 'running', updatedAt: '2026-06-20T10:00:00Z' },
+    { jobId: 'backup-old', type: 'backup', status: 'running', updatedAt: '2026-06-20T10:01:00Z' },
+    { jobId: 'verify-done', type: 'backup_verify', status: 'succeeded', updatedAt: '2026-06-20T10:02:00Z' },
+    { jobId: 'restore-new', type: 'backup_restore', status: 'queued', updatedAt: '2026-06-20T10:03:00Z' },
+    { jobId: 'backup-failed', type: 'backup', status: 'failed', updatedAt: '2026-06-20T10:04:00Z' },
+  ];
+
+  const active = activeBackupJobs(jobs);
+
+  assert.deepEqual(active.map((job) => job.jobId), ['restore-new', 'backup-old']);
+  assert.equal(selectActiveBackupJob(jobs).jobId, 'restore-new');
+  assert.equal(backupJobRunningId({ type: 'backup_restore', subjectId: '42:vaultwarden' }), 'restore-42');
+  assert.equal(backupJobRunningId({ type: 'backup_verify', subjectId: '42' }), 'verify-42');
+  assert.equal(backupJobRunningId({ type: 'backup', subjectId: 'vaultwarden' }), 'app-vaultwarden');
+  assert.equal(backupJobRunningId({ type: 'backup', subjectId: '__full__' }), 'full');
 });

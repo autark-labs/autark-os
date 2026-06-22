@@ -7,6 +7,7 @@ import type { ProjectOsJob } from '@/types/jobs';
 
 export const backupQueryKeys = {
   all: ['backups'] as const,
+  jobs: ['backups', 'jobs'] as const,
   report: ['backups', 'report'] as const,
   job: (jobId: string | null) => ['backups', 'job', jobId] as const,
 };
@@ -46,6 +47,15 @@ export function useProjectOsJobQuery(jobId: string | null) {
     queryFn: () => JobsAPIClient.get(jobId || ''),
     enabled: Boolean(jobId),
     refetchInterval: 1_200,
+  });
+}
+
+export function useBackupJobsQuery() {
+  return useQuery({
+    queryKey: backupQueryKeys.jobs,
+    queryFn: () => JobsAPIClient.list(),
+    refetchInterval: 1_200,
+    staleTime: 1_200,
   });
 }
 
