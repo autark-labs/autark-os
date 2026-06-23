@@ -108,8 +108,10 @@ function OverviewPage() {
                     iconUrl={managedAppIconUrl(app)}
                     key={app.appInstanceId}
                     name={app.name}
+                    secondaryActionLabel="Manage"
+                    secondaryTo="/apps"
                     status={accessLabel(app)}
-                    statusTone={app.privateUrl ? 'success' : 'info'}
+                    statusTone="info"
                   />
                 ))}
               </div>
@@ -142,6 +144,8 @@ function OverviewPage() {
                     iconUrl={observedServiceIconUrl(service)}
                     key={service.id}
                     name={service.displayName}
+                    secondaryActionLabel="Review"
+                    secondaryTo="/apps/found"
                     status="Pinned"
                     statusTone="info"
                   />

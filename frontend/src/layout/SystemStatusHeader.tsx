@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Boxes, CheckCircle2, CircleAlert, ExternalLink, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Boxes, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ type HeaderService = {
 };
 
 function SystemStatusHeader() {
+  const [currentTime, setCurrentTime] = useState(() => formatClock(new Date()));
   const doctorQuery = useSystemDoctorQuery();
   const doctor = doctorQuery.data ?? null;
   const loading = doctorQuery.isLoading;
@@ -58,28 +59,27 @@ function SystemStatusHeader() {
       icon: Boxes,
     };
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(formatClock(new Date())), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-20 border-b border-po-border bg-po-bg/80 px-4 py-2 backdrop-blur-xl md:px-6" aria-label="System status">
-      <div className="flex min-h-11 flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid size-8 shrink-0 place-items-center rounded-po-sm bg-po-brand-gradient text-sm font-black text-white shadow-po-brand-glow">
-            P
-          </div>
-          <div className="min-w-0">
-            <p className="m-0 truncate text-sm font-bold leading-tight text-po-text">Project OS</p>
-            <p className="m-0 truncate text-xs text-po-text-muted">
-              {doctor?.lanUrl ? `LAN: ${doctor.lanUrl}` : checkedAt}
-            </p>
-          </div>
+    <header className="sticky top-0 z-20 border-b border-slate-700/45 bg-slate-950/78 px-4 py-2 backdrop-blur-xl md:px-6" aria-label="System status">
+      <div className="flex min-h-10 flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="m-0 truncate text-sm font-semibold text-slate-200">Project OS</p>
+          <p className="m-0 hidden truncate text-xs text-slate-500 sm:block">
+            {doctor?.lanUrl ? `LAN ${doctor.lanUrl}` : checkedAt}
+          </p>
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
           <StatusPopover loading={loading} service={dockerService} />
           <TailscaleControlPopover check={tailscaleCheck} loading={loading} />
-          <div className="hidden min-w-0 items-center gap-1.5 text-xs text-po-text-muted sm:flex">
-            <RefreshCw className="size-3" />
-            <span className="truncate">{error ? 'Health check unavailable' : checkedAt}</span>
-          </div>
+          <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-slate-400 sm:inline-flex">
+            {error ? 'Status unavailable' : currentTime}
+          </span>
         </div>
       </div>
     </header>
@@ -90,10 +90,10 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
   const healthy = service.check?.status === 'ok';
   const unavailable = !service.check;
   const Icon = service.icon;
-  const statusTone = healthy ? 'green' : 'red';
-  const StatusIcon = statusTone === 'green' ? CheckCircle2 : CircleAlert;
-  const toneClass = statusTone === 'green'
-    ? 'border-po-success/30 bg-po-success/10 text-po-success hover:bg-po-success/15'
+  const statusTone = healthy ? 'blue' : 'red';
+  const StatusIcon = statusTone === 'blue' ? CheckCircle2 : CircleAlert;
+  const toneClass = statusTone === 'blue'
+    ? 'border-sky-500/25 bg-sky-500/12 text-sky-300 hover:bg-sky-500/18'
     : 'border-po-danger/35 bg-po-danger/10 text-po-danger hover:bg-po-danger/15';
   const statusLabel = healthy ? service.healthyLabel : service.needsAttentionLabel;
   const summary = healthy ? service.healthySummary : service.needsAttentionSummary;
@@ -103,21 +103,21 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
       <PopoverTrigger asChild>
         <Button
           aria-label={`${service.label}: ${loading && unavailable ? 'checking' : statusLabel}`}
-          className={cn('h-8 gap-2 rounded-po-sm border px-2.5 text-xs', toneClass)}
+          className={cn('h-8 gap-2 rounded-lg border px-2.5 text-xs shadow-po-sm', toneClass)}
           size="sm"
           type="button"
           variant="outline"
         >
-          <span className={cn('size-2 rounded-full', statusTone === 'green' && 'bg-po-success shadow-po-success-glow', statusTone === 'red' && 'bg-po-danger shadow-po-danger-glow')} />
+          <span className={cn('size-2 rounded-full', statusTone === 'blue' && 'bg-sky-400 shadow-po-info-glow', statusTone === 'red' && 'bg-po-danger shadow-po-danger-glow')} />
           <Icon data-icon="inline-start" />
           <span className="hidden font-semibold sm:inline">{service.label}</span>
           <span className="font-semibold">{loading && unavailable ? 'Checking' : statusLabel}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 gap-3 border-po-border bg-po-surface-elevated p-3 text-po-text shadow-po-md">
+      <PopoverContent align="end" className="w-80 gap-3 border-slate-700 bg-slate-950 p-3 text-po-text shadow-po-md">
         <PopoverHeader>
           <PopoverTitle className="flex items-center gap-2 text-sm">
-            <StatusIcon className={cn('size-4', statusTone === 'green' && 'text-po-success', statusTone === 'red' && 'text-po-danger')} />
+            <StatusIcon className={cn('size-4', statusTone === 'blue' && 'text-sky-300', statusTone === 'red' && 'text-po-danger')} />
             {service.label} {statusLabel.toLowerCase()}
           </PopoverTitle>
           <PopoverDescription className="text-xs text-po-text-muted">
@@ -160,6 +160,10 @@ function formatCheckedAt(value: string) {
     return 'Checked recently';
   }
   return `Checked ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+function formatClock(value: Date) {
+  return value.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
 export default SystemStatusHeader;

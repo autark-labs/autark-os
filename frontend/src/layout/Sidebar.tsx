@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
 import {
   Archive,
-  Boxes,
+  Activity,
   ChevronLeft,
   ChevronRight,
-  CircleGauge,
+  Compass,
   Database,
-  MonitorDot,
-  Network,
+  House,
+  LayoutGrid,
   Settings,
-  SquareTerminal,
-  StoreIcon,
+  Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -34,13 +33,13 @@ type NavGroup = {
 };
 
 const navIcons: Record<string, LucideIcon> = {
-  access: Network,
-  activity: MonitorDot,
-  apps: Boxes,
+  access: Users,
+  activity: Activity,
+  apps: LayoutGrid,
   backups: Archive,
-  diagnostics: SquareTerminal,
-  discover: StoreIcon,
-  home: CircleGauge,
+  diagnostics: Activity,
+  discover: Compass,
+  home: House,
   settings: Settings,
   storage: Database,
 };
@@ -87,23 +86,23 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   return (
     <aside className={cn(
-      'z-30 flex h-auto flex-col border-b border-po-border bg-po-sidebar shadow-po-sidebar backdrop-blur-xl transition-[padding] duration-300 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r',
-      collapsed ? 'lg:items-center p-2' : 'p-3',
+      'z-30 flex h-auto flex-col border-b border-slate-700/40 bg-slate-950/80 shadow-po-sidebar backdrop-blur-xl transition-[padding] duration-300 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r',
+      collapsed ? 'p-2 lg:items-center' : 'p-3',
     )}>
-      <div className={cn('mb-3 flex w-full items-center gap-3 lg:mb-4', collapsed ? 'lg:justify-center px-0' : 'px-1')}>
-        <div className={cn('grid place-items-center rounded-po-md bg-po-brand-gradient font-black text-white shadow-po-brand-glow', collapsed ? 'size-9 text-sm' : 'size-10')}>
+      <div className={cn('mb-4 flex w-full items-center gap-3 lg:mb-6', collapsed ? 'px-0 lg:justify-center' : 'px-2')}>
+        <div className={cn('grid place-items-center rounded-lg bg-sky-500 font-black text-white shadow-po-info-glow', collapsed ? 'size-9 text-sm' : 'size-10')}>
           P
         </div>
         {!collapsed && <div className="min-w-0">
-          <p className="m-0 text-[0.68rem] font-bold uppercase tracking-normal text-po-text-muted">Project OS</p>
-          <h1 className="m-0 text-lg font-bold leading-none text-po-text">Home</h1>
+          <p className="m-0 text-xs font-semibold text-slate-400">Project OS</p>
+          <h1 className="m-0 text-base font-bold leading-none text-white">Console</h1>
         </div>}
       </div>
 
       <button
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className={cn(
-          'mb-4 hidden items-center justify-center rounded-po-sm border border-po-border bg-po-surface-inset text-po-text-muted transition hover:border-po-border-accent hover:bg-po-surface-hover hover:text-po-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand lg:inline-flex',
+          'mb-5 hidden items-center justify-center rounded-lg border border-slate-700/50 bg-slate-900/50 text-slate-400 transition hover:border-sky-500/50 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 lg:inline-flex',
           collapsed ? 'size-9' : 'h-8 w-full gap-2',
         )}
         onClick={onToggleCollapse}
@@ -114,12 +113,12 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {!collapsed && <span className="text-xs font-semibold">Collapse</span>}
       </button>
 
-      <nav className={cn('flex gap-2 overflow-x-auto pb-1 lg:grid lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0', collapsed ? 'lg:gap-2 lg:px-0' : 'lg:gap-4 lg:pr-1')} aria-label="Primary navigation">
+      <nav className={cn('flex gap-2 overflow-x-auto pb-1 lg:grid lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0', collapsed ? 'lg:gap-2 lg:px-0' : 'lg:gap-2 lg:pr-0')} aria-label="Primary navigation">
         {navGroups.map((group, groupIndex) => (
-          <div className={cn('contents lg:grid', collapsed ? 'lg:gap-2' : 'lg:gap-1.5')} key={group.label || `group-${groupIndex}`}>
-            {!collapsed && group.label && <p className="mb-1 hidden px-3 text-[0.68rem] font-bold uppercase tracking-normal text-po-text-disabled lg:block">{group.label}</p>}
+          <div className={cn('contents lg:grid', collapsed ? 'lg:gap-2' : 'lg:gap-2')} key={group.label || `group-${groupIndex}`}>
+            {!collapsed && group.label && <p className="sr-only">{group.label}</p>}
             {group.items.map((item) => {
-              const Icon = navIcons[item.icon] || CircleGauge;
+              const Icon = navIcons[item.icon] || House;
               const isActive = item.activePaths?.includes(location.pathname);
 
               return (
@@ -127,10 +126,10 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   aria-label={item.label}
                   className={({ isActive: navActive }) =>
                     cn(
-                      'group flex min-h-9 shrink-0 items-center rounded-po-sm text-sm font-medium text-po-text-secondary no-underline transition hover:bg-po-surface-hover hover:text-po-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand',
-                      collapsed ? 'lg:w-10 lg:justify-center lg:px-0 gap-2 px-3' : 'gap-3 px-3',
+                      'group flex min-h-10 shrink-0 items-center rounded-lg text-sm font-medium text-slate-200 no-underline transition hover:bg-slate-800/75 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500',
+                      collapsed ? 'gap-2 px-3 lg:w-10 lg:justify-center lg:px-0' : 'gap-3 px-3',
                       (navActive || isActive) &&
-                        'bg-po-brand-gradient text-white shadow-po-brand-glow',
+                        'bg-sky-500 text-white shadow-po-info-glow hover:bg-sky-500',
                     )
                   }
                   key={item.label}
@@ -141,7 +140,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                     <>
                       <span
                         className={cn(
-                          'grid place-items-center rounded-po-xs bg-white/10 text-po-text-muted transition group-hover:text-po-text',
+                          'grid place-items-center rounded-md text-slate-400 transition group-hover:text-white',
                           collapsed ? 'size-7 bg-transparent' : 'size-7',
                           (navActive || isActive) && 'text-white',
                         )}
@@ -162,42 +161,42 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         <div className="mt-6 hidden gap-3 lg:mt-auto lg:grid">
           <button
             aria-label={`Switch to ${viewMode === 'advanced' ? 'Basic' : 'Advanced'} view`}
-            className="grid size-9 place-items-center rounded-po-sm border border-po-border bg-po-surface-inset text-[0.68rem] font-bold text-po-text-secondary transition hover:border-po-border-accent hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-brand"
+            className="grid size-9 place-items-center rounded-lg border border-slate-700/50 bg-slate-900/50 text-xs font-bold text-slate-300 transition hover:border-sky-500/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
             onClick={() => setViewMode(viewMode === 'advanced' ? 'basic' : 'advanced')}
             title={`View mode: ${viewMode === 'advanced' ? 'Advanced' : 'Basic'}`}
             type="button"
           >
             {viewMode === 'advanced' ? 'A' : 'B'}
           </button>
-          <div className={cn('mx-auto size-2 rounded-full', setupReady ? 'bg-po-success shadow-po-success-glow' : 'bg-po-warning shadow-po-warning-glow')} title={setupReady ? 'Ready for your apps' : 'Setup needs attention'} />
+          <div className={cn('mx-auto size-2 rounded-full', setupReady ? 'bg-sky-400 shadow-po-info-glow' : 'bg-amber-400 shadow-po-warning-glow')} title={setupReady ? 'Ready for your apps' : 'Setup needs attention'} />
         </div>
-      ) : <div className="mt-6 hidden rounded-po-lg border border-po-border bg-po-surface p-3 shadow-po-sm lg:mt-auto lg:block">
+      ) : <div className="mt-6 hidden rounded-xl border border-slate-700/45 bg-slate-900/45 p-3 shadow-po-sm lg:mt-auto lg:block">
         <div className="flex items-start gap-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-po-sm bg-po-info/10 text-po-info">
-            <SquareTerminal className="size-4" />
+          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-sky-500/12 text-sky-300">
+            <Settings className="size-4" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-bold text-po-text">{deviceName}</span>
-              <span className="shrink-0 rounded-full border border-po-border bg-po-surface-inset px-2 py-0.5 text-[0.68rem] font-semibold text-po-text-muted">{versionLabel}</span>
+              <span className="truncate text-sm font-bold text-white">{deviceName}</span>
+              <span className="shrink-0 rounded-full border border-slate-700/45 bg-slate-950/55 px-2 py-0.5 text-xs font-semibold text-slate-400">{versionLabel}</span>
             </div>
-            <p className="mt-1 truncate text-xs text-po-text-muted">{setup?.devMode ? 'Development mode' : 'Project OS appliance'}</p>
+            <p className="mt-1 truncate text-xs text-slate-400">{setup?.devMode ? 'Development mode' : 'Project OS appliance'}</p>
           </div>
         </div>
-        <div className="mt-3 grid gap-2 rounded-po-sm border border-po-border bg-po-surface-inset p-2 text-xs text-po-text-muted">
+        <div className="mt-3 grid gap-2 rounded-lg border border-slate-700/45 bg-slate-950/45 p-2 text-xs text-slate-400">
           <div className="flex items-center gap-2">
-            <span className={cn('size-2 rounded-full', setupReady ? 'bg-po-success shadow-po-success-glow' : 'bg-po-warning shadow-po-warning-glow')} />
+            <span className={cn('size-2 rounded-full', setupReady ? 'bg-sky-400 shadow-po-info-glow' : 'bg-amber-400 shadow-po-warning-glow')} />
             <span>{setupReady ? 'Ready for your apps' : 'Setup needs attention'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className={cn('size-2 rounded-full', updateCurrent ? 'bg-po-success shadow-po-success-glow' : 'bg-po-info shadow-[0_0_0_5px_rgb(56_189_248/0.16)]')} />
+            <span className={cn('size-2 rounded-full', updateCurrent ? 'bg-sky-400 shadow-po-info-glow' : 'bg-po-info shadow-po-info-glow')} />
             <span>{updateCurrent ? 'Up to date' : 'Update available'}</span>
           </div>
         </div>
         <div className="mt-3 grid gap-2">
-          <div className="flex items-center justify-between gap-2 text-xs text-po-text-muted">
+          <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
             <span>View mode</span>
-            <span className="font-semibold text-po-text-secondary">{viewMode === 'advanced' ? 'Advanced' : 'Basic'}</span>
+            <span className="font-semibold text-slate-200">{viewMode === 'advanced' ? 'Advanced' : 'Basic'}</span>
           </div>
           <ViewModeToggle />
         </div>

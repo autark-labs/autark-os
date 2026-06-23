@@ -339,7 +339,7 @@ function MarketplacePage() {
       <div className="mb-6 grid gap-4">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
-          <Input className="h-13 border-slate-700/40 bg-slate-900/70 pl-11 text-white placeholder:text-slate-500 focus-visible:border-violet-300 focus-visible:ring-violet-700/30" onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name, purpose, or category..." type="search" value={searchQuery} />
+          <Input className="h-13 border-slate-700/40 bg-slate-900/70 pl-11 text-white placeholder:text-slate-500 focus-visible:border-sky-300 focus-visible:ring-sky-700/30" onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name, purpose, or category..." type="search" value={searchQuery} />
         </label>
         <div aria-label="Discover filters" className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-2 text-sm text-slate-500">
@@ -347,11 +347,11 @@ function MarketplacePage() {
             {showAdvancedMetrics ? 'Show' : 'Starter catalog'}
           </span>
           {showAdvancedMetrics && categories.map((category) => (
-            <Button className={cn('h-9 border-slate-700/40 bg-slate-900/65 px-4 text-slate-300 hover:bg-slate-800 hover:text-white', selectedCategory === category && 'border-violet-300/40 bg-violet-600/20 text-violet-200 hover:bg-violet-600/25')} key={category} onClick={() => setSelectedCategory(category)} type="button" variant="outline">
+            <Button className={cn('h-9 border-slate-700/40 bg-slate-900/65 px-4 text-slate-300 hover:bg-slate-800 hover:text-white', selectedCategory === category && 'border-sky-300/40 bg-sky-600/20 text-sky-100 hover:bg-sky-600/25')} key={category} onClick={() => setSelectedCategory(category)} type="button" variant="outline">
               {category}
             </Button>
           ))}
-          <Button className={cn('h-9 border-slate-700/40 bg-slate-900/65 px-4 text-slate-300 hover:bg-slate-800 hover:text-white', hideInstalled && 'border-emerald-300/40 bg-emerald-600/15 text-emerald-200 hover:bg-emerald-600/20')} onClick={() => setHideInstalled((value) => !value)} type="button" variant="outline">
+          <Button className={cn('h-9 border-slate-700/40 bg-slate-900/65 px-4 text-slate-300 hover:bg-slate-800 hover:text-white', hideInstalled && 'border-sky-300/40 bg-sky-600/15 text-sky-100 hover:bg-sky-600/20')} onClick={() => setHideInstalled((value) => !value)} type="button" variant="outline">
             {hideInstalled ? 'Showing new apps only' : 'Hide installed'}
           </Button>
           {canRestoreStartHere && (
@@ -363,7 +363,7 @@ function MarketplacePage() {
       </div>
 
       <div className="grid items-start gap-6 2xl:grid-cols-[minmax(620px,1fr)_minmax(420px,560px)]">
-        <MarketplaceAppList apps={visibleApps} modeLabel={showAdvancedMetrics ? 'All apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
+        <MarketplaceAppList apps={visibleApps} density={showAdvancedMetrics ? 'full' : 'basic'} modeLabel={showAdvancedMetrics ? 'All apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
         <MarketplaceAppDetail app={selectedApp} appView={selectedView} backupJob={backupJob?.subjectId === selectedApp.id ? backupJob : null} installJob={installJob?.subjectId === selectedApp.id ? installJob : null} installLocked={selectedAppInstallLocked} installOptions={installOptions ?? fallbackInstallOptions} installPreview={installPreview} installStatusMessage={installStatusMessage} installing={selectedAppInstalling} installPlan={installPlan} installedApp={selectedInstalledApp} onBack={() => { setSearchQuery(''); setSelectedCategory('All'); }} onCreateBackup={createFirstBackup} onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(selectedApp.id)} onInstall={(options) => installApp(selectedApp.id, options)} onReinstallCurrent={reinstallWithCurrentSettings} onRequestPlan={(options) => requestPlan(selectedApp.id, options)} onSetupAnswersChange={changeSetupAnswers} planLoading={planLoading} recoveryMode={recoveryAppId === selectedApp.id ? recoveryMode : null} setupAnswers={setupAnswers} setupReady={installPreview?.valid ?? true} setupSchema={selectedView.setupSchema} />
       </div>
     </PageShell>
@@ -376,7 +376,7 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
   }
   if (!terminalJob(installJob)) {
     return (
-      <div className="mb-5 rounded-lg border border-violet-300/25 bg-violet-500/10 p-4 text-sm text-violet-100">
+      <div className="mb-5 rounded-lg border border-sky-300/25 bg-sky-500/10 p-4 text-sm text-sky-100">
         <p className="font-semibold text-white">Installing {appNameForJob(installJob, apps)}</p>
         <p className="mt-1">{currentJobStep(installJob) || 'Project OS is preparing this app.'}</p>
       </div>
@@ -392,7 +392,7 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
   }
   if (installJob.status === 'succeeded') {
     return (
-      <div className="mb-5 rounded-lg border border-emerald-300/25 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+      <div className="mb-5 rounded-lg border border-sky-300/25 bg-sky-500/10 p-4 text-sm text-sky-100">
         <p className="font-semibold text-white">{appNameForJob(installJob, apps)} is ready</p>
         <p className="mt-1">Open the app or create a first restore point before experimenting.</p>
       </div>
@@ -416,11 +416,11 @@ function DiscoverGuidedHeader({
     <header className="mb-5 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/65 p-5 text-slate-100 shadow-po-panel">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex max-w-3xl gap-4">
-          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl border border-violet-300/20 bg-violet-500/15 text-violet-100 sm:grid">
+          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl border border-sky-300/20 bg-sky-500/15 text-sky-100 sm:grid">
             <Sparkles className="size-6" />
           </span>
           <div>
-            <Badge className="border-violet-300/25 bg-violet-500/10 text-violet-100" variant="outline">Discover</Badge>
+            <Badge className="border-sky-300/25 bg-sky-500/10 text-sky-100" variant="outline">Discover</Badge>
             <h2 className="mt-3 text-3xl font-bold leading-none text-white md:text-4xl">Discover Apps</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
               Install useful self-hosted apps without managing Docker by hand.
@@ -446,7 +446,7 @@ function DiscoverGuidedHeader({
               <ol className="grid gap-3 text-sm text-slate-300">
                 {['Pick an app that fits what you want to do.', 'Review setup choices and any host readiness notes.', 'Confirm the install plan before Project OS changes this server.', 'Open the app from My Apps and create a first restore point.'].map((step, index) => (
                   <li className="grid grid-cols-[28px_1fr] gap-3" key={step}>
-                    <span className="grid size-7 place-items-center rounded-full border border-violet-300/25 bg-violet-500/10 text-xs font-bold text-violet-100">{index + 1}</span>
+                    <span className="grid size-7 place-items-center rounded-full border border-sky-300/25 bg-sky-500/10 text-xs font-bold text-sky-100">{index + 1}</span>
                     <span className="leading-6">{step}</span>
                   </li>
                 ))}
@@ -492,8 +492,8 @@ function DiscoverGuidedHeader({
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-violet-300/20 bg-violet-500/10 p-4">
-        <p className="text-xs font-semibold uppercase tracking-normal text-violet-200">Recommended path</p>
+      <div className="mt-5 rounded-xl border border-sky-300/20 bg-sky-500/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-normal text-sky-200">Recommended path</p>
         <p className="mt-2 text-sm leading-6 text-slate-200">
           Pick an app, review the setup, and Project OS will prepare storage, networking, health checks, and backups.
         </p>
@@ -505,17 +505,17 @@ function DiscoverGuidedHeader({
 function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss: () => void; onSelect: (appId: string) => void; recommendations: StarterRecommendation[] }) {
   const blocked = recommendations.some((recommendation) => recommendation.readiness === 'blocked');
   return (
-    <section className="mb-5 rounded-2xl border border-emerald-300/18 bg-po-hero-marketplace-handoff p-5 shadow-po-panel">
+    <section className="mb-5 rounded-2xl border border-sky-300/20 bg-sky-500/10 p-5 shadow-po-panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-normal text-emerald-300">Start here</p>
+          <p className="text-xs font-black uppercase tracking-normal text-sky-200">Start here</p>
           <h3 className="mt-2 text-2xl font-black text-white">Start with these apps</h3>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
             Reliable first installs based on your onboarding choices, with a few safe defaults when you have not picked starter apps yet.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={blocked ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100'} variant="outline">
+          <Badge className={blocked ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-sky-300/25 bg-sky-500/10 text-sky-100'} variant="outline">
             {blocked ? 'Readiness review needed' : 'Ready to review'}
           </Badge>
           <Button aria-label="Hide Start here" className={poButtonClass('quietIcon')} onClick={onDismiss} size="icon" type="button" variant="outline">
@@ -532,9 +532,9 @@ function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss
                 <p className="mt-1 text-sm text-slate-400">{recommendation.app.shortValue || recommendation.app.plainLanguage}</p>
               </div>
               {recommendation.installed ? (
-                <Badge className="border-emerald-300/25 bg-emerald-500/10 text-emerald-100" variant="outline">Installed</Badge>
+                <Badge className="border-sky-300/25 bg-sky-500/10 text-sky-100" variant="outline">Installed</Badge>
               ) : (
-                <Badge className={recommendation.readiness === 'ready' ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100' : recommendation.readiness === 'blocked' ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-sky-300/25 bg-sky-500/10 text-sky-100'} variant="outline">
+                <Badge className={recommendation.readiness === 'ready' ? 'border-sky-300/25 bg-sky-500/10 text-sky-100' : recommendation.readiness === 'blocked' ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-sky-300/25 bg-sky-500/10 text-sky-100'} variant="outline">
                   {recommendation.readiness === 'ready' ? 'Ready' : recommendation.readiness === 'blocked' ? 'Needs setup' : 'Review'}
                 </Badge>
               )}
@@ -542,7 +542,7 @@ function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss
             <div className="mt-3 grid gap-2 text-sm text-slate-300">
               {recommendation.notes.map((note) => (
                 <div className="flex gap-2" key={note}>
-                  {recommendation.readiness === 'ready' ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-300" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />}
+                  {recommendation.readiness === 'ready' ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-sky-300" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-300" />}
                   <span>{note}</span>
                 </div>
               ))}

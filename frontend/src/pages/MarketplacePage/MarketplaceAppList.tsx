@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Info, MoreHorizontal, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Clock3, Info, MoreHorizontal, SlidersHorizontal, Sparkles, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,7 @@ import { AppImage } from './MarketplacePage.shared';
 
 type MarketplaceAppListProps = {
   apps: DiscoverAppView[];
+  density?: 'basic' | 'full';
   modeLabel?: string;
   selectedAppId: string;
   sortBy: string;
@@ -29,10 +30,11 @@ type MarketplaceAppListProps = {
   onSortChange: (value: string) => void;
 };
 
-export function MarketplaceAppList({ apps, modeLabel = 'All apps', selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
+export function MarketplaceAppList({ apps, density = 'full', modeLabel = 'All apps', selectedAppId, sortBy, onSelect, onSortChange }: MarketplaceAppListProps) {
+  const basic = density === 'basic';
   return (
-    <Card className="rounded-lg border-white/10 bg-slate-900/55 py-0 text-slate-100 shadow-po-panel">
-      <CardHeader className="flex flex-row items-center justify-between gap-4 p-5">
+    <Card className={cn('rounded-lg py-0 text-slate-100 shadow-po-panel', basic ? 'border-slate-800/80 bg-slate-950/35' : 'border-white/10 bg-slate-900/55')}>
+      <CardHeader className="flex flex-row items-center justify-between gap-4 p-4 md:p-5">
         <div>
           <CardTitle className="text-lg font-bold text-white">{modeLabel}</CardTitle>
           <p className="mt-1 text-sm text-slate-400">{apps.length} available</p>
@@ -58,16 +60,19 @@ export function MarketplaceAppList({ apps, modeLabel = 'All apps', selectedAppId
           </DropdownMenuContent>
         </DropdownMenu>
       </CardHeader>
-      <CardContent className="grid gap-4 p-5 pt-0 md:grid-cols-2 2xl:grid-cols-3">
-        {apps.length ? apps.map((app) => <AppStoreCard app={app} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
-          <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-8 text-center text-sm text-slate-400">No apps match this view.</div>
+      <CardContent className={cn('grid gap-4 p-4 pt-0 md:p-5 md:pt-0', basic ? 'sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-2' : 'md:grid-cols-2 2xl:grid-cols-3')}>
+        {apps.length ? apps.map((app) => <AppStoreCard app={app} density={density} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
+          <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-8 text-center text-sm text-slate-400 sm:col-span-2">No apps match this view.</div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function AppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView; isSelected: boolean; onSelect: () => void }) {
+function AppStoreCard({ app, density, isSelected, onSelect }: { app: DiscoverAppView; density: 'basic' | 'full'; isSelected: boolean; onSelect: () => void }) {
+  if (density === 'basic') {
+    return <BasicAppStoreCard app={app} isSelected={isSelected} onSelect={onSelect} />;
+  }
   const primaryActionId = app.primaryAction.id;
   const actionVariant = primaryActionId === 'review_setup' ? 'default' : 'outline';
   return (
@@ -93,7 +98,7 @@ function AppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView; isS
 
       <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-white/10 pt-3">
         <div className="min-w-0 text-xs text-slate-400">{app.serviceKindLabel}</div>
-        <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && poButtonClass('primary'), primaryActionId === 'manage' && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15', primaryActionId === 'review_existing' && 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15')} disabled={app.primaryAction.disabled} onClick={onSelect} type="button" variant={actionVariant}>
+        <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && 'border-sky-400/30 bg-sky-500 text-white shadow-po-info-glow hover:bg-sky-400', primaryActionId === 'manage' && 'border-sky-300/25 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15', primaryActionId === 'review_existing' && 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15')} disabled={app.primaryAction.disabled} onClick={onSelect} type="button" variant={actionVariant}>
           {primaryActionId === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
           {app.primaryAction.label}
         </Button>
@@ -117,9 +122,53 @@ function AppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView; isS
   );
 }
 
+function BasicAppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView; isSelected: boolean; onSelect: () => void }) {
+  return (
+    <button
+      className={cn(
+        'group grid min-h-[190px] w-full content-between rounded-xl border border-slate-700/65 bg-slate-900/70 p-4 text-left text-slate-100 shadow-po-card transition',
+        'hover:-translate-y-0.5 hover:border-sky-400/45 hover:bg-slate-900/85 hover:shadow-po-info-glow',
+        isSelected && 'border-sky-400/55 outline outline-1 outline-sky-300/30 shadow-po-info-glow',
+      )}
+      onClick={onSelect}
+      type="button"
+    >
+      <span className="grid gap-4">
+        <span className="flex items-start gap-3">
+          <span className="grid size-16 shrink-0 place-items-center rounded-xl border border-slate-700/60 bg-slate-950/50 shadow-po-sm">
+            <AppImage app={app.app} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-bold text-white">{app.name}</span>
+            <span className="mt-1 block truncate text-xs font-medium text-slate-400">{app.categoryLabel}</span>
+            <Badge className={cn('mt-2 rounded-full px-2 py-0.5 text-[0.7rem]', stateBadgeClass(app.statusTone))} variant="outline">
+              {app.stateLabel}
+            </Badge>
+          </span>
+        </span>
+
+        <span className="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-400">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 className="size-3.5 text-sky-300" />
+            {app.estimatedInstallTime}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Zap className="size-3.5 text-sky-300" />
+            {app.difficulty}
+          </span>
+        </span>
+      </span>
+
+      <span className="mt-4 grid h-10 place-items-center rounded-lg bg-sky-500 px-4 text-sm font-semibold text-white shadow-po-info-glow transition group-hover:bg-sky-400">
+        {app.primaryAction.label}
+      </span>
+    </button>
+  );
+}
+
 function stateBadgeClass(tone: string) {
   if (tone === 'success') {
-    return 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100';
+    return 'border-sky-300/25 bg-sky-500/10 text-sky-100';
   }
   if (tone === 'warning') {
     return 'border-amber-300/25 bg-amber-500/10 text-amber-100';

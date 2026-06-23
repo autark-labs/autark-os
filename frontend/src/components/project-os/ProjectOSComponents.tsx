@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, Sparkles, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, MoreVertical, Sparkles, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
@@ -525,6 +525,10 @@ export function QuickAccessAppTile({
   status,
   statusTone = 'success',
   onAction,
+  secondaryActionLabel,
+  secondaryHref,
+  secondaryOnAction,
+  secondaryTo,
   to,
 }: {
   actionLabel?: string;
@@ -535,38 +539,74 @@ export function QuickAccessAppTile({
   iconUrl?: string | null;
   name: ReactNode;
   onAction?: () => void;
+  secondaryActionLabel?: string;
+  secondaryHref?: string;
+  secondaryOnAction?: () => void;
+  secondaryTo?: string;
   status?: ReactNode;
   statusTone?: Tone;
   to?: string;
 }) {
+  const primaryButtonClass = 'h-9 rounded-lg border-sky-400/30 bg-sky-500 px-4 text-sm font-semibold text-white shadow-po-info-glow hover:bg-sky-400';
+  const secondaryButtonClass = 'h-9 rounded-lg border-slate-700/75 bg-slate-950/45 px-4 text-sm font-semibold text-slate-200 hover:border-slate-600 hover:bg-slate-800 hover:text-white';
   const action = href ? (
-    <Button asChild className="bg-po-brand text-white hover:bg-po-brand/85" size="sm">
+    <Button asChild className={primaryButtonClass} size="sm">
       <a href={href} rel="noreferrer" target="_blank">{actionLabel}</a>
     </Button>
   ) : to ? (
-    <Button asChild className="bg-po-brand text-white hover:bg-po-brand/85" size="sm">
+    <Button asChild className={primaryButtonClass} size="sm">
       <Link to={to}>{actionLabel}</Link>
     </Button>
   ) : (
-    <Button className="bg-po-brand text-white hover:bg-po-brand/85" disabled={!onAction} onClick={onAction} size="sm" type="button">
+    <Button className={primaryButtonClass} disabled={!onAction} onClick={onAction} size="sm" type="button">
       {actionLabel}
     </Button>
   );
+  const secondaryAction = secondaryActionLabel ? secondaryHref ? (
+    <Button asChild className={secondaryButtonClass} size="sm" variant="outline">
+      <a href={secondaryHref} rel="noreferrer" target="_blank">{secondaryActionLabel}</a>
+    </Button>
+  ) : secondaryTo ? (
+    <Button asChild className={secondaryButtonClass} size="sm" variant="outline">
+      <Link to={secondaryTo}>{secondaryActionLabel}</Link>
+    </Button>
+  ) : (
+    <Button className={secondaryButtonClass} disabled={!secondaryOnAction} onClick={secondaryOnAction} size="sm" type="button" variant="outline">
+      {secondaryActionLabel}
+    </Button>
+  ) : null;
+  const detailRoute = secondaryTo ?? to ?? '/apps';
 
   return (
-    <SoftCard className={cn('grid min-h-40 content-between gap-4 text-center', className)} interactive>
-      <div className="grid justify-items-center gap-3">
-        <div className="grid size-14 place-items-center overflow-hidden rounded-po-md bg-po-surface-inset text-po-brand-strong shadow-po-sm">
-          {iconUrl ? <img alt="" className="size-full object-contain p-1.5" src={iconUrl} /> : icon || <Sparkles className="size-7" />}
+    <SoftCard
+      className={cn(
+        'grid min-h-[214px] content-between overflow-hidden rounded-xl border-slate-700/65 bg-slate-900/70 text-left shadow-po-card',
+        'transition hover:-translate-y-0.5 hover:border-sky-400/45 hover:bg-slate-900/85 hover:shadow-po-info-glow',
+        className,
+      )}
+    >
+      <div className="grid gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="grid size-16 place-items-center overflow-hidden rounded-xl border border-slate-700/60 bg-slate-950/50 text-sky-200 shadow-po-sm">
+            {iconUrl ? <img alt="" className="size-full object-contain p-2" src={iconUrl} /> : icon || <Sparkles className="size-8" />}
+          </div>
+          <div className="flex items-center gap-2">
+            {status && <GlowBadge className="rounded-full px-2.5 py-0.5 text-xs" tone={statusTone}>{status}</GlowBadge>}
+            <Button asChild aria-label="App details" className="size-8 rounded-lg border-slate-700/65 bg-slate-950/35 text-slate-400 hover:bg-slate-800 hover:text-white" size="icon" variant="outline">
+              <Link to={detailRoute}>
+                <MoreVertical className="size-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
         <div>
-          <p className="m-0 font-bold text-po-text">{name}</p>
-          {description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-po-text-muted">{description}</p>}
+          <p className="m-0 truncate text-base font-bold text-white">{name}</p>
+          {description && <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-slate-400">{description}</p>}
         </div>
       </div>
-      <div className="grid justify-items-center gap-2">
-        {status && <GlowBadge tone={statusTone}>{status}</GlowBadge>}
+      <div className={cn('grid gap-2 pt-4', secondaryAction && '2xl:grid-cols-2')}>
         {action}
+        {secondaryAction}
       </div>
     </SoftCard>
   );

@@ -25,12 +25,12 @@ function AppShell() {
   return (
     <div className={cn(
       'grid min-h-screen grid-cols-1 bg-po-bg text-po-text transition-[grid-template-columns] duration-300',
-      sidebarCollapsed ? 'lg:grid-cols-[76px_minmax(0,1fr)]' : 'lg:grid-cols-[272px_minmax(0,1fr)]',
+      sidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[210px_minmax(0,1fr)]',
     )}>
       <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
       <main className="min-w-0 bg-po-bg-mesh">
         <SystemStatusHeader />
-        <div className="p-[var(--po-space-page-y)] md:p-[var(--po-space-page-x)]">
+        <div className="p-4 md:p-6">
           <Outlet />
         </div>
       </main>
