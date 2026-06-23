@@ -41,4 +41,5 @@ runtime/project-os/project-os.db
 # Local screenshots and smoke-test captures
 screenshots/
 docs/development
+docs/current-app-state
 .superpowers
