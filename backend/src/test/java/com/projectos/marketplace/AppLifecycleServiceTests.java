@@ -517,6 +517,42 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void repairRecreatesPrivateAccessWhenStoredPrivateLinkConflictsWithLocalHttpPort() {
+        repository.saveSettings("vaultwarden", new InstallSettings(
+                "http://localhost:8090",
+                "https://project-os.example.ts.net:8090",
+                true,
+                java.util.Map.of(),
+                BackupPolicy.defaults(),
+                "private",
+                "optional",
+                8090,
+                "http",
+                null,
+                null,
+                null,
+                null,
+                true));
+        AppLifecycleService devService = new AppLifecycleService(
+                repository,
+                composeExecutor,
+                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                () -> List.of(),
+                runtimeLayout,
+                new PostInstallGuideBuilder(),
+                tailscaleService,
+                true);
+
+        AppActionResult result = devService.repair("vaultwarden");
+
+        assertThat(result.status()).isEqualTo("completed");
+        assertThat(tailscaleService.lastLocalPort).isEqualTo(8090);
+        assertThat(tailscaleService.lastHttpsPort).isNotEqualTo(8090);
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().privateAccessUrl())
+                .isEqualTo("https://project-os.example.ts.net:" + tailscaleService.lastHttpsPort);
+    }
+
+    @Test
     void listAppsDoesNotAdoptRediscoveredManagedContainersFromDockerLabels() throws Exception {
         repository.delete("vaultwarden");
         Files.createDirectories(runtimeRoot.resolve("apps/vaultwarden"));

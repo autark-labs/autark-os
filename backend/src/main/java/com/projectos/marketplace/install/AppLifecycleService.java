@@ -922,7 +922,9 @@ public class AppLifecycleService {
                 ? localHealthCheck(app.appId(), manifest, accessUrl)
                 : AppAccessCheck.notConfigured(app.appId());
         AppAccessCheck privateCheck = settings.tailscaleEnabled()
-                ? privateAccessCheck(app.appId(), settings.privateAccessUrl())
+                ? privateAccessPortConflict(settings, accessUrl)
+                        ? AppAccessCheck.unreachable(app.appId(), settings.privateAccessUrl())
+                        : privateAccessCheck(app.appId(), settings.privateAccessUrl())
                 : AppAccessCheck.notConfigured(app.appId());
         settings = updateAccessCheckTimestamps(app, settings, localCheck);
         AppHealthSnapshot snapshot = buildHealthSnapshot(app, runtime, manifest, localCheck, privateCheck);
@@ -1245,7 +1247,7 @@ public class AppLifecycleService {
         Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
         Integer privatePort = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
         String privateStatus = observedAccess == null ? "not_enabled" : observedAccess.privateLinkStatus();
-        boolean privateLinkUsesLocalHttpPort = privatePort != null && localPort != null && privatePort.equals(localPort);
+        boolean privateLinkUsesLocalHttpPort = privateAccessPortConflict(settings, accessUrl);
         String primaryOpenUrl = !privateLinkUsesLocalHttpPort
                 ? firstPresent(settings.privateAccessUrl(), accessUrl)
                 : firstPresent(accessUrl, settings.privateAccessUrl());
@@ -1260,6 +1262,12 @@ public class AppLifecycleService {
                 localPort,
                 privatePort,
                 privateLinkUsesLocalHttpPort ? "port_conflict" : privateStatus);
+    }
+
+    private boolean privateAccessPortConflict(InstallSettings settings, String accessUrl) {
+        Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
+        Integer privatePort = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
+        return settings.tailscaleEnabled() && localPort != null && privatePort != null && localPort.equals(privatePort);
     }
 
     private String sanitizeAccessMode(String mode, String fallback) {
