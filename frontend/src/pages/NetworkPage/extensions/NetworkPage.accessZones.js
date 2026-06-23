@@ -20,7 +20,7 @@ export function zoneAppChip(item) {
   return {
     id: item.appId,
     label: item.appName,
-    url: item.observedAccess?.privateUrl || item.observedAccess?.localUrl || item.accessUrl || item.settings?.privateAccessUrl || item.settings?.accessUrl || '',
+    url: item.accessRoute?.primaryOpenUrl || item.settings?.privateAccessUrl || item.observedAccess?.privateUrl || item.accessRoute?.localUrl || item.observedAccess?.localUrl || item.accessUrl || item.settings?.accessUrl || '',
     external: false,
     status: item.friendlyStatus || item.canonicalUserStatus || 'Unknown',
   };

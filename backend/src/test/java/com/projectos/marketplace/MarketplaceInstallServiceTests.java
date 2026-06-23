@@ -155,6 +155,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
+        FakeTailscaleService tailscaleService = new FakeTailscaleService();
         MarketplaceInstallService installService = new MarketplaceInstallService(
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
@@ -165,7 +166,7 @@ class MarketplaceInstallServiceTests {
                 customizationResolver,
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
-                new FakeTailscaleService());
+                tailscaleService);
 
         InstallResult result = installService.install(manifest, new InstallOptionsRequest(
                 new InstallOptionsRequest.PortOptions(19090),
@@ -178,6 +179,10 @@ class MarketplaceInstallServiceTests {
                 .contains("19090:80")
                 .contains(runtimeRoot.resolve("apps/vaultwarden/vault-data").toString());
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
+        assertThat(tailscaleService.lastLocalPort).isEqualTo(19090);
+        assertThat(tailscaleService.lastHttpsPort).isNotEqualTo(19090);
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().privateAccessUrl())
+                .isEqualTo("https://project-os.example.ts.net:" + tailscaleService.lastHttpsPort);
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().backup().frequency()).isEqualTo("weekly");
     }
 
@@ -626,6 +631,9 @@ class MarketplaceInstallServiceTests {
     }
 
     private static class FakeTailscaleService extends TailscaleService {
+        int lastLocalPort;
+        int lastHttpsPort;
+
         @Override
         public TailscaleServeResult serveHttps(int localPort) {
             return serveHttps(localPort, localPort);
@@ -633,6 +641,8 @@ class MarketplaceInstallServiceTests {
 
         @Override
         public TailscaleServeResult serveHttps(int localPort, int httpsPort) {
+            lastLocalPort = localPort;
+            lastHttpsPort = httpsPort;
             return new TailscaleServeResult(true, "https://project-os.example.ts.net:" + httpsPort, "Private HTTPS link is ready.", List.of("fake tailscale serve " + localPort));
         }
     }

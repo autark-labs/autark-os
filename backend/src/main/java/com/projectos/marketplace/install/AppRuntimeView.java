@@ -18,6 +18,7 @@ public record AppRuntimeView(
         String runtimePath,
         String composeProject,
         String accessUrl,
+        AppAccessRoute accessRoute,
         AccessDesiredState desiredAccess,
         AccessObservedState observedAccess,
         Instant installedAt,

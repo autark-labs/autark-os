@@ -2,6 +2,7 @@ import { MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import type { AppRuntimeView } from '@/types/app';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationItem, PrivateAccessReconciliationReport, TailscaleDevice, TailscaleStatus } from '@/types/network';
 import type { AppExposureGroup, AppExposureLevel, NetworkDeviceView, NetworkIssueView, NetworkNodeAppDetail, NetworkNodeData, NetworkNodeStatus, NetworkPosture, PrivateAppAccess } from './NetworkPage.types';
+import { privateAccessUrlForApp } from './NetworkPage.privateAccess.js';
 
 export function buildNetworkPosture({
   devices,
@@ -131,11 +132,12 @@ export function buildPrivateAppAccess(privateApps: AppRuntimeView[], tailscale: 
   const reconciliationByAppId = new Map((reconciliation?.apps || []).map((item) => [item.appId, item]));
   return privateApps.map((app) => {
     const reconciliationItem = reconciliationByAppId.get(app.appId) || null;
-    const privateUrl = reconciliationItem?.expectedPrivateUrl || reconciliationItem?.actualPrivateUrl || buildTailnetUrl(app, tailscale);
+    const privateUrl = privateAccessUrlForApp(app, reconciliationItem);
+    const portConflict = app.accessRoute?.privateLinkStatus === 'port_conflict';
     const healthy = reconciliationItem?.status === 'healthy';
     const needsRepair = reconciliationItem != null && !['healthy', 'waiting'].includes(reconciliationItem.status);
-    const configured = healthy || app.observedAccess?.privateLinkStatus === 'configured' || Boolean(privateUrl);
-    const missing = needsRepair || app.observedAccess?.privateLinkStatus === 'missing';
+    const configured = !portConflict && (healthy || app.observedAccess?.privateLinkStatus === 'configured' || Boolean(privateUrl));
+    const missing = portConflict || needsRepair || app.observedAccess?.privateLinkStatus === 'missing';
     return {
       app,
       localUrl: app.observedAccess?.localUrl || app.accessUrl || app.settings?.accessUrl || null,
@@ -323,23 +325,6 @@ export function getRecommendedActions(node: NetworkNodeData, connected: boolean,
     return ['Add your phone or laptop to the same tailnet.', 'Use online and last-seen status to confirm private links are reachable.'];
   }
   return ['Review private links before sharing them.', 'Keep advanced networking changes intentional and reversible.'];
-}
-
-function buildTailnetUrl(app: AppRuntimeView, tailscale: TailscaleStatus | null) {
-  if (app.observedAccess?.privateUrl) return app.observedAccess.privateUrl;
-  if (app.settings?.privateAccessUrl) return app.settings.privateAccessUrl;
-  if (!tailscale?.connected) return null;
-  const host = tailscale.dnsName?.replace(/\.$/, '') || tailscale.tailnetIps?.[0];
-  const accessUrl = app.accessUrl || app.settings?.accessUrl;
-  if (!host || !accessUrl) return null;
-  try {
-    const parsedUrl = new URL(accessUrl);
-    const port = parsedUrl.port ? `:${parsedUrl.port}` : '';
-    const path = parsedUrl.pathname === '/' ? '' : parsedUrl.pathname;
-    return `https://${host}${port}${path}`;
-  } catch {
-    return null;
-  }
 }
 
 function classifyAppExposure(app: AppRuntimeView, tailscale: TailscaleStatus | null): AppExposureLevel {

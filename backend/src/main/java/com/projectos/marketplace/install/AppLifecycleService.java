@@ -627,7 +627,8 @@ public class AppLifecycleService {
             throw new InstallationException("Project OS could not find a local browser port for " + app.appName() + ".");
         }
 
-        TailscaleServeResult serveResult = tailscaleService.serveHttps(localPort, localPort);
+        int privateHttpsPort = AppPrivateAccessPorts.selectHttpsPort(app.appId(), localPort, repository);
+        TailscaleServeResult serveResult = tailscaleService.serveHttps(localPort, privateHttpsPort);
         if (!serveResult.configured()) {
             repository.recordEvent(app.appId(), "private_access_failed", serveResult.message());
             activityWarning("private_access_failed", "Private link failed for " + app.appName(), serveResult.message(), app.appId());
@@ -683,7 +684,10 @@ public class AppLifecycleService {
     }
 
     private TailscaleServeResult disablePrivateAccessMapping(InstalledApp app, InstallSettings settings) {
-        Integer port = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(firstPresent(settings.accessUrl(), app.accessUrl())) : settings.expectedLocalPort();
+        Integer port = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
+        if (port == null) {
+            port = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(firstPresent(settings.accessUrl(), app.accessUrl())) : settings.expectedLocalPort();
+        }
         if (port == null) {
             return new TailscaleServeResult(true, settings.privateAccessUrl(), "No private HTTPS port was stored for this app.", List.of("No private HTTPS port was stored for this app."));
         }
@@ -880,6 +884,7 @@ public class AppLifecycleService {
         }
         AccessDesiredState desiredAccess = desiredAccessState(settings, manifest, accessUrl);
         AccessObservedState observedAccess = observedAccessState(settings, accessUrl);
+        AppAccessRoute accessRoute = accessRoute(settings, accessUrl, observedAccess);
         return new AppRuntimeView(
                 app.appId(),
                 app.appName(),
@@ -893,6 +898,7 @@ public class AppLifecycleService {
                 app.runtimePath(),
                 app.composeProject(),
                 accessUrl,
+                accessRoute,
                 desiredAccess,
                 observedAccess,
                 app.installedAt(),
@@ -1233,6 +1239,27 @@ public class AppLifecycleService {
                 settings.lastSuccessfulAccessAt(),
                 settings.lastRepairAttemptAt(),
                 settings.lastRepairStatus());
+    }
+
+    private AppAccessRoute accessRoute(InstallSettings settings, String accessUrl, AccessObservedState observedAccess) {
+        Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
+        Integer privatePort = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
+        String privateStatus = observedAccess == null ? "not_enabled" : observedAccess.privateLinkStatus();
+        boolean privateLinkUsesLocalHttpPort = privatePort != null && localPort != null && privatePort.equals(localPort);
+        String primaryOpenUrl = !privateLinkUsesLocalHttpPort
+                ? firstPresent(settings.privateAccessUrl(), accessUrl)
+                : firstPresent(accessUrl, settings.privateAccessUrl());
+        String backendProtocol = firstPresent(settings.expectedProtocol(), runtimeStatusResolver.protocolFromUrl(accessUrl), "http");
+        String backendTargetUrl = localPort == null ? null : backendProtocol + "://127.0.0.1:" + localPort;
+        return new AppAccessRoute(
+                primaryOpenUrl,
+                accessUrl,
+                settings.privateAccessUrl(),
+                backendTargetUrl,
+                backendProtocol,
+                localPort,
+                privatePort,
+                privateLinkUsesLocalHttpPort ? "port_conflict" : privateStatus);
     }
 
     private String sanitizeAccessMode(String mode, String fallback) {

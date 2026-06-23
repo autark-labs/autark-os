@@ -110,6 +110,7 @@ class InstalledAppsControllerTests {
                 "http://localhost:8090",
                 null,
                 null,
+                null,
                 Instant.parse("2026-06-21T12:00:00Z"),
                 "Backups disabled",
                 null,

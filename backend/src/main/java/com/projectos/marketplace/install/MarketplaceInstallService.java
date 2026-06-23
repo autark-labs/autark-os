@@ -3,7 +3,6 @@ package com.projectos.marketplace.install;
 import com.projectos.marketplace.api.InstallOptionsRequest;
 
 import java.nio.file.Path;
-import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -332,28 +331,12 @@ public class MarketplaceInstallService {
         if (hostPort == null) {
             return new TailscaleServeResult(false, null, "This app does not expose a local HTTP port for Tailscale Serve.", List.of());
         }
-        return tailscaleService.serveHttps(hostPort, hostPort);
+        int privateHttpsPort = AppPrivateAccessPorts.selectHttpsPort(manifest.id(), hostPort, installedAppRepository);
+        return tailscaleService.serveHttps(hostPort, privateHttpsPort);
     }
 
     private Integer portFromAccessUrl(String accessUrl) {
-        if (accessUrl == null || accessUrl.isBlank()) {
-            return null;
-        }
-        try {
-            URI uri = URI.create(accessUrl);
-            if (uri.getPort() > 0) {
-                return uri.getPort();
-            }
-            if ("http".equalsIgnoreCase(uri.getScheme())) {
-                return 80;
-            }
-            if ("https".equalsIgnoreCase(uri.getScheme())) {
-                return 443;
-            }
-            return null;
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
+        return AppPrivateAccessPorts.portFromUrl(accessUrl);
     }
 
     private void activityInfo(String action, String title, String message, String appId) {

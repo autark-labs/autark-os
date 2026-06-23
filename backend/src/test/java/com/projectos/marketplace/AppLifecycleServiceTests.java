@@ -50,6 +50,7 @@ class AppLifecycleServiceTests {
     InstalledAppRepository repository;
     AppLifecycleService service;
     FakeLifecycleDockerComposeExecutor composeExecutor;
+    FakeTailscaleService tailscaleService;
     RuntimeLayout runtimeLayout;
 
     @BeforeEach
@@ -59,6 +60,7 @@ class AppLifecycleServiceTests {
         runtimeLayout = new RuntimeLayout(properties);
         repository = new InstalledAppRepository(runtimeLayout);
         composeExecutor = new FakeLifecycleDockerComposeExecutor();
+        tailscaleService = new FakeTailscaleService();
         service = new AppLifecycleService(
                 repository,
                 composeExecutor,
@@ -66,7 +68,7 @@ class AppLifecycleServiceTests {
                 () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
-                new FakeTailscaleService());
+                tailscaleService);
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
@@ -498,6 +500,21 @@ class AppLifecycleServiceTests {
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().expectedLocalPort()).isEqualTo(8090);
     }
 
+    @Test
+    void refreshDoesNotUsePrivateLinkWhenItConflictsWithTheLocalHttpPort() {
+        repository.saveSettings("vaultwarden", new InstallSettings(
+                "http://localhost:8090",
+                "https://project-os.example.ts.net:8090",
+                true,
+                java.util.Map.of(),
+                BackupPolicy.defaults()));
+
+        AppRuntimeView app = service.getApp("vaultwarden");
+
+        assertThat(app.accessRoute().privateLinkStatus()).isEqualTo("port_conflict");
+        assertThat(app.accessRoute().primaryOpenUrl()).isEqualTo("http://localhost:8090");
+        assertThat(app.accessRoute().privateUrl()).isEqualTo("https://project-os.example.ts.net:8090");
+    }
 
     @Test
     void listAppsDoesNotAdoptRediscoveredManagedContainersFromDockerLabels() throws Exception {
@@ -623,11 +640,15 @@ class AppLifecycleServiceTests {
         AppActionResult result = service.enablePrivateAccess("vaultwarden");
 
         assertThat(result.status()).isEqualTo("completed");
-        assertThat(result.message()).contains("https://project-os.example.ts.net:8090");
+        assertThat(result.message()).contains("https://project-os.example.ts.net:");
+        assertThat(tailscaleService.lastLocalPort).isEqualTo(8090);
+        assertThat(tailscaleService.lastHttpsPort).isNotEqualTo(8090);
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
-        assertThat(repository.settingsFor("vaultwarden").orElseThrow().privateAccessUrl()).isEqualTo("https://project-os.example.ts.net:8090");
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().privateAccessUrl()).isEqualTo("https://project-os.example.ts.net:" + tailscaleService.lastHttpsPort);
         assertThat(result.app().desiredAccess().mode()).isEqualTo("private");
         assertThat(result.app().observedAccess().privateLinkStatus()).isEqualTo("configured");
+        assertThat(result.app().accessRoute().primaryOpenUrl()).isEqualTo("https://project-os.example.ts.net:" + tailscaleService.lastHttpsPort);
+        assertThat(result.app().accessRoute().backendTargetUrl()).isEqualTo("http://127.0.0.1:8090");
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().lastRepairStatus()).isEqualTo("private_access_enabled");
         assertThat(repository.eventsFor("vaultwarden", 5))
                 .extracting(event -> event.type())
@@ -687,8 +708,13 @@ class AppLifecycleServiceTests {
     }
 
     private static class FakeTailscaleService extends TailscaleService {
+        int lastLocalPort;
+        int lastHttpsPort;
+
         @Override
         public TailscaleServeResult serveHttps(int localPort, int httpsPort) {
+            lastLocalPort = localPort;
+            lastHttpsPort = httpsPort;
             return new TailscaleServeResult(true, "https://project-os.example.ts.net:" + httpsPort, "Private HTTPS link is ready.", List.of("fake tailscale serve " + localPort));
         }
     }

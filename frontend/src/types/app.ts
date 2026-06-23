@@ -87,6 +87,17 @@ export type AccessObservedState = {
   lastRepairStatus: string | null;
 };
 
+export type AppAccessRoute = {
+  primaryOpenUrl: string | null;
+  localUrl: string | null;
+  privateUrl: string | null;
+  backendTargetUrl: string | null;
+  backendProtocol: 'http' | 'https' | string | null;
+  localPort: number | null;
+  privatePort: number | null;
+  privateLinkStatus: 'configured' | 'missing' | 'not_enabled' | 'port_conflict' | string | null;
+};
+
 export type AppTelemetry = {
   cpuPercent: string;
   memoryUsage: string;
@@ -189,6 +200,7 @@ export type AppRuntimeView = {
   runtimePath: string;
   composeProject: string;
   accessUrl: string | null;
+  accessRoute?: AppAccessRoute | null;
   desiredAccess: AccessDesiredState | null;
   observedAccess: AccessObservedState | null;
   installedAt: string;

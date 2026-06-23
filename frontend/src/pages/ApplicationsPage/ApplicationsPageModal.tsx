@@ -315,6 +315,16 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
 
             {showAdvancedMetrics && <TabsContent className="grid gap-4" value="app-config">
               <section className="rounded-lg border border-slate-700/30 bg-slate-900/60 p-4">
+                <h4 className="font-bold text-white">Access links</h4>
+                <p className="mt-1 text-sm text-slate-400">Known app routes from Project OS.</p>
+                <div className="mt-4 grid gap-3">
+                  <AccessLinkRow label="Primary open link" value={app.accessRoute?.primaryOpenUrl || app.settings?.privateAccessUrl || app.observedAccess?.privateUrl || app.accessUrl || app.settings?.accessUrl || null} />
+                  <AccessLinkRow label="Private link" value={app.accessRoute?.privateUrl || app.settings?.privateAccessUrl || app.observedAccess?.privateUrl || null} />
+                  <AccessLinkRow label="Local link" value={app.accessRoute?.localUrl || app.observedAccess?.localUrl || app.accessUrl || app.settings?.accessUrl || null} />
+                  <AccessLinkRow label="Backend target" value={app.accessRoute?.backendTargetUrl || null} />
+                </div>
+              </section>
+              <section className="rounded-lg border border-slate-700/30 bg-slate-900/60 p-4">
                 <h4 className="font-bold text-white">App defaults</h4>
                 <p className="mt-1 text-sm text-slate-400">Advanced values supplied by this app template.</p>
                 {app.appConfiguration?.length ? (
@@ -347,6 +357,25 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AccessLinkRow({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-slate-700/30 bg-slate-950/45 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+        <p className="mt-1 break-all font-mono text-xs text-slate-300">{value || 'Not configured'}</p>
+      </div>
+      {value && /^https?:\/\//i.test(value) && (
+        <Button asChild className="border-slate-700/50 bg-slate-950/60 text-slate-200 hover:bg-slate-800" size="sm" type="button" variant="outline">
+          <a href={value} rel="noreferrer" target="_blank">
+            <ExternalLink className="size-3.5" />
+            Open
+          </a>
+        </Button>
+      )}
+    </div>
   );
 }
 

@@ -12,5 +12,12 @@ export function pinnedExternalServiceCard(service) {
 }
 
 export function appCardPrimaryUrl(app) {
-  return app.observedAccess?.privateUrl || app.observedAccess?.localUrl || app.accessUrl || app.settings?.privateAccessUrl || app.settings?.accessUrl || '';
+  return app.accessRoute?.primaryOpenUrl
+    || app.settings?.privateAccessUrl
+    || app.observedAccess?.privateUrl
+    || app.accessRoute?.localUrl
+    || app.observedAccess?.localUrl
+    || app.accessUrl
+    || app.settings?.accessUrl
+    || '';
 }

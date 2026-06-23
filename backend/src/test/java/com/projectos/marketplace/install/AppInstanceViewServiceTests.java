@@ -26,7 +26,7 @@ class AppInstanceViewServiceTests {
         InstalledAppRepository repository = repository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(false, "daily", 7)));
+        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", "https://project-os.example.ts.net:12890", true, java.util.Map.of(), new BackupPolicy(false, "daily", 7)));
         AppInstanceViewService service = service(repository, List.of(
                 new ManagedContainer("vaultwarden", "projectos_homelab-box_vaultwarden", "Up 2 minutes (healthy)", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "projectos_homelab-box_vaultwarden")));
 
@@ -38,9 +38,14 @@ class AppInstanceViewServiceTests {
         assertThat(view.category()).isEqualTo("Security");
         assertThat(view.userStatus()).isEqualTo("Ready");
         assertThat(view.ownershipState()).isEqualTo("owned");
-        assertThat(view.accessState()).isEqualTo("local_ready");
+        assertThat(view.accessState()).isEqualTo("private_ready");
         assertThat(view.localUrl()).isEqualTo("http://localhost:8090");
+        assertThat(view.privateUrl()).isEqualTo("https://project-os.example.ts.net:12890");
         assertThat(view.actions()).extracting(action -> action.id()).contains("open-vaultwarden", "restart-vaultwarden");
+        assertThat(view.actions())
+                .filteredOn(action -> action.id().equals("open-vaultwarden"))
+                .singleElement()
+                .satisfies(action -> assertThat(action.href()).contains("https://project-os.example.ts.net:12890"));
         assertThat(view.issues()).isEmpty();
     }
 

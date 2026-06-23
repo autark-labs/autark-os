@@ -52,9 +52,9 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         ApplicationManifest manifest = catalogService.findById(item.appId()).orElse(null);
         String backupState = backupState(item.appId(), settings);
         List<ProjectOsIssue> issues = issues(item, app, backupState);
-        List<ProjectOsAction> actions = actions(item, app);
         String localUrl = firstPresent(settings == null ? null : settings.accessUrl(), app == null ? null : app.accessUrl());
         String privateUrl = settings == null ? null : settings.privateAccessUrl();
+        List<ProjectOsAction> actions = actions(item, app, localUrl, privateUrl);
         return new AppInstanceView(
                 firstPresent(ownership == null ? null : ownership.appInstanceId(), item.appId()),
                 firstPresent(ownership == null ? null : ownership.catalogAppId(), item.appId()),
@@ -135,10 +135,10 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         return issues;
     }
 
-    private List<ProjectOsAction> actions(AppReconciliationItem item, InstalledApp app) {
+    private List<ProjectOsAction> actions(AppReconciliationItem item, InstalledApp app, String localUrl, String privateUrl) {
         List<ProjectOsAction> actions = new ArrayList<>();
         if ("Ready".equals(item.status()) && app != null) {
-            actions.add(ProjectOsAction.get("open-" + item.appId(), "Open", app.accessUrl()));
+            actions.add(ProjectOsAction.get("open-" + item.appId(), "Open", firstPresent(privateUrl, localUrl, app.accessUrl())));
             actions.add(ProjectOsAction.post("restart-" + item.appId(), "Restart", "/api/apps/" + item.appId() + "/restart", false, false));
         } else if ("Missing".equals(item.status()) && item.ownership() == DockerResourceOwnership.OWNED && app != null) {
             actions.add(ProjectOsAction.post("repair-" + item.appId(), "Repair", "/api/apps/" + item.appId() + "/repair", false, false));

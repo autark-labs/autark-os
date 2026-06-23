@@ -17,10 +17,13 @@ test('pinned external services get a distinct card model without managed runtime
   assert.equal(card.secondaryAction, 'Review service');
 });
 
-test('app cards prefer private links before local links', () => {
+test('app cards use the canonical primary route before observed links', () => {
   assert.equal(appCardPrimaryUrl({
     accessUrl: 'http://localhost:8080',
+    accessRoute: {
+      primaryOpenUrl: 'https://vault.tailnet:12890',
+    },
     observedAccess: { privateUrl: 'https://vault.tailnet', localUrl: 'http://192.168.1.5:8080' },
     settings: {},
-  }), 'https://vault.tailnet');
+  }), 'https://vault.tailnet:12890');
 });
