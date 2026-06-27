@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" role="img" aria-label="Immich service image">
+  <rect width="160" height="120" rx="18" fill="#111827"/>
+  <rect x="28" y="24" width="104" height="72" rx="14" fill="#1e293b"/>
+  <circle cx="58" cy="54" r="17" fill="#ef4444"/>
+  <circle cx="82" cy="44" r="17" fill="#f59e0b"/>
+  <circle cx="101" cy="62" r="17" fill="#22c55e"/>
+  <circle cx="76" cy="73" r="17" fill="#3b82f6"/>
+  <circle cx="80" cy="59" r="12" fill="#f8fafc"/>
+</svg>

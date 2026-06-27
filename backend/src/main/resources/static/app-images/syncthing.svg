@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Syncthing">
+  <defs>
+    <linearGradient id="syncthing-a" x1="16" x2="80" y1="12" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#35d0ff"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="96" height="96" rx="22" fill="#061226"/>
+  <circle cx="48" cy="48" r="31" fill="url(#syncthing-a)" opacity=".22"/>
+  <circle cx="30" cy="34" r="8" fill="#38bdf8"/>
+  <circle cx="66" cy="36" r="8" fill="#60a5fa"/>
+  <circle cx="48" cy="65" r="8" fill="#93c5fd"/>
+  <path d="M37 37h20M34 42l10 17M61 43 51 59" fill="none" stroke="#dbeafe" stroke-linecap="round" stroke-width="5"/>
+</svg>

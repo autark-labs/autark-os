@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Pi-hole">
+  <rect width="96" height="96" rx="22" fill="#1f0710"/>
+  <circle cx="48" cy="48" r="29" fill="#dc2626"/>
+  <circle cx="48" cy="48" r="15" fill="#fff1f2"/>
+  <path d="M48 18v18M48 60v18M18 48h18M60 48h18" stroke="#fecdd3" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="48" cy="48" r="6" fill="#991b1b"/>
+</svg>
