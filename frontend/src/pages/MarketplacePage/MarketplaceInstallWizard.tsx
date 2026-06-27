@@ -46,6 +46,7 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
 
   async function startInstall() {
     await onInstall(installOptions);
+    setOpen(false);
   }
 
   return (
@@ -91,7 +92,6 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
             </Collapsible>
           )}
 
-          {installing && <InstallProgressCard />}
         </div>
 
         <DialogFooter className="border-slate-800 bg-slate-900/80">
@@ -273,18 +273,6 @@ export function TechnicalPlanCard({ plan }: { plan: InstallPlan }) {
           </>
         )}
       </dl>
-    </section>
-  );
-}
-
-function InstallProgressCard() {
-  return (
-    <section className="rounded-lg border border-violet-300/25 bg-violet-600/10 p-4">
-      <h4 className="font-bold text-white">Installing now</h4>
-      <p className="mt-2 text-sm text-slate-300">Project OS is setting up storage and starting the app.</p>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
-        <div className="h-full w-2/3 animate-pulse rounded-full bg-violet-500" />
-      </div>
     </section>
   );
 }

@@ -374,6 +374,7 @@ function InlineInstallStatus({
             <p className={cn('mt-1 text-sm', succeeded ? 'text-emerald-100/80' : failed ? 'text-red-100/80' : 'text-violet-100/75')}>
               {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Project OS stopped before making this app available.' : currentJobStep(job)}
             </p>
+            {running && <JobProgressBar job={job} />}
             <JobStepList job={job} />
             {succeeded && (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -424,6 +425,25 @@ function InlineInstallStatus({
   }
 
   return null;
+}
+
+function JobProgressBar({ job }: { job: ProjectOsJob }) {
+  const completedSteps = job.steps.filter((step) => ['succeeded', 'skipped'].includes(step.status)).length;
+  const totalSteps = Math.max(job.steps.length, 1);
+  const runningStepIndex = job.steps.findIndex((step) => step.status === 'running' || step.id === job.currentStep);
+  const progressStepCount = runningStepIndex >= 0 ? Math.max(completedSteps, runningStepIndex) + 0.5 : completedSteps;
+  const percent = Math.min(100, Math.max(8, Math.round((progressStepCount / totalSteps) * 100)));
+  return (
+    <div className="mt-4">
+      <div className="flex items-center justify-between gap-3 text-xs text-violet-100/75">
+        <span>Install progress</span>
+        <span>{Math.min(completedSteps, totalSteps)} of {totalSteps} steps complete</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-950">
+        <div className="h-full rounded-full bg-violet-400 transition-all" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
 }
 
 function JobStepList({ job }: { job: ProjectOsJob }) {

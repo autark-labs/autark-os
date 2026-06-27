@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, Clock3, Info, MoreHorizontal, SlidersHorizontal, Sparkles, Zap } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Clock3, Info, Loader2, MoreHorizontal, SlidersHorizontal, Sparkles, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,7 @@ type MarketplaceAppListProps = {
   apps: DiscoverAppView[];
   basicCatalogMode?: 'starter' | 'all-safe';
   density?: 'basic' | 'full';
+  installingAppId?: string | null;
   modeLabel?: string;
   selectedAppId: string;
   sortBy: string;
@@ -32,7 +33,7 @@ type MarketplaceAppListProps = {
   onSortChange: (value: string) => void;
 };
 
-export function MarketplaceAppList({ apps, basicCatalogMode, density = 'full', modeLabel = 'All apps', selectedAppId, sortBy, onBasicCatalogModeChange, onSelect, onSortChange }: MarketplaceAppListProps) {
+export function MarketplaceAppList({ apps, basicCatalogMode, density = 'full', installingAppId = null, modeLabel = 'All apps', selectedAppId, sortBy, onBasicCatalogModeChange, onSelect, onSortChange }: MarketplaceAppListProps) {
   const basic = density === 'basic';
   return (
     <Card className={cn('rounded-lg py-0 text-slate-100 shadow-po-panel', basic ? 'border-slate-800/80 bg-slate-950/35' : 'border-white/10 bg-slate-900/55')}>
@@ -75,7 +76,7 @@ export function MarketplaceAppList({ apps, basicCatalogMode, density = 'full', m
         </div>
       </CardHeader>
       <CardContent className={cn('grid gap-4 p-4 pt-0 md:p-5 md:pt-0', basic ? 'sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-2' : 'md:grid-cols-2 2xl:grid-cols-3')}>
-        {apps.length ? apps.map((app) => <AppStoreCard app={app} density={density} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
+        {apps.length ? apps.map((app) => <AppStoreCard app={app} density={density} installing={installingAppId === app.id} isSelected={selectedAppId === app.id} key={app.id} onSelect={() => onSelect(app.id)} />) : (
           <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-8 text-center text-sm text-slate-400 sm:col-span-2">No apps match this view.</div>
         )}
       </CardContent>
@@ -83,9 +84,9 @@ export function MarketplaceAppList({ apps, basicCatalogMode, density = 'full', m
   );
 }
 
-function AppStoreCard({ app, density, isSelected, onSelect }: { app: DiscoverAppView; density: 'basic' | 'full'; isSelected: boolean; onSelect: () => void }) {
+function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app: DiscoverAppView; density: 'basic' | 'full'; installing: boolean; isSelected: boolean; onSelect: () => void }) {
   if (density === 'basic') {
-    return <BasicAppStoreCard app={app} isSelected={isSelected} onSelect={onSelect} />;
+    return <BasicAppStoreCard app={app} installing={installing} isSelected={isSelected} onSelect={onSelect} />;
   }
   const primaryActionId = app.primaryAction.id;
   const actionVariant = primaryActionId === 'review_setup' ? 'default' : 'outline';
@@ -100,6 +101,7 @@ function AppStoreCard({ app, density, isSelected, onSelect }: { app: DiscoverApp
             <span className="flex flex-wrap items-center gap-2">
               <strong className="truncate text-base text-white">{app.name}</strong>
               <Badge className={stateBadgeClass(app.statusTone)} variant="outline">{app.stateLabel}</Badge>
+              {installing && <Badge className="gap-1 border-sky-300/25 bg-sky-500/10 text-sky-100" variant="outline"><Loader2 className="size-3 animate-spin" />Installing</Badge>}
             </span>
             <span className="mt-1 block text-xs text-slate-400">{app.categoryLabel} · {app.estimatedInstallTime} · {app.difficulty}</span>
           </span>
@@ -113,9 +115,9 @@ function AppStoreCard({ app, density, isSelected, onSelect }: { app: DiscoverApp
 
       <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-white/10 pt-3">
         <div className="min-w-0 text-xs text-slate-400">{app.serviceKindLabel}</div>
-        <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && 'border-sky-400/30 bg-sky-500 text-white shadow-po-info-glow hover:bg-sky-400', primaryActionId === 'manage' && 'border-sky-300/25 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15', primaryActionId === 'review_existing' && 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15')} disabled={app.primaryAction.disabled} onClick={onSelect} type="button" variant={actionVariant}>
-          {primaryActionId === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
-          {actionLabel}
+        <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && 'border-sky-400/30 bg-sky-500 text-white shadow-po-info-glow hover:bg-sky-400', primaryActionId === 'manage' && 'border-sky-300/25 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15', primaryActionId === 'review_existing' && 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15')} disabled={!installing && app.primaryAction.disabled} onClick={onSelect} type="button" variant={actionVariant}>
+          {installing ? <Loader2 className="size-3.5 animate-spin" /> : primaryActionId === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
+          {installing ? 'Installing' : actionLabel}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -137,7 +139,7 @@ function AppStoreCard({ app, density, isSelected, onSelect }: { app: DiscoverApp
   );
 }
 
-function BasicAppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView; isSelected: boolean; onSelect: () => void }) {
+function BasicAppStoreCard({ app, installing, isSelected, onSelect }: { app: DiscoverAppView; installing: boolean; isSelected: boolean; onSelect: () => void }) {
   const actionLabel = marketplaceActionLabel(app);
   return (
     <button
@@ -160,6 +162,12 @@ function BasicAppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView
             <Badge className={cn('mt-2 rounded-full px-2 py-0.5 text-[0.7rem]', stateBadgeClass(app.statusTone))} variant="outline">
               {app.stateLabel}
             </Badge>
+            {installing && (
+              <Badge className="mt-2 gap-1 rounded-full border-sky-300/25 bg-sky-500/10 px-2 py-0.5 text-[0.7rem] text-sky-100" variant="outline">
+                <Loader2 className="size-3 animate-spin" />
+                Installing
+              </Badge>
+            )}
           </span>
         </span>
 
@@ -176,7 +184,10 @@ function BasicAppStoreCard({ app, isSelected, onSelect }: { app: DiscoverAppView
       </span>
 
       <span className="mt-4 grid h-10 place-items-center rounded-lg bg-sky-500 px-4 text-sm font-semibold text-white shadow-po-info-glow transition group-hover:bg-sky-400">
-        {actionLabel}
+        <span className="inline-flex items-center gap-2">
+          {installing && <Loader2 className="size-3.5 animate-spin" />}
+          {installing ? 'Installing' : actionLabel}
+        </span>
       </span>
     </button>
   );
