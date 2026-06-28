@@ -4,6 +4,7 @@ import { AlertTriangle, Bell, CheckCircle2, Filter, Info, RefreshCw, Search, Spa
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { JobProgress } from '@/components/project-os/JobProgress';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
@@ -556,10 +557,12 @@ function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss
                 </div>
               ))}
             </div>
-            <Button className={poButtonClass('primary', 'mt-4 w-full')} disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} type="button">
-              <Sparkles className="size-4" />
-              {recommendation.installed ? 'Already installed' : 'Review install'}
-            </Button>
+            <DisabledAction className="mt-4 w-full" disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
+              <Button className={poButtonClass('primary', 'w-full')} disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} type="button">
+                <Sparkles className="size-4" />
+                {recommendation.installed ? 'Already installed' : 'Review install'}
+              </Button>
+            </DisabledAction>
           </article>
         ))}
       </div>

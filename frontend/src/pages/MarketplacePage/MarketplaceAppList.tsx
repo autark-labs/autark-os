@@ -2,6 +2,7 @@ import { CheckCircle2, ChevronDown, Clock3, Info, Loader2, MoreHorizontal, Slide
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,6 +92,8 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
   const primaryActionId = app.primaryAction.id;
   const actionVariant = primaryActionId === 'review_setup' ? 'default' : 'outline';
   const actionLabel = marketplaceActionLabel(app);
+  const primaryDisabled = !installing && app.primaryAction.disabled;
+  const primaryDisabledReason = app.primaryAction.reason || 'This app action is not available right now.';
   return (
     <div className={cn('group relative grid min-h-[258px] overflow-hidden rounded-xl border p-4 text-slate-100 shadow-po-card transition hover:-translate-y-0.5 hover:border-violet-300/45', marketplaceCardToneClass(app), isSelected && 'border-violet-300/55 outline outline-1 outline-violet-300/35 shadow-po-brand-glow')}>
       <div className="absolute inset-0 bg-po-card-hover-sheen opacity-0 transition group-hover:opacity-100" />
@@ -115,10 +118,12 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
 
       <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-white/10 pt-3">
         <div className="min-w-0 text-xs text-slate-400">{app.serviceKindLabel}</div>
-        <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && 'border-sky-400/30 bg-sky-500 text-white shadow-po-info-glow hover:bg-sky-400', primaryActionId === 'manage' && 'border-sky-300/25 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15', primaryActionId === 'review_existing' && 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15')} disabled={!installing && app.primaryAction.disabled} onClick={onSelect} type="button" variant={actionVariant}>
-          {installing ? <Loader2 className="size-3.5 animate-spin" /> : primaryActionId === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
-          {installing ? 'Installing' : actionLabel}
-        </Button>
+        <DisabledAction disabled={primaryDisabled} reason={primaryDisabledReason}>
+          <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && 'border-sky-400/30 bg-sky-500 text-white shadow-po-info-glow hover:bg-sky-400', primaryActionId === 'manage' && 'border-sky-300/25 bg-sky-500/10 text-sky-100 hover:bg-sky-500/15', primaryActionId === 'review_existing' && 'border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15')} disabled={primaryDisabled} onClick={onSelect} type="button" variant={actionVariant}>
+            {installing ? <Loader2 className="size-3.5 animate-spin" /> : primaryActionId === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
+            {installing ? 'Installing' : actionLabel}
+          </Button>
+        </DisabledAction>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button aria-label={`${app.name} actions`} className={poButtonClass('quietIcon')} size="icon" type="button" variant="outline">

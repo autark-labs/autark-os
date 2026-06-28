@@ -9,19 +9,54 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('high-friction pages use shared disabled action reasons', () => {
+test('disabled action component explains unavailable controls accessibly', () => {
   assert.equal(existsSync(resolve(root, 'src/components/project-os/DisabledAction.tsx')), true);
 
   const disabledAction = source('src/components/project-os/DisabledAction.tsx');
-  const backupsComponents = source('src/pages/BackupsPage/BackupsPage.components.tsx');
-  const backupsPage = source('src/pages/BackupsPage/BackupsPage.tsx');
-  const privateAccessManager = source('src/pages/NetworkPage/PrivateAccessManager.tsx');
 
   assert.match(disabledAction, /Tooltip/);
   assert.match(disabledAction, /aria-label/);
   assert.match(disabledAction, /tabIndex=\{0\}/);
+  assert.match(disabledAction, /cursor-not-allowed/);
+});
 
-  assert.match(backupsComponents, /DisabledAction/);
-  assert.match(backupsPage, /DisabledAction/);
-  assert.match(privateAccessManager, /DisabledAction/);
+test('active user-facing surfaces use shared disabled action reasons', () => {
+  const surfaces = [
+    'src/components/RefreshStatus.tsx',
+    'src/components/project-os/ProjectOSComponents.tsx',
+    'src/components/project-os/TailscaleControlPopover.tsx',
+    'src/pages/AdminSecurityGate.tsx',
+    'src/pages/ApplicationsPage/ApplicationsDashboard.tsx',
+    'src/pages/ApplicationsPage/ApplicationsPageModal.tsx',
+    'src/pages/ApplicationsPage/ApplicationsPageRemoveDialog.tsx',
+    'src/pages/ApplicationsPage/ApplicationsStabilityTab.tsx',
+    'src/pages/ApplicationsPage/ObservedServiceDetailsSheet.tsx',
+    'src/pages/BackupsPage/BackupsPage.components.tsx',
+    'src/pages/BackupsPage/BackupsPage.tsx',
+    'src/pages/MarketplacePage/DuplicateInstallWarningDialog.tsx',
+    'src/pages/MarketplacePage/MarketplacePage.tsx',
+    'src/pages/MarketplacePage/MarketplaceAppDetail.tsx',
+    'src/pages/MarketplacePage/MarketplaceAppList.tsx',
+    'src/pages/MarketplacePage/MarketplaceInstallWizard.tsx',
+    'src/pages/MonitoringPage/MonitoringPage.tsx',
+    'src/pages/NetworkPage/PrivateAccessManager.tsx',
+    'src/pages/OnboardingPage/OnboardingWizard.tsx',
+    'src/pages/ResolveExistingAppsPage/ResolveExistingAppsPage.tsx',
+    'src/pages/SettingsPage/SettingsPage.tsx',
+    'src/pages/StoragePage/StoragePage.tsx',
+    'src/pages/SupportPage/SupportPage.tsx',
+  ];
+
+  for (const relativePath of surfaces) {
+    const fileSource = source(relativePath);
+    assert.match(fileSource, /DisabledAction/, `${relativePath} should use DisabledAction for unavailable controls`);
+  }
+});
+
+test('repo guidance rejects partial cross-surface behavior implementations', () => {
+  const agentsGuidance = source('../AGENTS.md');
+
+  assert.match(agentsGuidance, /No partial cross-surface product behavior/);
+  assert.match(agentsGuidance, /update every active surface/);
+  assert.match(agentsGuidance, /lean-slice exception/);
 });

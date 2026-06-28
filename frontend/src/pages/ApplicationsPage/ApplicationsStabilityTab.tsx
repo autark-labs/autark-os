@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Clock3, ExternalLink, RotateCcw, ShieldCheck, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -72,10 +73,12 @@ export function ApplicationsStabilityTab({ access, app, autoRepairEnabled, healt
             <h4 className="font-bold text-white">Self-repair</h4>
             <p className="mt-1 max-w-2xl text-sm text-slate-400">Project OS watches this app in the background and can retry safe fixes like restarting containers or recreating a private link.</p>
           </div>
-          <label className="flex items-center gap-3 rounded-lg border border-slate-700/40 bg-slate-950/50 px-3 py-2 text-sm text-slate-200">
-            <span>{saving ? 'Saving...' : autoRepairEnabled ? 'Automatic fixes on' : 'Automatic fixes off'}</span>
-            <Switch checked={autoRepairEnabled} disabled={saving} onCheckedChange={onAutoRepairChange} />
-          </label>
+          <DisabledAction disabled={saving} reason="Project OS is already saving the self-repair setting.">
+            <label className="flex items-center gap-3 rounded-lg border border-slate-700/40 bg-slate-950/50 px-3 py-2 text-sm text-slate-200">
+              <span>{saving ? 'Saving...' : autoRepairEnabled ? 'Automatic fixes on' : 'Automatic fixes off'}</span>
+              <Switch checked={autoRepairEnabled} disabled={saving} onCheckedChange={onAutoRepairChange} />
+            </label>
+          </DisabledAction>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Diagnostic label="Last check" value={formatDate(health?.checkedAt)} />

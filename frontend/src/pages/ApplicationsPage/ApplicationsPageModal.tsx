@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { AlertTriangle, Archive, CheckCircle2, Cpu, ExternalLink, HardDrive, Network, Save, ShieldCheck, SlidersHorizontal, Loader2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -349,10 +350,12 @@ export function ManageAppDialog({ access, app, health, onAction, open, onOpenCha
 
           <DialogFooter className="m-0 shrink-0 rounded-none rounded-b-xl border-slate-800 bg-slate-900/80">
             <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onOpenChange(false)} type="button" variant="outline">Cancel</Button>
-            <Button className="bg-violet-600 text-white hover:bg-violet-500" disabled={saving || planning || changePlan?.saveAllowed === false} type="submit">
-              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-              {saving ? 'Applying...' : changePlan?.redeployRequired ? 'Save and Restart App' : 'Save Settings'}
-            </Button>
+            <DisabledAction disabled={saving || planning || changePlan?.saveAllowed === false} reason={saving ? 'Project OS is already applying these app settings.' : planning ? 'Wait for Project OS to finish checking the change plan.' : 'Project OS cannot safely apply this change yet.'}>
+              <Button className="bg-violet-600 text-white hover:bg-violet-500" disabled={saving || planning || changePlan?.saveAllowed === false} type="submit">
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {saving ? 'Applying...' : changePlan?.redeployRequired ? 'Save and Restart App' : 'Save Settings'}
+              </Button>
+            </DisabledAction>
           </DialogFooter>
         </form>
       </DialogContent>

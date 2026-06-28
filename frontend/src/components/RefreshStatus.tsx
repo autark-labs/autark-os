@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,8 @@ export function RefreshStatus({ className, disabled, intervalLabel, onRefresh, r
   }, []);
 
   const label = useMemo(() => formatUpdatedAt(updatedAt), [updatedAt]);
+  const refreshDisabled = Boolean(disabled || refreshing);
+  const refreshDisabledReason = refreshing ? 'Refresh is already running.' : 'Refresh is not available right now.';
   const tones = {
     slate: 'border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800',
     violet: 'border-violet-300/20 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25',
@@ -38,10 +41,12 @@ export function RefreshStatus({ className, disabled, intervalLabel, onRefresh, r
         {intervalLabel && <p>{intervalLabel}</p>}
       </div>
       {showButton && onRefresh && (
-        <Button className={cn('gap-2 border', tones[tone])} disabled={disabled || refreshing} onClick={onRefresh} type="button" variant="outline">
-          <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
-          Refresh
-        </Button>
+        <DisabledAction disabled={refreshDisabled} reason={refreshDisabledReason}>
+          <Button className={cn('gap-2 border', tones[tone])} disabled={refreshDisabled} onClick={onRefresh} type="button" variant="outline">
+            <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+            Refresh
+          </Button>
+        </DisabledAction>
       )}
     </div>
   );

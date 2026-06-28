@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageErrorState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -113,10 +114,14 @@ function MonitoringPage() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {showAdvancedMetrics && <Button className="border-violet-300/20 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20" disabled={diagnosticsMutation.isPending} onClick={() => void exportDiagnostics()} type="button" variant="outline">
-                {diagnosticsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                Export diagnostics
-              </Button>}
+              {showAdvancedMetrics && (
+                <DisabledAction disabled={diagnosticsMutation.isPending} reason="Diagnostics export is already being prepared.">
+                  <Button className="border-violet-300/20 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20" disabled={diagnosticsMutation.isPending} onClick={() => void exportDiagnostics()} type="button" variant="outline">
+                    {diagnosticsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                    Export diagnostics
+                  </Button>
+                </DisabledAction>
+              )}
               <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])} refreshing={monitoring.isFetching || appState.isFetching} tone="violet" updatedAt={appState.updatedAt ?? monitoring.updatedAt} />
             </div>
           </div>

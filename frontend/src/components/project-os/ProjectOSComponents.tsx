@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, MoreVertical, Sparkles, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -306,9 +307,11 @@ export function ProjectOsActionButton({
     );
   }
   return (
-    <Button className={className} disabled size="sm" type="button" variant={variant}>
-      {label}
-    </Button>
+    <DisabledAction disabled reason="This action is not available yet.">
+      <Button className={className} disabled size="sm" type="button" variant={variant}>
+        {label}
+      </Button>
+    </DisabledAction>
   );
 }
 
@@ -558,9 +561,11 @@ export function QuickAccessAppTile({
       <Link to={to}>{actionLabel}</Link>
     </Button>
   ) : (
-    <Button className={primaryButtonClass} disabled={!onAction} onClick={onAction} size="sm" type="button">
-      {actionLabel}
-    </Button>
+    <DisabledAction disabled={!onAction} reason="This action is not available yet.">
+      <Button className={primaryButtonClass} disabled={!onAction} onClick={onAction} size="sm" type="button">
+        {actionLabel}
+      </Button>
+    </DisabledAction>
   );
   const secondaryAction = secondaryActionLabel ? secondaryHref ? (
     <Button asChild className={secondaryButtonClass} size="sm" variant="outline">
@@ -571,9 +576,11 @@ export function QuickAccessAppTile({
       <Link to={secondaryTo}>{secondaryActionLabel}</Link>
     </Button>
   ) : (
-    <Button className={secondaryButtonClass} disabled={!secondaryOnAction} onClick={secondaryOnAction} size="sm" type="button" variant="outline">
-      {secondaryActionLabel}
-    </Button>
+    <DisabledAction disabled={!secondaryOnAction} reason="This secondary action is not available yet.">
+      <Button className={secondaryButtonClass} disabled={!secondaryOnAction} onClick={secondaryOnAction} size="sm" type="button" variant="outline">
+        {secondaryActionLabel}
+      </Button>
+    </DisabledAction>
   ) : null;
   const detailRoute = secondaryTo ?? to ?? '/apps';
 

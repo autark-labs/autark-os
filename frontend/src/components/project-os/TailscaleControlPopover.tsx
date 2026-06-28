@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, CircleAlert, Copy, ExternalLink, LockKeyhole, Network, RefreshCw, Terminal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -127,18 +128,22 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
           {actions.map((action) => {
             if (action.id === 'refresh') {
               return (
-                <Button disabled={refreshing} key={action.id} onClick={load} size="sm" type="button" variant="outline">
-                  <RefreshCw data-icon="inline-start" className={cn(refreshing && 'animate-spin')} />
-                  {action.label}
-                </Button>
+                <DisabledAction disabled={refreshing} key={action.id} reason="Tailscale status is already refreshing.">
+                  <Button disabled={refreshing} onClick={load} size="sm" type="button" variant="outline">
+                    <RefreshCw data-icon="inline-start" className={cn(refreshing && 'animate-spin')} />
+                    {action.label}
+                  </Button>
+                </DisabledAction>
               );
             }
             if (action.id === 'copy-hostname') {
               return (
-                <Button disabled={!action.enabled} key={action.id} onClick={copyHostname} size="sm" type="button" variant="outline">
-                  {copied ? <CheckCircle2 data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
-                  {action.label}
-                </Button>
+                <DisabledAction disabled={!action.enabled} key={action.id} reason="Connect Tailscale before copying a private hostname.">
+                  <Button disabled={!action.enabled} onClick={copyHostname} size="sm" type="button" variant="outline">
+                    {copied ? <CheckCircle2 data-icon="inline-start" /> : <Copy data-icon="inline-start" />}
+                    {action.label}
+                  </Button>
+                </DisabledAction>
               );
             }
             if (action.external) {

@@ -30,6 +30,7 @@ import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, surfaceFrameClass, surfacePanelClass } from '@/components/project-os/ProjectOSComponents';
 import {
@@ -266,14 +267,18 @@ function SettingsPage() {
           <Badge className={cn('border', dirty ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
             {dirty ? 'Unsaved changes' : 'Saved'}
           </Badge>
-          <Button className={poButtonClass('quiet')} disabled={refreshing} onClick={() => { void load(true); void doctorQuery.refetch(); }} type="button" variant="outline">
-            <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
-            Refresh
-          </Button>
-          <Button className={poButtonClass('primary')} disabled={!dirty || saving} onClick={() => void save()} type="button">
-            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {saving ? 'Saving' : 'Save changes'}
-          </Button>
+          <DisabledAction disabled={refreshing} reason="Settings are already refreshing.">
+            <Button className={poButtonClass('quiet')} disabled={refreshing} onClick={() => { void load(true); void doctorQuery.refetch(); }} type="button" variant="outline">
+              <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+              Refresh
+            </Button>
+          </DisabledAction>
+          <DisabledAction disabled={!dirty || saving} reason={saving ? 'Project OS is already saving these settings.' : 'Make a change before saving settings.'}>
+            <Button className={poButtonClass('primary')} disabled={!dirty || saving} onClick={() => void save()} type="button">
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {saving ? 'Saving' : 'Save changes'}
+            </Button>
+          </DisabledAction>
         </div>
         </div>
         <div className="grid gap-4 p-5 md:grid-cols-3">

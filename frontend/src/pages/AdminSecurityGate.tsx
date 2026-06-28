@@ -3,6 +3,7 @@ import { Lock, ShieldCheck } from 'lucide-react';
 import { AdminSecurityAPIClient, type AdminSecurityStatus } from '@/api/AdminSecurityAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { writeAdminToken } from '@/lib/adminSecuritySession';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -16,6 +17,12 @@ function AdminSecurityGate({ status, onAuthenticated }: AdminSecurityGateProps) 
   const [setupCode, setSetupCode] = useState(status.setupCode || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const submitDisabled = busy || password.length < 12 || (!status.claimed && !setupCode.trim());
+  const submitDisabledReason = busy
+    ? 'Project OS is already checking this admin login.'
+    : password.length < 12
+      ? 'Enter an admin password with at least 12 characters.'
+      : 'Confirm the setup code before claiming Project OS.';
 
   async function submit() {
     setBusy(true);
@@ -73,9 +80,11 @@ function AdminSecurityGate({ status, onAuthenticated }: AdminSecurityGateProps) 
 
         {error && <div className="mt-4 rounded-lg border border-red-300/20 bg-red-500/10 p-3 text-sm text-red-100">{error}</div>}
 
-        <Button className="mt-5 w-full bg-violet-600 text-white hover:bg-violet-500" disabled={busy || password.length < 12 || (!status.claimed && !setupCode.trim())} onClick={submit} type="button">
-          {status.claimed ? 'Log in' : 'Claim and continue'}
-        </Button>
+        <DisabledAction className="mt-5 w-full" disabled={submitDisabled} reason={submitDisabledReason}>
+          <Button className="w-full bg-violet-600 text-white hover:bg-violet-500" disabled={submitDisabled} onClick={submit} type="button">
+            {status.claimed ? 'Log in' : 'Claim and continue'}
+          </Button>
+        </DisabledAction>
       </section>
     </main>
   );

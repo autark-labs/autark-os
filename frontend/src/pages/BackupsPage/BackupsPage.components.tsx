@@ -199,10 +199,12 @@ export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, 
           <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={onClose} type="button" variant="outline">Close</Button>
           {point && (
             <>
-              <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={running === `verify-${point.id}`} onClick={() => onVerify(point)} type="button" variant="outline">
-                {running === `verify-${point.id}` ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
-                Verify
-              </Button>
+              <DisabledAction disabled={running === `verify-${point.id}`} reason="Project OS is already verifying this restore point.">
+                <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={running === `verify-${point.id}`} onClick={() => onVerify(point)} type="button" variant="outline">
+                  {running === `verify-${point.id}` ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                  Verify
+                </Button>
+              </DisabledAction>
               <Button className="bg-violet-600 text-white hover:bg-violet-500" onClick={() => onRestore(point)} type="button">
                 <RotateCcw className="size-4" />
                 Restore
@@ -341,13 +343,17 @@ function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, run
           <Button className="bg-violet-600 text-white hover:bg-violet-500" onClick={() => onRestore(point, null)} size="sm" type="button">
             Restore all
           </Button>
-          <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button" variant="outline">
-            One app
-          </Button>
-          <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={running} onClick={() => onVerify(point)} size="sm" type="button" variant="outline">
-            {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
-            Verify
-          </Button>
+          <DisabledAction disabled={!eligibleApps.length} reason="No currently installed app matches this restore point.">
+            <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button" variant="outline">
+              One app
+            </Button>
+          </DisabledAction>
+          <DisabledAction disabled={running} reason="Project OS is already verifying this restore point.">
+            <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={running} onClick={() => onVerify(point)} size="sm" type="button" variant="outline">
+              {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+              Verify
+            </Button>
+          </DisabledAction>
         </div>
       </div>
     </div>
@@ -380,13 +386,17 @@ function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, running 
             Restore all
           </Button>
         )}
-        <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button" variant="outline">
-          Restore app
-        </Button>
-        <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={running} onClick={() => onVerify(point)} size="sm" type="button" variant="outline">
-          {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
-          Verify
-        </Button>
+        <DisabledAction disabled={!eligibleApps.length} reason="No currently installed app matches this restore point.">
+          <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button" variant="outline">
+            Restore app
+          </Button>
+        </DisabledAction>
+        <DisabledAction disabled={running} reason="Project OS is already verifying this restore point.">
+          <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={running} onClick={() => onVerify(point)} size="sm" type="button" variant="outline">
+            {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+            Verify
+          </Button>
+        </DisabledAction>
       </div>
     </SurfaceInset>
   );

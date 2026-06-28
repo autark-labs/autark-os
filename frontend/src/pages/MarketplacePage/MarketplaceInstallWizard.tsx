@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { HelpCircle, TriangleAlert } from 'lucide-react';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -43,6 +44,8 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
+  const installDisabled = installing || installLocked;
+  const installDisabledReason = installing ? `${app.name} is already installing.` : installStatusMessage || 'Resolve the blocked install state before continuing.';
 
   async function startInstall() {
     await onInstall(installOptions);
@@ -98,9 +101,11 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
           <Button className={poButtonClass('quiet')} onClick={() => onRequestPlan(installOptions)} type="button" variant="outline">
             {planLoading ? 'Checking...' : 'Preview'}
           </Button>
-          <Button className={poButtonClass('primary')} disabled={installing || installLocked} onClick={startInstall} type="button">
-            {installing ? 'Installing...' : installLocked ? 'Install blocked' : `Install ${app.name}`}
-          </Button>
+          <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
+            <Button className={poButtonClass('primary')} disabled={installDisabled} onClick={startInstall} type="button">
+              {installing ? 'Installing...' : installLocked ? 'Install blocked' : `Install ${app.name}`}
+            </Button>
+          </DisabledAction>
         </DialogFooter>
       </DialogContent>
     </Dialog>

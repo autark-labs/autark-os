@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ExternalLink, Pin, RefreshCw, ShieldAlert } from 'lucide-react';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageSection, PageShell, SoftCard, StatusPill } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
@@ -96,10 +97,12 @@ function ResolveExistingAppsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button disabled={appState.isFetching} onClick={() => void refreshObservedServices()} type="button" variant="outline">
-            <RefreshCw className={cn('size-4', appState.isFetching && 'animate-spin')} />
-            Refresh
-          </Button>
+          <DisabledAction disabled={appState.isFetching} reason="Project OS is already refreshing existing apps.">
+            <Button disabled={appState.isFetching} onClick={() => void refreshObservedServices()} type="button" variant="outline">
+              <RefreshCw className={cn('size-4', appState.isFetching && 'animate-spin')} />
+              Refresh
+            </Button>
+          </DisabledAction>
           <Button asChild>
             <Link to="/apps">My Apps</Link>
           </Button>
@@ -199,10 +202,12 @@ function ServiceSummaryCard({
           Review
         </Button>
         {canPin && (
-          <Button disabled={busy} onClick={onPin} size="sm" type="button" variant="outline">
-            <Pin className="size-4" />
-            Pin to My Apps
-          </Button>
+          <DisabledAction disabled={busy} reason="Project OS is already pinning this service.">
+            <Button disabled={busy} onClick={onPin} size="sm" type="button" variant="outline">
+              <Pin className="size-4" />
+              Pin to My Apps
+            </Button>
+          </DisabledAction>
         )}
       </div>
     </SoftCard>
@@ -263,15 +268,19 @@ function ServiceDetailsPreview({
         <div className="mt-5 grid gap-3 rounded-lg border border-po-border bg-po-surface-inset p-4">
           <h3 className="m-0 text-base font-bold text-po-text">Available Actions</h3>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={!onReview} onClick={onReview} type="button">
-              <ShieldAlert className="size-4" />
-              Review service details
-            </Button>
-            {canPin && (
-              <Button disabled={busy || !onPin} onClick={onPin} type="button" variant="outline">
-                <Pin className="size-4" />
-                Pin to My Apps
+            <DisabledAction disabled={!onReview} reason="Select a found service before reviewing details.">
+              <Button disabled={!onReview} onClick={onReview} type="button">
+                <ShieldAlert className="size-4" />
+                Review service details
               </Button>
+            </DisabledAction>
+            {canPin && (
+              <DisabledAction disabled={busy || !onPin} reason={busy ? 'Project OS is already pinning this service.' : 'Select a found service before pinning it.'}>
+                <Button disabled={busy || !onPin} onClick={onPin} type="button" variant="outline">
+                  <Pin className="size-4" />
+                  Pin to My Apps
+                </Button>
+              </DisabledAction>
             )}
           </div>
         </div>

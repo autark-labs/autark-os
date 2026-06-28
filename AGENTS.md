@@ -67,6 +67,18 @@ Required behavior:
 
 For application state specifically, Home, My Apps, Discover, Access, Backups, Storage, Monitoring, Settings, Support, and onboarding/setup must not independently decide what is installed, pinned, found, recoverable, or managed. Those states must come from the canonical application-state model.
 
+### No partial cross-surface product behavior
+
+When implementing a user-facing behavior pattern, update every active surface that exposes that behavior in the same pass. Examples include disabled-action explanations, install job progress, ownership labels, action notifications, app status badges, and recovery/cleanup safety copy.
+
+Required behavior:
+
+- Identify the active pages, dialogs, drawers, popovers, cards, and shared components that expose the behavior before editing.
+- Update every active surface or stop and ask for an explicit lean-slice exception before coding.
+- A lean-slice exception must name the excluded surfaces, explain why they are excluded, and leave a concrete follow-up story or checklist.
+- Do not report a behavior as implemented if only the primary page, happy path, or newest component reflects it.
+- Prefer shared components and contract tests for cross-surface behaviors so future changes cannot quietly drift back into partial implementations.
+
 ### Prefer additive refactors over broad rewrites
 
 Refactor behind stable APIs/components when possible. Do not churn unrelated files. Preserve working behavior while simplifying the implementation.

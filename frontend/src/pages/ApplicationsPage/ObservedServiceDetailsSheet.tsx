@@ -4,6 +4,7 @@ import { ExternalLink, Loader2, Pin, PinOff, RotateCcw, Search, ShieldAlert } fr
 import { Link } from 'react-router-dom';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -170,16 +171,20 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                 </Button>
               )}
               {canPin && (
-                <Button disabled={busyAction !== null} onClick={() => runMutation('pin', () => ObservedServicesAPIClient.pin(service.id), { optimisticPinned: true, refresh: false })} size="sm" type="button">
-                  {busyAction === 'pin' ? <Loader2 className="size-4 animate-spin" /> : <Pin className="size-4" />}
-                  Pin to My Apps
-                </Button>
+                <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before pinning.">
+                  <Button disabled={busyAction !== null} onClick={() => runMutation('pin', () => ObservedServicesAPIClient.pin(service.id), { optimisticPinned: true, refresh: false })} size="sm" type="button">
+                    {busyAction === 'pin' ? <Loader2 className="size-4 animate-spin" /> : <Pin className="size-4" />}
+                    Pin to My Apps
+                  </Button>
+                </DisabledAction>
               )}
               {canUnpin && (
-                <Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" disabled={busyAction !== null} onClick={() => runMutation('unpin', () => ObservedServicesAPIClient.unpin(service.id), { optimisticPinned: false, refresh: false })} size="sm" type="button" variant="outline">
-                  {busyAction === 'unpin' ? <Loader2 className="size-4 animate-spin" /> : <PinOff className="size-4" />}
-                  Unpin from My Apps
-                </Button>
+                <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before unpinning.">
+                  <Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" disabled={busyAction !== null} onClick={() => runMutation('unpin', () => ObservedServicesAPIClient.unpin(service.id), { optimisticPinned: false, refresh: false })} size="sm" type="button" variant="outline">
+                    {busyAction === 'unpin' ? <Loader2 className="size-4 animate-spin" /> : <PinOff className="size-4" />}
+                    Unpin from My Apps
+                  </Button>
+                </DisabledAction>
               )}
               {canInstallCopy && (
                 <Button asChild className="border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15" size="sm" variant="outline">
@@ -202,10 +207,12 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                 <Label htmlFor="observed-service-match">Catalog app id</Label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input id="observed-service-match" onChange={(event) => setMatchValue(event.target.value)} placeholder="vaultwarden" value={matchValue} />
-                  <Button disabled={busyAction !== null} onClick={() => runMutation('match', () => ObservedServicesAPIClient.match(service.id, matchValue.trim() || null))} type="button" variant="outline">
-                    {busyAction === 'match' ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                    Save match
-                  </Button>
+                  <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before saving this match.">
+                    <Button disabled={busyAction !== null} onClick={() => runMutation('match', () => ObservedServicesAPIClient.match(service.id, matchValue.trim() || null))} type="button" variant="outline">
+                      {busyAction === 'match' ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                      Save match
+                    </Button>
+                  </DisabledAction>
                 </div>
               </div>
             </section>
@@ -218,10 +225,12 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                 <p className="mt-1 text-sm leading-6 text-amber-100/75">{adoptionAction.disabled ? adoptionAction.reason || 'This service cannot be adopted safely yet.' : 'Review the plan before Project OS takes control of this service.'}</p>
               </div>
               {canAdopt && !plan && (
-                <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={busyAction !== null} onClick={loadPlan} type="button">
-                  {busyAction === 'adoption_plan' ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
-                  Review adoption plan
-                </Button>
+                <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before loading an adoption plan.">
+                  <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={busyAction !== null} onClick={loadPlan} type="button">
+                    {busyAction === 'adoption_plan' ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
+                    Review adoption plan
+                  </Button>
+                </DisabledAction>
               )}
               {plan && (
                 <div className="grid gap-3 text-sm">
@@ -241,10 +250,12 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                     </div>
                   )}
                   {planAvailable && (
-                    <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={adoptDisabled} onClick={() => runMutation('adopt', () => ObservedServicesAPIClient.adopt(service.id, confirmation), { optimisticAdopt: true, refresh: false })} type="button">
-                      {busyAction === 'adopt' ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
-                      Adopt service
-                    </Button>
+                    <DisabledAction disabled={adoptDisabled} reason={busyAction !== null ? 'Wait for the current service action to finish before adopting.' : blockedReasons.length > 0 ? 'Resolve the blocked adoption items before adopting this service.' : confirmationText ? 'Type the confirmation text exactly before adopting this service.' : 'This adoption plan is not available yet.'}>
+                      <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={adoptDisabled} onClick={() => runMutation('adopt', () => ObservedServicesAPIClient.adopt(service.id, confirmation), { optimisticAdopt: true, refresh: false })} type="button">
+                        {busyAction === 'adopt' ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
+                        Adopt service
+                      </Button>
+                    </DisabledAction>
                   )}
                 </div>
               )}

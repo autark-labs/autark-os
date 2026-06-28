@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
 import { Badge } from '@/components/ui/badge';
@@ -295,16 +296,18 @@ function SummaryRow({ label, tone, value }: { label: string; tone: string; value
 
 function DiagnosticAction({ busy = false, detail, icon: Icon, label, onClick }: { busy?: boolean; detail: string; icon: LucideIcon; label: string; onClick: () => void }) {
   return (
-    <button className="rounded-lg border border-white/10 bg-slate-950/70 p-5 text-left shadow-po-panel transition hover:border-sky-300/30 hover:bg-slate-900/80" disabled={busy} onClick={onClick} type="button">
-      <div className="flex items-center justify-between gap-3">
-        <span className="grid size-10 place-items-center rounded-lg border border-sky-300/20 bg-sky-500/10 text-sky-100">
-          {busy ? <RefreshCw className="size-5 animate-spin" /> : <Icon className="size-5" />}
-        </span>
-        <span className="text-sm font-bold uppercase text-slate-500">Action</span>
-      </div>
-      <p className="mt-4 text-xl font-black text-white">{label}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{detail}</p>
-    </button>
+    <DisabledAction className="w-full" disabled={busy} reason="Project OS is already preparing support information.">
+      <button className="w-full rounded-lg border border-white/10 bg-slate-950/70 p-5 text-left shadow-po-panel transition hover:border-sky-300/30 hover:bg-slate-900/80" disabled={busy} onClick={onClick} type="button">
+        <div className="flex items-center justify-between gap-3">
+          <span className="grid size-10 place-items-center rounded-lg border border-sky-300/20 bg-sky-500/10 text-sky-100">
+            {busy ? <RefreshCw className="size-5 animate-spin" /> : <Icon className="size-5" />}
+          </span>
+          <span className="text-sm font-bold uppercase text-slate-500">Action</span>
+        </div>
+        <p className="mt-4 text-xl font-black text-white">{label}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-400">{detail}</p>
+      </button>
+    </DisabledAction>
   );
 }
 

@@ -3,6 +3,7 @@ import { AlertTriangle, Archive, CheckCircle2, Copy, Database, FolderSearch, Har
 import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -358,10 +359,12 @@ function CleanupDialog({ confirmation, loading, onChange, onClose, onConfirm, ta
         )}
         <DialogFooter>
           <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={onClose} type="button" variant="outline">Cancel</Button>
-          <Button className="bg-red-600 text-white hover:bg-red-500" disabled={!canConfirm || loading} onClick={onConfirm} type="button">
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-            Create checkpoint and remove
-          </Button>
+          <DisabledAction disabled={!canConfirm || loading} reason={loading ? 'Project OS is already preparing this cleanup.' : 'Type the folder name exactly before cleanup can continue.'}>
+            <Button className="bg-red-600 text-white hover:bg-red-500" disabled={!canConfirm || loading} onClick={onConfirm} type="button">
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Create checkpoint and remove
+            </Button>
+          </DisabledAction>
         </DialogFooter>
       </DialogContent>
     </Dialog>

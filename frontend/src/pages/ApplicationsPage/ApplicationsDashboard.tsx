@@ -19,6 +19,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry, AppUpdateStatus } from '@/types/app';
@@ -336,15 +337,19 @@ function PinnedExternalCard({ app, onReviewService }: { app: AppOwnershipView; o
             </a>
           </Button>
         ) : (
-          <Button className="bg-slate-800 text-slate-300 hover:bg-slate-700" disabled size="sm" type="button">
-            <ExternalLink className="size-4" />
-            No link yet
-          </Button>
+          <DisabledAction disabled reason="This pinned service does not have an openable link yet.">
+            <Button className="bg-slate-800 text-slate-300 hover:bg-slate-700" disabled size="sm" type="button">
+              <ExternalLink className="size-4" />
+              No link yet
+            </Button>
+          </DisabledAction>
         )}
-        <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!service} onClick={() => service && onReviewService(service.id)} size="sm" type="button" variant="outline">
-          <Settings2 className="size-4" />
-          Review
-        </Button>
+        <DisabledAction disabled={!service} reason="Project OS has not matched this pinned service to an observed service yet.">
+          <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={!service} onClick={() => service && onReviewService(service.id)} size="sm" type="button" variant="outline">
+            <Settings2 className="size-4" />
+            Review
+          </Button>
+        </DisabledAction>
       </div>
     </article>
   );
@@ -401,10 +406,12 @@ function ApplicationCard({ access, actionLoading, app, health, isSelected, onAct
             </a>
           </Button>
         ) : (
-          <Button className="bg-slate-800 text-slate-300 hover:bg-slate-700" disabled size="sm" type="button">
-            <ExternalLink className="size-4" />
-            No link yet
-          </Button>
+          <DisabledAction disabled reason="This app does not have an openable link yet. Open Manage to review access setup.">
+            <Button className="bg-slate-800 text-slate-300 hover:bg-slate-700" disabled size="sm" type="button">
+              <ExternalLink className="size-4" />
+              No link yet
+            </Button>
+          </DisabledAction>
         )}
         <Button className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onManage(app.appId)} size="sm" type="button" variant="outline">
           <Settings2 className="size-4" />
@@ -478,10 +485,12 @@ function ExpandedAppManagement({ access, app, actionLoading, health, onAction, o
       {update?.updateAvailable && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-sky-300/20 bg-sky-500/10 px-3 py-2 text-sm text-sky-100">
           <span>{update.appName} has a trusted catalog update. Project OS will verify a backup before redeploying.</span>
-          <Button className="bg-sky-500 text-slate-950 hover:bg-sky-400" disabled={busy} onClick={() => onUpdate(app.appId)} size="sm" type="button">
-            {actionLoading === 'update' ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
-            Update
-          </Button>
+          <DisabledAction disabled={busy} reason="Wait for the current app action to finish before updating.">
+            <Button className="bg-sky-500 text-slate-950 hover:bg-sky-400" disabled={busy} onClick={() => onUpdate(app.appId)} size="sm" type="button">
+              {actionLoading === 'update' ? <Loader2 className="size-4 animate-spin" /> : <UploadCloud className="size-4" />}
+              Update
+            </Button>
+          </DisabledAction>
         </div>
       )}
       {usageGuide && <ApplicationsUsageGuide guide={usageGuide} />}
@@ -497,10 +506,12 @@ function ExpandedAppManagement({ access, app, actionLoading, health, onAction, o
         </div>
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           {repairSuggested && (
-            <Button className="bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={busy} onClick={() => onAction(app.appId, 'repair')} size="sm" type="button">
-              {actionLoading === 'repair' ? <Loader2 className="size-4 animate-spin" /> : <BadgeAlert className="size-4" />}
-              Try to fix
-            </Button>
+            <DisabledAction disabled={busy} reason="Wait for the current app action to finish before repairing.">
+              <Button className="bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={busy} onClick={() => onAction(app.appId, 'repair')} size="sm" type="button">
+                {actionLoading === 'repair' ? <Loader2 className="size-4 animate-spin" /> : <BadgeAlert className="size-4" />}
+                Try to fix
+              </Button>
+            </DisabledAction>
           )}
           {app.accessUrl && (
             <Button asChild className="bg-violet-600 text-white hover:bg-violet-500" size="sm">
@@ -510,14 +521,18 @@ function ExpandedAppManagement({ access, app, actionLoading, health, onAction, o
               </a>
             </Button>
           )}
-          <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={busy} onClick={() => onAction(app.appId, status === 'Paused' ? 'start' : 'stop')} size="sm" type="button" variant="outline">
-            {status === 'Paused' ? <Play className="size-4" /> : <Square className="size-4" />}
-            {status === 'Paused' ? 'Start' : 'Pause'}
-          </Button>
-          <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={busy} onClick={() => onAction(app.appId, 'restart')} size="sm" type="button" variant="outline">
-            {actionLoading === 'restart' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
-            Restart
-          </Button>
+          <DisabledAction disabled={busy} reason="Wait for the current app action to finish before changing runtime state.">
+            <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={busy} onClick={() => onAction(app.appId, status === 'Paused' ? 'start' : 'stop')} size="sm" type="button" variant="outline">
+              {status === 'Paused' ? <Play className="size-4" /> : <Square className="size-4" />}
+              {status === 'Paused' ? 'Start' : 'Pause'}
+            </Button>
+          </DisabledAction>
+          <DisabledAction disabled={busy} reason="Wait for the current app action to finish before restarting.">
+            <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={busy} onClick={() => onAction(app.appId, 'restart')} size="sm" type="button" variant="outline">
+              {actionLoading === 'restart' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
+              Restart
+            </Button>
+          </DisabledAction>
           <Button asChild className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" size="sm" variant="outline">
             <Link to="/access">Manage access</Link>
           </Button>
@@ -525,10 +540,12 @@ function ExpandedAppManagement({ access, app, actionLoading, health, onAction, o
             <Link to="/backups">Backups</Link>
           </Button>
           {update?.rollbackAvailable && (
-            <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={busy} onClick={() => onRollback(app.appId)} size="sm" type="button" variant="outline">
-              {actionLoading === 'rollback' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
-              Roll back
-            </Button>
+            <DisabledAction disabled={busy} reason="Wait for the current app action to finish before rolling back.">
+              <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={busy} onClick={() => onRollback(app.appId)} size="sm" type="button" variant="outline">
+                {actionLoading === 'rollback' ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
+                Roll back
+              </Button>
+            </DisabledAction>
           )}
           <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onManage(app.appId)} size="sm" type="button" variant="outline">
             <Settings2 className="size-4" />

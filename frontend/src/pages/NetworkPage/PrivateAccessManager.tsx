@@ -134,12 +134,14 @@ export function PrivateAccessManager({
                   </div>
                 </div>
                 <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button className="border-amber-300/30 bg-slate-950/50 text-amber-100 hover:bg-slate-900" disabled={!mapping.servePort || loadingAppId === `stale-${mapping.servePort}`} type="button" variant="outline">
-                      <Trash2 className={cn('size-4', loadingAppId === `stale-${mapping.servePort}` && 'animate-pulse')} />
-                      Review stale link
-                    </Button>
-                  </AlertDialogTrigger>
+                  <DisabledAction disabled={!mapping.servePort || loadingAppId === `stale-${mapping.servePort}`} reason={!mapping.servePort ? 'Project OS needs the stale Tailscale port before it can review cleanup.' : 'Project OS is already reviewing this stale private link.'}>
+                    <AlertDialogTrigger asChild>
+                      <Button className="border-amber-300/30 bg-slate-950/50 text-amber-100 hover:bg-slate-900" disabled={!mapping.servePort || loadingAppId === `stale-${mapping.servePort}`} type="button" variant="outline">
+                        <Trash2 className={cn('size-4', loadingAppId === `stale-${mapping.servePort}` && 'animate-pulse')} />
+                        Review stale link
+                      </Button>
+                    </AlertDialogTrigger>
+                  </DisabledAction>
                   <AlertDialogContent className="border-amber-300/20 bg-slate-950 text-slate-100">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Remove this stale private link?</AlertDialogTitle>
@@ -230,9 +232,11 @@ function PrivateLinksTable({
                   Check
                 </Button>
               </DisabledAction>
-              <Button aria-label={`Turn off private access for ${access.app.appName}`} className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={loadingAppId === access.app.appId} onClick={() => onTurnOffPrivateAccess(access.app)} size="icon-sm" type="button" variant="outline">
-                <ShieldOff className={cn('size-3.5', loadingAppId === access.app.appId && 'animate-pulse')} />
-              </Button>
+              <DisabledAction disabled={loadingAppId === access.app.appId} reason="Wait for the current private access update to finish before turning this off.">
+                <Button aria-label={`Turn off private access for ${access.app.appName}`} className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" disabled={loadingAppId === access.app.appId} onClick={() => onTurnOffPrivateAccess(access.app)} size="icon-sm" type="button" variant="outline">
+                  <ShieldOff className={cn('size-3.5', loadingAppId === access.app.appId && 'animate-pulse')} />
+                </Button>
+              </DisabledAction>
             </div>
           </div>
         ))}

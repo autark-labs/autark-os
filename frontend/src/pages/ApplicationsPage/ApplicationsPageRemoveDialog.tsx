@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Loader2, ShieldCheck, Trash2 } from 'lucide-react';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -42,10 +43,12 @@ export function UninstallDialog({ app, disabled, iconOnly = false, onUninstall }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button className="border-red-400/30 bg-red-500/10 text-red-100 hover:bg-red-500/20" disabled={disabled} onClick={openPlan} size={iconOnly ? 'icon-sm' : 'default'} title="Remove app" type="button" variant="outline">
-        <Trash2 className="size-4" />
-        {iconOnly ? <span className="sr-only">Remove {app.appName}</span> : 'Remove'}
-      </Button>
+      <DisabledAction disabled={disabled} reason="Wait for the current app action to finish before removing this app.">
+        <Button className="border-red-400/30 bg-red-500/10 text-red-100 hover:bg-red-500/20" disabled={disabled} onClick={openPlan} size={iconOnly ? 'icon-sm' : 'default'} title="Remove app" type="button" variant="outline">
+          <Trash2 className="size-4" />
+          {iconOnly ? <span className="sr-only">Remove {app.appName}</span> : 'Remove'}
+        </Button>
+      </DisabledAction>
       <DialogContent className="border-slate-700 bg-slate-950 text-slate-100 sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="text-white">Remove {app.appName}</DialogTitle>
@@ -79,7 +82,9 @@ export function UninstallDialog({ app, disabled, iconOnly = false, onUninstall }
         )}
         <DialogFooter className="border-slate-800 bg-slate-900/80">
           <Button className="border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => setOpen(false)} type="button" variant="outline">Cancel</Button>
-          <Button className="bg-red-600 text-white hover:bg-red-500" disabled={!confirmed || !plan} onClick={removeApp} type="button">Remove app</Button>
+          <DisabledAction disabled={!confirmed || !plan} reason={!plan ? 'Wait for the uninstall plan to load.' : 'Confirm that Project OS should remove the app while keeping its data.'}>
+            <Button className="bg-red-600 text-white hover:bg-red-500" disabled={!confirmed || !plan} onClick={removeApp} type="button">Remove app</Button>
+          </DisabledAction>
         </DialogFooter>
       </DialogContent>
     </Dialog>

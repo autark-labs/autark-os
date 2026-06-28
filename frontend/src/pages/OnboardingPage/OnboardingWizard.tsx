@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Network, ServerCog, ShieldCheck, Sparkles } from 'lucide-react';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -129,6 +130,12 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const canFinish = readiness.canCompleteOnboarding && (!readiness.finishAnywayRequiresAdvanced || advancedFinish);
   const existingInstall = setupStatus?.existingInstall;
   const showExistingInstallWarning = Boolean(existingInstall?.conflict || (setupStatus?.devMode && existingInstall?.resources?.length));
+  const finishDisabled = saving || !canFinish;
+  const finishDisabledReason = saving
+    ? 'Project OS is already saving setup.'
+    : readiness.finishAnywayRequiresAdvanced && !advancedFinish
+      ? 'Review Advanced finish before continuing with remaining setup items.'
+      : readiness.summary;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.26),transparent_34%),linear-gradient(135deg,#020617,#0f172a)] p-4 text-slate-100 md:p-8">
@@ -353,10 +360,12 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </CollapsibleContent>
               </Collapsible>
             )}
-            <Button className="mt-5 w-full bg-violet-600 text-white hover:bg-violet-500" disabled={saving || !canFinish} onClick={finish} type="button">
-              {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-              {readiness.finishAnywayRequiresAdvanced && advancedFinish ? 'Finish anyway' : 'Finish setup'}
-            </Button>
+            <DisabledAction className="mt-5 w-full" disabled={finishDisabled} reason={finishDisabledReason}>
+              <Button className="w-full bg-violet-600 text-white hover:bg-violet-500" disabled={finishDisabled} onClick={finish} type="button">
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                {readiness.finishAnywayRequiresAdvanced && advancedFinish ? 'Finish anyway' : 'Finish setup'}
+              </Button>
+            </DisabledAction>
             {!readiness.canCompleteOnboarding && <p className="mt-3 text-sm text-amber-200">{readiness.summary}</p>}
           </aside>
         </div>

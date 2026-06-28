@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { JobProgress } from '@/components/project-os/JobProgress';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -56,6 +57,12 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
   const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
+  const installDisabled = installing || installLocked || !setupReady;
+  const installDisabledReason = installing
+    ? `${app.name} is already installing.`
+    : installLocked
+      ? installStatusMessage || 'Another install is active.'
+      : 'Finish the required install choices before installing.';
 
   function openInstallReview() {
     setInstallReviewOpen(true);
@@ -118,20 +125,26 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
                   </Link>
                 </Button>
               ) : (
-                <Button className="bg-amber-500 text-slate-950" disabled type="button">
-                  <TriangleAlert className="size-4" />
-                  Review existing service
-                </Button>
+                <DisabledAction disabled reason="Project OS cannot open the existing service review yet. Refresh existing apps and try again.">
+                  <Button className="bg-amber-500 text-slate-950" disabled type="button">
+                    <TriangleAlert className="size-4" />
+                    Review existing service
+                  </Button>
+                </DisabledAction>
               )}
-              <Button className={poButtonClass('quiet')} disabled={installing || installLocked || !setupReady} onClick={openDuplicateWarning} type="button" variant="outline">
-                Install second copy
-              </Button>
+              <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
+                <Button className={poButtonClass('quiet')} disabled={installDisabled} onClick={openDuplicateWarning} type="button" variant="outline">
+                  Install second copy
+                </Button>
+              </DisabledAction>
             </>
           ) : (
-            <Button className={poButtonClass('primary')} disabled={installing || installLocked || !setupReady} onClick={openInstallReview} type="button">
-              {installing ? <Loader2 className="size-4 animate-spin" /> : null}
-              {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish install choices' : 'Install'}
-            </Button>
+            <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
+              <Button className={poButtonClass('primary')} disabled={installDisabled} onClick={openInstallReview} type="button">
+                {installing ? <Loader2 className="size-4 animate-spin" /> : null}
+                {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish install choices' : 'Install'}
+              </Button>
+            </DisabledAction>
           )}
           <DocsSourceMenu app={app} />
           {!isInstalled && <InstallWizard app={app} hideTrigger installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installStatusMessage={!setupReady ? 'Finish the required install choices before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onRequestPlan={onRequestPlan} onSetupAnswersChange={onSetupAnswersChange} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} setupSchema={setupSchema} />}
@@ -213,10 +226,12 @@ function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
                   </a>
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled>
-                  View source
-                  <span className="ml-auto text-xs text-slate-500">Unavailable</span>
-                </DropdownMenuItem>
+                <DisabledAction className="w-full" disabled reason="This catalog app does not publish a source URL yet.">
+                  <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled>
+                    View source
+                    <span className="ml-auto text-xs text-slate-500">Unavailable</span>
+                  </DropdownMenuItem>
+                </DisabledAction>
               )}
               {app.documentationUrl ? (
                 <DropdownMenuItem asChild className="focus:bg-slate-800 focus:text-white">
@@ -227,10 +242,12 @@ function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
                   </a>
                 </DropdownMenuItem>
               ) : (
-                <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled>
-                  Read docs
-                  <span className="ml-auto text-xs text-slate-500">Unavailable</span>
-                </DropdownMenuItem>
+                <DisabledAction className="w-full" disabled reason="This catalog app does not publish documentation yet.">
+                  <DropdownMenuItem className="focus:bg-slate-800 focus:text-white" disabled>
+                    Read docs
+                    <span className="ml-auto text-xs text-slate-500">Unavailable</span>
+                  </DropdownMenuItem>
+                </DisabledAction>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -311,9 +328,11 @@ function RecoveryInstallNotice({ disabled, mode: _mode, onReinstallCurrent }: { 
                 Open Backups
               </Link>
             </Button>
-            <Button className="bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={disabled} onClick={onReinstallCurrent} size="sm" type="button">
-              I backed up, reinstall
-            </Button>
+            <DisabledAction disabled={disabled} reason="Wait for the active install or reinstall job to finish.">
+              <Button className="bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={disabled} onClick={onReinstallCurrent} size="sm" type="button">
+                I backed up, reinstall
+              </Button>
+            </DisabledAction>
           </div>
         </div>
       </div>
@@ -386,10 +405,12 @@ function InlineInstallStatus({
                   </Button>
                 )}
                 {installedApp && shouldOfferFirstBackup(installedApp) && (
-                  <Button className={poButtonClass('quiet')} disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appId)} size="sm" type="button" variant="outline">
-                    {backupJob && !terminalJob(backupJob) ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
-                    {backupJob?.status === 'succeeded' ? 'Backup created' : backupJob && !terminalJob(backupJob) ? 'Creating backup' : 'Create first backup'}
-                  </Button>
+                  <DisabledAction disabled={backupJob ? !terminalJob(backupJob) : false} reason="Project OS is already creating the first backup for this app.">
+                    <Button className={poButtonClass('quiet')} disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appId)} size="sm" type="button" variant="outline">
+                      {backupJob && !terminalJob(backupJob) ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
+                      {backupJob?.status === 'succeeded' ? 'Backup created' : backupJob && !terminalJob(backupJob) ? 'Creating backup' : 'Create first backup'}
+                    </Button>
+                  </DisabledAction>
                 )}
                 <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
                   <Link to="/apps">View in My Apps</Link>
