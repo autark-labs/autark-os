@@ -241,14 +241,14 @@ export const ApplicationsPage = () => {
   };
 
   return (
-    <main className="min-h-full bg-neutral-100 text-neutral-950">
+    <main className="min-h-full bg-slate-800 text-slate-50">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-4 md:p-6">
-        <header className="rounded-2xl border border-neutral-300 bg-white">
+        <header className="rounded-2xl border border-sky-400/30 bg-slate-900 shadow-xl shadow-slate-950/30">
           <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex max-w-3xl flex-col gap-3">
               <div className="flex flex-col gap-2">
-                <h1 className="text-4xl font-semibold tracking-tight text-neutral-950">Your apps and services</h1>
-                <p className="text-base leading-7 text-neutral-700">
+                <h1 className="text-4xl font-semibold tracking-tight text-white">Your apps and services</h1>
+                <p className="text-base leading-7 text-sky-100/80">
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae arcu sed tortor facilisis
                   volutpat.
                 </p>
@@ -256,10 +256,10 @@ export const ApplicationsPage = () => {
             </div>
 
             <div className="relative min-w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-200/70" />
               <Input
                 aria-label="Search apps and services"
-                className="border-neutral-300 bg-white pl-9 text-neutral-950 placeholder:text-neutral-500"
+                className="border-sky-400/40 bg-slate-800 pl-9 text-white placeholder:text-sky-100/50 focus-visible:border-cyan-300"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search apps and services"
                 value={query}
@@ -267,7 +267,7 @@ export const ApplicationsPage = () => {
             </div>
           </div>
 
-          <Separator className="bg-neutral-300" />
+          <Separator className="bg-sky-400/20" />
 
           <div className="grid gap-3 p-5 sm:grid-cols-3">
             <PageMetric label="Managed" value={managedCount} />
@@ -283,13 +283,13 @@ export const ApplicationsPage = () => {
             <AdvancedApplicationsView actions={actions} items={visibleItems} onSelect={setSelectedId} selectedId={selectedItem?.id} />
           )}
 
-          <Card className="h-fit overflow-visible rounded-2xl border border-neutral-300 bg-white shadow-none ring-0 lg:sticky lg:top-5">
+          <Card className="h-fit overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 lg:sticky lg:top-5">
             <CardHeader>
               <div className="flex items-start gap-3">
                 {selectedItem && <AppIcon item={selectedItem} />}
                 <div className="min-w-0">
-                  <CardTitle className="truncate text-neutral-950">{selectedItem?.name ?? 'Selected app'}</CardTitle>
-                  <CardDescription className="text-neutral-600">{selectedItem?.description ?? 'Lorem ipsum dolor sit amet.'}</CardDescription>
+                  <CardTitle className="truncate text-white">{selectedItem?.name ?? 'Selected app'}</CardTitle>
+                  <CardDescription className="text-sky-100/70">{selectedItem?.description ?? 'Lorem ipsum dolor sit amet.'}</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -305,7 +305,7 @@ export const ApplicationsPage = () => {
                   </div>
 
                   {selectedItem.href && (
-                    <Button asChild className="bg-neutral-950 text-white hover:bg-neutral-800">
+                    <Button asChild className="bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-200">
                       <a href={selectedItem.href} rel="noreferrer" target="_blank">
                         <ExternalLink data-icon="inline-start" />
                         Open app
@@ -316,17 +316,17 @@ export const ApplicationsPage = () => {
                   {selectedItem.kind === 'managed' && (
                     <div className="grid grid-cols-3 gap-2">
                       {selectedItem.runtimeState === 'paused' ? (
-                        <Button className="border-neutral-300 text-neutral-900" onClick={() => handleStart(selectedItem.id)} type="button" variant="outline">
+                        <Button className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleStart(selectedItem.id)} type="button" variant="outline">
                           <Play data-icon="inline-start" />
                           Start
                         </Button>
                       ) : (
-                        <Button className="border-neutral-300 text-neutral-900" onClick={() => handleStop(selectedItem.id)} type="button" variant="outline">
+                        <Button className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleStop(selectedItem.id)} type="button" variant="outline">
                           <Pause data-icon="inline-start" />
                           Stop
                         </Button>
                       )}
-                      <Button className="col-span-2 border-neutral-300 text-neutral-900" onClick={() => handleRestart(selectedItem.id)} type="button" variant="outline">
+                      <Button className="col-span-2 border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleRestart(selectedItem.id)} type="button" variant="outline">
                         <RotateCw data-icon="inline-start" />
                         Restart
                       </Button>
@@ -334,7 +334,7 @@ export const ApplicationsPage = () => {
                   )}
 
                   {selectedItem.nextAction ? (
-                    <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+                    <div className="flex flex-col gap-3 rounded-xl border border-orange-400 bg-orange-200 p-4 text-orange-950 shadow-lg shadow-orange-500/20">
                       <div className="flex items-start gap-3">
                         <AlertTriangle />
                         <div>
@@ -342,12 +342,12 @@ export const ApplicationsPage = () => {
                           <p className="mt-1 text-sm leading-6">{selectedItem.nextAction.description}</p>
                         </div>
                       </div>
-                      <Button className="bg-amber-500 text-neutral-950 hover:bg-amber-400" onClick={() => handleRunNextAction(selectedItem.id)} type="button">
+                      <Button className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400" onClick={() => handleRunNextAction(selectedItem.id)} type="button">
                         {selectedItem.nextAction.label}
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-950">
+                    <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-200 p-4 text-emerald-950 shadow-lg shadow-emerald-500/10">
                       <CheckCircle2 />
                       <div>
                         <p className="font-medium">{selectedItem.kind === 'managed' ? 'App fully functional' : 'No action needed'}</p>
@@ -357,7 +357,7 @@ export const ApplicationsPage = () => {
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-neutral-600">No item selected.</p>
+                <p className="text-sm text-sky-100/70">No item selected.</p>
               )}
             </CardContent>
           </Card>
@@ -368,19 +368,24 @@ export const ApplicationsPage = () => {
 };
 
 function PageMetric({ label, value }: { label: string; value: number }) {
+  const attention = label === 'Needs review' && value > 0;
+
   return (
-    <div className="min-w-28 rounded-xl border border-neutral-300 bg-neutral-100 px-4 py-3">
-      <div className="text-2xl font-semibold text-neutral-950">{value}</div>
-      <div className="text-sm text-neutral-600">{label}</div>
+    <div className={attention
+      ? 'min-w-28 rounded-xl border border-orange-400 bg-orange-200 px-4 py-3 text-orange-950 shadow-lg shadow-orange-500/20'
+      : 'min-w-28 rounded-xl border border-sky-400/25 bg-slate-800 px-4 py-3 text-sky-50'}
+    >
+      <div className="text-2xl font-semibold">{value}</div>
+      <div className={attention ? 'text-sm text-orange-800' : 'text-sm text-sky-100/70'}>{label}</div>
     </div>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg bg-neutral-100 px-3 py-2">
-      <span className="text-neutral-600">{label}</span>
-      <span className="font-medium text-neutral-950">{value}</span>
+    <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-800 px-3 py-2">
+      <span className="text-sky-100/70">{label}</span>
+      <span className="font-medium text-white">{value}</span>
     </div>
   );
 }
@@ -397,11 +402,11 @@ function labelForKind(kind: ApplicationSurfaceItem['kind']) {
 
 function AppIcon({ item }: { item: ApplicationSurfaceItem }) {
   return (
-    <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-neutral-300 bg-white">
+    <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-sky-400/30 bg-white">
       {item.iconUrl ? (
         <img alt="" className="size-9 object-contain" src={item.iconUrl} />
       ) : (
-        <span className="text-sm font-semibold text-neutral-700">{item.name.slice(0, 2).toUpperCase()}</span>
+        <span className="text-sm font-semibold text-slate-700">{item.name.slice(0, 2).toUpperCase()}</span>
       )}
     </div>
   );

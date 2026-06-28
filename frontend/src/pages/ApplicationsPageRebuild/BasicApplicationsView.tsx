@@ -45,11 +45,11 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
       {items.map((item) => (
         <Card
           className={cn(
-            'relative cursor-pointer overflow-visible rounded-2xl border bg-white py-0 shadow-none ring-0 transition-colors hover:bg-neutral-50',
-            item.nextAction && 'border-amber-300 bg-amber-50/70 hover:bg-amber-50',
-            item.runtimeState === 'paused' && 'border-neutral-300 bg-neutral-50',
-            !item.nextAction && item.runtimeState !== 'paused' && 'border-neutral-300',
-            selectedId === item.id && 'border-neutral-950 shadow-md',
+            'relative cursor-pointer overflow-visible rounded-2xl border bg-sky-100 py-0 shadow-lg shadow-slate-950/20 ring-0 transition-all duration-200 hover:-translate-y-1 hover:bg-sky-50 hover:shadow-xl hover:shadow-slate-950/25',
+            item.nextAction && 'border-orange-500 bg-orange-200 hover:bg-orange-100',
+            item.runtimeState === 'paused' && 'border-slate-400 bg-slate-200 hover:bg-slate-100',
+            !item.nextAction && item.runtimeState !== 'paused' && 'border-sky-300',
+            selectedId === item.id && 'z-10 -translate-y-2 border-cyan-300 shadow-2xl shadow-cyan-300/50 ring-4 ring-cyan-300/35 hover:-translate-y-2 hover:shadow-cyan-300/60',
           )}
           key={item.id}
           onClick={() => onSelect(item.id)}
@@ -59,20 +59,20 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
             <div className="flex min-w-0 flex-col items-center gap-3">
               <AppIcon item={item} />
               <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-                <CardTitle className="max-w-full truncate text-lg text-neutral-950">{item.name}</CardTitle>
+                <CardTitle className="max-w-full truncate text-lg text-slate-950">{item.name}</CardTitle>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="px-4 py-2">
-            <div className="rounded-xl bg-blue-200 p-0 border-2xl border-2 border-black items-center text-center justify-center justify-items-center align-items-center">
-              <div className="flex flex-col justify-center gap-2 p-2">
-                <div className="flex flex-row gap-2">
-                  <LockIcon size="20" className="text-sm text-foreground"/>
-                  <p className="text-sm text-foreground">{item.access}</p>
+          <CardContent className="px-4 py-1">
+            <div className="items-center justify-center justify-items-center rounded-lg border border-sky-700 bg-slate-900 p-0 text-center">
+              <div className="flex flex-col justify-center gap-1 p-1.5">
+                <div className="flex flex-row gap-1.5">
+                  <LockIcon size="16" className="text-xs text-cyan-200"/>
+                  <p className="text-xs text-sky-50">{item.access}</p>
                 </div>
-                <div className="flex flex-row gap-2">
-                  <Server size="20" className="text-sm text-foreground"/>
-                  <p className="text-sm text-foreground">{item.backup}</p>
+                <div className="flex flex-row gap-1.5">
+                  <Server size="16" className="text-xs text-cyan-200"/>
+                  <p className="text-xs text-sky-50">{item.backup}</p>
                 </div>
               </div>
             </div>
@@ -83,7 +83,7 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
             onPointerDown={(event) => event.stopPropagation()}
           >
             {item.href ? (
-              <Button asChild className="flex-1 bg-neutral-950 text-white hover:bg-neutral-800" size="lg">
+              <Button asChild className="flex-1 bg-cyan-300 text-slate-950 shadow-md shadow-cyan-700/20 hover:bg-cyan-200" size="lg">
                 <a href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank">
                   <ExternalLink className="size-5" data-icon="inline-start" />
                   Open
@@ -104,7 +104,7 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
               <DropdownMenuTrigger asChild>
                 <Button
                   aria-label={`${item.name} options`}
-                  className="border-neutral-300 text-neutral-900"
+                  className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100"
                   size="icon-lg"
                   type="button"
                   variant="outline"
@@ -114,7 +114,7 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="z-[100] w-40 border-neutral-300 bg-white text-neutral-950"
+                className="z-[100] w-40 border-sky-400/30 bg-slate-900 text-slate-50"
                 onClick={(event) => event.stopPropagation()}
               >
                 <DropdownMenuGroup>
@@ -140,31 +140,31 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
 
 function StatusBadge({ item }: { item: ApplicationSurfaceItem }) {
   if (item.status === 'Ready') {
-    return <Badge className="absolute right-3 top-3 bg-emerald-600 text-white">Ready</Badge>;
+    return <Badge className="absolute right-3 top-3 bg-emerald-300 text-emerald-950">Ready</Badge>;
   }
   if (item.status === 'Needs review') {
     return (
-      <Badge className="absolute right-3 top-3 bg-amber-500 text-neutral-950">
+      <Badge className="absolute right-3 top-3 bg-orange-500 text-white">
         <AlertTriangle data-icon="inline-start" />
         Needs review
       </Badge>
     );
   }
   if (item.status === 'Paused') {
-    return <Badge className="absolute right-3 top-3 bg-neutral-700 text-white">Paused</Badge>;
+    return <Badge className="absolute right-3 top-3 bg-slate-700 text-white">Paused</Badge>;
   }
-  return <Badge className="absolute right-3 top-3 bg-neutral-200 text-neutral-950">{item.status}</Badge>;
+  return <Badge className="absolute right-3 top-3 bg-cyan-100 text-slate-950">{item.status}</Badge>;
 }
 
 function ApplicationsEmptyState() {
   return (
-    <Empty className="min-h-96 rounded-2xl border border-neutral-300 bg-white">
+    <Empty className="min-h-96 rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50">
       <EmptyHeader>
-        <EmptyMedia className="bg-neutral-100 text-neutral-950" variant="icon">
+        <EmptyMedia className="bg-cyan-300 text-slate-950" variant="icon">
           <Search />
         </EmptyMedia>
         <EmptyTitle>No matching apps or services</EmptyTitle>
-        <EmptyDescription>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</EmptyDescription>
+        <EmptyDescription className="text-sky-100/70">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );
@@ -172,11 +172,11 @@ function ApplicationsEmptyState() {
 
 function AppIcon({ item }: { item: ApplicationSurfaceItem }) {
   return (
-    <div className="grid size-24 shrink-0 place-items-center rounded-2xl border border-neutral-300 bg-white">
+    <div className="grid size-24 shrink-0 place-items-center rounded-2xl border border-sky-300 bg-white shadow-sm">
       {item.iconUrl ? (
         <img alt="" className="size-20 object-contain" src={item.iconUrl} />
       ) : (
-        <span className="text-xl font-semibold text-neutral-700">{item.name.slice(0, 2).toUpperCase()}</span>
+        <span className="text-xl font-semibold text-slate-700">{item.name.slice(0, 2).toUpperCase()}</span>
       )}
     </div>
   );
