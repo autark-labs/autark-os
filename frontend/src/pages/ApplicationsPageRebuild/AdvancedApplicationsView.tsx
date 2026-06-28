@@ -1,4 +1,4 @@
-import { AlertTriangle, ExternalLink, MoreHorizontal, Pause, Play, RotateCw, ShieldCheck } from 'lucide-react';
+import { ExternalLink, MoreHorizontal, Pause, Play, RotateCw, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -45,7 +45,6 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                 <TableHead className="text-sky-100/70">State</TableHead>
                 <TableHead className="text-sky-100/70">Access</TableHead>
                 <TableHead className="text-sky-100/70">Backup</TableHead>
-                <TableHead className="text-sky-100/70">Next</TableHead>
                 <TableHead className="text-right text-sky-100/70">Controls</TableHead>
               </TableRow>
             </TableHeader>
@@ -66,7 +65,6 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                       <ApplicationIcon item={item} size="sm" />
                       <div className="min-w-0">
                         <div className="font-medium text-slate-950">{item.name}</div>
-                        <div className="max-w-sm truncate text-xs text-slate-600">{item.description}</div>
                       </div>
                     </div>
                   </TableCell>
@@ -78,22 +76,8 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                   </TableCell>
                   <TableCell className="text-slate-700">{item.access}</TableCell>
                   <TableCell className="text-slate-700">{item.backup}</TableCell>
-                  <TableCell>
-                    {item.nextAction ? (
-                      <Button className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400" onClick={(event) => {
-                        event.stopPropagation();
-                        onSelect(item.id);
-                        actions.onRunNextAction(item.id);
-                      }} size="sm" type="button">
-                        <AlertTriangle data-icon="inline-start" />
-                        {item.nextAction.label}
-                      </Button>
-                    ) : (
-                      <span className="text-sm text-slate-600">Clear</span>
-                    )}
-                  </TableCell>
                   <TableCell className="rounded-r-xl">
-                    <div className="flex flex-wrap justify-end gap-2">
+                    <div className="flex justify-end gap-2 whitespace-nowrap">
                       {item.href && (
                         <Button asChild className="border-cyan-300 bg-cyan-300 text-slate-950 shadow-sm shadow-cyan-700/20 hover:bg-cyan-200" size="sm" variant="outline">
                           <a href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank">
