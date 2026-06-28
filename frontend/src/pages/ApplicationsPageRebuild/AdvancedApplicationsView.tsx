@@ -1,5 +1,4 @@
 import { AlertTriangle, ExternalLink, MoreHorizontal, Pause, Play, RotateCw, ShieldCheck } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -17,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { ApplicationIcon, ApplicationKindBadge, ApplicationStatusBadge } from './ApplicationVisuals';
 import type { ApplicationActionHandlers, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type AdvancedApplicationsViewProps = {
@@ -28,58 +28,59 @@ type AdvancedApplicationsViewProps = {
 
 export function AdvancedApplicationsView({ actions, items, onSelect, selectedId }: AdvancedApplicationsViewProps) {
   return (
-    <Card className="overflow-visible rounded-2xl border border-neutral-300 bg-white shadow-none ring-0">
+    <Card className="overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
       <CardHeader>
-        <CardTitle className="text-neutral-950">Operations</CardTitle>
-        <CardDescription className="text-neutral-600">
+        <CardTitle className="text-white">Operations</CardTitle>
+        <CardDescription className="text-sky-100/70">
           Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse vitae sem at arcu porta pretium.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-xl border border-neutral-300">
-          <Table>
+        <div className="rounded-xl border border-sky-400/25 bg-slate-800 px-2 pb-2">
+          <Table className="border-separate border-spacing-y-2">
             <TableHeader>
-              <TableRow className="border-neutral-300 bg-neutral-100 hover:bg-neutral-100">
-                <TableHead className="text-neutral-700">Name</TableHead>
-                <TableHead className="text-neutral-700">Type</TableHead>
-                <TableHead className="text-neutral-700">State</TableHead>
-                <TableHead className="text-neutral-700">Access</TableHead>
-                <TableHead className="text-neutral-700">Backup</TableHead>
-                <TableHead className="text-neutral-700">Next</TableHead>
-                <TableHead className="text-right text-neutral-700">Controls</TableHead>
+              <TableRow className="border-transparent hover:bg-transparent">
+                <TableHead className="text-sky-100/70">Name</TableHead>
+                <TableHead className="text-sky-100/70">Type</TableHead>
+                <TableHead className="text-sky-100/70">State</TableHead>
+                <TableHead className="text-sky-100/70">Access</TableHead>
+                <TableHead className="text-sky-100/70">Backup</TableHead>
+                <TableHead className="text-sky-100/70">Next</TableHead>
+                <TableHead className="text-right text-sky-100/70">Controls</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.map((item) => (
                 <TableRow
                   className={cn(
-                    'cursor-pointer border-neutral-300',
-                    item.nextAction && 'bg-amber-50 hover:bg-amber-50',
-                    selectedId === item.id && 'bg-neutral-100',
+                    'cursor-pointer border-transparent bg-sky-100 text-slate-950 shadow-md shadow-slate-950/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-lg',
+                    item.nextAction && 'bg-orange-200 hover:bg-orange-100',
+                    item.runtimeState === 'paused' && 'bg-slate-200 hover:bg-slate-100',
+                    selectedId === item.id && 'bg-cyan-100 shadow-xl shadow-cyan-300/35 ring-2 ring-cyan-300/40 hover:bg-cyan-50',
                   )}
                   key={item.id}
                   onClick={() => onSelect(item.id)}
                 >
-                  <TableCell>
+                  <TableCell className="rounded-l-xl">
                     <div className="flex items-center gap-3">
-                      <AppIcon item={item} />
+                      <ApplicationIcon item={item} size="sm" />
                       <div className="min-w-0">
-                        <div className="font-medium text-neutral-950">{item.name}</div>
-                        <div className="max-w-sm truncate text-xs text-neutral-600">{item.description}</div>
+                        <div className="font-medium text-slate-950">{item.name}</div>
+                        <div className="max-w-sm truncate text-xs text-slate-600">{item.description}</div>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className="bg-neutral-200 text-neutral-950">{labelForKind(item.kind)}</Badge>
+                    <ApplicationKindBadge kind={item.kind} />
                   </TableCell>
                   <TableCell>
-                    <StatusBadge item={item} />
+                    <ApplicationStatusBadge item={item} />
                   </TableCell>
-                  <TableCell>{item.access}</TableCell>
-                  <TableCell>{item.backup}</TableCell>
+                  <TableCell className="text-slate-700">{item.access}</TableCell>
+                  <TableCell className="text-slate-700">{item.backup}</TableCell>
                   <TableCell>
                     {item.nextAction ? (
-                      <Button className="bg-amber-500 text-neutral-950 hover:bg-amber-400" onClick={(event) => {
+                      <Button className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400" onClick={(event) => {
                         event.stopPropagation();
                         onSelect(item.id);
                         actions.onRunNextAction(item.id);
@@ -88,13 +89,13 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                         {item.nextAction.label}
                       </Button>
                     ) : (
-                      <span className="text-sm text-neutral-600">Clear</span>
+                      <span className="text-sm text-slate-600">Clear</span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
+                  <TableCell className="rounded-r-xl">
+                    <div className="flex flex-wrap justify-end gap-2">
                       {item.href && (
-                        <Button asChild className="border-neutral-300 text-neutral-900" size="sm" variant="outline">
+                        <Button asChild className="border-cyan-300 bg-cyan-300 text-slate-950 shadow-sm shadow-cyan-700/20 hover:bg-cyan-200" size="sm" variant="outline">
                           <a href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank">
                             <ExternalLink data-icon="inline-start" />
                             Open
@@ -103,7 +104,7 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                       )}
                       {item.kind === 'managed' && (
                         item.runtimeState === 'paused' ? (
-                          <Button className="border-neutral-300 text-neutral-900" onClick={(event) => {
+                          <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={(event) => {
                             event.stopPropagation();
                             actions.onStart(item.id);
                           }} size="sm" type="button" variant="outline">
@@ -111,7 +112,7 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                             Start
                           </Button>
                         ) : (
-                          <Button className="border-neutral-300 text-neutral-900" onClick={(event) => {
+                          <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={(event) => {
                             event.stopPropagation();
                             actions.onStop(item.id);
                           }} size="sm" type="button" variant="outline">
@@ -121,7 +122,7 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                         )
                       )}
                       {item.kind === 'managed' && (
-                        <Button className="border-neutral-300 text-neutral-900" onClick={(event) => {
+                        <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={(event) => {
                           event.stopPropagation();
                           actions.onRestart(item.id);
                         }} size="sm" type="button" variant="outline">
@@ -130,7 +131,7 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                         </Button>
                       )}
                       {item.kind === 'managed' && (
-                        <Button className="border-neutral-300 text-neutral-900" onClick={(event) => {
+                        <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={(event) => {
                           event.stopPropagation();
                           actions.onCreateBackup(item.id);
                         }} size="sm" type="button" variant="outline">
@@ -138,7 +139,7 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
                           Backup
                         </Button>
                       )}
-                      <Button aria-label={`More controls for ${item.name}`} className="border-neutral-300 text-neutral-900" onClick={() => onSelect(item.id)} size="icon-sm" type="button" variant="outline">
+                      <Button aria-label={`More controls for ${item.name}`} className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={() => onSelect(item.id)} size="icon-sm" type="button" variant="outline">
                         <MoreHorizontal />
                       </Button>
                     </div>
@@ -151,39 +152,4 @@ export function AdvancedApplicationsView({ actions, items, onSelect, selectedId 
       </CardContent>
     </Card>
   );
-}
-
-function StatusBadge({ item }: { item: ApplicationSurfaceItem }) {
-  if (item.status === 'Ready') {
-    return <Badge className="bg-emerald-600 text-white">Ready</Badge>;
-  }
-  if (item.status === 'Needs review') {
-    return <Badge className="bg-amber-500 text-neutral-950">Needs review</Badge>;
-  }
-  if (item.status === 'Paused') {
-    return <Badge className="bg-neutral-700 text-white">Paused</Badge>;
-  }
-  return <Badge className="bg-neutral-200 text-neutral-950">{item.status}</Badge>;
-}
-
-function AppIcon({ item }: { item: ApplicationSurfaceItem }) {
-  return (
-    <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-neutral-300 bg-white">
-      {item.iconUrl ? (
-        <img alt="" className="size-7 object-contain" src={item.iconUrl} />
-      ) : (
-        <span className="text-xs font-semibold text-neutral-700">{item.name.slice(0, 2).toUpperCase()}</span>
-      )}
-    </div>
-  );
-}
-
-function labelForKind(kind: ApplicationSurfaceItem['kind']) {
-  if (kind === 'managed') {
-    return 'Managed';
-  }
-  if (kind === 'pinned') {
-    return 'Pinned';
-  }
-  return 'Found';
 }

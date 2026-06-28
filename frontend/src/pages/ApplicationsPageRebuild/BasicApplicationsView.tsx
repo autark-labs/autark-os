@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, ExternalLink, LockIcon, MoreHorizontal, Search, Trash2, Server } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { ExternalLink, LockIcon, MoreHorizontal, Search, Trash2, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -24,6 +23,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
+import { ApplicationIcon, ApplicationStatusBadge } from './ApplicationVisuals';
 import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type BasicApplicationsViewProps = {
@@ -55,9 +55,9 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
           onClick={() => onSelect(item.id)}
         >
           <CardHeader className="px-4 pt-5">
-            <StatusBadge item={item} />
+            <ApplicationStatusBadge item={item} overlay />
             <div className="flex min-w-0 flex-col items-center gap-3">
-              <AppIcon item={item} />
+              <ApplicationIcon item={item} size="lg" />
               <div className="flex min-w-0 flex-col items-center gap-1 text-center">
                 <CardTitle className="max-w-full truncate text-lg text-slate-950">{item.name}</CardTitle>
               </div>
@@ -138,24 +138,6 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
   );
 }
 
-function StatusBadge({ item }: { item: ApplicationSurfaceItem }) {
-  if (item.status === 'Ready') {
-    return <Badge className="absolute right-3 top-3 bg-emerald-300 text-emerald-950">Ready</Badge>;
-  }
-  if (item.status === 'Needs review') {
-    return (
-      <Badge className="absolute right-3 top-3 bg-orange-500 text-white">
-        <AlertTriangle data-icon="inline-start" />
-        Needs review
-      </Badge>
-    );
-  }
-  if (item.status === 'Paused') {
-    return <Badge className="absolute right-3 top-3 bg-slate-700 text-white">Paused</Badge>;
-  }
-  return <Badge className="absolute right-3 top-3 bg-cyan-100 text-slate-950">{item.status}</Badge>;
-}
-
 function ApplicationsEmptyState() {
   return (
     <Empty className="min-h-96 rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50">
@@ -167,17 +149,5 @@ function ApplicationsEmptyState() {
         <EmptyDescription className="text-sky-100/70">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</EmptyDescription>
       </EmptyHeader>
     </Empty>
-  );
-}
-
-function AppIcon({ item }: { item: ApplicationSurfaceItem }) {
-  return (
-    <div className="grid size-24 shrink-0 place-items-center rounded-2xl border border-sky-300 bg-white shadow-sm">
-      {item.iconUrl ? (
-        <img alt="" className="size-20 object-contain" src={item.iconUrl} />
-      ) : (
-        <span className="text-xl font-semibold text-slate-700">{item.name.slice(0, 2).toUpperCase()}</span>
-      )}
-    </div>
   );
 }

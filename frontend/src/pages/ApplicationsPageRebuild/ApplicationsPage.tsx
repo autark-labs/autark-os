@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { ApplicationIcon, labelForKind } from './ApplicationVisuals';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
 import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
@@ -286,7 +287,7 @@ export const ApplicationsPage = () => {
           <Card className="h-fit overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 lg:sticky lg:top-5">
             <CardHeader>
               <div className="flex items-start gap-3">
-                {selectedItem && <AppIcon item={selectedItem} />}
+                {selectedItem && <ApplicationIcon item={selectedItem} size="md" />}
                 <div className="min-w-0">
                   <CardTitle className="truncate text-white">{selectedItem?.name ?? 'Selected app'}</CardTitle>
                   <CardDescription className="text-sky-100/70">{selectedItem?.description ?? 'Lorem ipsum dolor sit amet.'}</CardDescription>
@@ -386,28 +387,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-800 px-3 py-2">
       <span className="text-sky-100/70">{label}</span>
       <span className="font-medium text-white">{value}</span>
-    </div>
-  );
-}
-
-function labelForKind(kind: ApplicationSurfaceItem['kind']) {
-  if (kind === 'managed') {
-    return 'Managed app';
-  }
-  if (kind === 'pinned') {
-    return 'Pinned app';
-  }
-  return 'Found service';
-}
-
-function AppIcon({ item }: { item: ApplicationSurfaceItem }) {
-  return (
-    <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-sky-400/30 bg-white">
-      {item.iconUrl ? (
-        <img alt="" className="size-9 object-contain" src={item.iconUrl} />
-      ) : (
-        <span className="text-sm font-semibold text-slate-700">{item.name.slice(0, 2).toUpperCase()}</span>
-      )}
     </div>
   );
 }
