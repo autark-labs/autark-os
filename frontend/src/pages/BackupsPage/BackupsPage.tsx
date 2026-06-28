@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
@@ -352,6 +353,9 @@ function BackupsPage() {
                 <FactRow label="Restore points" value={`${report.recentRestorePoints.length}`} />
                 <FactRow label="Protected by restore point" value={`${report.protectedApps}/${report.totalApps}`} />
                 {showAdvancedMetrics && <FactRow label="Backup folder" value={report.backupRoot} />}
+                <Button asChild className="mt-1 justify-start border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-900" size="sm" variant="outline">
+                  <Link to="/storage">View storage</Link>
+                </Button>
               </div>
             </SurfacePanel>
 

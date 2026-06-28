@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import { advancedNavigation, navigationGroups, primaryNavigation, routeAliases } from './navigationModel.js';
+
+const root = process.cwd();
+
+function source(relativePath) {
+  return readFileSync(resolve(root, relativePath), 'utf8');
+}
 
 test('basic navigation focuses on the five core appliance routes', () => {
   const items = navigationGroups('basic').flatMap((group) => group.items);
@@ -29,4 +37,9 @@ test('old active concepts have intentional aliases to MVP routes', () => {
 test('primary navigation remains within MVP scope', () => {
   assert.equal(primaryNavigation.length, 5);
   assert.equal(primaryNavigation.find((item) => item.id === 'access')?.to, '/access');
+});
+
+test('operational pages removed from basic nav remain reachable through contextual links', () => {
+  assert.match(source('src/pages/BackupsPage/BackupsPage.tsx'), /to="\/storage"/);
+  assert.match(source('src/layout/SystemStatusHeader.tsx'), /to="\/settings"/);
 });

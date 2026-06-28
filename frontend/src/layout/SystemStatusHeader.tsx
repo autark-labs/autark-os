@@ -178,6 +178,9 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
             <Link to={service.href}>{healthy ? 'View details' : 'Set up'}</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
+            <Link to="/settings">Settings</Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
             <a href={service.externalHref} rel="noreferrer" target="_blank">
               {service.externalLabel}
               <ExternalLink data-icon="inline-end" />
