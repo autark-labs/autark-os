@@ -26,7 +26,11 @@ test('Home remote data loading is owned by the home repository', () => {
   assert.match(repository, /useHomeActivityQuery/);
   assert.match(repository, /useHomeRepository/);
   assert.match(repository, /SystemAPIClient\.summary/);
-  assert.match(repository, /SystemAPIClient\.recommendedAction/);
+  assert.match(repository, /useRecommendedActionQuery/);
   assert.match(repository, /ActivityAPIClient\.recent/);
   assert.match(repository, /refetchInterval:\s*30_000/);
+
+  const recommendedActionRepository = source('repositories/recommendedActionRepository.ts');
+  assert.match(recommendedActionRepository, /SystemAPIClient\.recommendedAction/);
+  assert.match(recommendedActionRepository, /refetchInterval:\s*30_000/);
 });

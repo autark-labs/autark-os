@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { JobProgress } from '@/components/project-os/JobProgress';
@@ -35,7 +35,6 @@ type HeaderService = {
 };
 
 function SystemStatusHeader() {
-  const [currentTime, setCurrentTime] = useState(() => formatClock(new Date()));
   const doctorQuery = useSystemDoctorQuery();
   const activeJobQuery = useGlobalActiveProjectOsJob();
   const doctor = doctorQuery.data ?? null;
@@ -64,11 +63,6 @@ function SystemStatusHeader() {
       icon: Boxes,
     };
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setCurrentTime(formatClock(new Date())), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-
   return (
     <header className="sticky top-0 z-20 border-b border-slate-700/45 bg-slate-950/78 px-4 py-2 backdrop-blur-xl md:px-6" aria-label="System status">
       <div className="flex min-h-10 flex-wrap items-center justify-between gap-3">
@@ -84,7 +78,7 @@ function SystemStatusHeader() {
           <StatusPopover loading={loading} service={dockerService} />
           <TailscaleControlPopover check={tailscaleCheck} loading={loading} />
           <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-slate-400 sm:inline-flex">
-            {error ? 'Status unavailable' : currentTime}
+            {error ? 'Status unavailable' : checkedAt}
           </span>
         </div>
       </div>
@@ -198,10 +192,6 @@ function formatCheckedAt(value: string) {
     return 'Checked recently';
   }
   return `Checked ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-}
-
-function formatClock(value: Date) {
-  return value.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
 export default SystemStatusHeader;
