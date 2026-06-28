@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshStatus } from '@/components/RefreshStatus';
+import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
@@ -235,6 +236,8 @@ function ApplicationsPage() {
           </Button>
         </div>
       </div>
+
+      <CanonicalRecommendedAction />
 
       {error && <PageErrorState message={error} onRetry={refreshApps} />}
 

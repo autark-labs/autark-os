@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Bell, CheckCircle2, Filter, Info, RefreshCw, Search, Sparkles, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
 import { JobProgress } from '@/components/project-os/JobProgress';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
@@ -335,6 +336,8 @@ function MarketplacePage() {
         marketplaceActivity={marketplaceActivity}
         onRefresh={refreshDiscover}
       />
+
+      <CanonicalRecommendedAction />
 
       {discoverError && <PageErrorState className="mb-5" message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
       <InstallJobBanner apps={apps} installJob={installJob} selectedAppId={selectedApp.id} />

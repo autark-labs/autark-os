@@ -5,6 +5,7 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import type { ActivityLog } from '@/types/activity';
 import type { RecommendedAction, SystemSummary } from '@/types/system';
+import { useRecommendedActionQuery } from './recommendedActionRepository';
 
 export const homeQueryKeys = {
   all: ['home'] as const,
@@ -33,12 +34,7 @@ export function useHomeSummaryQuery() {
 }
 
 export function useHomeRecommendedActionQuery() {
-  return useQuery<RecommendedAction>({
-    queryKey: homeQueryKeys.recommendedAction,
-    queryFn: () => SystemAPIClient.recommendedAction(),
-    refetchInterval: 30_000,
-    staleTime: 30_000,
-  });
+  return useRecommendedActionQuery();
 }
 
 export function useHomeActivityQuery() {

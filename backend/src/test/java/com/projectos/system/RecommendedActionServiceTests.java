@@ -3,85 +3,124 @@ package com.projectos.system;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
-import java.util.function.Supplier;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
 import com.projectos.api.ProjectOsAction;
 import com.projectos.api.ProjectOsIssue;
-import com.projectos.api.ProjectOsIssueFactory;
 
 class RecommendedActionServiceTests {
 
     @Test
-    void setupIncompleteTakesPriorityOverOtherNonCriticalIssues() {
-        RecommendedActionService service = service(summary(
-                setup(false),
-                docker(true),
-                List.of(ProjectOsIssueFactory.backupIssue("first-backup", "vaultwarden", "warning", "backup_enabled_no_restore_point", "Create your first restore point", "Vaultwarden has backups enabled but no restore point yet.", ProjectOsAction.route("open-backups", "Open backups", "/backups")))));
+    void setupActionWinsBeforeIssuePriority() {
+        RecommendedActionService service = service(
+                summary(false, List.of(issue("docker", "critical", "docker_unavailable"))),
+                new InMemoryDismissals());
 
         RecommendedAction action = service.current();
 
         assertThat(action.id()).isEqualTo("complete-setup");
-        assertThat(action.severity()).isEqualTo("warning");
-        assertThat(action.dismissible()).isFalse();
+        assertThat(action.primaryAction()).contains(ProjectOsAction.route("open-setup", "Continue setup", "/setup"));
     }
 
     @Test
-    void dockerUnavailableIsCriticalAndCannotBeDismissed() {
-        ProjectOsIssue dockerIssue = ProjectOsIssueFactory.systemIssue("docker-unavailable", "critical", "docker_unavailable", "Docker is not ready", "Project OS needs Docker before it can install apps.", ProjectOsAction.route("open-diagnostics", "View diagnostics", "/diagnostics"));
-        InMemoryRecommendedActionDismissals dismissals = new InMemoryRecommendedActionDismissals();
-        RecommendedActionService service = service(summary(setup(true), docker(false), List.of(dockerIssue)), dismissals);
+    void appSafetyIssuesWinBeforeBackupAndPrivateAccess() {
+        RecommendedActionService service = service(
+                summary(true, List.of(
+                        issue("private", "info", "private_access_needs_setup"),
+                        issue("backup", "info", "backup_enabled_no_restore_point"),
+                        issue("app", "warning", "app_missing_container"))),
+                new InMemoryDismissals());
 
-        service.dismiss("docker-unavailable");
         RecommendedAction action = service.current();
 
-        assertThat(action.id()).isEqualTo("docker-unavailable");
-        assertThat(action.severity()).isEqualTo("critical");
-        assertThat(action.dismissible()).isFalse();
+        assertThat(action.id()).isEqualTo("app");
+        assertThat(action.title()).isEqualTo("app_missing_container title");
     }
 
     @Test
-    void dismissedBackupNudgeFallsThroughToNoActionNeeded() {
-        ProjectOsIssue backupIssue = ProjectOsIssueFactory.backupIssue("first-backup", "vaultwarden", "warning", "backup_enabled_no_restore_point", "Create your first restore point", "Vaultwarden has backups enabled but no restore point yet.", ProjectOsAction.route("open-backups", "Open backups", "/backups"));
-        InMemoryRecommendedActionDismissals dismissals = new InMemoryRecommendedActionDismissals();
-        RecommendedActionService service = service(summary(setup(true), docker(true), List.of(backupIssue)), dismissals);
+    void backupRestorePointPromptWinsBeforePrivateAccessSetup() {
+        RecommendedActionService service = service(
+                summary(true, List.of(
+                        issue("private", "info", "private_access_needs_setup"),
+                        issue("backup", "info", "backup_enabled_no_restore_point"))),
+                new InMemoryDismissals());
 
-        service.dismiss("first-backup");
+        RecommendedAction action = service.current();
 
-        assertThat(service.current().id()).isEqualTo("no-action-needed");
-        assertThat(service.current().severity()).isEqualTo("success");
+        assertThat(action.id()).isEqualTo("backup");
     }
 
-    private RecommendedActionService service(SystemSummary summary) {
-        return service(summary, new InMemoryRecommendedActionDismissals());
+    @Test
+    void dismissedWarningsAreSkippedButCriticalActionsRemainVisible() {
+        InMemoryDismissals dismissals = new InMemoryDismissals();
+        dismissals.dismiss("warning-app");
+        dismissals.dismiss("critical-docker");
+
+        RecommendedActionService warningService = service(
+                summary(true, List.of(
+                        issue("warning-app", "warning", "app_needs_attention"),
+                        issue("backup", "info", "backup_enabled_no_restore_point"))),
+                dismissals);
+        RecommendedActionService criticalService = service(
+                summary(true, List.of(
+                        issue("critical-docker", "critical", "docker_unavailable"),
+                        issue("backup", "info", "backup_enabled_no_restore_point"))),
+                dismissals);
+
+        assertThat(warningService.current().id()).isEqualTo("backup");
+        assertThat(criticalService.current().id()).isEqualTo("critical-docker");
     }
 
     private RecommendedActionService service(SystemSummary summary, RecommendedActionDismissals dismissals) {
-        return new RecommendedActionService((Supplier<SystemSummary>) () -> summary, dismissals);
+        return new RecommendedActionService(() -> summary, dismissals);
     }
 
-    private SystemSummary summary(SetupProgressSummary setup, DockerSummary docker, List<ProjectOsIssue> issues) {
+    private SystemSummary summary(boolean setupComplete, List<ProjectOsIssue> issues) {
         return new SystemSummary(
-                "project-os-test",
-                "pos_test",
+                "Project OS",
+                "instance-1",
                 "http://localhost:8082",
-                setup,
-                docker,
+                new SetupProgressSummary(setupComplete, setupComplete ? "complete" : "in_progress", setupComplete ? "done" : "host_check", setupComplete ? "Setup is complete." : "Setup is incomplete."),
+                new DockerSummary(true, "Docker is ready."),
                 new AccessSummary("local_only", "Local access is ready."),
                 new AppsSummary(1, 1, 0, List.of()),
-                new BackupSummary("not_configured", "No restore point is required yet."),
-                new StorageSummary("unknown", "Storage details are available from the Storage page."),
+                new BackupSummary("needs_restore_point", "A restore point is needed."),
+                new StorageSummary("ok", "Storage is available."),
                 issues,
-                Instant.parse("2026-06-20T12:00:00Z"));
+                Instant.parse("2026-06-21T12:00:00Z"));
     }
 
-    private SetupProgressSummary setup(boolean complete) {
-        return new SetupProgressSummary(complete, complete ? "ready" : "needs_admin_setup", complete ? "done" : "host_check", complete ? "Setup complete." : "Setup is not complete.");
+    private ProjectOsIssue issue(String id, String severity, String reasonCode) {
+        return new ProjectOsIssue(
+                id,
+                "system",
+                "",
+                severity,
+                reasonCode,
+                reasonCode + " title",
+                reasonCode + " summary",
+                Optional.of(ProjectOsAction.route("open-" + id, "Open " + id, "/" + id)),
+                List.of(),
+                Map.of());
     }
 
-    private DockerSummary docker(boolean ready) {
-        return new DockerSummary(ready, ready ? "Docker is ready." : "Docker is not ready.");
+    private static final class InMemoryDismissals implements RecommendedActionDismissals {
+        private final Set<String> dismissed = new HashSet<>();
+
+        @Override
+        public boolean dismissed(String actionId) {
+            return dismissed.contains(actionId);
+        }
+
+        @Override
+        public void dismiss(String actionId) {
+            dismissed.add(actionId);
+        }
     }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
+import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
 import { JobProgress } from '@/components/project-os/JobProgress';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
@@ -248,6 +249,8 @@ function BackupsPage() {
         {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
         {message && <div className="border-b border-emerald-300/20 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100">{message}</div>}
       </SurfaceFrame>
+
+      <CanonicalRecommendedAction />
 
       {report && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">

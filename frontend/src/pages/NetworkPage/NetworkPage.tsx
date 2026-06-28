@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshStatus } from '@/components/RefreshStatus';
+import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
 import { PageShell, StatusPill } from '@/components/project-os/ProjectOSComponents';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
@@ -135,6 +136,8 @@ function NetworkPage() {
         </div>
         <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} updatedAt={appState.updatedAt ?? network.updatedAt} />
       </header>
+
+      <CanonicalRecommendedAction />
 
       {pageError && <PageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
 
