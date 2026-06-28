@@ -677,6 +677,19 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void failedUninstallLeavesAppRecordVisible() {
+        composeExecutor.failDown = true;
+
+        assertThatThrownBy(() -> service.uninstall("vaultwarden"))
+                .hasMessageContaining("Could not uninstall Vaultwarden");
+
+        assertThat(repository.findById("vaultwarden")).isPresent();
+        assertThat(repository.eventsFor("vaultwarden", 10))
+                .extracting(event -> event.type())
+                .contains("uninstall_failed");
+    }
+
+    @Test
     void updateSettingsPersistsValidatedUserPreferences() {
         AppRuntimeView app = service.updateSettings("vaultwarden", new InstallSettings(
                 "http://localhost:8090",
@@ -839,6 +852,7 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         boolean restartCalled;
         boolean upCalled;
+        boolean failDown;
         boolean transitionToStarting;
 
         @Override
@@ -866,6 +880,9 @@ class AppLifecycleServiceTests {
 
         @Override
         public DockerComposeResult down(Path composeFile, String projectName) {
+            if (failDown) {
+                return new DockerComposeResult(1, List.of("failed to remove " + projectName));
+            }
             return new DockerComposeResult(0, List.of("removed " + projectName));
         }
 

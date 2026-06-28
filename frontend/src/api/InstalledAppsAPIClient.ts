@@ -1,5 +1,6 @@
 import { httpClient } from './httpClient';
 import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, AppUpdateResult, AppUpdateStatus, InstallSettings, UninstallPlan } from '@/types/app';
+import type { ProjectOsJob } from '@/types/jobs';
 
 export type InstalledAppAction = 'start' | 'stop' | 'restart' | 'repair';
 
@@ -100,7 +101,7 @@ export const InstalledAppsAPIClient = {
   },
 
   async uninstall(appId: string) {
-    const response = await httpClient.delete<AppActionResult>(`/api/apps/${appId}`);
+    const response = await httpClient.post<ProjectOsJob>(`/api/apps/${appId}/uninstall`);
     return response.data;
   },
 };

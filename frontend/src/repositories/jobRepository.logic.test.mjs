@@ -41,10 +41,11 @@ test('activeJobsByFamily groups app lifecycle and backup work', () => {
   const families = activeJobsByFamily([
     job('install', 'install_app', 'vaultwarden', 'running', '2026-06-21T12:00:00Z'),
     job('repair', 'repair_app', 'homepage', 'running', '2026-06-21T12:01:00Z'),
+    job('uninstall', 'uninstall_app', 'memos', 'queued', '2026-06-21T12:03:00Z'),
     job('restore', 'backup_restore', '42:vaultwarden', 'queued', '2026-06-21T12:02:00Z'),
   ]);
 
-  assert.deepEqual(families.appLifecycle.map((candidate) => candidate.jobId), ['repair', 'install']);
+  assert.deepEqual(families.appLifecycle.map((candidate) => candidate.jobId), ['uninstall', 'repair', 'install']);
   assert.deepEqual(families.backup.map((candidate) => candidate.jobId), ['restore']);
   assert.deepEqual(families.install.map((candidate) => candidate.jobId), ['install']);
 });
@@ -64,6 +65,7 @@ test('job progress and current step derive stable user-facing progress', () => {
   assert.equal(jobProgressPercent(running), 50);
   assert.equal(jobProgressPercent({ ...running, status: 'succeeded' }), 100);
   assert.equal(jobTypeLabel('backup_verify'), 'Backup verification');
+  assert.equal(jobTypeLabel('uninstall_app'), 'Uninstall');
 });
 
 function job(jobId, type, subjectId, status, updatedAt) {

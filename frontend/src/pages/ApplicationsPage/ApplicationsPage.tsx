@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshStatus } from '@/components/RefreshStatus';
@@ -7,24 +7,26 @@ import { PageErrorState, PageLoadingState } from '@/components/project-os/PageSt
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { showActionErrorNotification, showActionNotification, showJobNotification } from '@/lib/actionNotifications';
 import {
   applicationStateQueryKey,
   invalidateAppUpdates,
   invalidateApplicationState,
-  removeManagedAppFromApplicationStateCache,
   setRuntimeAppInApplicationStateCache,
   setRuntimeAppStatusInApplicationStateCache,
   useAppUpdatesQuery,
   useApplicationStateRepository,
   updatesByAppId as buildUpdatesByAppId,
 } from '@/repositories/applicationStateRepository';
+import { setProjectOsJobCache, terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
 import { usePrivateAccessReconciliationQuery } from '@/repositories/networkRepository';
-import type { AppRuntimeView, InstallSettings } from '@/types/app';
+import type { AppRuntimeView } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
+import type { ProjectOsJob } from '@/types/jobs';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ApplicationsDashboard, EmptyState } from './ApplicationsDashboard';
-import { ManageAppDialog } from './ApplicationsPageModal';
+import { AppManagementSheet } from './ApplicationsPageDrawer';
 import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
 import {
   appNeedsAttention,
@@ -39,11 +41,14 @@ function ApplicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
+  const { showAdvancedMetrics } = useProjectSettings();
   const updatesQuery = useAppUpdatesQuery();
   const reconciliationQuery = usePrivateAccessReconciliationQuery();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<AppAction | 'uninstall' | 'update' | 'rollback' | null>(null);
+  const jobsQuery = useProjectOsJobsQuery();
+  const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, AppAction | 'update' | 'rollback' | null>>({});
   const [manageAppId, setManageAppId] = useState<string | null>(null);
+  const [locallyUninstallingAppIds, setLocallyUninstallingAppIds] = useState<Set<string>>(() => new Set());
+  const [trackedUninstallJobIds, setTrackedUninstallJobIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -59,6 +64,25 @@ function ApplicationsPage() {
   const error = localError || (appState.error ? errorMessage(appState.error) : null);
   const managedApp = useMemo(() => apps.find((app) => app.appId === manageAppId) || null, [apps, manageAppId]);
   const managedAppReconciliation = useMemo(() => reconciliation?.apps.find((item) => item.appId === manageAppId) || null, [manageAppId, reconciliation?.apps]);
+  const activeUninstallJobs = useMemo(() => (jobsQuery.data ?? []).filter((job) => job.type === 'uninstall_app' && !terminalJob(job)), [jobsQuery.data]);
+  const uninstallJobsByAppId = useMemo(() => {
+    const jobs = new Map<string, ProjectOsJob>();
+    for (const job of activeUninstallJobs) {
+      if (job.subjectId) {
+        jobs.set(job.subjectId, job);
+      }
+    }
+    return jobs;
+  }, [activeUninstallJobs]);
+  const uninstallingAppIds = useMemo(() => {
+    const ids = new Set(locallyUninstallingAppIds);
+    for (const job of activeUninstallJobs) {
+      if (job.subjectId) {
+        ids.add(job.subjectId);
+      }
+    }
+    return ids;
+  }, [activeUninstallJobs, locallyUninstallingAppIds]);
   const visibleApps = useMemo(() => apps.filter((app) => {
     const query = search.trim().toLowerCase();
     if (!query) {
@@ -76,6 +100,43 @@ function ApplicationsPage() {
   const pinnedExternalViews = useMemo(() => pinnedExternalViewsFromObservedServices(observedServices), [observedServices]);
   const selectedServiceId = searchParams.get('service');
   const selectedObservedService = useMemo(() => observedServices.find((service) => service.id === selectedServiceId) || null, [observedServices, selectedServiceId]);
+
+  useEffect(() => {
+    setLocallyUninstallingAppIds((current) => {
+      const next = new Set([...current].filter((appId) => apps.some((app) => app.appId === appId)));
+      return next.size === current.size ? current : next;
+    });
+  }, [apps]);
+
+  useEffect(() => {
+    if (!trackedUninstallJobIds.length) {
+      return;
+    }
+    const jobs = jobsQuery.data ?? [];
+    const completedJobs = jobs.filter((job) => trackedUninstallJobIds.includes(job.jobId) && terminalJob(job));
+    if (!completedJobs.length) {
+      return;
+    }
+
+    for (const job of completedJobs) {
+      showJobNotification(job);
+      if (job.status === 'failed') {
+        const message = job.error?.message || 'Project OS could not uninstall this app. The app is still visible.';
+        setLocalError(message);
+        if (job.subjectId) {
+          setLocallyUninstallingAppIds((current) => {
+            const next = new Set(current);
+            next.delete(job.subjectId || '');
+            return next;
+          });
+        }
+      } else if (job.status === 'succeeded') {
+        void invalidateApplicationState(queryClient);
+        void invalidateAppUpdates(queryClient);
+      }
+    }
+    setTrackedUninstallJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
+  }, [jobsQuery.data, queryClient, trackedUninstallJobIds]);
 
   const refreshApps = useCallback(async () => {
     setLocalError(null);
@@ -98,9 +159,13 @@ function ApplicationsPage() {
     queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
   }
 
+  function setAppActionLoading(appId: string, action: AppAction | 'update' | 'rollback' | null) {
+    setActionLoadingByAppId((current) => ({ ...current, [appId]: action }));
+  }
+
   async function runAction(appId: string, action: AppAction) {
     const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
-    setActionLoading(action);
+    setAppActionLoading(appId, action);
     setLocalError(null);
     setRuntimeAppStatusInApplicationStateCache(queryClient, appId, optimisticStatusForAction(action));
     try {
@@ -116,29 +181,33 @@ function ApplicationsPage() {
       setLocalError(message);
       showActionErrorNotification(err, 'App action failed');
     } finally {
-      setActionLoading(null);
+      setAppActionLoading(appId, null);
     }
   }
 
   async function uninstall(appId: string) {
-    setActionLoading('uninstall');
     setLocalError(null);
+    setLocallyUninstallingAppIds((current) => new Set(current).add(appId));
     try {
-      const data = await InstalledAppsAPIClient.uninstall(appId);
-      removeManagedAppFromApplicationStateCache(queryClient, appId);
-      showActionNotification(data, 'App removed');
-      refreshAfterMutation({ updates: true });
+      const job = await InstalledAppsAPIClient.uninstall(appId);
+      setProjectOsJobCache(queryClient, job);
+      setTrackedUninstallJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showJobNotification(job);
+      void jobsQuery.refetch();
     } catch (err) {
       const message = errorMessage(err);
       setLocalError(message);
+      setLocallyUninstallingAppIds((current) => {
+        const next = new Set(current);
+        next.delete(appId);
+        return next;
+      });
       showActionErrorNotification(err, 'Uninstall failed');
-    } finally {
-      setActionLoading(null);
     }
   }
 
   async function updateApp(appId: string) {
-    setActionLoading('update');
+    setAppActionLoading(appId, 'update');
     setLocalError(null);
     try {
       const data = await InstalledAppsAPIClient.updateApp(appId);
@@ -149,12 +218,12 @@ function ApplicationsPage() {
       setLocalError(message);
       showActionErrorNotification(err, 'Update failed');
     } finally {
-      setActionLoading(null);
+      setAppActionLoading(appId, null);
     }
   }
 
   async function rollbackApp(appId: string) {
-    setActionLoading('rollback');
+    setAppActionLoading(appId, 'rollback');
     setLocalError(null);
     try {
       const data = await InstalledAppsAPIClient.rollbackApp(appId);
@@ -165,29 +234,7 @@ function ApplicationsPage() {
       setLocalError(message);
       showActionErrorNotification(err, 'Rollback failed');
     } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function saveSettings(appId: string, settings: InstallSettings) {
-    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
-    const existingApp = appState.apps.find((app) => app.appId === appId);
-    setLocalError(null);
-    if (existingApp) {
-      setRuntimeAppInApplicationStateCache(queryClient, appWithOptimisticSettings(existingApp, settings));
-    }
-    try {
-      const data = await InstalledAppsAPIClient.updateSettings(appId, settings);
-      setRuntimeAppInApplicationStateCache(queryClient, data);
-      refreshAfterMutation();
-      showActionNotification({ status: 'completed', message: data.appName + ' settings were saved.' }, 'Settings saved');
-      return data;
-    } catch (err) {
-      restoreApplicationState(previousState);
-      const message = errorMessage(err);
-      setLocalError(message);
-      showActionErrorNotification(err, 'Settings were not saved');
-      throw err;
+      setAppActionLoading(appId, null);
     }
   }
 
@@ -237,17 +284,13 @@ function ApplicationsPage() {
       ) : (
         <ApplicationsDashboard
           accessByAppId={accessByAppId}
-          actionLoading={actionLoading}
+          actionLoadingByAppId={actionLoadingByAppId}
           apps={visibleApps}
           onAction={runAction}
           onManage={setManageAppId}
           onSearch={setSearch}
-          onSelect={(appId) => setSelectedId((current) => current === appId ? null : appId)}
-          onUninstall={uninstall}
           onUpdate={updateApp}
-          onRollback={rollbackApp}
           search={search}
-          selectedId={selectedId}
           summary={appSummary}
           healthByAppId={healthByAppId}
           observedServices={observedServices}
@@ -255,20 +298,28 @@ function ApplicationsPage() {
           pinnedApps={pinnedExternalViews}
           reconciliation={reconciliation}
           telemetryByAppId={telemetryByAppId}
+          uninstallingAppIds={uninstallingAppIds}
           updatesByAppId={updatesByAppId}
         />
       )}
 
       {managedApp && (
-        <ManageAppDialog
+        <AppManagementSheet
           access={accessByAppId[managedApp.appId]}
+          actionLoading={actionLoadingByAppId[managedApp.appId]}
           app={managedApp}
           health={healthByAppId[managedApp.appId] || managedApp.healthSnapshot}
-          onAction={(action) => runAction(managedApp.appId, action)}
+          onAction={runAction}
           onOpenChange={(open) => !open && setManageAppId(null)}
-          onSave={saveSettings}
+          onRollback={rollbackApp}
+          onUninstall={uninstall}
+          onUpdate={updateApp}
           open={Boolean(managedApp)}
           reconciliation={managedAppReconciliation}
+          showAdvanced={showAdvancedMetrics}
+          telemetry={telemetryByAppId[managedApp.appId] || managedApp.telemetry}
+          uninstallJob={uninstallJobsByAppId.get(managedApp.appId) || null}
+          update={updatesByAppId[managedApp.appId] || null}
         />
       )}
       <ObservedServiceDetailsSheet
@@ -294,18 +345,4 @@ function appActionTitle(action: AppAction) {
   if (action === 'restart') return 'App restarted';
   if (action === 'repair') return 'Repair finished';
   return 'App action finished';
-}
-
-function appWithOptimisticSettings(app: AppRuntimeView, settings: InstallSettings): AppRuntimeView {
-  return {
-    ...app,
-    accessUrl: settings.accessUrl ?? app.accessUrl,
-    observedAccess: app.observedAccess ? {
-      ...app.observedAccess,
-      localUrl: settings.accessUrl ?? app.observedAccess.localUrl,
-      privateUrl: settings.privateAccessUrl ?? app.observedAccess.privateUrl,
-      privateLinkStatus: settings.tailscaleEnabled ? app.observedAccess.privateLinkStatus : 'not_enabled',
-    } : app.observedAccess,
-    settings,
-  };
 }

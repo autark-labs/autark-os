@@ -14,12 +14,17 @@ import org.junit.jupiter.api.Test;
 
 import com.projectos.apps.ApplicationStateService;
 import com.projectos.apps.ApplicationState;
+import com.projectos.jobs.ProjectOsJob;
+import com.projectos.jobs.ProjectOsJobRepository;
+import com.projectos.jobs.ProjectOsJobService;
 import com.projectos.marketplace.install.AppActionResult;
 import com.projectos.marketplace.install.AppRuntimeView;
 import com.projectos.marketplace.install.AppLifecycleService;
 import com.projectos.marketplace.install.AppTelemetry;
 import com.projectos.marketplace.install.AppUpdateService;
 import com.projectos.monitoring.MonitoringMetricsService;
+import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
+import com.projectos.marketplace.runtime.RuntimeLayout;
 
 class InstalledAppsControllerTests {
 
@@ -33,7 +38,8 @@ class InstalledAppsControllerTests {
                 lifecycleService,
                 metricsService,
                 updateService,
-                applicationStateService);
+                applicationStateService,
+                jobService());
         AppActionResult result = new AppActionResult("vaultwarden", "start", "completed", "Started.", null, List.of(), Instant.parse("2026-06-21T12:00:00Z"));
         when(lifecycleService.start("vaultwarden")).thenReturn(result);
 
@@ -55,7 +61,8 @@ class InstalledAppsControllerTests {
                 lifecycleService,
                 metricsService,
                 updateService,
-                applicationStateService);
+                applicationStateService,
+                jobService());
 
         List<AppRuntimeView> apps = controller.apps();
 
@@ -75,12 +82,50 @@ class InstalledAppsControllerTests {
                 lifecycleService,
                 metricsService,
                 updateService,
-                applicationStateService);
+                applicationStateService,
+                jobService());
 
         Map<String, AppTelemetry> telemetry = controller.telemetry();
 
         assertThat(telemetry).containsEntry("vaultwarden", app.telemetry());
         verify(lifecycleService, never()).telemetry();
+    }
+
+    @Test
+    void uninstallEndpointReturnsDurableJobWithoutRemovingAppSynchronously() {
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        ProjectOsJobService jobService = jobService();
+        InstalledAppsController controller = new InstalledAppsController(
+                lifecycleService,
+                metricsService,
+                updateService,
+                applicationStateService,
+                jobService);
+        AppActionResult result = new AppActionResult("vaultwarden", "uninstall", "removed", "Removed.", null, List.of(), Instant.parse("2026-06-21T12:00:00Z"));
+        when(lifecycleService.uninstall("vaultwarden")).thenReturn(result);
+
+        ProjectOsJob job = controller.startUninstall("vaultwarden");
+
+        assertThat(job.type()).isEqualTo("uninstall_app");
+        assertThat(job.subjectId()).isEqualTo("vaultwarden");
+        assertThat(job.status()).isEqualTo("queued");
+        assertThat(job.steps()).extracting(step -> step.id()).containsExactly(
+                "load_uninstall_plan",
+                "create_safety_checkpoint",
+                "stop_remove_compose_project",
+                "preserve_data",
+                "remove_app_record",
+                "refresh_app_state");
+        verify(lifecycleService, never()).uninstall("vaultwarden");
+
+        jobService.runQueuedJobsNow();
+
+        verify(lifecycleService).uninstall("vaultwarden");
+        verify(applicationStateService).invalidate();
+        verify(applicationStateService, never()).refreshInBackground();
     }
 
     private ApplicationState applicationStateWith(AppRuntimeView app) {
@@ -120,5 +165,21 @@ class InstalledAppsControllerTests {
                 null,
                 List.of(),
                 List.of());
+    }
+
+    private ProjectOsJobService jobService() {
+        try {
+            RuntimeLayout layout = new RuntimeLayout(
+                    runtimeProperties(java.nio.file.Files.createTempDirectory("project-os-controller-jobs").toString()));
+            return new ProjectOsJobService(new ProjectOsJobRepository(layout, () -> Instant.parse("2026-06-21T12:00:00Z")), Runnable::run, false);
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private ProjectOsRuntimeProperties runtimeProperties(String runtimeRoot) {
+        ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
+        properties.setRuntimeRoot(runtimeRoot);
+        return properties;
     }
 }

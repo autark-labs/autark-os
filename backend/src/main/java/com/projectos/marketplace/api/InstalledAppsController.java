@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.projectos.apps.ApplicationStateService;
+import com.projectos.jobs.ProjectOsJob;
+import com.projectos.jobs.ProjectOsJobOutcome;
+import com.projectos.jobs.ProjectOsJobService;
+import com.projectos.jobs.ProjectOsJobStep;
 import com.projectos.marketplace.install.AppActionResult;
 import com.projectos.marketplace.install.AppAccessCheck;
 import com.projectos.marketplace.install.AppLifecycleService;
@@ -39,12 +43,14 @@ public class InstalledAppsController {
     private final MonitoringMetricsService monitoringMetricsService;
     private final AppUpdateService appUpdateService;
     private final ApplicationStateService applicationStateService;
+    private final ProjectOsJobService jobService;
 
-    public InstalledAppsController(AppLifecycleService appLifecycleService, MonitoringMetricsService monitoringMetricsService, AppUpdateService appUpdateService, ApplicationStateService applicationStateService) {
+    public InstalledAppsController(AppLifecycleService appLifecycleService, MonitoringMetricsService monitoringMetricsService, AppUpdateService appUpdateService, ApplicationStateService applicationStateService, ProjectOsJobService jobService) {
         this.appLifecycleService = appLifecycleService;
         this.monitoringMetricsService = monitoringMetricsService;
         this.appUpdateService = appUpdateService;
         this.applicationStateService = applicationStateService;
+        this.jobService = jobService;
     }
 
     @GetMapping
@@ -174,6 +180,15 @@ public class InstalledAppsController {
         return appLifecycleService.settingsChangePlan(id, settings);
     }
 
+    @PostMapping("/{id}/uninstall")
+    public ProjectOsJob startUninstall(@PathVariable String id) {
+        return jobService.start("uninstall_app", id, uninstallJobSteps(), () -> {
+            AppActionResult result = appLifecycleService.uninstall(id);
+            applicationStateService.invalidate();
+            return ProjectOsJobOutcome.succeeded(result.message());
+        });
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<AppActionResult> uninstall(@PathVariable String id) {
         return ResponseEntity.ok(refreshAfter(appLifecycleService.uninstall(id)));
@@ -191,5 +206,15 @@ public class InstalledAppsController {
         }
         String message = "reachable".equals(health.localAccessStatus()) ? "App link is responding." : "App is running, but the link is not responding.";
         return new AppAccessCheck(app.appId(), app.accessUrl(), health.localAccessStatus(), message, health.checkedAt());
+    }
+
+    private List<ProjectOsJobStep> uninstallJobSteps() {
+        return List.of(
+                ProjectOsJobStep.pending("load_uninstall_plan", "Load uninstall plan"),
+                ProjectOsJobStep.pending("create_safety_checkpoint", "Create safety checkpoint"),
+                ProjectOsJobStep.pending("stop_remove_compose_project", "Stop and remove app containers"),
+                ProjectOsJobStep.pending("preserve_data", "Preserve app data"),
+                ProjectOsJobStep.pending("remove_app_record", "Remove app from My Apps"),
+                ProjectOsJobStep.pending("refresh_app_state", "Refresh app state"));
     }
 }
