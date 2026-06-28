@@ -40,7 +40,7 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
   }
 
   return (
-    <section className="grid min-h-[32rem] auto-rows-[15rem] grid-cols-[repeat(auto-fill,12rem)] items-start justify-start gap-3">
+    <section className="grid min-h-[44rem] auto-rows-[15rem] grid-cols-[repeat(auto-fill,12rem)] items-start justify-start gap-3">
       {items.map((item) => (
         <Card
           className={cn(
