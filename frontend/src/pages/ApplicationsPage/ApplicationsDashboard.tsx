@@ -43,6 +43,7 @@ import {
   uptimeLabel,
 } from './extensions/ApplicationsPage.logic';
 import { appCardPrimaryUrl } from './extensions/ApplicationsPage.cardModel';
+import { appRemediationDisplay, shouldShowRemediation } from './extensions/ApplicationsPage.remediation';
 import type { AppAction } from './extensions/ApplicationsPage.types';
 
 type ApplicationsDashboardProps = {
@@ -355,9 +356,23 @@ function ApplicationCard({ access, actionLoading, app, health, isSelected, onAct
   const reason = statusReason(app, telemetry, access, health, reconciliation);
   const link = appCardPrimaryUrl(app);
   const busy = Boolean(actionLoading);
+  const remediation = appRemediationDisplay({ app, health });
+  const showRemediation = shouldShowRemediation(remediation);
 
   return (
     <article className={cn('grid gap-4 rounded-xl border bg-slate-950/48 p-4 shadow-po-card transition', isSelected ? 'border-violet-300/45 bg-violet-950/20' : 'border-white/10 hover:border-violet-300/30 hover:bg-slate-900/55')}>
+      {showRemediation && (
+        <div className={cn(
+          'rounded-lg border px-3 py-2',
+          remediation.tone === 'critical' ? 'border-red-300/25 bg-red-500/10 text-red-100' : 'border-amber-300/25 bg-amber-500/10 text-amber-100'
+        )}>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-black uppercase tracking-normal">{remediation.label}</span>
+            <span className="shrink-0 text-xs font-semibold opacity-85">{remediation.nextActionLabel}</span>
+          </div>
+          <p className="mt-1 text-sm leading-5 text-slate-200">{remediation.summary}</p>
+        </div>
+      )}
       <button className="flex gap-3 text-left" onClick={() => onManage(app.appId)} type="button">
         <AppIcon app={app} />
         <div className="min-w-0 flex-1">
