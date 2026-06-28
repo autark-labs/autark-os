@@ -10,6 +10,7 @@ import type { PrivateAccessReconciliationItem } from '@/types/network';
 import { Diagnostic } from './ApplicationsPage.shared';
 import { buildAppIssueGuidance } from './extensions/ApplicationsPage.issueActions';
 import { formatDate, humanize } from './extensions/ApplicationsPage.logic';
+import { appRemediationDisplay } from './extensions/ApplicationsPage.remediation';
 import type { AppAction } from './extensions/ApplicationsPage.types';
 
 type ApplicationsStabilityTabProps = {
@@ -31,9 +32,11 @@ export function ApplicationsStabilityTab({ access, app, autoRepairEnabled, healt
   const latestRepair = stabilityEvents.find((event) => event.type.includes('repair') || event.type.includes('private_access'));
   const health = liveHealth || app.healthSnapshot;
   const issueGuidance = buildAppIssueGuidance({ access, app, health, reconciliation, telemetry });
+  const remediation = appRemediationDisplay({ app, health });
 
   return (
     <div className="grid gap-4">
+      {remediation && <RemediationSummaryCard remediation={remediation} />}
       {issueGuidance && <IssueGuidanceCard guidance={issueGuidance} onAction={onAction} />}
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -110,6 +113,26 @@ export function ApplicationsStabilityTab({ access, app, autoRepairEnabled, healt
         </section>
       )}
     </div>
+  );
+}
+
+function RemediationSummaryCard({ remediation }: { remediation: ReturnType<typeof appRemediationDisplay> }) {
+  const tone = remediation.tone === 'critical'
+    ? 'border-red-300/25 bg-red-500/10 text-red-100'
+    : remediation.tone === 'warning'
+      ? 'border-amber-300/25 bg-amber-500/10 text-amber-100'
+      : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100';
+  return (
+    <section className={cn('rounded-lg border p-4', tone)}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-current/70">Self-healing state</p>
+          <h4 className="mt-1 text-lg font-black text-white">{remediation.label}</h4>
+          <p className="mt-2 text-sm leading-6 text-current/85">{remediation.summary}</p>
+        </div>
+        <span className="rounded-full border border-white/10 bg-slate-950/40 px-3 py-1 text-xs font-bold text-white">{remediation.nextActionLabel}</span>
+      </div>
+    </section>
   );
 }
 

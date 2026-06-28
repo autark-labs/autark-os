@@ -6,13 +6,13 @@ export function diagnosticsHeadline(summary, doctor) {
 }
 
 /**
- * @param {{ summary?: any, doctor?: any, setup?: any, observedServices?: any[] }} params
+ * @param {{ summary?: any, doctor?: any, setup?: any, managedApps?: any[], observedServices?: any[] }} params
  */
-export function diagnosticsSummaryRows({ summary, doctor, setup, observedServices = [] }) {
+export function diagnosticsSummaryRows({ summary, doctor, setup, managedApps = [], observedServices = [] }) {
   const checks = new Map((doctor?.checks || setup?.checks || []).map((check) => [check.id, check]));
   const rows = {
     docker: statusRow('Docker', checkLabel(checks.get('docker'), summary?.dockerStatus)),
-    apps: appRow(observedServices),
+    apps: appRow(observedServices, managedApps),
     tailscale: statusRow('Tailscale', checkLabel(checks.get('tailscale'), summary?.tailscaleStatus)),
     backups: statusRow('Backups', backupLabel(summary)),
     storage: statusRow('Storage', storageLabel(summary)),
@@ -46,12 +46,20 @@ function statusRow(label, value) {
   return { label, value: value || 'Unknown', tone };
 }
 
-function appRow(observedServices) {
+function appRow(observedServices, managedApps) {
   const issues = (observedServices || []).filter((service) => service.userStatus !== 'installed_managed');
-  if (!issues.length) {
+  const repairing = (managedApps || []).filter((app) => app?.remediation?.state === 'auto_repairing').length;
+  const failed = (managedApps || []).filter((app) => ['repair_failed', 'restore_recommended'].includes(app?.remediation?.state)).length;
+  const needsReview = (managedApps || []).filter((app) => app?.remediation?.state === 'needs_user_action').length;
+  const parts = [];
+  if (issues.length) parts.push(`${issues.length} found on this server`);
+  if (repairing) parts.push(`${repairing} repairing`);
+  if (failed) parts.push(`${failed} repair failed`);
+  if (needsReview) parts.push(`${needsReview} need review`);
+  if (!parts.length) {
     return { label: 'Apps', value: 'Ready', tone: 'success' };
   }
-  return { label: 'Apps', value: `${issues.length} found on this server`, tone: 'warning' };
+  return { label: 'Apps', value: parts.join(', '), tone: failed ? 'warning' : 'warning' };
 }
 
 function checkLabel(check, fallback) {

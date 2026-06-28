@@ -14,8 +14,9 @@ export function appRemediationDisplay({ app, health = null } = {}) {
   const lastRepairStatus = settings.lastRepairStatus || latestRepairStatus(app?.recentEvents || []);
   const autoRepairEnabled = settings.autoRepairEnabled !== false;
   const hasRestorePoint = app?.canonicalBackupState === 'protected_by_restore_point' || app?.backupState === 'protected_by_restore_point';
-  const repairRunning = lastRepairStatus === 'running' || lastRepairStatus === 'started' || recentRepairStarted(app?.recentEvents || []);
-  const repairFailed = lastRepairStatus === 'failed' || lastRepairStatus === 'error';
+  const normalizedRepairStatus = String(lastRepairStatus || '').toLowerCase();
+  const repairRunning = normalizedRepairStatus.includes('running') || normalizedRepairStatus.includes('started') || normalizedRepairStatus.includes('queued') || recentRepairStarted(app?.recentEvents || []);
+  const repairFailed = normalizedRepairStatus.includes('failed') || normalizedRepairStatus.includes('error') || normalizedRepairStatus.includes('blocked') || normalizedRepairStatus.includes('needs_attention');
 
   if (repairRunning) {
     return {

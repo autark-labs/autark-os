@@ -379,6 +379,76 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void runtimeViewExposesCanonicalRemediationState() {
+        repository.saveSettings("vaultwarden", new InstallSettings(
+                "http://localhost:8090",
+                null,
+                false,
+                java.util.Map.of(),
+                BackupPolicy.defaults(),
+                "local",
+                "optional",
+                8090,
+                "http",
+                null,
+                null,
+                Instant.parse("2026-06-20T12:05:00Z"),
+                "guardian_repair_running",
+                true));
+        composeExecutor.containers = List.of(new DockerContainerStatus(
+                "project-os-vaultwarden",
+                "vaultwarden",
+                "running",
+                "unhealthy",
+                "Up 1 minute (unhealthy)",
+                "0.0.0.0:8090->80/tcp"));
+
+        AppRuntimeView app = service.getApp("vaultwarden");
+
+        assertThat(app.remediation().state()).isEqualTo("auto_repairing");
+        assertThat(app.remediation().label()).isEqualTo("Project OS is repairing");
+        assertThat(app.remediation().nextActionLabel()).isEqualTo("Wait for repair");
+    }
+
+    @Test
+    void runtimeViewOnlyRecommendsRestoreWhenCompletedRestorePointExists() {
+        repository.saveSettings("vaultwarden", new InstallSettings(
+                "http://localhost:8090",
+                null,
+                false,
+                java.util.Map.of(),
+                new BackupPolicy(true, "daily", 7),
+                "local",
+                "optional",
+                8090,
+                "http",
+                null,
+                null,
+                Instant.parse("2026-06-20T12:05:00Z"),
+                "guardian_repair_failed",
+                true));
+        composeExecutor.containers = List.of(new DockerContainerStatus(
+                "project-os-vaultwarden",
+                "vaultwarden",
+                "running",
+                "unhealthy",
+                "Up 1 minute (unhealthy)",
+                "0.0.0.0:8090->80/tcp"));
+
+        AppRuntimeView withoutRestorePoint = service.getApp("vaultwarden");
+
+        assertThat(withoutRestorePoint.remediation().state()).isEqualTo("repair_failed");
+        assertThat(withoutRestorePoint.remediation().summary()).doesNotContain("restore point");
+
+        new BackupRepository(runtimeLayout).record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
+
+        AppRuntimeView withRestorePoint = service.getApp("vaultwarden");
+
+        assertThat(withRestorePoint.remediation().state()).isEqualTo("restore_recommended");
+        assertThat(withRestorePoint.remediation().nextActionLabel()).isEqualTo("Review restore");
+    }
+
+    @Test
     void runningContainerIsReadyEvenWhenRawStatusMentionsCreatedTime() {
         composeExecutor.containers = List.of(new DockerContainerStatus(
                 "project-os-vaultwarden",

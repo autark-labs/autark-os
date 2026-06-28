@@ -79,66 +79,13 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         String lastRepairStatus = settings == null ? null : settings.lastRepairStatus();
         boolean autoRepairEnabled = settings == null || settings.autoRepairEnabled();
         boolean hasRestorePoint = "protected_by_restore_point".equals(backupState);
-
-        if (repairRunning(lastRepairStatus)) {
-            return new AppRemediationView(
-                    "auto_repairing",
-                    "Project OS is repairing",
-                    item.appName() + " is not ready yet. Project OS is trying a safe repair before asking you to intervene.",
-                    "Wait for repair",
-                    "warning");
-        }
-
-        if (repairFailed(lastRepairStatus) && hasRestorePoint) {
-            return new AppRemediationView(
-                    "restore_recommended",
-                    "Restore recommended",
-                    "Safe repair did not finish. A completed restore point is available, so review restore before trying riskier fixes.",
-                    "Review restore",
-                    "critical");
-        }
-
-        if (repairFailed(lastRepairStatus)) {
-            return new AppRemediationView(
-                    "repair_failed",
-                    "Repair needs review",
-                    "Project OS tried a safe repair, but " + item.appName() + " still needs attention. Review the repair details before taking a riskier action.",
-                    "Review repair",
-                    "critical");
-        }
-
-        if (needsUserAction(item.status())) {
-            if (autoRepairEnabled && "Missing".equals(item.status())) {
-                return new AppRemediationView(
-                        "needs_user_action",
-                        "Repair available",
-                        item.appName() + " needs attention. Project OS can try a safe repair from Manage.",
-                        "Open Manage",
-                        "warning");
-            }
-            return new AppRemediationView(
-                    "needs_user_action",
-                    "Needs your review",
-                    item.appName() + " needs your review before Project OS can safely recover it.",
-                    "Open Manage",
-                    "critical");
-        }
-
-        if (autoRepairEnabled && "Ready".equals(item.status())) {
-            return new AppRemediationView(
-                    "watching",
-                    "Project OS is watching",
-                    item.appName() + " is ready. If it drifts, Project OS will try safe repair before asking you to intervene.",
-                    "No action needed",
-                    "success");
-        }
-
-        return new AppRemediationView(
-                "healthy",
-                "Ready",
-                item.appName() + " is ready to use.",
-                "No action needed",
-                "success");
+        return AppRemediationPolicy.remediation(
+                item.appName(),
+                item.status(),
+                lastRepairStatus,
+                autoRepairEnabled,
+                hasRestorePoint,
+                needsUserAction(item.status()));
     }
 
     private List<ProjectOsIssue> issues(AppReconciliationItem item, InstalledApp app, String backupState) {
@@ -228,14 +175,6 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
             case "Needs setup" -> "needs_setup";
             default -> "needs_attention";
         };
-    }
-
-    private boolean repairRunning(String lastRepairStatus) {
-        return "running".equalsIgnoreCase(lastRepairStatus) || "started".equalsIgnoreCase(lastRepairStatus);
-    }
-
-    private boolean repairFailed(String lastRepairStatus) {
-        return "failed".equalsIgnoreCase(lastRepairStatus) || "error".equalsIgnoreCase(lastRepairStatus);
     }
 
     private boolean needsUserAction(String status) {

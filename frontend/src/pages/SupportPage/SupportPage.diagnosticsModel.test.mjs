@@ -27,6 +27,26 @@ test('Diagnostics summary includes apps found on the server without treating own
   });
 });
 
+test('Diagnostics summary surfaces app repair state from canonical managed apps', () => {
+  const rows = diagnosticsSummaryRows({
+    summary: { dockerStatus: 'Ready', tailscaleStatus: 'Ready', findings: [] },
+    doctor: { checks: [{ id: 'docker', status: 'ok' }, { id: 'tailscale', status: 'ok' }] },
+    managedApps: [
+      { appId: 'vaultwarden', remediation: { state: 'auto_repairing' } },
+      { appId: 'home-assistant', remediation: { state: 'repair_failed' } },
+      { appId: 'homepage', remediation: { state: 'watching' } },
+    ],
+    observedServices: [],
+  });
+
+  assert.deepEqual(rows.find((row) => row.id === 'apps'), {
+    id: 'apps',
+    label: 'Apps',
+    value: '1 repairing, 1 repair failed',
+    tone: 'warning',
+  });
+});
+
 test('Diagnostics copy separates production conflicts from allowed development instances', () => {
   assert.equal(productionConflictSummary({ existingInstall: { conflict: false } }), null);
   assert.equal(productionConflictSummary({ devMode: false, existingInstall: { conflict: true, summary: 'Another install exists.' } }).title, 'Existing Project OS install found');

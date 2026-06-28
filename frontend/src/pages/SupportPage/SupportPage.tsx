@@ -16,6 +16,7 @@ import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceView } from '@/types/observedService';
+import type { AppRuntimeView } from '@/types/app';
 import type { SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemSetupStatus } from '@/types/system';
 import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from './SupportPage.diagnosticsModel';
 import { formatDate, humanize, shortSha, summaryFromBundle } from './SupportPage.logic';
@@ -113,11 +114,12 @@ function SupportPage() {
   const observedServices = appState.observedServices;
   const findings = summary?.findings || state.bundle?.findings || [];
   const redactionRules = summary?.redactionRules || state.bundle?.redactionRules || [];
-  const summaryRows = diagnosticsSummaryRows({ summary, doctor: state.doctor, setup: state.setup, observedServices });
+  const summaryRows = diagnosticsSummaryRows({ summary, doctor: state.doctor, setup: state.setup, managedApps: appState.apps, observedServices });
   const headline = diagnosticsHeadline(summary, state.doctor);
   const conflict = productionConflictSummary(state.setup);
   const ownershipResources = useMemo(() => observedServices.filter((service) => service.userStatus !== 'installed_managed'), [observedServices]);
   const dockerResources = useMemo(() => observedServices.filter((service) => service.source === 'docker'), [observedServices]);
+  const repairResources = useMemo(() => appState.apps.filter((app) => hasRepairDetail(app)), [appState.apps]);
   const tailscaleCheck = state.setup?.checks?.find((check) => check.id === 'tailscale');
   const operatorCheck = state.setup?.checks?.find((check) => check.id === 'tailscale-operator');
 
@@ -202,6 +204,12 @@ function SupportPage() {
             {ownershipResources.length ? ownershipResources.map((resource) => (
               <ResourceLine key={resource.id} resource={resource} />
             )) : <p className="text-sm text-slate-400">No found apps or ignored resources are currently visible.</p>}
+          </AdvancedSection>
+
+          <AdvancedSection defaultOpen={repairResources.length > 0} icon={ShieldCheck} title="App repair details">
+            {repairResources.length ? repairResources.map((app) => (
+              <RepairLine app={app} key={app.appId} />
+            )) : <p className="text-sm text-slate-400">No app repair attempts or remediation states are currently visible.</p>}
           </AdvancedSection>
 
           <AdvancedSection defaultOpen={false} icon={FileText} title="Docker resources">
@@ -347,6 +355,41 @@ function ResourceLine({ resource, technical = false }: { resource: ObservedServi
       )}
     </div>
   );
+}
+
+function RepairLine({ app }: { app: AppRuntimeView }) {
+  const repairEvents = (app.recentEvents || []).filter((event) => event.type.includes('repair') || event.type.includes('health') || event.type.includes('private_access')).slice(0, 3);
+  return (
+    <div className="rounded-lg border border-slate-700/45 bg-slate-900/45 p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-bold text-white">{app.appName}</p>
+          <p className="mt-1 text-sm text-slate-400">{app.remediation?.summary || app.healthSnapshot?.detail || 'Project OS has not recorded repair detail for this app.'}</p>
+        </div>
+        <Badge className={cn('border-slate-600/60 bg-slate-950/60 text-slate-300', app.remediation?.tone === 'critical' && 'border-red-300/25 bg-red-500/10 text-red-100', app.remediation?.tone === 'warning' && 'border-amber-300/25 bg-amber-500/10 text-amber-100', app.remediation?.tone === 'success' && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')} variant="outline">
+          {app.remediation?.label || app.friendlyStatus}
+        </Badge>
+      </div>
+      <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
+        <span>Health: {app.healthSnapshot?.status || app.friendlyStatus}</span>
+        <span>Last repair: {app.settings?.lastRepairStatus ? humanize(app.settings.lastRepairStatus) : 'No repair recorded'}</span>
+        <span>Attempted: {formatDate(app.settings?.lastRepairAttemptAt || undefined)}</span>
+        <span>Next action: {app.remediation?.nextActionLabel || 'No action needed'}</span>
+      </div>
+      {repairEvents.length > 0 && (
+        <div className="mt-3 grid gap-2 border-t border-slate-700/45 pt-3 text-xs text-slate-400">
+          {repairEvents.map((event) => <span key={event.id}>{formatDate(event.createdAt)} - {humanize(event.type)}: {event.message}</span>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function hasRepairDetail(app: AppRuntimeView) {
+  const state = app.remediation?.state;
+  return Boolean(state && !['healthy', 'watching'].includes(state))
+    || Boolean(app.settings?.lastRepairStatus)
+    || (app.recentEvents || []).some((event) => event.type.includes('repair') || event.type.includes('health') || event.type.includes('private_access'));
 }
 
 function labelForOwnership(value: string) {

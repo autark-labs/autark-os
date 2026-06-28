@@ -97,3 +97,17 @@ test('uses needs user action when Project OS cannot safely repair the app', () =
   assert.equal(display.nextActionLabel, 'Open Manage');
   assert.match(display.summary, /needs your review/i);
 });
+
+test('normalizes prefixed guardian repair statuses when backend remediation is unavailable', () => {
+  const running = appRemediationDisplay({
+    app: { ...baseApp, settings: { autoRepairEnabled: true, lastRepairStatus: 'guardian_repair_running' } },
+    health: { status: 'Needs attention', message: 'Container missing', repairAvailable: true },
+  });
+  const failed = appRemediationDisplay({
+    app: { ...baseApp, settings: { autoRepairEnabled: true, lastRepairStatus: 'manual_repair_failed' } },
+    health: { status: 'Needs attention', message: 'Container unhealthy', repairAvailable: true },
+  });
+
+  assert.equal(running.state, 'auto_repairing');
+  assert.equal(failed.state, 'repair_failed');
+});

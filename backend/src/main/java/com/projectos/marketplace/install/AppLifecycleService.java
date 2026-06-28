@@ -886,6 +886,15 @@ public class AppLifecycleService {
         AccessDesiredState desiredAccess = desiredAccessState(settings, manifest, accessUrl);
         AccessObservedState observedAccess = observedAccessState(settings, accessUrl);
         AppAccessRoute accessRoute = accessRoute(settings, accessUrl, observedAccess);
+        AppHealthSnapshot healthSnapshot = repository.healthFor(app.appId()).orElse(null);
+        String remediationStatus = healthSnapshot == null ? status.friendlyStatus() : healthSnapshot.status();
+        AppRemediationView remediation = AppRemediationPolicy.remediation(
+                app.appName(),
+                remediationStatus,
+                settings.lastRepairStatus(),
+                settings.autoRepairEnabled(),
+                hasCompletedRestorePoint(app.appId(), settings),
+                isRepairAvailable(remediationStatus));
         return new AppRuntimeView(
                 app.appId(),
                 app.appName(),
@@ -906,11 +915,24 @@ public class AppLifecycleService {
                 settings.backup().enabled() ? settings.backup().label() : "Backups disabled",
                 settings,
                 telemetry,
-                repository.healthFor(app.appId()).orElse(null),
+                healthSnapshot,
                 usageGuide,
                 setupGuide,
                 appConfiguration,
+                remediation,
                 repository.eventsFor(app.appId(), EVENT_LIMIT));
+    }
+
+    private boolean hasCompletedRestorePoint(String appId, InstallSettings settings) {
+        if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
+            return false;
+        }
+        return backupRepository.forApp(appId, 10).stream()
+                .anyMatch(restorePoint -> "completed".equalsIgnoreCase(restorePoint.status()));
+    }
+
+    private boolean isRepairAvailable(String status) {
+        return "Needs attention".equals(status) || "Unavailable".equals(status) || "Missing".equals(status) || "Paused".equals(status);
     }
 
     private AppHealthSnapshot healthSnapshot(InstalledApp app) {
