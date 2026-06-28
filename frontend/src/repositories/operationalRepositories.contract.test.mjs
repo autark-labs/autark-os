@@ -28,6 +28,7 @@ test('operational pages use repository hooks instead of page-local polling', () 
 
   const storageRepository = source('src/repositories/storageRepository.ts');
   const backupRepository = source('src/repositories/backupRepository.ts');
+  const jobRepository = source('src/repositories/jobRepository.ts');
   const monitoringRepository = source('src/repositories/monitoringRepository.ts');
 
   assert.match(storageRepository, /storageQueryKeys/);
@@ -39,8 +40,13 @@ test('operational pages use repository hooks instead of page-local polling', () 
   assert.match(backupRepository, /useBackupReportRepository/);
   assert.match(backupRepository, /useBackupJobsQuery/);
   assert.match(backupRepository, /useProjectOsJobQuery/);
-  assert.match(backupRepository, /JobsAPIClient\.list/);
-  assert.match(backupRepository, /enabled:\s*Boolean\(jobId\)/);
+  assert.match(backupRepository, /useProjectOsJobsQuery/);
+  assert.match(backupRepository, /useSharedProjectOsJobQuery/);
+  assert.doesNotMatch(backupRepository, /JobsAPIClient/);
+
+  assert.match(jobRepository, /JobsAPIClient\.list/);
+  assert.match(jobRepository, /JobsAPIClient\.get/);
+  assert.match(jobRepository, /enabled:\s*Boolean\(jobId\)/);
 
   const backupsPage = source('src/pages/BackupsPage/BackupsPage.tsx');
   assert.match(backupsPage, /useBackupJobsQuery/);

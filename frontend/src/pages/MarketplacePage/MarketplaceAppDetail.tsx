@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { JobProgress } from '@/components/project-os/JobProgress';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -16,6 +17,7 @@ import {
 import { backupSafetyWarning } from '@/lib/backupSafety';
 import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
+import { currentJobStepText, terminalJob } from '@/repositories/jobRepository';
 import type { DiscoverAppView, DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
@@ -372,9 +374,9 @@ function InlineInstallStatus({
           <div className="min-w-0 flex-1">
             <h4 className="font-bold text-white">{succeeded ? `${app.name} is ready` : failed ? `${app.name} did not finish installing` : `Installing ${app.name}`}</h4>
             <p className={cn('mt-1 text-sm', succeeded ? 'text-emerald-100/80' : failed ? 'text-red-100/80' : 'text-violet-100/75')}>
-              {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Project OS stopped before making this app available.' : currentJobStep(job)}
+              {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Project OS stopped before making this app available.' : currentJobStepText(job, 'Project OS is working on this job.')}
             </p>
-            {running && <JobProgressBar job={job} />}
+            {running && <JobProgress className="mt-4" job={job} subjectLabel={app.name} />}
             <JobStepList job={job} />
             {succeeded && (
               <div className="mt-4 flex flex-wrap gap-2">
@@ -427,25 +429,6 @@ function InlineInstallStatus({
   return null;
 }
 
-function JobProgressBar({ job }: { job: ProjectOsJob }) {
-  const completedSteps = job.steps.filter((step) => ['succeeded', 'skipped'].includes(step.status)).length;
-  const totalSteps = Math.max(job.steps.length, 1);
-  const runningStepIndex = job.steps.findIndex((step) => step.status === 'running' || step.id === job.currentStep);
-  const progressStepCount = runningStepIndex >= 0 ? Math.max(completedSteps, runningStepIndex) + 0.5 : completedSteps;
-  const percent = Math.min(100, Math.max(8, Math.round((progressStepCount / totalSteps) * 100)));
-  return (
-    <div className="mt-4">
-      <div className="flex items-center justify-between gap-3 text-xs text-violet-100/75">
-        <span>Install progress</span>
-        <span>{Math.min(completedSteps, totalSteps)} of {totalSteps} steps complete</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-950">
-        <div className="h-full rounded-full bg-violet-400 transition-all" style={{ width: `${percent}%` }} />
-      </div>
-    </div>
-  );
-}
-
 function JobStepList({ job }: { job: ProjectOsJob }) {
   return (
     <div className="mt-4 grid gap-2">
@@ -462,15 +445,6 @@ function JobStepList({ job }: { job: ProjectOsJob }) {
       ))}
     </div>
   );
-}
-
-function terminalJob(job: ProjectOsJob) {
-  return ['succeeded', 'failed', 'cancelled'].includes(job.status);
-}
-
-function currentJobStep(job: ProjectOsJob) {
-  const step = job.steps.find((candidate) => candidate.id === job.currentStep) ?? job.steps.find((candidate) => candidate.status === 'running') ?? job.steps.find((candidate) => candidate.status === 'pending');
-  return step?.message || step?.label || 'Project OS is working on this job.';
 }
 
 function shouldOfferFirstBackup(_app: DiscoverInstalledAppSummary) {

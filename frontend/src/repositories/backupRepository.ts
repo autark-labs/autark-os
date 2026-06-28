@@ -1,9 +1,13 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
-import { JobsAPIClient } from '@/api/JobsAPIClient';
 import type { BackupReport, RestorePlan } from '@/types/backup';
 import type { ProjectOsJob } from '@/types/jobs';
+import {
+  setProjectOsJobCache,
+  useProjectOsJobQuery as useSharedProjectOsJobQuery,
+  useProjectOsJobsQuery,
+} from './jobRepository';
 
 export const backupQueryKeys = {
   all: ['backups'] as const,
@@ -42,44 +46,43 @@ export function useBackupReportRepository({ paused = false }: { paused?: boolean
 }
 
 export function useProjectOsJobQuery(jobId: string | null) {
-  return useQuery({
-    queryKey: backupQueryKeys.job(jobId),
-    queryFn: () => JobsAPIClient.get(jobId || ''),
-    enabled: Boolean(jobId),
-    refetchInterval: 1_200,
-  });
+  return useSharedProjectOsJobQuery(jobId);
 }
 
 export function useBackupJobsQuery() {
-  return useQuery({
-    queryKey: backupQueryKeys.jobs,
-    queryFn: () => JobsAPIClient.list(),
-    refetchInterval: 1_200,
-    staleTime: 1_200,
-  });
+  return useProjectOsJobsQuery();
 }
 
 export function useRunAppBackupMutation() {
   const queryClient = useQueryClient();
   return useMutation<ProjectOsJob, unknown, string>({
     mutationFn: (appId) => BackupAPIClient.run(appId),
-    onSuccess: () => invalidateBackupQueries(queryClient),
+    onSuccess: (job) => {
+      setProjectOsJobCache(queryClient, job);
+      void invalidateBackupQueries(queryClient);
+    },
   });
 }
 
 export function useRunFullBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutation<ProjectOsJob>({
     mutationFn: () => BackupAPIClient.runFull(),
-    onSuccess: () => invalidateBackupQueries(queryClient),
+    onSuccess: (job) => {
+      setProjectOsJobCache(queryClient, job);
+      void invalidateBackupQueries(queryClient);
+    },
   });
 }
 
 export function useRunRoutineBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutation<ProjectOsJob>({
     mutationFn: () => BackupAPIClient.runRoutine(),
-    onSuccess: () => invalidateBackupQueries(queryClient),
+    onSuccess: (job) => {
+      setProjectOsJobCache(queryClient, job);
+      void invalidateBackupQueries(queryClient);
+    },
   });
 }
 
@@ -93,7 +96,10 @@ export function useRestoreBackupMutation() {
   const queryClient = useQueryClient();
   return useMutation<ProjectOsJob, unknown, { restorePointId: number; appId?: string | null }>({
     mutationFn: ({ restorePointId, appId }) => BackupAPIClient.restore(restorePointId, appId),
-    onSuccess: () => invalidateBackupQueries(queryClient),
+    onSuccess: (job) => {
+      setProjectOsJobCache(queryClient, job);
+      void invalidateBackupQueries(queryClient);
+    },
   });
 }
 
@@ -101,7 +107,10 @@ export function useVerifyRestorePointMutation() {
   const queryClient = useQueryClient();
   return useMutation<ProjectOsJob, unknown, number>({
     mutationFn: (restorePointId) => BackupAPIClient.verify(restorePointId),
-    onSuccess: () => invalidateBackupQueries(queryClient),
+    onSuccess: (job) => {
+      setProjectOsJobCache(queryClient, job);
+      void invalidateBackupQueries(queryClient);
+    },
   });
 }
 

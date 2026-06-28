@@ -29,6 +29,7 @@ test('marketplace detail and install wizard do not carry legacy install result p
 test('marketplace page reads discover data and jobs through the repository layer', () => {
   const page = source('MarketplacePage.tsx');
   const repository = projectSource('repositories/discoverRepository.ts');
+  const jobRepository = projectSource('repositories/jobRepository.ts');
 
   assert.doesNotMatch(page, /ActivityAPIClient|BackupAPIClient|DiscoverAPIClient|JobsAPIClient|SystemAPIClient/);
   assert.doesNotMatch(page, /setInterval|clearInterval|loadApps|loadInstallPreview/);
@@ -49,7 +50,10 @@ test('marketplace page reads discover data and jobs through the repository layer
   assert.match(repository, /useDiscoverJobQuery/);
   assert.match(repository, /useDiscoverJobsQuery/);
   assert.match(repository, /DiscoverAPIClient\.listApps/);
-  assert.match(repository, /JobsAPIClient\.list/);
-  assert.match(repository, /JobsAPIClient\.get/);
+  assert.match(repository, /useProjectOsJobsQuery/);
+  assert.match(repository, /useProjectOsJobQuery/);
+  assert.doesNotMatch(repository, /JobsAPIClient/);
+  assert.match(jobRepository, /JobsAPIClient\.list/);
+  assert.match(jobRepository, /JobsAPIClient\.get/);
   assert.match(repository, /invalidateApplicationState/);
 });

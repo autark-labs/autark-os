@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
+import { JobProgress } from '@/components/project-os/JobProgress';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -18,6 +19,7 @@ import {
   useRunRoutineBackupMutation,
   useVerifyRestorePointMutation,
 } from '@/repositories/backupRepository';
+import { terminalJob } from '@/repositories/jobRepository';
 import type { AppBackupStatus, BackupReport, RestorePlan, RestorePoint } from '@/types/backup';
 import type { ProjectOsJob } from '@/types/jobs';
 import {
@@ -34,7 +36,7 @@ import {
   RoutineTimeline,
   SectionHeader,
 } from './BackupsPage.components';
-import { backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
+import { backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
 
 type RestoreView = 'timeline' | 'list';
 
@@ -373,20 +375,20 @@ function BackupsPage() {
 
 function BackupJobBanner({ job }: { job: ProjectOsJob }) {
   return (
-    <div className="border-b border-violet-300/20 bg-violet-500/10 px-6 py-4 text-sm text-violet-100">
-      <p className="font-semibold text-white">{backupJobBannerTitle(job)}</p>
-      <p className="mt-1">{currentJobStep(job)}</p>
+    <div className="border-b border-violet-300/20 bg-violet-500/10 px-6 py-4">
+      <JobProgress job={job} subjectLabel={backupSubjectLabel(job)} />
     </div>
   );
 }
 
-function terminalJob(job: ProjectOsJob) {
-  return ['succeeded', 'failed', 'cancelled'].includes(job.status);
-}
-
-function currentJobStep(job: ProjectOsJob) {
-  const step = job.steps.find((candidate) => candidate.id === job.currentStep) ?? job.steps.find((candidate) => candidate.status === 'running') ?? job.steps.find((candidate) => candidate.status === 'pending');
-  return step?.message || step?.label || 'Project OS is creating a restore point.';
+function backupSubjectLabel(job: ProjectOsJob) {
+  if (job.subjectId === '__full__') {
+    return 'all apps';
+  }
+  if (job.subjectId === '__routine__') {
+    return 'routine backup';
+  }
+  return job.subjectId || undefined;
 }
 
 export default BackupsPage;

@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { ActivityAPIClient } from '@/api/ActivityAPIClient';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { DiscoverAPIClient } from '@/api/DiscoverAPIClient';
-import { JobsAPIClient } from '@/api/JobsAPIClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView, DiscoverInstallPreview, DiscoverInstallRequestOptions } from '@/types/discover';
@@ -10,10 +9,18 @@ import type { ProjectOsJob } from '@/types/jobs';
 import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
 import { invalidateApplicationState } from './applicationStateRepository';
 import { invalidateBackupQueries } from './backupRepository';
-import { latestActiveDiscoverJob } from './discoverRepository.logic';
+import {
+  JOB_FAMILIES,
+  latestActiveJob,
+  setProjectOsJobCache,
+  useProjectOsJobQuery,
+  useProjectOsJobsQuery,
+} from './jobRepository';
 import { useSystemDoctorQuery } from './systemRepository';
 
-export { latestActiveDiscoverJob };
+export function latestActiveDiscoverJob(jobs: ProjectOsJob[], types: string[] = JOB_FAMILIES.discover) {
+  return latestActiveJob(jobs, types) as ProjectOsJob | null;
+}
 
 export type DiscoverReadiness = {
   doctor: SystemDoctorStatus | null;
@@ -106,7 +113,7 @@ export function useDiscoverInstallMutation() {
   return useMutation<ProjectOsJob, unknown, DiscoverInstallMutationInput>({
     mutationFn: ({ appId, answers, options = {} }) => DiscoverAPIClient.install(appId, answers, options),
     onSuccess: (job) => {
-      queryClient.setQueryData(discoverQueryKeys.job(job.jobId), job);
+      setProjectOsJobCache(queryClient, job);
       void invalidateDiscoverQueries(queryClient);
       void invalidateApplicationState(queryClient);
     },
@@ -118,7 +125,7 @@ export function useDiscoverBackupMutation() {
   return useMutation<ProjectOsJob, unknown, string>({
     mutationFn: (appId) => BackupAPIClient.run(appId),
     onSuccess: (job) => {
-      queryClient.setQueryData(discoverQueryKeys.job(job.jobId), job);
+      setProjectOsJobCache(queryClient, job);
       void invalidateDiscoverQueries(queryClient);
       void invalidateBackupQueries(queryClient);
       void invalidateApplicationState(queryClient);
@@ -127,21 +134,11 @@ export function useDiscoverBackupMutation() {
 }
 
 export function useDiscoverJobQuery(jobId: string | null) {
-  return useQuery<ProjectOsJob>({
-    queryKey: discoverQueryKeys.job(jobId),
-    queryFn: () => JobsAPIClient.get(jobId || ''),
-    enabled: Boolean(jobId),
-    refetchInterval: 1_200,
-  });
+  return useProjectOsJobQuery(jobId);
 }
 
 export function useDiscoverJobsQuery() {
-  return useQuery<ProjectOsJob[]>({
-    queryKey: discoverQueryKeys.jobs,
-    queryFn: () => JobsAPIClient.list(),
-    refetchInterval: 1_200,
-    staleTime: 1_200,
-  });
+  return useProjectOsJobsQuery();
 }
 
 export function invalidateDiscoverQueries(queryClient: QueryClient) {

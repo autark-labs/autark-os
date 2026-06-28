@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Boxes, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react';
+import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { JobProgress } from '@/components/project-os/JobProgress';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +13,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { jobTypeLabel, useGlobalActiveProjectOsJob } from '@/repositories/jobRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
+import type { ProjectOsJob } from '@/types/jobs';
 import type { SystemSetupCheck } from '@/types/system';
 
 type HeaderService = {
@@ -34,7 +37,9 @@ type HeaderService = {
 function SystemStatusHeader() {
   const [currentTime, setCurrentTime] = useState(() => formatClock(new Date()));
   const doctorQuery = useSystemDoctorQuery();
+  const activeJobQuery = useGlobalActiveProjectOsJob();
   const doctor = doctorQuery.data ?? null;
+  const activeJob = activeJobQuery.activeJob;
   const loading = doctorQuery.isLoading;
   const error = doctorQuery.error;
 
@@ -75,6 +80,7 @@ function SystemStatusHeader() {
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
+          {activeJob && <GlobalJobPopover job={activeJob} />}
           <StatusPopover loading={loading} service={dockerService} />
           <TailscaleControlPopover check={tailscaleCheck} loading={loading} />
           <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-slate-400 sm:inline-flex">
@@ -83,6 +89,35 @@ function SystemStatusHeader() {
         </div>
       </div>
     </header>
+  );
+}
+
+function GlobalJobPopover({ job }: { job: ProjectOsJob }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          aria-label={`${jobTypeLabel(job.type)} in progress`}
+          className="h-8 gap-2 rounded-lg border border-sky-500/25 bg-sky-500/12 px-2.5 text-xs text-sky-300 shadow-po-sm hover:bg-sky-500/18"
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <Loader2 className="size-3.5 animate-spin" />
+          <span className="hidden font-semibold sm:inline">Working</span>
+          <span className="font-semibold">{jobTypeLabel(job.type)}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-96 gap-3 border-slate-700 bg-slate-950 p-3 text-po-text shadow-po-md">
+        <PopoverHeader>
+          <PopoverTitle className="text-sm">Project OS is working</PopoverTitle>
+          <PopoverDescription className="text-xs text-po-text-muted">
+            This progress follows you while you move around the app.
+          </PopoverDescription>
+        </PopoverHeader>
+        <JobProgress job={job} subjectLabel={job.subjectId || undefined} />
+      </PopoverContent>
+    </Popover>
   );
 }
 

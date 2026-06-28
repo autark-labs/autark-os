@@ -1,3 +1,5 @@
+import { activeJobs } from '../../repositories/jobRepository.logic.js';
+
 /**
  * @param {string | null | undefined} value
  * @returns {string}
@@ -105,17 +107,14 @@ export function backupJobCompletedMessage(job) {
   return 'Backup job completed.';
 }
 
-const BACKUP_JOB_TYPES = new Set(['backup', 'backup_verify', 'backup_restore']);
-const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
+const BACKUP_JOB_TYPES = ['backup', 'backup_verify', 'backup_restore'];
 
 /**
  * @param {Array<{ type?: string, status?: string, updatedAt?: string, createdAt?: string }>} jobs
  * @returns {Array<unknown>}
  */
 export function activeBackupJobs(jobs) {
-  return (Array.isArray(jobs) ? jobs : [])
-    .filter((job) => BACKUP_JOB_TYPES.has(job?.type) && !TERMINAL_JOB_STATUSES.has(job?.status))
-    .toSorted((left, right) => jobTime(right) - jobTime(left));
+  return activeJobs(jobs, BACKUP_JOB_TYPES);
 }
 
 /**
@@ -145,12 +144,6 @@ export function backupJobRunningId(job) {
     return 'routine';
   }
   return subjectId ? `app-${subjectId}` : 'backup';
-}
-
-function jobTime(job) {
-  const value = job?.updatedAt || job?.createdAt || '';
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 /**

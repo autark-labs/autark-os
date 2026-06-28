@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Bell, CheckCircle2, Filter, Info, RefreshCw, Search, Sparkles, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { JobProgress } from '@/components/project-os/JobProgress';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import {
@@ -36,6 +37,7 @@ import {
   useMarketplaceActivityQuery,
   latestActiveDiscoverJob,
 } from '@/repositories/discoverRepository';
+import { terminalJob } from '@/repositories/jobRepository';
 import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView } from '@/types/discover';
 import type { ProjectOsJob } from '@/types/jobs';
@@ -384,12 +386,7 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
     return null;
   }
   if (!terminalJob(installJob)) {
-    return (
-      <div className="mb-5 rounded-lg border border-sky-300/25 bg-sky-500/10 p-4 text-sm text-sky-100">
-        <p className="font-semibold text-white">Installing {appNameForJob(installJob, apps)}</p>
-        <p className="mt-1">{currentJobStep(installJob) || 'Project OS is preparing this app.'}</p>
-      </div>
-    );
+    return <JobProgress className="mb-5" job={installJob} subjectLabel={appNameForJob(installJob, apps)} />;
   }
   if (installJob.status === 'failed') {
     return (
@@ -574,18 +571,6 @@ function readStartHereDismissed() {
     return false;
   }
   return window.localStorage.getItem(START_HERE_DISMISSAL_KEY) === 'true';
-}
-
-function terminalJob(job: ProjectOsJob) {
-  return ['succeeded', 'failed', 'cancelled'].includes(job.status);
-}
-
-function currentJobStep(job: ProjectOsJob) {
-  const step = job.steps.find((candidate) => candidate.id === job.currentStep) ?? job.steps.find((candidate) => candidate.status === 'running') ?? job.steps.find((candidate) => candidate.status === 'pending');
-  if (!step) {
-    return '';
-  }
-  return step.message || step.label;
 }
 
 function appNameForJob(job: ProjectOsJob, apps: DiscoverAppView[]) {
