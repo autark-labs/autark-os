@@ -43,7 +43,7 @@ export function BasicApplicationsView({ items, onSelect, selectedId }: BasicAppl
           key={item.id}
           onClick={() => onSelect(item.id)}
         >
-          <CardHeader className="px-4 pt-5 pb-2">
+          <CardHeader className="px-4 pt-5">
             <StatusBadge item={item} />
             <div className="flex min-w-0 flex-col items-center gap-3">
               <AppIcon item={item} />
@@ -53,14 +53,15 @@ export function BasicApplicationsView({ items, onSelect, selectedId }: BasicAppl
             </div>
           </CardHeader>
           <CardContent className="px-4 py-2">
-            <div className="rounded-xl bg-neutral-100 p-2">
+            <div className="rounded-xl bg-blue-200 p-0 border-2xl border-2 border-black">
               <div className="flex flex-wrap justify-center gap-2">
-                <Badge className="bg-white text-neutral-950">{item.access}</Badge>
-                <Badge className="bg-white text-neutral-950">{item.backup}</Badge>
+                <p className="text-sm text-foreground">{item.access}</p> 
+                <p className="text-xs text-neutral-950">●</p>
+                <p className="text-sm text-foreground">{item.backup}</p>
               </div>
             </div>
           </CardContent>
-          <CardFooter className="gap-2 rounded-b-2xl border-neutral-300 bg-white px-4 py-4">
+          <CardFooter className="gap-2 p-2">
             {item.href ? (
               <Button asChild className="flex-1 bg-neutral-950 text-white hover:bg-neutral-800" size="lg">
                 <a href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank">
