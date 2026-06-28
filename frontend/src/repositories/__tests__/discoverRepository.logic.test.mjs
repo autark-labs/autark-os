@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   latestActiveDiscoverJob,
-} from './discoverRepository.logic.js';
+} from '../discoverRepository.logic.js';
 
 test('latestActiveDiscoverJob restores newest active install or backup job from durable jobs', () => {
   const jobs = [

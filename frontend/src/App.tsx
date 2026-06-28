@@ -9,8 +9,8 @@ import { readAdminToken } from './lib/adminSecuritySession';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
 import { Toaster } from './components/ui/sonner';
+import { ApplicationsPage } from './pages/ApplicationsPageRebuild/ApplicationsPage';
 
-const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage/ApplicationsPage'));
 const BackupsPage = lazy(() => import('./pages/BackupsPage/BackupsPage'));
 const MarketplacePage = lazy(() => import('./pages/MarketplacePage/MarketplacePage'));
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage/MonitoringPage'));

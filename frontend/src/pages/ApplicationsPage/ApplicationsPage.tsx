@@ -65,6 +65,7 @@ function ApplicationsPage() {
   const managedApp = useMemo(() => apps.find((app) => app.appId === manageAppId) || null, [apps, manageAppId]);
   const managedAppReconciliation = useMemo(() => reconciliation?.apps.find((item) => item.appId === manageAppId) || null, [manageAppId, reconciliation?.apps]);
   const activeUninstallJobs = useMemo(() => (jobsQuery.data ?? []).filter((job) => job.type === 'uninstall_app' && !terminalJob(job)), [jobsQuery.data]);
+  
   const uninstallJobsByAppId = useMemo(() => {
     const jobs = new Map<string, ProjectOsJob>();
     for (const job of activeUninstallJobs) {
@@ -74,6 +75,7 @@ function ApplicationsPage() {
     }
     return jobs;
   }, [activeUninstallJobs]);
+
   const uninstallingAppIds = useMemo(() => {
     const ids = new Set(locallyUninstallingAppIds);
     for (const job of activeUninstallJobs) {
@@ -83,6 +85,7 @@ function ApplicationsPage() {
     }
     return ids;
   }, [activeUninstallJobs, locallyUninstallingAppIds]);
+
   const visibleApps = useMemo(() => apps.filter((app) => {
     const query = search.trim().toLowerCase();
     if (!query) {
@@ -90,12 +93,14 @@ function ApplicationsPage() {
     }
     return [app.appName, app.category, app.description, app.friendlyStatus].some((value) => value?.toLowerCase().includes(query));
   }).sort((left, right) => appPriority(left, telemetryByAppId[left.appId], accessByAppId[left.appId], healthByAppId[left.appId] || left.healthSnapshot) - appPriority(right, telemetryByAppId[right.appId], accessByAppId[right.appId], healthByAppId[right.appId] || right.healthSnapshot) || left.appName.localeCompare(right.appName)), [accessByAppId, apps, healthByAppId, search, telemetryByAppId]);
+  
   const appSummary = useMemo(() => ({
     installed: apps.length,
     running: apps.filter((app) => displayStatus(app, healthByAppId[app.appId] || app.healthSnapshot) === 'Ready').length,
     stopped: apps.filter((app) => displayStatus(app, healthByAppId[app.appId] || app.healthSnapshot) === 'Paused').length,
     unhealthy: apps.filter((app) => appNeedsAttention(app, telemetryByAppId[app.appId], accessByAppId[app.appId], healthByAppId[app.appId] || app.healthSnapshot)).length,
   }), [accessByAppId, apps, healthByAppId, telemetryByAppId]);
+  
   const updatesByAppId = useMemo(() => buildUpdatesByAppId(updates), [updates]);
   const pinnedExternalViews = useMemo(() => pinnedExternalViewsFromObservedServices(observedServices), [observedServices]);
   const selectedServiceId = searchParams.get('service');

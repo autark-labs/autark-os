@@ -9,7 +9,7 @@ import {
   jobTypeLabel,
   latestActiveJob,
   terminalJob,
-} from './jobRepository.logic.js';
+} from '../jobRepository.logic.js';
 
 test('latestActiveJob restores the newest non-terminal job for requested types', () => {
   const jobs = [
