@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import type { ApplicationActionHandlers, ApplicationSurfaceItem } from './ApplicationsPage.types';
+import type { ApplicationActionHandlers, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type AdvancedApplicationsViewProps = {
   actions: ApplicationActionHandlers;

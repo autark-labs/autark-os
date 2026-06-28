@@ -24,7 +24,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
-import type { ApplicationSurfaceItem } from './ApplicationsPage.types';
+import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type BasicApplicationsViewProps = {
   items: ApplicationSurfaceItem[];

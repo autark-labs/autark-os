@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
-import type { ApplicationSurfaceItem } from './ApplicationsPage.types';
+import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 const initialItems: ApplicationSurfaceItem[] = [
   {
