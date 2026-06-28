@@ -8,6 +8,7 @@ import { JobProgress } from '@/components/project-os/JobProgress';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { showActionNotification, showJobNotification } from '@/lib/actionNotifications';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -38,7 +39,7 @@ import {
   RoutineTimeline,
   SectionHeader,
 } from './BackupsPage.components';
-import { backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
+import { backupJobRunningId, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
 
 type RestoreView = 'timeline' | 'list';
 
@@ -53,7 +54,6 @@ function BackupsPage() {
   const [restoreView, setRestoreView] = useState<RestoreView>('timeline');
   const [activeJob, setActiveJob] = useState<ProjectOsJob | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const backupJobsQuery = useBackupJobsQuery();
   const recoveredActiveJob = useMemo(() => {
     const recovered = selectActiveBackupJob(backupJobsQuery.data ?? []) as ProjectOsJob | null;
@@ -90,8 +90,9 @@ function BackupsPage() {
       if (terminalJob(activeJobQuery.data)) {
         if (activeJobQuery.data.status === 'failed') {
           setError(activeJobQuery.data.error?.message || 'Backup job failed.');
+          showJobNotification(activeJobQuery.data);
         } else if (activeJobQuery.data.status === 'succeeded') {
-          setMessage(backupJobCompletedMessage(activeJobQuery.data));
+          showJobNotification(activeJobQuery.data);
         }
         setRunning(null);
         void refreshBackupReport();
@@ -127,14 +128,18 @@ function BackupsPage() {
   async function runBackup(id: string, action: () => Promise<ProjectOsJob>) {
     setRunning(id);
     setError(null);
-    setMessage(null);
     try {
       const result = await action();
       setActiveJob(result);
-      setMessage(result.status === 'failed' ? result.error?.message || 'Backup could not be started.' : backupJobStartedMessage(result));
+      showJobNotification(result);
+      if (result.status === 'failed') {
+        setError(result.error?.message || 'Backup could not be started.');
+      }
       await backupReport.refresh();
     } catch (runError) {
-      setError(apiErrorMessage(runError, 'Backup could not be started.'));
+      const notificationMessage = apiErrorMessage(runError, 'Backup could not be started.');
+      setError(notificationMessage);
+      showActionNotification({ severity: 'error', title: 'Backup could not start', message: notificationMessage }, 'Backup could not start');
       setRunning(null);
     }
   }
@@ -169,17 +174,21 @@ function BackupsPage() {
     }
     setRunning(`restore-${restorePoint.id}`);
     setError(null);
-    setMessage(null);
     try {
       const result = await restoreBackupMutation.mutateAsync({ restorePointId: restorePoint.id, appId: restoreTargetAppId });
       setActiveJob(result);
-      setMessage(result.status === 'failed' ? result.error?.message || 'Restore could not be started.' : backupJobStartedMessage(result));
+      showJobNotification(result);
+      if (result.status === 'failed') {
+        setError(result.error?.message || 'Restore could not be started.');
+      }
       setRestorePoint(null);
       setRestorePlan(null);
       setRestoreTargetAppId(null);
       await backupReport.refresh();
     } catch (restoreError) {
-      setError(apiErrorMessage(restoreError, 'Restore could not be completed.'));
+      const notificationMessage = apiErrorMessage(restoreError, 'Restore could not be completed.');
+      setError(notificationMessage);
+      showActionNotification({ severity: 'error', title: 'Restore could not start', message: notificationMessage }, 'Restore could not start');
       setRunning(null);
     }
   }
@@ -187,14 +196,18 @@ function BackupsPage() {
   async function verifyRestorePoint(point: RestorePoint) {
     setRunning(`verify-${point.id}`);
     setError(null);
-    setMessage(null);
     try {
       const result = await verifyRestorePointMutation.mutateAsync(point.id);
       setActiveJob(result);
-      setMessage(result.status === 'failed' ? result.error?.message || 'Verification could not be started.' : backupJobStartedMessage(result));
+      showJobNotification(result);
+      if (result.status === 'failed') {
+        setError(result.error?.message || 'Verification could not be started.');
+      }
       await backupReport.refresh();
     } catch (verifyError) {
-      setError(apiErrorMessage(verifyError, 'Backup verification could not be completed.'));
+      const notificationMessage = apiErrorMessage(verifyError, 'Backup verification could not be completed.');
+      setError(notificationMessage);
+      showActionNotification({ severity: 'error', title: 'Backup verification could not start', message: notificationMessage }, 'Backup verification could not start');
       setRunning(null);
     }
   }
@@ -254,7 +267,6 @@ function BackupsPage() {
 
         {pageError && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={pageError} onRetry={() => void backupReport.refresh()} title="Backup status could not refresh" />}
         {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
-        {message && <div className="border-b border-emerald-300/20 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100">{message}</div>}
       </SurfaceFrame>
 
       <CanonicalRecommendedAction />

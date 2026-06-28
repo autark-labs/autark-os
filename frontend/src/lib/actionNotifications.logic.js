@@ -14,11 +14,64 @@ export function actionNotificationFromResult(result = {}, fallbackTitle = 'Actio
   };
 }
 
+export function actionNotificationFromJob(job = {}) {
+  const type = job.type || '';
+  const status = String(job.status || '').toLowerCase();
+  const failed = status === 'failed';
+  const succeeded = status === 'succeeded';
+  const title = `${jobOperationLabel(type)} ${failed ? 'failed' : succeeded ? 'completed' : 'started'}`;
+  const step = currentStep(job);
+  const message = failed
+    ? job.error?.message || `${jobOperationLabel(type)} could not finish.`
+    : step?.message || step?.label || jobSubjectMessage(job);
+  const severity = failed ? 'error' : succeeded ? 'success' : 'info';
+  return {
+    severity,
+    title,
+    message,
+    sticky: failed,
+    nextAction: failed ? { label: 'Review diagnostics', href: '/diagnostics' } : null,
+  };
+}
+
 export function notificationToastMethod(severity) {
   if (severity === 'success') return 'success';
   if (severity === 'info') return 'info';
   if (severity === 'warning') return 'warning';
   return 'error';
+}
+
+function jobOperationLabel(type) {
+  switch (type) {
+    case 'backup':
+      return 'Backup';
+    case 'backup_verify':
+      return 'Backup verification';
+    case 'backup_restore':
+    case 'restore':
+      return 'Restore';
+    case 'install_app':
+      return 'Install';
+    case 'repair_app':
+      return 'Repair';
+    case 'update_app':
+      return 'Update';
+    default:
+      return 'Project OS task';
+  }
+}
+
+function currentStep(job) {
+  return job?.steps?.find((step) => step.id === job.currentStep)
+    || job?.steps?.find((step) => step.status === 'running')
+    || null;
+}
+
+function jobSubjectMessage(job) {
+  if (job?.subjectId && job.subjectId !== '__full__' && job.subjectId !== '__routine__') {
+    return `${jobOperationLabel(job.type)} is running for ${job.subjectId}.`;
+  }
+  return `${jobOperationLabel(job.type)} is running.`;
 }
 
 function normalizeSeverity(result) {

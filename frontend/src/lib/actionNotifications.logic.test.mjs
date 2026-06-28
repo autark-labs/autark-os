@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic.js';
+import { actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic.js';
 
 test('maps completed app action results to concise success notifications', () => {
   const notification = actionNotificationFromResult({
@@ -58,4 +58,50 @@ test('maps severities to sonner toast methods', () => {
   assert.equal(notificationToastMethod('warning'), 'warning');
   assert.equal(notificationToastMethod('error'), 'error');
   assert.equal(notificationToastMethod('critical'), 'error');
+});
+
+test('maps running backup jobs to non-sticky progress notifications', () => {
+  const notification = actionNotificationFromJob({
+    jobId: 'job-1',
+    type: 'backup',
+    subjectId: 'vaultwarden',
+    status: 'running',
+    currentStep: 'archive',
+    steps: [{ id: 'archive', label: 'Archive app data', status: 'running', message: 'Archiving Vaultwarden data.' }],
+  });
+
+  assert.equal(notification.severity, 'info');
+  assert.equal(notification.title, 'Backup started');
+  assert.equal(notification.message, 'Archiving Vaultwarden data.');
+  assert.equal(notification.sticky, false);
+});
+
+test('maps succeeded backup jobs to concise success notifications', () => {
+  const notification = actionNotificationFromJob({
+    jobId: 'job-2',
+    type: 'backup_restore',
+    subjectId: 'vaultwarden',
+    status: 'succeeded',
+    steps: [],
+  });
+
+  assert.equal(notification.severity, 'success');
+  assert.equal(notification.title, 'Restore completed');
+  assert.equal(notification.sticky, false);
+});
+
+test('maps failed backup jobs to sticky user-actionable errors', () => {
+  const notification = actionNotificationFromJob({
+    jobId: 'job-3',
+    type: 'backup_verify',
+    subjectId: 'vaultwarden',
+    status: 'failed',
+    steps: [],
+    error: { message: 'Restore point archive is missing.', code: 'missing_archive', advancedDetails: {} },
+  });
+
+  assert.equal(notification.severity, 'error');
+  assert.equal(notification.title, 'Backup verification failed');
+  assert.equal(notification.message, 'Restore point archive is missing.');
+  assert.equal(notification.sticky, true);
 });
