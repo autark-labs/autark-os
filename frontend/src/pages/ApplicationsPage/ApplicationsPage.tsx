@@ -1,15 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { showActionNotification } from '@/lib/actionNotifications';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import {
   applicationStateQueryKey,
   invalidateAppUpdates,
@@ -22,7 +20,7 @@ import {
   updatesByAppId as buildUpdatesByAppId,
 } from '@/repositories/applicationStateRepository';
 import { usePrivateAccessReconciliationQuery } from '@/repositories/networkRepository';
-import type { AppRuntimeView, AppUpdateResult, InstallSettings } from '@/types/app';
+import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ApplicationsDashboard, EmptyState } from './ApplicationsDashboard';
@@ -48,7 +46,6 @@ function ApplicationsPage() {
   const [manageAppId, setManageAppId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
-  const [updateResult, setUpdateResult] = useState<AppUpdateResult | null>(null);
 
   const apps = appState.apps;
   const observedServices = appState.observedServices;
@@ -105,7 +102,6 @@ function ApplicationsPage() {
     const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
     setActionLoading(action);
     setLocalError(null);
-    setUpdateResult(null);
     setRuntimeAppStatusInApplicationStateCache(queryClient, appId, optimisticStatusForAction(action));
     try {
       const data = await InstalledAppsAPIClient.runAction(appId, action);
@@ -118,7 +114,7 @@ function ApplicationsPage() {
       restoreApplicationState(previousState);
       const message = errorMessage(err);
       setLocalError(message);
-      toast.error('App action failed', { description: message, duration: Infinity });
+      showActionErrorNotification(err, 'App action failed');
     } finally {
       setActionLoading(null);
     }
@@ -127,7 +123,6 @@ function ApplicationsPage() {
   async function uninstall(appId: string) {
     setActionLoading('uninstall');
     setLocalError(null);
-    setUpdateResult(null);
     try {
       const data = await InstalledAppsAPIClient.uninstall(appId);
       removeManagedAppFromApplicationStateCache(queryClient, appId);
@@ -136,7 +131,7 @@ function ApplicationsPage() {
     } catch (err) {
       const message = errorMessage(err);
       setLocalError(message);
-      toast.error('Uninstall failed', { description: message, duration: Infinity });
+      showActionErrorNotification(err, 'Uninstall failed');
     } finally {
       setActionLoading(null);
     }
@@ -145,15 +140,14 @@ function ApplicationsPage() {
   async function updateApp(appId: string) {
     setActionLoading('update');
     setLocalError(null);
-    setUpdateResult(null);
     try {
       const data = await InstalledAppsAPIClient.updateApp(appId);
-      setUpdateResult(data);
+      showActionNotification({ ok: true, severity: 'success', title: 'App updated', message: data.message }, 'App updated');
       refreshAfterMutation({ updates: true });
     } catch (err) {
       const message = errorMessage(err);
       setLocalError(message);
-      toast.error('Update failed', { description: message, duration: Infinity });
+      showActionErrorNotification(err, 'Update failed');
     } finally {
       setActionLoading(null);
     }
@@ -162,15 +156,14 @@ function ApplicationsPage() {
   async function rollbackApp(appId: string) {
     setActionLoading('rollback');
     setLocalError(null);
-    setUpdateResult(null);
     try {
       const data = await InstalledAppsAPIClient.rollbackApp(appId);
-      setUpdateResult(data);
+      showActionNotification({ ok: true, severity: 'success', title: 'Rollback completed', message: data.message }, 'Rollback completed');
       refreshAfterMutation({ updates: true });
     } catch (err) {
       const message = errorMessage(err);
       setLocalError(message);
-      toast.error('Rollback failed', { description: message, duration: Infinity });
+      showActionErrorNotification(err, 'Rollback failed');
     } finally {
       setActionLoading(null);
     }
@@ -193,7 +186,7 @@ function ApplicationsPage() {
       restoreApplicationState(previousState);
       const message = errorMessage(err);
       setLocalError(message);
-      toast.error('Settings were not saved', { description: message, duration: Infinity });
+      showActionErrorNotification(err, 'Settings were not saved');
       throw err;
     }
   }
@@ -236,13 +229,6 @@ function ApplicationsPage() {
       <CanonicalRecommendedAction />
 
       {error && <PageErrorState message={error} onRetry={refreshApps} />}
-
-      {updateResult && (
-        <div className="flex items-center gap-3 rounded-lg border border-sky-400/25 bg-sky-500/10 p-4 text-sm text-sky-100">
-          <CheckCircle2 className="size-4" />
-          {updateResult.message}
-        </div>
-      )}
 
       {loading ? (
         <PageLoadingState label="Loading your apps" sublabel="Checking installed apps, health, private access, and available actions." />

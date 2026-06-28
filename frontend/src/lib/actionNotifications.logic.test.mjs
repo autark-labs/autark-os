@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic.js';
+import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic.js';
 
 test('maps completed app action results to concise success notifications', () => {
   const notification = actionNotificationFromResult({
@@ -104,4 +104,15 @@ test('maps failed backup jobs to sticky user-actionable errors', () => {
   assert.equal(notification.title, 'Backup verification failed');
   assert.equal(notification.message, 'Restore point archive is missing.');
   assert.equal(notification.sticky, true);
+});
+
+
+test('maps thrown errors to sticky action notifications', () => {
+  const notification = actionNotificationFromError(new Error('Docker is not running.'), 'App action failed');
+
+  assert.equal(notification.severity, 'error');
+  assert.equal(notification.title, 'App action failed');
+  assert.equal(notification.message, 'Docker is not running.');
+  assert.equal(notification.sticky, true);
+  assert.deepEqual(notification.nextAction, { label: 'Review diagnostics', href: '/diagnostics' });
 });

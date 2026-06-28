@@ -8,13 +8,13 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
-import { toast } from 'sonner';
 import type { ObservedServiceView } from '@/types/observedService';
 import type { SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemSetupStatus } from '@/types/system';
 import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from './SupportPage.diagnosticsModel';
@@ -63,13 +63,17 @@ function SupportPage() {
       ]);
       setState((current) => ({ ...current, doctor, logs, setup, summary }));
       if (background) {
-        const showToast = doctor.status === 'needs_attention' ? toast.warning : toast.success;
-        showToast(doctor.headline, { description: doctor.summary });
+        showActionNotification({
+          ok: doctor.status !== 'needs_attention',
+          severity: doctor.status === 'needs_attention' ? 'warning' : 'success',
+          title: doctor.headline,
+          message: doctor.summary,
+        }, doctor.headline);
       }
     } catch (err) {
       const message = apiErrorMessage(err, 'Diagnostics could not be loaded.');
       setError(message);
-      toast.error('Diagnostics failed', { description: message, duration: Infinity });
+      showActionErrorNotification(err, 'Diagnostics failed');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -86,9 +90,9 @@ function SupportPage() {
       const bundle = await SystemAPIClient.supportBundle();
       setState((current) => ({ ...current, bundle, summary: summaryFromBundle(bundle), setup: bundle.setup || current.setup, logs: bundle.logs || current.logs }));
       await navigator.clipboard.writeText(bundle.bundleText);
-      toast.success('Support bundle copied', { description: 'Redacted diagnostics are ready to share.' });
+      showActionNotification({ ok: true, severity: 'success', title: 'Support bundle copied', message: 'Redacted diagnostics are ready to share.' }, 'Support bundle copied');
     } catch (err) {
-      toast.error('Support bundle failed', { description: apiErrorMessage(err, 'Project OS could not generate the support bundle.'), duration: Infinity });
+      showActionErrorNotification(err, 'Support bundle failed');
     } finally {
       setBundleBusy(false);
     }
@@ -99,9 +103,9 @@ function SupportPage() {
     try {
       const logs = await SystemAPIClient.supportLogs(160);
       setState((current) => ({ ...current, logs }));
-      toast.info('Technical logs loaded', { description: 'Recent redacted log lines are available below.' });
+      showActionNotification({ ok: true, severity: 'info', title: 'Technical logs loaded', message: 'Recent redacted log lines are available below.' }, 'Technical logs loaded');
     } catch (err) {
-      toast.error('Logs could not load', { description: apiErrorMessage(err), duration: Infinity });
+      showActionErrorNotification(err, 'Logs could not load');
     }
   }
 

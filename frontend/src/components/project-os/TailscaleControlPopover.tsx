@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import {
   Popover,
   PopoverContent,
@@ -14,7 +15,6 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { tailscaleControlActions, tailscaleControlView } from './TailscaleControlPopover.logic.js';
-import { toast } from 'sonner';
 import type { PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';
 import type { SystemSetupCheck } from '@/types/system';
 
@@ -42,9 +42,7 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
       setStatus(nextStatus);
       setReconciliation(nextReconciliation);
     } catch (error) {
-      toast.warning('Tailscale status unavailable', {
-        description: error instanceof Error ? error.message : 'Project OS could not refresh Tailscale status.',
-      });
+      showActionErrorNotification(error, 'Tailscale status unavailable');
     } finally {
       setRefreshing(false);
     }
@@ -64,14 +62,14 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
     if (!hostname) return;
     await navigator.clipboard.writeText(hostname);
     setCopied(true);
-    toast.success('Hostname copied', { description: hostname });
+    showActionNotification({ ok: true, severity: 'success', title: 'Hostname copied', message: hostname }, 'Hostname copied');
     window.setTimeout(() => setCopied(false), 1600);
   }
 
   async function copySetupCommand() {
     const command = check?.actionCommand || 'sudo tailscale up';
     await navigator.clipboard.writeText(command);
-    toast.success('Tailscale command copied', { description: command });
+    showActionNotification({ ok: true, severity: 'success', title: 'Tailscale command copied', message: command }, 'Tailscale command copied');
   }
 
   return (

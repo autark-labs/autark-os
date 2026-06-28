@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { showActionErrorNotification } from '@/lib/actionNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,6 @@ import {
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan, ObservedServiceView } from '@/types/observedService';
-import { toast } from 'sonner';
 
 type ObservedServiceDetailsSheetProps = {
   onActionComplete: (result: ObservedServiceActionResult) => void;
@@ -110,7 +110,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
       }
       const message = apiErrorMessage(error, 'Service action could not be completed.');
       setLocalError(message);
-      toast.error('Service action failed', { description: message, duration: Infinity });
+      showActionErrorNotification(error, 'Service action failed');
     } finally {
       setBusyAction(null);
     }

@@ -200,6 +200,10 @@ class AppLifecycleServiceTests {
     void restartRecordsLifecycleEvent() {
         AppActionResult result = service.restart("vaultwarden");
 
+        assertThat(result.ok()).isTrue();
+        assertThat(result.severity()).isEqualTo("success");
+        assertThat(result.title()).isEqualTo("App restarted");
+        assertThat(result.nextAction()).isEqualTo("refresh_apps");
         assertThat(result.status()).isEqualTo("completed");
         assertThat(result.app().friendlyStatus()).isEqualTo("Ready");
         assertThat(repository.eventsFor("vaultwarden", 5))

@@ -254,6 +254,11 @@ export type AppActionResult = {
   app?: AppRuntimeView | null;
   output?: string[];
   completedAt?: string;
+  ok?: boolean;
+  severity?: 'success' | 'info' | 'warning' | 'error' | string;
+  title?: string;
+  nextAction?: string | null;
+  jobId?: string | null;
 };
 
 export type AppUpdateStatus = {

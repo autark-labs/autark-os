@@ -8,10 +8,10 @@ import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
 import { PageSection, PageShell, SoftCard, StatusPill } from '@/components/project-os/ProjectOSComponents';
 import { Button } from '@/components/ui/button';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import { applicationStateQueryKey, setObservedServicePinnedInApplicationStateCache, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
-import { toast } from 'sonner';
 import { ObservedServiceDetailsSheet } from '../ApplicationsPage/ObservedServiceDetailsSheet';
 import {
   resolveExistingServiceActions,
@@ -73,17 +73,17 @@ function ResolveExistingAppsPage() {
     setObservedServicePinnedInApplicationStateCache(queryClient, service.id, true);
     try {
       const result = await ObservedServicesAPIClient.pin(service.id);
-      showToast(result.severity, result.title, result.message || `${service.displayName} is pinned to My Apps.`);
+      showActionNotification(result, result.title || `${service.displayName} pinned`);
     } catch (pinError) {
       queryClient.setQueryData(applicationStateQueryKey, previousApplicationState);
-      showToast('error', 'Service could not be pinned', apiErrorMessage(pinError), true);
+      showActionErrorNotification(pinError, 'Service could not be pinned');
     } finally {
       setBusyId(null);
     }
   }
 
   function handleObservedServiceResult(result: ObservedServiceActionResult) {
-    showToast(result.severity, result.title, result.message || undefined, !result.ok);
+    showActionNotification(result, result.title || 'Service action finished');
     void appState.refresh();
   }
 
@@ -313,27 +313,6 @@ function stateTone(service: ObservedServiceView): 'success' | 'warning' | 'dange
   if (service.userStatus === 'recoverable') return 'warning';
   if (service.pinned || service.userStatus === 'pinned_external') return 'info';
   return 'neutral';
-}
-
-function showToast(severity: string, title: string, description?: string, sticky = false) {
-  const options = { description, duration: sticky ? Infinity : undefined };
-  const normalizedSeverity = notificationSeverity(severity);
-  if (normalizedSeverity === 'success') {
-    toast.success(title, options);
-  } else if (normalizedSeverity === 'warning') {
-    toast.warning(title, options);
-  } else if (normalizedSeverity === 'error') {
-    toast.error(title, options);
-  } else {
-    toast.info(title, options);
-  }
-}
-
-function notificationSeverity(severity: string): 'success' | 'info' | 'warning' | 'error' {
-  if (severity === 'success' || severity === 'info' || severity === 'warning' || severity === 'error') {
-    return severity;
-  }
-  return 'info';
 }
 
 export default ResolveExistingAppsPage;

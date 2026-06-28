@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import {
   applicationStateQueryKey,
@@ -21,7 +22,6 @@ import {
   useAccessNetworkRepository,
   useRemoveStalePrivateAccessMutation,
 } from '@/repositories/networkRepository';
-import { toast } from 'sonner';
 import type { AppRuntimeView } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
 import type { PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleStatus } from '@/types/network';
@@ -84,7 +84,7 @@ function NetworkPage() {
   const copyPrivateLink = useCallback(async (appId: string, url: string | null) => {
     if (!url) return;
     await navigator.clipboard.writeText(url);
-    toast.success('Link copied', { description: url });
+    showActionNotification({ ok: true, severity: 'success', title: 'Link copied', message: url }, 'Link copied');
     setCopiedAppId(appId);
     window.setTimeout(() => setCopiedAppId((current) => current === appId ? null : current), 1600);
   }, []);
@@ -103,12 +103,13 @@ function NetworkPage() {
       } else {
         void invalidateApplicationState(queryClient);
       }
+      showActionNotification(result, enabled ? 'Private access ready' : 'Private access turned off');
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
       const message = apiErrorMessage(err, 'Unable to update private access for this app.');
       setActionError(message);
-      toast.error('Private access update failed', { description: message, duration: Infinity });
+      showActionErrorNotification(err, 'Private access update failed');
     } finally {
       setAppActionLoading(null);
     }
@@ -119,9 +120,12 @@ function NetworkPage() {
     setActionError(null);
     try {
       await removeStalePrivateAccess.mutateAsync(port);
+      showActionNotification({ ok: true, severity: 'success', title: 'Stale private link removed', message: 'Project OS removed the stale Tailscale Serve entry.' }, 'Stale private link removed');
       await refreshAll();
     } catch (err) {
-      setActionError(apiErrorMessage(err, 'Unable to remove this stale private link.'));
+      const message = apiErrorMessage(err, 'Unable to remove this stale private link.');
+      setActionError(message);
+      showActionErrorNotification(err, 'Stale private link removal failed');
     } finally {
       setAppActionLoading(null);
     }

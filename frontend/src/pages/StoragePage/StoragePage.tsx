@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { backupSafetyChecklist } from '@/lib/backupSafety';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import { useCleanupOrphanMutation, useStorageReportRepository } from '@/repositories/storageRepository';
 import type { AppStorageUsage, OrphanedStorage, StorageRecommendation, StorageReport, StorageUsage } from '@/types/system';
@@ -22,7 +23,6 @@ function StoragePage() {
   const storage = useStorageReportRepository();
   const cleanupOrphanMutation = useCleanupOrphanMutation();
   const [actionError, setActionError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<OrphanedStorage | null>(null);
   const [cleanupConfirmation, setCleanupConfirmation] = useState('');
@@ -40,14 +40,20 @@ function StoragePage() {
       return;
     }
     setActionError(null);
-    setMessage(null);
     try {
       const result = await cleanupOrphanMutation.mutateAsync(cleanupTarget.name);
-      setMessage(`${result.message} Safety checkpoint: ${result.safetyCheckpointPath}`);
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: 'Unused data cleaned up',
+        message: `${result.message} Safety checkpoint saved at ${result.safetyCheckpointPath}.`,
+      }, 'Unused data cleaned up');
       setCleanupTarget(null);
       setCleanupConfirmation('');
     } catch (cleanupError) {
-      setActionError(apiErrorMessage(cleanupError, 'Unused data could not be cleaned up.'));
+      const message = apiErrorMessage(cleanupError, 'Unused data could not be cleaned up.');
+      setActionError(message);
+      showActionErrorNotification(cleanupError, 'Unused data could not be cleaned up');
     }
   }
 
@@ -91,9 +97,6 @@ function StoragePage() {
         </div>
 
         {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void storage.refresh()} title="Storage data could not refresh" />}
-        {message && (
-          <div className="border-b border-emerald-300/20 bg-emerald-500/10 px-6 py-4 text-sm text-emerald-100">{message}</div>
-        )}
 
         <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
           <SignalCard icon={statusIcon(report?.status)} label="Health" value={report?.headline || 'Unknown'} detail={storageHero.action} tone={statusTone(report?.status)} />

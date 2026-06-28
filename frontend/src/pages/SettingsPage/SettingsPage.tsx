@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { poButtonClass, poCardClass, poNavItemClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
@@ -170,7 +171,6 @@ function SettingsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   async function load(background = false) {
@@ -229,20 +229,28 @@ function SettingsPage() {
     }
     setSaving(true);
     setError(null);
-    setMessage(null);
     try {
       const previous = state.projectSettings;
       const saved = await SystemAPIClient.updateSettings(draft);
+      let appDefaultsMessage = '';
       if (shouldApplyProjectSettingsToApps(previous, saved)) {
-        await SystemAPIClient.applyAppDefaults(saved);
+        const result = await SystemAPIClient.applyAppDefaults(saved);
+        appDefaultsMessage = result.message;
         await appState.refresh();
       }
       setState((current) => ({ ...current, projectSettings: saved }));
       setDraft(saved);
       setProjectSettings(saved);
-      setMessage('Settings saved.');
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: 'Settings saved',
+        message: appDefaultsMessage || 'Project OS settings were saved.',
+      }, 'Settings saved');
     } catch (saveError) {
-      setError(apiErrorMessage(saveError, 'Settings could not be saved.'));
+      const message = apiErrorMessage(saveError, 'Settings could not be saved.');
+      setError(message);
+      showActionErrorNotification(saveError, 'Settings could not be saved');
     } finally {
       setSaving(false);
     }
@@ -289,7 +297,6 @@ function SettingsPage() {
       </header>
 
       {error && <PageErrorState message={error} onRetry={() => { void load(true); void doctorQuery.refetch(); }} title="Settings could not refresh" />}
-      {message && <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">{message}</div>}
 
       <nav className={cn(surfacePanelClass, 'grid gap-2 bg-slate-950/55 p-2 sm:grid-cols-2 xl:grid-cols-4')}>
         {topLevelSettingsGroups.map((group) => {

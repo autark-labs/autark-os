@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 import type { ProjectOsJob } from '@/types/jobs';
-import { actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic';
+import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic';
 
 export type ActionNotificationResult = {
   ok?: boolean;
@@ -12,28 +12,26 @@ export type ActionNotificationResult = {
   nextAction?: unknown;
 };
 
+type ActionNotification = {
+  severity: string;
+  title: string;
+  message?: string;
+  sticky: boolean;
+};
+
 export function showActionNotification(result: ActionNotificationResult, fallbackTitle = 'Action finished') {
-  const notification = actionNotificationFromResult(result, fallbackTitle) as {
-    severity: string;
-    title: string;
-    message?: string;
-    sticky: boolean;
-  };
-  const method = notificationToastMethod(notification.severity) as 'success' | 'info' | 'warning' | 'error';
-  toast[method](notification.title, {
-    description: notification.message || undefined,
-    duration: notification.sticky ? Infinity : undefined,
-  });
-  return notification;
+  return showNotification(actionNotificationFromResult(result, fallbackTitle) as ActionNotification);
+}
+
+export function showActionErrorNotification(error: unknown, fallbackTitle = 'Action failed') {
+  return showNotification(actionNotificationFromError(error, fallbackTitle) as ActionNotification);
 }
 
 export function showJobNotification(job: ProjectOsJob) {
-  const notification = actionNotificationFromJob(job) as {
-    severity: string;
-    title: string;
-    message?: string;
-    sticky: boolean;
-  };
+  return showNotification(actionNotificationFromJob(job) as ActionNotification);
+}
+
+function showNotification(notification: ActionNotification) {
   const method = notificationToastMethod(notification.severity) as 'success' | 'info' | 'warning' | 'error';
   toast[method](notification.title, {
     description: notification.message || undefined,

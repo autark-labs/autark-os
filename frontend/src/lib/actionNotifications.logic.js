@@ -14,6 +14,17 @@ export function actionNotificationFromResult(result = {}, fallbackTitle = 'Actio
   };
 }
 
+export function actionNotificationFromError(error, fallbackTitle = 'Action failed') {
+  const message = errorMessage(error);
+  return {
+    severity: 'error',
+    title: fallbackTitle,
+    message,
+    sticky: true,
+    nextAction: { label: 'Review diagnostics', href: '/diagnostics' },
+  };
+}
+
 export function actionNotificationFromJob(job = {}) {
   const type = job.type || '';
   const status = String(job.status || '').toLowerCase();
@@ -32,6 +43,22 @@ export function actionNotificationFromJob(job = {}) {
     sticky: failed,
     nextAction: failed ? { label: 'Review diagnostics', href: '/diagnostics' } : null,
   };
+}
+
+function errorMessage(error) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+  if (error && typeof error === 'object') {
+    const maybeMessage = error.message || error.title || error.detail;
+    if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+      return maybeMessage;
+    }
+  }
+  return 'Project OS could not complete this action. Review diagnostics for details.';
 }
 
 export function notificationToastMethod(severity) {
