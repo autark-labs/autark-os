@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ExternalLink, Pause, Play, RotateCw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -107,6 +107,9 @@ export const ApplicationsPage = () => {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ApplicationFilter>('all');
   const [selectedId, setSelectedId] = useState(initialItems[0]?.id ?? '');
+  const [scrollStabilizerHeight, setScrollStabilizerHeight] = useState(0);
+  const toolbarRef = useRef<HTMLElement | null>(null);
+  const scrollStabilizerTimeoutRef = useRef<number | null>(null);
 
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -136,6 +139,51 @@ export const ApplicationsPage = () => {
   const pinnedCount = items.filter((item) => item.kind === 'pinned').length;
   const attentionCount = items.filter((item) => item.runtimeState === 'needs_attention' || item.nextAction).length;
   const nextReviewItem = visibleItems.find((item) => item.nextAction) ?? items.find((item) => item.nextAction) ?? null;
+
+  useEffect(() => {
+    return () => {
+      if (scrollStabilizerTimeoutRef.current) {
+        window.clearTimeout(scrollStabilizerTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const stabilizeScrollForFilterChange = () => {
+    if (window.scrollY < 24) {
+      return;
+    }
+
+    setScrollStabilizerHeight(Math.max(window.innerHeight, 720));
+
+    window.requestAnimationFrame(() => {
+      const toolbarTop = toolbarRef.current
+        ? toolbarRef.current.getBoundingClientRect().top + window.scrollY
+        : 0;
+      const targetTop = Math.max(0, toolbarTop - 16);
+
+      if (window.scrollY > targetTop) {
+        window.scrollTo({ behavior: 'smooth', top: targetTop });
+      }
+    });
+
+    if (scrollStabilizerTimeoutRef.current) {
+      window.clearTimeout(scrollStabilizerTimeoutRef.current);
+    }
+
+    scrollStabilizerTimeoutRef.current = window.setTimeout(() => {
+      setScrollStabilizerHeight(0);
+      scrollStabilizerTimeoutRef.current = null;
+    }, 650);
+  };
+
+  const handleFilterChange = (nextFilter: string) => {
+    if (!nextFilter || nextFilter === filter) {
+      return;
+    }
+
+    stabilizeScrollForFilterChange();
+    setFilter(nextFilter as ApplicationFilter);
+  };
 
   const handleStart = (id: string) => {
     setItems((currentItems) => currentItems.map((item) => {
@@ -282,7 +330,7 @@ export const ApplicationsPage = () => {
           </div>
         </header>
 
-        <section className="rounded-2xl border border-sky-400/30 bg-slate-900 p-3 shadow-xl shadow-slate-950/20">
+        <section ref={toolbarRef} className="rounded-2xl border border-sky-400/30 bg-slate-900 p-3 shadow-xl shadow-slate-950/20">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-200/70" />
@@ -299,11 +347,7 @@ export const ApplicationsPage = () => {
               <ToggleGroup
                 aria-label="Filter apps and services"
                 className="flex-wrap"
-                onValueChange={(value) => {
-                  if (value) {
-                    setFilter(value as ApplicationFilter);
-                  }
-                }}
+                onValueChange={handleFilterChange}
                 size="sm"
                 type="single"
                 value={filter}
@@ -331,6 +375,7 @@ export const ApplicationsPage = () => {
                 disabled={!nextReviewItem}
                 onClick={() => {
                   if (nextReviewItem) {
+                    stabilizeScrollForFilterChange();
                     setQuery('');
                     setFilter('needs_review');
                     setSelectedId(nextReviewItem.id);
@@ -431,6 +476,13 @@ export const ApplicationsPage = () => {
             </CardContent>
           </Card>
         </section>
+        {scrollStabilizerHeight > 0 && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none shrink-0"
+            style={{ height: scrollStabilizerHeight }}
+          />
+        )}
       </div>
     </main>
   );

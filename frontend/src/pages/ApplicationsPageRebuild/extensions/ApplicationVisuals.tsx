@@ -17,8 +17,8 @@ const iconSizeClasses: Record<ApplicationIconSize, { frame: string; image: strin
     fallback: 'text-sm',
   },
   lg: {
-    frame: 'size-24 rounded-2xl shadow-sm',
-    image: 'size-20',
+    frame: 'size-28 rounded-2xl shadow-sm',
+    image: 'size-24',
     fallback: 'text-xl',
   },
 };

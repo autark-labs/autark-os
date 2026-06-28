@@ -28,7 +28,7 @@ type AdvancedApplicationsViewProps = {
 
 export function AdvancedApplicationsView({ actions, items, onSelect, selectedId }: AdvancedApplicationsViewProps) {
   return (
-    <Card className="overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
+    <Card className="min-h-[32rem] overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
       <CardHeader>
         <CardTitle className="text-white">Operations</CardTitle>
         <CardDescription className="text-sky-100/70">

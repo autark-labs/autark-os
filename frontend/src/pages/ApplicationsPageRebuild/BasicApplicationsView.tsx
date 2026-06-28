@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { ExternalLink, LockIcon, MoreHorizontal, Search, Trash2, Server } from 'lucide-react';
+import { ExternalLink, MoreHorizontal, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
-  CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -41,11 +40,11 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
   }
 
   return (
-    <section className="grid auto-rows-max items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid min-h-[32rem] auto-rows-[15rem] grid-cols-[repeat(auto-fill,12rem)] items-start justify-start gap-3">
       {items.map((item) => (
         <Card
           className={cn(
-            'relative h-fit cursor-pointer overflow-visible rounded-2xl border bg-sky-100 py-0 shadow-lg shadow-slate-950/20 ring-0 transition-all duration-200 hover:-translate-y-1 hover:bg-sky-50 hover:shadow-xl hover:shadow-slate-950/25',
+            'relative h-60 w-48 cursor-pointer overflow-visible rounded-2xl border bg-sky-100 py-0 shadow-lg shadow-slate-950/20 ring-0 transition-all duration-200 hover:-translate-y-1 hover:bg-sky-50 hover:shadow-xl hover:shadow-slate-950/25',
             item.nextAction && 'border-orange-500 bg-orange-200 hover:bg-orange-100',
             item.runtimeState === 'paused' && 'border-slate-400 bg-slate-200 hover:bg-slate-100',
             !item.nextAction && item.runtimeState !== 'paused' && 'border-sky-300',
@@ -53,16 +52,19 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
           )}
           key={item.id}
           onClick={() => onSelect(item.id)}
+          size="sm"
         >
-          <CardHeader className="px-4 pt-5">
+          <CardHeader className="px-3 pt-4">
             <ApplicationStatusBadge item={item} overlay />
-            <div className="flex min-w-0 flex-col items-center gap-3">
+            <div className="flex min-w-0 flex-col items-center gap-2">
               <ApplicationIcon item={item} size="lg" />
               <div className="flex min-w-0 flex-col items-center gap-1 text-center">
                 <CardTitle className="max-w-full truncate text-lg text-slate-950">{item.name}</CardTitle>
               </div>
             </div>
           </CardHeader>
+
+          {/* Metadata section parked while the Basic card treatment is redesigned.
           <CardContent className="px-4 py-1">
             <div className="items-center justify-center justify-items-center rounded-lg border border-sky-700 bg-slate-900 p-0 text-center">
               <div className="flex flex-col justify-center gap-1 p-1.5">
@@ -77,8 +79,10 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
               </div>
             </div>
           </CardContent>
+          */}
+
           <CardFooter
-            className="gap-2 p-2"
+            className="mt-auto gap-2 p-2"
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
           >
