@@ -41,11 +41,11 @@ export function BasicApplicationsView({ items, onSelect, onUninstall, selectedId
   }
 
   return (
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid auto-rows-max items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
       {items.map((item) => (
         <Card
           className={cn(
-            'relative cursor-pointer overflow-visible rounded-2xl border bg-sky-100 py-0 shadow-lg shadow-slate-950/20 ring-0 transition-all duration-200 hover:-translate-y-1 hover:bg-sky-50 hover:shadow-xl hover:shadow-slate-950/25',
+            'relative h-fit cursor-pointer overflow-visible rounded-2xl border bg-sky-100 py-0 shadow-lg shadow-slate-950/20 ring-0 transition-all duration-200 hover:-translate-y-1 hover:bg-sky-50 hover:shadow-xl hover:shadow-slate-950/25',
             item.nextAction && 'border-orange-500 bg-orange-200 hover:bg-orange-100',
             item.runtimeState === 'paused' && 'border-slate-400 bg-slate-200 hover:bg-slate-100',
             !item.nextAction && item.runtimeState !== 'paused' && 'border-sky-300',

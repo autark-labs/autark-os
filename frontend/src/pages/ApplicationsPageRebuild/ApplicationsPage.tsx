@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { ApplicationIcon, labelForKind } from './ApplicationVisuals';
 import { BasicApplicationsView } from './BasicApplicationsView';
@@ -98,28 +99,43 @@ const initialItems: ApplicationSurfaceItem[] = [
   },
 ];
 
+type ApplicationFilter = 'all' | 'managed' | 'pinned' | 'found' | 'needs_review';
+
 export const ApplicationsPage = () => {
   const { viewMode } = useProjectSettings();
   const [items, setItems] = useState<ApplicationSurfaceItem[]>(initialItems);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<ApplicationFilter>('all');
   const [selectedId, setSelectedId] = useState(initialItems[0]?.id ?? '');
 
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return items;
-    }
-
     return items.filter((item) => {
+      const matchesFilter =
+        filter === 'all'
+        || (filter === 'managed' && item.kind === 'managed')
+        || (filter === 'pinned' && item.kind === 'pinned')
+        || (filter === 'found' && item.kind === 'observed')
+        || (filter === 'needs_review' && Boolean(item.nextAction));
+
+      if (!matchesFilter) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
       return [item.name, item.kind, item.status, item.access, item.backup, item.nextAction?.label ?? '', item.description]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
-  }, [items, query]);
+  }, [filter, items, query]);
 
   const selectedItem = visibleItems.find((item) => item.id === selectedId) ?? visibleItems[0] ?? null;
   const managedCount = items.filter((item) => item.kind === 'managed').length;
   const pinnedCount = items.filter((item) => item.kind === 'pinned').length;
   const attentionCount = items.filter((item) => item.runtimeState === 'needs_attention' || item.nextAction).length;
+  const nextReviewItem = visibleItems.find((item) => item.nextAction) ?? items.find((item) => item.nextAction) ?? null;
 
   const handleStart = (id: string) => {
     setItems((currentItems) => currentItems.map((item) => {
@@ -245,39 +261,91 @@ export const ApplicationsPage = () => {
     <main className="min-h-full bg-slate-800 text-slate-50">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-4 md:p-6">
         <header className="rounded-2xl border border-sky-400/30 bg-slate-900 shadow-xl shadow-slate-950/30">
-          <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-2 p-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex max-w-3xl flex-col gap-3">
-              <div className="flex flex-col gap-2">
-                <h1 className="text-4xl font-semibold tracking-tight text-white">Your apps and services</h1>
-                <p className="text-base leading-7 text-sky-100/80">
+              <div className="flex flex-col gap-1">
+                <h1 className="text-3xl font-semibold tracking-tight text-white">Your apps and services</h1>
+                <p className="max-w-2xl text-sm leading-6 text-sky-100/80">
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae arcu sed tortor facilisis
                   volutpat.
                 </p>
               </div>
             </div>
-
-            <div className="relative min-w-72">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-200/70" />
-              <Input
-                aria-label="Search apps and services"
-                className="border-sky-400/40 bg-slate-800 pl-9 text-white placeholder:text-sky-100/50 focus-visible:border-cyan-300"
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search apps and services"
-                value={query}
-              />
-            </div>
           </div>
 
           <Separator className="bg-sky-400/20" />
 
-          <div className="grid gap-3 p-5 sm:grid-cols-3">
+          <div className="grid gap-3 p-4 sm:grid-cols-3">
             <PageMetric label="Managed" value={managedCount} />
             <PageMetric label="Pinned" value={pinnedCount} />
             <PageMetric label="Needs review" value={attentionCount} />
           </div>
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="rounded-2xl border border-sky-400/30 bg-slate-900 p-3 shadow-xl shadow-slate-950/20">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-200/70" />
+              <Input
+                aria-label="Search apps and services"
+                className="h-9 border-sky-400/40 bg-slate-800 pl-9 text-white placeholder:text-sky-100/50 focus-visible:border-cyan-300"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search apps and services"
+                value={query}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:justify-end">
+              <ToggleGroup
+                aria-label="Filter apps and services"
+                className="flex-wrap"
+                onValueChange={(value) => {
+                  if (value) {
+                    setFilter(value as ApplicationFilter);
+                  }
+                }}
+                size="sm"
+                type="single"
+                value={filter}
+                variant="outline"
+              >
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="all">
+                  All
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="managed">
+                  Managed
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="pinned">
+                  Pinned
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="found">
+                  Found
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="needs_review">
+                  Needs review
+                </ToggleGroupItem>
+              </ToggleGroup>
+
+              <Button
+                className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400"
+                disabled={!nextReviewItem}
+                onClick={() => {
+                  if (nextReviewItem) {
+                    setQuery('');
+                    setFilter('needs_review');
+                    setSelectedId(nextReviewItem.id);
+                  }
+                }}
+                type="button"
+              >
+                <AlertTriangle data-icon="inline-start" />
+                Review next
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
           {viewMode === 'basic' ? (
             <BasicApplicationsView items={visibleItems} onSelect={setSelectedId} onUninstall={handleUninstall} selectedId={selectedItem?.id} />
           ) : (
