@@ -50,16 +50,16 @@ export function BasicApplicationsView({ items, onSelect, selectedId }: BasicAppl
                 <AppIcon item={item} />
                 <div className="flex min-w-0 flex-col gap-1">
                   <CardTitle className="truncate text-xl text-neutral-950">{item.name}</CardTitle>
-                  <CardDescription className="text-neutral-600">{labelForKind(item.kind)}</CardDescription>
+                  <StatusBadge item={item} />
+                  {/* <CardDescription className="text-neutral-600">{labelForKind(item.kind)}</CardDescription> */}
                 </div>
               </div>
-              <StatusBadge item={item} />
             </div>
           </CardHeader>
           <CardContent>
             <div className="flex min-h-28 flex-col justify-between gap-4 rounded-xl bg-neutral-100 p-4">
               <p className="line-clamp-3 text-sm leading-6 text-neutral-700">{item.description}</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-between">
                 <Badge className="bg-white text-neutral-950">{item.access}</Badge>
                 <Badge className="bg-white text-neutral-950">{item.backup}</Badge>
               </div>
