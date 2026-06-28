@@ -108,7 +108,7 @@ function GlobalJobPopover({ job }: { job: ProjectOsJob }) {
           <span className="font-semibold">{jobTypeLabel(job.type)}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-96 gap-3 border-slate-700 bg-slate-950 p-3 text-po-text shadow-po-md">
+      <PopoverContent align="end" className="w-[min(92vw,24rem)] gap-3 border-slate-700 bg-slate-950 p-3 text-po-text shadow-po-md">
         <PopoverHeader>
           <PopoverTitle className="text-sm">Project OS is working</PopoverTitle>
           <PopoverDescription className="text-xs text-po-text-muted">
@@ -149,7 +149,7 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
           <span className="font-semibold">{loading && unavailable ? 'Checking' : statusLabel}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 gap-3 border-slate-700 bg-slate-950 p-3 text-po-text shadow-po-md">
+      <PopoverContent align="end" className="w-[min(92vw,20rem)] gap-3 border-slate-700 bg-slate-950 p-3 text-po-text shadow-po-md">
         <PopoverHeader>
           <PopoverTitle className="flex items-center gap-2 text-sm">
             <StatusIcon className={cn('size-4', statusTone === 'blue' && 'text-sky-300', statusTone === 'red' && 'text-po-danger')} />

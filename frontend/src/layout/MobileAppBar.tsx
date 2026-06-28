@@ -1,6 +1,7 @@
 import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House, LayoutGrid, Loader2, Menu, Settings, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
+import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -49,6 +50,7 @@ function MobileAppBar() {
   const navGroups = navigationGroups(viewMode) as NavGroup[];
   const activeJob = activeJobQuery.activeJob;
   const checks = doctorQuery.data?.checks ?? [];
+  const tailscaleCheck = checks.find((check) => check.id === 'tailscale') ?? null;
   const issueCount = checks.filter((check) => check.status !== 'ok').length;
   const statusLabel = activeJob ? 'Working' : doctorQuery.isLoading ? 'Checking' : issueCount ? 'Needs attention' : 'Ready';
   const statusTone = activeJob ? 'info' : issueCount ? 'warning' : 'success';
@@ -68,7 +70,7 @@ function MobileAppBar() {
               <span className="sr-only">Status</span>
             </Button>
           </SheetTrigger>
-          <SheetContent className="border-slate-800 bg-slate-950 p-0 text-slate-100" side="right">
+          <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-slate-800 bg-slate-950 p-0 text-slate-100" side="right">
             <SheetHeader className="border-b border-slate-800 p-4">
               <SheetTitle className="text-white">System status</SheetTitle>
               <SheetDescription>Project OS health and active work.</SheetDescription>
@@ -85,6 +87,16 @@ function MobileAppBar() {
                 <p className="m-0 mt-1 text-sm text-slate-300">
                   {activeJob ? `${jobTypeLabel(activeJob.type)} is in progress.` : issueCount ? `${issueCount} setup check${issueCount === 1 ? '' : 's'} need attention.` : 'Project OS is ready for core app flows.'}
                 </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="m-0 text-xs font-black uppercase tracking-normal text-slate-400">Private access</p>
+                    <p className="m-0 mt-1 text-sm text-slate-300">Check or manage secure Tailscale access without leaving mobile navigation.</p>
+                  </div>
+                  <TailscaleControlPopover align="start" check={tailscaleCheck} className="shrink-0" loading={doctorQuery.isLoading} triggerLabel="compact" />
+                </div>
               </div>
 
               {checks.length > 0 && (
@@ -120,7 +132,7 @@ function MobileAppBar() {
               Menu
             </Button>
           </SheetTrigger>
-          <SheetContent className="border-slate-800 bg-slate-950 p-0 text-slate-100" side="left">
+          <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-slate-800 bg-slate-950 p-0 text-slate-100" side="left">
             <SheetHeader className="border-b border-slate-800 p-4">
               <SheetTitle className="text-white">Project OS navigation</SheetTitle>
               <SheetDescription>Move between core appliance flows and advanced tools.</SheetDescription>

@@ -36,7 +36,7 @@ function AppShell() {
         <div className="hidden lg:block">
           <SystemStatusHeader />
         </div>
-        <div className="p-4 md:p-6">
+        <div className="px-3 pb-4 pt-3 sm:px-4 md:p-6">
           <Outlet />
         </div>
       </main>

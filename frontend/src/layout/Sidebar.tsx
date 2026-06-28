@@ -86,8 +86,8 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   return (
     <aside className={cn(
-      'z-30 flex h-auto flex-col border-b border-slate-700/40 bg-slate-950/80 shadow-po-sidebar backdrop-blur-xl transition-[padding] duration-300 lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r',
-      collapsed ? 'p-2 lg:items-center' : 'p-3',
+      'z-30 hidden h-screen flex-col border-r border-slate-700/40 bg-slate-950/80 shadow-po-sidebar backdrop-blur-xl transition-[padding] duration-300 lg:sticky lg:top-0 lg:flex',
+      collapsed ? 'items-center p-2' : 'p-3',
     )}>
       <div className={cn('mb-4 flex w-full items-center gap-3 lg:mb-6', collapsed ? 'px-0 lg:justify-center' : 'px-2')}>
         <div className={cn('grid place-items-center rounded-lg bg-sky-500 font-black text-white shadow-po-info-glow', collapsed ? 'size-9 text-sm' : 'size-10')}>
@@ -113,7 +113,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         {!collapsed && <span className="text-xs font-semibold">Collapse</span>}
       </button>
 
-      <nav className={cn('flex gap-2 overflow-x-auto pb-1 lg:grid lg:overflow-x-hidden lg:overflow-y-auto lg:pb-0', collapsed ? 'lg:gap-2 lg:px-0' : 'lg:gap-2 lg:pr-0')} aria-label="Primary navigation">
+      <nav className={cn('grid gap-2 overflow-x-hidden overflow-y-auto pb-0', collapsed ? 'px-0' : 'pr-0')} aria-label="Primary navigation">
         {navGroups.map((group, groupIndex) => (
           <div className={cn('contents lg:grid', collapsed ? 'lg:gap-2' : 'lg:gap-2')} key={group.label || `group-${groupIndex}`}>
             {!collapsed && group.label && <p className="sr-only">{group.label}</p>}
