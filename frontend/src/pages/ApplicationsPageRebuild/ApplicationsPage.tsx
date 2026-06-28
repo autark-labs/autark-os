@@ -259,7 +259,7 @@ export const ApplicationsPage = () => {
 
   return (
     <main className="min-h-full bg-slate-800 text-slate-50">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 p-4 md:p-6">
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-5 p-4 md:p-5 2xl:px-6">
         <header className="rounded-2xl border border-sky-400/30 bg-slate-900 shadow-xl shadow-slate-950/30">
           <div className="flex flex-col gap-2 p-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex max-w-3xl flex-col gap-3">
