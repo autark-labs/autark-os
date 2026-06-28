@@ -1,4 +1,4 @@
-import { ArrowRight, ExternalLink, Play, Search } from 'lucide-react';
+import { AlertTriangle, ArrowRight, ExternalLink, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { cn } from '@/lib/utils';
 import type { ApplicationSurfaceItem } from './ApplicationsPage.types';
 
 type BasicApplicationsViewProps = {
@@ -33,17 +34,24 @@ export function BasicApplicationsView({ items, onSelect, selectedId }: BasicAppl
     <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {items.map((item) => (
         <Card
-          className={[
-            'overflow-visible rounded-2xl border border-neutral-300 bg-white shadow-none ring-0 transition-colors hover:bg-neutral-50',
-            selectedId === item.id ? 'border-neutral-950 outline outline-2 outline-offset-2 outline-neutral-950' : '',
-          ].join(' ')}
+          className={cn(
+            'cursor-pointer overflow-visible rounded-2xl border bg-white shadow-none ring-0 transition-colors hover:bg-neutral-50',
+            item.nextAction && 'border-amber-300 bg-amber-50/70 hover:bg-amber-50',
+            item.runtimeState === 'paused' && 'border-neutral-300 bg-neutral-50',
+            !item.nextAction && item.runtimeState !== 'paused' && 'border-neutral-300',
+            selectedId === item.id && 'border-neutral-950 outline outline-2 outline-offset-2 outline-neutral-950',
+          )}
           key={item.id}
+          onClick={() => onSelect(item.id)}
         >
           <CardHeader>
             <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <CardTitle className="truncate text-xl text-neutral-950">{item.name}</CardTitle>
-                <CardDescription className="text-neutral-600">{labelForKind(item.kind)}</CardDescription>
+              <div className="flex min-w-0 items-start gap-3">
+                <AppIcon item={item} />
+                <div className="flex min-w-0 flex-col gap-1">
+                  <CardTitle className="truncate text-xl text-neutral-950">{item.name}</CardTitle>
+                  <CardDescription className="text-neutral-600">{labelForKind(item.kind)}</CardDescription>
+                </div>
               </div>
               <StatusBadge item={item} />
             </div>
@@ -57,12 +65,24 @@ export function BasicApplicationsView({ items, onSelect, selectedId }: BasicAppl
               </div>
             </div>
           </CardContent>
-          <CardFooter className="justify-between gap-3 border-neutral-300 bg-white">
-            <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => onSelect(item.id)} type="button">
-              {item.nextStep === 'Open' ? <ExternalLink data-icon="inline-start" /> : <Play data-icon="inline-start" />}
-              {item.nextStep}
-            </Button>
-            <Button className="border-neutral-300 text-neutral-900" onClick={() => onSelect(item.id)} type="button" variant="outline">
+          <CardFooter className="flex-wrap justify-between gap-3 border-neutral-300 bg-white">
+            {item.href ? (
+              <Button asChild className="bg-neutral-950 text-white hover:bg-neutral-800">
+                <a href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank">
+                  <ExternalLink data-icon="inline-start" />
+                  Open
+                </a>
+              </Button>
+            ) : (
+              <Button disabled type="button">
+                <ExternalLink data-icon="inline-start" />
+                No link
+              </Button>
+            )}
+            <Button className="border-neutral-300 text-neutral-900" onClick={(event) => {
+              event.stopPropagation();
+              onSelect(item.id);
+            }} type="button" variant="outline">
               Details
               <ArrowRight data-icon="inline-end" />
             </Button>
@@ -78,7 +98,12 @@ function StatusBadge({ item }: { item: ApplicationSurfaceItem }) {
     return <Badge className="bg-emerald-600 text-white">Ready</Badge>;
   }
   if (item.status === 'Needs review') {
-    return <Badge className="bg-amber-500 text-neutral-950">Needs review</Badge>;
+    return (
+      <Badge className="bg-amber-500 text-neutral-950">
+        <AlertTriangle data-icon="inline-start" />
+        Needs review
+      </Badge>
+    );
   }
   if (item.status === 'Paused') {
     return <Badge className="bg-neutral-700 text-white">Paused</Badge>;
@@ -97,6 +122,18 @@ function ApplicationsEmptyState() {
         <EmptyDescription>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</EmptyDescription>
       </EmptyHeader>
     </Empty>
+  );
+}
+
+function AppIcon({ item }: { item: ApplicationSurfaceItem }) {
+  return (
+    <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-neutral-300 bg-white">
+      {item.iconUrl ? (
+        <img alt="" className="size-9 object-contain" src={item.iconUrl} />
+      ) : (
+        <span className="text-sm font-semibold text-neutral-700">{item.name.slice(0, 2).toUpperCase()}</span>
+      )}
+    </div>
   );
 }
 
