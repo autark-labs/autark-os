@@ -42,7 +42,6 @@ export const ApplicationsPage = () => {
   const [filter, setFilter] = useState<ApplicationFilter>('all');
   const [managementOpen, setManagementOpen] = useState(false);
   const [selectedId, setSelectedId] = useState('');
-  const [localEventsById, setLocalEventsById] = useState<Record<string, string>>({});
   const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
   const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
@@ -69,7 +68,6 @@ export const ApplicationsPage = () => {
 
       return {
         ...item,
-        lastEvent: localEventsById[item.id] || item.lastEvent,
         operationState,
       };
     });
@@ -81,7 +79,6 @@ export const ApplicationsPage = () => {
     appState.observedServices,
     appState.telemetryByAppId,
     jobsQuery.data,
-    localEventsById,
     settingsLoadingByAppId,
   ]);
 
@@ -201,10 +198,6 @@ export const ApplicationsPage = () => {
     }
 
     setFilter(nextFilter as ApplicationFilter);
-  };
-
-  const recordLocalEvent = (id: string, message: string) => {
-    setLocalEventsById((current) => ({ ...current, [id]: message }));
   };
 
   const setAppActionLoading = (appId: string, action: ApplicationRuntimeAction | null) => {
@@ -337,7 +330,12 @@ export const ApplicationsPage = () => {
   const handleStop = (id: string) => void runManagedAction(id, 'stop');
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
   const handleDirtyChange = (id: string, dirty: boolean) => setSettingsDirtyByAppId((current) => ({ ...current, [id]: dirty }));
-  const handleCreateBackup = (id: string) => recordLocalEvent(id, 'Backup review opened just now');
+  const handleCreateBackup = (id: string) => {
+    setSelectedId(id);
+    setManagementOpen(true);
+    void invalidateApplicationState(queryClient);
+  };
+
   const handleRunNextAction = (id: string) => {
     const item = items.find((candidate) => candidate.id === id);
     if (item?.managementState === 'managed' && item.nextAction?.id === 'start_app') {
@@ -345,7 +343,9 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    recordLocalEvent(id, 'Review opened just now');
+    setSelectedId(id);
+    setManagementOpen(true);
+    void invalidateApplicationState(queryClient);
   };
 
   const handleUninstall = (id: string) => {

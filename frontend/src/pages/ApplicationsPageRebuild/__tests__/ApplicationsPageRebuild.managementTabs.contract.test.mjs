@@ -122,3 +122,32 @@ test('applications rebuild settings tab uses real controls and confirm-before-sa
   assert.doesNotMatch(settings, /<FieldLabel className="text-white">\s*<SettingLabel/);
   assert.doesNotMatch(tooltip, /bg-foreground px-3 py-1\.5 text-xs text-background/);
 });
+
+test('applications rebuild management panel uses canonical runtime data instead of generated mock facts', () => {
+  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+  const liveModel = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.liveModel.ts');
+
+  assert.doesNotMatch(panel, /appManagementMock/);
+  assert.doesNotMatch(panel, /127\.0\.0\.1:\$\{8000 \+ seed\}/);
+  assert.doesNotMatch(panel, /project-os-\$\{item\.id\}/);
+  assert.doesNotMatch(panel, /\/var\/lib\/project-os\/apps\/\$\{item\.id\}/);
+  assert.doesNotMatch(panel, /Just now/);
+  assert.doesNotMatch(panel, /Today/);
+  assert.doesNotMatch(panel, /State checked/);
+
+  assert.doesNotMatch(page, /localEventsById/);
+  assert.doesNotMatch(page, /recordLocalEvent/);
+  assert.doesNotMatch(page, /Backup review opened just now/);
+  assert.doesNotMatch(page, /Review opened just now/);
+
+  assert.match(panel, /item\.runtime\.composeProject/);
+  assert.match(panel, /item\.runtime\.runtimePath/);
+  assert.match(panel, /item\.runtime\.version/);
+  assert.match(panel, /item\.runtime\.image/);
+  assert.match(panel, /item\.runtime\.recentEvents/);
+  assert.match(panel, /formatRuntimeTimestamp/);
+  assert.match(page, /invalidateApplicationState\(queryClient\)/);
+  assert.match(liveModel, /recentEvents: app\.recentEvents \?\? \[\]/);
+  assert.match(liveModel, /runtime: appRuntimeDetails\(app, health, telemetry\)/);
+});

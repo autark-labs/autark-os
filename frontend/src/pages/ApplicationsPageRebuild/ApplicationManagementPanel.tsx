@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { DestructiveActionDialog } from './components/DestructiveActionDialog';
 import { ExpandedOperationStatus } from './components/AppOperationStatus';
-import { labelForManagementState } from './components/AppStateBadges';
+import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
 import { ApplicationGuideTab } from './managementTabs/ApplicationGuideTab';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
 import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
@@ -33,7 +33,7 @@ type ApplicationManagementPanelProps = {
 export function ApplicationManagementPanel({ actions, item, settingsLoadingAction = null, variant = 'inline' }: ApplicationManagementPanelProps) {
   const managed = item.managementState === 'managed';
   const rail = variant === 'rail';
-  const mock = appManagementMock(item);
+  const recentEvents = item.runtime.recentEvents.slice(0, 5);
 
   return (
     <section
@@ -59,9 +59,9 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
 
           <TabsContent className="grid gap-4" value="overview">
             <section className="grid gap-2 sm:grid-cols-2">
-              <Detail label="Repair" value={mock.repair} />
-              <Detail label="Container" value={mock.container} />
-              <Detail label="Storage" value={mock.storage} />
+              <Detail label="State" value={labelForReadiness(item.readinessState)} />
+              <Detail label="Attention" value={labelForAttention(item.attentionState)} />
+              <Detail label="Container" value={item.settings.containerStatus || item.runtime.health?.dockerStatus || 'Not reported'} />
               <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
             </section>
 
@@ -114,26 +114,28 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
               <AccordionItem value="runtime">
                 <AccordionTrigger className="text-sky-50">Runtime details</AccordionTrigger>
                 <AccordionContent className="grid gap-2">
-                  <Detail label="Compose project" value={mock.composeProject} />
-                  <Detail label="Runtime path" value={mock.runtimePath} />
-                  <Detail label="Version" value={mock.version} />
+                  <Detail label="Compose project" value={item.runtime.composeProject || 'Not reported'} />
+                  <Detail label="Runtime path" value={item.runtime.runtimePath || 'Not reported'} />
+                  <Detail label="Version" value={item.runtime.version || 'Not reported'} />
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="template">
                 <AccordionTrigger className="text-sky-50">Template values</AccordionTrigger>
                 <AccordionContent className="grid gap-2 sm:grid-cols-2">
-                  <Detail label="Image" value={mock.image} />
+                  <Detail label="Image" value={item.runtime.image || 'Not reported'} />
                   <Detail label="Category" value={labelForManagementState(item.managementState)} />
-                  <Detail label="Port" value={mock.port} />
+                  <Detail label="Port" value={formatPort(item.settings.expectedLocalPort)} />
                   <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="events">
                 <AccordionTrigger className="text-sky-50">Recent events</AccordionTrigger>
                 <AccordionContent className="grid gap-2">
-                  <ActivityRow label={item.lastEvent || 'State checked'} value="Just now" />
-                  <ActivityRow label={`${item.access} access reviewed`} value="Today" />
-                  <ActivityRow label={`${item.backup} backup status`} value="Today" />
+                  {recentEvents.length > 0 ? recentEvents.map((event) => (
+                    <ActivityRow key={event.id} label={event.message} value={formatRuntimeTimestamp(event.createdAt)} />
+                  )) : (
+                    <EmptyActivity item={item} />
+                  )}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -204,19 +206,33 @@ function ActivityRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function appManagementMock(item: ApplicationSurfaceItem) {
-  const seed = item.id.length;
-  return {
-    backendTarget: `http://127.0.0.1:${8000 + seed}`,
-    composeProject: `project-os-${item.id}`,
-    container: item.readinessState === 'ready' ? 'healthy' : item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'stopped' : 'attention',
-    image: `${item.id}:stable`,
-    localUrl: item.href?.startsWith('http://localhost') ? item.href : `http://localhost:${8000 + seed}`,
-    port: String(8000 + seed),
-    privateUrl: `https://${item.id}.tailnet.example`,
-    repair: item.attentionState !== 'none' ? 'Needs review' : 'Ready',
-    runtimePath: `/var/lib/project-os/apps/${item.id}`,
-    storage: `${item.id}-data`,
-    version: '2026.6',
-  };
+function EmptyActivity({ item }: { item: ApplicationSurfaceItem }) {
+  return (
+    <div className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2">
+      <p className="text-sm font-medium text-sky-50">{item.lastEvent || 'No recent events reported'}</p>
+      <p className="mt-1 text-xs text-sky-100/60">
+        {item.runtime.checkedAt ? `Last checked ${formatRuntimeTimestamp(item.runtime.checkedAt)}` : 'Project OS has not reported activity for this item.'}
+      </p>
+    </div>
+  );
+}
+
+function formatPort(value: number | null) {
+  return value ? String(value) : 'Not reported';
+}
+
+function formatRuntimeTimestamp(value?: string) {
+  if (!value) {
+    return 'Not reported';
+  }
+
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(timestamp);
 }
