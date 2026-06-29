@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ExternalLink, Pause, Play, RotateCw, Search, Wrench, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Pause, Play, RotateCw, Search, ShieldCheck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -609,28 +609,6 @@ export const ApplicationsPage = () => {
                     {managementOpen ? 'Close details' : 'Manage app'}
                   </Button>
                 )}
-                {selectedItem.nextAction ? (
-                <div className="flex flex-col gap-3 rounded-xl border border-orange-400 bg-orange-200 px-4 py-1 text-orange-950 shadow-lg shadow-orange-500/20">
-                    <div className="flex items-start gap-3">
-                    <AlertTriangle />
-                    <div>
-                        <p className="font-medium">{selectedItem.nextAction.label}</p>
-                        <p className="mt-1 text-sm leading-6">{selectedItem.nextAction.description}</p>
-                    </div>
-                    </div>
-                    <Button className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400" onClick={() => handleRunNextAction(selectedItem.id)} type="button">
-                    {selectedItem.nextAction.label}
-                    </Button>
-                </div>
-                ) : (
-                <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-200 px-4 py-1 text-emerald-950 shadow-lg shadow-emerald-500/10">
-                    <CheckCircle2 />
-                    <div>
-                    <p className="font-medium">{selectedItem.kind === 'managed' ? 'App fully functional' : 'No action needed'}</p>
-                    <p className="mt-1 text-sm leading-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
-                    </div>
-                </div>
-                )}
               </div>
             </CardHeader>
             <CardContent className="overflow-hidden">
@@ -661,6 +639,53 @@ export const ApplicationsPage = () => {
 
                   <div className="min-w-0">
                     <div className="flex flex-col gap-4">
+                      <section className="grid gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
+                        {selectedItem.href && (
+                          <Button asChild className="bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-200">
+                            <a href={selectedItem.href} rel="noreferrer" target="_blank">
+                              <ExternalLink data-icon="inline-start" />
+                              Open app
+                            </a>
+                          </Button>
+                        )}
+
+                        {selectedItem.nextAction ? (
+                          <div className="rounded-lg border border-orange-400 bg-orange-200 p-3 text-orange-950">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium">{selectedItem.nextAction.label}</p>
+                                <p className="mt-1 text-xs leading-5">{selectedItem.nextAction.description}</p>
+                              </div>
+                              <Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => handleRunNextAction(selectedItem.id)} size="sm" type="button">
+                                Run
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-200 px-3 py-2 text-sm text-emerald-950">
+                            <CheckCircle2 data-icon="inline-start" />
+                            {selectedItem.kind === 'managed' ? 'App fully functional' : 'No action needed'}
+                          </div>
+                        )}
+
+                        {selectedItem.kind === 'managed' && (
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => selectedItem.runtimeState === 'paused' ? handleStart(selectedItem.id) : handleStop(selectedItem.id)} type="button" variant="outline">
+                              {selectedItem.runtimeState === 'paused' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+                              {selectedItem.runtimeState === 'paused' ? 'Start' : 'Pause'}
+                            </Button>
+                            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleRestart(selectedItem.id)} type="button" variant="outline">
+                              <RotateCw data-icon="inline-start" />
+                              Restart
+                            </Button>
+                            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleCreateBackup(selectedItem.id)} type="button" variant="outline">
+                              <ShieldCheck data-icon="inline-start" />
+                              Backup
+                            </Button>
+                          </div>
+                        )}
+                      </section>
+
                       <div className="grid gap-2 text-sm">
                         <InfoRow label="Type" value={labelForKind(selectedItem.kind)} />
                         <InfoRow label="State" value={selectedItem.status} />
@@ -668,35 +693,6 @@ export const ApplicationsPage = () => {
                         <InfoRow label="Backup" value={selectedItem.backup} />
                         {selectedItem.lastEvent && <InfoRow label="Last event" value={selectedItem.lastEvent} />}
                       </div>
-
-                      {selectedItem.href && (
-                        <Button asChild className="bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-200">
-                          <a href={selectedItem.href} rel="noreferrer" target="_blank">
-                            <ExternalLink data-icon="inline-start" />
-                            Open app
-                          </a>
-                        </Button>
-                      )}
-
-                      {selectedItem.kind === 'managed' && (
-                        <div className="grid grid-cols-3 gap-2">
-                          {selectedItem.runtimeState === 'paused' ? (
-                            <Button className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleStart(selectedItem.id)} type="button" variant="outline">
-                              <Play data-icon="inline-start" />
-                              Start
-                            </Button>
-                          ) : (
-                            <Button className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleStop(selectedItem.id)} type="button" variant="outline">
-                              <Pause data-icon="inline-start" />
-                              Stop
-                            </Button>
-                          )}
-                          <Button className="col-span-2 border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleRestart(selectedItem.id)} type="button" variant="outline">
-                            <RotateCw data-icon="inline-start" />
-                            Restart
-                          </Button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

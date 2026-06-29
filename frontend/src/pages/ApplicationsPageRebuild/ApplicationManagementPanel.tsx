@@ -1,18 +1,12 @@
 import {
   Activity,
-  AlertTriangle,
   Archive,
-  CheckCircle2,
   Cpu,
   ExternalLink,
-  Folder,
   Info,
   KeyRound,
   Link2,
   Network,
-  Pause,
-  Play,
-  RotateCw,
   Server,
   ShieldCheck,
   Trash2,
@@ -50,7 +44,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { ApplicationStatusBadge, labelForKind } from './extensions/ApplicationVisuals';
+import { labelForKind } from './extensions/ApplicationVisuals';
 import type { ApplicationActionHandlers, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationManagementPanelProps = {
@@ -59,9 +53,8 @@ type ApplicationManagementPanelProps = {
   variant?: 'inline' | 'rail';
 };
 
-export function ApplicationManagementPanel({ actions, item, variant = 'inline' }: ApplicationManagementPanelProps) {
+export function ApplicationManagementPanel({ item, variant = 'inline' }: ApplicationManagementPanelProps) {
   const managed = item.kind === 'managed';
-  const paused = item.runtimeState === 'paused';
   const rail = variant === 'rail';
   const mock = appManagementMock(item);
 
@@ -86,59 +79,11 @@ export function ApplicationManagementPanel({ actions, item, variant = 'inline' }
 
           <div className="p-4">
             <TabsContent className="grid gap-4" value="overview">
-              <section className="grid gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <ApplicationStatusBadge item={item} />
-                  <Badge className="bg-slate-900 text-sky-50">{labelForKind(item.kind)}</Badge>
-                  <Badge className="bg-slate-900 text-sky-50">{item.access}</Badge>
-                </div>
-
-                {item.nextAction ? (
-                  <div className="rounded-lg border border-orange-400 bg-orange-200 p-3 text-orange-950">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{item.nextAction.label}</p>
-                        <p className="mt-1 text-xs leading-5">{item.nextAction.description}</p>
-                      </div>
-                      <Button className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => actions.onRunNextAction(item.id)} size="sm" type="button">
-                        Run
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-200 px-3 py-2 text-sm text-emerald-950">
-                    <CheckCircle2 data-icon="inline-start" />
-                    App fully functional
-                  </div>
-                )}
-
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {managed && (
-                    <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => paused ? actions.onStart(item.id) : actions.onStop(item.id)} type="button" variant="outline">
-                      {paused ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
-                      {paused ? 'Start' : 'Pause'}
-                    </Button>
-                  )}
-                  {managed && (
-                    <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => actions.onRestart(item.id)} type="button" variant="outline">
-                      <RotateCw data-icon="inline-start" />
-                      Restart
-                    </Button>
-                  )}
-                  {managed && (
-                    <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => actions.onCreateBackup(item.id)} type="button" variant="outline">
-                      <ShieldCheck data-icon="inline-start" />
-                      Backup
-                    </Button>
-                  )}
-                </div>
-              </section>
-
               <section className="grid gap-2 sm:grid-cols-2">
-                <Detail label="State" value={item.status} />
-                <Detail label="Backup" value={item.backup} />
-                <Detail label="Last event" value={item.lastEvent || 'No recent activity'} />
                 <Detail label="Repair" value={mock.repair} />
+                <Detail label="Container" value={mock.container} />
+                <Detail label="Storage" value={mock.storage} />
+                <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
               </section>
 
               <DangerZone itemName={item.name} managed={managed} />
