@@ -7,7 +7,6 @@ import {
   Network,
   Search,
   ShieldCheck,
-  Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -16,22 +15,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { DestructiveActionDialog } from './components/DestructiveActionDialog';
 import { ExpandedOperationStatus } from './components/AppOperationStatus';
 import { labelForManagementState, labelForReadiness } from './components/AppStateBadges';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
@@ -105,7 +94,7 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
               </section>
             )}
 
-            <DangerZone itemName={item.name} managed={managed} />
+            <DangerZone managed={managed} />
           </TabsContent>
 
           <TabsContent className="grid gap-4" value="guide">
@@ -244,7 +233,7 @@ function MetricBar({ icon: Icon, label, text, value }: { icon: typeof Cpu; label
   );
 }
 
-function DangerZone({ itemName, managed }: { itemName: string; managed: boolean }) {
+function DangerZone({ managed }: { managed: boolean }) {
   return (
     <section className="rounded-xl border border-red-400/25 bg-red-500/10 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -252,46 +241,13 @@ function DangerZone({ itemName, managed }: { itemName: string; managed: boolean 
           <p className="text-sm font-semibold text-red-100">Uninstall</p>
           <p className="text-xs text-red-100/70">{managed ? 'Data is preserved by default.' : 'Observed services are not managed.'}</p>
         </div>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button className="border-red-300/30 bg-slate-900 text-red-100 hover:bg-red-950" size="sm" type="button" variant="outline">
-              <Trash2 data-icon="inline-start" />
-              Review
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent className="bg-slate-950 text-slate-50">
-            <AlertDialogHeader>
-              <AlertDialogTitle>Uninstall {itemName}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This wireframe keeps data by default and would show a reviewed uninstall plan before applying changes.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <PlanList title="Will remove" items={['App container', 'Project OS app record', 'Runtime shortcut']} />
-              <PlanList title="Will keep" items={['App data folder', 'Backup metadata', 'Support events']} />
-            </div>
-            <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-              Safety checkpoint planned
-            </div>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction className="bg-red-600 text-white hover:bg-red-500">Keep data and uninstall</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <DestructiveActionDialog
+          className="border-red-300/30 bg-slate-900 text-red-100 hover:bg-red-950"
+          disabledReason={managed ? 'A safety plan is required before uninstall can run.' : 'Only managed apps can be uninstalled from Project OS.'}
+          triggerLabel="Review"
+        />
       </div>
     </section>
-  );
-}
-
-function PlanList({ items, title }: { items: string[]; title: string }) {
-  return (
-    <div className="rounded-lg border border-slate-700/40 bg-slate-900 p-3">
-      <p className="text-xs font-semibold text-sky-100/60">{title}</p>
-      <ul className="mt-2 grid gap-1 text-sm text-slate-200">
-        {items.map((item) => <li key={item}>{item}</li>)}
-      </ul>
-    </div>
   );
 }
 
