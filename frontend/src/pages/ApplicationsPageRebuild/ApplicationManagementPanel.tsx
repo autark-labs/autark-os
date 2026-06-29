@@ -28,17 +28,17 @@ export function ApplicationManagementPanel({ actions, item, variant = 'inline' }
           : 'animate-in fade-in-0 slide-in-from-top-2 rounded-2xl border border-cyan-300/40 shadow-2xl shadow-cyan-950/40',
       )}
     >
-      <div className={cn('flex flex-col gap-4 border-b border-sky-400/20 p-4', !rail && 'lg:flex-row lg:items-start lg:justify-between')}>
+      {/* <div className={cn('flex flex-col gap-4 border-b border-sky-400/20 p-4', !rail && 'lg:flex-row lg:items-start lg:justify-between')}>
         <div className="flex min-w-0 items-start gap-3">
-          {/* <ApplicationIcon item={item} size="md" /> */}
-          {/* <div className="min-w-0">
+          <ApplicationIcon item={item} size="md" />
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate text-xl font-semibold text-white">{item.name}</h3>
               <ApplicationStatusBadge item={item} />
               <Badge className="bg-slate-800 text-sky-50">{labelForKind(item.kind)}</Badge>
             </div>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">{item.description}</p>
-          </div> */}
+          </div>
         </div>
 
         {item.href && !rail && (
@@ -49,37 +49,18 @@ export function ApplicationManagementPanel({ actions, item, variant = 'inline' }
             </a>
           </Button>
         )}
-      </div>
+      </div> */}
 
       <Tabs className="gap-0" defaultValue="overview">
         <TabsList className="w-full justify-start rounded-none border-b border-sky-400/20 bg-slate-900 px-4 py-2" variant="line">
-          <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="overview">Overview</TabsTrigger>
-          <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="actions">Actions</TabsTrigger>
-          <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="activity">Activity</TabsTrigger>
+          <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white data-active:text-shadow-2xl data-active:shadow-cyan-500/20" value="overview">Overview</TabsTrigger>
+          <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white data-active:text-shadow-2xl data-active:shadow-cyan-500/20" value="actions">Actions</TabsTrigger>
+          <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white data-active:text-shadow-2xl data-active:shadow-cyan-500/20" value="activity">Activity</TabsTrigger>
+          <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="settings">Settings</TabsTrigger>
         </TabsList>
 
         <div className="p-4">
           <TabsContent className={cn('grid gap-4', !rail && 'lg:grid-cols-[minmax(0,1fr)_18rem]')} value="overview">
-            {item.nextAction ? (
-              <section className="rounded-xl border border-orange-400 bg-orange-200 p-4 text-orange-950 shadow-lg shadow-orange-500/20">
-                <p className="font-semibold">{item.nextAction.label}</p>
-                <p className="mt-1 text-sm leading-6">{item.nextAction.description}</p>
-                <Button className="mt-3 bg-orange-500 text-white hover:bg-orange-400" onClick={() => actions.onRunNextAction(item.id)} type="button">
-                  {item.nextAction.label}
-                </Button>
-              </section>
-            ) : (
-              <section className="rounded-xl border border-emerald-300 bg-emerald-200 p-4 text-emerald-950">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5" />
-                  <div>
-                    <p className="font-semibold">{managed ? 'App fully functional' : 'No action needed'}</p>
-                    <p className="mt-1 text-sm leading-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
-                  </div>
-                </div>
-              </section>
-            )}
-
             <section className="grid gap-2">
               <Detail label="State" value={item.status} />
               <Detail label="Access" value={item.access} />
