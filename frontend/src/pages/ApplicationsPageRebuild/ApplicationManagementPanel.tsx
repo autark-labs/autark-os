@@ -9,7 +9,6 @@ import {
   KeyRound,
   Link2,
   Network,
-  RefreshCcw,
   Search,
   Server,
   ShieldCheck,
@@ -49,10 +48,9 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { labelForKind } from './extensions/ApplicationVisuals';
-import type { ApplicationActionHandlers, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
+import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationManagementPanelProps = {
-  actions: ApplicationActionHandlers;
   item: ApplicationSurfaceItem;
   variant?: 'inline' | 'rail';
 };
@@ -89,18 +87,6 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
                 <Detail label="Container" value={mock.container} />
                 <Detail label="Storage" value={mock.storage} />
                 <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
-              </section>
-
-              <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-white">Maintenance</span>
-                  <HelpTip content="Update, rollback, and recovery controls from the old manage modal are shown here as wireframe status." />
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <OperationBadge label="Update" tone={mock.updateAvailable ? 'orange' : 'green'} value={mock.updateAvailable ? 'Available' : 'Current'} />
-                  <OperationBadge label="Rollback" tone={mock.rollbackAvailable ? 'sky' : 'slate'} value={mock.rollbackAvailable ? 'Ready' : 'None'} />
-                  <OperationBadge label="Restore" tone={item.backup === 'Protected' ? 'green' : 'orange'} value={item.backup === 'Protected' ? 'Ready' : 'Needs backup'} />
-                </div>
               </section>
 
               {item.kind === 'observed' && (
@@ -248,15 +234,6 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
                     <ActivityRow label={`${item.backup} backup status`} value="Today" />
                   </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="recovery">
-                  <AccordionTrigger className="text-sky-50">Update and recovery</AccordionTrigger>
-                  <AccordionContent className="grid gap-2 sm:grid-cols-2">
-                    <Detail label="Update" value={mock.updateAvailable ? 'Available' : 'Current'} />
-                    <Detail label="Rollback" value={mock.rollbackAvailable ? 'Available' : 'None recorded'} />
-                    <Detail label="Restore point" value={item.backup === 'Protected' ? 'Available' : 'Missing'} />
-                    <Detail label="Last repair" value={mock.repair} />
-                  </AccordionContent>
-                </AccordionItem>
               </Accordion>
             </TabsContent>
           </div>
@@ -271,22 +248,6 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-lg bg-slate-900 px-3 py-2">
       <p className="text-xs font-medium text-sky-100/60">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold text-white">{value}</p>
-    </div>
-  );
-}
-
-function OperationBadge({ label, tone, value }: { label: string; tone: 'green' | 'orange' | 'sky' | 'slate'; value: string }) {
-  const toneClass = {
-    green: 'border-emerald-300/30 bg-emerald-200 text-emerald-950',
-    orange: 'border-orange-400 bg-orange-200 text-orange-950',
-    sky: 'border-cyan-300/30 bg-cyan-200 text-cyan-950',
-    slate: 'border-slate-600 bg-slate-900 text-sky-100',
-  }[tone];
-
-  return (
-    <div className={cn('rounded-lg border px-3 py-2', toneClass)}>
-      <p className="text-xs font-medium opacity-75">{label}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
     </div>
   );
 }
@@ -419,7 +380,7 @@ function DangerZone({ itemName, managed }: { itemName: string; managed: boolean 
             </AlertDialogHeader>
             <div className="grid gap-3 sm:grid-cols-2">
               <PlanList title="Will remove" items={['App container', 'Project OS app record', 'Runtime shortcut']} />
-              <PlanList title="Will keep" items={['App data folder', 'Latest restore point', 'Support events']} />
+              <PlanList title="Will keep" items={['App data folder', 'Backup metadata', 'Support events']} />
             </div>
             <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
               Safety checkpoint planned
@@ -474,9 +435,7 @@ function appManagementMock(item: ApplicationSurfaceItem) {
     runtimePath: `/var/lib/project-os/apps/${item.id}`,
     storage: `${item.id}-data`,
     adminUser: item.kind === 'managed' ? 'admin' : 'Not managed',
-    rollbackAvailable: item.runtimeState === 'needs_attention' || seed % 4 === 0,
     setupToken: `${item.id.slice(0, 4)}-${seed}-setup`,
-    updateAvailable: item.runtimeState === 'running' && seed % 3 === 0,
     version: '2026.6',
   };
 }
