@@ -609,6 +609,28 @@ export const ApplicationsPage = () => {
                     {managementOpen ? 'Close details' : 'Manage app'}
                   </Button>
                 )}
+                {selectedItem.nextAction ? (
+                <div className="flex flex-col gap-3 rounded-xl border border-orange-400 bg-orange-200 px-4 py-1 text-orange-950 shadow-lg shadow-orange-500/20">
+                    <div className="flex items-start gap-3">
+                    <AlertTriangle />
+                    <div>
+                        <p className="font-medium">{selectedItem.nextAction.label}</p>
+                        <p className="mt-1 text-sm leading-6">{selectedItem.nextAction.description}</p>
+                    </div>
+                    </div>
+                    <Button className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400" onClick={() => handleRunNextAction(selectedItem.id)} type="button">
+                    {selectedItem.nextAction.label}
+                    </Button>
+                </div>
+                ) : (
+                <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-200 px-4 py-1 text-emerald-950 shadow-lg shadow-emerald-500/10">
+                    <CheckCircle2 />
+                    <div>
+                    <p className="font-medium">{selectedItem.kind === 'managed' ? 'App fully functional' : 'No action needed'}</p>
+                    <p className="mt-1 text-sm leading-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                    </div>
+                </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="overflow-hidden">
@@ -673,29 +695,6 @@ export const ApplicationsPage = () => {
                             <RotateCw data-icon="inline-start" />
                             Restart
                           </Button>
-                        </div>
-                      )}
-
-                      {selectedItem.nextAction ? (
-                        <div className="flex flex-col gap-3 rounded-xl border border-orange-400 bg-orange-200 p-4 text-orange-950 shadow-lg shadow-orange-500/20">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle />
-                            <div>
-                              <p className="font-medium">{selectedItem.nextAction.label}</p>
-                              <p className="mt-1 text-sm leading-6">{selectedItem.nextAction.description}</p>
-                            </div>
-                          </div>
-                          <Button className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400" onClick={() => handleRunNextAction(selectedItem.id)} type="button">
-                            {selectedItem.nextAction.label}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-200 p-4 text-emerald-950 shadow-lg shadow-emerald-500/10">
-                          <CheckCircle2 />
-                          <div>
-                            <p className="font-medium">{selectedItem.kind === 'managed' ? 'App fully functional' : 'No action needed'}</p>
-                            <p className="mt-1 text-sm leading-6">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
-                          </div>
                         </div>
                       )}
                     </div>

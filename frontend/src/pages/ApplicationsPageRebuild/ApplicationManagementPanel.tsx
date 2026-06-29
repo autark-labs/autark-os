@@ -30,15 +30,15 @@ export function ApplicationManagementPanel({ actions, item, variant = 'inline' }
     >
       <div className={cn('flex flex-col gap-4 border-b border-sky-400/20 p-4', !rail && 'lg:flex-row lg:items-start lg:justify-between')}>
         <div className="flex min-w-0 items-start gap-3">
-          <ApplicationIcon item={item} size="md" />
-          <div className="min-w-0">
+          {/* <ApplicationIcon item={item} size="md" /> */}
+          {/* <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate text-xl font-semibold text-white">{item.name}</h3>
               <ApplicationStatusBadge item={item} />
               <Badge className="bg-slate-800 text-sky-50">{labelForKind(item.kind)}</Badge>
             </div>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">{item.description}</p>
-          </div>
+          </div> */}
         </div>
 
         {item.href && !rail && (
