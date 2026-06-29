@@ -62,3 +62,13 @@ test('applications rebuild settings tab uses a guarded batch form for container 
   assert.match(page, /window\.confirm\('Discard unsaved app settings\?'\)/);
   assert.match(rail, /canCloseManagement/);
 });
+
+test('applications rebuild settings controls expose row-sized interaction targets', () => {
+  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
+
+  assert.match(settings, /onClick=\{\(\) => toggleField\(\)\}/);
+  assert.match(settings, /onKeyDown=\{\(event\) =>/);
+  assert.match(settings, /aria-checked=\{field\.value\}/);
+  assert.match(settings, /aria-disabled=\{disabled\}/);
+  assert.match(settings, /htmlFor=\{inputId\}/);
+});

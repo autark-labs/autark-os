@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { AlertTriangle, CheckCircle2, Container, KeyRound, Loader2, RotateCcw, Save } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -235,25 +236,59 @@ function ControlledSwitch({
   offCopy: string;
   onCopy: string;
 }) {
+  const inputId = useId();
+
   return (
     <Controller
       control={control}
       name={name}
-      render={({ field }) => (
-        <Field
-          className={cn('rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2', disabled && 'opacity-80')}
-          data-disabled={disabled}
-          orientation="horizontal"
-        >
-          <FieldContent>
-            <FieldLabel className="text-white">{label}</FieldLabel>
-            <FieldDescription className="text-sky-100/60">
-              {field.value ? onCopy : offCopy}
-            </FieldDescription>
-          </FieldContent>
-          <Switch checked={field.value} disabled={disabled} onCheckedChange={field.onChange} size="sm" />
-        </Field>
-      )}
+      render={({ field }) => {
+        const toggleField = () => {
+          if (!disabled) {
+            field.onChange(!field.value);
+          }
+        };
+
+        const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleField();
+          }
+        };
+
+        return (
+          <Field
+            aria-checked={field.value}
+            aria-disabled={disabled}
+            className={cn(
+              'rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2 transition-colors',
+              disabled ? 'opacity-80' : 'cursor-pointer hover:border-cyan-300/50 hover:bg-slate-800',
+            )}
+            data-disabled={disabled}
+            onClick={() => toggleField()}
+            onKeyDown={(event) => handleKeyDown(event)}
+            orientation="horizontal"
+            role="switch"
+            tabIndex={disabled ? -1 : 0}
+          >
+            <FieldContent>
+              <FieldLabel className="cursor-inherit text-white" htmlFor={inputId}>{label}</FieldLabel>
+              <FieldDescription className="text-sky-100/60">
+                {field.value ? onCopy : offCopy}
+              </FieldDescription>
+            </FieldContent>
+            <Switch
+              checked={field.value}
+              disabled={disabled}
+              id={inputId}
+              onCheckedChange={field.onChange}
+              onClick={(event) => event.stopPropagation()}
+              size="sm"
+              tabIndex={-1}
+            />
+          </Field>
+        );
+      }}
     />
   );
 }
