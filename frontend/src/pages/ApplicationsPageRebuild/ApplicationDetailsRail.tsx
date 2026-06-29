@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ApplicationIcon, labelForKind } from './extensions/ApplicationVisuals';
 import { ApplicationManagementPanel } from './ApplicationManagementPanel';
-import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
+import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationDetailsRailProps = {
   actions: ApplicationActionHandlers;
@@ -19,10 +19,11 @@ type ApplicationDetailsRailProps = {
   item: ApplicationSurfaceItem | null;
   managementOpen: boolean;
   onManagementOpenChange: (open: boolean) => void;
+  settingsLoadingByItemId: Record<string, ApplicationSettingsAction | null | undefined>;
 };
 
 export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDetailsRailProps>(function ApplicationDetailsRail(
-  { actions, actionLoadingByItemId, item, managementOpen, onManagementOpenChange },
+  { actions, actionLoadingByItemId, item, managementOpen, onManagementOpenChange, settingsLoadingByItemId },
   ref,
 ) {
   return (
@@ -82,7 +83,12 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
                 <p className="text-sm font-semibold text-white">Management</p>
                 <p className="text-xs text-sky-100/60">Lorem ipsum dolor sit amet.</p>
               </div>
-              <ApplicationManagementPanel item={item} variant="rail" />
+              <ApplicationManagementPanel
+                actions={actions}
+                item={item}
+                settingsLoadingAction={settingsLoadingByItemId[item.id] ?? null}
+                variant="rail"
+              />
             </div>
 
             <div className="min-w-0">

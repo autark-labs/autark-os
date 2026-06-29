@@ -4,13 +4,8 @@ import {
   Copy,
   Cpu,
   Download,
-  ExternalLink,
-  Info,
-  KeyRound,
-  Link2,
   Network,
   Search,
-  Server,
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
@@ -34,34 +29,28 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { labelForKind } from './extensions/ApplicationVisuals';
-import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
+import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
+import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
+import type { ApplicationActionHandlers, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationManagementPanelProps = {
+  actions: Pick<ApplicationActionHandlers, 'onAutoRepairChange' | 'onPrivateAccessChange'>;
   item: ApplicationSurfaceItem;
+  settingsLoadingAction?: ApplicationSettingsAction | null;
   variant?: 'inline' | 'rail';
 };
 
-export function ApplicationManagementPanel({ item, variant = 'inline' }: ApplicationManagementPanelProps) {
+export function ApplicationManagementPanel({ actions, item, settingsLoadingAction = null, variant = 'inline' }: ApplicationManagementPanelProps) {
   const managed = item.kind === 'managed';
   const rail = variant === 'rail';
   const mock = appManagementMock(item);
 
   return (
-    <TooltipProvider>
       <section
         className={cn(
           'bg-slate-900 text-slate-50',
@@ -140,31 +129,7 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
             </TabsContent>
 
             <TabsContent className="grid gap-4" value="settings">
-              <section className="grid gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
-                <CompactField help="Primary link used by the Open button." label="Open URL">
-                  <Input className="border-sky-400/30 bg-slate-900 text-sky-50" readOnly value={item.href || 'No link configured'} />
-                </CompactField>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <SettingToggle checked={managed && item.access === 'Private'} help="Private links are managed from Access." label="Private access" />
-                  <SettingToggle checked={managed && item.backup === 'Protected'} help="Backup schedule is controlled globally." label="Backup protection" />
-                  <SettingToggle checked={managed} help="Project OS can attempt safe restart-style repairs." label="Self repair" />
-                  <SettingToggle checked={item.kind !== 'observed'} help="Pinned apps appear in app shortcuts." label="Pinned shortcut" />
-                </div>
-              </section>
-
-              <section className="grid gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-white">Storage</span>
-                  <HelpTip content="Folder edits are shown here as a wireframe. Real changes should be plan-then-apply." />
-                </div>
-                <div className="grid gap-2 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                  <Input className="border-sky-400/30 bg-slate-900 text-sky-50" readOnly value="data" />
-                  <Input className="border-sky-400/30 bg-slate-900 text-sky-50" readOnly value={mock.storage} />
-                  <Input className="border-sky-400/30 bg-slate-900 text-sky-50" readOnly value="config" />
-                  <Input className="border-sky-400/30 bg-slate-900 text-sky-50" readOnly value={`${item.id}-config`} />
-                </div>
-              </section>
+              <ApplicationSettingsTab actions={actions} item={item} loadingAction={settingsLoadingAction} />
             </TabsContent>
 
             <TabsContent className="grid gap-4" value="telemetry">
@@ -185,26 +150,7 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
             </TabsContent>
 
             <TabsContent className="grid gap-4" value="links">
-              <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
-                <LinkRow icon={ExternalLink} label="Open" value={item.href || null} />
-                <LinkRow icon={KeyRound} label="Private" value={item.access === 'Private' ? mock.privateUrl : null} />
-                <LinkRow icon={Server} label="Local" value={mock.localUrl} />
-                <LinkRow icon={Link2} label="Backend" value={managed ? mock.backendTarget : null} />
-              </section>
-              <section className="grid gap-2 sm:grid-cols-2">
-                <Button asChild className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" variant="outline">
-                  <Link to="/access">
-                    <KeyRound data-icon="inline-start" />
-                    Access
-                  </Link>
-                </Button>
-                <Button asChild className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" variant="outline">
-                  <Link to="/backups">
-                    <ShieldCheck data-icon="inline-start" />
-                    Backups
-                  </Link>
-                </Button>
-              </section>
+              <ApplicationLinksTab item={item} />
             </TabsContent>
 
             <TabsContent className="grid gap-4" value="advanced">
@@ -239,7 +185,6 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
           </div>
         </Tabs>
       </section>
-    </TooltipProvider>
   );
 }
 
@@ -248,43 +193,6 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-lg bg-slate-900 px-3 py-2">
       <p className="text-xs font-medium text-sky-100/60">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold text-white">{value}</p>
-    </div>
-  );
-}
-
-function HelpTip({ content }: { content: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button aria-label="More information" className="size-7 border-sky-400/30 bg-slate-900 text-sky-100 hover:bg-slate-700" size="icon-sm" type="button" variant="outline">
-          <Info />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{content}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function CompactField({ children, help, label }: { children: React.ReactNode; help: string; label: string }) {
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <Label className="text-sm text-sky-50">{label}</Label>
-        <HelpTip content={help} />
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function SettingToggle({ checked, help, label }: { checked: boolean; help: string; label: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-900 px-3 py-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-sm font-medium text-white">{label}</span>
-        <HelpTip content={help} />
-      </div>
-      <Switch checked={checked} size="sm" />
     </div>
   );
 }
@@ -330,28 +238,6 @@ function MetricBar({ icon: Icon, label, text, value }: { icon: typeof Cpu; label
         <span className="text-xs text-sky-100/60">{text || `${value}%`}</span>
       </div>
       {typeof value === 'number' && <Progress className="mt-3 bg-slate-900" value={value} />}
-    </div>
-  );
-}
-
-function LinkRow({ icon: Icon, label, value }: { icon: typeof ExternalLink; label: string; value: string | null }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-900 px-3 py-2">
-      <div className="min-w-0">
-        <p className="flex items-center gap-2 text-xs font-medium text-sky-100/60">
-          <Icon data-icon="inline-start" />
-          {label}
-        </p>
-        <p className="mt-1 truncate font-mono text-xs text-white">{value || 'Not configured'}</p>
-      </div>
-      {value && /^https?:\/\//i.test(value) && (
-        <Button asChild className="border-sky-400/30 bg-slate-800 text-sky-50 hover:bg-slate-700" size="sm" variant="outline">
-          <a href={value} rel="noreferrer" target="_blank">
-            <ExternalLink data-icon="inline-start" />
-            Open
-          </a>
-        </Button>
-      )}
     </div>
   );
 }

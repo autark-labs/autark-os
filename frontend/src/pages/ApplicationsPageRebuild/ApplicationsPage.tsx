@@ -15,12 +15,14 @@ import {
   setRuntimeAppStatusInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
+import { invalidateNetworkQueries } from '@/repositories/networkRepository';
+import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
 import { buildApplicationSurfaceItems } from './extensions/ApplicationsPage.liveModel';
-import type { ApplicationRuntimeAction } from './extensions/ApplicationsPage.types';
+import type { ApplicationRuntimeAction, ApplicationSettingsAction } from './extensions/ApplicationsPage.types';
 
 type ApplicationFilter = 'all' | 'managed' | 'pinned' | 'found' | 'needs_review';
 
@@ -34,6 +36,7 @@ export const ApplicationsPage = () => {
   const [selectedId, setSelectedId] = useState('');
   const [localEventsById, setLocalEventsById] = useState<Record<string, string>>({});
   const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
+  const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const railRef = useRef<HTMLDivElement | null>(null);
 
   const items = useMemo(() => {
@@ -79,6 +82,7 @@ export const ApplicationsPage = () => {
   const pinnedCount = items.filter((item) => item.kind === 'pinned').length;
   const attentionCount = items.filter((item) => item.runtimeState === 'needs_attention' || item.nextAction).length;
   const nextReviewItem = visibleItems.find((item) => item.nextAction) ?? items.find((item) => item.nextAction) ?? null;
+  const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
 
   useEffect(() => {
     if (!items.length) {
@@ -158,6 +162,10 @@ export const ApplicationsPage = () => {
     setActionLoadingByAppId((current) => ({ ...current, [appId]: action }));
   };
 
+  const setSettingsLoading = (appId: string, action: ApplicationSettingsAction | null) => {
+    setSettingsLoadingByAppId((current) => ({ ...current, [appId]: action }));
+  };
+
   const restoreApplicationState = (previousState: ApplicationState | undefined) => {
     queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
   };
@@ -183,9 +191,72 @@ export const ApplicationsPage = () => {
     }
   };
 
+  async function updateAutoRepair(appId: string, enabled: boolean) {
+    const app = managedAppById.get(appId);
+    if (!app) {
+      return;
+    }
+
+    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
+    const nextSettings = {
+      ...settingsWithDefaults(app),
+      autoRepairEnabled: enabled,
+    };
+
+    setSettingsLoading(appId, 'auto_repair');
+    setRuntimeAppInApplicationStateCache(queryClient, { ...app, settings: nextSettings });
+
+    try {
+      const updatedApp = await InstalledAppsAPIClient.updateSettings(appId, nextSettings);
+      setRuntimeAppInApplicationStateCache(queryClient, updatedApp);
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: enabled ? 'Automatic repair enabled' : 'Automatic repair disabled',
+        message: enabled ? 'Project OS can attempt safe container repairs for this app.' : 'Project OS will watch this app without applying automatic repairs.',
+      });
+      void invalidateApplicationState(queryClient);
+    } catch (err) {
+      restoreApplicationState(previousState);
+      showActionErrorNotification(err, 'Container posture update failed');
+    } finally {
+      setSettingsLoading(appId, null);
+    }
+  }
+
+  async function updatePrivateAccess(appId: string, enabled: boolean) {
+    const app = managedAppById.get(appId);
+    if (!app) {
+      return;
+    }
+
+    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
+    setSettingsLoading(appId, 'private_access');
+    setRuntimeAppInApplicationStateCache(queryClient, appWithOptimisticPrivateAccess(app, enabled));
+
+    try {
+      const result = enabled
+        ? await InstalledAppsAPIClient.repairPrivateAccess(appId)
+        : await InstalledAppsAPIClient.disablePrivateAccess(appId);
+      if (result.app) {
+        setRuntimeAppInApplicationStateCache(queryClient, result.app);
+      }
+      showActionNotification(result, enabled ? 'Private access ready' : 'Private access turned off');
+      void invalidateApplicationState(queryClient);
+      void invalidateNetworkQueries(queryClient);
+    } catch (err) {
+      restoreApplicationState(previousState);
+      showActionErrorNotification(err, 'Private access update failed');
+    } finally {
+      setSettingsLoading(appId, null);
+    }
+  }
+
   const handleStart = (id: string) => void runManagedAction(id, 'start');
   const handleStop = (id: string) => void runManagedAction(id, 'stop');
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
+  const handleAutoRepairChange = (id: string, enabled: boolean) => void updateAutoRepair(id, enabled);
+  const handlePrivateAccessChange = (id: string, enabled: boolean) => void updatePrivateAccess(id, enabled);
   const handleCreateBackup = (id: string) => recordLocalEvent(id, 'Backup review opened just now');
   const handleRunNextAction = (id: string) => {
     const item = items.find((candidate) => candidate.id === id);
@@ -204,7 +275,9 @@ export const ApplicationsPage = () => {
   };
 
   const actions = {
+    onAutoRepairChange: handleAutoRepairChange,
     onCreateBackup: handleCreateBackup,
+    onPrivateAccessChange: handlePrivateAccessChange,
     onRestart: handleRestart,
     onRunNextAction: handleRunNextAction,
     onStart: handleStart,
@@ -328,6 +401,7 @@ export const ApplicationsPage = () => {
             item={selectedItem}
             managementOpen={managementOpen}
             onManagementOpenChange={setManagementOpen}
+            settingsLoadingByItemId={settingsLoadingByAppId}
             ref={railRef}
           />
         </section>
@@ -335,6 +409,56 @@ export const ApplicationsPage = () => {
     </main>
   );
 };
+
+function settingsWithDefaults(app: AppRuntimeView): InstallSettings {
+  return {
+    accessUrl: app.settings?.accessUrl ?? app.accessUrl ?? null,
+    autoRepairEnabled: app.settings?.autoRepairEnabled ?? true,
+    backup: {
+      enabled: app.settings?.backup?.enabled ?? true,
+      frequency: app.settings?.backup?.frequency || 'daily',
+      retention: app.settings?.backup?.retention ?? 7,
+    },
+    desiredAccessMode: app.settings?.desiredAccessMode || app.desiredAccess?.mode || 'local',
+    expectedLocalPort: app.settings?.expectedLocalPort ?? app.desiredAccess?.expectedLocalPort ?? app.observedAccess?.localPort ?? null,
+    expectedProtocol: app.settings?.expectedProtocol ?? app.desiredAccess?.expectedProtocol ?? app.observedAccess?.protocol ?? null,
+    lastAccessCheckAt: app.settings?.lastAccessCheckAt ?? app.observedAccess?.lastAccessCheckAt ?? null,
+    lastRepairAttemptAt: app.settings?.lastRepairAttemptAt ?? app.observedAccess?.lastRepairAttemptAt ?? null,
+    lastRepairStatus: app.settings?.lastRepairStatus ?? app.observedAccess?.lastRepairStatus ?? null,
+    lastSuccessfulAccessAt: app.settings?.lastSuccessfulAccessAt ?? app.observedAccess?.lastSuccessfulAccessAt ?? null,
+    privateAccessRequirement: app.settings?.privateAccessRequirement || app.desiredAccess?.privateAccessRequirement || 'optional',
+    privateAccessUrl: app.settings?.privateAccessUrl ?? app.accessRoute?.privateUrl ?? app.observedAccess?.privateUrl ?? null,
+    storageSubfolders: app.settings?.storageSubfolders ?? {},
+    tailscaleEnabled: Boolean(app.settings?.tailscaleEnabled),
+  };
+}
+
+function appWithOptimisticPrivateAccess(app: AppRuntimeView, enabled: boolean): AppRuntimeView {
+  const currentSettings = settingsWithDefaults(app);
+
+  return {
+    ...app,
+    canonicalAccessState: enabled ? 'private_ready' : 'local_ready',
+    desiredAccess: app.desiredAccess ? {
+      ...app.desiredAccess,
+      mode: enabled ? 'local-and-private' : 'local',
+      privateAccessRequired: enabled ? app.desiredAccess.privateAccessRequired : false,
+      privateAccessRecommended: enabled ? app.desiredAccess.privateAccessRecommended : false,
+    } : app.desiredAccess,
+    observedAccess: app.observedAccess ? {
+      ...app.observedAccess,
+      privateLinkStatus: enabled ? 'configured' : 'not_enabled',
+      privateUrl: enabled ? app.observedAccess.privateUrl : null,
+    } : app.observedAccess,
+    settings: {
+      ...currentSettings,
+      desiredAccessMode: enabled ? 'local-and-private' : 'local',
+      privateAccessRequirement: enabled ? currentSettings.privateAccessRequirement : 'disabled',
+      privateAccessUrl: enabled ? currentSettings.privateAccessUrl : null,
+      tailscaleEnabled: enabled,
+    },
+  };
+}
 
 function optimisticStatusForAction(action: ApplicationRuntimeAction) {
   return action === 'stop' ? 'Paused' : 'Starting';

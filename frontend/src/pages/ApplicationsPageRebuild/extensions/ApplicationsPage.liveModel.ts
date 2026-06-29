@@ -52,9 +52,11 @@ function managedAppSurfaceItem(
     id: app.appId,
     kind: 'managed',
     lastEvent: app.recentEvents?.[0]?.message || health?.message || app.remediation?.summary || undefined,
+    links: appLinks(app),
     name: app.appName,
     nextAction: managedNextAction(app, status, backup, needsAttention),
     runtimeState: managedRuntimeState(status, app),
+    settings: appSettings(app),
     sourceId: app.appId,
     status,
   };
@@ -72,9 +74,11 @@ function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSu
     id: `observed:${service.id}`,
     kind: pinned ? 'pinned' : 'observed',
     lastEvent: service.userStatusLabel || undefined,
+    links: observedLinks(service),
     name: service.displayName || service.id,
     nextAction: needsReview ? observedNextAction(service) : undefined,
     runtimeState: pinned ? 'shortcut' : 'found',
+    settings: observedSettings(service),
     sourceId: service.id,
     status: pinned ? 'Pinned' : needsReview ? 'Needs review' : 'Found',
   };
@@ -206,4 +210,48 @@ function primaryOpenUrl(app: AppRuntimeView): string | undefined {
     || app.accessUrl
     || app.settings?.accessUrl
     || undefined;
+}
+
+function appLinks(app: AppRuntimeView): ApplicationSurfaceItem['links'] {
+  return {
+    backendTargetUrl: app.accessRoute?.backendTargetUrl || undefined,
+    localUrl: app.accessRoute?.localUrl || app.observedAccess?.localUrl || app.accessUrl || app.settings?.accessUrl || undefined,
+    primaryUrl: primaryOpenUrl(app),
+    privateUrl: app.accessRoute?.privateUrl || app.settings?.privateAccessUrl || app.observedAccess?.privateUrl || undefined,
+  };
+}
+
+function observedLinks(service: ObservedServiceView): ApplicationSurfaceItem['links'] {
+  return {
+    primaryUrl: service.url || undefined,
+    localUrl: service.url || undefined,
+  };
+}
+
+function appSettings(app: AppRuntimeView): ApplicationSurfaceItem['settings'] {
+  return {
+    autoRepairEnabled: app.settings?.autoRepairEnabled ?? true,
+    canEdit: true,
+    containerDetail: app.healthSnapshot?.detail || app.healthSnapshot?.message || app.technicalStatus || app.healthCheck || 'No container detail reported.',
+    containerStatus: app.technicalStatus || app.healthSnapshot?.dockerStatus || app.friendlyStatus,
+    desiredAccessMode: app.settings?.desiredAccessMode || app.desiredAccess?.mode || 'local',
+    privateAccessRequired: Boolean(app.desiredAccess?.privateAccessRequired || app.settings?.privateAccessRequirement === 'required'),
+    privateAccessUrl: appLinks(app).privateUrl,
+    privateLinkStatus: app.accessRoute?.privateLinkStatus || app.observedAccess?.privateLinkStatus || 'not_enabled',
+    tailscaleEnabled: Boolean(app.settings?.tailscaleEnabled || app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private'),
+  };
+}
+
+function observedSettings(service: ObservedServiceView): ApplicationSurfaceItem['settings'] {
+  return {
+    autoRepairEnabled: false,
+    canEdit: false,
+    containerDetail: service.userStatusDescription || 'Project OS observes this service but does not manage its container.',
+    containerStatus: service.runtimeState || service.userStatusLabel || 'Observed',
+    desiredAccessMode: service.accessScope || 'external',
+    privateAccessRequired: false,
+    privateAccessUrl: undefined,
+    privateLinkStatus: service.accessScope || 'not_managed',
+    tailscaleEnabled: service.accessScope.toLowerCase().includes('tailscale') || service.accessScope.toLowerCase().includes('private'),
+  };
 }
