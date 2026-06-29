@@ -1,12 +1,16 @@
 import {
   Activity,
   Archive,
+  Copy,
   Cpu,
+  Download,
   ExternalLink,
   Info,
   KeyRound,
   Link2,
   Network,
+  RefreshCcw,
+  Search,
   Server,
   ShieldCheck,
   Trash2,
@@ -71,6 +75,7 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
         <Tabs className="gap-0" defaultValue="overview">
           <TabsList className="w-full justify-start overflow-x-auto rounded-none border-b border-sky-400/20 bg-slate-900 px-3 py-2" variant="line">
             <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="overview">Overview</TabsTrigger>
+            <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="guide">Guide</TabsTrigger>
             <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="settings">Settings</TabsTrigger>
             <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="telemetry">Telemetry</TabsTrigger>
             <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-white" value="links">Links</TabsTrigger>
@@ -86,7 +91,66 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
                 <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
               </section>
 
+              <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-white">Maintenance</span>
+                  <HelpTip content="Update, rollback, and recovery controls from the old manage modal are shown here as wireframe status." />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <OperationBadge label="Update" tone={mock.updateAvailable ? 'orange' : 'green'} value={mock.updateAvailable ? 'Available' : 'Current'} />
+                  <OperationBadge label="Rollback" tone={mock.rollbackAvailable ? 'sky' : 'slate'} value={mock.rollbackAvailable ? 'Ready' : 'None'} />
+                  <OperationBadge label="Restore" tone={item.backup === 'Protected' ? 'green' : 'orange'} value={item.backup === 'Protected' ? 'Ready' : 'Needs backup'} />
+                </div>
+              </section>
+
+              {item.kind === 'observed' && (
+                <section className="grid gap-3 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-amber-100">Found service</span>
+                    <Badge className="border-amber-300/30 bg-slate-900 text-amber-100" variant="outline">Not managed</Badge>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <Button className="border-amber-300/30 bg-slate-900 text-amber-100 hover:bg-slate-800" type="button" variant="outline">
+                      <Search data-icon="inline-start" />
+                      Match
+                    </Button>
+                    <Button className="border-amber-300/30 bg-slate-900 text-amber-100 hover:bg-slate-800" type="button" variant="outline">
+                      <ShieldCheck data-icon="inline-start" />
+                      Adopt
+                    </Button>
+                    <Button asChild className="border-amber-300/30 bg-slate-900 text-amber-100 hover:bg-slate-800" variant="outline">
+                      <Link to="/discover">
+                        <Download data-icon="inline-start" />
+                        Install copy
+                      </Link>
+                    </Button>
+                  </div>
+                </section>
+              )}
+
               <DangerZone itemName={item.name} managed={managed} />
+            </TabsContent>
+
+            <TabsContent className="grid gap-4" value="guide">
+              <section className="grid gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-white">Use</span>
+                  <Badge className="bg-slate-900 text-sky-50">{managed ? 'Prepared' : 'Shortcut'}</Badge>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <CopyValue label="Primary URL" value={item.href || mock.localUrl} />
+                  <CopyValue label="Admin user" value={mock.adminUser} />
+                  <CopyValue label="Setup token" sensitive value={mock.setupToken} />
+                  <CopyValue label="Data folder" value={mock.storage} />
+                </div>
+              </section>
+
+              <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
+                <span className="text-sm font-semibold text-white">Setup</span>
+                <StepRow index={1} text="Open the app from the control panel." />
+                <StepRow index={2} text="Use the setup values only if the app asks for them." />
+                <StepRow index={3} text="Return here for access, backup, or recovery changes." />
+              </section>
             </TabsContent>
 
             <TabsContent className="grid gap-4" value="settings">
@@ -184,6 +248,15 @@ export function ApplicationManagementPanel({ item, variant = 'inline' }: Applica
                     <ActivityRow label={`${item.backup} backup status`} value="Today" />
                   </AccordionContent>
                 </AccordionItem>
+                <AccordionItem value="recovery">
+                  <AccordionTrigger className="text-sky-50">Update and recovery</AccordionTrigger>
+                  <AccordionContent className="grid gap-2 sm:grid-cols-2">
+                    <Detail label="Update" value={mock.updateAvailable ? 'Available' : 'Current'} />
+                    <Detail label="Rollback" value={mock.rollbackAvailable ? 'Available' : 'None recorded'} />
+                    <Detail label="Restore point" value={item.backup === 'Protected' ? 'Available' : 'Missing'} />
+                    <Detail label="Last repair" value={mock.repair} />
+                  </AccordionContent>
+                </AccordionItem>
               </Accordion>
             </TabsContent>
           </div>
@@ -198,6 +271,22 @@ function Detail({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-lg bg-slate-900 px-3 py-2">
       <p className="text-xs font-medium text-sky-100/60">{label}</p>
       <p className="mt-1 truncate text-sm font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function OperationBadge({ label, tone, value }: { label: string; tone: 'green' | 'orange' | 'sky' | 'slate'; value: string }) {
+  const toneClass = {
+    green: 'border-emerald-300/30 bg-emerald-200 text-emerald-950',
+    orange: 'border-orange-400 bg-orange-200 text-orange-950',
+    sky: 'border-cyan-300/30 bg-cyan-200 text-cyan-950',
+    slate: 'border-slate-600 bg-slate-900 text-sky-100',
+  }[tone];
+
+  return (
+    <div className={cn('rounded-lg border px-3 py-2', toneClass)}>
+      <p className="text-xs font-medium opacity-75">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
     </div>
   );
 }
@@ -235,6 +324,36 @@ function SettingToggle({ checked, help, label }: { checked: boolean; help: strin
         <HelpTip content={help} />
       </div>
       <Switch checked={checked} size="sm" />
+    </div>
+  );
+}
+
+function CopyValue({ label, sensitive = false, value }: { label: string; sensitive?: boolean; value: string }) {
+  return (
+    <div className="grid gap-2 rounded-lg bg-slate-900 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-sky-100/60">{label}</span>
+        <Button
+          aria-label={`Copy ${label}`}
+          className="border-sky-400/30 bg-slate-800 text-sky-50 hover:bg-slate-700"
+          onClick={() => void navigator.clipboard?.writeText(value)}
+          size="icon-sm"
+          type="button"
+          variant="outline"
+        >
+          <Copy />
+        </Button>
+      </div>
+      <p className="truncate font-mono text-xs text-white">{sensitive ? '••••••••••••' : value}</p>
+    </div>
+  );
+}
+
+function StepRow({ index, text }: { index: number; text: string }) {
+  return (
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm text-sky-50">
+      <span className="grid size-6 place-items-center rounded-full bg-slate-800 text-xs font-semibold text-sky-100">{index}</span>
+      <span className="leading-6">{text}</span>
     </div>
   );
 }
@@ -298,6 +417,13 @@ function DangerZone({ itemName, managed }: { itemName: string; managed: boolean 
                 This wireframe keeps data by default and would show a reviewed uninstall plan before applying changes.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <PlanList title="Will remove" items={['App container', 'Project OS app record', 'Runtime shortcut']} />
+              <PlanList title="Will keep" items={['App data folder', 'Latest restore point', 'Support events']} />
+            </div>
+            <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+              Safety checkpoint planned
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction className="bg-red-600 text-white hover:bg-red-500">Keep data and uninstall</AlertDialogAction>
@@ -306,6 +432,17 @@ function DangerZone({ itemName, managed }: { itemName: string; managed: boolean 
         </AlertDialog>
       </div>
     </section>
+  );
+}
+
+function PlanList({ items, title }: { items: string[]; title: string }) {
+  return (
+    <div className="rounded-lg border border-slate-700/40 bg-slate-900 p-3">
+      <p className="text-xs font-semibold text-sky-100/60">{title}</p>
+      <ul className="mt-2 grid gap-1 text-sm text-slate-200">
+        {items.map((item) => <li key={item}>{item}</li>)}
+      </ul>
+    </div>
   );
 }
 
@@ -336,6 +473,10 @@ function appManagementMock(item: ApplicationSurfaceItem) {
     repair: item.runtimeState === 'needs_attention' ? 'Needs review' : 'Ready',
     runtimePath: `/var/lib/project-os/apps/${item.id}`,
     storage: `${item.id}-data`,
+    adminUser: item.kind === 'managed' ? 'admin' : 'Not managed',
+    rollbackAvailable: item.runtimeState === 'needs_attention' || seed % 4 === 0,
+    setupToken: `${item.id.slice(0, 4)}-${seed}-setup`,
+    updateAvailable: item.runtimeState === 'running' && seed % 3 === 0,
     version: '2026.6',
   };
 }

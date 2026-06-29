@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ExternalLink, Pause, Play, RotateCw, Search, ShieldCheck, Wrench, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ExternalLink, Pause, Play, RefreshCcw, RotateCw, Search, ShieldCheck, Wrench, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -681,6 +681,20 @@ export const ApplicationsPage = () => {
                             <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => handleCreateBackup(selectedItem.id)} type="button" variant="outline">
                               <ShieldCheck data-icon="inline-start" />
                               Backup
+                            </Button>
+                            {(selectedItem.runtimeState === 'needs_attention' || selectedItem.nextAction) && (
+                              <Button className="border-orange-300/40 bg-slate-900 text-orange-100 hover:bg-slate-700 hover:text-orange-50" onClick={() => handleRunNextAction(selectedItem.id)} type="button" variant="outline">
+                                <Wrench data-icon="inline-start" />
+                                Repair
+                              </Button>
+                            )}
+                            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white disabled:opacity-50" disabled title="Wireframe only" type="button" variant="outline">
+                              <RefreshCcw data-icon="inline-start" />
+                              Update
+                            </Button>
+                            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white disabled:opacity-50" disabled title="Wireframe only" type="button" variant="outline">
+                              <RefreshCcw data-icon="inline-start" />
+                              Rollback
                             </Button>
                           </div>
                         )}
