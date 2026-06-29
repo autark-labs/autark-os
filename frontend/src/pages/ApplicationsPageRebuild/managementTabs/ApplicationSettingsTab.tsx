@@ -51,7 +51,7 @@ const backupFrequencies = ['daily', 'weekly', 'monthly'] as const;
 const protocols = ['http', 'https'] as const;
 
 export function ApplicationSettingsTab({ actions, item, loadingAction }: ApplicationSettingsTabProps) {
-  const editable = item.kind === 'managed' && item.settings.canEdit;
+  const editable = item.managementState === 'managed' && item.settings.canEdit;
   const initialValues = useMemo(
     () => settingsFormValues(item),
     [

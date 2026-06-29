@@ -22,7 +22,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
-import { ApplicationIcon, ApplicationStatusBadge } from './extensions/ApplicationVisuals';
+import { ApplicationAttentionIndicator, ApplicationIcon, ApplicationManagementBadge, ApplicationReadinessBadge } from './extensions/ApplicationVisuals';
 import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type BasicApplicationsViewProps = {
@@ -49,9 +49,9 @@ export function BasicApplicationsView({ items, managementOpen, onSelect, onUnins
             'relative h-60 w-48 overflow-visible rounded-2xl border bg-sky-100 py-0 shadow-lg shadow-slate-950/20 ring-0 transition-all duration-200',
             !managementOpen && 'cursor-pointer hover:-translate-y-1 hover:bg-sky-50 hover:shadow-xl hover:shadow-slate-950/25',
             managementOpen && 'pointer-events-none cursor-default',
-            item.nextAction && cn('border-orange-500 bg-orange-200', !managementOpen && 'hover:bg-orange-100'),
-            item.runtimeState === 'paused' && cn('border-slate-400 bg-slate-200', !managementOpen && 'hover:bg-slate-100'),
-            !item.nextAction && item.runtimeState !== 'paused' && 'border-sky-300',
+            item.attentionState !== 'none' && cn('border-orange-500 bg-orange-200', !managementOpen && 'hover:bg-orange-100'),
+            item.readinessState === 'paused' && cn('border-slate-400 bg-slate-200', !managementOpen && 'hover:bg-slate-100'),
+            item.attentionState === 'none' && item.readinessState !== 'paused' && 'border-sky-300',
             managementOpen && selectedId && selectedId !== item.id && 'scale-[0.98] opacity-35 blur-[1px]',
             selectedId === item.id && cn(
               'z-10 -translate-y-2 border-cyan-300 shadow-2xl shadow-cyan-300/50 ring-4 ring-cyan-300/35',
@@ -67,11 +67,15 @@ export function BasicApplicationsView({ items, managementOpen, onSelect, onUnins
           size="sm"
         >
           <CardHeader className="px-3 pt-4">
-            <ApplicationStatusBadge item={item} overlay />
+            <ApplicationReadinessBadge item={item} overlay />
             <div className="flex min-w-0 flex-col items-center gap-2">
               <ApplicationIcon item={item} size="lg" />
               <div className="flex min-w-0 flex-col items-center gap-1 text-center">
                 <CardTitle className="max-w-full truncate text-lg text-slate-950">{item.name}</CardTitle>
+                <div className="flex max-w-full flex-wrap justify-center gap-1">
+                  <ApplicationManagementBadge item={item} />
+                  <ApplicationAttentionIndicator item={item} />
+                </div>
               </div>
             </div>
           </CardHeader>

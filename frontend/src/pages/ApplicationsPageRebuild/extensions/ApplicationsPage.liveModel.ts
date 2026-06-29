@@ -5,7 +5,14 @@ import {
 } from '@/repositories/applicationStateRepository';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
 import type { ObservedServiceView } from '@/types/observedService';
-import type { ApplicationNextAction, ApplicationRuntimeState, ApplicationSurfaceItem } from './ApplicationsPage.types';
+import type {
+  AppAttentionState,
+  AppOperationState,
+  AppReadinessState,
+  ApplicationNextAction,
+  ApplicationRuntimeState,
+  ApplicationSurfaceItem,
+} from './ApplicationsPage.types';
 
 type ApplicationSurfaceInput = Pick<
   ApplicationStateRepositoryView,
@@ -42,9 +49,12 @@ function managedAppSurfaceItem(
   const backup = backupLabel(app);
   const status = managedStatus(displayStatus, app);
   const needsAttention = appNeedsAttentionFromCanonicalState(app, health, access, telemetry);
+  const readinessState = managedReadinessState(displayStatus, app, access);
+  const attentionState = managedAttentionState(displayStatus, app, needsAttention);
 
   return {
     access: accessLabel(app, access),
+    attentionState,
     backup,
     description: app.description || app.category || 'Managed app',
     href: primaryOpenUrl(app),
@@ -53,8 +63,11 @@ function managedAppSurfaceItem(
     kind: 'managed',
     lastEvent: app.recentEvents?.[0]?.message || health?.message || app.remediation?.summary || undefined,
     links: appLinks(app),
+    managementState: 'managed',
     name: app.appName,
-    nextAction: managedNextAction(app, status, backup, needsAttention),
+    nextAction: managedNextAction(app, readinessState, attentionState, backup),
+    operationState: idleOperationState(),
+    readinessState,
     runtimeState: managedRuntimeState(status, app),
     settings: appSettings(app),
     sourceId: app.appId,
@@ -65,9 +78,11 @@ function managedAppSurfaceItem(
 function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSurfaceItem {
   const pinned = service.pinned || service.userStatus === 'pinned_external';
   const needsReview = ['recoverable', 'managed_elsewhere', 'blocked'].includes(service.userStatus) || !pinned;
+  const attentionState = observedAttentionState(service, needsReview);
 
   return {
     access: observedAccessLabel(service),
+    attentionState,
     backup: 'Not managed',
     description: service.userStatusDescription || service.category || 'Found service',
     href: service.url || undefined,
@@ -75,8 +90,11 @@ function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSu
     kind: pinned ? 'pinned' : 'observed',
     lastEvent: service.userStatusLabel || undefined,
     links: observedLinks(service),
+    managementState: pinned ? 'linked' : 'found',
     name: service.displayName || service.id,
     nextAction: needsReview ? observedNextAction(service) : undefined,
+    operationState: idleOperationState(),
+    readinessState: observedReadinessState(service, pinned),
     runtimeState: pinned ? 'shortcut' : 'found',
     settings: observedSettings(service),
     sourceId: service.id,
@@ -97,6 +115,75 @@ function managedStatus(displayStatus: string, app: AppRuntimeView): ApplicationS
   return 'Ready';
 }
 
+function managedReadinessState(displayStatus: string, app: AppRuntimeView, access?: AppAccessCheck): AppReadinessState {
+  if (displayStatus === 'Starting') {
+    return 'starting';
+  }
+  if (displayStatus === 'Paused') {
+    return 'paused';
+  }
+  if (displayStatus === 'Stopped' || app.friendlyStatus === 'Stopped' || app.canonicalRuntimeState === 'stopped') {
+    return 'stopped';
+  }
+  if (displayStatus === 'Unavailable' || access?.status === 'unreachable') {
+    return 'unreachable';
+  }
+  if (displayStatus === 'Missing' || displayStatus === 'Managed elsewhere') {
+    return 'unknown';
+  }
+  return 'ready';
+}
+
+function managedAttentionState(displayStatus: string, app: AppRuntimeView, needsAttention: boolean): AppAttentionState {
+  if (displayStatus === 'Managed elsewhere') {
+    return 'conflict';
+  }
+  if (displayStatus === 'Missing' || app.canonicalIssues?.some((issue) => issue.severity === 'error')) {
+    return 'blocked';
+  }
+  if (needsAttention || displayStatus === 'Needs attention' || displayStatus === 'Unavailable') {
+    return 'needs_review';
+  }
+  return 'none';
+}
+
+function observedReadinessState(service: ObservedServiceView, pinned: boolean): AppReadinessState {
+  const runtimeState = service.runtimeState?.toLowerCase() ?? '';
+  if (!service.url && !pinned) {
+    return 'unknown';
+  }
+  if (runtimeState.includes('start')) {
+    return 'starting';
+  }
+  if (runtimeState.includes('pause')) {
+    return 'paused';
+  }
+  if (runtimeState.includes('stop') || runtimeState.includes('exit')) {
+    return 'stopped';
+  }
+  if (runtimeState.includes('unhealthy') || runtimeState.includes('unreachable')) {
+    return 'unreachable';
+  }
+  return service.url || pinned ? 'ready' : 'unknown';
+}
+
+function observedAttentionState(service: ObservedServiceView, needsReview: boolean): AppAttentionState {
+  if (service.userStatus === 'blocked') {
+    return 'blocked';
+  }
+  if (service.userStatus === 'managed_elsewhere') {
+    return 'conflict';
+  }
+  if (needsReview) {
+    return 'needs_review';
+  }
+  return 'none';
+}
+
+function idleOperationState(): AppOperationState {
+  return { kind: 'idle' };
+}
+
 function managedRuntimeState(status: ApplicationSurfaceItem['status'], app: AppRuntimeView): ApplicationRuntimeState {
   if (status === 'Paused') {
     return 'paused';
@@ -115,11 +202,11 @@ function managedRuntimeState(status: ApplicationSurfaceItem['status'], app: AppR
 
 function managedNextAction(
   app: AppRuntimeView,
-  status: ApplicationSurfaceItem['status'],
+  readinessState: AppReadinessState,
+  attentionState: AppAttentionState,
   backup: ApplicationSurfaceItem['backup'],
-  needsAttention: boolean,
 ): ApplicationNextAction | undefined {
-  if (status === 'Paused') {
+  if (readinessState === 'paused' || readinessState === 'stopped') {
     return {
       description: 'Start the app so it can be opened again.',
       id: 'start_app',
@@ -127,7 +214,7 @@ function managedNextAction(
     };
   }
 
-  if (needsAttention || status === 'Needs review') {
+  if (attentionState !== 'none' || readinessState === 'unreachable' || readinessState === 'unknown') {
     return {
       description: app.remediation?.summary || app.canonicalIssues?.[0]?.summary || 'Review the app state before making changes.',
       id: 'review_issue',

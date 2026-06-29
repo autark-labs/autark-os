@@ -33,7 +33,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { labelForKind } from './extensions/ApplicationVisuals';
+import { labelForManagementState, labelForReadiness } from './extensions/ApplicationVisuals';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
 import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
 import type { ApplicationActionHandlers, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
@@ -46,7 +46,7 @@ type ApplicationManagementPanelProps = {
 };
 
 export function ApplicationManagementPanel({ actions, item, settingsLoadingAction = null, variant = 'inline' }: ApplicationManagementPanelProps) {
-  const managed = item.kind === 'managed';
+  const managed = item.managementState === 'managed';
   const rail = variant === 'rail';
   const mock = appManagementMock(item);
 
@@ -78,7 +78,7 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
               <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
             </section>
 
-            {item.kind === 'observed' && (
+            {item.managementState === 'found' && (
               <section className="grid gap-3 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-amber-100">Found service</span>
@@ -142,7 +142,7 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
             <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-white">Health check</span>
-                <Badge className="bg-slate-900 text-sky-50">{item.status}</Badge>
+                <Badge className="bg-slate-900 text-sky-50">{labelForReadiness(item.readinessState)}</Badge>
               </div>
               <Detail label="Checked" value={mock.checkedAt} />
               <Detail label="Container" value={mock.container} />
@@ -167,7 +167,7 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
                 <AccordionTrigger className="text-sky-50">Template values</AccordionTrigger>
                 <AccordionContent className="grid gap-2 sm:grid-cols-2">
                   <Detail label="Image" value={mock.image} />
-                  <Detail label="Category" value={managed ? 'Managed app' : labelForKind(item.kind)} />
+                  <Detail label="Category" value={labelForManagementState(item.managementState)} />
                   <Detail label="Port" value={mock.port} />
                   <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
                 </AccordionContent>
@@ -308,7 +308,7 @@ function appManagementMock(item: ApplicationSurfaceItem) {
     backendTarget: `http://127.0.0.1:${8000 + seed}`,
     checkedAt: '2 min ago',
     composeProject: `project-os-${item.id}`,
-    container: item.runtimeState === 'running' ? 'healthy' : item.runtimeState === 'paused' ? 'stopped' : 'attention',
+    container: item.readinessState === 'ready' ? 'healthy' : item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'stopped' : 'attention',
     cpu: Math.min(92, 8 + seed * 3),
     disk: `${seed + 2} MB/s`,
     image: `${item.id}:stable`,
@@ -317,10 +317,10 @@ function appManagementMock(item: ApplicationSurfaceItem) {
     network: `${seed * 4} KB/s`,
     port: String(8000 + seed),
     privateUrl: `https://${item.id}.tailnet.example`,
-    repair: item.runtimeState === 'needs_attention' ? 'Needs review' : 'Ready',
+    repair: item.attentionState !== 'none' ? 'Needs review' : 'Ready',
     runtimePath: `/var/lib/project-os/apps/${item.id}`,
     storage: `${item.id}-data`,
-    adminUser: item.kind === 'managed' ? 'admin' : 'Not managed',
+    adminUser: item.managementState === 'managed' ? 'admin' : 'Not managed',
     setupToken: `${item.id.slice(0, 4)}-${seed}-setup`,
     version: '2026.6',
   };

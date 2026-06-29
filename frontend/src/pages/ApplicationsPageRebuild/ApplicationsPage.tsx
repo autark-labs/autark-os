@@ -65,10 +65,10 @@ export const ApplicationsPage = () => {
     return items.filter((item) => {
       const matchesFilter =
         filter === 'all'
-        || (filter === 'managed' && item.kind === 'managed')
-        || (filter === 'pinned' && item.kind === 'pinned')
-        || (filter === 'found' && item.kind === 'observed')
-        || (filter === 'needs_review' && Boolean(item.nextAction));
+        || (filter === 'managed' && item.managementState === 'managed')
+        || (filter === 'pinned' && item.managementState === 'linked')
+        || (filter === 'found' && item.managementState === 'found')
+        || (filter === 'needs_review' && item.attentionState !== 'none');
 
       if (!matchesFilter) {
         return false;
@@ -78,15 +78,15 @@ export const ApplicationsPage = () => {
         return true;
       }
 
-      return [item.name, item.kind, item.status, item.access, item.backup, item.nextAction?.label ?? '', item.description]
+      return [item.name, item.managementState, item.readinessState, item.attentionState, item.access, item.backup, item.nextAction?.label ?? '', item.description]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
   }, [filter, items, query]);
 
   const selectedItem = visibleItems.find((item) => item.id === selectedId) ?? visibleItems[0] ?? null;
-  const managedCount = items.filter((item) => item.kind === 'managed').length;
-  const pinnedCount = items.filter((item) => item.kind === 'pinned').length;
-  const attentionCount = items.filter((item) => item.runtimeState === 'needs_attention' || item.nextAction).length;
+  const managedCount = items.filter((item) => item.managementState === 'managed').length;
+  const pinnedCount = items.filter((item) => item.managementState === 'linked').length;
+  const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
   const nextReviewItem = visibleItems.find((item) => item.nextAction) ?? items.find((item) => item.nextAction) ?? null;
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
@@ -276,7 +276,7 @@ export const ApplicationsPage = () => {
   const handleCreateBackup = (id: string) => recordLocalEvent(id, 'Backup review opened just now');
   const handleRunNextAction = (id: string) => {
     const item = items.find((candidate) => candidate.id === id);
-    if (item?.kind === 'managed' && item.nextAction?.id === 'start_app') {
+    if (item?.managementState === 'managed' && item.nextAction?.id === 'start_app') {
       void runManagedAction(item.sourceId || item.id, 'start');
       return;
     }

@@ -1,6 +1,23 @@
 export type ApplicationRuntimeState = 'running' | 'starting' | 'paused' | 'needs_attention' | 'found' | 'shortcut';
 export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart';
 export type ApplicationSettingsAction = 'planning' | 'saving';
+export type AppManagementState = 'managed' | 'found' | 'linked';
+export type AppReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown';
+export type AppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked';
+export type AppOperationState =
+  | { kind: 'idle' }
+  | {
+    kind: 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling';
+    label: string;
+    jobId?: string;
+    currentStep?: string;
+  }
+  | {
+    kind: 'failed';
+    label: string;
+    message: string;
+    jobId?: string;
+  };
 
 export type ApplicationNextAction = {
   id: 'create_backup' | 'review_found_service' | 'review_issue' | 'start_app';
@@ -13,6 +30,10 @@ export type ApplicationSurfaceItem = {
   sourceId?: string;
   name: string;
   kind: 'managed' | 'pinned' | 'observed';
+  managementState: AppManagementState;
+  readinessState: AppReadinessState;
+  attentionState: AppAttentionState;
+  operationState: AppOperationState;
   status: 'Ready' | 'Starting' | 'Paused' | 'Needs review' | 'Found' | 'Pinned';
   runtimeState: ApplicationRuntimeState;
   access: 'Open' | 'Private' | 'Local only' | 'No link';

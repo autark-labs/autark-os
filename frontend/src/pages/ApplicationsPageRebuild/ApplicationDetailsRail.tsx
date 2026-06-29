@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ApplicationIcon, labelForKind } from './extensions/ApplicationVisuals';
+import { ApplicationIcon, labelForAttention, labelForManagementState, labelForReadiness } from './extensions/ApplicationVisuals';
 import { ApplicationManagementPanel } from './ApplicationManagementPanel';
 import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
@@ -102,8 +102,9 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
                 <RailControls actions={actions} item={item} loadingAction={actionLoadingByItemId[item.id] ?? null} />
 
                 <div className="grid gap-2 text-sm">
-                  <InfoRow label="Type" value={labelForKind(item.kind)} />
-                  <InfoRow label="State" value={item.status} />
+                  <InfoRow label="Type" value={labelForManagementState(item.managementState)} />
+                  <InfoRow label="State" value={labelForReadiness(item.readinessState)} />
+                  <InfoRow label="Attention" value={labelForAttention(item.attentionState)} />
                   <InfoRow label="Access" value={item.access} />
                   <InfoRow label="Backup" value={item.backup} />
                   {item.lastEvent && <InfoRow label="Last event" value={item.lastEvent} />}
@@ -148,17 +149,17 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
       ) : (
         <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-200 px-3 py-2 text-sm text-emerald-950">
           <CheckCircle2 data-icon="inline-start" />
-          {item.kind === 'managed' ? 'App fully functional' : 'No action needed'}
+          {item.managementState === 'managed' ? 'App fully functional' : 'No action needed'}
         </div>
       )}
 
-      {item.kind === 'managed' && (
+      {item.managementState === 'managed' && (
         <div className="grid gap-2 sm:grid-cols-3">
-          <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => item.runtimeState === 'paused' ? actions.onStart(item.id) : actions.onStop(item.id)} type="button" variant="outline">
+          <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => item.readinessState === 'paused' || item.readinessState === 'stopped' ? actions.onStart(item.id) : actions.onStop(item.id)} type="button" variant="outline">
             {loadingAction === 'start' || loadingAction === 'stop'
               ? <Loader2 className="animate-spin" data-icon="inline-start" />
-              : item.runtimeState === 'paused' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
-            {loadingAction === 'start' ? 'Starting' : loadingAction === 'stop' ? 'Pausing' : item.runtimeState === 'paused' ? 'Start' : 'Pause'}
+              : item.readinessState === 'paused' || item.readinessState === 'stopped' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+            {loadingAction === 'start' ? 'Starting' : loadingAction === 'stop' ? 'Pausing' : item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'Start' : 'Pause'}
           </Button>
           <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => actions.onRestart(item.id)} type="button" variant="outline">
             {loadingAction === 'restart' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />}
@@ -168,7 +169,7 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
             <ShieldCheck data-icon="inline-start" />
             Backup
           </Button>
-          {(item.runtimeState === 'needs_attention' || item.nextAction) && (
+          {(item.attentionState !== 'none' || item.nextAction) && (
             <Button className="border-orange-300/40 bg-slate-900 text-orange-100 hover:bg-slate-700 hover:text-orange-50" onClick={() => actions.onRunNextAction(item.id)} type="button" variant="outline">
               <Wrench data-icon="inline-start" />
               Repair

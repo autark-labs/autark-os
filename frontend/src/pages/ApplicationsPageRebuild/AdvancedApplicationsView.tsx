@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { ApplicationIcon, ApplicationKindBadge, ApplicationStatusBadge } from './extensions/ApplicationVisuals';
+import { ApplicationAttentionIndicator, ApplicationIcon, ApplicationManagementBadge, ApplicationReadinessBadge } from './extensions/ApplicationVisuals';
 import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type AdvancedApplicationsViewProps = {
@@ -63,8 +63,8 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                       'border-transparent bg-sky-100 text-slate-950 shadow-md shadow-slate-950/20 transition-all duration-200',
                       !managementOpen && 'cursor-pointer hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-lg',
                       managementOpen && 'pointer-events-none cursor-default',
-                      item.nextAction && cn('bg-orange-200', !managementOpen && 'hover:bg-orange-100'),
-                      item.runtimeState === 'paused' && cn('bg-slate-200', !managementOpen && 'hover:bg-slate-100'),
+                      item.attentionState !== 'none' && cn('bg-orange-200', !managementOpen && 'hover:bg-orange-100'),
+                      item.readinessState === 'paused' && cn('bg-slate-200', !managementOpen && 'hover:bg-slate-100'),
                       managementOpen && selectedId && selectedId !== item.id && 'opacity-35 blur-[1px]',
                       selectedId === item.id && cn(
                         'bg-cyan-100 shadow-xl shadow-cyan-300/35 ring-2 ring-cyan-300/40',
@@ -87,10 +87,13 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                       </div>
                     </TableCell>
                     <TableCell>
-                      <ApplicationKindBadge kind={item.kind} />
+                      <ApplicationManagementBadge item={item} />
                     </TableCell>
                     <TableCell>
-                      <ApplicationStatusBadge item={item} />
+                      <div className="flex flex-wrap gap-1">
+                        <ApplicationReadinessBadge item={item} />
+                        <ApplicationAttentionIndicator item={item} />
+                      </div>
                     </TableCell>
                     <TableCell className="text-slate-700">{item.access}</TableCell>
                     <TableCell className="text-slate-700">{item.backup}</TableCell>
@@ -104,13 +107,13 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                             </a>
                           </Button>
                         )}
-                        {item.kind === 'managed' && (
+                        {item.managementState === 'managed' && (
                           primaryRuntimeActionLoading ? (
                             <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled size="sm" type="button" variant="outline">
                               <Loader2 className="animate-spin" data-icon="inline-start" />
                               {runtimeActionLabel(loadingAction)}
                             </Button>
-                          ) : item.runtimeState === 'paused' ? (
+                          ) : item.readinessState === 'paused' || item.readinessState === 'stopped' ? (
                             <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
                               event.stopPropagation();
                               actions.onStart(item.id);
@@ -128,7 +131,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                             </Button>
                           )
                         )}
-                        {item.kind === 'managed' && (
+                        {item.managementState === 'managed' && (
                           <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
                             event.stopPropagation();
                             actions.onRestart(item.id);
@@ -137,7 +140,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                             {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
                           </Button>
                         )}
-                        {item.kind === 'managed' && (
+                        {item.managementState === 'managed' && (
                           <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={(event) => {
                             event.stopPropagation();
                             actions.onCreateBackup(item.id);
