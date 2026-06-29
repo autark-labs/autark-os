@@ -319,8 +319,11 @@ function managedAppFromObservedService(service) {
 
 function upsertByKey(items, nextItem, keyFor) {
   const key = keyFor(nextItem);
-  const without = items.filter((item) => keyFor(item) !== key);
-  return [...without, nextItem];
+  const index = items.findIndex((item) => keyFor(item) === key);
+  if (index === -1) {
+    return [...items, nextItem];
+  }
+  return items.map((item, currentIndex) => currentIndex === index ? nextItem : item);
 }
 
 function accessCheckFromApp(app) {

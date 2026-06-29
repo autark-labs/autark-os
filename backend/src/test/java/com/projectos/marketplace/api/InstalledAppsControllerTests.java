@@ -2,6 +2,7 @@ package com.projectos.marketplace.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,8 +16,10 @@ import org.junit.jupiter.api.Test;
 import com.projectos.apps.ApplicationStateService;
 import com.projectos.apps.ApplicationState;
 import com.projectos.jobs.ProjectOsJob;
+import com.projectos.jobs.ProjectOsJobOutcome;
 import com.projectos.jobs.ProjectOsJobRepository;
 import com.projectos.jobs.ProjectOsJobService;
+import com.projectos.jobs.ProjectOsJobStep;
 import com.projectos.marketplace.install.AppActionResult;
 import com.projectos.marketplace.install.AppRuntimeView;
 import com.projectos.marketplace.install.AppLifecycleService;
@@ -29,24 +32,59 @@ import com.projectos.marketplace.runtime.RuntimeLayout;
 class InstalledAppsControllerTests {
 
     @Test
-    void lifecycleMutationSchedulesCachedApplicationStateRefreshWithoutBlocking() {
+    void lifecycleMutationReturnsDurableJobWithoutImplyingReadiness() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
         AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        ProjectOsJobService jobService = jobService();
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
                 updateService,
                 applicationStateService,
-                jobService());
+                jobService);
         AppActionResult result = new AppActionResult("vaultwarden", "start", "completed", "Started.", null, List.of(), Instant.parse("2026-06-21T12:00:00Z"));
         when(lifecycleService.start("vaultwarden")).thenReturn(result);
 
-        controller.start("vaultwarden");
+        ProjectOsJob job = controller.start("vaultwarden");
 
-        verify(applicationStateService).refreshInBackground();
+        assertThat(job.type()).isEqualTo("start_app");
+        assertThat(job.subjectId()).isEqualTo("vaultwarden");
+        assertThat(job.status()).isEqualTo("queued");
+        verify(lifecycleService, never()).start("vaultwarden");
+        verify(applicationStateService, never()).refreshInBackground();
         verify(applicationStateService, never()).refreshNow();
+
+        jobService.runQueuedJobsNow();
+
+        verify(lifecycleService).start("vaultwarden");
+        verify(applicationStateService, atLeastOnce()).invalidate();
+    }
+
+    @Test
+    void lifecycleMutationReturnsExistingActiveLifecycleJobForSameApp() {
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        ProjectOsJobService jobService = jobService();
+        ProjectOsJob existing = jobService.start(
+                "restart_app",
+                "vaultwarden",
+                List.of(ProjectOsJobStep.pending("run_command", "Restart app")),
+                () -> ProjectOsJobOutcome.succeeded("Restarted."));
+        InstalledAppsController controller = new InstalledAppsController(
+                lifecycleService,
+                metricsService,
+                updateService,
+                applicationStateService,
+                jobService);
+
+        ProjectOsJob returned = controller.start("vaultwarden");
+
+        assertThat(returned.jobId()).isEqualTo(existing.jobId());
+        verify(lifecycleService, never()).start("vaultwarden");
     }
 
     @Test

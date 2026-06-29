@@ -1,7 +1,7 @@
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
 export const JOB_FAMILIES = {
-  appLifecycle: ['install_app', 'repair_app', 'update_app', 'uninstall_app'],
+  appLifecycle: ['install_app', 'repair_app', 'update_app', 'uninstall_app', 'start_app', 'stop_app', 'restart_app'],
   backup: ['backup', 'backup_verify', 'backup_restore', 'restore'],
   discover: ['install_app', 'backup'],
   install: ['install_app'],
@@ -78,6 +78,12 @@ export function jobTypeLabel(type) {
       return 'Restore';
     case 'update_app':
       return 'Update';
+    case 'start_app':
+      return 'Start';
+    case 'stop_app':
+      return 'Pause';
+    case 'restart_app':
+      return 'Restart';
     case 'uninstall_app':
       return 'Uninstall';
     default:

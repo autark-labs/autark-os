@@ -36,7 +36,7 @@ export function buildApplicationSurfaceItems({
     ...observedServices
       .filter((service) => !service.managedByThisProjectOs && service.userStatus !== 'installed_managed')
       .map(observedServiceSurfaceItem),
-  ];
+  ].slice().sort(compareSurfaceItems);
 }
 
 function managedAppSurfaceItem(
@@ -67,10 +67,12 @@ function managedAppSurfaceItem(
     managementState,
     name: app.appName,
     nextAction: managedNextAction(app, readinessState, attentionState, backup),
-    operationState: idleOperationState(),
+    operationState: backendOperationState(app.operationState),
     readinessState,
     runtimeState: managedRuntimeState(status, app),
     settings: appSettings(app),
+    sortKey: app.sortKey || `managed:${app.appName.toLowerCase()}:${app.appId}`,
+    displayOrder: app.displayOrder,
     sourceId: app.appId,
     status,
   };
@@ -100,9 +102,21 @@ function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSu
     readinessState,
     runtimeState: pinned ? 'shortcut' : 'found',
     settings: observedSettings(service),
+    sortKey: `${managementState}:${(service.displayName || service.id).toLowerCase()}:${service.id}`,
     sourceId: service.id,
     status: pinned ? 'Pinned' : needsReview ? 'Needs review' : 'Found',
   };
+}
+
+function compareSurfaceItems(left: ApplicationSurfaceItem, right: ApplicationSurfaceItem) {
+  const leftOrder = left.displayOrder ?? Number.MAX_SAFE_INTEGER;
+  const rightOrder = right.displayOrder ?? Number.MAX_SAFE_INTEGER;
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+  const leftSort = left.sortKey || `${left.managementState}:${left.name.toLowerCase()}:${left.id}`;
+  const rightSort = right.sortKey || `${right.managementState}:${right.name.toLowerCase()}:${right.id}`;
+  return leftSort.localeCompare(rightSort);
 }
 
 function managedStatus(displayStatus: string, app: AppRuntimeView): ApplicationSurfaceItem['status'] {
@@ -206,6 +220,39 @@ function backendAttentionState(value: string): AppAttentionState {
 
 function idleOperationState(): AppOperationState {
   return { kind: 'idle' };
+}
+
+function backendOperationState(value: AppRuntimeView['operationState']): AppOperationState {
+  if (!value || value.kind === 'idle') {
+    return idleOperationState();
+  }
+  if (value.kind === 'failed') {
+    return {
+      kind: 'failed',
+      label: value.label || 'Action failed',
+      message: value.message || 'Project OS could not finish this action.',
+      jobId: value.jobId || undefined,
+    };
+  }
+  if (value.kind === 'starting' || value.kind === 'stopping' || value.kind === 'restarting' || value.kind === 'saving_settings' || value.kind === 'backing_up' || value.kind === 'uninstalling') {
+    return {
+      kind: value.kind,
+      label: value.label || operationLabel(value.kind),
+      jobId: value.jobId || undefined,
+      currentStep: value.currentStep || value.message || undefined,
+    };
+  }
+  return idleOperationState();
+}
+
+function operationLabel(kind: string) {
+  if (kind === 'starting') return 'Starting';
+  if (kind === 'stopping') return 'Pausing';
+  if (kind === 'restarting') return 'Restarting';
+  if (kind === 'saving_settings') return 'Saving settings';
+  if (kind === 'backing_up') return 'Creating backup';
+  if (kind === 'uninstalling') return 'Uninstalling safely';
+  return 'Working';
 }
 
 function managedRuntimeState(status: ApplicationSurfaceItem['status'], app: AppRuntimeView): ApplicationRuntimeState {

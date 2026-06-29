@@ -12,10 +12,9 @@ import {
   applicationStateQueryKey,
   invalidateApplicationState,
   setRuntimeAppInApplicationStateCache,
-  setRuntimeAppStatusInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
-import { invalidateProjectOsJobs, setProjectOsJobCache, useProjectOsJobsQuery } from '@/repositories/jobRepository';
+import { invalidateProjectOsJobs, setProjectOsJobCache, terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
 import type { AppRuntimeView, AppSettingsChangePlan, InstallSettings } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
@@ -47,6 +46,7 @@ export const ApplicationsPage = () => {
   const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
   const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
+  const [trackedAppJobIds, setTrackedAppJobIds] = useState<string[]>([]);
   const railRef = useRef<HTMLDivElement | null>(null);
 
   const items = useMemo(() => {
@@ -108,7 +108,8 @@ export const ApplicationsPage = () => {
     });
   }, [filter, items, query]);
 
-  const selectedItem = visibleItems.find((item) => item.id === selectedId) ?? visibleItems[0] ?? null;
+  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
+  const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
   const managedCount = items.filter((item) => item.managementState === 'managed').length;
   const pinnedCount = items.filter((item) => item.managementState === 'linked').length;
   const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
@@ -126,7 +127,7 @@ export const ApplicationsPage = () => {
     }
 
     if (!items.some((item) => item.id === selectedId)) {
-      setSelectedId(items[0].id);
+      setSelectedId('');
     }
   }, [items, selectedId]);
 
@@ -181,6 +182,19 @@ export const ApplicationsPage = () => {
     };
   }, [canCloseManagement, managementOpen]);
 
+  useEffect(() => {
+    if (!trackedAppJobIds.length) {
+      return;
+    }
+    const jobs = jobsQuery.data ?? [];
+    const completedJobs = jobs.filter((job) => trackedAppJobIds.includes(job.jobId) && terminalJob(job));
+    if (!completedJobs.length) {
+      return;
+    }
+    void invalidateApplicationState(queryClient);
+    setTrackedAppJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
+  }, [jobsQuery.data, queryClient, trackedAppJobIds]);
+
   const handleFilterChange = (nextFilter: string) => {
     if (!nextFilter || nextFilter === filter) {
       return;
@@ -206,20 +220,21 @@ export const ApplicationsPage = () => {
   };
 
   const runManagedAction = async (appId: string, action: ApplicationRuntimeAction) => {
-    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
-
     setAppActionLoading(appId, action);
-    setRuntimeAppStatusInApplicationStateCache(queryClient, appId, optimisticStatusForAction(action));
 
     try {
       const data = await InstalledAppsAPIClient.runAction(appId, action);
-      if (data.app) {
-        setRuntimeAppInApplicationStateCache(queryClient, data.app);
-      }
-      showActionNotification(data, appActionTitle(action));
+      setProjectOsJobCache(queryClient, data);
+      setTrackedAppJobIds((current) => current.includes(data.jobId) ? current : [...current, data.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'App action started',
+        message: `${appActionLabel(action)} is running. Project OS will keep showing progress until the app reports its real state.`,
+      });
+      void invalidateProjectOsJobs(queryClient);
       void invalidateApplicationState(queryClient);
     } catch (err) {
-      restoreApplicationState(previousState);
       showActionErrorNotification(err, 'App action failed');
     } finally {
       setAppActionLoading(appId, null);
@@ -303,6 +318,7 @@ export const ApplicationsPage = () => {
     try {
       const job = await InstalledAppsAPIClient.uninstall(appId);
       setProjectOsJobCache(queryClient, job);
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
         ok: true,
         severity: 'info',
@@ -446,7 +462,7 @@ export const ApplicationsPage = () => {
               managementOpen={managementOpen}
               onSelect={setSelectedId}
               onUninstall={handleUninstall}
-              selectedId={selectedItem?.id}
+              selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
             />
           ) : (
             <div className="max-h-[44rem] min-h-[44rem] overflow-y-auto pr-1">
@@ -456,7 +472,7 @@ export const ApplicationsPage = () => {
                 items={visibleItems}
                 managementOpen={managementOpen}
                 onSelect={setSelectedId}
-                selectedId={selectedItem?.id}
+                selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
               />
             </div>
           )}
@@ -464,7 +480,7 @@ export const ApplicationsPage = () => {
           <ApplicationDetailsRail
             actions={actions}
             actionLoadingByItemId={actionLoadingByAppId}
-            item={selectedItem}
+            item={selectedItemIsVisible ? selectedItem : null}
             managementOpen={managementOpen}
             canCloseManagement={canCloseManagement}
             onManagementOpenChange={setManagementOpen}
@@ -578,15 +594,11 @@ function appWithOptimisticPrivateAccess(app: AppRuntimeView, enabled: boolean): 
   };
 }
 
-function optimisticStatusForAction(action: ApplicationRuntimeAction) {
-  return action === 'stop' ? 'Paused' : 'Starting';
-}
-
-function appActionTitle(action: ApplicationRuntimeAction) {
-  if (action === 'start') return 'App started';
-  if (action === 'stop') return 'App paused';
-  if (action === 'restart') return 'App restarted';
-  return 'App action finished';
+function appActionLabel(action: ApplicationRuntimeAction) {
+  if (action === 'start') return 'Start';
+  if (action === 'stop') return 'Pause';
+  if (action === 'restart') return 'Restart';
+  return 'App action';
 }
 
 function PageMetric({ label, value }: { label: string; value: number }) {

@@ -183,6 +183,21 @@ test('runtime app cache helpers update routine management state', () => {
   assert.deepEqual(removed.managedApps, []);
 });
 
+test('runtime app cache helper preserves existing runtime app order', () => {
+  const state = {
+    runtimeApps: [
+      runtimeApp('homepage', 'Ready'),
+      runtimeApp('syncthing', 'Ready'),
+      runtimeApp('vaultwarden', 'Ready'),
+    ],
+    managedApps: [],
+  };
+
+  const updated = setRuntimeAppInState(state, { ...runtimeApp('syncthing', 'Starting'), appName: 'Syncthing' });
+
+  assert.deepEqual(updated.runtimeApps.map((app) => app.appId), ['homepage', 'syncthing', 'vaultwarden']);
+});
+
 function runtimeApp(appId, friendlyStatus, healthSnapshot = null) {
   return {
     appId,

@@ -7,6 +7,10 @@ export function operationStateForItem(item, localAction, settingsAction, jobs = 
     return operationStateFromJob(activeJob);
   }
 
+  if (item?.operationState && item.operationState.kind && item.operationState.kind !== 'idle') {
+    return item.operationState;
+  }
+
   if (localAction) {
     return operationStateFromLocalAction(localAction);
   }
@@ -54,6 +58,30 @@ function operationStateFromLocalAction(action) {
 }
 
 function operationStateFromJob(job) {
+  if (job.type === 'start_app') {
+    return {
+      kind: 'starting',
+      label: 'Starting',
+      jobId: job.jobId,
+      currentStep: currentJobStepText(job),
+    };
+  }
+  if (job.type === 'stop_app') {
+    return {
+      kind: 'stopping',
+      label: 'Pausing',
+      jobId: job.jobId,
+      currentStep: currentJobStepText(job),
+    };
+  }
+  if (job.type === 'restart_app') {
+    return {
+      kind: 'restarting',
+      label: 'Restarting',
+      jobId: job.jobId,
+      currentStep: currentJobStepText(job),
+    };
+  }
   if (job.type === 'uninstall_app') {
     return {
       kind: 'uninstalling',
@@ -77,7 +105,7 @@ function jobsForItem(item, jobs) {
   const itemIds = new Set([item?.id, item?.sourceId].filter(Boolean));
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => itemIds.has(job.subjectId))
-    .filter((job) => ['backup', 'backup_verify', 'uninstall_app'].includes(job.type))
+    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'uninstall_app'].includes(job.type))
     .toSorted((left, right) => jobTime(right) - jobTime(left));
 }
 

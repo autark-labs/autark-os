@@ -30,6 +30,8 @@ export type ApplicationNextAction = {
 export type ApplicationSurfaceItem = {
   id: string;
   sourceId?: string;
+  sortKey?: string;
+  displayOrder?: number;
   name: string;
   kind: 'managed' | 'pinned' | 'observed';
   managementState: AppManagementState;

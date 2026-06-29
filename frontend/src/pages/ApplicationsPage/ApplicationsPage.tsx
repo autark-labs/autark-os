@@ -10,11 +10,8 @@ import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification, showJobNotification } from '@/lib/actionNotifications';
 import {
-  applicationStateQueryKey,
   invalidateAppUpdates,
   invalidateApplicationState,
-  setRuntimeAppInApplicationStateCache,
-  setRuntimeAppStatusInApplicationStateCache,
   useAppUpdatesQuery,
   useApplicationStateRepository,
   updatesByAppId as buildUpdatesByAppId,
@@ -22,7 +19,6 @@ import {
 import { setProjectOsJobCache, terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
 import { usePrivateAccessReconciliationQuery } from '@/repositories/networkRepository';
 import type { AppRuntimeView } from '@/types/app';
-import type { ApplicationState } from '@/types/applicationState';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ApplicationsDashboard, EmptyState } from './ApplicationsDashboard';
@@ -49,6 +45,7 @@ function ApplicationsPage() {
   const [manageAppId, setManageAppId] = useState<string | null>(null);
   const [locallyUninstallingAppIds, setLocallyUninstallingAppIds] = useState<Set<string>>(() => new Set());
   const [trackedUninstallJobIds, setTrackedUninstallJobIds] = useState<string[]>([]);
+  const [trackedLifecycleJobIds, setTrackedLifecycleJobIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -143,6 +140,19 @@ function ApplicationsPage() {
     setTrackedUninstallJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
   }, [jobsQuery.data, queryClient, trackedUninstallJobIds]);
 
+  useEffect(() => {
+    if (!trackedLifecycleJobIds.length) {
+      return;
+    }
+    const jobs = jobsQuery.data ?? [];
+    const completedJobs = jobs.filter((job) => trackedLifecycleJobIds.includes(job.jobId) && terminalJob(job));
+    if (!completedJobs.length) {
+      return;
+    }
+    void invalidateApplicationState(queryClient);
+    setTrackedLifecycleJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
+  }, [jobsQuery.data, queryClient, trackedLifecycleJobIds]);
+
   const refreshApps = useCallback(async () => {
     setLocalError(null);
     await Promise.all([
@@ -160,28 +170,33 @@ function ApplicationsPage() {
     }
   }, [queryClient, reconciliationQuery]);
 
-  function restoreApplicationState(previousState: ApplicationState | undefined) {
-    queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
-  }
-
   function setAppActionLoading(appId: string, action: AppAction | 'update' | 'rollback' | null) {
     setActionLoadingByAppId((current) => ({ ...current, [appId]: action }));
   }
 
   async function runAction(appId: string, action: AppAction) {
-    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
     setAppActionLoading(appId, action);
     setLocalError(null);
-    setRuntimeAppStatusInApplicationStateCache(queryClient, appId, optimisticStatusForAction(action));
     try {
-      const data = await InstalledAppsAPIClient.runAction(appId, action);
-      if (data.app) {
-        setRuntimeAppInApplicationStateCache(queryClient, data.app);
+      if (action === 'repair') {
+        const result = await InstalledAppsAPIClient.repair(appId);
+        showActionNotification(result, 'Repair finished');
+        refreshAfterMutation();
+        return;
       }
-      showActionNotification(data, appActionTitle(action));
+
+      const job = await InstalledAppsAPIClient.runAction(appId, action);
+      setProjectOsJobCache(queryClient, job);
+      setTrackedLifecycleJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'App action started',
+        message: `${appActionLabel(action)} is running. Project OS will update the app state when the app reports its real status.`,
+      });
+      void jobsQuery.refetch();
       refreshAfterMutation();
     } catch (err) {
-      restoreApplicationState(previousState);
       const message = errorMessage(err);
       setLocalError(message);
       showActionErrorNotification(err, 'App action failed');
@@ -340,14 +355,10 @@ function ApplicationsPage() {
 
 export default ApplicationsPage;
 
-function optimisticStatusForAction(action: AppAction) {
-  return action === 'stop' ? 'Paused' : 'Starting';
-}
-
-function appActionTitle(action: AppAction) {
-  if (action === 'start') return 'App started';
-  if (action === 'stop') return 'App paused';
-  if (action === 'restart') return 'App restarted';
-  if (action === 'repair') return 'Repair finished';
-  return 'App action finished';
+function appActionLabel(action: AppAction) {
+  if (action === 'start') return 'Start';
+  if (action === 'stop') return 'Pause';
+  if (action === 'restart') return 'Restart';
+  if (action === 'repair') return 'Repair';
+  return 'App action';
 }

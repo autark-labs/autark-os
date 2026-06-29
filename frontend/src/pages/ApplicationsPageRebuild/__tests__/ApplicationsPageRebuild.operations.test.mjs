@@ -29,6 +29,24 @@ test('operationStateForItem maps settings save but not settings planning', () =>
 
 test('operationStateForItem maps durable jobs by app subject and current step', () => {
   assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
+    job('restart-1', 'restart_app', 'vaultwarden', 'running', 'wait'),
+  ]), {
+    kind: 'restarting',
+    label: 'Restarting',
+    jobId: 'restart-1',
+    currentStep: 'Waiting for app readiness',
+  });
+
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
+    job('start-1', 'start_app', 'vaultwarden', 'queued', 'run'),
+  ]), {
+    kind: 'starting',
+    label: 'Starting',
+    jobId: 'start-1',
+    currentStep: 'Running app command',
+  });
+
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
     job('backup-1', 'backup', 'vaultwarden', 'running', 'archive'),
   ]), {
     kind: 'backing_up',
@@ -83,6 +101,8 @@ function job(jobId, type, subjectId, status, currentStep) {
     status,
     currentStep,
     steps: [
+      { id: 'run', label: 'Run command', message: 'Running app command', status: currentStep === 'run' ? 'running' : 'pending' },
+      { id: 'wait', label: 'Wait for readiness', message: 'Waiting for app readiness', status: currentStep === 'wait' ? 'running' : 'pending' },
       { id: 'archive', label: 'Create archive', message: 'Writing backup archive', status: currentStep === 'archive' ? 'running' : 'pending' },
       { id: 'remove', label: 'Remove app', message: 'Removing containers', status: currentStep === 'remove' ? 'running' : 'pending' },
     ],

@@ -17,7 +17,10 @@ import com.projectos.host.ObservedServiceRepository;
 import com.projectos.host.ObservedServiceScanner;
 import com.projectos.host.ObservedServiceService;
 import com.projectos.host.ObservedServiceView;
+import com.projectos.jobs.ProjectOsJob;
+import com.projectos.jobs.ProjectOsJobStep;
 import com.projectos.marketplace.install.AppInstanceView;
+import com.projectos.marketplace.install.AppRuntimeView;
 import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
 import com.projectos.marketplace.runtime.RuntimeLayout;
 
@@ -218,6 +221,32 @@ class ApplicationStateServiceTests {
         assertThat(service.snapshot().stale()).isFalse();
     }
 
+    @Test
+    void snapshotOverlaysLifecycleOperationOnTargetAppAndPreservesOrder() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("syncthing", "Syncthing")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("restart-1", "restart_app", "syncthing", "running", "wait_until_ready")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps())
+                .extracting(AppRuntimeView::appId)
+                .containsExactly("homepage", "syncthing");
+        assertThat(state.runtimeApps())
+                .extracting(AppRuntimeView::sortKey)
+                .containsExactly("managed:homepage", "managed:syncthing");
+        assertThat(state.runtimeApps())
+                .extracting(AppRuntimeView::displayOrder)
+                .containsExactly(0, 1);
+        assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("idle");
+        assertThat(state.runtimeApps().get(1).operationState().kind()).isEqualTo("restarting");
+        assertThat(state.runtimeApps().get(1).readinessState()).isEqualTo("starting");
+    }
+
     private ObservedServiceScanner noScan() {
         return new ObservedServiceScanner(List::of, () -> new com.projectos.system.ProjectOsIdentity("", "project-os", "", "", Instant.EPOCH, 1));
     }
@@ -297,6 +326,49 @@ class ApplicationStateServiceTests {
                 List.of(),
                 List.of(),
                 Instant.parse("2026-06-21T12:00:00Z"));
+    }
+
+    private AppRuntimeView runtimeApp(String appId, String name) {
+        return new AppRuntimeView(
+                appId,
+                name,
+                "Apps",
+                name + " app",
+                "1.0.0",
+                "",
+                "Ready",
+                "running",
+                "healthy",
+                "/runtime/apps/" + appId,
+                "project-os-" + appId,
+                "http://localhost:3000",
+                null,
+                null,
+                null,
+                Instant.parse("2026-06-21T12:00:00Z"),
+                "Backups disabled",
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                List.of());
+    }
+
+    private ProjectOsJob lifecycleJob(String jobId, String type, String subjectId, String status, String currentStep) {
+        return new ProjectOsJob(
+                jobId,
+                type,
+                subjectId,
+                status,
+                currentStep,
+                List.of(
+                        ProjectOsJobStep.pending("run_command", "Run app command"),
+                        ProjectOsJobStep.running("wait_until_ready", "Wait for app readiness", "Waiting for the app to report ready.")),
+                Instant.parse("2026-06-21T12:00:00Z"),
+                Instant.parse("2026-06-21T12:00:01Z"),
+                null);
     }
 
     private ObservedServiceRepository repository() {

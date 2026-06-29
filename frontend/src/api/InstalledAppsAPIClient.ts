@@ -2,7 +2,8 @@ import { httpClient } from './httpClient';
 import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, AppUpdateResult, AppUpdateStatus, InstallSettings, UninstallPlan } from '@/types/app';
 import type { ProjectOsJob } from '@/types/jobs';
 
-export type InstalledAppAction = 'start' | 'stop' | 'restart' | 'repair';
+export type InstalledAppLifecycleAction = 'start' | 'stop' | 'restart';
+export type InstalledAppAction = InstalledAppLifecycleAction | 'repair';
 
 export const InstalledAppsAPIClient = {
   async listApps() {
@@ -60,8 +61,13 @@ export const InstalledAppsAPIClient = {
     return response.data;
   },
 
-  async runAction(appId: string, action: InstalledAppAction) {
-    const response = await httpClient.post<AppActionResult>(`/api/apps/${appId}/${action}`);
+  async runAction(appId: string, action: InstalledAppLifecycleAction) {
+    const response = await httpClient.post<ProjectOsJob>(`/api/apps/${appId}/${action}`);
+    return response.data;
+  },
+
+  async repair(appId: string) {
+    const response = await httpClient.post<AppActionResult>(`/api/apps/${appId}/repair`);
     return response.data;
   },
 

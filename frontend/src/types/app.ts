@@ -31,6 +31,14 @@ export type BackendAppManagementState = 'managed' | 'found' | 'linked' | string;
 export type BackendAppReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown' | string;
 export type BackendAppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked' | string;
 
+export type BackendAppOperationState = {
+  kind: 'idle' | 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling' | 'failed' | string;
+  label?: string | null;
+  jobId?: string | null;
+  currentStep?: string | null;
+  message?: string | null;
+};
+
 export type AppRemediationView = {
   state: 'healthy' | 'watching' | 'auto_repairing' | 'repair_succeeded' | 'repair_failed' | 'needs_user_action' | 'restore_recommended' | string;
   label: string;
@@ -214,6 +222,10 @@ export type AppRuntimeView = {
   managementState?: BackendAppManagementState;
   readinessState?: BackendAppReadinessState;
   attentionState?: BackendAppAttentionState;
+  operationState?: BackendAppOperationState | null;
+  sortKey?: string;
+  displayOrder?: number;
+  availableActions?: ProjectOsAction[];
   technicalStatus: string;
   healthCheck: string;
   runtimePath: string;

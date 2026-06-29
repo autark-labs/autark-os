@@ -3,6 +3,7 @@ package com.projectos.apps;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Comparator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -17,9 +18,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.projectos.api.AppOperationView;
+import com.projectos.api.ProjectOsAction;
 import com.projectos.host.ObservedService;
 import com.projectos.host.ObservedServiceService;
 import com.projectos.host.ObservedServiceView;
+import com.projectos.jobs.ProjectOsJob;
+import com.projectos.jobs.ProjectOsJobService;
+import com.projectos.jobs.ProjectOsJobStep;
 import com.projectos.marketplace.install.AppInstanceView;
 import com.projectos.marketplace.install.AppInstanceViewProvider;
 import com.projectos.marketplace.install.AppLifecycleService;
@@ -35,6 +41,7 @@ public class ApplicationStateService {
     private final ObservedServiceService observedServiceService;
     private final AppOwnershipService appOwnershipService;
     private final Supplier<Instant> clock;
+    private final Supplier<List<ProjectOsJob>> jobs;
     private final Executor backgroundRefreshExecutor;
     private final ThreadPoolExecutor ownedBackgroundRefreshExecutor;
     private final AtomicReference<ApplicationState> cached;
@@ -46,13 +53,15 @@ public class ApplicationStateService {
             AppInstanceViewProvider appInstanceViewProvider,
             AppLifecycleService appLifecycleService,
             ObservedServiceService observedServiceService,
-            AppOwnershipService appOwnershipService) {
+            AppOwnershipService appOwnershipService,
+            ProjectOsJobService jobService) {
         this(
                 appInstanceViewProvider::list,
                 appLifecycleService::listApps,
                 observedServiceService,
                 appOwnershipService,
                 Instant::now,
+                jobService::list,
                 defaultBackgroundRefreshExecutor(),
                 true);
     }
@@ -63,7 +72,17 @@ public class ApplicationStateService {
             ObservedServiceService observedServiceService,
             AppOwnershipService appOwnershipService,
             Supplier<Instant> clock) {
-        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, Runnable::run, false);
+        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, List::of, Runnable::run, false);
+    }
+
+    public ApplicationStateService(
+            Supplier<List<AppInstanceView>> managedApps,
+            Supplier<List<AppRuntimeView>> runtimeApps,
+            ObservedServiceService observedServiceService,
+            AppOwnershipService appOwnershipService,
+            Supplier<Instant> clock,
+            Supplier<List<ProjectOsJob>> jobs) {
+        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, jobs, Runnable::run, false);
     }
 
     public ApplicationStateService(
@@ -73,7 +92,7 @@ public class ApplicationStateService {
             AppOwnershipService appOwnershipService,
             Supplier<Instant> clock,
             Executor backgroundRefreshExecutor) {
-        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, backgroundRefreshExecutor, false);
+        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, List::of, backgroundRefreshExecutor, false);
     }
 
     private ApplicationStateService(
@@ -82,6 +101,7 @@ public class ApplicationStateService {
             ObservedServiceService observedServiceService,
             AppOwnershipService appOwnershipService,
             Supplier<Instant> clock,
+            Supplier<List<ProjectOsJob>> jobs,
             Executor backgroundRefreshExecutor,
             boolean ownsBackgroundRefreshExecutor) {
         this.managedApps = managedApps;
@@ -89,6 +109,7 @@ public class ApplicationStateService {
         this.observedServiceService = observedServiceService;
         this.appOwnershipService = appOwnershipService;
         this.clock = clock;
+        this.jobs = jobs == null ? List::of : jobs;
         this.backgroundRefreshExecutor = backgroundRefreshExecutor;
         this.ownedBackgroundRefreshExecutor = ownsBackgroundRefreshExecutor && backgroundRefreshExecutor instanceof ThreadPoolExecutor executor ? executor : null;
         Instant now = clock.get();
@@ -174,7 +195,7 @@ public class ApplicationStateService {
 
     private ApplicationState buildSnapshot(Instant startedAt) {
         List<AppInstanceView> managed = managedApps.get();
-        List<AppRuntimeView> runtime = runtimeApps.get();
+        List<AppRuntimeView> runtime = runtimeApps(runtimeApps.get());
         List<ObservedService> observed = cachedObservedServices();
         List<ObservedServiceView> observedViews = observed.stream()
                 .map(ObservedServiceService::toView)
@@ -201,6 +222,108 @@ public class ApplicationStateService {
                 false,
                 "",
                 completedAt.plus(SNAPSHOT_REFRESH_INTERVAL));
+    }
+
+    private List<AppRuntimeView> runtimeApps(List<AppRuntimeView> apps) {
+        List<ProjectOsJob> operationJobs = lifecycleOperationJobs();
+        List<AppRuntimeView> sorted = apps.stream()
+                .sorted(Comparator.comparing(this::managedSortName).thenComparing(AppRuntimeView::appId))
+                .toList();
+        return java.util.stream.IntStream.range(0, sorted.size())
+                .mapToObj(index -> runtimeApp(sorted.get(index), index, operationJobs))
+                .toList();
+    }
+
+    private AppRuntimeView runtimeApp(AppRuntimeView app, int displayOrder, List<ProjectOsJob> operationJobs) {
+        ProjectOsJob job = operationJobs.stream()
+                .filter(candidate -> app.appId().equals(candidate.subjectId()))
+                .findFirst()
+                .orElse(null);
+        AppOperationView operation = operationState(job);
+        return app.withSurfaceState(
+                operation,
+                "managed:" + app.appId(),
+                displayOrder,
+                availableActions(app, operation));
+    }
+
+    private List<ProjectOsJob> lifecycleOperationJobs() {
+        return jobs.get().stream()
+                .filter(this::isLifecycleOperationJob)
+                .sorted(Comparator.comparing(ProjectOsJob::updatedAt).reversed())
+                .toList();
+    }
+
+    private boolean isLifecycleOperationJob(ProjectOsJob job) {
+        if (job == null || !List.of("queued", "running", "failed").contains(job.status())) {
+            return false;
+        }
+        return List.of("start_app", "stop_app", "restart_app", "uninstall_app").contains(job.type());
+    }
+
+    private AppOperationView operationState(ProjectOsJob job) {
+        if (job == null) {
+            return AppOperationView.idle();
+        }
+        if ("failed".equals(job.status())) {
+            return AppOperationView.failed(operationLabel(job.type()), job.jobId(), job.error() == null ? "" : job.error().message());
+        }
+        return AppOperationView.running(operationKind(job.type()), operationLabel(job.type()), job.jobId(), currentStepText(job), currentStepText(job));
+    }
+
+    private String operationKind(String type) {
+        return switch (type) {
+            case "start_app" -> "starting";
+            case "stop_app" -> "stopping";
+            case "restart_app" -> "restarting";
+            case "uninstall_app" -> "uninstalling";
+            default -> "idle";
+        };
+    }
+
+    private String operationLabel(String type) {
+        return switch (type) {
+            case "start_app" -> "Starting";
+            case "stop_app" -> "Pausing";
+            case "restart_app" -> "Restarting";
+            case "uninstall_app" -> "Uninstalling safely";
+            default -> "Working";
+        };
+    }
+
+    private String currentStepText(ProjectOsJob job) {
+        ProjectOsJobStep step = job.steps().stream()
+                .filter(candidate -> candidate.id().equals(job.currentStep()))
+                .findFirst()
+                .orElseGet(() -> job.steps().stream()
+                        .filter(candidate -> "running".equals(candidate.status()))
+                        .findFirst()
+                        .orElseGet(() -> job.steps().stream()
+                                .filter(candidate -> "pending".equals(candidate.status()))
+                                .findFirst()
+                                .orElse(null)));
+        if (step == null) {
+            return "";
+        }
+        return step.message() == null || step.message().isBlank() ? step.label() : step.message();
+    }
+
+    private List<ProjectOsAction> availableActions(AppRuntimeView app, AppOperationView operation) {
+        if (operation != null && !"idle".equals(operation.kind()) && !"failed".equals(operation.kind())) {
+            return List.of();
+        }
+        boolean paused = "paused".equals(app.readinessState()) || "stopped".equals(app.readinessState()) || "Stopped".equals(app.friendlyStatus());
+        return paused
+                ? List.of(
+                        ProjectOsAction.post("start", "Start", "/api/apps/" + app.appId() + "/start", false, false),
+                        ProjectOsAction.post("restart", "Restart", "/api/apps/" + app.appId() + "/restart", false, false))
+                : List.of(
+                        ProjectOsAction.post("stop", "Pause", "/api/apps/" + app.appId() + "/stop", false, false),
+                        ProjectOsAction.post("restart", "Restart", "/api/apps/" + app.appId() + "/restart", false, false));
+    }
+
+    private String managedSortName(AppRuntimeView app) {
+        return app.appName() == null ? "" : app.appName().toLowerCase(java.util.Locale.ROOT);
     }
 
     private ApplicationState markFailed(ApplicationState previous, Instant startedAt, RuntimeException exception) {
