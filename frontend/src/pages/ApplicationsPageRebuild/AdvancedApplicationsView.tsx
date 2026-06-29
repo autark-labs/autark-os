@@ -16,6 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { CompactOperationStatus } from './components/AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
@@ -91,9 +92,12 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                       <ManagementBadge item={item} />
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        <ReadinessBadge item={item} />
-                        <AttentionIndicator item={item} />
+                      <div className="grid gap-1.5">
+                        <div className="flex flex-wrap gap-1">
+                          <ReadinessBadge item={item} />
+                          <AttentionIndicator item={item} />
+                        </div>
+                        <CompactOperationStatus item={item} />
                       </div>
                     </TableCell>
                     <TableCell className="text-slate-700">{item.access}</TableCell>

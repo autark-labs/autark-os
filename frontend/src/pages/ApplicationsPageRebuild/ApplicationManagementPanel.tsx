@@ -30,9 +30,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { ExpandedOperationStatus } from './components/AppOperationStatus';
 import { labelForManagementState, labelForReadiness } from './components/AppStateBadges';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
 import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
@@ -70,6 +70,8 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
         </TabsList>
 
         <div className="p-4">
+          <ExpandedOperationStatus item={item} className="mb-4" />
+
           <TabsContent className="grid gap-4" value="overview">
             <section className="grid gap-2 sm:grid-cols-2">
               <Detail label="Repair" value={mock.repair} />

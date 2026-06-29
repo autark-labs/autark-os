@@ -22,6 +22,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { cn } from '@/lib/utils';
+import { CompactOperationStatus } from './components/AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
@@ -80,6 +81,8 @@ export function BasicApplicationsView({ items, managementOpen, onSelect, onUnins
               </div>
             </div>
           </CardHeader>
+
+          <CompactOperationStatus item={item} className="mx-3" />
 
           {/* Metadata section parked while the Basic card treatment is redesigned.
           <CardContent className="px-4 py-1">

@@ -9,7 +9,8 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { OperationBadge, labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
+import { ExpandedOperationStatus } from './components/AppOperationStatus';
+import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { ApplicationManagementPanel } from './ApplicationManagementPanel';
 import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
@@ -100,7 +101,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
 
             <div className="min-w-0">
               <div className="flex flex-col gap-4">
-                <OperationBadge item={item} />
+                <ExpandedOperationStatus item={item} />
                 <RailControls actions={actions} item={item} loadingAction={actionLoadingByItemId[item.id] ?? null} />
 
                 <div className="grid gap-2 text-sm">
