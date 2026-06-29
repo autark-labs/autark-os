@@ -543,9 +543,10 @@ export const ApplicationsPage = () => {
 
           <Card
             className={cn(
-              'h-fit w-full justify-self-end overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 transition-[width,box-shadow] duration-300 ease-out lg:sticky lg:top-5 lg:w-[22rem]',
+              'relative z-30 h-fit w-full justify-self-end overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 transition-[width,box-shadow] duration-300 ease-out lg:sticky lg:top-5 lg:w-[22rem]',
               managementOpen && 'shadow-2xl shadow-cyan-950/50 lg:w-[58rem]',
             )}
+            onPointerDown={(event) => event.stopPropagation()}
             ref={railRef}
           >
             <CardHeader>
@@ -563,7 +564,7 @@ export const ApplicationsPage = () => {
                       'border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white',
                       managementOpen && 'border-cyan-300 bg-cyan-300 text-slate-950 hover:bg-cyan-200 hover:text-slate-950',
                     )}
-                    onClick={() => setManagementOpen((open) => !open)}
+                    onClick={() => setManagementOpen(!managementOpen)}
                     type="button"
                     variant="outline"
                   >
