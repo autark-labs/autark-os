@@ -15,13 +15,14 @@ import {
   setRuntimeAppStatusInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
-import { useProjectOsJobsQuery } from '@/repositories/jobRepository';
+import { invalidateProjectOsJobs, setProjectOsJobCache, useProjectOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
 import type { AppRuntimeView, AppSettingsChangePlan, InstallSettings } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
+import { mapUninstallPlanToDestructiveActionPlan } from './extensions/ApplicationsPage.destructiveActions';
 import { buildApplicationSurfaceItems } from './extensions/ApplicationsPage.liveModel';
 import { operationStateForItem } from './extensions/ApplicationsPage.operations';
 import type {
@@ -293,6 +294,29 @@ export const ApplicationsPage = () => {
     }
   }
 
+  async function loadUninstallPlan(appId: string) {
+    const plan = await InstalledAppsAPIClient.uninstallPlan(appId);
+    return mapUninstallPlanToDestructiveActionPlan(plan);
+  }
+
+  async function runUninstall(appId: string) {
+    try {
+      const job = await InstalledAppsAPIClient.uninstall(appId);
+      setProjectOsJobCache(queryClient, job);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'Uninstall started',
+        message: 'Project OS is removing this app safely and keeping it visible until the job finishes.',
+      });
+      void invalidateProjectOsJobs(queryClient);
+      void invalidateApplicationState(queryClient);
+    } catch (err) {
+      showActionErrorNotification(err, 'Uninstall could not start');
+      throw err;
+    }
+  }
+
   const handleStart = (id: string) => void runManagedAction(id, 'start');
   const handleStop = (id: string) => void runManagedAction(id, 'stop');
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
@@ -311,14 +335,15 @@ export const ApplicationsPage = () => {
   const handleUninstall = (id: string) => {
     setSelectedId(id);
     setManagementOpen(true);
-    recordLocalEvent(id, 'Uninstall review opened just now');
   };
 
   const actions = {
     onCreateBackup: handleCreateBackup,
     onDirtyChange: handleDirtyChange,
+    onLoadUninstallPlan: loadUninstallPlan,
     onRestart: handleRestart,
     onRunNextAction: handleRunNextAction,
+    onRunUninstall: runUninstall,
     onSaveSettings: saveApplicationSettings,
     onSettingsPlanRequest: requestSettingsPlan,
     onStart: handleStart,

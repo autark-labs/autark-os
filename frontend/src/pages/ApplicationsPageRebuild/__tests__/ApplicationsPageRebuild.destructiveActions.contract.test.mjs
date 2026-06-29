@@ -43,3 +43,29 @@ test('applications rebuild destructive actions use a shared plan-confirm-run dia
   assert.match(client, /uninstallPlan\(appId: string\)/);
   assert.match(client, /uninstall\(appId: string\)/);
 });
+
+test('applications rebuild uninstall uses real plan and job-backed action wiring', () => {
+  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+
+  assert.match(types, /onLoadUninstallPlan: \(id: string\) => Promise<DestructiveActionPlan>/);
+  assert.match(types, /onRunUninstall: \(id: string\) => Promise<void>/);
+
+  assert.match(page, /mapUninstallPlanToDestructiveActionPlan/);
+  assert.match(page, /loadUninstallPlan\(appId: string\)/);
+  assert.match(page, /InstalledAppsAPIClient\.uninstallPlan\(appId\)/);
+  assert.match(page, /runUninstall\(appId: string\)/);
+  assert.match(page, /InstalledAppsAPIClient\.uninstall\(appId\)/);
+  assert.match(page, /setProjectOsJobCache\(queryClient, job\)/);
+  assert.match(page, /invalidateProjectOsJobs\(queryClient\)/);
+  assert.match(page, /invalidateApplicationState\(queryClient\)/);
+  assert.match(page, /showActionNotification\(\{\s*ok: true,\s*severity: 'info',\s*title: 'Uninstall started'/);
+  assert.doesNotMatch(page, /Uninstall review opened just now/);
+
+  assert.match(panel, /loadPlan=\{\(\) => actions\.onLoadUninstallPlan\(item\.id\)\}/);
+  assert.match(panel, /runAction=\{\(\) => actions\.onRunUninstall\(item\.id\)\}/);
+  assert.match(panel, /disabledReason=\{uninstallDisabledReason\}/);
+  assert.match(panel, /item\.operationState\.kind === 'idle'/);
+  assert.doesNotMatch(panel, /A safety plan is required before uninstall can run/);
+});

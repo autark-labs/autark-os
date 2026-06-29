@@ -1,3 +1,5 @@
+import type { DestructiveActionPlan } from './ApplicationsPage.destructiveActions';
+
 export type ApplicationRuntimeState = 'running' | 'starting' | 'paused' | 'needs_attention' | 'found' | 'shortcut';
 export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart';
 export type ApplicationSettingsAction = 'planning' | 'saving';
@@ -50,8 +52,10 @@ export type ApplicationSurfaceItem = {
 export type ApplicationActionHandlers = {
   onCreateBackup: (id: string) => void;
   onDirtyChange: (id: string, dirty: boolean) => void;
+  onLoadUninstallPlan: (id: string) => Promise<DestructiveActionPlan>;
   onRestart: (id: string) => void;
   onRunNextAction: (id: string) => void;
+  onRunUninstall: (id: string) => Promise<void>;
   onSaveSettings: (id: string, values: ApplicationSettingsFormValues) => Promise<void>;
   onSettingsPlanRequest: (id: string, values: ApplicationSettingsFormValues) => Promise<ApplicationSettingsImpact | null>;
   onStart: (id: string) => void;

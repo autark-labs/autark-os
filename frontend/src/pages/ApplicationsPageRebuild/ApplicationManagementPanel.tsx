@@ -28,7 +28,7 @@ import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab'
 import type { ApplicationActionHandlers, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationManagementPanelProps = {
-  actions: Pick<ApplicationActionHandlers, 'onDirtyChange' | 'onSaveSettings' | 'onSettingsPlanRequest'>;
+  actions: Pick<ApplicationActionHandlers, 'onDirtyChange' | 'onLoadUninstallPlan' | 'onRunUninstall' | 'onSaveSettings' | 'onSettingsPlanRequest'>;
   item: ApplicationSurfaceItem;
   settingsLoadingAction?: ApplicationSettingsAction | null;
   variant?: 'inline' | 'rail';
@@ -94,7 +94,7 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
               </section>
             )}
 
-            <DangerZone managed={managed} />
+            <DangerZone actions={actions} item={item} managed={managed} />
           </TabsContent>
 
           <TabsContent className="grid gap-4" value="guide">
@@ -233,7 +233,22 @@ function MetricBar({ icon: Icon, label, text, value }: { icon: typeof Cpu; label
   );
 }
 
-function DangerZone({ managed }: { managed: boolean }) {
+function DangerZone({
+  actions,
+  item,
+  managed,
+}: {
+  actions: Pick<ApplicationActionHandlers, 'onLoadUninstallPlan' | 'onRunUninstall'>;
+  item: ApplicationSurfaceItem;
+  managed: boolean;
+}) {
+  const uninstallReady = managed && item.operationState.kind === 'idle';
+  const uninstallDisabledReason = !managed
+    ? 'Only managed apps can be uninstalled from Project OS.'
+    : !uninstallReady
+      ? 'Wait for the current app action to finish before uninstalling.'
+      : null;
+
   return (
     <section className="rounded-xl border border-red-400/25 bg-red-500/10 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -241,11 +256,20 @@ function DangerZone({ managed }: { managed: boolean }) {
           <p className="text-sm font-semibold text-red-100">Uninstall</p>
           <p className="text-xs text-red-100/70">{managed ? 'Data is preserved by default.' : 'Observed services are not managed.'}</p>
         </div>
-        <DestructiveActionDialog
-          className="border-red-300/30 bg-slate-900 text-red-100 hover:bg-red-950"
-          disabledReason={managed ? 'A safety plan is required before uninstall can run.' : 'Only managed apps can be uninstalled from Project OS.'}
-          triggerLabel="Review"
-        />
+        {uninstallDisabledReason ? (
+          <DestructiveActionDialog
+            className="border-red-300/30 bg-slate-900 text-red-100 hover:bg-red-950"
+            disabledReason={uninstallDisabledReason}
+            triggerLabel="Review"
+          />
+        ) : (
+          <DestructiveActionDialog
+            className="border-red-300/30 bg-slate-900 text-red-100 hover:bg-red-950"
+            loadPlan={() => actions.onLoadUninstallPlan(item.id)}
+            runAction={() => actions.onRunUninstall(item.id)}
+            triggerLabel="Review"
+          />
+        )}
       </div>
     </section>
   );

@@ -80,7 +80,8 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   const values = useWatch({ control }) as ApplicationSettingsFormValues;
   const planning = loadingAction === 'planning';
   const saving = loadingAction === 'saving' || isSubmitting;
-  const busy = planning || saving;
+  const operationBusy = item.operationState.kind !== 'idle';
+  const busy = planning || saving || operationBusy;
 
   useEffect(() => {
     reset(initialValues);
@@ -109,7 +110,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   }, [isDirty]);
 
   const prepareSave = handleSubmit(async (nextValues) => {
-    if (!editable) {
+    if (!editable || operationBusy) {
       return;
     }
 
@@ -242,7 +243,11 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         <div className="flex flex-col gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-medium text-white">{isDirty ? 'Unsaved changes' : 'Settings are current'}</p>
-            <p className="mt-1 text-xs leading-5 text-sky-100/60">Save checks impact first. Project OS will warn before restarting containers or changing access.</p>
+            <p className="mt-1 text-xs leading-5 text-sky-100/60">
+              {operationBusy
+                ? 'Settings are paused while Project OS finishes the current app action.'
+                : 'Save checks impact first. Project OS will warn before restarting containers or changing access.'}
+            </p>
           </div>
           <div className="flex shrink-0 gap-2">
             <Button
@@ -289,7 +294,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction disabled={saving || pendingImpact?.saveAllowed === false} onClick={(event) => {
+            <AlertDialogAction disabled={busy || pendingImpact?.saveAllowed === false} onClick={(event) => {
               event.preventDefault();
               void confirmSave();
             }}>
