@@ -65,16 +65,28 @@ test('applications rebuild settings tab uses a guarded batch form for app settin
 });
 
 test('applications rebuild settings tab uses real controls and confirm-before-save planning', () => {
+  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
   const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
+  const tooltip = source('src/components/ui/tooltip.tsx');
 
   assert.match(settings, /AlertDialog/);
   assert.match(settings, /Tooltip/);
+  assert.match(settings, /bg-slate-950/);
   assert.match(settings, /Input/);
   assert.match(settings, /Select/);
+  assert.match(settings, /useId/);
+  assert.match(settings, /htmlFor=\{inputId\}/);
+  assert.match(settings, /id=\{inputId\}/);
   assert.match(settings, /prepareSave/);
   assert.match(settings, /confirmSave/);
   assert.match(settings, /Local app port/);
   assert.match(settings, /Backup retention/);
+  assert.match(rail, /lg:w-\[66rem\]/);
+  assert.match(rail, /xl:w-\[72rem\]/);
+  assert.match(tooltip, /bg-popover/);
+  assert.match(tooltip, /text-popover-foreground/);
   assert.doesNotMatch(settings, /role="switch"/);
   assert.doesNotMatch(settings, /onClick=\{\(\) => toggleField\(\)\}/);
+  assert.doesNotMatch(settings, /<FieldLabel className="text-white">\s*<SettingLabel/);
+  assert.doesNotMatch(tooltip, /bg-foreground px-3 py-1\.5 text-xs text-background/);
 });

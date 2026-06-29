@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { AlertTriangle, CheckCircle2, Container, HelpCircle, KeyRound, Loader2, RotateCcw, Save, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -170,7 +170,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         <FieldSet className="rounded-xl border border-sky-400/20 bg-slate-800 p-3">
           <SettingsSectionHeader icon={Container} status={values.autoRepairEnabled ? 'Automatic repair on' : 'Manual repair'} title="Container" />
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 xl:grid-cols-2">
             <SwitchField
               control={control}
               disabled={!editable || busy}
@@ -212,7 +212,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         <FieldSet className="rounded-xl border border-sky-400/20 bg-slate-800 p-3">
           <SettingsSectionHeader icon={ShieldCheck} status={values.backupEnabled ? 'Backups on' : 'Backups off'} title="Backups" />
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 xl:grid-cols-3">
             <SwitchField
               control={control}
               disabled={!editable || busy}
@@ -315,17 +315,25 @@ function SettingsSectionHeader({ icon: Icon, status, title }: { icon: LucideIcon
   );
 }
 
-function SettingLabel({ explanation, label }: { explanation: string; label: string }) {
+function SettingLabel({ explanation, inputId, label }: { explanation: string; inputId?: string; label: string }) {
   return (
-    <div className="flex items-center gap-2">
-      <span>{label}</span>
+    <div className="flex min-w-0 items-center gap-2">
+      {inputId ? (
+        <FieldLabel className="min-w-0 text-white" htmlFor={inputId}>
+          {label}
+        </FieldLabel>
+      ) : (
+        <span className="min-w-0 text-sm font-medium text-white">{label}</span>
+      )}
       <Tooltip>
         <TooltipTrigger asChild>
           <Button aria-label={`${label} explanation`} className="size-6 border-sky-400/30 bg-slate-800 text-sky-100 hover:bg-slate-700" size="icon-sm" type="button" variant="outline">
             <HelpCircle />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{explanation}</TooltipContent>
+        <TooltipContent className="max-w-xs border border-sky-400/30 bg-slate-950 text-sky-50 shadow-xl shadow-slate-950/50" side="top" sideOffset={8}>
+          {explanation}
+        </TooltipContent>
       </Tooltip>
     </div>
   );
@@ -344,6 +352,8 @@ function SwitchField({
   label: string;
   name: 'autoRepairEnabled' | 'backupEnabled' | 'tailscaleEnabled';
 }) {
+  const inputId = useId();
+
   return (
     <Controller
       control={control}
@@ -351,12 +361,10 @@ function SwitchField({
       render={({ field }) => (
         <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2" data-disabled={disabled} orientation="horizontal">
           <FieldContent>
-            <FieldLabel className="text-white">
-              <SettingLabel explanation={explanation} label={label} />
-            </FieldLabel>
+            <SettingLabel explanation={explanation} inputId={inputId} label={label} />
             <FieldDescription className="text-sky-100/60">{field.value ? 'Enabled' : 'Disabled'}</FieldDescription>
           </FieldContent>
-          <Switch checked={Boolean(field.value)} disabled={disabled} onCheckedChange={field.onChange} size="sm" />
+          <Switch checked={Boolean(field.value)} disabled={disabled} id={inputId} onCheckedChange={(checked) => field.onChange(checked)} />
         </Field>
       )}
     />
@@ -378,19 +386,19 @@ function NumberField({
   min: number;
   name: 'backupRetention' | 'localPort';
 }) {
+  const inputId = useId();
+
   return (
     <Controller
       control={control}
       name={name}
       render={({ field }) => (
         <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2" data-disabled={disabled}>
-          <FieldLabel className="text-white" htmlFor={name}>
-            <SettingLabel explanation={explanation} label={label} />
-          </FieldLabel>
+          <SettingLabel explanation={explanation} inputId={inputId} label={label} />
           <Input
             className="border-sky-400/30 bg-slate-800 text-white"
             disabled={disabled}
-            id={name}
+            id={inputId}
             min={min}
             onChange={(event) => field.onChange(event.target.value === '' ? null : Number(event.target.value))}
             type="number"
@@ -417,17 +425,17 @@ function SelectField({
   name: 'backupFrequency' | 'expectedProtocol';
   options: readonly string[];
 }) {
+  const inputId = useId();
+
   return (
     <Controller
       control={control}
       name={name}
       render={({ field }) => (
         <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2" data-disabled={disabled}>
-          <FieldLabel className="text-white">
-            <SettingLabel explanation={explanation} label={label} />
-          </FieldLabel>
+          <SettingLabel explanation={explanation} inputId={inputId} label={label} />
           <Select disabled={disabled} onValueChange={field.onChange} value={String(field.value)}>
-            <SelectTrigger className="w-full border-sky-400/30 bg-slate-800 text-white">
+            <SelectTrigger className="w-full border-sky-400/30 bg-slate-800 text-white" id={inputId}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

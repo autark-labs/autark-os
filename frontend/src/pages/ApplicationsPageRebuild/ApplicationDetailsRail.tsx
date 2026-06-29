@@ -31,7 +31,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
     <Card
       className={cn(
         'relative z-30 h-fit w-full scroll-mt-5 justify-self-end overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 transition-[width,box-shadow] duration-300 ease-out lg:sticky lg:top-5 lg:w-[22rem]',
-        managementOpen && 'shadow-2xl shadow-cyan-950/50 lg:w-[58rem]',
+        managementOpen && 'shadow-2xl shadow-cyan-950/50 lg:w-[66rem] xl:w-[72rem]',
       )}
       onPointerDown={(event) => event.stopPropagation()}
       ref={ref}
@@ -74,7 +74,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
             className={cn(
               'grid transition-[grid-template-columns,gap] duration-300 ease-out',
               managementOpen
-                ? 'grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]'
+                ? 'grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_21rem]'
                 : 'grid-cols-[0fr_minmax(0,1fr)] gap-0',
             )}
           >
