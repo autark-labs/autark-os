@@ -54,11 +54,11 @@ export function ExpandedOperationStatus({ className, item }: { className?: strin
         {failed ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />}
         <div className="min-w-0">
           <p className="text-sm font-semibold">{item.operationState.label}</p>
-          {item.operationState.kind === 'failed' ? (
-            <p className="mt-1 text-xs leading-5 opacity-80">
-              Project OS could not finish this action. The app remains visible so you can review its state before trying again.
-            </p>
-          ) : (
+      {item.operationState.kind === 'failed' ? (
+        <p className="mt-1 text-xs leading-5 opacity-80">
+          {item.operationState.message || 'Project OS could not finish this action. The app remains visible so you can review its state before trying again.'}
+        </p>
+      ) : (
             <p className="mt-1 text-xs leading-5 opacity-80">
               {item.operationState.currentStep || 'Project OS is working on this app. Conflicting controls are paused until it finishes.'}
             </p>

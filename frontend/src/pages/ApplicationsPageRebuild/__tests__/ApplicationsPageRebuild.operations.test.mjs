@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { operationStateForItem } from '../extensions/ApplicationsPage.operations.js';
+import { operationStateForItem, runtimeControlsDisabled } from '../extensions/ApplicationsPage.operations.js';
 
 test('operationStateForItem maps local runtime actions before idle state', () => {
   assert.deepEqual(operationStateForItem(item('vaultwarden'), 'start', null, []), {
@@ -83,6 +83,13 @@ test('operationStateForItem maps failed durable jobs and ignores jobs for other 
   ]), {
     kind: 'idle',
   });
+});
+
+test('runtime controls remain available after a failed operation', () => {
+  assert.equal(runtimeControlsDisabled({ kind: 'idle' }, null), false);
+  assert.equal(runtimeControlsDisabled({ kind: 'failed' }, null), false);
+  assert.equal(runtimeControlsDisabled({ kind: 'starting' }, null), true);
+  assert.equal(runtimeControlsDisabled({ kind: 'idle' }, 'start'), true);
 });
 
 function item(id) {

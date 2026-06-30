@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -46,6 +47,7 @@ public class AppLifecycleService {
     private static final int EVENT_LIMIT = 8;
     private static final Duration ACCESS_CHECK_TIMEOUT = Duration.ofMillis(850);
     private static final Pattern SAFE_STORAGE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
+    private static final Pattern HOST_PORT_CONFLICT = Pattern.compile("host port [^:]*:(\\d+)/tcp: address already in use", Pattern.CASE_INSENSITIVE);
     private static final Set<String> BACKUP_FREQUENCIES = Set.of("hourly", "daily", "weekly");
     private static final DateTimeFormatter SAFETY_CHECKPOINT_NAME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
@@ -833,7 +835,16 @@ public class AppLifecycleService {
         }
         repository.recordEvent(app.appId(), action + "_failed", String.join("\n", result.output()));
         activityWarning(action + "_failed", failureMessage, failureReason(result.output()), app.appId());
-        throw new InstallationException(failureMessage + ". Check recent activity for details.");
+        throw new InstallationException(lifecycleFailureMessage(failureMessage, result.output()));
+    }
+
+    private String lifecycleFailureMessage(String fallbackMessage, List<String> output) {
+        String outputText = output == null ? "" : String.join("\n", output);
+        Matcher portConflict = HOST_PORT_CONFLICT.matcher(outputText);
+        if (portConflict.find()) {
+            return "Port " + portConflict.group(1) + " is already in use. Stop the service using that port or change the app port, then try again.";
+        }
+        return fallbackMessage + ". Check recent activity for details.";
     }
 
     private AppRuntimeView refresh(InstalledApp app) {

@@ -13,6 +13,7 @@ import { ExpandedOperationStatus } from './components/AppOperationStatus';
 import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { ApplicationManagementPanel } from './ApplicationManagementPanel';
+import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations.js';
 import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationDetailsRailProps = {
@@ -124,7 +125,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
 });
 
 function RailControls({ actions, item, loadingAction }: { actions: ApplicationActionHandlers; item: ApplicationSurfaceItem; loadingAction: ApplicationRuntimeAction | null }) {
-  const runtimeActionDisabled = Boolean(loadingAction) || item.operationState.kind !== 'idle';
+  const runtimeActionDisabled = runtimeControlsDisabled(item.operationState, loadingAction);
 
   return (
     <section className="grid gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3">

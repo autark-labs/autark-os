@@ -36,14 +36,15 @@ test('applications rebuild starts lifecycle jobs and re-pulls canonical app stat
   assert.match(operations, /kind: 'saving_settings'/);
   assert.match(operations, /kind: 'failed'/);
   assert.match(advanced, /actionLoadingByItemId/);
-  assert.match(advanced, /item\.operationState\.kind !== 'idle'/);
+  assert.match(advanced, /runtimeControlsDisabled\(item\.operationState, loadingAction\)/);
   assert.match(rail, /actionLoadingByItemId/);
-  assert.match(rail, /item\.operationState\.kind !== 'idle'/);
+  assert.match(rail, /runtimeControlsDisabled\(item\.operationState, loadingAction\)/);
 });
 
 test('applications rebuild pins and unpins observed services through canonical application state', () => {
   const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
   const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+  const observedSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
   const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /onPinObservedService: \(serviceId: string\) => Promise<void>/);
@@ -61,12 +62,52 @@ test('applications rebuild pins and unpins observed services through canonical a
   assert.match(page, /invalidateApplicationState\(queryClient\)/);
 
   assert.match(panel, /ObservedServiceManagementSection/);
-  assert.match(panel, /actions\.onPinObservedService\(serviceId\)/);
-  assert.match(panel, /actions\.onUnpinObservedService\(serviceId\)/);
-  assert.match(panel, /item\.managementState === 'found'/);
-  assert.match(panel, /item\.managementState === 'linked'/);
-  assert.match(panel, /Pin to My Apps/);
-  assert.match(panel, /Unpin/);
+  assert.match(observedSection, /actions\.onPinObservedService\(serviceId\)/);
+  assert.match(observedSection, /actions\.onUnpinObservedService\(serviceId\)/);
+  assert.match(observedSection, /item\.managementState === 'found'/);
+  assert.match(observedSection, /item\.managementState === 'linked'/);
+  assert.match(observedSection, /Pin to My Apps/);
+  assert.match(observedSection, /Unpin/);
   assert.doesNotMatch(panel, />\s*Match\s*</);
   assert.doesNotMatch(panel, />\s*Adopt\s*</);
+});
+
+test('applications rebuild manages observed-service matching and adoption inside the pullout', () => {
+  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+  const observedSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
+  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+
+  assert.match(types, /onMatchObservedService: \(serviceId: string, catalogAppId: string \| null\) => Promise<void>/);
+  assert.match(types, /onLoadObservedServiceAdoptionPlan: \(serviceId: string\) => Promise<ObservedServiceAdoptionPlan>/);
+  assert.match(types, /onAdoptObservedService: \(serviceId: string, confirmation: string\) => Promise<void>/);
+
+  assert.match(page, /ObservedServicesAPIClient\.match\(serviceId, catalogAppId\)/);
+  assert.match(page, /ObservedServicesAPIClient\.adoptionPlan\(serviceId\)/);
+  assert.match(page, /ObservedServicesAPIClient\.adopt\(serviceId, confirmation\)/);
+  assert.match(page, /showActionErrorNotification\(err, 'Service match could not be saved'\)/);
+  assert.match(page, /showActionErrorNotification\(err, 'Service could not be adopted'\)/);
+
+  assert.match(panel, /ObservedServiceManagementSection/);
+  assert.match(observedSection, /Recovery plan/);
+  assert.match(observedSection, /Review recovery plan/);
+  assert.match(observedSection, /Adopt service/);
+  assert.match(observedSection, /Install copy/);
+  assert.match(observedSection, /adoption_plan/);
+  assert.match(observedSection, /planList\(/);
+});
+
+test('applications rebuild keeps catalog matching in the advanced pullout tab', () => {
+  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+  const observedSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
+  const catalogSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceCatalogMatchSection.tsx');
+
+  assert.match(panel, /ObservedServiceCatalogMatchSection/);
+  assert.match(panel, /<TabsContent className="grid gap-4" value="advanced">[\s\S]*<ObservedServiceCatalogMatchSection/);
+  assert.doesNotMatch(observedSection, /Catalog match/);
+  assert.doesNotMatch(observedSection, /Clear match/);
+  assert.doesNotMatch(observedSection, /change_match/);
+  assert.match(catalogSection, /Catalog match/);
+  assert.match(catalogSection, /Clear match/);
+  assert.match(catalogSection, /change_match/);
 });

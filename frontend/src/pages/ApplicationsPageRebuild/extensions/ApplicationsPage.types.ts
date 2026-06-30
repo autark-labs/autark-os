@@ -1,5 +1,6 @@
 import type { DestructiveActionPlan } from './ApplicationsPage.destructiveActions';
 import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUsageGuide } from '@/types/app';
+import type { ObservedServiceAdoptionPlan } from '@/types/observedService';
 
 export type ApplicationRuntimeState = 'running' | 'starting' | 'paused' | 'needs_attention' | 'found' | 'shortcut';
 export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart';
@@ -52,6 +53,8 @@ export type ApplicationSurfaceItem = {
   access: 'Open' | 'Private' | 'Local only' | 'No link';
   backup: 'Protected' | 'Needs backup' | 'Not managed';
   availableActions: ApplicationAvailableAction[];
+  catalogAppId?: string | null;
+  catalogMatchConfidence?: string;
   nextAction?: ApplicationNextAction;
   description: string;
   href?: string;
@@ -60,12 +63,18 @@ export type ApplicationSurfaceItem = {
   links: ApplicationLinksView;
   settings: ApplicationSettingsView;
   runtime: ApplicationRuntimeDetailsView;
+  userStatus?: string;
+  userStatusDescription?: string;
+  userStatusLabel?: string;
 };
 
 export type ApplicationActionHandlers = {
   onCreateBackup: (id: string) => void;
   onDirtyChange: (id: string, dirty: boolean) => void;
+  onAdoptObservedService: (serviceId: string, confirmation: string) => Promise<void>;
   onLoadUninstallPlan: (id: string) => Promise<DestructiveActionPlan>;
+  onLoadObservedServiceAdoptionPlan: (serviceId: string) => Promise<ObservedServiceAdoptionPlan>;
+  onMatchObservedService: (serviceId: string, catalogAppId: string | null) => Promise<void>;
   onPinObservedService: (serviceId: string) => Promise<void>;
   onRestart: (id: string) => void;
   onRunNextAction: (id: string) => void;

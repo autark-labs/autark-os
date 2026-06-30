@@ -1,22 +1,11 @@
-import { useState } from 'react';
-import {
-  Download,
-  Loader2,
-  Pin,
-  PinOff,
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { DestructiveActionDialog } from './components/DestructiveActionDialog';
 import { ExpandedOperationStatus } from './components/AppOperationStatus';
 import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
@@ -24,10 +13,24 @@ import { ApplicationGuideTab } from './managementTabs/ApplicationGuideTab';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
 import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
 import { ApplicationTelemetryTab } from './managementTabs/ApplicationTelemetryTab';
+import { ObservedServiceCatalogMatchSection } from './managementTabs/ObservedServiceCatalogMatchSection';
+import { ObservedServiceManagementSection } from './managementTabs/ObservedServiceManagementSection';
 import type { ApplicationActionHandlers, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationManagementPanelProps = {
-  actions: Pick<ApplicationActionHandlers, 'onDirtyChange' | 'onLoadUninstallPlan' | 'onPinObservedService' | 'onRunUninstall' | 'onSaveSettings' | 'onSettingsPlanRequest' | 'onUnpinObservedService'>;
+  actions: Pick<
+    ApplicationActionHandlers,
+    | 'onAdoptObservedService'
+    | 'onDirtyChange'
+    | 'onLoadObservedServiceAdoptionPlan'
+    | 'onLoadUninstallPlan'
+    | 'onMatchObservedService'
+    | 'onPinObservedService'
+    | 'onRunUninstall'
+    | 'onSaveSettings'
+    | 'onSettingsPlanRequest'
+    | 'onUnpinObservedService'
+  >;
   item: ApplicationSurfaceItem;
   settingsLoadingAction?: ApplicationSettingsAction | null;
   variant?: 'inline' | 'rail';
@@ -90,6 +93,7 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
           </TabsContent>
 
           <TabsContent className="grid gap-4" value="advanced">
+            <ObservedServiceCatalogMatchSection actions={actions} item={item} />
             <Accordion className="rounded-xl border border-sky-400/20 bg-slate-800 px-3" collapsible defaultValue="runtime" type="single">
               <AccordionItem value="runtime">
                 <AccordionTrigger className="text-sky-50">Runtime details</AccordionTrigger>
@@ -122,113 +126,6 @@ export function ApplicationManagementPanel({ actions, item, settingsLoadingActio
           </TabsContent>
         </div>
       </Tabs>
-    </section>
-  );
-}
-
-function ObservedServiceManagementSection({
-  actions,
-  item,
-}: {
-  actions: Pick<ApplicationActionHandlers, 'onPinObservedService' | 'onUnpinObservedService'>;
-  item: ApplicationSurfaceItem;
-}) {
-  const [busyAction, setBusyAction] = useState<'pin' | 'unpin' | null>(null);
-  const serviceId = item.sourceId || item.id;
-  const pinAction = item.availableActions.find((action) => action.id === 'pin');
-  const unpinAction = item.availableActions.find((action) => action.id === 'unpin');
-  const installCopyAction = item.availableActions.find((action) => action.id === 'install_copy');
-  const isFound = item.managementState === 'found';
-  const isLinked = item.managementState === 'linked';
-
-  if (!isFound && !isLinked) {
-    return null;
-  }
-
-  const canPin = isFound && Boolean(pinAction) && !pinAction?.disabled;
-  const canUnpin = isLinked && Boolean(unpinAction) && !unpinAction?.disabled;
-  const pinDisabledReason = busyAction
-    ? 'Wait for the current service action to finish.'
-    : pinAction?.disabled
-      ? pinAction.reason || 'Project OS cannot pin this service right now.'
-      : !pinAction
-        ? 'Project OS cannot pin this service right now.'
-        : '';
-  const unpinDisabledReason = busyAction
-    ? 'Wait for the current service action to finish.'
-    : unpinAction?.disabled
-      ? unpinAction.reason || 'Project OS cannot unpin this service right now.'
-      : !unpinAction
-        ? 'Project OS cannot unpin this service right now.'
-        : '';
-
-  async function runObservedServiceAction(nextAction: 'pin' | 'unpin') {
-    setBusyAction(nextAction);
-    try {
-      if (nextAction === 'pin') {
-        await actions.onPinObservedService(serviceId);
-      } else {
-        await actions.onUnpinObservedService(serviceId);
-      }
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  return (
-    <section className="grid gap-3 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-amber-100">{isLinked ? 'Linked service' : 'Found service'}</p>
-          <p className="text-xs text-amber-100/70">
-            {isLinked ? 'Project OS can open this service but does not manage its runtime.' : 'Project OS found this service on the server.'}
-          </p>
-        </div>
-        <Badge className="border-amber-300/30 bg-slate-900 text-amber-100" variant="outline">
-          {isLinked ? 'Linked' : 'Not managed'}
-        </Badge>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        {isFound && (
-          <DisabledAction disabled={!canPin} reason={pinDisabledReason}>
-            <Button
-              className="border-amber-300/30 bg-slate-900 text-amber-100 hover:bg-slate-800"
-              disabled={!canPin}
-              onClick={() => void runObservedServiceAction('pin')}
-              type="button"
-              variant="outline"
-            >
-              {busyAction === 'pin' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Pin data-icon="inline-start" />}
-              Pin to My Apps
-            </Button>
-          </DisabledAction>
-        )}
-
-        {isLinked && (
-          <DisabledAction disabled={!canUnpin} reason={unpinDisabledReason}>
-            <Button
-              className="border-amber-300/30 bg-slate-900 text-amber-100 hover:bg-slate-800"
-              disabled={!canUnpin}
-              onClick={() => void runObservedServiceAction('unpin')}
-              type="button"
-              variant="outline"
-            >
-              {busyAction === 'unpin' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <PinOff data-icon="inline-start" />}
-              Unpin
-            </Button>
-          </DisabledAction>
-        )}
-
-        {installCopyAction?.href && (
-          <Button asChild className="border-amber-300/30 bg-slate-900 text-amber-100 hover:bg-slate-800" variant="outline">
-            <Link to={installCopyAction.href}>
-              <Download data-icon="inline-start" />
-              Install copy
-            </Link>
-          </Button>
-        )}
-      </div>
     </section>
   );
 }

@@ -35,6 +35,14 @@ export function operationStateForItem(item, localAction, settingsAction, jobs = 
   return { kind: 'idle' };
 }
 
+export function runtimeControlsDisabled(operationState, loadingAction) {
+  if (loadingAction) {
+    return true;
+  }
+  const kind = operationState?.kind ?? 'idle';
+  return kind !== 'idle' && kind !== 'failed';
+}
+
 function operationStateFromLocalAction(action) {
   if (action === 'start') {
     return {

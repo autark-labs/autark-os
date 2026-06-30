@@ -21,6 +21,7 @@ import { invalidateProjectOsJobs, setProjectOsJobCache, terminalJob, useProjectO
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
 import type { AppRuntimeView, AppSettingsChangePlan, InstallSettings } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
+import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan } from '@/types/observedService';
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
@@ -359,6 +360,38 @@ export const ApplicationsPage = () => {
     }
   }
 
+  async function matchObservedService(serviceId: string, catalogAppId: string | null) {
+    try {
+      const result = await ObservedServicesAPIClient.match(serviceId, catalogAppId);
+      handleObservedServiceActionResult(result, result.title || 'Service match saved');
+    } catch (err) {
+      showActionErrorNotification(err, 'Service match could not be saved');
+      throw err;
+    }
+  }
+
+  async function loadObservedServiceAdoptionPlan(serviceId: string): Promise<ObservedServiceAdoptionPlan> {
+    return ObservedServicesAPIClient.adoptionPlan(serviceId);
+  }
+
+  async function adoptObservedService(serviceId: string, confirmation: string) {
+    try {
+      const result = await ObservedServicesAPIClient.adopt(serviceId, confirmation);
+      handleObservedServiceActionResult(result, result.title || 'Service adopted');
+    } catch (err) {
+      showActionErrorNotification(err, 'Service could not be adopted');
+      throw err;
+    }
+  }
+
+  function handleObservedServiceActionResult(result: ObservedServiceActionResult, fallbackTitle: string) {
+    const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+    showActionNotification(result, fallbackTitle);
+    if (!stateUpdated) {
+      void invalidateApplicationState(queryClient);
+    }
+  }
+
   const handleStart = (id: string) => void runManagedAction(id, 'start');
   const handleStop = (id: string) => void runManagedAction(id, 'stop');
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
@@ -388,8 +421,11 @@ export const ApplicationsPage = () => {
 
   const actions = {
     onCreateBackup: handleCreateBackup,
+    onAdoptObservedService: adoptObservedService,
     onDirtyChange: handleDirtyChange,
+    onLoadObservedServiceAdoptionPlan: loadObservedServiceAdoptionPlan,
     onLoadUninstallPlan: loadUninstallPlan,
+    onMatchObservedService: matchObservedService,
     onPinObservedService: pinObservedService,
     onRestart: handleRestart,
     onRunNextAction: handleRunNextAction,

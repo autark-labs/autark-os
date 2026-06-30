@@ -12,3 +12,8 @@ export function operationStateForItem(
   settingsAction: ApplicationSettingsAction | null,
   jobs: ProjectOsJob[],
 ): AppOperationState;
+
+export function runtimeControlsDisabled(
+  operationState: AppOperationState,
+  loadingAction: ApplicationRuntimeAction | null,
+): boolean;

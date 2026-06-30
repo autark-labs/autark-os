@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { CompactOperationStatus } from './components/AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
+import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations.js';
 import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type AdvancedApplicationsViewProps = {
@@ -56,7 +57,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
               {items.map((item) => {
                 const loadingAction = actionLoadingByItemId[item.id] ?? null;
                 const primaryRuntimeActionLoading = loadingAction === 'start' || loadingAction === 'stop';
-                const runtimeActionDisabled = Boolean(loadingAction) || item.operationState.kind !== 'idle';
+                const runtimeActionDisabled = runtimeControlsDisabled(item.operationState, loadingAction);
 
                 return (
                   <TableRow

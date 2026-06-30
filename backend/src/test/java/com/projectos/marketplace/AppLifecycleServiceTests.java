@@ -126,6 +126,17 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void lifecycleStartFailureExplainsPortConflictInUserLanguage() {
+        composeExecutor.failUpOutput = List.of(
+                "Error response from daemon: failed to bind host port 0.0.0.0:8385/tcp: address already in use");
+
+        assertThatThrownBy(() -> service.start("vaultwarden"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Port 8385 is already in use")
+                .hasMessageContaining("change the app port");
+    }
+
+    @Test
     void telemetryForAllAppsUsesAppIdsAsKeys() {
         assertThat(service.telemetry())
                 .containsKey("vaultwarden")
@@ -884,12 +895,16 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         boolean restartCalled;
         boolean upCalled;
+        List<String> failUpOutput = List.of();
         boolean failDown;
         boolean transitionToStarting;
 
         @Override
         public DockerComposeResult up(Path composeFile, String projectName) {
             upCalled = true;
+            if (!failUpOutput.isEmpty()) {
+                return new DockerComposeResult(1, failUpOutput);
+            }
             if (transitionToStarting) {
                 containers = startingContainer();
             }

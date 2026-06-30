@@ -104,6 +104,8 @@ function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSu
       reason: action.reason,
     })),
     backup: 'Not managed',
+    catalogAppId: service.catalogAppId,
+    catalogMatchConfidence: service.catalogMatchConfidence,
     description: service.userStatusDescription || service.category || 'Found service',
     href: service.url || undefined,
     id: `observed:${service.id}`,
@@ -121,6 +123,9 @@ function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSu
     sortKey: `${managementState}:${(service.displayName || service.id).toLowerCase()}:${service.id}`,
     sourceId: service.id,
     status: pinned ? 'Pinned' : needsReview ? 'Needs review' : 'Found',
+    userStatus: service.userStatus,
+    userStatusDescription: service.userStatusDescription,
+    userStatusLabel: service.userStatusLabel,
   };
 }
 
