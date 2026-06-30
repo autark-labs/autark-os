@@ -159,3 +159,39 @@ test('applications rebuild runs repair only from canonical available actions', (
   assert.match(recovery, /Run repair/);
   assert.match(recovery, /actions\.onRepair\(item\.id\)/);
 });
+
+test('applications rebuild starts app backup jobs from real backup actions', () => {
+  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
+  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
+  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+
+  assert.match(types, /onCreateBackup: \(id: string\) => void/);
+  assert.match(types, /'backup'/);
+  assert.match(page, /BackupAPIClient/);
+  assert.match(page, /BackupAPIClient\.run\(appId\)/);
+  assert.match(page, /setAppActionLoading\(appId, 'backup'\)/);
+  assert.match(page, /setProjectOsJobCache\(queryClient, job\)/);
+  assert.match(page, /setProjectOsJobInApplicationStateCache\(queryClient, job\)/);
+  assert.match(page, /invalidateBackupQueries\(queryClient\)/);
+  assert.match(page, /title: 'Backup started'/);
+  assert.doesNotMatch(page, /const handleCreateBackup = \(id: string\) => \{[\s\S]*setManagementOpen\(true\);[\s\S]*invalidateApplicationState\(queryClient\);[\s\S]*\};/);
+
+  assert.match(rail, /actions\.onCreateBackup\(item\.id\)/);
+  assert.match(advanced, /actions\.onCreateBackup\(item\.id\)/);
+});
+
+test('applications rebuild surfaces backup-aware safety warnings around risky flows', () => {
+  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+  const recovery = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationRecoveryTab.tsx');
+  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
+  const observed = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
+
+  assert.match(panel, /backupSafetyMessage\(item\)/);
+  assert.match(panel, /No verified backup/);
+  assert.match(recovery, /backupSafetyMessage\(item\)/);
+  assert.match(recovery, /Repair preserves data/);
+  assert.match(settings, /item\.backup !== 'Protected'/);
+  assert.match(settings, /No verified restore point/);
+  assert.match(observed, /Backup protection starts after recovery/);
+});

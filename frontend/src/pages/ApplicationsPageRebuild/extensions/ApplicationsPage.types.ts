@@ -3,7 +3,7 @@ import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUsage
 import type { ObservedServiceAdoptionPlan } from '@/types/observedService';
 
 export type ApplicationRuntimeState = 'running' | 'starting' | 'paused' | 'needs_attention' | 'found' | 'shortcut';
-export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair';
+export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup';
 export type ApplicationSettingsAction = 'planning' | 'saving';
 export type AppManagementState = 'managed' | 'found' | 'linked';
 export type AppReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown';

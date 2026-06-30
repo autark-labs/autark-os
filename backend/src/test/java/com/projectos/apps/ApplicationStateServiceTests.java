@@ -265,6 +265,40 @@ class ApplicationStateServiceTests {
     }
 
     @Test
+    void snapshotOverlaysBackupJobOnTargetApp() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("backup-1", "backup", "vaultwarden", "running", "copy_data")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("idle");
+        assertThat(state.runtimeApps().get(1).operationState().kind()).isEqualTo("backing_up");
+        assertThat(state.runtimeApps().get(1).operationState().label()).isEqualTo("Creating backup");
+        assertThat(state.runtimeApps().get(1).availableActions()).isEmpty();
+    }
+
+    @Test
+    void snapshotKeepsFailedBackupVisibleOnReadyApp() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("vaultwarden", "Vaultwarden")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("backup-failed", "backup", "vaultwarden", "failed", "copy_data")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("failed");
+        assertThat(state.runtimeApps().getFirst().operationState().label()).isEqualTo("Creating backup");
+    }
+
+    @Test
     void snapshotOnlyIncludesRepairActionWhenCanonicalStateNeedsRemediation() {
         ApplicationStateService service = new ApplicationStateService(
                 List::of,

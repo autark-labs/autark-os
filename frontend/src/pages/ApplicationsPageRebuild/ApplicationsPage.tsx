@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Search } from 'lucide-react';
+import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import {
 } from '@/repositories/applicationStateRepository';
 import { invalidateProjectOsJobs, setProjectOsJobCache, terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
+import { invalidateBackupQueries } from '@/repositories/backupRepository';
 import type { AppRuntimeView, AppSettingsChangePlan, InstallSettings } from '@/types/app';
 import type { ApplicationState } from '@/types/applicationState';
 import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan } from '@/types/observedService';
@@ -36,7 +38,7 @@ import type {
 } from './extensions/ApplicationsPage.types';
 
 type ApplicationFilter = 'all' | 'managed' | 'pinned' | 'found' | 'needs_review';
-type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair'>;
+type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'backup'>;
 
 export const ApplicationsPage = () => {
   const { viewMode } = useProjectSettings();
@@ -263,6 +265,30 @@ export const ApplicationsPage = () => {
     }
   };
 
+  const runBackup = async (appId: string) => {
+    setAppActionLoading(appId, 'backup');
+
+    try {
+      const job = await BackupAPIClient.run(appId);
+      setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'Backup started',
+        message: 'Project OS is creating a restore point for this app and will keep showing progress here.',
+      });
+      void invalidateProjectOsJobs(queryClient);
+      void invalidateBackupQueries(queryClient);
+      void invalidateApplicationState(queryClient);
+    } catch (err) {
+      showActionErrorNotification(err, 'Backup could not start');
+    } finally {
+      setAppActionLoading(appId, null);
+    }
+  };
+
   async function requestSettingsPlan(appId: string, values: ApplicationSettingsFormValues): Promise<ApplicationSettingsImpact | null> {
     const app = managedAppById.get(appId);
     if (!app) {
@@ -421,11 +447,7 @@ export const ApplicationsPage = () => {
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
   const handleRepair = (id: string) => void runRepair(id);
   const handleDirtyChange = (id: string, dirty: boolean) => setSettingsDirtyByAppId((current) => ({ ...current, [id]: dirty }));
-  const handleCreateBackup = (id: string) => {
-    setSelectedId(id);
-    setManagementOpen(true);
-    void invalidateApplicationState(queryClient);
-  };
+  const handleCreateBackup = (id: string) => void runBackup(id);
 
   const handleRunNextAction = (id: string) => {
     const item = items.find((candidate) => candidate.id === id);
@@ -696,6 +718,7 @@ function appActionLabel(action: ApplicationRuntimeAction) {
   if (action === 'stop') return 'Pause';
   if (action === 'restart') return 'Restart';
   if (action === 'repair') return 'Repair';
+  if (action === 'backup') return 'Backup';
   return 'App action';
 }
 

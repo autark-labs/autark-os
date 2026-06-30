@@ -1,6 +1,7 @@
 package com.projectos.backups;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.projectos.backups.api.RestoreRequest;
+import com.projectos.apps.ApplicationStateService;
 import com.projectos.jobs.ProjectOsJob;
 import com.projectos.jobs.ProjectOsJobRepository;
 import com.projectos.jobs.ProjectOsJobService;
@@ -27,10 +29,44 @@ class BackupControllerTests {
     Path runtimeRoot;
 
     @Test
+    void appBackupReturnsQueuedJobAndInvalidatesApplicationState() {
+        BackupService backupService = mock(BackupService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        ProjectOsJobService jobService = jobService();
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupRunResult result = new BackupRunResult(
+                "vaultwarden",
+                "Vaultwarden",
+                "completed",
+                "Backup completed for Vaultwarden.",
+                null,
+                Instant.parse("2026-06-21T12:00:00Z"));
+        when(backupService.run("vaultwarden")).thenReturn(result);
+
+        ProjectOsJob job = controller.run("vaultwarden");
+
+        assertThat(job.type()).isEqualTo("backup");
+        assertThat(job.subjectId()).isEqualTo("vaultwarden");
+        assertThat(job.status()).isEqualTo("queued");
+        assertThat(job.steps()).extracting(ProjectOsJobStep::id)
+                .containsExactly("prepare_backup", "copy_data", "verify_backup", "finish");
+        verify(backupService, never()).run("vaultwarden");
+        verify(applicationStateService, atLeastOnce()).invalidate();
+
+        jobService.runQueuedJobsNow();
+
+        ProjectOsJob completed = jobService.findById(job.jobId()).orElseThrow();
+        assertThat(completed.status()).isEqualTo("succeeded");
+        verify(backupService).run("vaultwarden");
+        verify(applicationStateService, atLeastOnce()).invalidate();
+    }
+
+    @Test
     void verifyRestorePointReturnsQueuedJobWithoutRunningVerificationInline() {
         BackupService backupService = mock(BackupService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         ProjectOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
         BackupVerificationResult result = new BackupVerificationResult(
                 42L,
                 "verified",
@@ -61,8 +97,9 @@ class BackupControllerTests {
     @Test
     void restorePointReturnsQueuedJobWithoutRunningRestoreInline() {
         BackupService backupService = mock(BackupService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         ProjectOsJobService jobService = jobService();
-        BackupController controller = new BackupController(backupService, jobService);
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
         RestoreResult result = new RestoreResult(
                 42L,
                 "completed",

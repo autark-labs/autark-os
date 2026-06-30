@@ -15,6 +15,10 @@ test('operationStateForItem maps local runtime actions before idle state', () =>
     kind: 'restarting',
     label: 'Restarting',
   });
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), 'backup', null, []), {
+    kind: 'backing_up',
+    label: 'Creating backup',
+  });
 });
 
 test('operationStateForItem maps settings save but not settings planning', () => {

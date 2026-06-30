@@ -151,8 +151,8 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                             event.stopPropagation();
                             actions.onCreateBackup(item.id);
                           }} disabled={runtimeActionDisabled} size="sm" type="button" variant="outline">
-                            <ShieldCheck data-icon="inline-start" />
-                            Backup
+                            {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
+                            {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
                           </Button>
                         )}
                         <Button aria-label={`More controls for ${item.name}`} className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={() => onSelect(item.id)} size="icon-sm" type="button" variant="outline">
@@ -174,5 +174,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
 function runtimeActionLabel(action: ApplicationRuntimeAction) {
   if (action === 'start') return 'Starting';
   if (action === 'stop') return 'Pausing';
+  if (action === 'backup') return 'Backing up';
+  if (action === 'repair') return 'Repairing';
   return 'Restarting';
 }

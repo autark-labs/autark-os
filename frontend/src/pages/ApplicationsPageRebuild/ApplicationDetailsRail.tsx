@@ -192,8 +192,8 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
             {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
           </Button>
           <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => actions.onCreateBackup(item.id)} type="button" variant="outline">
-            <ShieldCheck data-icon="inline-start" />
-            Backup
+            {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
+            {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
           </Button>
           {repairAction && (
             <Button

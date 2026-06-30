@@ -161,6 +161,16 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
           </Alert>
         )}
 
+        {editable && item.backup !== 'Protected' && (
+          <Alert className="border-orange-400/40 bg-orange-200 text-orange-950">
+            <AlertTriangle />
+            <AlertTitle>No verified restore point</AlertTitle>
+            <AlertDescription className="text-orange-900">
+              Save only changes you understand. Create a backup before changing container or access posture when the app can safely run one.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {planError && (
           <Alert className="border-orange-400/40 bg-orange-200 text-orange-950">
             <AlertTriangle />

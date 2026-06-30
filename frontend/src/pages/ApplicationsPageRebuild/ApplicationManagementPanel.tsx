@@ -189,6 +189,9 @@ function DangerZone({
         <div>
           <p className="text-sm font-semibold text-red-100">Uninstall</p>
           <p className="text-xs text-red-100/70">{managed ? 'Data is preserved by default.' : 'Observed services are not managed.'}</p>
+          {backupSafetyMessage(item) && (
+            <p className="mt-1 text-xs leading-5 text-red-100/80">{backupSafetyMessage(item)}</p>
+          )}
         </div>
         {uninstallDisabledReason ? (
           <DestructiveActionDialog
@@ -207,6 +210,16 @@ function DangerZone({
       </div>
     </section>
   );
+}
+
+function backupSafetyMessage(item: ApplicationSurfaceItem) {
+  if (item.managementState !== 'managed' || item.backup === 'Protected') {
+    return '';
+  }
+  if (item.backup === 'Not managed') {
+    return 'Backups are disabled for this app. Review settings before relying on restore points.';
+  }
+  return 'No verified backup is available yet. Create a backup before uninstalling when the app can safely run one.';
 }
 
 function ActivityRow({ label, value }: { label: string; value: string }) {

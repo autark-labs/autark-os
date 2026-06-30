@@ -258,7 +258,7 @@ public class ApplicationStateService {
         if (job == null || !List.of("queued", "running", "failed", "succeeded", "cancelled", "canceled").contains(job.status())) {
             return false;
         }
-        return List.of("start_app", "stop_app", "restart_app", "repair_app", "uninstall_app").contains(job.type());
+        return List.of("start_app", "stop_app", "restart_app", "repair_app", "backup", "backup_verify", "uninstall_app").contains(job.type());
     }
 
     private AppOperationView operationState(ProjectOsJob job, AppRuntimeView app) {
@@ -266,7 +266,7 @@ public class ApplicationStateService {
             return AppOperationView.idle();
         }
         if ("failed".equals(job.status())) {
-            if (!failedLifecycleJobStillRelevant(app)) {
+            if (!failedLifecycleJobStillRelevant(job, app)) {
                 return AppOperationView.idle();
             }
             return AppOperationView.failed(operationLabel(job.type()), job.jobId(), job.error() == null ? "" : job.error().message());
@@ -277,7 +277,10 @@ public class ApplicationStateService {
         return AppOperationView.running(operationKind(job.type()), operationLabel(job.type()), job.jobId(), currentStepText(job), currentStepText(job));
     }
 
-    private boolean failedLifecycleJobStillRelevant(AppRuntimeView app) {
+    private boolean failedLifecycleJobStillRelevant(ProjectOsJob job, AppRuntimeView app) {
+        if (job != null && List.of("backup", "backup_verify").contains(job.type())) {
+            return true;
+        }
         String readinessState = app.readinessState() == null ? "" : app.readinessState();
         if (List.of("ready", "starting", "paused").contains(readinessState)) {
             return false;
@@ -292,6 +295,7 @@ public class ApplicationStateService {
             case "stop_app" -> "stopping";
             case "restart_app" -> "restarting";
             case "repair_app" -> "repairing";
+            case "backup", "backup_verify" -> "backing_up";
             case "uninstall_app" -> "uninstalling";
             default -> "idle";
         };
@@ -303,6 +307,7 @@ public class ApplicationStateService {
             case "stop_app" -> "Pausing";
             case "restart_app" -> "Restarting";
             case "repair_app" -> "Repairing";
+            case "backup", "backup_verify" -> "Creating backup";
             case "uninstall_app" -> "Uninstalling safely";
             default -> "Working";
         };

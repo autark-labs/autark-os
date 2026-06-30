@@ -17,6 +17,7 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
   const repairAction = item.availableActions.find((action) => action.id === 'repair');
   const recovery = explainFailure(item.operationState.message);
   const recentEvents = item.runtime.recentEvents.slice(0, 4);
+  const backupWarning = backupSafetyMessage(item);
 
   return (
     <section className="grid gap-4 rounded-xl border border-red-300/40 bg-red-950 p-4 text-red-50 shadow-inner shadow-red-950/40">
@@ -37,6 +38,14 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
         <p className="text-sm font-semibold text-white">{recovery.title}</p>
         <p className="text-sm leading-6 text-red-50/80">{recovery.description}</p>
       </div>
+
+      {backupWarning && (
+        <Alert className="border-red-300/40 bg-red-900 text-red-50">
+          <AlertTriangle />
+          <AlertTitle>Backup status</AlertTitle>
+          <AlertDescription className="text-red-50/80">{backupWarning}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {repairAction && (
@@ -79,6 +88,16 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
       </div>
     </section>
   );
+}
+
+function backupSafetyMessage(item: ApplicationSurfaceItem) {
+  if (item.backup === 'Protected') {
+    return '';
+  }
+  if (item.backup === 'Not managed') {
+    return 'Repair preserves data when possible, but backups are disabled for this app.';
+  }
+  return 'Repair preserves data when possible. Create a backup first if the app can safely run one.';
 }
 
 function explainFailure(message: string) {

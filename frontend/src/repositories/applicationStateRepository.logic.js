@@ -146,7 +146,7 @@ export function setRuntimeAppInState(state, app) {
 }
 
 function lifecycleJobTypes() {
-  return new Set(['install_app', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'uninstall_app']);
+  return new Set(['install_app', 'repair_app', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'uninstall_app']);
 }
 
 function operationStateFromProjectOsJob(job) {
@@ -192,6 +192,7 @@ function operationKind(type) {
   if (type === 'start_app') return 'starting';
   if (type === 'stop_app') return 'stopping';
   if (type === 'restart_app') return 'restarting';
+  if (type === 'repair_app') return 'repairing';
   if (type === 'install_app') return 'installing';
   if (type === 'backup' || type === 'backup_verify') return 'backing_up';
   if (type === 'uninstall_app') return 'uninstalling';
@@ -202,6 +203,7 @@ function operationLabel(type) {
   if (type === 'start_app') return 'Starting';
   if (type === 'stop_app') return 'Pausing';
   if (type === 'restart_app') return 'Restarting';
+  if (type === 'repair_app') return 'Repairing';
   if (type === 'install_app') return 'Installing';
   if (type === 'backup' || type === 'backup_verify') return 'Creating backup';
   if (type === 'uninstall_app') return 'Uninstalling safely';

@@ -167,6 +167,9 @@ export function ObservedServiceManagementSection({ actions, item }: ObservedServ
                 ? adoptionAction.reason || 'Project OS cannot recover this service safely yet.'
                 : 'Review what Project OS will change before taking control of this service.'}
             </p>
+            <p className="mt-1 text-xs leading-5 text-orange-100/75">
+              Backup protection starts after recovery. Project OS will preserve data by default, then you can create a restore point once the app is managed.
+            </p>
           </div>
 
           {canLoadAdoptionPlan && !plan && (

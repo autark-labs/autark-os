@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.projectos.apps.ApplicationStateService;
 import com.projectos.jobs.ProjectOsJob;
 import com.projectos.jobs.ProjectOsJobOutcome;
 import com.projectos.jobs.ProjectOsJobService;
@@ -21,10 +22,12 @@ public class BackupController {
 
     private final BackupService backupService;
     private final ProjectOsJobService jobService;
+    private final ApplicationStateService applicationStateService;
 
-    public BackupController(BackupService backupService, ProjectOsJobService jobService) {
+    public BackupController(BackupService backupService, ProjectOsJobService jobService, ApplicationStateService applicationStateService) {
         this.backupService = backupService;
         this.jobService = jobService;
+        this.applicationStateService = applicationStateService;
     }
 
     @GetMapping
@@ -34,7 +37,13 @@ public class BackupController {
 
     @PostMapping("/apps/{appId}/run")
     public ProjectOsJob run(@PathVariable String appId) {
-        return jobService.start("backup", appId, backupSteps(), () -> backupOutcome(backupService.run(appId)));
+        ProjectOsJob job = jobService.start("backup", appId, backupSteps(), () -> {
+            BackupRunResult result = backupService.run(appId);
+            invalidateApplicationState();
+            return backupOutcome(result);
+        });
+        invalidateApplicationState();
+        return job;
     }
 
     @PostMapping("/full/run")
@@ -142,5 +151,11 @@ public class BackupController {
 
     private String restoreSubject(long id, String appId) {
         return id + ":" + (appId == null || appId.isBlank() ? "all" : appId);
+    }
+
+    private void invalidateApplicationState() {
+        if (applicationStateService != null) {
+            applicationStateService.invalidate();
+        }
     }
 }

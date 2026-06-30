@@ -73,6 +73,12 @@ function operationStateFromLocalAction(action) {
       label: 'Repairing',
     };
   }
+  if (action === 'backup') {
+    return {
+      kind: 'backing_up',
+      label: 'Creating backup',
+    };
+  }
   return { kind: 'idle' };
 }
 
