@@ -1,4 +1,5 @@
-import { ExternalLink, Loader2, Pause, Play, RotateCw, ShieldCheck } from 'lucide-react';
+import { ExternalLink, Loader2, Pause, Play, RotateCw, Search, ShieldCheck } from 'lucide-react';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -7,6 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@/components/ui/empty';
 import {
   Table,
   TableBody,
@@ -20,27 +28,31 @@ import { CompactOperationStatus } from './components/AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations.js';
-import type { ApplicationActionHandlers, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
+import type { ApplicationActionHandlers, ApplicationEmptyState, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type AdvancedApplicationsViewProps = {
   actions: ApplicationActionHandlers;
   actionLoadingByItemId: Record<string, ApplicationRuntimeAction | null | undefined>;
+  emptyState: ApplicationEmptyState;
   items: ApplicationSurfaceItem[];
   managementOpen: boolean;
   onSelect: (id: string) => void;
   selectedId?: string;
 };
 
-export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items, managementOpen, onSelect, selectedId }: AdvancedApplicationsViewProps) {
+export function AdvancedApplicationsView({ actions, actionLoadingByItemId, emptyState, items, managementOpen, onSelect, selectedId }: AdvancedApplicationsViewProps) {
   return (
     <Card className="min-h-[44rem] overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
       <CardHeader>
         <CardTitle className="text-white">Operations</CardTitle>
         <CardDescription className="text-sky-100/70">
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse vitae sem at arcu porta pretium.
+          Review app state, access posture, backup coverage, and runtime controls in a compact operations view.
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!items.length ? (
+          <AdvancedEmptyState emptyState={emptyState} />
+        ) : (
         <div className="rounded-xl border border-sky-400/25 bg-slate-800 px-2 pb-2">
           <Table className="border-separate border-spacing-y-2">
             <TableHeader>
@@ -58,6 +70,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                 const loadingAction = actionLoadingByItemId[item.id] ?? null;
                 const primaryRuntimeActionLoading = loadingAction === 'start' || loadingAction === 'stop';
                 const runtimeActionDisabled = runtimeControlsDisabled(item.operationState, loadingAction);
+                const runtimeDisabledReason = runtimeControlDisabledReason(item, loadingAction);
 
                 return (
                   <TableRow
@@ -115,45 +128,55 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
                         )}
                         {item.managementState === 'managed' && (
                           primaryRuntimeActionLoading ? (
-                            <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled size="sm" type="button" variant="outline">
-                              <Loader2 className="animate-spin" data-icon="inline-start" />
-                              {runtimeActionLabel(loadingAction)}
-                            </Button>
+                            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+                              <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled size="sm" type="button" variant="outline">
+                                <Loader2 className="animate-spin" data-icon="inline-start" />
+                                {runtimeActionLabel(loadingAction)}
+                              </Button>
+                            </DisabledAction>
                           ) : item.readinessState === 'paused' || item.readinessState === 'stopped' ? (
-                            <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
-                              event.stopPropagation();
-                              actions.onStart(item.id);
-                            }} size="sm" type="button" variant="outline">
-                              <Play data-icon="inline-start" />
-                              Start
-                            </Button>
+                            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+                              <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
+                                event.stopPropagation();
+                                actions.onStart(item.id);
+                              }} size="sm" type="button" variant="outline">
+                                <Play data-icon="inline-start" />
+                                Start
+                              </Button>
+                            </DisabledAction>
                           ) : (
-                            <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
-                              event.stopPropagation();
-                              actions.onStop(item.id);
-                            }} size="sm" type="button" variant="outline">
-                              <Pause data-icon="inline-start" />
-                              Stop
-                            </Button>
+                            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+                              <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
+                                event.stopPropagation();
+                                actions.onStop(item.id);
+                              }} size="sm" type="button" variant="outline">
+                                <Pause data-icon="inline-start" />
+                                Stop
+                              </Button>
+                            </DisabledAction>
                           )
                         )}
                         {item.managementState === 'managed' && (
-                          <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
-                            event.stopPropagation();
-                            actions.onRestart(item.id);
-                          }} size="sm" type="button" variant="outline">
-                            {loadingAction === 'restart' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />}
-                            {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
-                          </Button>
+                          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+                            <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" disabled={runtimeActionDisabled} onClick={(event) => {
+                              event.stopPropagation();
+                              actions.onRestart(item.id);
+                            }} size="sm" type="button" variant="outline">
+                              {loadingAction === 'restart' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />}
+                              {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
+                            </Button>
+                          </DisabledAction>
                         )}
                         {item.managementState === 'managed' && (
-                          <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={(event) => {
-                            event.stopPropagation();
-                            actions.onCreateBackup(item.id);
-                          }} disabled={runtimeActionDisabled} size="sm" type="button" variant="outline">
-                            {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
-                            {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
-                          </Button>
+                          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+                            <Button className="border-sky-300 bg-white text-slate-950 hover:bg-sky-100" onClick={(event) => {
+                              event.stopPropagation();
+                              actions.onCreateBackup(item.id);
+                            }} disabled={runtimeActionDisabled} size="sm" type="button" variant="outline">
+                              {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
+                              {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
+                            </Button>
+                          </DisabledAction>
                         )}
                       </div>
                     </TableCell>
@@ -163,8 +186,23 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, items
             </TableBody>
           </Table>
         </div>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function AdvancedEmptyState({ emptyState }: { emptyState: ApplicationEmptyState }) {
+  return (
+    <Empty className="min-h-96 rounded-xl border border-sky-400/25 bg-slate-800 text-slate-50">
+      <EmptyHeader>
+        <EmptyMedia className="bg-cyan-300 text-slate-950" variant="icon">
+          <Search />
+        </EmptyMedia>
+        <EmptyTitle>{emptyState.title}</EmptyTitle>
+        <EmptyDescription className="text-sky-100/70">{emptyState.description}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
@@ -174,4 +212,14 @@ function runtimeActionLabel(action: ApplicationRuntimeAction) {
   if (action === 'backup') return 'Backing up';
   if (action === 'repair') return 'Repairing';
   return 'Restarting';
+}
+
+function runtimeControlDisabledReason(item: ApplicationSurfaceItem, loadingAction: ApplicationRuntimeAction | null) {
+  if (loadingAction) {
+    return `${runtimeActionLabel(loadingAction)} is already running for ${item.name}.`;
+  }
+  if (item.operationState.kind !== 'idle' && item.operationState.kind !== 'failed') {
+    return item.operationState.currentStep || `${item.operationState.label} is currently running for ${item.name}.`;
+  }
+  return 'This runtime control is currently available.';
 }

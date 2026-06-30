@@ -29,6 +29,11 @@ export type ApplicationNextAction = {
   description: string;
 };
 
+export type ApplicationEmptyState = {
+  title: string;
+  description: string;
+};
+
 export type ApplicationAvailableAction = {
   id: string;
   label: string;

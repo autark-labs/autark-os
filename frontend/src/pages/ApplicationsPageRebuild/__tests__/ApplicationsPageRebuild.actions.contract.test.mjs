@@ -264,3 +264,52 @@ test('applications rebuild surfaces backup-aware safety warnings around risky fl
   assert.match(settings, /No verified restore point/);
   assert.match(observed, /Backup protection starts after recovery/);
 });
+
+test('applications rebuild finish pass removes placeholders and explains disabled runtime controls', () => {
+  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
+  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
+  const basic = source('src/pages/ApplicationsPageRebuild/BasicApplicationsView.tsx');
+
+  for (const file of [page, rail, advanced, basic]) {
+    assert.doesNotMatch(file, /Lorem ipsum|Lorem ipsum dolor sit amet/);
+  }
+
+  assert.match(rail, /DisabledAction/);
+  assert.match(advanced, /DisabledAction/);
+  assert.match(rail, /runtimeControlDisabledReason\(item, loadingAction\)/);
+  assert.match(advanced, /runtimeControlDisabledReason\(item, loadingAction\)/);
+  assert.match(rail, /reason=\{runtimeDisabledReason\}/);
+  assert.match(advanced, /reason=\{runtimeDisabledReason\}/);
+});
+
+test('applications rebuild has filter-specific empty states and compact recent activity', () => {
+  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+  const basic = source('src/pages/ApplicationsPageRebuild/BasicApplicationsView.tsx');
+  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
+  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
+
+  assert.match(page, /emptyStateForFilter\(filter, query\)/);
+  assert.match(page, /emptyState=\{emptyState\}/);
+  assert.match(page, /No managed apps installed/);
+  assert.match(page, /No unmanaged services found/);
+  assert.match(page, /No apps need review/);
+  assert.match(basic, /emptyState: ApplicationEmptyState/);
+  assert.match(advanced, /emptyState: ApplicationEmptyState/);
+
+  assert.match(rail, /RecentActivitySummary/);
+  assert.match(rail, /Last action/);
+  assert.match(rail, /item\.lastEvent/);
+});
+
+test('applications rebuild advanced tab can copy compact support details', () => {
+  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+
+  assert.match(panel, /Support details/);
+  assert.match(panel, /copySupportDetails\(item\)/);
+  assert.match(panel, /navigator\.clipboard\?\.writeText\(supportDetailsText\(item\)\)/);
+  assert.match(panel, /App ID:/);
+  assert.match(panel, /Compose project:/);
+  assert.match(panel, /Runtime path:/);
+  assert.match(panel, /Last event:/);
+});

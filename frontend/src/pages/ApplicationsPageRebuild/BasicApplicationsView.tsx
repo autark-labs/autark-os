@@ -17,18 +17,19 @@ import { cn } from '@/lib/utils';
 import { CompactOperationStatus } from './components/AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
-import type { ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
+import type { ApplicationEmptyState, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type BasicApplicationsViewProps = {
+  emptyState: ApplicationEmptyState;
   items: ApplicationSurfaceItem[];
   managementOpen: boolean;
   onSelect: (id: string) => void;
   selectedId?: string;
 };
 
-export function BasicApplicationsView({ items, managementOpen, onSelect, selectedId }: BasicApplicationsViewProps) {
+export function BasicApplicationsView({ emptyState, items, managementOpen, onSelect, selectedId }: BasicApplicationsViewProps) {
   if (!items.length) {
-    return <ApplicationsEmptyState />;
+    return <ApplicationsEmptyState emptyState={emptyState} />;
   }
 
   return (
@@ -115,15 +116,15 @@ export function BasicApplicationsView({ items, managementOpen, onSelect, selecte
   );
 }
 
-function ApplicationsEmptyState() {
+function ApplicationsEmptyState({ emptyState }: { emptyState: ApplicationEmptyState }) {
   return (
     <Empty className="min-h-96 rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50">
       <EmptyHeader>
         <EmptyMedia className="bg-cyan-300 text-slate-950" variant="icon">
           <Search />
         </EmptyMedia>
-        <EmptyTitle>No matching apps or services</EmptyTitle>
-        <EmptyDescription className="text-sky-100/70">Lorem ipsum dolor sit amet, consectetur adipiscing elit.</EmptyDescription>
+        <EmptyTitle>{emptyState.title}</EmptyTitle>
+        <EmptyDescription className="text-sky-100/70">{emptyState.description}</EmptyDescription>
       </EmptyHeader>
     </Empty>
   );

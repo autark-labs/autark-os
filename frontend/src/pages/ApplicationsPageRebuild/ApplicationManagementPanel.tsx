@@ -4,6 +4,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Copy } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { DestructiveActionDialog } from './components/DestructiveActionDialog';
@@ -123,6 +125,16 @@ export function ApplicationManagementPanel({
 
           <TabsContent className="grid gap-4" value="advanced">
             <ObservedServiceCatalogMatchSection actions={actions} item={item} />
+            <section className="flex flex-col gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">Support details</p>
+                <p className="text-xs leading-5 text-sky-100/60">Copy the compact app state, runtime path, access links, and last event for troubleshooting.</p>
+              </div>
+              <Button className="w-fit border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => copySupportDetails(item)} size="sm" type="button" variant="outline">
+                <Copy data-icon="inline-start" />
+                Copy details
+              </Button>
+            </section>
             <Accordion className="rounded-xl border border-sky-400/20 bg-slate-800 px-3" collapsible defaultValue="runtime" type="single">
               <AccordionItem value="runtime">
                 <AccordionTrigger className="text-sky-50">Runtime details</AccordionTrigger>
@@ -261,4 +273,38 @@ function formatRuntimeTimestamp(value?: string) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(timestamp);
+}
+
+function copySupportDetails(item: ApplicationSurfaceItem) {
+  void navigator.clipboard?.writeText(supportDetailsText(item));
+}
+
+function supportDetailsText(item: ApplicationSurfaceItem) {
+  return [
+    `App ID: ${item.sourceId || item.id}`,
+    `Name: ${item.name}`,
+    `Type: ${labelForManagementState(item.managementState)}`,
+    `Readiness: ${labelForReadiness(item.readinessState)}`,
+    `Attention: ${labelForAttention(item.attentionState)}`,
+    `Operation: ${operationStateText(item)}`,
+    `Access: ${item.access}`,
+    `Backup: ${item.backup}`,
+    `Primary URL: ${item.links.primaryUrl || 'Not configured'}`,
+    `Private URL: ${item.links.privateUrl || 'Not configured'}`,
+    `Local URL: ${item.links.localUrl || 'Not configured'}`,
+    `Compose project: ${item.runtime.composeProject || 'Not reported'}`,
+    `Runtime path: ${item.runtime.runtimePath || 'Not reported'}`,
+    `Container status: ${item.settings.containerStatus || item.runtime.health?.dockerStatus || 'Not reported'}`,
+    `Last event: ${item.lastEvent || item.runtime.recentEvents[0]?.message || 'No recent event reported'}`,
+  ].join('\n');
+}
+
+function operationStateText(item: ApplicationSurfaceItem) {
+  if (item.operationState.kind === 'idle') {
+    return 'Idle';
+  }
+  if (item.operationState.kind === 'failed') {
+    return item.operationState.message || item.operationState.label;
+  }
+  return item.operationState.currentStep || item.operationState.label;
 }

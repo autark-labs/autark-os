@@ -121,6 +121,7 @@ export const ApplicationsPage = () => {
   const visibleReviewableItems = visibleItems.filter(isReviewableItem);
   const nextReviewItem = visibleReviewableItems[0] ?? reviewableItems[0] ?? null;
   const reviewNextButtonLabel = nextReviewItem ? 'Review next' : 'All clear';
+  const emptyState = emptyStateForFilter(filter, query);
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
@@ -506,10 +507,9 @@ export const ApplicationsPage = () => {
             <div className="flex max-w-3xl flex-col gap-3">
               <div className="flex flex-col gap-1">
                 <h1 className="text-3xl font-semibold tracking-tight text-white">Your apps and services</h1>
-                <p className="max-w-2xl text-sm leading-6 text-sky-100/80">
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer vitae arcu sed tortor facilisis
-                  volutpat.
-                </p>
+                    <p className="max-w-2xl text-sm leading-6 text-sky-100/80">
+                      Open apps, review found services, and recover anything that needs attention from one focused control surface.
+                    </p>
               </div>
             </div>
           </div>
@@ -592,6 +592,7 @@ export const ApplicationsPage = () => {
         <section className="grid min-h-[44rem] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
           {viewMode === 'basic' ? (
             <BasicApplicationsView
+              emptyState={emptyState}
               items={visibleItems}
               managementOpen={managementOpen}
               onSelect={setSelectedId}
@@ -602,6 +603,7 @@ export const ApplicationsPage = () => {
               <AdvancedApplicationsView
                 actions={actions}
                 actionLoadingByItemId={actionLoadingByAppId}
+                emptyState={emptyState}
                 items={visibleItems}
                 managementOpen={managementOpen}
                 onSelect={setSelectedId}
@@ -722,4 +724,46 @@ function PageMetric({ label, value }: { label: string; value: number }) {
 function isReviewableItem(item: { nextAction?: { id: string } }) {
   const nextAction = item.nextAction;
   return Boolean(nextAction && (nextAction.id === 'review_issue' || nextAction.id === 'review_found_service'));
+}
+
+function emptyStateForFilter(filter: ApplicationFilter, query: string) {
+  if (query.trim()) {
+    return {
+      title: 'No matching apps or services',
+      description: 'Adjust the search or clear filters to see the full app list.',
+    };
+  }
+
+  if (filter === 'managed') {
+    return {
+      title: 'No managed apps installed',
+      description: 'Install an app from Discover to have Project OS manage its runtime, access, and backups.',
+    };
+  }
+
+  if (filter === 'pinned') {
+    return {
+      title: 'No pinned services',
+      description: 'Pin a found service when you want it to stay visible in My Apps.',
+    };
+  }
+
+  if (filter === 'found') {
+    return {
+      title: 'No unmanaged services found',
+      description: 'Project OS is not seeing any external services that need review on this server.',
+    };
+  }
+
+  if (filter === 'needs_review') {
+    return {
+      title: 'No apps need review',
+      description: 'Managed apps and visible services are not asking for user action right now.',
+    };
+  }
+
+  return {
+    title: 'No apps or services yet',
+    description: 'Install an app from Discover or pin an existing service when Project OS finds one.',
+  };
 }

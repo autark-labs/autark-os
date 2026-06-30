@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Pause, Play, RotateCw, ShieldCheck, Wrench, X } from 'lucide-react';
+import { DisabledAction } from '@/components/project-os/DisabledAction';
 import {
   Card,
   CardContent,
@@ -51,7 +52,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
             {item && <ApplicationIcon item={item} size="md" />}
             <div className="min-w-0 flex-1">
               <CardTitle className="truncate text-white">{item?.name ?? 'Selected app'}</CardTitle>
-              <CardDescription className="text-sky-100/70">{item?.description ?? 'Lorem ipsum dolor sit amet.'}</CardDescription>
+              <CardDescription className="text-sky-100/70">{item?.description ?? 'Select an app or service to review details.'}</CardDescription>
             </div>
           </div>
 
@@ -96,7 +97,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
             >
               <div className="mb-3">
                 <p className="text-sm font-semibold text-white">Management</p>
-                <p className="text-xs text-sky-100/60">Lorem ipsum dolor sit amet.</p>
+                <p className="text-xs text-sky-100/60">Focused controls, settings, links, and diagnostics for the selected item.</p>
               </div>
               <ApplicationManagementPanel
                 actions={actions}
@@ -134,6 +135,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
                   <InfoRow label="Backup" value={item.backup} />
                   {item.lastEvent && <InfoRow label="Last event" value={item.lastEvent} />}
                 </div>
+                <RecentActivitySummary item={item} />
               </div>
             </div>
           </div>
@@ -147,6 +149,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
 
 function RailControls({ actions, item, loadingAction }: { actions: ApplicationActionHandlers; item: ApplicationSurfaceItem; loadingAction: ApplicationRuntimeAction | null }) {
   const runtimeActionDisabled = runtimeControlsDisabled(item.operationState, loadingAction);
+  const runtimeDisabledReason = runtimeControlDisabledReason(item, loadingAction);
   const repairAction = item.availableActions.find((action) => action.id === 'repair');
 
   return (
@@ -167,9 +170,11 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
               <p className="font-medium">{item.nextAction.label}</p>
               <p className="mt-1 text-xs leading-5">{item.nextAction.description}</p>
             </div>
-            <Button className="bg-orange-500 text-white hover:bg-orange-400" disabled={runtimeActionDisabled} onClick={() => actions.onRunNextAction(item.id)} size="sm" type="button">
-              {runtimeActionDisabled && item.nextAction.id === 'start_app' ? 'Running' : nextActionButtonLabel(item.nextAction.id)}
-            </Button>
+            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+              <Button className="bg-orange-500 text-white hover:bg-orange-400" disabled={runtimeActionDisabled} onClick={() => actions.onRunNextAction(item.id)} size="sm" type="button">
+                {runtimeActionDisabled && item.nextAction.id === 'start_app' ? 'Running' : nextActionButtonLabel(item.nextAction.id)}
+              </Button>
+            </DisabledAction>
           </div>
         </div>
       ) : (
@@ -181,32 +186,40 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
 
       {item.managementState === 'managed' && (
         <div className="grid gap-2 sm:grid-cols-3">
-          <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => item.readinessState === 'paused' || item.readinessState === 'stopped' ? actions.onStart(item.id) : actions.onStop(item.id)} type="button" variant="outline">
-            {loadingAction === 'start' || loadingAction === 'stop'
-              ? <Loader2 className="animate-spin" data-icon="inline-start" />
-              : item.readinessState === 'paused' || item.readinessState === 'stopped' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
-            {loadingAction === 'start' ? 'Starting' : loadingAction === 'stop' ? 'Pausing' : item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'Start' : 'Pause'}
-          </Button>
-          <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => actions.onRestart(item.id)} type="button" variant="outline">
-            {loadingAction === 'restart' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />}
-            {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
-          </Button>
-          <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => actions.onCreateBackup(item.id)} type="button" variant="outline">
-            {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
-            {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
-          </Button>
-          {repairAction && (
-            <Button
-              className="border-orange-300/40 bg-slate-900 text-orange-100 hover:bg-slate-700 hover:text-orange-50"
-              disabled={runtimeActionDisabled || repairAction.disabled}
-              onClick={() => actions.onRepair(item.id)}
-              title={repairAction.reason || undefined}
-              type="button"
-              variant="outline"
-            >
-              {loadingAction === 'repair' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Wrench data-icon="inline-start" />}
-              {loadingAction === 'repair' ? 'Repairing' : repairAction.label || 'Repair'}
+          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => item.readinessState === 'paused' || item.readinessState === 'stopped' ? actions.onStart(item.id) : actions.onStop(item.id)} type="button" variant="outline">
+              {loadingAction === 'start' || loadingAction === 'stop'
+                ? <Loader2 className="animate-spin" data-icon="inline-start" />
+                : item.readinessState === 'paused' || item.readinessState === 'stopped' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+              {loadingAction === 'start' ? 'Starting' : loadingAction === 'stop' ? 'Pausing' : item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'Start' : 'Pause'}
             </Button>
+          </DisabledAction>
+          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => actions.onRestart(item.id)} type="button" variant="outline">
+              {loadingAction === 'restart' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />}
+              {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
+            </Button>
+          </DisabledAction>
+          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+            <Button className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700 hover:text-white" disabled={runtimeActionDisabled} onClick={() => actions.onCreateBackup(item.id)} type="button" variant="outline">
+              {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
+              {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
+            </Button>
+          </DisabledAction>
+          {repairAction && (
+            <DisabledAction disabled={runtimeActionDisabled || Boolean(repairAction.disabled)} reason={repairAction.disabled ? repairAction.reason || 'Repair is not available for this app right now.' : runtimeDisabledReason}>
+              <Button
+                className="border-orange-300/40 bg-slate-900 text-orange-100 hover:bg-slate-700 hover:text-orange-50"
+                disabled={runtimeActionDisabled || Boolean(repairAction.disabled)}
+                onClick={() => actions.onRepair(item.id)}
+                title={repairAction.reason || undefined}
+                type="button"
+                variant="outline"
+              >
+                {loadingAction === 'repair' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Wrench data-icon="inline-start" />}
+                {loadingAction === 'repair' ? 'Repairing' : repairAction.label || 'Repair'}
+              </Button>
+            </DisabledAction>
           )}
         </div>
       )}
@@ -227,4 +240,63 @@ function nextActionButtonLabel(id: ApplicationNextAction['id']) {
   if (id === 'start_app') return 'Start';
   if (id === 'create_backup') return 'Create backup';
   return 'Review';
+}
+
+function runtimeControlDisabledReason(item: ApplicationSurfaceItem, loadingAction: ApplicationRuntimeAction | null) {
+  if (loadingAction) {
+    return `${runtimeActionLabel(loadingAction)} is already running for ${item.name}.`;
+  }
+  if (item.operationState.kind !== 'idle' && item.operationState.kind !== 'failed') {
+    return item.operationState.currentStep || `${item.operationState.label} is currently running for ${item.name}.`;
+  }
+  return 'This runtime control is currently available.';
+}
+
+function runtimeActionLabel(action: ApplicationRuntimeAction) {
+  if (action === 'start') return 'Starting';
+  if (action === 'stop') return 'Pausing';
+  if (action === 'backup') return 'Backing up';
+  if (action === 'repair') return 'Repairing';
+  return 'Restarting';
+}
+
+function RecentActivitySummary({ item }: { item: ApplicationSurfaceItem }) {
+  const lastAction = item.lastEvent || operationStateText(item.operationState) || 'No recent app action reported.';
+  const timestamp = item.runtime.recentEvents[0]?.createdAt || item.runtime.checkedAt;
+
+  return (
+    <div className="grid gap-1 rounded-lg border border-sky-400/20 bg-slate-800 px-3 py-2 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sky-100/70">Last action</span>
+        <span className="min-w-0 truncate font-medium text-white">{lastAction}</span>
+      </div>
+      <p className="text-xs text-sky-100/50">{timestamp ? formatRuntimeTimestamp(timestamp) : 'Project OS will show the latest app event here when one is reported.'}</p>
+    </div>
+  );
+}
+
+function operationStateText(operationState: ApplicationSurfaceItem['operationState']) {
+  if (operationState.kind === 'idle') {
+    return '';
+  }
+  if (operationState.kind === 'failed') {
+    return operationState.message || operationState.label;
+  }
+  return operationState.currentStep || operationState.label;
+}
+
+function formatRuntimeTimestamp(value?: string) {
+  if (!value) {
+    return 'Not reported';
+  }
+
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(timestamp);
 }
