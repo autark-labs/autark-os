@@ -1,19 +1,16 @@
 import { Activity, Archive, Clock3, Cpu, Network } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useAppTelemetryQuery } from '@/repositories/appManagementRepository';
 import { labelForReadiness } from '../components/AppStateBadges';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function ApplicationTelemetryTab({ item }: { item: ApplicationSurfaceItem }) {
-  const telemetryQuery = useQuery({
-    queryKey: ['apps', item.id, 'telemetry'],
-    queryFn: () => InstalledAppsAPIClient.appTelemetry(item.id),
-    enabled: item.managementState === 'managed',
-    refetchInterval: 5_000,
-    staleTime: 4_000,
-  });
+  const telemetryQuery = useAppTelemetryQuery(
+    item.managementState === 'managed' ? item.id : null,
+    item.managementState === 'managed',
+    item.runtime.telemetry,
+  );
   const telemetry = telemetryQuery.data ?? item.runtime.telemetry;
   const health = item.runtime.health;
   const cpu = percentValue(telemetry?.cpuPercent);

@@ -9,10 +9,10 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('applications rebuild destructive actions use a shared plan-confirm-run dialog', () => {
-  const dialog = source('src/pages/ApplicationsPageRebuild/components/DestructiveActionDialog.tsx');
-  const destructiveActions = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.destructiveActions.ts');
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+test('applications page destructive actions use a shared plan-confirm-run dialog', () => {
+  const dialog = source('src/pages/ApplicationsPage/components/DestructiveActionDialog.tsx');
+  const destructiveActions = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.destructiveActions.ts');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const client = source('src/api/InstalledAppsAPIClient.ts');
 
   assert.match(destructiveActions, /export type DestructiveActionPlan/);
@@ -44,10 +44,10 @@ test('applications rebuild destructive actions use a shared plan-confirm-run dia
   assert.match(client, /uninstall\(appId: string\)/);
 });
 
-test('applications rebuild uninstall uses real plan and job-backed action wiring', () => {
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+test('applications page uninstall uses real plan and job-backed action wiring', () => {
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /onLoadUninstallPlan: \(id: string\) => Promise<DestructiveActionPlan>/);
   assert.match(types, /onRunUninstall: \(id: string\) => Promise<void>/);

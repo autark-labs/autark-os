@@ -9,16 +9,16 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('applications rebuild uses split behavior states instead of a single app status source', () => {
-  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
-  const liveModel = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.liveModel.ts');
-  const visuals = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationVisuals.tsx');
-  const badges = source('src/pages/ApplicationsPageRebuild/components/AppStateBadges.tsx');
-  const operationStatus = source('src/pages/ApplicationsPageRebuild/components/AppOperationStatus.tsx');
-  const basic = source('src/pages/ApplicationsPageRebuild/BasicApplicationsView.tsx');
-  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
-  const managementPanel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+test('applications page uses split behavior states instead of a single app status source', () => {
+  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
+  const liveModel = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.liveModel.ts');
+  const visuals = source('src/pages/ApplicationsPage/extensions/ApplicationVisuals.tsx');
+  const badges = source('src/pages/ApplicationsPage/components/AppStateBadges.tsx');
+  const operationStatus = source('src/pages/ApplicationsPage/components/AppOperationStatus.tsx');
+  const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
+  const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const managementPanel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
 
   assert.match(types, /export type AppManagementState = 'managed' \| 'found' \| 'linked'/);
   assert.match(types, /export type AppReadinessState = 'ready' \| 'starting' \| 'paused' \| 'stopped' \| 'unreachable' \| 'unknown'/);

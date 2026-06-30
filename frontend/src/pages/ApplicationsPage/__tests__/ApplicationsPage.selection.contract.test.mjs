@@ -9,8 +9,8 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('applications rebuild does not silently fall back to the first visible item', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+test('applications page does not silently fall back to the first visible item', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
   assert.doesNotMatch(page, /visibleItems\.find\(\(item\) => item\.id === selectedId\) \?\? visibleItems\[0\]/);
   assert.doesNotMatch(page, /setSelectedId\(items\[0\]\.id\)/);

@@ -27,13 +27,13 @@ test('shell doctor status uses a shared system repository query', () => {
   assert.match(systemRepository, /refetchInterval:\s*15_000/);
 });
 
-test('app management modal telemetry uses repository polling keyed by app and open state', () => {
+test('app management telemetry uses repository polling keyed by app and open state', () => {
   assert.equal(existsSync(resolve(root, 'src/repositories/appManagementRepository.ts')), true);
-  const modal = source('src/pages/ApplicationsPage/ApplicationsPageModal.tsx');
+  const telemetryTab = source('src/pages/ApplicationsPage/managementTabs/ApplicationTelemetryTab.tsx');
   const repository = source('src/repositories/appManagementRepository.ts');
 
-  assert.doesNotMatch(modal, /setInterval|clearInterval|InstalledAppsAPIClient\.appTelemetry/);
-  assert.match(modal, /useAppTelemetryQuery/);
+  assert.doesNotMatch(telemetryTab, /setInterval|clearInterval|InstalledAppsAPIClient\.appTelemetry/);
+  assert.match(telemetryTab, /useAppTelemetryQuery/);
   assert.match(repository, /appManagementQueryKeys/);
   assert.match(repository, /telemetry:\s*\(appId: string \| null\)/);
   assert.match(repository, /useAppTelemetryQuery/);

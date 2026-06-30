@@ -1,367 +1,769 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { RefreshStatus } from '@/components/RefreshStatus';
-import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
-import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
-import { PageShell } from '@/components/project-os/ProjectOSComponents';
-import { Button } from '@/components/ui/button';
+import { AlertTriangle, CheckCircle2, Search } from 'lucide-react';
+import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
+import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { showActionErrorNotification, showActionNotification, showJobNotification } from '@/lib/actionNotifications';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import {
-  invalidateAppUpdates,
+  applicationStateQueryKey,
   invalidateApplicationState,
+  setApplicationStateFromActionResultCache,
   setProjectOsJobInApplicationStateCache,
-  useAppUpdatesQuery,
+  setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
-  updatesByAppId as buildUpdatesByAppId,
 } from '@/repositories/applicationStateRepository';
-import { setProjectOsJobCache, terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
-import { usePrivateAccessReconciliationQuery } from '@/repositories/networkRepository';
-import type { AppRuntimeView } from '@/types/app';
-import type { ProjectOsJob } from '@/types/jobs';
-import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
-import { ApplicationsDashboard, EmptyState } from './ApplicationsDashboard';
-import { AppManagementSheet } from './ApplicationsPageDrawer';
-import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
-import {
-  appNeedsAttention,
-  appPriority,
-  displayStatus,
-  errorMessage,
-} from './extensions/ApplicationsPage.logic';
-import { pinnedExternalViewsFromObservedServices } from './extensions/ApplicationsPage.ownershipModel';
-import type { AppAction } from './extensions/ApplicationsPage.types';
+import { invalidateProjectOsJobs, setProjectOsJobCache, terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
+import { invalidateNetworkQueries } from '@/repositories/networkRepository';
+import { invalidateBackupQueries } from '@/repositories/backupRepository';
+import type { AppRuntimeView, AppSettingsChangePlan, InstallSettings } from '@/types/app';
+import type { ApplicationState } from '@/types/applicationState';
+import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan } from '@/types/observedService';
+import { ApplicationDetailsRail } from './ApplicationDetailsRail';
+import { BasicApplicationsView } from './BasicApplicationsView';
+import { AdvancedApplicationsView } from './AdvancedApplicationsView';
+import { mapUninstallPlanToDestructiveActionPlan } from './extensions/ApplicationsPage.destructiveActions';
+import { buildApplicationSurfaceItems } from './extensions/ApplicationsPage.liveModel';
+import { operationStateForItem } from './extensions/ApplicationsPage.operations';
+import type {
+  ApplicationRuntimeAction,
+  ApplicationSettingsAction,
+  ApplicationSettingsFormValues,
+  ApplicationSettingsImpact,
+} from './extensions/ApplicationsPage.types';
 
-function ApplicationsPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+type ApplicationFilter = 'all' | 'managed' | 'pinned' | 'found' | 'needs_review';
+type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'backup'>;
+
+export const ApplicationsPage = () => {
+  const { viewMode } = useProjectSettings();
   const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
-  const { showAdvancedMetrics } = useProjectSettings();
-  const updatesQuery = useAppUpdatesQuery();
-  const reconciliationQuery = usePrivateAccessReconciliationQuery();
   const jobsQuery = useProjectOsJobsQuery();
-  const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, AppAction | 'update' | 'rollback' | null>>({});
-  const [manageAppId, setManageAppId] = useState<string | null>(null);
-  const [locallyUninstallingAppIds, setLocallyUninstallingAppIds] = useState<Set<string>>(() => new Set());
-  const [trackedUninstallJobIds, setTrackedUninstallJobIds] = useState<string[]>([]);
-  const [trackedLifecycleJobIds, setTrackedLifecycleJobIds] = useState<string[]>([]);
-  const [search, setSearch] = useState('');
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<ApplicationFilter>('all');
+  const [managementOpen, setManagementOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState('');
+  const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
+  const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
+  const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
+  const [trackedAppJobIds, setTrackedAppJobIds] = useState<string[]>([]);
+  const railRef = useRef<HTMLDivElement | null>(null);
 
-  const apps = appState.apps;
-  const observedServices = appState.observedServices;
-  const telemetryByAppId = appState.telemetryByAppId;
-  const accessByAppId = appState.accessByAppId;
-  const healthByAppId = appState.healthByAppId;
-  const updates = updatesQuery.data ?? [];
-  const reconciliation = reconciliationQuery.data ?? null;
-  const loading = appState.isLoading;
-  const refreshing = appState.isFetching || updatesQuery.isFetching || reconciliationQuery.isFetching;
-  const error = localError || (appState.error ? errorMessage(appState.error) : null);
-  const managedApp = useMemo(() => apps.find((app) => app.appId === manageAppId) || null, [apps, manageAppId]);
-  const managedAppReconciliation = useMemo(() => reconciliation?.apps.find((item) => item.appId === manageAppId) || null, [manageAppId, reconciliation?.apps]);
-  const activeUninstallJobs = useMemo(() => (jobsQuery.data ?? []).filter((job) => job.type === 'uninstall_app' && !terminalJob(job)), [jobsQuery.data]);
-  
-  const uninstallJobsByAppId = useMemo(() => {
-    const jobs = new Map<string, ProjectOsJob>();
-    for (const job of activeUninstallJobs) {
-      if (job.subjectId) {
-        jobs.set(job.subjectId, job);
-      }
-    }
-    return jobs;
-  }, [activeUninstallJobs]);
-
-  const uninstallingAppIds = useMemo(() => {
-    const ids = new Set(locallyUninstallingAppIds);
-    for (const job of activeUninstallJobs) {
-      if (job.subjectId) {
-        ids.add(job.subjectId);
-      }
-    }
-    return ids;
-  }, [activeUninstallJobs, locallyUninstallingAppIds]);
-
-  const visibleApps = useMemo(() => apps.filter((app) => {
-    const query = search.trim().toLowerCase();
-    if (!query) {
-      return true;
-    }
-    return [app.appName, app.category, app.description, app.friendlyStatus].some((value) => value?.toLowerCase().includes(query));
-  }).sort((left, right) => appPriority(left, telemetryByAppId[left.appId], accessByAppId[left.appId], healthByAppId[left.appId] || left.healthSnapshot) - appPriority(right, telemetryByAppId[right.appId], accessByAppId[right.appId], healthByAppId[right.appId] || right.healthSnapshot) || left.appName.localeCompare(right.appName)), [accessByAppId, apps, healthByAppId, search, telemetryByAppId]);
-  
-  const appSummary = useMemo(() => ({
-    installed: apps.length,
-    running: apps.filter((app) => displayStatus(app, healthByAppId[app.appId] || app.healthSnapshot) === 'Ready').length,
-    stopped: apps.filter((app) => displayStatus(app, healthByAppId[app.appId] || app.healthSnapshot) === 'Paused').length,
-    unhealthy: apps.filter((app) => appNeedsAttention(app, telemetryByAppId[app.appId], accessByAppId[app.appId], healthByAppId[app.appId] || app.healthSnapshot)).length,
-  }), [accessByAppId, apps, healthByAppId, telemetryByAppId]);
-  
-  const updatesByAppId = useMemo(() => buildUpdatesByAppId(updates), [updates]);
-  const pinnedExternalViews = useMemo(() => pinnedExternalViewsFromObservedServices(observedServices), [observedServices]);
-  const selectedServiceId = searchParams.get('service');
-  const selectedObservedService = useMemo(() => observedServices.find((service) => service.id === selectedServiceId) || null, [observedServices, selectedServiceId]);
-
-  useEffect(() => {
-    setLocallyUninstallingAppIds((current) => {
-      const next = new Set([...current].filter((appId) => apps.some((app) => app.appId === appId)));
-      return next.size === current.size ? current : next;
+  const items = useMemo(() => {
+    const liveItems = buildApplicationSurfaceItems({
+      accessByAppId: appState.accessByAppId,
+      apps: appState.apps,
+      healthByAppId: appState.healthByAppId,
+      observedServices: appState.observedServices,
+      telemetryByAppId: appState.telemetryByAppId,
     });
-  }, [apps]);
 
-  useEffect(() => {
-    if (!trackedUninstallJobIds.length) {
-      return;
-    }
-    const jobs = jobsQuery.data ?? [];
-    const completedJobs = jobs.filter((job) => trackedUninstallJobIds.includes(job.jobId) && terminalJob(job));
-    if (!completedJobs.length) {
-      return;
-    }
+    return liveItems.map((item) => {
+      const itemId = item.sourceId || item.id;
+      const operationState = operationStateForItem(
+        item,
+        actionLoadingByAppId[itemId] ?? null,
+        settingsLoadingByAppId[itemId] ?? null,
+        jobsQuery.data ?? [],
+      );
 
-    for (const job of completedJobs) {
-      showJobNotification(job);
-      if (job.status === 'failed') {
-        const message = job.error?.message || 'Project OS could not uninstall this app. The app is still visible.';
-        setLocalError(message);
-        if (job.subjectId) {
-          setLocallyUninstallingAppIds((current) => {
-            const next = new Set(current);
-            next.delete(job.subjectId || '');
-            return next;
-          });
-        }
-      } else if (job.status === 'succeeded') {
-        void invalidateApplicationState(queryClient);
-        void invalidateAppUpdates(queryClient);
+      return {
+        ...item,
+        operationState,
+      };
+    });
+  }, [
+    actionLoadingByAppId,
+    appState.accessByAppId,
+    appState.apps,
+    appState.healthByAppId,
+    appState.observedServices,
+    appState.telemetryByAppId,
+    jobsQuery.data,
+    settingsLoadingByAppId,
+  ]);
+
+  const visibleItems = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesFilter =
+        filter === 'all'
+        || (filter === 'managed' && item.managementState === 'managed')
+        || (filter === 'pinned' && item.managementState === 'linked')
+        || (filter === 'found' && item.managementState === 'found')
+        || (filter === 'needs_review' && item.attentionState !== 'none');
+
+      if (!matchesFilter) {
+        return false;
       }
-    }
-    setTrackedUninstallJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
-  }, [jobsQuery.data, queryClient, trackedUninstallJobIds]);
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return [item.name, item.managementState, item.readinessState, item.attentionState, item.access, item.backup, item.nextAction?.label ?? '', item.description]
+        .some((value) => value.toLowerCase().includes(normalizedQuery));
+    });
+  }, [filter, items, query]);
+
+  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
+  const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
+  const managedCount = items.filter((item) => item.managementState === 'managed').length;
+  const pinnedCount = items.filter((item) => item.managementState === 'linked').length;
+  const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
+  const reviewableItems = items.filter(isReviewableItem);
+  const visibleReviewableItems = visibleItems.filter(isReviewableItem);
+  const nextReviewItem = visibleReviewableItems[0] ?? reviewableItems[0] ?? null;
+  const reviewNextButtonLabel = nextReviewItem ? 'Review next' : 'All clear';
+  const emptyState = emptyStateForFilter(filter, query);
+  const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
+  const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
+  const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
 
   useEffect(() => {
-    if (!trackedLifecycleJobIds.length) {
+    if (!items.length) {
+      if (selectedId) {
+        setSelectedId('');
+      }
       return;
     }
-    const jobs = jobsQuery.data ?? [];
-    const completedJobs = jobs.filter((job) => trackedLifecycleJobIds.includes(job.jobId) && terminalJob(job));
-    if (!completedJobs.length) {
-      return;
+
+    if (!items.some((item) => item.id === selectedId)) {
+      setSelectedId('');
     }
-    void invalidateApplicationState(queryClient);
-    setTrackedLifecycleJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
-  }, [jobsQuery.data, queryClient, trackedLifecycleJobIds]);
+  }, [items, selectedId]);
 
-  const refreshApps = useCallback(async () => {
-    setLocalError(null);
-    await Promise.all([
-      appState.refresh(),
-      updatesQuery.refetch(),
-      reconciliationQuery.refetch(),
-    ]);
-  }, [appState, reconciliationQuery, updatesQuery]);
-
-  const refreshAfterMutation = useCallback((options: { updates?: boolean } = {}) => {
-    void invalidateApplicationState(queryClient);
-    void reconciliationQuery.refetch();
-    if (options.updates) {
-      void invalidateAppUpdates(queryClient);
+  useEffect(() => {
+    if (!managementOpen) {
+      return undefined;
     }
-  }, [queryClient, reconciliationQuery]);
 
-  function setAppActionLoading(appId: string, action: AppAction | 'update' | 'rollback' | null) {
-    setActionLoadingByAppId((current) => ({ ...current, [appId]: action }));
-  }
-
-  async function runAction(appId: string, action: AppAction) {
-    setAppActionLoading(appId, action);
-    setLocalError(null);
-    try {
-      if (action === 'repair') {
-        const result = await InstalledAppsAPIClient.repair(appId);
-        showActionNotification(result, 'Repair finished');
-        refreshAfterMutation();
+    const ensureRailVisible = () => {
+      const rail = railRef.current;
+      if (!rail) {
         return;
       }
 
-      const job = await InstalledAppsAPIClient.runAction(appId, action);
-      setProjectOsJobCache(queryClient, job);
-      setProjectOsJobInApplicationStateCache(queryClient, job);
-      setTrackedLifecycleJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      const margin = 20;
+      const rect = rail.getBoundingClientRect();
+      const availableHeight = window.innerHeight - margin * 2;
+      let scrollDelta = 0;
+
+      if (rect.height <= availableHeight) {
+        if (rect.bottom > window.innerHeight - margin) {
+          scrollDelta = rect.bottom - window.innerHeight + margin;
+        } else if (rect.top < margin) {
+          scrollDelta = rect.top - margin;
+        }
+      } else if (rect.top > margin || rect.top < margin) {
+        scrollDelta = rect.top - margin;
+      }
+
+      if (Math.abs(scrollDelta) > 1) {
+        window.scrollTo({ behavior: 'smooth', top: window.scrollY + scrollDelta });
+      }
+    };
+
+    const scrollTimers = [0, 160, 340].map((delay) => window.setTimeout(ensureRailVisible, delay));
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && railRef.current?.contains(target)) {
+        return;
+      }
+
+      if (canCloseManagement()) {
+        setManagementOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      scrollTimers.forEach((timer) => window.clearTimeout(timer));
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [canCloseManagement, managementOpen]);
+
+  useEffect(() => {
+    if (!trackedAppJobIds.length) {
+      return;
+    }
+    const jobs = jobsQuery.data ?? [];
+    const completedJobs = jobs.filter((job) => trackedAppJobIds.includes(job.jobId) && terminalJob(job));
+    if (!completedJobs.length) {
+      return;
+    }
+    void invalidateApplicationState(queryClient);
+    setTrackedAppJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
+  }, [jobsQuery.data, queryClient, trackedAppJobIds]);
+
+  const handleFilterChange = (nextFilter: string) => {
+    if (!nextFilter || nextFilter === filter) {
+      return;
+    }
+
+    setFilter(nextFilter as ApplicationFilter);
+  };
+
+  const setAppActionLoading = (appId: string, action: ApplicationRuntimeAction | null) => {
+    setActionLoadingByAppId((current) => ({ ...current, [appId]: action }));
+  };
+
+  const setSettingsLoading = (appId: string, action: ApplicationSettingsAction | null) => {
+    setSettingsLoadingByAppId((current) => ({ ...current, [appId]: action }));
+  };
+
+  const restoreApplicationState = (previousState: ApplicationState | undefined) => {
+    queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
+  };
+
+  const runManagedAction = async (appId: string, action: ManagedLifecycleAction) => {
+    setAppActionLoading(appId, action);
+
+    try {
+      const data = await InstalledAppsAPIClient.runAction(appId, action);
+      setProjectOsJobCache(queryClient, data);
+      setProjectOsJobInApplicationStateCache(queryClient, data);
+      setTrackedAppJobIds((current) => current.includes(data.jobId) ? current : [...current, data.jobId]);
       showActionNotification({
         ok: true,
         severity: 'info',
         title: 'App action started',
-        message: `${appActionLabel(action)} is running. Project OS will update the app state when the app reports its real status.`,
+        message: `${appActionLabel(action)} is running. Project OS will keep showing progress until the app reports its real state.`,
       });
-      void jobsQuery.refetch();
-      refreshAfterMutation();
+      void invalidateProjectOsJobs(queryClient);
+      void invalidateApplicationState(queryClient);
     } catch (err) {
-      const message = errorMessage(err);
-      setLocalError(message);
       showActionErrorNotification(err, 'App action failed');
     } finally {
       setAppActionLoading(appId, null);
     }
+  };
+
+  const runRepair = async (appId: string) => {
+    setAppActionLoading(appId, 'repair');
+
+    try {
+      const job = await InstalledAppsAPIClient.repair(appId);
+      setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'Repair started',
+        message: 'Project OS is repairing this app and will keep showing progress until the app reports its real state.',
+      });
+      void invalidateProjectOsJobs(queryClient);
+      void invalidateApplicationState(queryClient);
+    } catch (err) {
+      showActionErrorNotification(err, 'Repair could not start');
+    } finally {
+      setAppActionLoading(appId, null);
+    }
+  };
+
+  const runBackup = async (appId: string) => {
+    setAppActionLoading(appId, 'backup');
+
+    try {
+      const job = await BackupAPIClient.run(appId);
+      setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'Backup started',
+        message: 'Project OS is creating a restore point for this app and will keep showing progress here.',
+      });
+      void invalidateProjectOsJobs(queryClient);
+      void invalidateBackupQueries(queryClient);
+      void invalidateApplicationState(queryClient);
+    } catch (err) {
+      showActionErrorNotification(err, 'Backup could not start');
+    } finally {
+      setAppActionLoading(appId, null);
+    }
+  };
+
+  async function requestSettingsPlan(appId: string, values: ApplicationSettingsFormValues): Promise<ApplicationSettingsImpact | null> {
+    const app = managedAppById.get(appId);
+    if (!app) {
+      return null;
+    }
+
+    setSettingsLoading(appId, 'planning');
+    try {
+      const nextSettings = settingsFromFormValues(app, values);
+      const plan = await InstalledAppsAPIClient.settingsChangePlan(appId, nextSettings);
+      return settingsImpactFromPlan(plan);
+    } finally {
+      setSettingsLoading(appId, null);
+    }
   }
 
-  async function uninstall(appId: string) {
-    setLocalError(null);
-    setLocallyUninstallingAppIds((current) => new Set(current).add(appId));
+  async function saveApplicationSettings(appId: string, values: ApplicationSettingsFormValues) {
+    const app = managedAppById.get(appId);
+    if (!app) {
+      return;
+    }
+
+    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
+    const nextSettings = settingsFromFormValues(app, values);
+
+    setSettingsLoading(appId, 'saving');
+    setRuntimeAppInApplicationStateCache(queryClient, {
+      ...app,
+      settings: nextSettings,
+    });
+
+    try {
+      const plan = await InstalledAppsAPIClient.settingsChangePlan(appId, nextSettings);
+      if (plan.saveAllowed === false) {
+        throw new Error(plan.blockedReasons[0] || 'Project OS cannot safely apply these settings yet.');
+      }
+      const updatedApp = await InstalledAppsAPIClient.updateSettings(appId, nextSettings);
+      setRuntimeAppInApplicationStateCache(queryClient, updatedApp);
+
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: plan.restartRequired || plan.redeployRequired ? 'Settings saved and restart requested' : 'Settings saved',
+        message: plan.summary,
+      });
+      setSettingsDirtyByAppId((current) => ({ ...current, [appId]: false }));
+      void invalidateApplicationState(queryClient);
+      void invalidateNetworkQueries(queryClient);
+    } catch (err) {
+      restoreApplicationState(previousState);
+      showActionErrorNotification(err, 'Settings update failed');
+      throw err;
+    } finally {
+      setSettingsLoading(appId, null);
+    }
+  }
+
+  async function runPrivateNetworkAccessChange(appId: string, enabled: boolean) {
+    setSettingsLoading(appId, 'private_access');
+
+    try {
+      const result = enabled
+        ? await InstalledAppsAPIClient.enablePrivateAccess(appId)
+        : await InstalledAppsAPIClient.disablePrivateAccess(appId);
+      if (result.app) {
+        setRuntimeAppInApplicationStateCache(queryClient, result.app);
+      }
+      showActionNotification(result, enabled ? 'Private network ready' : 'Private network turned off');
+      void invalidateApplicationState(queryClient);
+      void invalidateNetworkQueries(queryClient);
+    } catch (err) {
+      showActionErrorNotification(err, enabled ? 'Private network could not be enabled' : 'Private network could not be turned off');
+      throw err;
+    } finally {
+      setSettingsLoading(appId, null);
+    }
+  }
+
+  async function loadUninstallPlan(appId: string) {
+    const plan = await InstalledAppsAPIClient.uninstallPlan(appId);
+    return mapUninstallPlanToDestructiveActionPlan(plan);
+  }
+
+  async function runUninstall(appId: string) {
     try {
       const job = await InstalledAppsAPIClient.uninstall(appId);
       setProjectOsJobCache(queryClient, job);
       setProjectOsJobInApplicationStateCache(queryClient, job);
-      setTrackedUninstallJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
-      showJobNotification(job);
-      void jobsQuery.refetch();
-    } catch (err) {
-      const message = errorMessage(err);
-      setLocalError(message);
-      setLocallyUninstallingAppIds((current) => {
-        const next = new Set(current);
-        next.delete(appId);
-        return next;
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'Uninstall started',
+        message: 'Project OS is removing this app safely and keeping it visible until the job finishes.',
       });
-      showActionErrorNotification(err, 'Uninstall failed');
-    }
-  }
-
-  async function updateApp(appId: string) {
-    setAppActionLoading(appId, 'update');
-    setLocalError(null);
-    try {
-      const data = await InstalledAppsAPIClient.updateApp(appId);
-      showActionNotification({ ok: true, severity: 'success', title: 'App updated', message: data.message }, 'App updated');
-      refreshAfterMutation({ updates: true });
+      void invalidateProjectOsJobs(queryClient);
+      void invalidateApplicationState(queryClient);
     } catch (err) {
-      const message = errorMessage(err);
-      setLocalError(message);
-      showActionErrorNotification(err, 'Update failed');
-    } finally {
-      setAppActionLoading(appId, null);
+      showActionErrorNotification(err, 'Uninstall could not start');
+      throw err;
     }
   }
 
-  async function rollbackApp(appId: string) {
-    setAppActionLoading(appId, 'rollback');
-    setLocalError(null);
+  async function pinObservedService(serviceId: string) {
     try {
-      const data = await InstalledAppsAPIClient.rollbackApp(appId);
-      showActionNotification({ ok: true, severity: 'success', title: 'Rollback completed', message: data.message }, 'Rollback completed');
-      refreshAfterMutation({ updates: true });
+      const result = await ObservedServicesAPIClient.pin(serviceId);
+      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+      showActionNotification(result, result.title || 'Service pinned');
+      if (!stateUpdated) {
+        void invalidateApplicationState(queryClient);
+      }
     } catch (err) {
-      const message = errorMessage(err);
-      setLocalError(message);
-      showActionErrorNotification(err, 'Rollback failed');
-    } finally {
-      setAppActionLoading(appId, null);
+      showActionErrorNotification(err, 'Service could not be pinned');
+      throw err;
     }
   }
 
-  async function refreshObservedServices() {
-    await refreshApps();
+  async function unpinObservedService(serviceId: string) {
+    try {
+      const result = await ObservedServicesAPIClient.unpin(serviceId);
+      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+      showActionNotification(result, result.title || 'Service unpinned');
+      if (!stateUpdated) {
+        void invalidateApplicationState(queryClient);
+      }
+    } catch (err) {
+      showActionErrorNotification(err, 'Service could not be unpinned');
+      throw err;
+    }
   }
 
-  function reviewObservedService(id: string) {
-    const next = new URLSearchParams(searchParams);
-    next.set('service', id);
-    setSearchParams(next);
+  async function matchObservedService(serviceId: string, catalogAppId: string | null) {
+    try {
+      const result = await ObservedServicesAPIClient.match(serviceId, catalogAppId);
+      handleObservedServiceActionResult(result, result.title || 'Service match saved');
+    } catch (err) {
+      showActionErrorNotification(err, 'Service match could not be saved');
+      throw err;
+    }
   }
 
-  function closeObservedServiceSheet() {
-    const next = new URLSearchParams(searchParams);
-    next.delete('service');
-    setSearchParams(next);
+  async function loadObservedServiceAdoptionPlan(serviceId: string): Promise<ObservedServiceAdoptionPlan> {
+    return ObservedServicesAPIClient.adoptionPlan(serviceId);
   }
 
-  function handleObservedServiceResult(result: ObservedServiceActionResult) {
-    showActionNotification(result, result.title || 'Service action finished');
+  async function adoptObservedService(serviceId: string, confirmation: string) {
+    try {
+      const result = await ObservedServicesAPIClient.adopt(serviceId, confirmation);
+      handleObservedServiceActionResult(result, result.title || 'Service adopted');
+    } catch (err) {
+      showActionErrorNotification(err, 'Service could not be adopted');
+      throw err;
+    }
   }
+
+  function handleObservedServiceActionResult(result: ObservedServiceActionResult, fallbackTitle: string) {
+    const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+    showActionNotification(result, fallbackTitle);
+    if (!stateUpdated) {
+      void invalidateApplicationState(queryClient);
+    }
+  }
+
+  const handleStart = (id: string) => void runManagedAction(id, 'start');
+  const handleStop = (id: string) => void runManagedAction(id, 'stop');
+  const handleRestart = (id: string) => void runManagedAction(id, 'restart');
+  const handleRepair = (id: string) => void runRepair(id);
+  const handleDirtyChange = (id: string, dirty: boolean) => setSettingsDirtyByAppId((current) => ({ ...current, [id]: dirty }));
+  const handleCreateBackup = (id: string) => void runBackup(id);
+
+  const handleRunNextAction = (id: string) => {
+    const item = items.find((candidate) => candidate.id === id);
+    if (item?.managementState === 'managed' && item.nextAction?.id === 'start_app') {
+      void runManagedAction(item.sourceId || item.id, 'start');
+      return;
+    }
+    if (item?.managementState === 'managed' && item.nextAction?.id === 'create_backup') {
+      void runBackup(item.sourceId || item.id);
+      return;
+    }
+
+    setSelectedId(id);
+    setManagementOpen(true);
+    void invalidateApplicationState(queryClient);
+  };
+
+  const actions = {
+    onCreateBackup: handleCreateBackup,
+    onAdoptObservedService: adoptObservedService,
+    onDirtyChange: handleDirtyChange,
+    onLoadObservedServiceAdoptionPlan: loadObservedServiceAdoptionPlan,
+    onLoadUninstallPlan: loadUninstallPlan,
+    onMatchObservedService: matchObservedService,
+    onPinObservedService: pinObservedService,
+    onRepair: handleRepair,
+    onRestart: handleRestart,
+    onRunNextAction: handleRunNextAction,
+    onRunUninstall: runUninstall,
+    onSaveSettings: saveApplicationSettings,
+    onSettingsPlanRequest: requestSettingsPlan,
+    onSetPrivateNetworkAccess: runPrivateNetworkAccessChange,
+    onStart: handleStart,
+    onStop: handleStop,
+    onUnpinObservedService: unpinObservedService,
+  };
 
   return (
-    <PageShell>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold leading-none text-white md:text-3xl">My Apps</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-400">Open apps, review issues, and manage safe repair actions from one place.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshApps} refreshing={refreshing} updatedAt={appState.updatedAt} />
-          <Button asChild className="bg-gradient-to-br from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500">
-            <Link to="/discover">Add app</Link>
-          </Button>
-        </div>
+    <main className="min-h-full bg-slate-800 text-slate-50">
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-5 p-4 md:p-5 2xl:px-6">
+        <header className="rounded-2xl border border-sky-400/30 bg-slate-900 shadow-xl shadow-slate-950/30">
+          <div className="flex flex-col gap-2 p-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex max-w-3xl flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <h1 className="text-3xl font-semibold tracking-tight text-white">Your apps and services</h1>
+                    <p className="max-w-2xl text-sm leading-6 text-sky-100/80">
+                      Open apps, review found services, and recover anything that needs attention from one focused control surface.
+                    </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator className="bg-sky-400/20" />
+
+          <div className="grid gap-3 p-4 sm:grid-cols-3">
+            <PageMetric label="Managed" value={managedCount} />
+            <PageMetric label="Pinned" value={pinnedCount} />
+            <PageMetric label="Needs review" value={attentionCount} />
+          </div>
+        </header>
+
+        <section className="rounded-2xl border border-sky-400/30 bg-slate-900 p-3 shadow-xl shadow-slate-950/20">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-200/70" />
+              <Input
+                aria-label="Search apps and services"
+                className="h-9 border-sky-400/40 bg-slate-800 pl-9 text-white placeholder:text-sky-100/50 focus-visible:border-cyan-300"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search apps and services"
+                value={query}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:justify-end">
+              <ToggleGroup
+                aria-label="Filter apps and services"
+                className="flex-wrap"
+                onValueChange={handleFilterChange}
+                size="sm"
+                type="single"
+                value={filter}
+                variant="outline"
+              >
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="all">
+                  All
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="managed">
+                  Managed
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="pinned">
+                  Pinned
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="found">
+                  Found
+                </ToggleGroupItem>
+                <ToggleGroupItem className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="needs_review">
+                  Needs review
+                </ToggleGroupItem>
+              </ToggleGroup>
+
+              <Button
+                className="bg-orange-500 text-white shadow-md shadow-orange-700/20 hover:bg-orange-400"
+                disabled={!nextReviewItem}
+                onClick={() => {
+                  if (nextReviewItem) {
+                    setQuery('');
+                    setFilter('needs_review');
+                    setSelectedId(nextReviewItem.id);
+                    setManagementOpen(true);
+                  }
+                }}
+                title={nextReviewItem ? 'Open the next app or service that needs review.' : 'No apps or services need review.'}
+                type="button"
+              >
+                {nextReviewItem ? <AlertTriangle data-icon="inline-start" /> : <CheckCircle2 data-icon="inline-start" />}
+                {reviewNextButtonLabel}
+              </Button>
+            </div>
+          </div>
+          {(appState.isLoading || Boolean(appState.error)) && (
+            <div className="mt-3 rounded-xl border border-sky-400/20 bg-slate-800 px-3 py-2 text-sm text-sky-100/80">
+              {appState.isLoading ? 'Loading apps and found services.' : 'Could not load the current apps list.'}
+            </div>
+          )}
+        </section>
+
+        <section className="grid min-h-[44rem] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          {viewMode === 'basic' ? (
+            <BasicApplicationsView
+              emptyState={emptyState}
+              items={visibleItems}
+              managementOpen={managementOpen}
+              onSelect={setSelectedId}
+              selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
+            />
+          ) : (
+            <div className="max-h-[44rem] min-h-[44rem] overflow-y-auto pr-1">
+              <AdvancedApplicationsView
+                actions={actions}
+                actionLoadingByItemId={actionLoadingByAppId}
+                emptyState={emptyState}
+                items={visibleItems}
+                managementOpen={managementOpen}
+                onSelect={setSelectedId}
+                selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
+              />
+            </div>
+          )}
+
+          <ApplicationDetailsRail
+            actions={actions}
+            actionLoadingByItemId={actionLoadingByAppId}
+            item={selectedItemIsVisible ? selectedItem : null}
+            managementOpen={managementOpen}
+            canCloseManagement={canCloseManagement}
+            onManagementOpenChange={setManagementOpen}
+            settingsLoadingByItemId={settingsLoadingByAppId}
+            ref={railRef}
+          />
+        </section>
       </div>
-
-      <CanonicalRecommendedAction />
-
-      {error && <PageErrorState message={error} onRetry={refreshApps} />}
-
-      {loading ? (
-        <PageLoadingState label="Loading your apps" sublabel="Checking installed apps, health, private access, and available actions." />
-      ) : apps.length === 0 && pinnedExternalViews.length === 0 && observedServices.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <ApplicationsDashboard
-          accessByAppId={accessByAppId}
-          actionLoadingByAppId={actionLoadingByAppId}
-          apps={visibleApps}
-          onAction={runAction}
-          onManage={setManageAppId}
-          onSearch={setSearch}
-          onUpdate={updateApp}
-          search={search}
-          summary={appSummary}
-          healthByAppId={healthByAppId}
-          observedServices={observedServices}
-          onReviewService={reviewObservedService}
-          pinnedApps={pinnedExternalViews}
-          reconciliation={reconciliation}
-          telemetryByAppId={telemetryByAppId}
-          uninstallingAppIds={uninstallingAppIds}
-          updatesByAppId={updatesByAppId}
-        />
-      )}
-
-      {managedApp && (
-        <AppManagementSheet
-          access={accessByAppId[managedApp.appId]}
-          actionLoading={actionLoadingByAppId[managedApp.appId]}
-          app={managedApp}
-          health={healthByAppId[managedApp.appId] || managedApp.healthSnapshot}
-          onAction={runAction}
-          onOpenChange={(open) => !open && setManageAppId(null)}
-          onRollback={rollbackApp}
-          onUninstall={uninstall}
-          onUpdate={updateApp}
-          open={Boolean(managedApp)}
-          reconciliation={managedAppReconciliation}
-          showAdvanced={showAdvancedMetrics}
-          telemetry={telemetryByAppId[managedApp.appId] || managedApp.telemetry}
-          uninstallJob={uninstallJobsByAppId.get(managedApp.appId) || null}
-          update={updatesByAppId[managedApp.appId] || null}
-        />
-      )}
-      <ObservedServiceDetailsSheet
-        onActionComplete={handleObservedServiceResult}
-        onOpenChange={(open) => !open && closeObservedServiceSheet()}
-        onRefresh={refreshObservedServices}
-        open={Boolean(selectedServiceId)}
-        service={selectedObservedService}
-      />
-    </PageShell>
+    </main>
   );
+};
+
+function settingsWithDefaults(app: AppRuntimeView): InstallSettings {
+  return {
+    accessUrl: app.settings?.accessUrl ?? app.accessUrl ?? null,
+    autoRepairEnabled: app.settings?.autoRepairEnabled ?? true,
+    backup: {
+      enabled: app.settings?.backup?.enabled ?? true,
+      frequency: app.settings?.backup?.frequency || 'daily',
+      retention: app.settings?.backup?.retention ?? 7,
+    },
+    desiredAccessMode: app.settings?.desiredAccessMode || app.desiredAccess?.mode || 'local',
+    expectedLocalPort: app.settings?.expectedLocalPort ?? app.desiredAccess?.expectedLocalPort ?? app.observedAccess?.localPort ?? null,
+    expectedProtocol: app.settings?.expectedProtocol ?? app.desiredAccess?.expectedProtocol ?? app.observedAccess?.protocol ?? null,
+    lastAccessCheckAt: app.settings?.lastAccessCheckAt ?? app.observedAccess?.lastAccessCheckAt ?? null,
+    lastRepairAttemptAt: app.settings?.lastRepairAttemptAt ?? app.observedAccess?.lastRepairAttemptAt ?? null,
+    lastRepairStatus: app.settings?.lastRepairStatus ?? app.observedAccess?.lastRepairStatus ?? null,
+    lastSuccessfulAccessAt: app.settings?.lastSuccessfulAccessAt ?? app.observedAccess?.lastSuccessfulAccessAt ?? null,
+    privateAccessRequirement: app.settings?.privateAccessRequirement || app.desiredAccess?.privateAccessRequirement || 'optional',
+    privateAccessUrl: app.settings?.privateAccessUrl ?? app.accessRoute?.privateUrl ?? app.observedAccess?.privateUrl ?? null,
+    storageSubfolders: app.settings?.storageSubfolders ?? {},
+    tailscaleEnabled: Boolean(app.settings?.tailscaleEnabled),
+  };
 }
 
-export default ApplicationsPage;
+function settingsFromFormValues(app: AppRuntimeView, values: ApplicationSettingsFormValues): InstallSettings {
+  const currentSettings = settingsWithDefaults(app);
+  const protocol = values.expectedProtocol || currentSettings.expectedProtocol || 'http';
+  const accessUrl = accessUrlWithPort(currentSettings.accessUrl ?? app.accessUrl, protocol, values.localPort ?? currentSettings.expectedLocalPort);
 
-function appActionLabel(action: AppAction) {
+  return {
+    ...currentSettings,
+    autoRepairEnabled: values.autoRepairEnabled,
+    accessUrl,
+    backup: {
+      enabled: values.backupEnabled,
+      frequency: values.backupFrequency,
+      retention: values.backupRetention,
+    },
+    expectedLocalPort: values.localPort,
+    expectedProtocol: protocol,
+  };
+}
+
+function settingsImpactFromPlan(plan: AppSettingsChangePlan): ApplicationSettingsImpact {
+  return {
+    blockedReasons: plan.blockedReasons,
+    changes: plan.changes,
+    headline: plan.headline,
+    redeployRequired: plan.redeployRequired,
+    restartRequired: Boolean(plan.restartRequired || plan.redeployRequired),
+    saveAllowed: plan.saveAllowed,
+    summary: plan.summary || plan.headline,
+    warnings: [...plan.warnings, ...plan.blockedReasons],
+  };
+}
+
+function accessUrlWithPort(currentUrl: string | null | undefined, protocol: string, port: number | null | undefined) {
+  if (!port) {
+    return currentUrl ?? null;
+  }
+
+  try {
+    const parsed = new URL(currentUrl || `${protocol}://localhost:${port}`);
+    parsed.protocol = `${protocol}:`;
+    parsed.port = String(port);
+    return parsed.toString().replace(/\/$/, '');
+  } catch {
+    return `${protocol}://localhost:${port}`;
+  }
+}
+
+function appActionLabel(action: ApplicationRuntimeAction) {
   if (action === 'start') return 'Start';
   if (action === 'stop') return 'Pause';
   if (action === 'restart') return 'Restart';
   if (action === 'repair') return 'Repair';
+  if (action === 'backup') return 'Backup';
   return 'App action';
+}
+
+function PageMetric({ label, value }: { label: string; value: number }) {
+  const attention = label === 'Needs review' && value > 0;
+
+  return (
+    <div className={attention
+      ? 'min-w-28 rounded-xl border border-orange-400 bg-orange-200 px-4 py-3 text-orange-950 shadow-lg shadow-orange-500/20'
+      : 'min-w-28 rounded-xl border border-sky-400/25 bg-slate-800 px-4 py-3 text-sky-50'}
+    >
+      <div className="text-2xl font-semibold">{value}</div>
+      <div className={attention ? 'text-sm text-orange-800' : 'text-sm text-sky-100/70'}>{label}</div>
+    </div>
+  );
+}
+
+function isReviewableItem(item: { nextAction?: { id: string } }) {
+  const nextAction = item.nextAction;
+  return Boolean(nextAction && (nextAction.id === 'review_issue' || nextAction.id === 'review_found_service'));
+}
+
+function emptyStateForFilter(filter: ApplicationFilter, query: string) {
+  if (query.trim()) {
+    return {
+      title: 'No matching apps or services',
+      description: 'Adjust the search or clear filters to see the full app list.',
+    };
+  }
+
+  if (filter === 'managed') {
+    return {
+      title: 'No managed apps installed',
+      description: 'Install an app from Discover to have Project OS manage its runtime, access, and backups.',
+    };
+  }
+
+  if (filter === 'pinned') {
+    return {
+      title: 'No pinned services',
+      description: 'Pin a found service when you want it to stay visible in My Apps.',
+    };
+  }
+
+  if (filter === 'found') {
+    return {
+      title: 'No unmanaged services found',
+      description: 'Project OS is not seeing any external services that need review on this server.',
+    };
+  }
+
+  if (filter === 'needs_review') {
+    return {
+      title: 'No apps need review',
+      description: 'Managed apps and visible services are not asking for user action right now.',
+    };
+  }
+
+  return {
+    title: 'No apps or services yet',
+    description: 'Install an app from Discover or pin an existing service when Project OS finds one.',
+  };
 }

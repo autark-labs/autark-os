@@ -9,11 +9,11 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('applications rebuild starts lifecycle jobs and re-pulls canonical app state', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const operations = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.operations.js');
-  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
+test('applications page starts lifecycle jobs and re-pulls canonical app state', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const operations = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.operations.js');
+  const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
 
   assert.match(page, /InstalledAppsAPIClient\.runAction\(appId, action\)/);
   assert.match(page, /setProjectOsJobCache\(queryClient, data\)/);
@@ -41,11 +41,11 @@ test('applications rebuild starts lifecycle jobs and re-pulls canonical app stat
   assert.match(rail, /runtimeControlsDisabled\(item\.operationState, loadingAction\)/);
 });
 
-test('applications rebuild pins and unpins observed services through canonical application state', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const observedSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
-  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+test('applications page pins and unpins observed services through canonical application state', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const observedSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
+  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /onPinObservedService: \(serviceId: string\) => Promise<void>/);
   assert.match(types, /onUnpinObservedService: \(serviceId: string\) => Promise<void>/);
@@ -72,11 +72,11 @@ test('applications rebuild pins and unpins observed services through canonical a
   assert.doesNotMatch(panel, />\s*Adopt\s*</);
 });
 
-test('applications rebuild manages observed-service matching and adoption inside the pullout', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const observedSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
-  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+test('applications page manages observed-service matching and adoption inside the pullout', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const observedSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
+  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /onMatchObservedService: \(serviceId: string, catalogAppId: string \| null\) => Promise<void>/);
   assert.match(types, /onLoadObservedServiceAdoptionPlan: \(serviceId: string\) => Promise<ObservedServiceAdoptionPlan>/);
@@ -97,10 +97,10 @@ test('applications rebuild manages observed-service matching and adoption inside
   assert.match(observedSection, /planList\(/);
 });
 
-test('applications rebuild keeps catalog matching in the advanced pullout tab', () => {
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const observedSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
-  const catalogSection = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceCatalogMatchSection.tsx');
+test('applications page keeps catalog matching in the advanced pullout tab', () => {
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const observedSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
+  const catalogSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceCatalogMatchSection.tsx');
 
   assert.match(panel, /ObservedServiceCatalogMatchSection/);
   assert.match(panel, /<TabsContent className="grid gap-4" value="advanced">[\s\S]*<ObservedServiceCatalogMatchSection/);
@@ -112,11 +112,11 @@ test('applications rebuild keeps catalog matching in the advanced pullout tab', 
   assert.match(catalogSection, /change_match/);
 });
 
-test('applications rebuild exposes a red recovery tab for failed app operations', () => {
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
-  const recovery = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationRecoveryTab.tsx');
-  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
+test('applications page exposes a red recovery tab for failed app operations', () => {
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
+  const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
 
   assert.match(panel, /const recoveryNeeded = item\.operationState\.kind === 'failed'/);
   assert.match(panel, /ApplicationRecoveryTab/);
@@ -136,12 +136,12 @@ test('applications rebuild exposes a red recovery tab for failed app operations'
   assert.match(settings, /operationBlocksManagement\(item\.operationState\)/);
 });
 
-test('applications rebuild runs repair only from canonical available actions', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
-  const recovery = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationRecoveryTab.tsx');
+test('applications page runs repair only from canonical available actions', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
   const api = source('src/api/InstalledAppsAPIClient.ts');
-  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /onRepair: \(id: string\) => void/);
   assert.ok(api.includes('post<ProjectOsJob>(`/api/apps/${appId}/repair`)'));
@@ -160,11 +160,11 @@ test('applications rebuild runs repair only from canonical available actions', (
   assert.match(recovery, /actions\.onRepair\(item\.id\)/);
 });
 
-test('applications rebuild starts app backup jobs from real backup actions', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
-  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
-  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+test('applications page starts app backup jobs from real backup actions', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
+  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /onCreateBackup: \(id: string\) => void/);
   assert.match(types, /'backup'/);
@@ -181,9 +181,9 @@ test('applications rebuild starts app backup jobs from real backup actions', () 
   assert.match(advanced, /actions\.onCreateBackup\(item\.id\)/);
 });
 
-test('applications rebuild only exposes concrete next actions from the rail', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
+test('applications page only exposes concrete next actions from the rail', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
 
   assert.match(page, /item\.nextAction\?\.id === 'start_app'/);
   assert.match(page, /item\.nextAction\?\.id === 'create_backup'/);
@@ -196,8 +196,8 @@ test('applications rebuild only exposes concrete next actions from the rail', ()
   assert.doesNotMatch(rail, />\s*Run\s*</);
 });
 
-test('applications rebuild review-next opens the review panel and has an all-clear state', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+test('applications page review-next opens the review panel and has an all-clear state', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
   assert.match(page, /const reviewableItems = items\.filter\(isReviewableItem\)/);
   assert.match(page, /const visibleReviewableItems = visibleItems\.filter\(isReviewableItem\)/);
@@ -211,10 +211,10 @@ test('applications rebuild review-next opens the review panel and has an all-cle
   assert.match(page, /setFilter\('needs_review'\)/);
 });
 
-test('applications rebuild removes placeholder overflow controls until real actions are chosen', () => {
-  const basic = source('src/pages/ApplicationsPageRebuild/BasicApplicationsView.tsx');
-  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+test('applications page removes placeholder overflow controls until real actions are chosen', () => {
+  const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
+  const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
   assert.doesNotMatch(basic, /DropdownMenu/);
   assert.doesNotMatch(basic, /Trash2/);
@@ -226,11 +226,11 @@ test('applications rebuild removes placeholder overflow controls until real acti
   assert.doesNotMatch(page, /onUninstall=\{handleUninstall\}/);
 });
 
-test('applications rebuild changes private network access as a standalone settings action', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
-  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+test('applications page changes private network access as a standalone settings action', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
+  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /ApplicationSettingsAction = 'planning' \| 'saving' \| 'private_access'/);
   assert.match(types, /onSetPrivateNetworkAccess: \(id: string, enabled: boolean\) => Promise<void>/);
@@ -250,11 +250,11 @@ test('applications rebuild changes private network access as a standalone settin
   assert.doesNotMatch(settings, /name: 'autoRepairEnabled' \| 'backupEnabled' \| 'tailscaleEnabled'/);
 });
 
-test('applications rebuild surfaces backup-aware safety warnings around risky flows', () => {
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const recovery = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationRecoveryTab.tsx');
-  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
-  const observed = source('src/pages/ApplicationsPageRebuild/managementTabs/ObservedServiceManagementSection.tsx');
+test('applications page surfaces backup-aware safety warnings around risky flows', () => {
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
+  const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
+  const observed = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
 
   assert.match(panel, /backupSafetyMessage\(item\)/);
   assert.match(panel, /No verified backup/);
@@ -265,11 +265,11 @@ test('applications rebuild surfaces backup-aware safety warnings around risky fl
   assert.match(observed, /Backup protection starts after recovery/);
 });
 
-test('applications rebuild finish pass removes placeholders and explains disabled runtime controls', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
-  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
-  const basic = source('src/pages/ApplicationsPageRebuild/BasicApplicationsView.tsx');
+test('applications page finish pass removes placeholders and explains disabled runtime controls', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
+  const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
 
   for (const file of [page, rail, advanced, basic]) {
     assert.doesNotMatch(file, /Lorem ipsum|Lorem ipsum dolor sit amet/);
@@ -283,11 +283,11 @@ test('applications rebuild finish pass removes placeholders and explains disable
   assert.match(advanced, /reason=\{runtimeDisabledReason\}/);
 });
 
-test('applications rebuild has filter-specific empty states and compact recent activity', () => {
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const basic = source('src/pages/ApplicationsPageRebuild/BasicApplicationsView.tsx');
-  const advanced = source('src/pages/ApplicationsPageRebuild/AdvancedApplicationsView.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
+test('applications page has filter-specific empty states and compact recent activity', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
+  const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
 
   assert.match(page, /emptyStateForFilter\(filter, query\)/);
   assert.match(page, /emptyState=\{emptyState\}/);
@@ -302,8 +302,8 @@ test('applications rebuild has filter-specific empty states and compact recent a
   assert.match(rail, /item\.lastEvent/);
 });
 
-test('applications rebuild advanced tab can copy compact support details', () => {
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
+test('applications page advanced tab can copy compact support details', () => {
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
 
   assert.match(panel, /Support details/);
   assert.match(panel, /copySupportDetails\(item\)/);

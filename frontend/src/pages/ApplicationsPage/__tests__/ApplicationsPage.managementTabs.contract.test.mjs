@@ -9,20 +9,20 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('applications rebuild splits settings and links management tabs into focused components', () => {
-  const tabsDir = resolve(root, 'src/pages/ApplicationsPageRebuild/managementTabs');
+test('applications page splits settings and links management tabs into focused components', () => {
+  const tabsDir = resolve(root, 'src/pages/ApplicationsPage/managementTabs');
   assert.equal(existsSync(resolve(tabsDir, 'ApplicationSettingsTab.tsx')), true);
   assert.equal(existsSync(resolve(tabsDir, 'ApplicationLinksTab.tsx')), true);
   assert.equal(existsSync(resolve(tabsDir, 'ApplicationGuideTab.tsx')), true);
   assert.equal(existsSync(resolve(tabsDir, 'ApplicationTelemetryTab.tsx')), true);
 
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
-  const links = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationLinksTab.tsx');
-  const guide = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationGuideTab.tsx');
-  const telemetry = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationTelemetryTab.tsx');
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const liveModel = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.liveModel.ts');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
+  const links = source('src/pages/ApplicationsPage/managementTabs/ApplicationLinksTab.tsx');
+  const guide = source('src/pages/ApplicationsPage/managementTabs/ApplicationGuideTab.tsx');
+  const telemetry = source('src/pages/ApplicationsPage/managementTabs/ApplicationTelemetryTab.tsx');
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const liveModel = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.liveModel.ts');
 
   assert.match(panel, /ApplicationSettingsTab/);
   assert.match(panel, /ApplicationLinksTab/);
@@ -43,8 +43,8 @@ test('applications rebuild splits settings and links management tabs into focuse
   assert.match(guide, /setupGuide/);
   assert.match(guide, /copyableFields/);
   assert.match(telemetry, /item\.runtime\.telemetry/);
-  assert.match(telemetry, /InstalledAppsAPIClient\.appTelemetry\(item\.id\)/);
-  assert.match(telemetry, /refetchInterval/);
+  assert.match(telemetry, /useAppTelemetryQuery/);
+  assert.doesNotMatch(telemetry, /InstalledAppsAPIClient\.appTelemetry/);
   assert.match(telemetry, /item\.runtime\.health/);
   assert.match(telemetry, /memoryPercent/);
   assert.match(telemetry, /networkIo/);
@@ -56,11 +56,11 @@ test('applications rebuild splits settings and links management tabs into focuse
   assert.match(liveModel, /runtime: appRuntimeDetails\(app, health, telemetry\)/);
 });
 
-test('applications rebuild settings tab uses a guarded batch form for app settings', () => {
+test('applications page settings tab uses a guarded batch form for app settings', () => {
   const pkg = source('package.json');
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
-  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
 
   assert.match(pkg, /"react-hook-form"/);
   assert.match(settings, /useForm<ApplicationSettingsFormValues>/);
@@ -86,9 +86,9 @@ test('applications rebuild settings tab uses a guarded batch form for app settin
   assert.match(rail, /canCloseManagement/);
 });
 
-test('applications rebuild settings tab uses real controls and confirm-before-save planning', () => {
-  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
-  const settings = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationSettingsTab.tsx');
+test('applications page settings tab uses real controls and confirm-before-save planning', () => {
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
   const styles = source('src/styles.css');
   const alertDialog = source('src/components/ui/alert-dialog.tsx');
   const selectSource = source('src/components/ui/select.tsx');
@@ -127,10 +127,10 @@ test('applications rebuild settings tab uses real controls and confirm-before-sa
   assert.doesNotMatch(tooltip, /bg-foreground px-3 py-1\.5 text-xs text-background/);
 });
 
-test('applications rebuild management panel uses canonical runtime data instead of generated mock facts', () => {
-  const panel = source('src/pages/ApplicationsPageRebuild/ApplicationManagementPanel.tsx');
-  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
-  const liveModel = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.liveModel.ts');
+test('applications page management panel uses canonical runtime data instead of generated mock facts', () => {
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const liveModel = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.liveModel.ts');
 
   assert.doesNotMatch(panel, /appManagementMock/);
   assert.doesNotMatch(panel, /127\.0\.0\.1:\$\{8000 \+ seed\}/);

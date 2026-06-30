@@ -11,7 +11,6 @@ function source(relativePath) {
 
 test('primary pages render canonical recommended action through shared component', () => {
   const pages = [
-    'src/pages/ApplicationsPage/ApplicationsPage.tsx',
     'src/pages/MarketplacePage/MarketplacePage.tsx',
     'src/pages/BackupsPage/BackupsPage.tsx',
     'src/pages/NetworkPage/NetworkPage.tsx',

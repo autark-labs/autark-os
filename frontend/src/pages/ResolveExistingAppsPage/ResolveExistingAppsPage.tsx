@@ -12,7 +12,7 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { cn } from '@/lib/utils';
 import { setApplicationStateFromActionResultCache, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
-import { ObservedServiceDetailsSheet } from '../ApplicationsPage/ObservedServiceDetailsSheet';
+import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
 import {
   resolveExistingServiceActions,
   visibleResolveExistingServices,
