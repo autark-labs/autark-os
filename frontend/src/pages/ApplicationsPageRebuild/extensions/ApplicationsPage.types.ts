@@ -3,7 +3,7 @@ import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUsage
 import type { ObservedServiceAdoptionPlan } from '@/types/observedService';
 
 export type ApplicationRuntimeState = 'running' | 'starting' | 'paused' | 'needs_attention' | 'found' | 'shortcut';
-export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart';
+export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair';
 export type ApplicationSettingsAction = 'planning' | 'saving';
 export type AppManagementState = 'managed' | 'found' | 'linked';
 export type AppReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown';
@@ -11,7 +11,7 @@ export type AppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked'
 export type AppOperationState =
   | { kind: 'idle' }
   | {
-    kind: 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling';
+    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'uninstalling';
     label: string;
     jobId?: string;
     currentStep?: string;
@@ -76,6 +76,7 @@ export type ApplicationActionHandlers = {
   onLoadObservedServiceAdoptionPlan: (serviceId: string) => Promise<ObservedServiceAdoptionPlan>;
   onMatchObservedService: (serviceId: string, catalogAppId: string | null) => Promise<void>;
   onPinObservedService: (serviceId: string) => Promise<void>;
+  onRepair: (id: string) => void;
   onRestart: (id: string) => void;
   onRunNextAction: (id: string) => void;
   onRunUninstall: (id: string) => Promise<void>;

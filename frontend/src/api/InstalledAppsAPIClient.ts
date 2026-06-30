@@ -67,7 +67,7 @@ export const InstalledAppsAPIClient = {
   },
 
   async repair(appId: string) {
-    const response = await httpClient.post<AppActionResult>(`/api/apps/${appId}/repair`);
+    const response = await httpClient.post<ProjectOsJob>(`/api/apps/${appId}/repair`);
     return response.data;
   },
 

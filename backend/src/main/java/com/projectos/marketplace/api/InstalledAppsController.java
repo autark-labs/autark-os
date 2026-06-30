@@ -142,8 +142,74 @@ public class InstalledAppsController {
     }
 
     @PostMapping("/{id}/repair")
-    public AppActionResult repair(@PathVariable String id) {
-        return refreshAfter(appLifecycleService.repair(id));
+    public ProjectOsJob repair(@PathVariable String id) {
+        ProjectOsJob active = activeLifecycleJob(id);
+        if (active != null) {
+            applicationStateService.invalidate();
+            return active;
+        }
+        ProjectOsJob created = jobService.startWithJob("repair_app", id, repairJobSteps(), job -> {
+            List<ProjectOsJobStep> inspecting = repairJobSteps().stream()
+                    .map(step -> "inspect_app".equals(step.id())
+                            ? ProjectOsJobStep.running(step.id(), step.label(), "Project OS is checking the app before repair.")
+                            : step)
+                    .toList();
+            jobService.recordProgress(job.jobId(), inspecting);
+
+            List<ProjectOsJobStep> repairing = inspecting.stream()
+                    .map(step -> "inspect_app".equals(step.id())
+                            ? ProjectOsJobStep.succeeded(step.id(), step.label(), "App check completed.")
+                            : "run_repair".equals(step.id())
+                                    ? ProjectOsJobStep.running(step.id(), step.label(), "Repairing app")
+                                    : step)
+                    .toList();
+            jobService.recordProgress(job.jobId(), repairing);
+
+            AppActionResult result = appLifecycleService.repair(id);
+            applicationStateService.invalidate();
+
+            if (!repairSucceeded(result)) {
+                List<ProjectOsJobStep> failed = repairing.stream()
+                        .map(step -> "run_repair".equals(step.id())
+                                ? ProjectOsJobStep.failed(step.id(), step.label(), result.message())
+                                : step)
+                        .toList();
+                jobService.recordProgress(job.jobId(), failed);
+                return ProjectOsJobOutcome.failed(result.message(), failed);
+            }
+
+            List<ProjectOsJobStep> verifying = repairing.stream()
+                    .map(step -> "run_repair".equals(step.id())
+                            ? ProjectOsJobStep.succeeded(step.id(), step.label(), result.message())
+                            : "verify_repair".equals(step.id())
+                                    ? ProjectOsJobStep.running(step.id(), step.label(), "Checking whether the app recovered.")
+                                    : step)
+                    .toList();
+            jobService.recordProgress(job.jobId(), verifying);
+
+            AppRuntimeView settled = waitForLifecycleReadiness(id, "repair", result.app());
+            applicationStateService.invalidate();
+
+            List<ProjectOsJobStep> refreshed = verifying.stream()
+                    .map(step -> "verify_repair".equals(step.id())
+                            ? ProjectOsJobStep.succeeded(step.id(), step.label(), lifecycleCompleteMessage("repair", settled))
+                            : "refresh_app_state".equals(step.id())
+                                    ? ProjectOsJobStep.running(step.id(), step.label(), "Refreshing app state.")
+                                    : step)
+                    .toList();
+            jobService.recordProgress(job.jobId(), refreshed);
+            applicationStateService.invalidate();
+
+            List<ProjectOsJobStep> completed = refreshed.stream()
+                    .map(step -> "refresh_app_state".equals(step.id())
+                            ? ProjectOsJobStep.succeeded(step.id(), step.label(), "App state refreshed.")
+                            : step)
+                    .toList();
+
+            return ProjectOsJobOutcome.succeeded(lifecycleCompleteMessage("repair", settled), completed);
+        });
+        applicationStateService.invalidate();
+        return created;
     }
 
     @PostMapping("/{id}/update")
@@ -249,7 +315,7 @@ public class InstalledAppsController {
     private ProjectOsJob activeLifecycleJob(String id) {
         return jobService.list().stream()
                 .filter(job -> id.equals(job.subjectId()))
-                .filter(job -> List.of("start_app", "stop_app", "restart_app").contains(job.type()))
+                .filter(job -> List.of("start_app", "stop_app", "restart_app", "repair_app").contains(job.type()))
                 .filter(job -> "queued".equals(job.status()) || "running".equals(job.status()))
                 .findFirst()
                 .orElse(null);
@@ -272,11 +338,18 @@ public class InstalledAppsController {
         throw new IllegalStateException(lifecycleTimeoutMessage(action));
     }
 
+    private boolean repairSucceeded(AppActionResult result) {
+        return result != null && result.ok() && !"needs_attention".equals(result.status());
+    }
+
     private boolean lifecycleReadinessResolved(String action, AppRuntimeView app) {
         if (app == null) {
             return true;
         }
         String readiness = app.readinessState() == null ? "" : app.readinessState();
+        if ("repair".equals(action)) {
+            return "ready".equals(readiness) || "paused".equals(readiness);
+        }
         if ("stop".equals(action)) {
             return "paused".equals(readiness) || "stopped".equals(readiness);
         }
@@ -303,6 +376,7 @@ public class InstalledAppsController {
             case "start" -> "Start app";
             case "stop" -> "Pause app";
             case "restart" -> "Restart app";
+            case "repair" -> "Repair app";
             default -> "Run app command";
         };
     }
@@ -310,6 +384,7 @@ public class InstalledAppsController {
     private String lifecycleWaitLabel(String action) {
         return switch (action) {
             case "stop" -> "Confirm app paused";
+            case "repair" -> "Confirm app recovered";
             default -> "Confirm app is ready";
         };
     }
@@ -319,6 +394,7 @@ public class InstalledAppsController {
             case "start" -> "Project OS is starting the app.";
             case "stop" -> "Project OS is pausing the app.";
             case "restart" -> "Project OS is restarting the app.";
+            case "repair" -> "Project OS is repairing the app.";
             default -> "Project OS is running the app command.";
         };
     }
@@ -328,11 +404,15 @@ public class InstalledAppsController {
             case "start" -> "Start command completed.";
             case "stop" -> "Pause command completed.";
             case "restart" -> "Restart command completed.";
+            case "repair" -> "Repair command completed.";
             default -> "App command completed.";
         };
     }
 
     private String lifecycleWaitMessage(String action) {
+        if ("repair".equals(action)) {
+            return "Waiting for the app to report recovered.";
+        }
         return "stop".equals(action)
                 ? "Waiting for the app to report paused."
                 : "Waiting for the app to report ready.";
@@ -344,11 +424,15 @@ public class InstalledAppsController {
             case "start" -> appName + " is ready.";
             case "stop" -> appName + " is paused.";
             case "restart" -> appName + " is ready after restart.";
+            case "repair" -> appName + " recovered.";
             default -> appName + " action finished.";
         };
     }
 
     private String lifecycleTimeoutMessage(String action) {
+        if ("repair".equals(action)) {
+            return "Project OS ran repair, but the app did not report recovered in time.";
+        }
         return "stop".equals(action)
                 ? "Project OS paused the app command, but the app did not report paused in time."
                 : "Project OS ran the app command, but the app did not report ready in time.";
@@ -370,6 +454,14 @@ public class InstalledAppsController {
                 ProjectOsJobStep.pending("stop_remove_compose_project", "Stop and remove app containers"),
                 ProjectOsJobStep.pending("preserve_data", "Preserve app data"),
                 ProjectOsJobStep.pending("remove_app_record", "Remove app from My Apps"),
+                ProjectOsJobStep.pending("refresh_app_state", "Refresh app state"));
+    }
+
+    private List<ProjectOsJobStep> repairJobSteps() {
+        return List.of(
+                ProjectOsJobStep.pending("inspect_app", "Inspect app"),
+                ProjectOsJobStep.pending("run_repair", "Run repair"),
+                ProjectOsJobStep.pending("verify_repair", "Verify repair"),
                 ProjectOsJobStep.pending("refresh_app_state", "Refresh app state"));
     }
 }

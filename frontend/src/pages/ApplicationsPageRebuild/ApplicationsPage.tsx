@@ -36,6 +36,7 @@ import type {
 } from './extensions/ApplicationsPage.types';
 
 type ApplicationFilter = 'all' | 'managed' | 'pinned' | 'found' | 'needs_review';
+type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair'>;
 
 export const ApplicationsPage = () => {
   const { viewMode } = useProjectSettings();
@@ -216,7 +217,7 @@ export const ApplicationsPage = () => {
     queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
   };
 
-  const runManagedAction = async (appId: string, action: ApplicationRuntimeAction) => {
+  const runManagedAction = async (appId: string, action: ManagedLifecycleAction) => {
     setAppActionLoading(appId, action);
 
     try {
@@ -234,6 +235,29 @@ export const ApplicationsPage = () => {
       void invalidateApplicationState(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'App action failed');
+    } finally {
+      setAppActionLoading(appId, null);
+    }
+  };
+
+  const runRepair = async (appId: string) => {
+    setAppActionLoading(appId, 'repair');
+
+    try {
+      const job = await InstalledAppsAPIClient.repair(appId);
+      setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'Repair started',
+        message: 'Project OS is repairing this app and will keep showing progress until the app reports its real state.',
+      });
+      void invalidateProjectOsJobs(queryClient);
+      void invalidateApplicationState(queryClient);
+    } catch (err) {
+      showActionErrorNotification(err, 'Repair could not start');
     } finally {
       setAppActionLoading(appId, null);
     }
@@ -395,6 +419,7 @@ export const ApplicationsPage = () => {
   const handleStart = (id: string) => void runManagedAction(id, 'start');
   const handleStop = (id: string) => void runManagedAction(id, 'stop');
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
+  const handleRepair = (id: string) => void runRepair(id);
   const handleDirtyChange = (id: string, dirty: boolean) => setSettingsDirtyByAppId((current) => ({ ...current, [id]: dirty }));
   const handleCreateBackup = (id: string) => {
     setSelectedId(id);
@@ -427,6 +452,7 @@ export const ApplicationsPage = () => {
     onLoadUninstallPlan: loadUninstallPlan,
     onMatchObservedService: matchObservedService,
     onPinObservedService: pinObservedService,
+    onRepair: handleRepair,
     onRestart: handleRestart,
     onRunNextAction: handleRunNextAction,
     onRunUninstall: runUninstall,
@@ -669,6 +695,7 @@ function appActionLabel(action: ApplicationRuntimeAction) {
   if (action === 'start') return 'Start';
   if (action === 'stop') return 'Pause';
   if (action === 'restart') return 'Restart';
+  if (action === 'repair') return 'Repair';
   return 'App action';
 }
 

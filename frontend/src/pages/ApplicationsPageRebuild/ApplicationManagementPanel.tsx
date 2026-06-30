@@ -27,6 +27,7 @@ type ApplicationManagementPanelProps = {
     | 'onLoadUninstallPlan'
     | 'onMatchObservedService'
     | 'onPinObservedService'
+    | 'onRepair'
     | 'onRestart'
     | 'onRunUninstall'
     | 'onSaveSettings'

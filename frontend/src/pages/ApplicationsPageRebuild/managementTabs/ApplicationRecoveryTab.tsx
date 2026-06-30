@@ -1,10 +1,10 @@
-import { AlertTriangle, ListChecks, Play, Settings, Square } from 'lucide-react';
+import { AlertTriangle, ListChecks, Play, Settings, Square, Wrench } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import type { ApplicationActionHandlers, ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 type ApplicationRecoveryTabProps = {
-  actions: Pick<ApplicationActionHandlers, 'onStart' | 'onStop' | 'onRestart'>;
+  actions: Pick<ApplicationActionHandlers, 'onRepair' | 'onStart' | 'onStop' | 'onRestart'>;
   item: ApplicationSurfaceItem;
   onEditSettings: () => void;
 };
@@ -14,6 +14,7 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
     return null;
   }
 
+  const repairAction = item.availableActions.find((action) => action.id === 'repair');
   const recovery = explainFailure(item.operationState.message);
   const recentEvents = item.runtime.recentEvents.slice(0, 4);
 
@@ -37,7 +38,13 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
         <p className="text-sm leading-6 text-red-50/80">{recovery.description}</p>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {repairAction && (
+          <Button className="bg-red-100 text-red-950 hover:bg-white" disabled={repairAction.disabled} onClick={() => actions.onRepair(item.id)} title={repairAction.reason || undefined} type="button">
+            <Wrench data-icon="inline-start" />
+            Run repair
+          </Button>
+        )}
         <Button className="bg-red-100 text-red-950 hover:bg-white" onClick={() => actions.onStart(item.id)} type="button">
           <Play data-icon="inline-start" />
           Start again

@@ -147,6 +147,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
 
 function RailControls({ actions, item, loadingAction }: { actions: ApplicationActionHandlers; item: ApplicationSurfaceItem; loadingAction: ApplicationRuntimeAction | null }) {
   const runtimeActionDisabled = runtimeControlsDisabled(item.operationState, loadingAction);
+  const repairAction = item.availableActions.find((action) => action.id === 'repair');
 
   return (
     <section className="grid gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
@@ -194,10 +195,17 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
             <ShieldCheck data-icon="inline-start" />
             Backup
           </Button>
-          {(item.attentionState !== 'none' || item.nextAction) && (
-            <Button className="border-orange-300/40 bg-slate-900 text-orange-100 hover:bg-slate-700 hover:text-orange-50" disabled={runtimeActionDisabled} onClick={() => actions.onRunNextAction(item.id)} type="button" variant="outline">
-              <Wrench data-icon="inline-start" />
-              Repair
+          {repairAction && (
+            <Button
+              className="border-orange-300/40 bg-slate-900 text-orange-100 hover:bg-slate-700 hover:text-orange-50"
+              disabled={runtimeActionDisabled || repairAction.disabled}
+              onClick={() => actions.onRepair(item.id)}
+              title={repairAction.reason || undefined}
+              type="button"
+              variant="outline"
+            >
+              {loadingAction === 'repair' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Wrench data-icon="inline-start" />}
+              {loadingAction === 'repair' ? 'Repairing' : repairAction.label || 'Repair'}
             </Button>
           )}
         </div>

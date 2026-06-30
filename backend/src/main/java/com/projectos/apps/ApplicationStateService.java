@@ -258,7 +258,7 @@ public class ApplicationStateService {
         if (job == null || !List.of("queued", "running", "failed", "succeeded", "cancelled", "canceled").contains(job.status())) {
             return false;
         }
-        return List.of("start_app", "stop_app", "restart_app", "uninstall_app").contains(job.type());
+        return List.of("start_app", "stop_app", "restart_app", "repair_app", "uninstall_app").contains(job.type());
     }
 
     private AppOperationView operationState(ProjectOsJob job, AppRuntimeView app) {
@@ -291,6 +291,7 @@ public class ApplicationStateService {
             case "start_app" -> "starting";
             case "stop_app" -> "stopping";
             case "restart_app" -> "restarting";
+            case "repair_app" -> "repairing";
             case "uninstall_app" -> "uninstalling";
             default -> "idle";
         };
@@ -301,6 +302,7 @@ public class ApplicationStateService {
             case "start_app" -> "Starting";
             case "stop_app" -> "Pausing";
             case "restart_app" -> "Restarting";
+            case "repair_app" -> "Repairing";
             case "uninstall_app" -> "Uninstalling safely";
             default -> "Working";
         };
@@ -328,13 +330,32 @@ public class ApplicationStateService {
             return List.of();
         }
         boolean paused = "paused".equals(app.readinessState()) || "stopped".equals(app.readinessState()) || "Stopped".equals(app.friendlyStatus());
-        return paused
+        List<ProjectOsAction> runtimeActions = paused
                 ? List.of(
                         ProjectOsAction.post("start", "Start", "/api/apps/" + app.appId() + "/start", false, false),
                         ProjectOsAction.post("restart", "Restart", "/api/apps/" + app.appId() + "/restart", false, false))
                 : List.of(
                         ProjectOsAction.post("stop", "Pause", "/api/apps/" + app.appId() + "/stop", false, false),
                         ProjectOsAction.post("restart", "Restart", "/api/apps/" + app.appId() + "/restart", false, false));
+        if (!repairRecommended(app)) {
+            return runtimeActions;
+        }
+        java.util.ArrayList<ProjectOsAction> actions = new java.util.ArrayList<>(runtimeActions);
+        actions.add(ProjectOsAction.post("repair", "Repair", "/api/apps/" + app.appId() + "/repair", false, false));
+        return actions;
+    }
+
+    private boolean repairRecommended(AppRuntimeView app) {
+        String attentionState = app.attentionState() == null ? "" : app.attentionState();
+        if (List.of("needs_review", "conflict", "blocked").contains(attentionState)) {
+            return true;
+        }
+        String readinessState = app.readinessState() == null ? "" : app.readinessState();
+        if (List.of("unreachable", "unknown").contains(readinessState)) {
+            return true;
+        }
+        String friendlyStatus = app.friendlyStatus() == null ? "" : app.friendlyStatus();
+        return List.of("Needs review", "Unavailable").contains(friendlyStatus);
     }
 
     private String managedSortName(AppRuntimeView app) {

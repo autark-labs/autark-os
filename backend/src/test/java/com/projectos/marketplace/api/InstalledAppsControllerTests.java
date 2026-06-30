@@ -88,6 +88,77 @@ class InstalledAppsControllerTests {
     }
 
     @Test
+    void repairMutationReturnsDurableJobAndRunsRepairLater() {
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        ProjectOsJobService jobService = jobService();
+        InstalledAppsController controller = new InstalledAppsController(
+                lifecycleService,
+                metricsService,
+                updateService,
+                applicationStateService,
+                jobService);
+        AppActionResult result = new AppActionResult("vaultwarden", "repair", "completed", "Repair completed.", null, List.of(), Instant.parse("2026-06-21T12:00:00Z"));
+        when(lifecycleService.repair("vaultwarden")).thenReturn(result);
+
+        ProjectOsJob job = controller.repair("vaultwarden");
+
+        assertThat(job.type()).isEqualTo("repair_app");
+        assertThat(job.subjectId()).isEqualTo("vaultwarden");
+        assertThat(job.status()).isEqualTo("queued");
+        assertThat(job.steps()).extracting(ProjectOsJobStep::id).containsExactly(
+                "inspect_app",
+                "run_repair",
+                "verify_repair",
+                "refresh_app_state");
+        verify(lifecycleService, never()).repair("vaultwarden");
+
+        jobService.runQueuedJobsNow();
+
+        verify(lifecycleService).repair("vaultwarden");
+        verify(applicationStateService, atLeastOnce()).invalidate();
+        verify(applicationStateService, never()).refreshInBackground();
+    }
+
+    @Test
+    void repairJobFailureKeepsRepairMessageActionable() {
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        ProjectOsJobService jobService = jobService();
+        InstalledAppsController controller = new InstalledAppsController(
+                lifecycleService,
+                metricsService,
+                updateService,
+                applicationStateService,
+                jobService);
+        AppActionResult result = new AppActionResult(
+                "syncthing",
+                "repair",
+                "needs_attention",
+                "Syncthing still needs attention after repair.",
+                null,
+                List.of(),
+                Instant.parse("2026-06-21T12:00:00Z"));
+        when(lifecycleService.repair("syncthing")).thenReturn(result);
+
+        ProjectOsJob job = controller.repair("syncthing");
+        jobService.runQueuedJobsNow();
+
+        ProjectOsJob failed = jobService.findById(job.jobId()).orElseThrow();
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.error()).isNotNull();
+        assertThat(failed.error().message()).isEqualTo("Syncthing still needs attention after repair.");
+        assertThat(failed.steps())
+                .filteredOn(step -> "run_repair".equals(step.id()))
+                .extracting(ProjectOsJobStep::status)
+                .containsExactly("failed");
+    }
+
+    @Test
     void appListReadUsesCachedApplicationState() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);

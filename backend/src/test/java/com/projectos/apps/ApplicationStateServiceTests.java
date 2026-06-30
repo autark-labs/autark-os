@@ -248,6 +248,45 @@ class ApplicationStateServiceTests {
     }
 
     @Test
+    void snapshotOverlaysRepairJobOnTargetApp() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("syncthing", "Syncthing", "Unavailable")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("repair-1", "repair_app", "syncthing", "running", "run_repair")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("repairing");
+        assertThat(state.runtimeApps().getFirst().operationState().label()).isEqualTo("Repairing");
+        assertThat(state.runtimeApps().getFirst().availableActions()).isEmpty();
+    }
+
+    @Test
+    void snapshotOnlyIncludesRepairActionWhenCanonicalStateNeedsRemediation() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(
+                        runtimeApp("homepage", "Homepage"),
+                        runtimeApp("syncthing", "Syncthing", "Unavailable")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.<ProjectOsJob>of());
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps().getFirst().availableActions())
+                .extracting(action -> action.id())
+                .doesNotContain("repair");
+        assertThat(state.runtimeApps().get(1).availableActions())
+                .extracting(action -> action.id())
+                .contains("repair");
+    }
+
+    @Test
     void snapshotIgnoresOlderFailedLifecycleJobAfterNewerSuccess() {
         ApplicationStateService service = new ApplicationStateService(
                 List::of,

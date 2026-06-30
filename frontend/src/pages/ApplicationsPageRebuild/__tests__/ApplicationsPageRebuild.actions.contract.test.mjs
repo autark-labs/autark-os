@@ -135,3 +135,27 @@ test('applications rebuild exposes a red recovery tab for failed app operations'
   assert.match(rail, /onManagementOpenChange\(true\)/);
   assert.match(settings, /operationBlocksManagement\(item\.operationState\)/);
 });
+
+test('applications rebuild runs repair only from canonical available actions', () => {
+  const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
+  const rail = source('src/pages/ApplicationsPageRebuild/ApplicationDetailsRail.tsx');
+  const recovery = source('src/pages/ApplicationsPageRebuild/managementTabs/ApplicationRecoveryTab.tsx');
+  const api = source('src/api/InstalledAppsAPIClient.ts');
+  const types = source('src/pages/ApplicationsPageRebuild/extensions/ApplicationsPage.types.ts');
+
+  assert.match(types, /onRepair: \(id: string\) => void/);
+  assert.ok(api.includes('post<ProjectOsJob>(`/api/apps/${appId}/repair`)'));
+  assert.match(page, /InstalledAppsAPIClient\.repair\(appId\)/);
+  assert.match(page, /setProjectOsJobCache\(queryClient, job\)/);
+  assert.match(page, /setProjectOsJobInApplicationStateCache\(queryClient, job\)/);
+  assert.match(page, /title: 'Repair started'/);
+
+  assert.match(rail, /const repairAction = item\.availableActions\.find\(\(action\) => action\.id === 'repair'\)/);
+  assert.match(rail, /repairAction &&/);
+  assert.match(rail, /actions\.onRepair\(item\.id\)/);
+  assert.doesNotMatch(rail, /item\.attentionState !== 'none' \|\| item\.nextAction/);
+
+  assert.match(recovery, /const repairAction = item\.availableActions\.find\(\(action\) => action\.id === 'repair'\)/);
+  assert.match(recovery, /Run repair/);
+  assert.match(recovery, /actions\.onRepair\(item\.id\)/);
+});

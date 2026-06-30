@@ -67,6 +67,12 @@ function operationStateFromLocalAction(action) {
       label: 'Restarting',
     };
   }
+  if (action === 'repair') {
+    return {
+      kind: 'repairing',
+      label: 'Repairing',
+    };
+  }
   return { kind: 'idle' };
 }
 
@@ -95,6 +101,14 @@ function operationStateFromJob(job) {
       currentStep: currentJobStepText(job),
     };
   }
+  if (job.type === 'repair_app') {
+    return {
+      kind: 'repairing',
+      label: 'Repairing',
+      jobId: job.jobId,
+      currentStep: currentJobStepText(job),
+    };
+  }
   if (job.type === 'uninstall_app') {
     return {
       kind: 'uninstalling',
@@ -118,12 +132,12 @@ function jobsForItem(item, jobs) {
   const itemIds = new Set([item?.id, item?.sourceId].filter(Boolean));
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => itemIds.has(job.subjectId))
-    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'uninstall_app'].includes(job.type))
+    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'backup', 'backup_verify', 'uninstall_app'].includes(job.type))
     .toSorted((left, right) => jobTime(right) - jobTime(left));
 }
 
 function failedJobStillRelevant(item, job) {
-  if (!['start_app', 'stop_app', 'restart_app'].includes(job.type)) {
+  if (!['start_app', 'stop_app', 'restart_app', 'repair_app'].includes(job.type)) {
     return true;
   }
   if (!item?.readinessState && !item?.attentionState) {

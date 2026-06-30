@@ -55,6 +55,15 @@ test('operationStateForItem maps durable jobs by app subject and current step', 
     currentStep: 'Writing backup archive',
   });
 
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
+    job('repair-1', 'repair_app', 'vaultwarden', 'running', 'repair'),
+  ]), {
+    kind: 'repairing',
+    label: 'Repairing',
+    jobId: 'repair-1',
+    currentStep: 'Repairing app',
+  });
+
   assert.deepEqual(operationStateForItem(item('vaultwarden'), 'restart', null, [
     job('uninstall-1', 'uninstall_app', 'vaultwarden', 'running', 'remove'),
   ]), {
@@ -152,6 +161,7 @@ function job(jobId, type, subjectId, status, currentStep, updatedAt = '2026-06-2
       { id: 'wait', label: 'Wait for readiness', message: 'Waiting for app readiness', status: currentStep === 'wait' ? 'running' : 'pending' },
       { id: 'archive', label: 'Create archive', message: 'Writing backup archive', status: currentStep === 'archive' ? 'running' : 'pending' },
       { id: 'remove', label: 'Remove app', message: 'Removing containers', status: currentStep === 'remove' ? 'running' : 'pending' },
+      { id: 'repair', label: 'Run repair', message: 'Repairing app', status: currentStep === 'repair' ? 'running' : 'pending' },
     ],
     createdAt: '2026-06-29T12:00:00Z',
     updatedAt,
