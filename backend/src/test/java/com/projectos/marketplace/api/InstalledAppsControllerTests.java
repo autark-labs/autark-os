@@ -162,7 +162,7 @@ class InstalledAppsControllerTests {
         jobService.runQueuedJobsNow();
 
         verify(lifecycleService).uninstall("vaultwarden");
-        verify(applicationStateService).invalidate();
+        verify(applicationStateService, atLeastOnce()).invalidate();
         verify(applicationStateService, never()).refreshInBackground();
     }
 

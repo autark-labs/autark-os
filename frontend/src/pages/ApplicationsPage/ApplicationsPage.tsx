@@ -12,6 +12,7 @@ import { showActionErrorNotification, showActionNotification, showJobNotificatio
 import {
   invalidateAppUpdates,
   invalidateApplicationState,
+  setProjectOsJobInApplicationStateCache,
   useAppUpdatesQuery,
   useApplicationStateRepository,
   updatesByAppId as buildUpdatesByAppId,
@@ -187,6 +188,7 @@ function ApplicationsPage() {
 
       const job = await InstalledAppsAPIClient.runAction(appId, action);
       setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
       setTrackedLifecycleJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
         ok: true,
@@ -211,6 +213,7 @@ function ApplicationsPage() {
     try {
       const job = await InstalledAppsAPIClient.uninstall(appId);
       setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
       setTrackedUninstallJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showJobNotification(job);
       void jobsQuery.refetch();

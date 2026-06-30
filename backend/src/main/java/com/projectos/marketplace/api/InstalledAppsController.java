@@ -183,11 +183,13 @@ public class InstalledAppsController {
 
     @PostMapping("/{id}/uninstall")
     public ProjectOsJob startUninstall(@PathVariable String id) {
-        return jobService.start("uninstall_app", id, uninstallJobSteps(), () -> {
+        ProjectOsJob job = jobService.start("uninstall_app", id, uninstallJobSteps(), () -> {
             AppActionResult result = appLifecycleService.uninstall(id);
             applicationStateService.invalidate();
             return ProjectOsJobOutcome.succeeded(result.message());
         });
+        applicationStateService.invalidate();
+        return job;
     }
 
     @DeleteMapping("/{id}")
@@ -203,9 +205,10 @@ public class InstalledAppsController {
     private ProjectOsJob startLifecycleJob(String action, String jobType, String id) {
         ProjectOsJob active = activeLifecycleJob(id);
         if (active != null) {
+            applicationStateService.invalidate();
             return active;
         }
-        return jobService.startWithJob(jobType, id, lifecycleJobSteps(action), job -> {
+        ProjectOsJob created = jobService.startWithJob(jobType, id, lifecycleJobSteps(action), job -> {
             List<ProjectOsJobStep> runningCommand = lifecycleJobSteps(action).stream()
                     .map(step -> "run_command".equals(step.id())
                             ? ProjectOsJobStep.running(step.id(), step.label(), lifecycleRunMessage(action))
@@ -239,6 +242,8 @@ public class InstalledAppsController {
                             : step)
                     .toList());
         });
+        applicationStateService.invalidate();
+        return created;
     }
 
     private ProjectOsJob activeLifecycleJob(String id) {

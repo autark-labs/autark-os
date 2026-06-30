@@ -107,6 +107,26 @@ export function setObservedServiceAdoptedInState(state, serviceId) {
   };
 }
 
+export function setProjectOsJobInState(state, job) {
+  if (!state || !job?.subjectId || !lifecycleJobTypes().has(job.type)) {
+    return state;
+  }
+
+  const operation = operationStateFromProjectOsJob(job);
+  const runtimeApps = (state.runtimeApps ?? []).map((app) => app.appId === job.subjectId
+    ? runtimeAppWithOperation(app, operation)
+    : app);
+  const managedApps = (state.managedApps ?? []).map((app) => app.catalogAppId === job.subjectId
+    ? managedAppWithOperation(app, operation)
+    : app);
+
+  return {
+    ...state,
+    runtimeApps,
+    managedApps,
+  };
+}
+
 export function setRuntimeAppInState(state, app) {
   if (!state || !app?.appId) {
     return state;
@@ -123,6 +143,111 @@ export function setRuntimeAppInState(state, app) {
       updatedAt: new Date().toISOString(),
     } : item),
   };
+}
+
+function lifecycleJobTypes() {
+  return new Set(['start_app', 'stop_app', 'restart_app', 'uninstall_app']);
+}
+
+function operationStateFromProjectOsJob(job) {
+  if (job.status === 'failed') {
+    return {
+      kind: 'failed',
+      label: operationLabel(job.type),
+      jobId: job.jobId,
+      currentStep: '',
+      message: job.error?.message || 'Project OS could not finish this action.',
+    };
+  }
+
+  return {
+    kind: operationKind(job.type),
+    label: operationLabel(job.type),
+    jobId: job.jobId,
+    currentStep: currentProjectOsJobStepText(job),
+    message: currentProjectOsJobStepText(job),
+  };
+}
+
+function runtimeAppWithOperation(app, operation) {
+  return {
+    ...app,
+    friendlyStatus: friendlyStatusForOperation(operation, app.friendlyStatus),
+    readinessState: readinessStateForOperation(operation, app.readinessState),
+    operationState: operation,
+    availableActions: operation.kind === 'idle' || operation.kind === 'failed' ? app.availableActions : [],
+  };
+}
+
+function managedAppWithOperation(app, operation) {
+  return {
+    ...app,
+    userStatus: friendlyStatusForOperation(operation, app.userStatus),
+    runtimeState: runtimeStateForOperation(operation, app.runtimeState),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function operationKind(type) {
+  if (type === 'start_app') return 'starting';
+  if (type === 'stop_app') return 'stopping';
+  if (type === 'restart_app') return 'restarting';
+  if (type === 'uninstall_app') return 'uninstalling';
+  return 'idle';
+}
+
+function operationLabel(type) {
+  if (type === 'start_app') return 'Starting';
+  if (type === 'stop_app') return 'Pausing';
+  if (type === 'restart_app') return 'Restarting';
+  if (type === 'uninstall_app') return 'Uninstalling safely';
+  return 'Working';
+}
+
+function readinessStateForOperation(operation, current) {
+  if (!operation || operation.kind === 'idle' || operation.kind === 'failed') {
+    return current;
+  }
+  if (operation.kind === 'starting' || operation.kind === 'restarting') {
+    return 'starting';
+  }
+  if (operation.kind === 'stopping') {
+    return 'paused';
+  }
+  return current;
+}
+
+function friendlyStatusForOperation(operation, current) {
+  if (!operation || operation.kind === 'idle' || operation.kind === 'failed') {
+    return current;
+  }
+  if (operation.kind === 'starting' || operation.kind === 'restarting') {
+    return 'Starting';
+  }
+  if (operation.kind === 'stopping') {
+    return 'Paused';
+  }
+  return current;
+}
+
+function runtimeStateForOperation(operation, current) {
+  if (!operation || operation.kind === 'idle' || operation.kind === 'failed') {
+    return current;
+  }
+  if (operation.kind === 'starting' || operation.kind === 'restarting') {
+    return 'starting';
+  }
+  if (operation.kind === 'stopping') {
+    return 'stopped';
+  }
+  return current;
+}
+
+function currentProjectOsJobStepText(job) {
+  const step = job.steps?.find((candidate) => candidate.id === job.currentStep)
+    ?? job.steps?.find((candidate) => candidate.status === 'running')
+    ?? job.steps?.find((candidate) => candidate.status === 'pending');
+  return step?.message || step?.label || '';
 }
 
 export function setRuntimeAppStatusInState(state, appId, status) {

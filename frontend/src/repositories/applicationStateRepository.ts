@@ -12,18 +12,18 @@ import {
   healthByAppId,
   managedRuntimeApps,
   removeManagedAppFromState,
-  setObservedServiceAdoptedInState,
   observedServices,
   ownershipViews,
+  setProjectOsJobInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
-  setObservedServicePinnedInState,
   telemetryByAppId,
   updatesByAppId,
 } from './applicationStateRepository.logic';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry, AppUpdateStatus } from '@/types/app';
 import type { AppOwnershipView } from '@/types/appOwnership';
 import type { ObservedServiceView } from '@/types/observedService';
+import type { ProjectOsJob } from '@/types/jobs';
 
 export {
   accessByAppId,
@@ -35,12 +35,11 @@ export {
   healthByAppId,
   managedRuntimeApps,
   removeManagedAppFromState,
-  setObservedServiceAdoptedInState,
   observedServices,
   ownershipViews,
+  setProjectOsJobInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
-  setObservedServicePinnedInState,
   telemetryByAppId,
   updatesByAppId,
 };
@@ -115,16 +114,23 @@ export function setApplicationStateCache(queryClient: QueryClient, state?: Appli
   }
 }
 
+export function setApplicationStateFromActionResultCache(queryClient: QueryClient, result?: { applicationState?: ApplicationState | null } | null) {
+  if (!result?.applicationState) {
+    return false;
+  }
+  setApplicationStateCache(queryClient, result.applicationState);
+  return true;
+}
+
 export function invalidateApplicationState(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: applicationStateQueryKey });
 }
 
-export function setObservedServicePinnedInApplicationStateCache(queryClient: QueryClient, serviceId: string, pinned: boolean) {
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setObservedServicePinnedInState(current, serviceId, pinned));
-}
-
-export function setObservedServiceAdoptedInApplicationStateCache(queryClient: QueryClient, serviceId: string) {
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setObservedServiceAdoptedInState(current, serviceId));
+export function setProjectOsJobInApplicationStateCache(queryClient: QueryClient, job?: ProjectOsJob | null) {
+  if (!job) {
+    return;
+  }
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setProjectOsJobInState(current, job));
 }
 
 export function setRuntimeAppInApplicationStateCache(queryClient: QueryClient, app: AppRuntimeView) {

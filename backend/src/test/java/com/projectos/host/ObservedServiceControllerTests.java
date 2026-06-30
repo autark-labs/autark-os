@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.DeleteMapping;
 
+import com.projectos.apps.ApplicationState;
 import com.projectos.apps.ApplicationStateService;
 
 class ObservedServiceControllerTests {
@@ -62,12 +64,14 @@ class ObservedServiceControllerTests {
         InMemoryObservedServiceService service = new InMemoryObservedServiceService();
         service.current = observed("obs_service", "observed", null, null);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        when(applicationStateService.refreshNow()).thenReturn(applicationState());
         ObservedServiceController controller = new ObservedServiceController(service, applicationStateService);
 
-        controller.pin("obs_service");
+        ActionResult result = controller.pin("obs_service");
 
-        verify(applicationStateService).refreshInBackground();
-        verify(applicationStateService, never()).refreshNow();
+        assertThat(result.applicationState()).isNotNull();
+        verify(applicationStateService).refreshNow();
+        verify(applicationStateService, never()).refreshInBackground();
     }
 
     @Test
@@ -105,6 +109,17 @@ class ObservedServiceControllerTests {
                 pinnedAt,
                 null,
                 "{}");
+    }
+
+    private static ApplicationState applicationState() {
+        return new ApplicationState(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                Instant.parse("2026-06-21T12:00:00Z"));
     }
 
     private static final class InMemoryObservedServiceService extends ObservedServiceService {

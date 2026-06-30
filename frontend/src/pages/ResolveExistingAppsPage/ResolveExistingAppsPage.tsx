@@ -10,7 +10,7 @@ import { PageSection, PageShell, SoftCard, StatusPill } from '@/components/proje
 import { Button } from '@/components/ui/button';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
-import { applicationStateQueryKey, setObservedServicePinnedInApplicationStateCache, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import { setApplicationStateFromActionResultCache, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ObservedServiceDetailsSheet } from '../ApplicationsPage/ObservedServiceDetailsSheet';
 import {
@@ -69,13 +69,14 @@ function ResolveExistingAppsPage() {
 
   async function pinService(service: ObservedServiceView) {
     setBusyId(service.id);
-    const previousApplicationState = queryClient.getQueryData(applicationStateQueryKey);
-    setObservedServicePinnedInApplicationStateCache(queryClient, service.id, true);
     try {
       const result = await ObservedServicesAPIClient.pin(service.id);
+      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
       showActionNotification(result, result.title || `${service.displayName} pinned`);
+      if (!stateUpdated) {
+        void appState.refresh();
+      }
     } catch (pinError) {
-      queryClient.setQueryData(applicationStateQueryKey, previousApplicationState);
       showActionErrorNotification(pinError, 'Service could not be pinned');
     } finally {
       setBusyId(null);
@@ -83,8 +84,11 @@ function ResolveExistingAppsPage() {
   }
 
   function handleObservedServiceResult(result: ObservedServiceActionResult) {
+    const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
     showActionNotification(result, result.title || 'Service action finished');
-    void appState.refresh();
+    if (!stateUpdated) {
+      void appState.refresh();
+    }
   }
 
   return (

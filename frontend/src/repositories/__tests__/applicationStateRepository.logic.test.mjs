@@ -9,6 +9,7 @@ import {
   healthByAppId,
   managedRuntimeApps,
   removeManagedAppFromState,
+  setProjectOsJobInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   setObservedServiceAdoptedInState,
@@ -109,7 +110,7 @@ test('only explicit unhealthy or unreachable states need attention', () => {
   assert.equal(appNeedsAttentionFromCanonicalState(unreachableApp, unreachableApp.healthSnapshot, accessByAppId({ runtimeApps: [unreachableApp] }).homepage, unreachableApp.telemetry), true);
 });
 
-test('optimistic pinning updates observed-service cache without dropping recoverable state', () => {
+test('observed service pinned-state helper preserves recoverable state', () => {
   const state = {
     observedServices: [
       observedService('docker:vaultwarden', 'recoverable', false),
@@ -139,7 +140,7 @@ test('optimistic pinning updates observed-service cache without dropping recover
   assert.equal(unpinnedFound.observedServices[1].availableActions.some((action) => action.id === 'unpin'), false);
 });
 
-test('optimistic adoption moves a recoverable service into managed app views', () => {
+test('observed service adoption helper moves a recoverable service into managed app views', () => {
   const state = {
     runtimeApps: [],
     managedApps: [],
@@ -204,6 +205,40 @@ test('runtime app cache helper preserves existing runtime app order', () => {
   const updated = setRuntimeAppInState(state, { ...runtimeApp('syncthing', 'Starting'), appName: 'Syncthing' });
 
   assert.deepEqual(updated.runtimeApps.map((app) => app.appId), ['homepage', 'syncthing', 'vaultwarden']);
+});
+
+test('project os job helper applies backend operation state without reordering apps', () => {
+  const state = {
+    runtimeApps: [
+      runtimeApp('homepage', 'Ready'),
+      runtimeApp('syncthing', 'Ready'),
+      runtimeApp('vaultwarden', 'Ready'),
+    ],
+    managedApps: [
+      { catalogAppId: 'homepage', name: 'Homepage', userStatus: 'Ready' },
+      { catalogAppId: 'syncthing', name: 'Syncthing', userStatus: 'Ready' },
+      { catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' },
+    ],
+  };
+
+  const updated = setProjectOsJobInState(state, {
+    jobId: 'restart-1',
+    type: 'restart_app',
+    subjectId: 'syncthing',
+    status: 'queued',
+    currentStep: 'run_command',
+    steps: [{ id: 'run_command', label: 'Restart app', status: 'pending', message: 'Project OS is restarting the app.' }],
+    createdAt: updatedAt,
+    updatedAt,
+  });
+
+  assert.deepEqual(updated.runtimeApps.map((app) => app.appId), ['homepage', 'syncthing', 'vaultwarden']);
+  assert.equal(updated.runtimeApps[1].operationState.kind, 'restarting');
+  assert.equal(updated.runtimeApps[1].operationState.jobId, 'restart-1');
+  assert.equal(updated.runtimeApps[1].readinessState, 'starting');
+  assert.equal(updated.runtimeApps[1].friendlyStatus, 'Starting');
+  assert.deepEqual(updated.runtimeApps[1].availableActions, []);
+  assert.equal(updated.managedApps[1].userStatus, 'Starting');
 });
 
 function runtimeApp(appId, friendlyStatus, healthSnapshot = null) {

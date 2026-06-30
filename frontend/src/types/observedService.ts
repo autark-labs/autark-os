@@ -1,3 +1,5 @@
+import type { ApplicationState } from './applicationState';
+
 export type ObservedServiceUserStatus =
   | 'installed_managed'
   | 'pinned_external'
@@ -54,7 +56,9 @@ export type ObservedServiceActionResult = {
   title: string;
   message?: string | null;
   subjectId?: string | null;
+  resourceId?: string | null;
   nextAction?: string | null;
+  applicationState?: ApplicationState | null;
 };
 
 export type ObservedServiceAdoptionPlan = {

@@ -22,10 +22,8 @@ import {
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import {
-  applicationStateQueryKey,
   catalogAppIsManaged,
-  setObservedServiceAdoptedInApplicationStateCache,
-  setObservedServicePinnedInApplicationStateCache,
+  setApplicationStateFromActionResultCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan, ObservedServiceView } from '@/types/observedService';
@@ -85,29 +83,17 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
   const confirmationText = typeof plan?.confirmationText === 'string' ? plan.confirmationText : '';
   const adoptDisabled = busyAction !== null || !planAvailable || blockedReasons.length > 0 || (confirmationText.length > 0 && confirmation !== confirmationText);
 
-  async function runMutation(actionId: string, mutation: () => Promise<ObservedServiceActionResult>, options: { optimisticPinned?: boolean; optimisticAdopt?: boolean; refresh?: boolean } = {}) {
+  async function runMutation(actionId: string, mutation: () => Promise<ObservedServiceActionResult>, options: { refresh?: boolean } = {}) {
     setBusyAction(actionId);
     setLocalError(null);
-    const shouldUpdateApplicationState = options.optimisticPinned !== undefined || options.optimisticAdopt;
-    const previousApplicationState = !shouldUpdateApplicationState
-      ? undefined
-      : queryClient.getQueryData(applicationStateQueryKey);
-    if (options.optimisticPinned !== undefined) {
-      setObservedServicePinnedInApplicationStateCache(queryClient, currentService.id, options.optimisticPinned);
-    }
-    if (options.optimisticAdopt) {
-      setObservedServiceAdoptedInApplicationStateCache(queryClient, currentService.id);
-    }
     try {
       const result = await mutation();
+      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
       onActionComplete(result);
-      if (options.refresh !== false) {
+      if (!stateUpdated && options.refresh !== false) {
         await onRefresh();
       }
     } catch (error) {
-      if (previousApplicationState !== undefined) {
-        queryClient.setQueryData(applicationStateQueryKey, previousApplicationState);
-      }
       const message = apiErrorMessage(error, 'Service action could not be completed.');
       setLocalError(message);
       showActionErrorNotification(error, 'Service action failed');
@@ -172,7 +158,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
               )}
               {canPin && (
                 <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before pinning.">
-                  <Button disabled={busyAction !== null} onClick={() => runMutation('pin', () => ObservedServicesAPIClient.pin(service.id), { optimisticPinned: true, refresh: false })} size="sm" type="button">
+                  <Button disabled={busyAction !== null} onClick={() => runMutation('pin', () => ObservedServicesAPIClient.pin(service.id), { refresh: false })} size="sm" type="button">
                     {busyAction === 'pin' ? <Loader2 className="size-4 animate-spin" /> : <Pin className="size-4" />}
                     Pin to My Apps
                   </Button>
@@ -180,7 +166,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
               )}
               {canUnpin && (
                 <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before unpinning.">
-                  <Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" disabled={busyAction !== null} onClick={() => runMutation('unpin', () => ObservedServicesAPIClient.unpin(service.id), { optimisticPinned: false, refresh: false })} size="sm" type="button" variant="outline">
+                  <Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" disabled={busyAction !== null} onClick={() => runMutation('unpin', () => ObservedServicesAPIClient.unpin(service.id), { refresh: false })} size="sm" type="button" variant="outline">
                     {busyAction === 'unpin' ? <Loader2 className="size-4 animate-spin" /> : <PinOff className="size-4" />}
                     Unpin from My Apps
                   </Button>
@@ -251,7 +237,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                   )}
                   {planAvailable && (
                     <DisabledAction disabled={adoptDisabled} reason={busyAction !== null ? 'Wait for the current service action to finish before adopting.' : blockedReasons.length > 0 ? 'Resolve the blocked adoption items before adopting this service.' : confirmationText ? 'Type the confirmation text exactly before adopting this service.' : 'This adoption plan is not available yet.'}>
-                      <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={adoptDisabled} onClick={() => runMutation('adopt', () => ObservedServicesAPIClient.adopt(service.id, confirmation), { optimisticAdopt: true, refresh: false })} type="button">
+                      <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={adoptDisabled} onClick={() => runMutation('adopt', () => ObservedServicesAPIClient.adopt(service.id, confirmation), { refresh: false })} type="button">
                         {busyAction === 'adopt' ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
                         Adopt service
                       </Button>

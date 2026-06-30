@@ -75,7 +75,7 @@ public class ObservedServiceController {
 
     private ActionResult refreshAfter(ActionResult result) {
         if (applicationStateService != null && result.ok()) {
-            applicationStateService.refreshInBackground();
+            return result.withApplicationState(applicationStateService.refreshNow());
         }
         return result;
     }

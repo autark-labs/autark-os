@@ -12,7 +12,8 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import {
   applicationStateQueryKey,
   invalidateApplicationState,
-  setObservedServicePinnedInApplicationStateCache,
+  setApplicationStateFromActionResultCache,
+  setProjectOsJobInApplicationStateCache,
   setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
@@ -220,6 +221,7 @@ export const ApplicationsPage = () => {
     try {
       const data = await InstalledAppsAPIClient.runAction(appId, action);
       setProjectOsJobCache(queryClient, data);
+      setProjectOsJobInApplicationStateCache(queryClient, data);
       setTrackedAppJobIds((current) => current.includes(data.jobId) ? current : [...current, data.jobId]);
       showActionNotification({
         ok: true,
@@ -313,6 +315,7 @@ export const ApplicationsPage = () => {
     try {
       const job = await InstalledAppsAPIClient.uninstall(appId);
       setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
         ok: true,
@@ -329,30 +332,28 @@ export const ApplicationsPage = () => {
   }
 
   async function pinObservedService(serviceId: string) {
-    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
-    setObservedServicePinnedInApplicationStateCache(queryClient, serviceId, true);
-
     try {
       const result = await ObservedServicesAPIClient.pin(serviceId);
+      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
       showActionNotification(result, result.title || 'Service pinned');
-      void invalidateApplicationState(queryClient);
+      if (!stateUpdated) {
+        void invalidateApplicationState(queryClient);
+      }
     } catch (err) {
-      queryClient.setQueryData(applicationStateQueryKey, previousState);
       showActionErrorNotification(err, 'Service could not be pinned');
       throw err;
     }
   }
 
   async function unpinObservedService(serviceId: string) {
-    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
-    setObservedServicePinnedInApplicationStateCache(queryClient, serviceId, false);
-
     try {
       const result = await ObservedServicesAPIClient.unpin(serviceId);
+      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
       showActionNotification(result, result.title || 'Service unpinned');
-      void invalidateApplicationState(queryClient);
+      if (!stateUpdated) {
+        void invalidateApplicationState(queryClient);
+      }
     } catch (err) {
-      queryClient.setQueryData(applicationStateQueryKey, previousState);
       showActionErrorNotification(err, 'Service could not be unpinned');
       throw err;
     }

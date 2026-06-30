@@ -17,6 +17,7 @@ test('applications rebuild starts lifecycle jobs and re-pulls canonical app stat
 
   assert.match(page, /InstalledAppsAPIClient\.runAction\(appId, action\)/);
   assert.match(page, /setProjectOsJobCache\(queryClient, data\)/);
+  assert.match(page, /setProjectOsJobInApplicationStateCache\(queryClient, data\)/);
   assert.match(page, /invalidateApplicationState\(queryClient\)/);
   assert.match(page, /actionLoadingByAppId/);
   assert.match(page, /useProjectOsJobsQuery\(\)/);
@@ -49,14 +50,14 @@ test('applications rebuild pins and unpins observed services through canonical a
   assert.match(types, /onUnpinObservedService: \(serviceId: string\) => Promise<void>/);
 
   assert.match(page, /ObservedServicesAPIClient/);
-  assert.match(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId, true\)/);
-  assert.match(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId, false\)/);
   assert.match(page, /ObservedServicesAPIClient\.pin\(serviceId\)/);
   assert.match(page, /ObservedServicesAPIClient\.unpin\(serviceId\)/);
+  assert.match(page, /setApplicationStateFromActionResultCache\(queryClient, result\)/);
   assert.match(page, /showActionNotification\(result/);
   assert.match(page, /showActionErrorNotification\(err, 'Service could not be pinned'\)/);
   assert.match(page, /showActionErrorNotification\(err, 'Service could not be unpinned'\)/);
-  assert.match(page, /queryClient\.setQueryData\(applicationStateQueryKey, previousState\)/);
+  assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId/);
+  assert.doesNotMatch(page, /queryClient\.setQueryData\(applicationStateQueryKey, previousState\)/);
   assert.match(page, /invalidateApplicationState\(queryClient\)/);
 
   assert.match(panel, /ObservedServiceManagementSection/);
