@@ -117,7 +117,9 @@ export const ApplicationsPage = () => {
   const managedCount = items.filter((item) => item.managementState === 'managed').length;
   const pinnedCount = items.filter((item) => item.managementState === 'linked').length;
   const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
-  const nextReviewItem = visibleItems.find((item) => item.nextAction) ?? items.find((item) => item.nextAction) ?? null;
+  const reviewableItems = items.filter(isReviewableItem);
+  const visibleReviewableItems = visibleItems.filter(isReviewableItem);
+  const nextReviewItem = visibleReviewableItems[0] ?? reviewableItems[0] ?? null;
   const reviewNextButtonLabel = nextReviewItem ? 'Review next' : 'All clear';
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
@@ -715,4 +717,9 @@ function PageMetric({ label, value }: { label: string; value: number }) {
       <div className={attention ? 'text-sm text-orange-800' : 'text-sm text-sky-100/70'}>{label}</div>
     </div>
   );
+}
+
+function isReviewableItem(item: { nextAction?: { id: string } }) {
+  const nextAction = item.nextAction;
+  return Boolean(nextAction && (nextAction.id === 'review_issue' || nextAction.id === 'review_found_service'));
 }

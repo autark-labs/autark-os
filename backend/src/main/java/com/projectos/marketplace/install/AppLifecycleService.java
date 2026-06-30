@@ -879,12 +879,13 @@ public class AppLifecycleService {
         AppAccessRoute accessRoute = accessRoute(settings, accessUrl, observedAccess);
         AppHealthSnapshot healthSnapshot = repository.healthFor(app.appId()).orElse(null);
         String remediationStatus = healthSnapshot == null ? status.friendlyStatus() : healthSnapshot.status();
+        String backupState = backupState(app.appId(), settings);
         AppRemediationView remediation = AppRemediationPolicy.remediation(
                 app.appName(),
                 remediationStatus,
                 settings.lastRepairStatus(),
                 settings.autoRepairEnabled(),
-                hasCompletedRestorePoint(app.appId(), settings),
+                "protected_by_restore_point".equals(backupState),
                 isRepairAvailable(remediationStatus));
         return new AppRuntimeView(
                 app.appId(),
@@ -904,6 +905,7 @@ public class AppLifecycleService {
                 observedAccess,
                 app.installedAt(),
                 settings.backup().enabled() ? settings.backup().label() : "Backups disabled",
+                backupState,
                 settings,
                 telemetry,
                 healthSnapshot,
@@ -914,12 +916,13 @@ public class AppLifecycleService {
                 repository.eventsFor(app.appId(), EVENT_LIMIT));
     }
 
-    private boolean hasCompletedRestorePoint(String appId, InstallSettings settings) {
+    private String backupState(String appId, InstallSettings settings) {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
-            return false;
+            return "backup_disabled";
         }
-        return backupRepository.forApp(appId, 10).stream()
+        boolean hasCompletedRestorePoint = backupRepository.forApp(appId, 10).stream()
                 .anyMatch(restorePoint -> "completed".equalsIgnoreCase(restorePoint.status()));
+        return hasCompletedRestorePoint ? "protected_by_restore_point" : "backup_enabled_no_restore_point";
     }
 
     private boolean isRepairAvailable(String status) {

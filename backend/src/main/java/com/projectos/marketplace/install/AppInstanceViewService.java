@@ -208,14 +208,14 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         if (restorePoints.isEmpty()) {
             return "backup_enabled_no_restore_point";
         }
-        RestorePoint latest = restorePoints.getFirst();
-        if ("failed".equalsIgnoreCase(latest.status())) {
-            return "backup_failed";
-        }
         boolean hasCompletedRestorePoint = restorePoints.stream()
                 .anyMatch(restorePoint -> "completed".equalsIgnoreCase(restorePoint.status()));
         if (hasCompletedRestorePoint) {
             return "protected_by_restore_point";
+        }
+        RestorePoint latest = restorePoints.getFirst();
+        if ("failed".equalsIgnoreCase(latest.status())) {
+            return "backup_failed";
         }
         return "backup_enabled_no_restore_point";
     }

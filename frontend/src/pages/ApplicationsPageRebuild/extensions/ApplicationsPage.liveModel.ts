@@ -73,7 +73,7 @@ function managedAppSurfaceItem(
     links: appLinks(app),
     managementState,
     name: app.appName,
-    nextAction: managedNextAction(app, readinessState, attentionState, backup),
+    nextAction: managedNextAction(app, readinessState, attentionState),
     operationState: backendOperationState(app.operationState),
     readinessState,
     runtime: appRuntimeDetails(app, health, telemetry),
@@ -297,7 +297,6 @@ function managedNextAction(
   app: AppRuntimeView,
   readinessState: AppReadinessState,
   attentionState: AppAttentionState,
-  backup: ApplicationSurfaceItem['backup'],
 ): ApplicationNextAction | undefined {
   if (readinessState === 'paused' || readinessState === 'stopped') {
     return {
@@ -315,7 +314,7 @@ function managedNextAction(
     };
   }
 
-  if (backup === 'Needs backup') {
+  if (app.canonicalBackupState === 'backup_enabled_no_restore_point') {
     return {
       description: 'Create the first backup snapshot before making larger changes.',
       id: 'create_backup',

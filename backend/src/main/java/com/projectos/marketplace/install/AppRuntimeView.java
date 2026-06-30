@@ -33,6 +33,7 @@ public record AppRuntimeView(
         AccessObservedState observedAccess,
         Instant installedAt,
         String lastBackup,
+        String canonicalBackupState,
         InstallSettings settings,
         AppTelemetry telemetry,
         AppHealthSnapshot healthSnapshot,
@@ -60,6 +61,7 @@ public record AppRuntimeView(
             AccessObservedState observedAccess,
             Instant installedAt,
             String lastBackup,
+            String canonicalBackupState,
             InstallSettings settings,
             AppTelemetry telemetry,
             AppHealthSnapshot healthSnapshot,
@@ -93,6 +95,7 @@ public record AppRuntimeView(
                 observedAccess,
                 installedAt,
                 lastBackup,
+                canonicalBackupState == null || canonicalBackupState.isBlank() ? backupStateFromSettings(settings) : canonicalBackupState,
                 settings,
                 telemetry,
                 healthSnapshot,
@@ -153,6 +156,7 @@ public record AppRuntimeView(
                 observedAccess,
                 installedAt,
                 lastBackup,
+                backupStateFromSettings(settings),
                 settings,
                 telemetry,
                 healthSnapshot,
@@ -191,6 +195,7 @@ public record AppRuntimeView(
                 observedAccess,
                 installedAt,
                 lastBackup,
+                canonicalBackupState,
                 settings,
                 telemetry,
                 healthSnapshot,
@@ -236,5 +241,12 @@ public record AppRuntimeView(
                 : List.of(
                         ProjectOsAction.post("stop", "Pause", "/api/apps/" + appId + "/stop", false, false),
                         ProjectOsAction.post("restart", "Restart", "/api/apps/" + appId + "/restart", false, false));
+    }
+
+    private static String backupStateFromSettings(InstallSettings settings) {
+        if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
+            return "backup_disabled";
+        }
+        return "backup_enabled_no_restore_point";
     }
 }

@@ -40,6 +40,8 @@ test('applications rebuild uses split behavior states instead of a single app st
   assert.match(liveModel, /attentionState,/);
   assert.match(liveModel, /operationState: idleOperationState\(\)/);
   assert.match(liveModel, /value\.kind === 'repairing'/);
+  assert.match(liveModel, /app\.canonicalBackupState === 'protected_by_restore_point'/);
+  assert.doesNotMatch(liveModel, /if \(backup === 'Needs backup'\)/);
   assert.match(liveModel, /service\.userStatus === 'blocked'/);
   assert.match(liveModel, /service\.userStatus === 'managed_elsewhere'/);
 

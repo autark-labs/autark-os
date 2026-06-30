@@ -199,6 +199,10 @@ test('applications rebuild only exposes concrete next actions from the rail', ()
 test('applications rebuild review-next opens the review panel and has an all-clear state', () => {
   const page = source('src/pages/ApplicationsPageRebuild/ApplicationsPage.tsx');
 
+  assert.match(page, /const reviewableItems = items\.filter\(isReviewableItem\)/);
+  assert.match(page, /const visibleReviewableItems = visibleItems\.filter\(isReviewableItem\)/);
+  assert.match(page, /nextAction\.id === 'review_issue' \|\| nextAction\.id === 'review_found_service'/);
+  assert.doesNotMatch(page, /const nextReviewItem = visibleItems\.find\(\(item\) => item\.nextAction\)/);
   assert.match(page, /reviewNextButtonLabel/);
   assert.match(page, /nextReviewItem \? 'Review next' : 'All clear'/);
   assert.match(page, /title=\{nextReviewItem \? 'Open the next app or service that needs review\.' : 'No apps or services need review\.'\}/);

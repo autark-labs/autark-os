@@ -156,6 +156,21 @@ class AppInstanceViewServiceTests {
     }
 
     @Test
+    void completedRestorePointKeepsAppProtectedEvenWhenLatestBackupFailed() {
+        InstalledAppRepository repository = repository();
+        BackupRepository backupRepository = backupRepository();
+        repository.save(installed("vaultwarden", "Ready"));
+        repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
+        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        backupRepository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
+        backupRepository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "", "failed", 0, "Backup failed.");
+        AppInstanceViewService service = service(repository, backupRepository, List.of(
+                new ManagedContainer("vaultwarden", "projectos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "projectos_homelab-box_vaultwarden")));
+
+        assertThat(service.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
+    }
+
+    @Test
     void failedLatestBackupMarksAppFailed() {
         InstalledAppRepository repository = repository();
         BackupRepository backupRepository = backupRepository();
