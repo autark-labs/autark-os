@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { AlertTriangle, Boxes, CheckCircle2, Clock3, Database, Pin, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import {
@@ -17,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import overviewBackground from '@/assets/overviewBackground.png';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useHomeRepository } from '@/repositories/homeRepository';
 import { managedAppIconUrl, observedServiceIconUrl } from './extensions/OverviewPage.appTiles';
@@ -73,15 +71,15 @@ function OverviewPage() {
           )}
 
           {observedNeedingReview.length > 0 && (
-            <SoftCard className="border-amber-300/25 bg-amber-500/10">
+            <SoftCard className="border-po-warning-border bg-po-warning-soft">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 gap-3">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-po-sm bg-amber-500/15 text-amber-200">
+                  <div className="grid size-9 shrink-0 place-items-center rounded-po-sm bg-po-surface-elevated text-po-warning">
                     <AlertTriangle className="size-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="m-0 text-sm font-bold text-white">Services found on this server</p>
-                    <p className="m-0 mt-1 text-sm leading-5 text-amber-100/80">
+                    <p className="m-0 text-sm font-bold text-po-text">Services found on this server</p>
+                    <p className="m-0 mt-1 text-sm leading-5 text-po-text-secondary">
                       Project OS found {observedNeedingReview.length} service{observedNeedingReview.length === 1 ? '' : 's'} that need review before they are treated as managed apps.
                     </p>
                   </div>
@@ -216,7 +214,7 @@ function HomeHero({
   const readyStatus = loading ? 'Checking' : needsReview ? 'Needs review' : 'Ready';
 
   return (
-    <header className="relative overflow-hidden rounded-po-lg border border-po-border-accent bg-po-bg shadow-po-brand-glow">
+    <header className="relative overflow-hidden rounded-po-lg border border-po-border bg-po-sidebar/70 shadow-po-lg">
       <div className="relative min-h-[360px] overflow-hidden md:min-h-[430px]">
         <img alt="" className="absolute inset-x-0 top-0 h-full w-full object-cover object-center opacity-95" src={overviewBackground} />
         <div className="absolute inset-0 bg-po-overview-side-overlay" />
@@ -226,14 +224,14 @@ function HomeHero({
         <div className="relative z-10 flex min-h-[360px] flex-col justify-between gap-7 p-5 md:min-h-[430px] md:p-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-2xl">
-              <p className="m-0 text-xs font-black uppercase tracking-normal text-violet-200">Project OS</p>
-              <h1 className="m-0 mt-3 text-4xl font-black leading-none text-white md:text-5xl">
+              <p className="m-0 text-xs font-black uppercase tracking-normal text-po-brand">Project OS</p>
+              <h1 className="m-0 mt-3 text-4xl font-black leading-none text-sidebar-foreground md:text-5xl">
                 {timeGreeting()}, {shortName(deviceName)}.
               </h1>
-              <p className="mt-4 max-w-xl text-lg font-semibold leading-7 text-slate-100">
+              <p className="mt-4 max-w-xl text-lg font-semibold leading-7 text-sidebar-foreground/90">
                 {homeHeroSubtitle(summary, loading)}
               </p>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-sidebar-muted-foreground">
                 Open apps, handle the next setup step, and keep your home server calm.
               </p>
             </div>
@@ -241,7 +239,7 @@ function HomeHero({
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
               <StatusPill tone={statusTone}>{readyStatus}</StatusPill>
               {loading && (
-                <span className="inline-flex items-center gap-2 rounded-po-full border border-white/10 bg-black/25 px-3 py-2 text-xs font-semibold text-slate-200 backdrop-blur-xl">
+                <span className="inline-flex items-center gap-2 rounded-po-full border border-sidebar-border bg-po-surface-inset px-3 py-2 text-xs font-semibold text-sidebar-foreground shadow-po-sm">
                   <Clock3 className="size-3.5" />
                   Updating
                 </span>
@@ -252,40 +250,6 @@ function HomeHero({
       </div>
     </header>
   );
-}
-
-function HomeHeroStat({
-  detail,
-  icon: Icon,
-  label,
-  tone,
-  value,
-}: {
-  detail: string;
-  icon: LucideIcon;
-  label: string;
-  tone: 'brand' | 'success' | 'warning' | 'info';
-  value: string;
-}) {
-  return (
-    <div className="flex min-h-[82px] items-center gap-3 rounded-po-sm border border-white/10 bg-slate-950/45 p-3">
-      <span className={cn('grid size-10 shrink-0 place-items-center rounded-po-sm', homeHeroIconTone(tone))}>
-        <Icon className="size-5" />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-xs font-semibold uppercase tracking-normal text-slate-400">{value}</span>
-        <span className="mt-1 block truncate text-sm font-black text-white">{label}</span>
-        <span className="mt-1 block truncate text-xs text-slate-400">{detail}</span>
-      </span>
-    </div>
-  );
-}
-
-function homeHeroIconTone(tone: 'brand' | 'success' | 'warning' | 'info') {
-  if (tone === 'success') return 'bg-po-success-soft text-emerald-200';
-  if (tone === 'warning') return 'bg-po-warning-soft text-amber-200';
-  if (tone === 'info') return 'bg-po-info-soft text-sky-200';
-  return 'bg-po-brand-soft text-po-brand-strong';
 }
 
 function homeHeroSubtitle(summary: SystemSummary | null, loading: boolean) {
