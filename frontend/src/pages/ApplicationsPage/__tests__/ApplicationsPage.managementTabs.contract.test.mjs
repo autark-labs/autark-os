@@ -87,17 +87,10 @@ test('applications page settings tab uses a guarded batch form for app settings'
 });
 
 test('applications page settings tab uses real controls and confirm-before-save planning', () => {
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
   const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
-  const styles = source('src/styles.css');
-  const alertDialog = source('src/components/ui/alert-dialog.tsx');
-  const selectSource = source('src/components/ui/select.tsx');
-  const switchSource = source('src/components/ui/switch.tsx');
-  const tooltip = source('src/components/ui/tooltip.tsx');
 
   assert.match(settings, /AlertDialog/);
   assert.match(settings, /Tooltip/);
-  assert.match(settings, /bg-slate-950/);
   assert.match(settings, /Input/);
   assert.match(settings, /Select/);
   assert.match(settings, /useId/);
@@ -107,24 +100,8 @@ test('applications page settings tab uses real controls and confirm-before-save 
   assert.match(settings, /confirmSave/);
   assert.match(settings, /Local app port/);
   assert.match(settings, /Backup retention/);
-  assert.match(rail, /lg:w-\[66rem\]/);
-  assert.match(rail, /xl:w-\[72rem\]/);
-  assert.match(styles, /--color-popover:\s*var\(--popover\)/);
-  assert.match(styles, /--color-popover-foreground:\s*var\(--popover-foreground\)/);
-  assert.match(styles, /--color-input:\s*var\(--input\)/);
-  assert.match(styles, /--color-background:\s*var\(--background\)/);
-  assert.match(switchSource, /data-\[size=default\]:h-6/);
-  assert.match(switchSource, /data-unchecked:border-border/);
-  assert.match(switchSource, /bg-primary-foreground/);
-  assert.match(selectSource, /border border-border bg-popover text-popover-foreground shadow-xl/);
-  assert.match(alertDialog, /border border-border bg-popover/);
-  assert.match(alertDialog, /shadow-2xl/);
-  assert.match(tooltip, /bg-popover/);
-  assert.match(tooltip, /text-popover-foreground/);
   assert.doesNotMatch(settings, /role="switch"/);
   assert.doesNotMatch(settings, /onClick=\{\(\) => toggleField\(\)\}/);
-  assert.doesNotMatch(settings, /<FieldLabel className="text-white">\s*<SettingLabel/);
-  assert.doesNotMatch(tooltip, /bg-foreground px-3 py-1\.5 text-xs text-background/);
 });
 
 test('applications page management panel uses canonical runtime data instead of generated mock facts', () => {

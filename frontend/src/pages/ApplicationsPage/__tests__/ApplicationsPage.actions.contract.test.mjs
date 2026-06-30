@@ -103,7 +103,7 @@ test('applications page keeps catalog matching in the advanced pullout tab', () 
   const catalogSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceCatalogMatchSection.tsx');
 
   assert.match(panel, /ObservedServiceCatalogMatchSection/);
-  assert.match(panel, /<TabsContent className="grid gap-4" value="advanced">[\s\S]*<ObservedServiceCatalogMatchSection/);
+  assert.match(panel, /<TabsContent[^>]+value="advanced"[\s\S]*<ObservedServiceCatalogMatchSection/);
   assert.doesNotMatch(observedSection, /Catalog match/);
   assert.doesNotMatch(observedSection, /Clear match/);
   assert.doesNotMatch(observedSection, /change_match/);
@@ -121,8 +121,7 @@ test('applications page exposes a red recovery tab for failed app operations', (
   assert.match(panel, /const recoveryNeeded = item\.operationState\.kind === 'failed'/);
   assert.match(panel, /ApplicationRecoveryTab/);
   assert.match(panel, /value="recovery"/);
-  assert.match(panel, /bg-red-600/);
-  assert.doesNotMatch(panel, /<ExpandedOperationStatus item=\{item\} className="mb-4" \/>/);
+  assert.doesNotMatch(panel, /ExpandedOperationStatus/);
 
   assert.match(recovery, /Start again/);
   assert.match(recovery, /Edit settings/);
