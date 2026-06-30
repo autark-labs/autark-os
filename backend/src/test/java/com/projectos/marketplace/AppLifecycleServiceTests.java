@@ -20,7 +20,6 @@ import com.projectos.marketplace.catalog.MarketplaceCatalogService;
 import com.projectos.marketplace.install.AppActionResult;
 import com.projectos.marketplace.install.AppGuardianService;
 import com.projectos.marketplace.install.AppHealthSnapshot;
-import com.projectos.marketplace.install.AppInstanceView;
 import com.projectos.marketplace.install.AppReliabilitySummary;
 import com.projectos.marketplace.install.AppLifecycleService;
 import com.projectos.marketplace.install.AppRuntimeView;
@@ -145,26 +144,13 @@ class AppLifecycleServiceTests {
     }
 
     @Test
-    void appListOnlyIncludesCanonicalManagedApps() throws Exception {
+    void appListOnlyIncludesOwnedInstalledApps() throws Exception {
         Path homepageRoot = runtimeRoot.resolve("apps/homepage");
         Files.createDirectories(homepageRoot);
         repository.save(new InstalledApp("homepage", "Homepage", "Ready", homepageRoot.toString(), "project-os-homepage", "http://localhost:3000", Instant.parse("2026-06-11T00:00:00Z")));
-        AppLifecycleService canonicalService = new AppLifecycleService(
-                repository,
-                composeExecutor,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                () -> List.of(),
-                runtimeLayout,
-                new PostInstallGuideBuilder(),
-                new FakeTailscaleService(),
-                false,
-                null,
-                new BackupRepository(runtimeLayout),
-                () -> List.of(appInstance("homepage", "Homepage")));
-
-        assertThat(canonicalService.listApps())
+        assertThat(service.listApps())
                 .extracting(AppRuntimeView::appId)
-                .containsExactly("homepage");
+                .containsExactly("vaultwarden");
     }
 
     @Test
@@ -802,6 +788,28 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void changingLocalPortKeepsOwnedAppVisibleInRuntimeList() {
+        composeExecutor.containers = List.of(new DockerContainerStatus(
+                "project-os-vaultwarden",
+                "vaultwarden",
+                "running",
+                "healthy",
+                "Up 1 second (healthy)",
+                "0.0.0.0:19090->80/tcp"));
+
+        service.updateSettings("vaultwarden", new InstallSettings(
+                "http://localhost:19090",
+                null,
+                false,
+                java.util.Map.of(),
+                BackupPolicy.defaults()));
+
+        assertThat(service.listApps())
+                .extracting(AppRuntimeView::appId)
+                .contains("vaultwarden");
+    }
+
+    @Test
     void enablePrivateAccessCreatesTailscaleServeLinkAndPersistsIt() {
         AppActionResult result = service.enablePrivateAccess("vaultwarden");
 
@@ -851,26 +859,6 @@ class AppLifecycleServiceTests {
                     assertThat(value.label()).isEqualTo("Database");
                     assertThat(value.value()).isEqualTo("obsidian");
                 });
-    }
-
-    private AppInstanceView appInstance(String appId, String name) {
-        return new AppInstanceView(
-                "appinst_" + appId,
-                appId,
-                name,
-                "General",
-                "",
-                "Ready",
-                "ready",
-                "running",
-                "owned",
-                "local_ready",
-                "backup_disabled",
-                "http://localhost:3000",
-                null,
-                List.of(),
-                List.of(),
-                Instant.parse("2026-06-20T12:00:00Z"));
     }
 
     private static class FakeTailscaleService extends TailscaleService {

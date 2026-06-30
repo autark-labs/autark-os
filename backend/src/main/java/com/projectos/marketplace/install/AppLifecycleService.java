@@ -61,7 +61,6 @@ public class AppLifecycleService {
     private final boolean devMode;
     private final ActivityLogService activityLogService;
     private final BackupRepository backupRepository;
-    private final AppInstanceViewProvider appInstanceViewProvider;
     private final AppTelemetryService appTelemetryService;
     private final AppRuntimeStatusResolver runtimeStatusResolver = new AppRuntimeStatusResolver();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -70,7 +69,7 @@ public class AppLifecycleService {
             .build();
 
     @Autowired
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppInstanceViewProvider appInstanceViewProvider, AppTelemetryService appTelemetryService) {
+    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -81,35 +80,11 @@ public class AppLifecycleService {
         this.devMode = devMode;
         this.activityLogService = activityLogService;
         this.backupRepository = backupRepository;
-        this.appInstanceViewProvider = appInstanceViewProvider;
         this.appTelemetryService = appTelemetryService;
     }
 
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppInstanceViewProvider appInstanceViewProvider) {
-        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appInstanceViewProvider, new AppTelemetryService(composeExecutor));
-    }
-
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository) {
-        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, () -> repository.findAll().stream()
-                .map(app -> new AppInstanceView(
-                        app.appId(),
-                        app.appId(),
-                        app.appName(),
-                        "",
-                        "",
-                        app.status(),
-                        app.status(),
-                        app.status(),
-                        "owned",
-                        app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        "backup_disabled",
-                        app.accessUrl(),
-                        null,
-                        List.of(),
-                        List.of(),
-                        new AppRemediationView("watching", "Project OS is watching", app.appName() + " is ready. If it drifts, Project OS will try safe repair before asking you to intervene.", "No action needed", "success"),
-                        Instant.now()))
-                .toList());
+        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, new AppTelemetryService(composeExecutor));
     }
 
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${project-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService) {
@@ -1411,26 +1386,22 @@ public class AppLifecycleService {
     }
 
     private InstalledApp installedApp(String appId) {
-        InstalledApp app = repository.findById(appId)
+        return repository.findById(appId)
                 .orElseThrow(() -> new InstallationException("Project-OS is not managing an app with id " + appId + "."));
-        if (!managedAppIds().contains(appId)) {
-            throw new InstallationException("Project OS is not managing an app with id " + appId + ".");
-        }
-        return app;
     }
 
     private List<InstalledApp> managedInstalledApps() {
-        Set<String> managedAppIds = managedAppIds();
         return repository.findAll().stream()
-                .filter(app -> managedAppIds.contains(app.appId()))
+                .filter(this::ownedByThisProjectOs)
                 .toList();
     }
 
-    private Set<String> managedAppIds() {
-        return appInstanceViewProvider.list().stream()
-                .map(AppInstanceView::catalogAppId)
-                .filter(id -> id != null && !id.isBlank())
-                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+    private boolean ownedByThisProjectOs(InstalledApp app) {
+        return repository.ownershipFor(app.appId())
+                .filter(metadata -> "owned".equalsIgnoreCase(metadata.ownershipStatus()))
+                .filter(metadata -> metadata.appInstanceId() != null && !metadata.appInstanceId().isBlank())
+                .filter(metadata -> metadata.projectOsInstanceId() != null && !metadata.projectOsInstanceId().isBlank())
+                .isPresent();
     }
 
     private void assertLifecycleEligible(InstalledApp app, String action) {
