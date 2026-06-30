@@ -56,44 +56,44 @@ function MobileAppBar() {
   const statusTone = activeJob ? 'info' : issueCount ? 'warning' : 'success';
 
   return (
-    <div className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-slate-700/45 bg-slate-950/88 px-4 text-po-text shadow-po-sidebar backdrop-blur-xl lg:hidden">
+    <div className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-po-border bg-po-sidebar px-4 text-sidebar-foreground shadow-po-sidebar lg:hidden">
       <div className="min-w-0">
-        <p className="m-0 truncate text-xs font-semibold uppercase tracking-normal text-sky-300">Project OS</p>
-        <h1 className="m-0 truncate text-base font-black leading-none text-white">Appliance</h1>
+        <p className="m-0 truncate text-xs font-semibold uppercase tracking-normal text-po-brand-strong">Project OS</p>
+        <h1 className="m-0 truncate text-base font-black leading-none text-sidebar-foreground">Appliance</h1>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
         <Sheet>
           <SheetTrigger asChild>
-            <Button aria-label="Open system status" className="border-slate-700/60 bg-slate-950/50 text-slate-100 hover:bg-slate-900" size="sm" type="button" variant="outline">
+            <Button aria-label="Open system status" className="border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-sidebar-accent/80" size="sm" type="button" variant="outline">
               {activeJob ? <Loader2 className="size-4 animate-spin" /> : statusTone === 'success' ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}
               <span className="sr-only">Status</span>
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-slate-800 bg-slate-950 p-0 text-slate-100" side="right">
-            <SheetHeader className="border-b border-slate-800 p-4">
-              <SheetTitle className="text-white">System status</SheetTitle>
+          <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-sidebar-border bg-po-sidebar p-0 text-sidebar-foreground" side="right">
+            <SheetHeader className="border-b border-sidebar-border p-4">
+              <SheetTitle className="text-sidebar-foreground">System status</SheetTitle>
               <SheetDescription>Project OS health and active work.</SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 p-4">
               <div className={cn(
                 'rounded-xl border p-3',
-                statusTone === 'success' && 'border-sky-300/25 bg-sky-500/10',
-                statusTone === 'warning' && 'border-amber-300/25 bg-amber-500/10',
-                statusTone === 'info' && 'border-violet-300/25 bg-violet-500/10'
+                statusTone === 'success' && 'border-po-info-border bg-po-info-soft',
+                statusTone === 'warning' && 'border-po-warning-border bg-po-warning-soft',
+                statusTone === 'info' && 'border-po-info-border bg-po-info-soft',
               )}>
-                <p className="m-0 text-xs font-black uppercase tracking-normal text-slate-400">Current state</p>
-                <p className="m-0 mt-1 text-base font-black text-white">{statusLabel}</p>
-                <p className="m-0 mt-1 text-sm text-slate-300">
+                <p className="m-0 text-xs font-black uppercase tracking-normal text-sidebar-foreground/62">Current state</p>
+                <p className="m-0 mt-1 text-base font-black text-sidebar-foreground">{statusLabel}</p>
+                <p className="m-0 mt-1 text-sm text-sidebar-foreground/75">
                   {activeJob ? `${jobTypeLabel(activeJob.type)} is in progress.` : issueCount ? `${issueCount} setup check${issueCount === 1 ? '' : 's'} need attention.` : 'Project OS is ready for core app flows.'}
                 </p>
               </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <div className="rounded-xl border border-sidebar-border bg-po-surface-inset p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="m-0 text-xs font-black uppercase tracking-normal text-slate-400">Private access</p>
-                    <p className="m-0 mt-1 text-sm text-slate-300">Check or manage secure Tailscale access without leaving mobile navigation.</p>
+                    <p className="m-0 text-xs font-black uppercase tracking-normal text-sidebar-foreground/62">Private access</p>
+                    <p className="m-0 mt-1 text-sm text-sidebar-foreground/75">Check or manage secure Tailscale access without leaving mobile navigation.</p>
                   </div>
                   <TailscaleControlPopover align="start" check={tailscaleCheck} className="shrink-0" loading={doctorQuery.isLoading} triggerLabel="compact" />
                 </div>
@@ -102,22 +102,22 @@ function MobileAppBar() {
               {checks.length > 0 && (
                 <div className="grid gap-2">
                   {checks.slice(0, 4).map((check) => (
-                    <div className="rounded-lg border border-slate-800 bg-slate-950/55 p-3" key={check.id}>
+                    <div className="rounded-lg border border-sidebar-border bg-po-surface-inset p-3" key={check.id}>
                       <div className="flex items-center justify-between gap-3">
-                        <p className="m-0 text-sm font-semibold text-white">{check.label || check.id}</p>
-                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold', check.status === 'ok' ? 'bg-sky-500/10 text-sky-200' : 'bg-amber-500/10 text-amber-200')}>{check.status === 'ok' ? 'Ready' : 'Check'}</span>
+                        <p className="m-0 text-sm font-semibold text-sidebar-foreground">{check.label || check.id}</p>
+                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-bold', check.status === 'ok' ? 'bg-po-info-soft text-po-brand-strong' : 'bg-po-warning-soft text-orange-200')}>{check.status === 'ok' ? 'Ready' : 'Check'}</span>
                       </div>
-                      <p className="m-0 mt-1 text-xs text-slate-400">{check.message}</p>
+                      <p className="m-0 mt-1 text-xs text-sidebar-foreground/62">{check.message}</p>
                     </div>
                   ))}
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-2">
-                <Button asChild className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-900" size="sm" variant="outline">
+                <Button asChild className="border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-sidebar-accent/80" size="sm" variant="outline">
                   <Link to="/diagnostics">Diagnostics</Link>
                 </Button>
-                <Button asChild className="border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-900" size="sm" variant="outline">
+                <Button asChild className="border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-sidebar-accent/80" size="sm" variant="outline">
                   <Link to="/settings">Settings</Link>
                 </Button>
               </div>
@@ -127,20 +127,20 @@ function MobileAppBar() {
 
         <Sheet>
           <SheetTrigger asChild>
-            <Button aria-label="Open navigation" className="border-slate-700/60 bg-slate-950/50 text-slate-100 hover:bg-slate-900" size="sm" type="button" variant="outline">
+            <Button aria-label="Open navigation" className="border-sidebar-border bg-sidebar-accent text-sidebar-foreground hover:bg-sidebar-accent/80" size="sm" type="button" variant="outline">
               <Menu data-icon="inline-start" />
               Menu
             </Button>
           </SheetTrigger>
-          <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-slate-800 bg-slate-950 p-0 text-slate-100" side="left">
-            <SheetHeader className="border-b border-slate-800 p-4">
-              <SheetTitle className="text-white">Project OS navigation</SheetTitle>
+          <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-sidebar-border bg-po-sidebar p-0 text-sidebar-foreground" side="left">
+            <SheetHeader className="border-b border-sidebar-border p-4">
+              <SheetTitle className="text-sidebar-foreground">Project OS navigation</SheetTitle>
               <SheetDescription>Move between core appliance flows and advanced tools.</SheetDescription>
             </SheetHeader>
             <nav aria-label="Mobile navigation" className="grid gap-5 p-4">
               {navGroups.map((group, groupIndex) => (
                 <section className="grid gap-2" key={group.label || `group-${groupIndex}`}>
-                  {group.label && <p className="m-0 text-xs font-black uppercase tracking-normal text-slate-500">{group.label}</p>}
+                  {group.label && <p className="m-0 text-xs font-black uppercase tracking-normal text-sidebar-foreground/50">{group.label}</p>}
                   <div className="grid gap-1">
                     {group.items.map((item) => {
                       const Icon = navIcons[item.icon] || House;
@@ -150,8 +150,8 @@ function MobileAppBar() {
                           <NavLink
                             aria-label={item.label}
                             className={({ isActive }) => cn(
-                              'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-200 no-underline transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500',
-                              (isActive || activeByAlias) && 'bg-sky-500 text-white shadow-po-info-glow hover:bg-sky-500'
+                              'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-sidebar-foreground/82 no-underline transition hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-info',
+                              (isActive || activeByAlias) && 'bg-po-brand text-sidebar-primary-foreground shadow-po-info-glow hover:bg-po-brand'
                             )}
                             to={item.to}
                           >
