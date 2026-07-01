@@ -42,4 +42,6 @@ Diagnostics uses `PageShell`, `Surface`, shared Project OS button primitives, an
 
 Activity uses `PageShell`, `Surface`, shared Project OS button primitives, and local `MonitoringPanel`/`MonitoringInset` wrappers under `pages/MonitoringPage`. Keep charts, filters, and event-row behavior local while using shared surfaces and cyan/orange status treatments.
 
+Settings uses `PageShell`, `Surface`, shared Project OS button primitives, and local `SettingsPanel`/`SettingsInset` wrappers under `pages/SettingsPage`. Keep setting rows, help popovers, and form-specific controls local while routing common surface and action styling through primitives.
+
 Avoid importing the legacy broad `ProjectOSComponents` styling helpers into pages as they are cleaned up. If a page needs one of those patterns, copy the visual decision into a small primitive or feature component and keep `className` available for layout tweaks.

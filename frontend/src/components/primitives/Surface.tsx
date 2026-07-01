@@ -1,7 +1,7 @@
 import type { HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
-type SurfaceElement = 'article' | 'aside' | 'div' | 'header' | 'section';
+type SurfaceElement = 'article' | 'aside' | 'div' | 'header' | 'main' | 'nav' | 'section';
 type SurfaceTone = 'panel' | 'muted' | 'inset' | 'warning' | 'danger' | 'success' | 'none';
 
 const surfaceToneClass: Record<SurfaceTone, string> = {

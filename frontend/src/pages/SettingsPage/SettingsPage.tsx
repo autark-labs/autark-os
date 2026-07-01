@@ -1,26 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  AppWindow,
   CheckCircle2,
   Code2,
   Copy,
   Database,
-  Folder,
-  Globe2,
-  HardDrive,
   HelpCircle,
-  KeyRound,
-  Laptop,
   Loader2,
-  Lock,
   Network,
   RefreshCw,
-  RotateCcw,
   Save,
   Settings,
   ShieldCheck,
-  UploadCloud,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -28,11 +19,11 @@ import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PageShell } from '@/components/layout/PageShell';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
+import { Surface } from '@/components/primitives/Surface';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
-import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
-import { PageShell, surfaceFrameClass, surfacePanelClass } from '@/components/project-os/ProjectOSComponents';
 import {
   Popover,
   PopoverContent,
@@ -52,7 +43,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
-import { poButtonClass, poCardClass, poNavItemClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
@@ -80,19 +70,6 @@ type SettingHelp = {
   usedFor: string[];
   tip: string;
 };
-
-const sections: Array<{ id: SettingsSection; label: string; icon: LucideIcon; description: string }> = [
-  { id: 'general', label: 'General', icon: Settings, description: 'Identity and display preferences' },
-  { id: 'system', label: 'System', icon: Laptop, description: 'Host and service behavior' },
-  { id: 'network', label: 'Network', icon: Globe2, description: 'Local network defaults' },
-  { id: 'storage', label: 'Storage', icon: HardDrive, description: 'Data paths and disk warnings' },
-  { id: 'backups', label: 'Backups', icon: Database, description: 'Automatic backup defaults' },
-  { id: 'applications', label: 'Applications', icon: AppWindow, description: 'Install and repair behavior' },
-  { id: 'security', label: 'Security', icon: Lock, description: 'Audit and access posture' },
-  { id: 'updates', label: 'Updates', icon: RotateCcw, description: 'Release channel choices' },
-  { id: 'remote-access', label: 'Remote Access', icon: Network, description: 'Private access settings' },
-  { id: 'advanced', label: 'Advanced', icon: Code2, description: 'Raw system details' },
-];
 
 const groupIcons: Record<SettingsGroupId, LucideIcon> = {
   advanced: Code2,
@@ -159,6 +136,53 @@ const settingHelp: Record<string, SettingHelp> = {
     tip: 'Keep this off if the interface feels too noisy.',
   },
 };
+
+function SettingsPanel({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <Surface as="section" className={cn('p-5', className)} tone="panel">
+      {children}
+    </Surface>
+  );
+}
+
+function SettingsInset({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <Surface className={cn('p-3', className)} tone="muted">
+      {children}
+    </Surface>
+  );
+}
+
+function SettingsLoadingState() {
+  return (
+    <PageShell>
+      <Surface className="flex min-h-[24rem] items-center justify-center p-6 text-center" tone="panel">
+        <div className="max-w-md">
+          <Loader2 className="mx-auto size-8 animate-spin text-cyan-200" />
+          <h1 className="mt-4 text-2xl font-black text-white">Loading settings</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-400">Reading appliance preferences, setup checks, and app defaults.</p>
+        </div>
+      </Surface>
+    </PageShell>
+  );
+}
+
+function SettingsErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Surface className="border-red-400/35 bg-red-500/10 p-4 text-red-100" tone="danger">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-black text-white">Settings could not refresh</h2>
+          <p className="mt-1 text-sm leading-6 text-red-100/85">{message}</p>
+        </div>
+        <ProjectDarkControlButton onClick={onRetry} type="button">
+          <RefreshCw className="size-4" />
+          Retry
+        </ProjectDarkControlButton>
+      </div>
+    </Surface>
+  );
+}
 
 function SettingsPage() {
   const { setProjectSettings } = useProjectSettings();
@@ -257,55 +281,58 @@ function SettingsPage() {
   }
 
   if (loading || appState.isLoading || !draft) {
-    return (
-      <PageLoadingState label="Loading settings" sublabel="Reading appliance preferences, setup checks, and app defaults." />
-    );
+    return <SettingsLoadingState />;
   }
 
   return (
-    <PageShell className="po-page-tall" maxWidth="max-w-po-page-wide">
-      <header className={surfaceFrameClass}>
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 bg-po-hero-settings p-6 md:p-7">
-        <div>
-          <p className="text-xs font-black uppercase tracking-normal text-violet-300">Settings</p>
-          <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Project OS controls</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, services, app defaults, backups, updates, and advanced host details.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge className={cn('border', dirty ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
-            {dirty ? 'Unsaved changes' : 'Saved'}
-          </Badge>
-          <DisabledAction disabled={refreshing} reason="Settings are already refreshing.">
-            <Button className={poButtonClass('quiet')} disabled={refreshing} onClick={() => { void load(true); void doctorQuery.refetch(); }} type="button" variant="outline">
-              <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
-              Refresh
-            </Button>
-          </DisabledAction>
-          <DisabledAction disabled={!dirty || saving} reason={saving ? 'Project OS is already saving these settings.' : 'Make a change before saving settings.'}>
-            <Button className={poButtonClass('primary')} disabled={!dirty || saving} onClick={() => void save()} type="button">
-              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-              {saving ? 'Saving' : 'Save changes'}
-            </Button>
-          </DisabledAction>
-        </div>
+    <PageShell>
+      <Surface as="header" className="overflow-hidden" tone="panel">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-sky-400/20 bg-slate-900 p-6 md:p-7">
+          <div>
+            <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Settings</p>
+            <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Project OS controls</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, services, app defaults, backups, updates, and advanced host details.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={cn('border', dirty ? 'border-orange-300/35 bg-orange-500/10 text-orange-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
+              {dirty ? 'Unsaved changes' : 'Saved'}
+            </Badge>
+            <DisabledAction disabled={refreshing} reason="Settings are already refreshing.">
+              <ProjectDarkControlButton disabled={refreshing} onClick={() => { void load(true); void doctorQuery.refetch(); }} type="button">
+                <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
+                Refresh
+              </ProjectDarkControlButton>
+            </DisabledAction>
+            <DisabledAction disabled={!dirty || saving} reason={saving ? 'Project OS is already saving these settings.' : 'Make a change before saving settings.'}>
+              <ProjectPrimaryButton disabled={!dirty || saving} onClick={() => void save()} type="button">
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {saving ? 'Saving' : 'Save changes'}
+              </ProjectPrimaryButton>
+            </DisabledAction>
+          </div>
         </div>
         <div className="grid gap-4 p-5 md:grid-cols-3">
-          <SettingsStatusCard icon={CheckCircle2} label="Save state" tone={dirty ? 'amber' : 'green'} value={dirty ? 'Review changes' : 'No pending changes'} />
-          <SettingsStatusCard icon={ShieldCheck} label="Setup" tone={state.setup?.status === 'ready' ? 'green' : 'amber'} value={state.setup?.headline || 'Setup status unavailable'} />
-          <SettingsStatusCard icon={ActiveGroupIcon} label="Selected" tone={activeGroupId === 'advanced' ? 'violet' : 'slate'} value={activeGroupMeta.label} />
+          <SettingsStatusCard icon={CheckCircle2} label="Save state" tone={dirty ? 'orange' : 'green'} value={dirty ? 'Review changes' : 'No pending changes'} />
+          <SettingsStatusCard icon={ShieldCheck} label="Setup" tone={state.setup?.status === 'ready' ? 'green' : 'orange'} value={state.setup?.headline || 'Setup status unavailable'} />
+          <SettingsStatusCard icon={ActiveGroupIcon} label="Selected" tone={activeGroupId === 'advanced' ? 'cyan' : 'slate'} value={activeGroupMeta.label} />
         </div>
-      </header>
+      </Surface>
 
-      {error && <PageErrorState message={error} onRetry={() => { void load(true); void doctorQuery.refetch(); }} title="Settings could not refresh" />}
+      {error && <SettingsErrorState message={error} onRetry={() => { void load(true); void doctorQuery.refetch(); }} />}
 
-      <nav className={cn(surfacePanelClass, 'grid gap-2 bg-slate-950/55 p-2 sm:grid-cols-2 xl:grid-cols-4')}>
+      <Surface as="nav" className="grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-4" tone="panel">
         {topLevelSettingsGroups.map((group) => {
           const groupId = group.id as SettingsGroupId;
           const Icon = groupIcons[groupId];
           const active = activeGroupId === group.id;
           return (
             <button
-              className={poNavItemClass(active)}
+              className={cn(
+                'flex min-w-0 items-start gap-3 rounded-xl border p-3 text-left text-sm transition',
+                active
+                  ? 'border-cyan-300/45 bg-cyan-400/10 text-cyan-100 shadow-sm shadow-cyan-950/20'
+                  : 'border-sky-400/20 bg-slate-800 text-sky-100/80 hover:border-cyan-300/35 hover:bg-slate-700 hover:text-white'
+              )}
               key={group.id}
               onClick={() => setActiveGroup(groupId)}
               type="button"
@@ -318,13 +345,13 @@ function SettingsPage() {
             </button>
           );
         })}
-      </nav>
+      </Surface>
 
       <div className="grid gap-5">
-        <main className={cn(surfacePanelClass, 'bg-slate-950/60 shadow-po-panel')}>
-          <div className={poCardClass('normal', 'mb-5 bg-slate-900/40')}>
+        <Surface as="main" className="p-5" tone="panel">
+          <SettingsInset className="mb-5">
             <div className="flex items-start gap-3">
-              <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-violet-300/20 bg-violet-500/10 text-violet-200">
+              <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 text-cyan-200">
                 <ActiveGroupIcon className="size-4" />
               </span>
               <div>
@@ -332,7 +359,7 @@ function SettingsPage() {
                 <p className="mt-1 text-sm leading-6 text-slate-400">{activeGroupMeta.description}</p>
               </div>
             </div>
-          </div>
+          </SettingsInset>
           <div className="grid gap-5">
             {sectionsForGroup(activeGroupId).map((sectionId) => (
               <SettingsPanelBySection
@@ -353,7 +380,7 @@ function SettingsPage() {
               />
             ))}
           </div>
-        </main>
+        </Surface>
       </div>
     </PageShell>
   );
@@ -363,7 +390,7 @@ function GeneralPanel({ draft, onUpdate }: PanelProps) {
   return (
     <SettingsGroup description="Basic system settings and preferences." title="General">
       <SettingRow helpId="deviceName" label="Device name" note="This name is used to identify your device on the network.">
-        <Input className="max-w-md border-slate-700 bg-slate-950/70 text-slate-100" onChange={(event) => onUpdate({ deviceName: event.target.value })} value={draft.deviceName} />
+        <Input className="max-w-md border-sky-400/30 bg-slate-950 text-slate-100" onChange={(event) => onUpdate({ deviceName: event.target.value })} value={draft.deviceName} />
       </SettingRow>
       <SettingRow helpId="timeZone" label="Time zone" note="Used for system services, logs, and backup schedules.">
         <SettingsSelect value={draft.timeZone} onChange={(value) => onUpdate({ timeZone: value })} options={[['America/Chicago', '(UTC-06:00) Central Time'], ['America/New_York', '(UTC-05:00) Eastern Time'], ['America/Denver', '(UTC-07:00) Mountain Time'], ['America/Los_Angeles', '(UTC-08:00) Pacific Time'], ['UTC', 'UTC']]} />
@@ -422,7 +449,7 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
       <ReadOnlyRow label="Runtime disk used" note="Project OS data usage on the runtime disk." value={percentLabel(metrics?.runtimeUsedPercent)} />
       <ReadOnlyRow label="Runtime disk free" note="Available space for app data and backups." value={formatBytes(metrics?.runtimeUsableBytes ?? 0)} />
       <SettingRow helpId="advancedMetrics" label="Show advanced disk info" note="Show detailed disk usage and filesystem information.">
-        <Badge className="border-slate-700 bg-slate-950 text-slate-300">Coming soon</Badge>
+        <Badge className="border-sky-400/25 bg-slate-950 text-slate-300">Coming soon</Badge>
       </SettingRow>
     </SettingsGroup>
   );
@@ -439,10 +466,10 @@ function BackupsPanel({ apps, backupRoot, draft, onUpdate }: PanelProps & { apps
         <SettingsSelect value={draft.backupFrequency} onChange={(value) => onUpdate({ backupFrequency: value })} options={[['hourly', 'Hourly'], ['daily', 'Daily'], ['weekly', 'Weekly']]} />
       </SettingRow>
       <SettingRow helpId="automaticBackupsEnabled" label="Backup time" note="Preferred time for scheduled backups.">
-        <Input className="max-w-40 border-slate-700 bg-slate-950/70 text-slate-100" onChange={(event) => onUpdate({ backupTime: event.target.value })} type="time" value={draft.backupTime} />
+        <Input className="max-w-40 border-sky-400/30 bg-slate-950 text-slate-100" onChange={(event) => onUpdate({ backupTime: event.target.value })} type="time" value={draft.backupTime} />
       </SettingRow>
       <SettingRow helpId="automaticBackupsEnabled" label="Retention" note="How many days automatic backups should be kept.">
-        <Input className="max-w-28 border-slate-700 bg-slate-950/70 text-slate-100" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
+        <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
       <ReadOnlyRow label="Backup folder" note="Current destination used by routine and manual restore points." value={backupRoot || 'Unavailable'} />
       <ReadOnlyRow label="Apps with backups on" note="Installed apps that currently have scheduled backups enabled. A completed restore point is required before an app is protected." value={`${appsWithBackupsOn}/${apps.length}`} />
@@ -504,7 +531,7 @@ function RemoteAccessPanel({ apps, draft, onUpdate, setup }: PanelProps & { apps
 function AdvancedPanel({ checks, copied, metrics, onCopy, onUpdate, settings, setup, version }: SystemPanelProps) {
   return (
     <SettingsGroup description="Low-level Project OS values for power users." title="Advanced">
-      <div className="rounded-lg border border-violet-300/20 bg-violet-500/10 p-4 text-sm leading-6 text-violet-100">
+      <div className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-4 text-sm leading-6 text-cyan-100">
         Advanced settings expose host details, raw paths, and instrumentation defaults. Keep these available for troubleshooting, but change them intentionally.
       </div>
       <SettingRow helpId="advancedMetrics" label="Show advanced metrics" note="Default advanced instrumentation visibility.">
@@ -522,12 +549,12 @@ function AdvancedPanel({ checks, copied, metrics, onCopy, onUpdate, settings, se
   );
 }
 
-function SettingsStatusCard({ icon: Icon, label, tone, value }: { icon: LucideIcon; label: string; tone: 'green' | 'amber' | 'slate' | 'violet'; value: string }) {
+function SettingsStatusCard({ icon: Icon, label, tone, value }: { icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'slate' | 'cyan'; value: string }) {
   const tones = {
-    amber: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
+    cyan: 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100',
     green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
+    orange: 'border-orange-300/30 bg-orange-500/10 text-orange-100',
     slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
-    violet: 'border-violet-300/20 bg-violet-500/10 text-violet-100',
   };
   return (
     <div className={cn('rounded-lg border p-4', tones[tone])}>
@@ -601,15 +628,15 @@ function SettingsPanelBySection({ advancedChecks, apps, backupRoot, copied, doct
 
 function SettingsGroup({ children, description, title }: { children: ReactNode; description: string; title: string }) {
   return (
-    <section>
+    <SettingsPanel>
       <div className="mb-6">
         <h2 className="text-xl font-black text-white">{title}</h2>
         <p className="mt-2 text-sm text-slate-400">{description}</p>
       </div>
-      <div className={poCardClass('normal', 'divide-y divide-white/10 p-0')}>
+      <SettingsInset className="divide-y divide-sky-400/15 overflow-hidden p-0">
         {children}
-      </div>
-    </section>
+      </SettingsInset>
+    </SettingsPanel>
   );
 }
 
@@ -624,21 +651,25 @@ function SettingRow({ children, helpId, label, note }: { children: ReactNode; he
       <div>{children}</div>
       <Popover>
         <PopoverTrigger asChild>
-          <Button aria-label={`About ${label}`} className="text-slate-500 hover:text-violet-200" size="icon" type="button" variant="ghost">
+          <button
+            aria-label={`About ${label}`}
+            className="grid size-8 place-items-center rounded-lg border border-sky-400/25 bg-slate-900 text-sky-100/70 transition hover:border-cyan-300/45 hover:text-cyan-100"
+            type="button"
+          >
             <HelpCircle data-icon="inline-start" />
-          </Button>
+          </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-80 border-po-border bg-po-surface-elevated p-3 text-po-text shadow-po-lg">
+        <PopoverContent align="end" className="w-80 border-sky-400/30 bg-slate-900 p-3 text-slate-100 shadow-xl shadow-slate-950/30">
           <PopoverHeader>
             <PopoverTitle className="text-sm">{help.title}</PopoverTitle>
-            <PopoverDescription className="text-xs leading-5 text-po-text-muted">{help.body}</PopoverDescription>
+            <PopoverDescription className="text-xs leading-5 text-slate-400">{help.body}</PopoverDescription>
           </PopoverHeader>
-          <div className="mt-3 rounded-po-sm border border-po-border bg-po-surface-inset p-3 text-xs text-po-text-secondary">
-            <p className="font-bold text-po-text">Used for</p>
+          <div className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-xs text-slate-300">
+            <p className="font-bold text-white">Used for</p>
             <ul className="mt-2 list-disc space-y-1 pl-4">
               {help.usedFor.map((item) => <li key={item}>{item}</li>)}
             </ul>
-            <p className="mt-3 text-po-text-muted"><span className="font-bold text-po-text-secondary">Tip:</span> {help.tip}</p>
+            <p className="mt-3 text-slate-400"><span className="font-bold text-slate-200">Tip:</span> {help.tip}</p>
           </div>
         </PopoverContent>
       </Popover>
@@ -653,7 +684,7 @@ function ReadOnlyRow({ label, note, value }: { label: string; note: string; valu
         <p className="text-sm font-bold text-white">{label}</p>
         <p className="mt-1 text-xs leading-5 text-slate-400">{note}</p>
       </div>
-      <code className="block overflow-hidden text-ellipsis whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-300">{value}</code>
+      <code className="block overflow-hidden text-ellipsis whitespace-nowrap rounded-lg border border-sky-400/25 bg-slate-950 px-3 py-2 text-sm text-slate-300">{value}</code>
       <span />
     </div>
   );
@@ -662,10 +693,10 @@ function ReadOnlyRow({ label, note, value }: { label: string; note: string; valu
 function SettingsSelect({ onChange, options, value }: { onChange: (value: string) => void; options: Array<[string, string]>; value: string }) {
   return (
     <UiSelect onValueChange={onChange} value={value}>
-      <SelectTrigger className="h-10 w-full border-slate-700 bg-slate-950/70 text-slate-100">
+      <SelectTrigger className="h-10 w-full border-sky-400/30 bg-slate-950 text-slate-100">
         <SelectValue />
       </SelectTrigger>
-      <SelectContent className="border-slate-700 bg-slate-950 text-slate-100">
+      <SelectContent className="border-sky-400/30 bg-slate-950 text-slate-100 shadow-xl shadow-slate-950/30">
         <SelectGroup>
           {options.map(([optionValue, label]) => (
             <SelectItem className="focus:bg-slate-800 focus:text-white" key={optionValue} value={optionValue}>{label}</SelectItem>
@@ -679,7 +710,7 @@ function SettingsSelect({ onChange, options, value }: { onChange: (value: string
 function SetupCheckRow({ check, copied, onCopy }: { check: SystemSetupCheck; copied: string | null; onCopy: (value: string, id: string) => void }) {
   const Icon = check.status === 'ok' ? CheckCircle2 : AlertTriangle;
   return (
-    <div className={cn('rounded-lg border p-4', check.status === 'ok' ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100' : 'border-amber-300/20 bg-amber-500/10 text-amber-100')}>
+    <div className={cn('rounded-lg border p-4', check.status === 'ok' ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100' : 'border-orange-300/30 bg-orange-500/10 text-orange-100')}>
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 size-5 shrink-0" />
         <div className="min-w-0 flex-1">
@@ -687,10 +718,10 @@ function SetupCheckRow({ check, copied, onCopy }: { check: SystemSetupCheck; cop
           <p className="mt-1 text-sm text-slate-300">{check.message}</p>
           {check.detail && <p className="mt-2 break-words text-xs text-slate-500">{check.detail}</p>}
           {check.actionCommand && (
-            <Button className={poButtonClass('quiet', 'mt-3 w-fit')} onClick={() => onCopy(check.actionCommand || '', check.id)} size="sm" type="button" variant="outline">
+            <ProjectDarkControlButton className="mt-3 w-fit" onClick={() => onCopy(check.actionCommand || '', check.id)} size="sm" type="button">
               <Copy className="size-3.5" />
               {copied === check.id ? 'Copied' : check.actionLabel || 'Copy command'}
-            </Button>
+            </ProjectDarkControlButton>
           )}
         </div>
       </div>
