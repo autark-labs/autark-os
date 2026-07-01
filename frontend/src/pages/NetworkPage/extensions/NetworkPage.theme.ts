@@ -23,9 +23,9 @@ export function statusTone(status: NetworkNodeStatus, surface: 'badge' | 'node' 
       soft: 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200',
     },
     warning: {
-      badge: 'border-amber-300/25 bg-amber-500/10 text-amber-200',
-      node: 'border-amber-300/30 bg-amber-500/10 text-amber-100 shadow-amber-950/20',
-      soft: 'border-amber-300/25 bg-amber-500/10 text-amber-200',
+      badge: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
+      node: 'border-orange-400/40 bg-orange-500/10 text-orange-100 shadow-orange-950/20',
+      soft: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
     },
     neutral: {
       badge: 'border-slate-600/50 bg-slate-800/70 text-slate-300',
@@ -38,6 +38,6 @@ export function statusTone(status: NetworkNodeStatus, surface: 'badge' | 'node' 
 
 export function diagnosticTone(status: string) {
   if (status === 'healthy') return 'border-emerald-400/25 bg-emerald-500/10 text-emerald-200';
-  if (status === 'warning') return 'border-amber-300/25 bg-amber-500/10 text-amber-200';
+  if (status === 'warning') return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
   return 'border-slate-600/40 bg-slate-900/70 text-slate-300';
 }

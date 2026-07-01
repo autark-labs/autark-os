@@ -32,4 +32,6 @@ Applications uses `PageShell`, `PageHeader`, `Surface`, `MetricCard`, `ProjectEm
 
 Home uses `PageShell`, `Surface`, `StatusPill`, and the same shared Project OS button primitives, with homepage-only cards and timeline components under `pages/OverviewPage/components`. Keep feature-specific composition local until a second page needs the same component.
 
+Access uses `PageShell`, `Surface`, `StatusPill`, shared Project OS button primitives, and local `NetworkPanel`/`NetworkInset` wrappers under `pages/NetworkPage`. Use this pattern for operational pages that need slate panels, blue borders, and compact actionable sections without bringing back broad `po-*` styling helpers.
+
 Avoid importing the legacy broad `ProjectOSComponents` styling helpers into pages as they are cleaned up. If a page needs one of those patterns, copy the visual decision into a small primitive or feature component and keep `className` available for layout tweaks.

@@ -3,8 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
-import { PageShell, StatusPill } from '@/components/project-os/ProjectOSComponents';
-import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
+import { PageShell } from '@/components/layout/PageShell';
+import { StatusPill } from '@/components/primitives/StatusPill';
+import { Surface } from '@/components/primitives/Surface';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
@@ -28,6 +29,7 @@ import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';
 import { NetworkIssuesPanel } from './NetworkIssuesPanel';
 import { PrivateAccessManager } from './PrivateAccessManager';
+import { AccessPageErrorState, AccessPageLoadingState, NetworkInset } from './NetworkPage.shared';
 import {
   buildDeviceViews,
   buildAppExposureGroups,
@@ -129,18 +131,18 @@ function NetworkPage() {
     <PageShell>
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold leading-none text-white md:text-3xl">Access</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-400">Open local links, review private Tailscale links, and fix access issues from one place.</p>
+          <h2 className="text-2xl font-bold leading-none text-slate-50 md:text-3xl">Access</h2>
+          <p className="mt-2 max-w-2xl text-sm text-sky-100/70">Open local links, review private Tailscale links, and fix access issues from one place.</p>
         </div>
-        <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} updatedAt={appState.updatedAt ?? network.updatedAt} />
+        <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} tone="cyan" updatedAt={appState.updatedAt ?? network.updatedAt} />
       </header>
 
       <CanonicalRecommendedAction />
 
-      {pageError && <PageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
+      {pageError && <AccessPageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
 
       {pageLoading ? (
-        <PageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
+        <AccessPageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : (
         <>
           <AccessZoneDiagram zones={accessZones} />
@@ -149,11 +151,11 @@ function NetworkPage() {
             <PrivateAccessSetupPath reconciliation={network.reconciliation} setup={network.setupStatus} tailscale={network.tailscale} />
           )}
           <Tabs className="gap-5" onValueChange={setActiveTab} value={selectedTab}>
-            <TabsList className="sticky top-0 z-10 w-full justify-start overflow-x-auto border-b border-slate-700/30 bg-slate-950/90 p-0 py-2 backdrop-blur" variant="line">
-              <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="private-apps">Private app links</TabsTrigger>
-              <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="issues">Issues</TabsTrigger>
-              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="devices">Trusted devices</TabsTrigger>}
-              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-slate-400 data-active:text-white" value="advanced">Map and diagnostics</TabsTrigger>}
+            <TabsList className="sticky top-0 z-10 w-full justify-start overflow-x-auto border-b border-sky-400/20 bg-slate-900/95 p-0 py-2 backdrop-blur" variant="line">
+              <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="private-apps">Private app links</TabsTrigger>
+              <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="issues">Issues</TabsTrigger>
+              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="devices">Trusted devices</TabsTrigger>}
+              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="advanced">Map and diagnostics</TabsTrigger>}
             </TabsList>
             <TabsContent className="min-h-[560px]" value="private-apps">
               <PrivateAccessManager
@@ -193,12 +195,12 @@ function TailscaleAccessCard({ posture, setup, tailscale }: { posture: ReturnTyp
   const display = tailscaleAccessDisplay(tailscale) as { badge: string; heading: string; summary: string; tone: 'success' | 'warning' };
   const check = setup?.checks?.find((item) => item.id === 'tailscale') || null;
   return (
-    <section className="overflow-hidden rounded-2xl border border-sky-300/18 bg-po-hero-devices p-5 shadow-po-panel">
+    <Surface className="overflow-hidden p-5 shadow-slate-950/20" tone="panel">
       <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
         <div>
-          <p className="text-xs font-black uppercase tracking-normal text-sky-200">Private access</p>
-          <h3 className="mt-2 text-2xl font-black text-white">{display.heading}</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+          <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Private access</p>
+          <h3 className="mt-2 text-2xl font-black text-slate-50">{display.heading}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">
             {display.tone === 'success' ? posture.summary : display.summary}
           </p>
         </div>
@@ -207,40 +209,40 @@ function TailscaleAccessCard({ posture, setup, tailscale }: { posture: ReturnTyp
           <TailscaleControlPopover align="end" check={check} triggerLabel="full" />
         </div>
       </div>
-    </section>
+    </Surface>
   );
 }
 
 function AccessZoneDiagram({ zones }: { zones: ReturnType<typeof buildAccessZones> }) {
   return (
-    <section className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/55 p-5 shadow-po-panel">
+    <Surface className="grid gap-3 p-5 shadow-slate-950/20" tone="panel">
       <div>
-        <h3 className="text-lg font-black text-white">Where apps are reachable</h3>
-        <p className="mt-1 text-sm text-slate-400">Project OS keeps public exposure empty by default and favors LAN or private Tailscale links.</p>
+        <h3 className="text-lg font-black text-slate-50">Where apps are reachable</h3>
+        <p className="mt-1 text-sm text-sky-100/70">Project OS keeps public exposure empty by default and favors LAN or private Tailscale links.</p>
       </div>
       <div className="grid gap-3 lg:grid-cols-4">
         {zones.map((zone) => (
-          <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4" key={zone.id}>
+          <NetworkInset className="rounded-xl p-4" key={zone.id}>
             <div className="flex items-center justify-between gap-2">
-              <h4 className="font-bold text-white">{zone.label}</h4>
-              <Badge className={zone.id === 'public' && zone.apps.length > 0 ? 'border-red-300/25 bg-red-500/10 text-red-100' : zone.id === 'public' ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100' : 'border-slate-600/40 bg-slate-950/50 text-slate-300'} variant="outline">
+              <h4 className="font-bold text-slate-50">{zone.label}</h4>
+              <Badge className={zone.id === 'public' && zone.apps.length > 0 ? 'border-red-400/40 bg-red-500/10 text-red-200' : zone.id === 'public' ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : 'border-sky-400/25 bg-slate-900 text-sky-100/80'} variant="outline">
                 {zone.statusLabel}
               </Badge>
             </div>
             <div className="mt-3 grid gap-2">
               {zone.apps.length ? zone.apps.map((app: { id: string; label: string; external: boolean; status: string; url: string }) => (
-                <a className="rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-300/35 hover:text-white" href={app.url || undefined} key={app.id} rel="noreferrer" target={app.url ? '_blank' : undefined}>
+                <a className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2 text-sm text-sky-100/85 transition hover:border-cyan-300/45 hover:bg-slate-700 hover:text-white" href={app.url || undefined} key={app.id} rel="noreferrer" target={app.url ? '_blank' : undefined}>
                   <span className="block truncate font-semibold">{app.label}</span>
-                  <span className="text-xs text-slate-500">{app.external ? 'Pinned external service' : app.status}</span>
+                  <span className="text-xs text-sky-100/50">{app.external ? 'Pinned external service' : app.status}</span>
                 </a>
               )) : (
-                <p className="m-0 rounded-lg border border-dashed border-slate-700/60 px-3 py-2 text-sm text-slate-500">{zone.emptyText}</p>
+                <p className="m-0 rounded-lg border border-dashed border-sky-400/20 px-3 py-2 text-sm text-sky-100/50">{zone.emptyText}</p>
               )}
             </div>
-          </div>
+          </NetworkInset>
         ))}
       </div>
-    </section>
+    </Surface>
   );
 }
 
@@ -251,16 +253,16 @@ function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconcil
   const connected = Boolean(tailscale?.connected);
 
   return (
-    <section className="rounded-lg border border-white/10 bg-slate-950/60 p-5">
+    <Surface className="p-5" tone="panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-normal text-sky-300">Private access setup path</p>
-          <h3 className="mt-2 text-xl font-black text-white">{statusLabel}</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+          <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Private access setup path</p>
+          <h3 className="mt-2 text-xl font-black text-slate-50">{statusLabel}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">
             Local access works without Tailscale. Private app links need this device connected to Tailscale, MagicDNS/HTTPS enabled, and Tailscale Serve permission granted to Project OS.
           </p>
         </div>
-        <Badge className={connected ? 'border-emerald-400/25 bg-emerald-500/10 text-emerald-100' : 'border-amber-300/25 bg-amber-500/10 text-amber-100'} variant="outline">
+        <Badge className={connected ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/45 bg-orange-500/10 text-orange-200'} variant="outline">
           {connected ? 'Connected' : 'Local-only available'}
         </Badge>
       </div>
@@ -275,22 +277,22 @@ function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconcil
           />
         ))}
       </div>
-    </section>
+    </Surface>
   );
 }
 
 function SetupStep({ action, detail, label, status }: { action: string; detail: string; label: string; status: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-slate-950/55 p-4">
+    <NetworkInset className="p-4">
       <div className="flex items-center justify-between gap-3">
-        <h4 className="font-semibold text-white">{label}</h4>
-        <Badge className={status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : status === 'warning' ? 'bg-amber-500/15 text-amber-100' : 'bg-slate-700 text-slate-200'}>
+        <h4 className="font-semibold text-slate-50">{label}</h4>
+        <Badge className={status === 'ok' ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : status === 'warning' ? 'border-orange-400/45 bg-orange-500/10 text-orange-200' : 'border-sky-400/25 bg-slate-900 text-sky-100/80'} variant="outline">
           {status === 'ok' ? 'Ready' : status === 'warning' ? 'Needs setup' : 'Later'}
         </Badge>
       </div>
-      <p className="mt-2 text-sm leading-6 text-slate-400">{detail}</p>
-      <p className="mt-3 text-xs font-semibold text-sky-200">{action}</p>
-    </div>
+      <p className="mt-2 text-sm leading-6 text-sky-100/70">{detail}</p>
+      <p className="mt-3 text-xs font-semibold text-cyan-200">{action}</p>
+    </NetworkInset>
   );
 }
 
