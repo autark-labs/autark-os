@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Clock3, Cpu, Database, Download, Filter, HardDrive, HeartPulse, Loader2, MemoryStick, Server, ShieldCheck, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -6,11 +7,11 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'rec
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
-import { PageErrorState } from '@/components/project-os/PageState';
-import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
+import { PageShell } from '@/components/layout/PageShell';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
+import { Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { buildAppRemediationFromIssue } from '@/lib/appRemediation';
 import { cn } from '@/lib/utils';
@@ -55,6 +56,22 @@ type AppTrendPoint = {
   cpu: number;
   memory: number;
 };
+
+function MonitoringPanel({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
+  return (
+    <Surface as="section" className={cn('p-5', className)} id={id} tone="panel">
+      {children}
+    </Surface>
+  );
+}
+
+function MonitoringInset({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <Surface className={cn('p-3', className)} tone="muted">
+      {children}
+    </Surface>
+  );
+}
 
 function MonitoringPage() {
   const { showAdvancedMetrics } = useProjectSettings();
@@ -102,12 +119,12 @@ function MonitoringPage() {
   const highlightedIssue = reliability?.issues[0] ?? null;
 
   return (
-    <PageShell className="po-page-tall">
-      <SurfaceFrame>
-        <div className="border-b border-white/10 bg-po-hero-monitoring p-6 md:p-7">
+    <PageShell>
+      <Surface className="overflow-hidden" tone="panel">
+        <div className="border-b border-sky-400/20 bg-slate-900 p-6 md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-normal text-violet-300">Monitoring</p>
+              <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Monitoring</p>
               <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">System Activity</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
                 See what Project OS is checking, fixing, and waiting on in the background.
@@ -116,18 +133,18 @@ function MonitoringPage() {
             <div className="flex flex-wrap items-center gap-2">
               {showAdvancedMetrics && (
                 <DisabledAction disabled={diagnosticsMutation.isPending} reason="Diagnostics export is already being prepared.">
-                  <Button className="border-violet-300/20 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20" disabled={diagnosticsMutation.isPending} onClick={() => void exportDiagnostics()} type="button" variant="outline">
+                  <ProjectDarkControlButton disabled={diagnosticsMutation.isPending} onClick={() => void exportDiagnostics()} type="button">
                     {diagnosticsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
                     Export diagnostics
-                  </Button>
+                  </ProjectDarkControlButton>
                 </DisabledAction>
               )}
-              <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])} refreshing={monitoring.isFetching || appState.isFetching} tone="violet" updatedAt={appState.updatedAt ?? monitoring.updatedAt} />
+              <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])} refreshing={monitoring.isFetching || appState.isFetching} tone="cyan" updatedAt={appState.updatedAt ?? monitoring.updatedAt} />
             </div>
           </div>
         </div>
 
-        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void monitoring.refresh()} title="Monitoring data could not refresh" />}
+        {error && <MonitoringErrorState message={error} onRetry={() => void monitoring.refresh()} />}
 
         <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
           <SignalCard
@@ -149,7 +166,7 @@ function MonitoringPage() {
             label="Automatic fixes"
             value={`${reliability?.recentSuccessfulRepairs ?? recentFixes.length}`}
             detail={`${reliability?.recentFailedRepairs ?? recentFailures.length} items still need review.`}
-            tone={(reliability?.recentFailedRepairs ?? recentFailures.length) > 0 ? 'amber' : 'violet'}
+            tone={(reliability?.recentFailedRepairs ?? recentFailures.length) > 0 ? 'orange' : 'cyan'}
           />
           <SignalCard
             icon={AlertTriangle}
@@ -159,7 +176,7 @@ function MonitoringPage() {
             tone={recentFailures.length > 0 ? 'red' : 'slate'}
           />
         </div>
-      </SurfaceFrame>
+      </Surface>
 
       <SystemActivitySummary highlightedIssue={highlightedIssue} recentFixes={recentFixes} recentEvents={monitoring.activity.slice(0, 5)} reliability={reliability} />
 
@@ -178,11 +195,11 @@ function MonitoringPage() {
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <SurfacePanel>
+        <MonitoringPanel>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <Activity className="size-5 text-violet-300" />
+                <Activity className="size-5 text-cyan-200" />
                 <h2 className="text-xl font-black text-white">Recent activity</h2>
               </div>
               <p className="mt-1 text-sm text-slate-400">{showAdvancedMetrics ? 'Install progress, health checks, repairs, private access changes, and backend warnings.' : 'The latest visible work Project OS has done for apps, backups, access, and repairs.'}</p>
@@ -190,16 +207,16 @@ function MonitoringPage() {
             <Badge className="border-slate-700 bg-slate-900 text-slate-300">{monitoring.activity.length} events</Badge>
           </div>
 
-          {showAdvancedMetrics && <SurfaceInset className="mt-5 grid gap-3">
+          {showAdvancedMetrics && <MonitoringInset className="mt-5 grid gap-3">
             <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
               <Filter className="size-3.5" />
               Filters
             </div>
             <FilterBar label="Level" options={levelFilters} value={level} onChange={setLevel} />
             <FilterBar label="Category" options={categoryFilters} value={category} onChange={setCategory} />
-          </SurfaceInset>}
+          </MonitoringInset>}
 
-          <div className="mt-5 max-h-[680px] space-y-3 overflow-y-auto pr-2 [scrollbar-color:rgba(139,92,246,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
+          <div className="mt-5 flex max-h-[680px] flex-col gap-3 overflow-y-auto pr-2 [scrollbar-color:rgba(103,232,249,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
             {monitoring.isLoading ? (
               <EmptyState title="Loading activity" message="Project OS is checking recent events." />
             ) : monitoring.activity.length ? (
@@ -216,16 +233,16 @@ function MonitoringPage() {
               <EmptyState title="No activity found" message="Try another filter, or install an app to start recording activity." />
             )}
           </div>
-        </SurfacePanel>
+        </MonitoringPanel>
 
-        <aside className="space-y-5">
-          <SurfacePanel>
+        <aside className="flex flex-col gap-5">
+          <MonitoringPanel>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-black text-white">Needs attention</h2>
                 <p className="mt-1 text-sm text-slate-400">Apps Project OS cannot fully fix on its own.</p>
               </div>
-              <Badge className={cn('border', (reliability?.issues.length ?? 0) > 0 ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
+              <Badge className={cn('border', (reliability?.issues.length ?? 0) > 0 ? 'border-orange-400/45 bg-orange-500/10 text-orange-200' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
                 {reliability?.issues.length ?? 0}
               </Badge>
             </div>
@@ -234,9 +251,9 @@ function MonitoringPage() {
                 <EmptyState title="No active issues" message="Project OS has not found any app stability issues." compact />
               )}
             </div>
-          </SurfacePanel>
+          </MonitoringPanel>
 
-          <SurfacePanel>
+          <MonitoringPanel>
             <h2 className="text-lg font-black text-white">What gets logged</h2>
             <div className="mt-4 grid gap-3 text-sm text-slate-300">
               <GuideRow icon={CheckCircle2} title="Successful work" text="Installs, repairs, access updates, and app checks that completed." />
@@ -244,7 +261,7 @@ function MonitoringPage() {
               <GuideRow icon={ShieldCheck} title="Background repair" text="Safe restart and private-link repair attempts performed by the guardian." />
               <GuideRow icon={Clock3} title="Timing" text="This page refreshes automatically every few seconds while it is open." />
             </div>
-          </SurfacePanel>
+          </MonitoringPanel>
         </aside>
       </div>
     </PageShell>
@@ -254,26 +271,26 @@ function MonitoringPage() {
 function SystemActivitySummary({ highlightedIssue, recentEvents, recentFixes, reliability }: { highlightedIssue: AppReliabilityIssue | null; recentEvents: ActivityLog[]; recentFixes: ActivityLog[]; reliability: AppReliabilitySummary | null }) {
   return (
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <SurfacePanel>
+      <MonitoringPanel>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <Activity className="size-5 text-violet-300" />
+              <Activity className="size-5 text-cyan-200" />
               <h2 className="text-xl font-black text-white">What Project OS is doing</h2>
             </div>
             <p className="mt-1 text-sm text-slate-400">Recent checks, background repairs, and app activity in plain language.</p>
           </div>
-          <Badge className="border-violet-300/20 bg-violet-500/10 text-violet-100">{recentEvents.length} recent</Badge>
+          <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-100">{recentEvents.length} recent</Badge>
         </div>
         <div className="mt-5 grid gap-3">
           {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} />) : (
             <EmptyState compact title="No recent activity" message="Project OS has not logged visible work for the current filters yet." />
           )}
         </div>
-      </SurfacePanel>
+      </MonitoringPanel>
 
       <div className="grid gap-5">
-        <SurfacePanel>
+        <MonitoringPanel>
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-lg border border-emerald-300/20 bg-emerald-500/10 text-emerald-200">
               <HeartPulse className="size-5" />
@@ -285,14 +302,14 @@ function SystemActivitySummary({ highlightedIssue, recentEvents, recentFixes, re
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
             <MiniCount label="Ready" tone="green" value={`${reliability?.readyApps ?? 0}`} />
-            <MiniCount label="Starting" tone="amber" value={`${reliability?.startingApps ?? 0}`} />
+            <MiniCount label="Starting" tone="orange" value={`${reliability?.startingApps ?? 0}`} />
             <MiniCount label="Review" tone="red" value={`${(reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)}`} />
           </div>
-        </SurfacePanel>
+        </MonitoringPanel>
 
-        <SurfacePanel>
+        <MonitoringPanel>
           <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg border border-violet-300/20 bg-violet-500/10 text-violet-200">
+            <span className="grid size-10 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/10 text-cyan-100">
               <Wrench className="size-5" />
             </span>
             <div>
@@ -304,7 +321,7 @@ function SystemActivitySummary({ highlightedIssue, recentEvents, recentFixes, re
             {recentFixes.slice(0, 3).map((event) => <CompactActivityItem event={event} key={event.id} />)}
             {!recentFixes.length && <EmptyState compact title="Quiet is good" message="Project OS will list safe repair work here when it happens." />}
           </div>
-        </SurfacePanel>
+        </MonitoringPanel>
 
         <HighlightedIssueCard issue={highlightedIssue} />
       </div>
@@ -331,7 +348,7 @@ function CompactActivityItem({ event }: { event: ActivityLog }) {
 function HighlightedIssueCard({ issue }: { issue: AppReliabilityIssue | null }) {
   if (!issue) {
     return (
-      <section className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 p-5 text-emerald-100 shadow-po-panel">
+      <section className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 p-5 text-emerald-100 shadow-xl shadow-slate-950/30">
         <div className="flex gap-3">
           <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
           <div>
@@ -345,27 +362,27 @@ function HighlightedIssueCard({ issue }: { issue: AppReliabilityIssue | null }) 
   const remediation = buildAppRemediationFromIssue(issue);
   const destination = remediation?.safeAction.kind === 'link' ? remediation.safeAction.to : '/apps';
   return (
-    <section className="rounded-lg border border-amber-300/20 bg-amber-500/10 p-5 text-amber-100 shadow-po-panel">
+    <section className="rounded-xl border border-orange-400/45 bg-orange-500/10 p-5 text-orange-200 shadow-xl shadow-slate-950/30">
       <div className="flex gap-3">
         <AlertTriangle className="mt-0.5 size-5 shrink-0" />
         <div>
           <h2 className="font-black text-white">{remediation?.title || `Review ${issue.appName}`}</h2>
-          <p className="mt-1 text-sm text-amber-100/80">{remediation?.summary || issue.message}</p>
-          <p className="mt-2 text-xs text-amber-100/70">{remediation?.nextStep || issue.suggestedAction}</p>
-          <Button asChild className="mt-4 border-amber-300/30 bg-slate-950/50 text-amber-100 hover:bg-slate-900" size="sm" variant="outline">
+          <p className="mt-1 text-sm text-orange-100/80">{remediation?.summary || issue.message}</p>
+          <p className="mt-2 text-xs text-orange-100/70">{remediation?.nextStep || issue.suggestedAction}</p>
+          <ProjectDarkControlButton asChild className="mt-4 border-orange-300/30 text-orange-100" size="sm">
             <Link to={destination}>{remediation?.safeAction.label || 'Open Applications'} <ChevronRight className="size-4" /></Link>
-          </Button>
+          </ProjectDarkControlButton>
         </div>
       </div>
     </section>
   );
 }
 
-function MiniCount({ label, tone, value }: { label: string; tone: 'green' | 'amber' | 'red'; value: string }) {
+function MiniCount({ label, tone, value }: { label: string; tone: 'green' | 'orange' | 'red'; value: string }) {
   const tones = {
-    amber: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
+    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
     green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
-    red: 'border-red-300/20 bg-red-500/10 text-red-100',
+    red: 'border-red-400/40 bg-red-500/10 text-red-200',
   };
   return (
     <div className={cn('rounded-lg border p-3', tones[tone])}>
@@ -382,21 +399,21 @@ function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData,
   const attentionPercent = (((reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)) / healthTotal) * 100;
 
   return (
-    <SurfacePanel>
+    <MonitoringPanel>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <BarChart3 className="size-5 text-violet-300" />
+            <BarChart3 className="size-5 text-cyan-200" />
             <h2 className="text-xl font-black text-white">Project OS metrics</h2>
           </div>
           <p className="mt-1 text-sm text-slate-400">A quick read on system activity, app health, and managed app resource usage.</p>
         </div>
-        <Badge className="border-violet-300/20 bg-violet-500/10 text-violet-100">{history?.windowLabel || 'Last 60 minutes'}</Badge>
+        <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-100">{history?.windowLabel || 'Last 60 minutes'}</Badge>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="grid gap-4">
-          <SurfaceInset className="p-4">
+          <MonitoringInset className="p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase text-slate-500">App health mix</p>
@@ -407,18 +424,18 @@ function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData,
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-950">
               <div className="flex h-full">
                 <span className="bg-emerald-400" style={{ width: `${healthyPercent}%` }} />
-                <span className="bg-amber-300" style={{ width: `${startingPercent}%` }} />
+                <span className="bg-orange-400" style={{ width: `${startingPercent}%` }} />
                 <span className="bg-red-400" style={{ width: `${attentionPercent}%` }} />
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
               <LegendDot color="bg-emerald-400" label={`${reliability?.readyApps ?? 0} ready`} />
-              <LegendDot color="bg-amber-300" label={`${reliability?.startingApps ?? 0} starting`} />
+              <LegendDot color="bg-orange-400" label={`${reliability?.startingApps ?? 0} starting`} />
               <LegendDot color="bg-red-400" label={`${(reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)} issues`} />
             </div>
-          </SurfaceInset>
+          </MonitoringInset>
 
-          <SurfaceInset className="p-4">
+          <MonitoringInset className="p-4">
             <p className="text-xs font-bold uppercase text-slate-500">Event tone</p>
             <ChartContainer
               className="mt-3 h-[190px] w-full aspect-auto"
@@ -440,11 +457,11 @@ function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData,
                 <Area dataKey="count" type="monotone" stroke="#a78bfa" fill="url(#eventToneFill)" strokeWidth={2} />
               </AreaChart>
             </ChartContainer>
-          </SurfaceInset>
+          </MonitoringInset>
         </div>
 
         <div className="grid gap-4">
-          <SurfaceInset className="p-4">
+          <MonitoringInset className="p-4">
             <p className="text-xs font-bold uppercase text-slate-500">Activity by area</p>
             <ChartContainer
               className="mt-3 h-[220px] w-full aspect-auto"
@@ -460,9 +477,9 @@ function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData,
                 <Bar dataKey="count" fill="#22d3ee" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ChartContainer>
-          </SurfaceInset>
+          </MonitoringInset>
 
-          <SurfaceInset className="p-4">
+          <MonitoringInset className="p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-bold uppercase text-slate-500">Managed app resources</p>
               <span className="text-xs text-slate-500">{resourceData.length ? 'Current top apps' : 'No current sample'}</span>
@@ -487,9 +504,9 @@ function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData,
             ) : (
               <EmptyState title="No app resource samples" message="App CPU and memory charts appear after telemetry is collected." compact />
             )}
-          </SurfaceInset>
+          </MonitoringInset>
 
-          <SurfaceInset className="p-4">
+          <MonitoringInset className="p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-bold uppercase text-slate-500">App resource trend</p>
               <span className="text-xs text-slate-500">{history?.windowLabel || 'Last 60 minutes'}</span>
@@ -524,10 +541,10 @@ function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData,
             ) : (
               <EmptyState title="Trend is still warming up" message="Keep Monitoring open briefly to collect enough app samples for a trend." compact />
             )}
-          </SurfaceInset>
+          </MonitoringInset>
         </div>
       </div>
-    </SurfacePanel>
+    </MonitoringPanel>
   );
 }
 
@@ -535,7 +552,7 @@ function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { histo
   const memoryUsedBytes = metrics ? metrics.totalMemoryBytes - metrics.freeMemoryBytes : 0;
   const runtimeUsedBytes = metrics ? metrics.runtimeTotalBytes - metrics.runtimeUsableBytes : 0;
   return (
-    <SurfacePanel>
+    <MonitoringPanel>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -549,8 +566,8 @@ function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { histo
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <MetricRing icon={Cpu} label="Device CPU" value={metrics?.systemCpuPercent ?? -1} detail={metrics ? `${metrics.availableProcessors} cores available` : 'No sample yet'} tone="cyan" />
-        <MetricRing icon={MemoryStick} label="Memory" value={metrics?.usedMemoryPercent ?? -1} detail={metrics ? `${formatBytes(memoryUsedBytes)} used of ${formatBytes(metrics.totalMemoryBytes)}` : 'No sample yet'} tone="violet" />
-        <MetricRing icon={HardDrive} label="Project OS disk" value={metrics?.runtimeUsedPercent ?? -1} detail={metrics ? `${formatBytes(runtimeUsedBytes)} used of ${formatBytes(metrics.runtimeTotalBytes)}` : 'No sample yet'} tone="amber" />
+        <MetricRing icon={MemoryStick} label="Memory" value={metrics?.usedMemoryPercent ?? -1} detail={metrics ? `${formatBytes(memoryUsedBytes)} used of ${formatBytes(metrics.totalMemoryBytes)}` : 'No sample yet'} tone="cyan" />
+        <MetricRing icon={HardDrive} label="Project OS disk" value={metrics?.runtimeUsedPercent ?? -1} detail={metrics ? `${formatBytes(runtimeUsedBytes)} used of ${formatBytes(metrics.runtimeTotalBytes)}` : 'No sample yet'} tone="orange" />
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -562,7 +579,7 @@ function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { histo
         <MetricDetail icon={Activity} label="Backend CPU" value={percentLabel(metrics?.processCpuPercent)} />
       </div>
 
-      <SurfaceInset className="mt-5 p-4">
+      <MonitoringInset className="mt-5 p-4">
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-bold uppercase text-slate-500">Device trends</p>
           <span className="text-xs text-slate-500">{history?.windowLabel || 'Last 60 minutes'}</span>
@@ -599,20 +616,19 @@ function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { histo
         ) : (
           <EmptyState title="Trend is still warming up" message="Project OS needs at least two retained host samples before drawing this trend." compact />
         )}
-      </SurfaceInset>
-    </SurfacePanel>
+      </MonitoringInset>
+    </MonitoringPanel>
   );
 }
 
-function MetricRing({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'cyan' | 'violet' | 'amber'; value: number }) {
+function MetricRing({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'cyan' | 'orange'; value: number }) {
   const colors = {
     cyan: '#22d3ee',
-    violet: '#a78bfa',
-    amber: '#fbbf24',
+    orange: '#fb923c',
   };
   const safeValue = value < 0 ? 0 : clamp(value);
   return (
-    <SurfaceInset className="p-4">
+    <MonitoringInset className="p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
         <Icon className="size-4 text-slate-400" />
@@ -620,7 +636,7 @@ function MetricRing({ detail, icon: Icon, label, tone, value }: { detail: string
       <div className="mt-4 flex items-center gap-4">
         <div
           className="grid size-20 shrink-0 place-items-center rounded-full"
-          style={{ background: `conic-gradient(${colors[tone]} ${safeValue * 3.6}deg, rgba(30,41,59,0.95) 0deg)` }}
+          style={{ background: `conic-gradient(${colors[tone]} ${safeValue * 3.6}deg, rgb(30 41 59) 0deg)` }}
         >
           <div className="grid size-14 place-items-center rounded-full bg-slate-950 text-sm font-black text-white">
             {value < 0 ? 'N/A' : `${Math.round(value)}%`}
@@ -628,19 +644,19 @@ function MetricRing({ detail, icon: Icon, label, tone, value }: { detail: string
         </div>
         <p className="text-sm text-slate-400">{detail}</p>
       </div>
-    </SurfaceInset>
+    </MonitoringInset>
   );
 }
 
 function MetricDetail({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <SurfaceInset className="flex min-w-0 gap-3">
+    <MonitoringInset className="flex min-w-0 gap-3">
       <Icon className="mt-0.5 size-4 shrink-0 text-slate-500" />
       <div className="min-w-0">
         <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
         <p className="mt-1 truncate text-sm text-slate-200" title={value}>{value}</p>
       </div>
-    </SurfaceInset>
+    </MonitoringInset>
   );
 }
 
@@ -653,13 +669,13 @@ function LegendDot({ color, label }: { color: string; label: string }) {
   );
 }
 
-function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'amber' | 'red' | 'slate' | 'violet'; value: string; }) {
+function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'red' | 'slate' | 'cyan'; value: string; }) {
   const tones = {
     green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-200',
-    amber: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
-    red: 'border-red-300/20 bg-red-500/10 text-red-100',
+    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
+    red: 'border-red-400/40 bg-red-500/10 text-red-200',
     slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
-    violet: 'border-violet-300/20 bg-violet-500/10 text-violet-100',
+    cyan: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
   };
   return (
     <div className={cn('rounded-lg border p-4', tones[tone])}>
@@ -680,10 +696,10 @@ function FilterBar({ label, onChange, options, value }: { label: string; options
       {options.map((option) => (
         <button
           className={cn(
-            'rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70',
+            'rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70',
             value === option
-              ? 'border-violet-300/30 bg-violet-500/20 text-violet-100'
-              : 'border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-600 hover:text-slate-200',
+              ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100'
+              : 'border-sky-400/25 bg-slate-800 text-slate-400 hover:border-cyan-300/45 hover:text-slate-200',
           )}
           key={option}
           onClick={() => onChange(option)}
@@ -700,8 +716,8 @@ function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics }: { event
   const Icon = eventIcon(event);
   return (
     <article className={cn('rounded-lg border bg-slate-900/45 transition', eventTone(event))}>
-      <button className="grid w-full gap-3 rounded-lg p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300/70 sm:grid-cols-[auto_minmax(0,1fr)_130px_auto] sm:items-start" onClick={onToggle} type="button">
-        <span className="grid size-10 place-items-center rounded-lg border border-white/10 bg-slate-950/70">
+      <button className="grid w-full gap-3 rounded-lg p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:grid-cols-[auto_minmax(0,1fr)_130px_auto] sm:items-start" onClick={onToggle} type="button">
+        <span className="grid size-10 place-items-center rounded-lg border border-sky-400/25 bg-slate-950/70">
           <Icon className="size-4" />
         </span>
         <span className="min-w-0">
@@ -734,46 +750,63 @@ function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics }: { event
 function IssueCard({ issue }: { issue: AppReliabilityIssue }) {
   const remediation = buildAppRemediationFromIssue(issue);
   return (
-    <div className="rounded-lg border border-amber-300/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+    <div className="rounded-lg border border-orange-400/45 bg-orange-500/10 p-4 text-sm text-orange-200">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold text-white">{issue.appName}</p>
           <p className="mt-1">{remediation?.summary || issue.message}</p>
         </div>
-        <Badge className="border-amber-300/20 bg-amber-500/10 text-amber-100">{issue.status}</Badge>
+        <Badge className="border-orange-400/45 bg-orange-500/10 text-orange-200">{issue.status}</Badge>
       </div>
-      <p className="mt-3 text-xs text-amber-100/75">{remediation?.nextStep || issue.suggestedAction}</p>
-      {issue.detail && remediation?.summary !== issue.detail && <p className="mt-2 text-xs text-amber-100/60">{issue.detail}</p>}
+      <p className="mt-3 text-xs text-orange-100/75">{remediation?.nextStep || issue.suggestedAction}</p>
+      {issue.detail && remediation?.summary !== issue.detail && <p className="mt-2 text-xs text-orange-100/60">{issue.detail}</p>}
     </div>
   );
 }
 
 function GuideRow({ icon: Icon, text, title }: { icon: typeof Activity; text: string; title: string }) {
   return (
-    <SurfaceInset className="flex gap-3">
-      <Icon className="mt-0.5 size-4 text-violet-300" />
+    <MonitoringInset className="flex gap-3">
+      <Icon className="mt-0.5 size-4 text-cyan-200" />
       <div>
         <p className="font-bold text-white">{title}</p>
         <p className="mt-1 text-xs text-slate-400">{text}</p>
       </div>
-    </SurfaceInset>
+    </MonitoringInset>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-950/45 p-3">
+    <MonitoringInset>
       <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
       <p className="mt-1 break-words text-slate-200">{value || 'None'}</p>
-    </div>
+    </MonitoringInset>
   );
 }
 
 function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
   return (
-    <div className={cn('rounded-lg border border-slate-800 bg-slate-900/40 text-center', compact ? 'p-4' : 'p-8')}>
+    <MonitoringInset className={cn('text-center', compact ? 'p-4' : 'p-8')}>
       <p className="font-bold text-white">{title}</p>
       <p className="mt-1 text-sm text-slate-400">{message}</p>
+    </MonitoringInset>
+  );
+}
+
+function MonitoringErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="border-b border-red-400/40 bg-red-500/10 px-6 py-4 text-red-100">
+      <div className="flex gap-3">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-current">Monitoring data could not refresh</p>
+          <p className="mt-1 text-sm leading-6 text-current/80">{message}</p>
+          <ProjectDarkControlButton className="mt-3 border-red-300/30 text-red-100 hover:bg-red-500/20" onClick={onRetry} size="sm" type="button">
+            Try again
+          </ProjectDarkControlButton>
+        </div>
+      </div>
     </div>
   );
 }
@@ -788,7 +821,7 @@ function postureIcon(posture?: string) {
   return ShieldCheck;
 }
 
-function postureTone(posture?: string): 'green' | 'amber' | 'red' | 'slate' | 'violet' {
+function postureTone(posture?: string): 'green' | 'orange' | 'red' | 'slate' | 'cyan' {
   if (posture === 'healthy') {
     return 'green';
   }
@@ -796,9 +829,9 @@ function postureTone(posture?: string): 'green' | 'amber' | 'red' | 'slate' | 'v
     return 'red';
   }
   if (posture === 'warning') {
-    return 'amber';
+    return 'orange';
   }
-  return 'violet';
+  return 'cyan';
 }
 
 function eventIcon(event: ActivityLog) {
@@ -819,10 +852,10 @@ function eventIcon(event: ActivityLog) {
 
 function eventTone(event: ActivityLog) {
   if (event.level === 'error' || event.outcome === 'failed') {
-    return 'border-red-300/20 text-red-100';
+    return 'border-red-400/40 text-red-200';
   }
   if (event.level === 'warning' || event.outcome === 'needs_attention') {
-    return 'border-amber-300/20 text-amber-100';
+    return 'border-orange-400/45 text-orange-200';
   }
   if (event.level === 'success') {
     return 'border-emerald-300/20 text-emerald-100';
@@ -832,10 +865,10 @@ function eventTone(event: ActivityLog) {
 
 function badgeTone(level: string) {
   if (level === 'error') {
-    return 'border-red-300/20 bg-red-500/10 text-red-100';
+    return 'border-red-400/40 bg-red-500/10 text-red-200';
   }
   if (level === 'warning') {
-    return 'border-amber-300/20 bg-amber-500/10 text-amber-100';
+    return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
   }
   if (level === 'success') {
     return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';

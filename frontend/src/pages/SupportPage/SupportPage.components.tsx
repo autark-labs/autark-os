@@ -1,19 +1,37 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, Copy, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
+import { Surface } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { SupportFinding, SupportLogLine, SupportRedactionRule } from '@/types/system';
 import { humanize } from './SupportPage.logic';
 
-export function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'amber' | 'red' | 'slate' | 'violet' | 'sky'; value: string }) {
+export function SupportPanel({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
+  return (
+    <Surface as="section" className={cn('p-5', className)} id={id} tone="panel">
+      {children}
+    </Surface>
+  );
+}
+
+export function SupportInset({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <Surface className={cn('p-3', className)} tone="muted">
+      {children}
+    </Surface>
+  );
+}
+
+export function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'red' | 'slate' | 'cyan' | 'sky'; value: string }) {
   const tones = {
     green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-200',
-    amber: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
-    red: 'border-red-300/20 bg-red-500/10 text-red-100',
+    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
+    red: 'border-red-400/40 bg-red-500/10 text-red-200',
     slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
-    violet: 'border-violet-300/20 bg-violet-500/10 text-violet-100',
+    cyan: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
     sky: 'border-sky-300/20 bg-sky-500/10 text-sky-100',
   };
   return (
@@ -30,18 +48,18 @@ export function SignalCard({ detail, icon: Icon, label, tone, value }: { detail:
 
 export function InfoLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 rounded-lg border border-slate-700/40 bg-slate-900/45 p-3">
+    <SupportInset className="grid gap-1">
       <span className="text-xs font-bold uppercase text-slate-500">{label}</span>
       <span className="break-words text-slate-200">{value}</span>
-    </div>
+    </SupportInset>
   );
 }
 
-export function BasicSupportCard({ detail, label, tone, value }: { detail: string; label: string; tone: 'green' | 'amber' | 'red'; value: string }) {
+export function BasicSupportCard({ detail, label, tone, value }: { detail: string; label: string; tone: 'green' | 'orange' | 'red'; value: string }) {
   const tones = {
     green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
-    amber: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
-    red: 'border-red-300/20 bg-red-500/10 text-red-100',
+    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
+    red: 'border-red-400/40 bg-red-500/10 text-red-200',
   };
   return (
     <div className={cn('rounded-lg border p-4', tones[tone])}>
@@ -64,12 +82,12 @@ export function FindingCard({ finding }: { finding: SupportFinding }) {
           <p className="mt-3 font-bold text-white">{finding.title}</p>
           <p className="mt-1 text-sm leading-5 text-current/75">{finding.message}</p>
         </div>
-        <Button asChild className="shrink-0 border-current/25 bg-slate-950/45 text-current hover:bg-slate-900" size="sm" variant="outline">
+        <ProjectDarkControlButton asChild className="shrink-0 border-current/25 text-current" size="sm">
           <Link to={finding.route || '/monitoring'}>
             {finding.actionLabel || 'Open page'}
             <ChevronRight className="size-4" />
           </Link>
-        </Button>
+        </ProjectDarkControlButton>
       </div>
     </div>
   );
@@ -77,17 +95,17 @@ export function FindingCard({ finding }: { finding: SupportFinding }) {
 
 export function RedactionRuleCard({ rule }: { rule: SupportRedactionRule }) {
   return (
-    <div className="rounded-lg border border-slate-700/45 bg-slate-900/45 p-3">
+    <SupportInset>
       <p className="font-bold text-white">{rule.label}</p>
       <p className="mt-1 text-xs leading-5 text-slate-500">{rule.description}</p>
-    </div>
+    </SupportInset>
   );
 }
 
 export function SectionHeader({ compact = false, description, icon: Icon, title }: { compact?: boolean; description: string; icon: LucideIcon; title: string }) {
   return (
     <div className="flex items-start gap-3">
-      <span className={cn('grid place-items-center rounded-lg border border-white/10 bg-slate-900 text-sky-300', compact ? 'size-9' : 'size-10')}>
+      <span className={cn('grid place-items-center rounded-lg border border-sky-400/25 bg-slate-800 text-cyan-200', compact ? 'size-9' : 'size-10')}>
         <Icon className="size-4" />
       </span>
       <div>
@@ -101,7 +119,7 @@ export function SectionHeader({ compact = false, description, icon: Icon, title 
 export function LogLine({ line }: { line: SupportLogLine }) {
   return (
     <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-3 border-b border-white/5 py-1.5 last:border-b-0">
-      <span className={cn('text-[11px] font-bold uppercase', line.level === 'error' ? 'text-red-300' : line.level === 'warning' ? 'text-amber-200' : 'text-slate-500')}>{line.level}</span>
+      <span className={cn('text-[11px] font-bold uppercase', line.level === 'error' ? 'text-red-300' : line.level === 'warning' ? 'text-orange-200' : 'text-slate-500')}>{line.level}</span>
       <span className="break-words text-slate-300">{line.line}</span>
     </div>
   );
@@ -109,24 +127,24 @@ export function LogLine({ line }: { line: SupportLogLine }) {
 
 export function CommandCard({ command, copied, description, id, label, onCopy }: { command: string; copied: string | null; description: string; id: string; label: string; onCopy: (value: string, id: string) => void }) {
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-3">
+    <SupportInset>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold text-white">{label}</p>
           <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
         </div>
-        <Button className="size-8 shrink-0 border-slate-700/60 bg-slate-950/50 text-slate-200 hover:bg-slate-800" onClick={() => onCopy(command, id)} size="icon" type="button" variant="outline">
+        <ProjectDarkControlButton className="size-8 shrink-0 p-0" onClick={() => onCopy(command, id)} size="icon" type="button">
           <Copy className="size-4" />
-        </Button>
+        </ProjectDarkControlButton>
       </div>
       <code className="mt-3 block overflow-x-auto rounded-md bg-black/45 px-3 py-2 text-xs text-slate-300">{copied === id ? 'Copied' : command}</code>
-    </div>
+    </SupportInset>
   );
 }
 
 export function RelatedLink({ detail, title, to }: { detail: string; title: string; to: string }) {
   return (
-    <Link className="rounded-lg border border-slate-700/40 bg-slate-900/45 p-3 text-sm no-underline transition hover:border-sky-300/30 hover:bg-slate-800/60" to={to}>
+    <Link className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm no-underline transition hover:border-cyan-300/45 hover:bg-slate-700" to={to}>
       <span className="block font-bold text-white">{title}</span>
       <span className="mt-1 block text-xs leading-5 text-slate-500">{detail}</span>
     </Link>
@@ -139,19 +157,19 @@ export function statusIcon(status?: string) {
   return ShieldCheck;
 }
 
-export function statusTone(status?: string): 'green' | 'amber' | 'red' | 'slate' | 'violet' {
+export function statusTone(status?: string): 'green' | 'orange' | 'red' | 'slate' | 'cyan' {
   if (status === 'ready') return 'green';
-  if (status === 'needs_admin_setup') return 'amber';
+  if (status === 'needs_admin_setup') return 'orange';
   if (!status) return 'slate';
-  return 'violet';
+  return 'cyan';
 }
 
 function findingTone(severity: string) {
   if (severity === 'error') {
-    return 'border-red-300/20 bg-red-500/10 text-red-100';
+    return 'border-red-400/40 bg-red-500/10 text-red-200';
   }
   if (severity === 'warning') {
-    return 'border-amber-300/20 bg-amber-500/10 text-amber-100';
+    return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
   }
   return 'border-sky-300/20 bg-sky-500/10 text-sky-100';
 }

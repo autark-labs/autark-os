@@ -38,4 +38,8 @@ Backups uses `PageShell`, `Surface`, shared Project OS button primitives, and lo
 
 Storage uses `PageShell`, `Surface`, shared Project OS button primitives, and local `StoragePanel`/`StorageInset` wrappers under `pages/StoragePage`. Keep cleanup confirmation, disk gauges, and storage-specific rows local while routing common surface and action styling through primitives.
 
+Diagnostics uses `PageShell`, `Surface`, shared Project OS button primitives, and local `SupportPanel`/`SupportInset` wrappers under `pages/SupportPage`. Keep support-bundle, log, and redaction details local to Diagnostics while sharing panel and action styling.
+
+Activity uses `PageShell`, `Surface`, shared Project OS button primitives, and local `MonitoringPanel`/`MonitoringInset` wrappers under `pages/MonitoringPage`. Keep charts, filters, and event-row behavior local while using shared surfaces and cyan/orange status treatments.
+
 Avoid importing the legacy broad `ProjectOSComponents` styling helpers into pages as they are cleaned up. If a page needs one of those patterns, copy the visual decision into a small primitive or feature component and keep `className` available for layout tweaks.

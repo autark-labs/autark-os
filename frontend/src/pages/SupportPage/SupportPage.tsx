@@ -6,11 +6,11 @@ import { Link } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
-import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
-import { PageShell, SurfaceFrame, SurfaceInset, SurfacePanel } from '@/components/project-os/ProjectOSComponents';
+import { PageShell } from '@/components/layout/PageShell';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
+import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ import type { AppRuntimeView } from '@/types/app';
 import type { SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemSetupStatus } from '@/types/system';
 import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from './SupportPage.diagnosticsModel';
 import { formatDate, humanize, shortSha, summaryFromBundle } from './SupportPage.logic';
-import { FindingCard, InfoLine, LogLine, RedactionRuleCard, RelatedLink, SectionHeader } from './SupportPage.components';
+import { FindingCard, InfoLine, LogLine, RedactionRuleCard, RelatedLink, SectionHeader, SupportInset, SupportPanel } from './SupportPage.components';
 
 type SupportState = {
   bundle: SupportBundle | null;
@@ -124,16 +124,16 @@ function SupportPage() {
   const operatorCheck = state.setup?.checks?.find((check) => check.id === 'tailscale-operator');
 
   if (loading || appState.isLoading) {
-    return <PageLoadingState label="Loading diagnostics" sublabel="Checking health, setup state, found apps, and recent logs." />;
+    return <DiagnosticsLoadingState />;
   }
 
   return (
     <PageShell>
-      <SurfaceFrame>
-        <div className="border-b border-white/10 bg-po-hero-support p-6 md:p-7">
+      <Surface className="overflow-hidden" tone="panel">
+        <div className="border-b border-sky-400/20 bg-slate-900 p-6 md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-normal text-sky-300">Diagnostics</p>
+              <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Diagnostics</p>
               <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">Project OS Diagnostics</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
                 {headline === 'Ready' ? 'Ready. Health checks, support bundle, and technical logs are available when you need them.' : 'Needs attention. Start with health checks, then use the support bundle or logs if you need more detail.'}
@@ -143,25 +143,25 @@ function SupportPage() {
           </div>
         </div>
 
-        {error && <PageErrorState className="rounded-none border-x-0 border-t-0 px-6 py-4" message={error} onRetry={() => void load(true)} title="Diagnostics could not refresh" />}
+        {error && <DiagnosticsErrorState message={error} onRetry={() => void load(true)} />}
 
         <div className="grid gap-3 p-5 md:grid-cols-5">
           {summaryRows.map((row) => <SummaryRow key={row.id} label={row.label} tone={row.tone} value={row.value} />)}
         </div>
-      </SurfaceFrame>
+      </Surface>
 
       {conflict && (
-        <SurfacePanel className={conflict.tone === 'warning' ? 'border-amber-300/20 bg-amber-500/10' : 'border-sky-300/20 bg-sky-500/10'}>
+        <SupportPanel className={conflict.tone === 'warning' ? 'border-orange-400/45 bg-orange-500/10' : 'border-sky-400/30 bg-sky-500/10'}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="text-xl font-black text-white">{conflict.title}</h2>
               <p className="mt-1 text-sm leading-6 text-slate-200">{conflict.message}</p>
             </div>
-            <Button asChild className="shrink-0 bg-violet-600 text-white hover:bg-violet-500">
+            <ProjectPrimaryButton asChild className="shrink-0">
               <Link to="/resolve-existing-apps">Recover existing apps</Link>
-            </Button>
+            </ProjectPrimaryButton>
           </div>
-        </SurfacePanel>
+        </SupportPanel>
       )}
 
       <section className="grid gap-4 md:grid-cols-3">
@@ -189,16 +189,16 @@ function SupportPage() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-4">
-          <SurfacePanel>
+          <SupportPanel>
             <SectionHeader icon={LifeBuoy} title="Recommended next steps" description="Support findings link to the page that owns the fix." />
             <div className="mt-4 grid gap-3">
               {findings.length ? findings.map((finding) => <FindingCard finding={finding} key={finding.id} />) : (
-                <SurfaceInset className="border-emerald-300/20 bg-emerald-500/10 text-sm text-emerald-100">
+                <SupportInset className="border-emerald-300/20 bg-emerald-500/10 text-sm text-emerald-100">
                   No support findings need attention right now.
-                </SurfaceInset>
+                </SupportInset>
               )}
             </div>
-          </SurfacePanel>
+          </SupportPanel>
 
           <AdvancedSection defaultOpen={false} icon={Server} title="App ownership details">
             {ownershipResources.length ? ownershipResources.map((resource) => (
@@ -241,7 +241,7 @@ function SupportPage() {
         </div>
 
         <aside className="grid h-fit gap-5">
-          <SurfacePanel>
+          <SupportPanel>
             <SectionHeader compact icon={ShieldCheck} title="Instance" description="Useful when comparing production and development hosts." />
             <div className="mt-4 grid gap-2 text-sm">
               <InfoLine label="Name" value={state.setup?.instanceSlug || 'Unknown'} />
@@ -249,9 +249,9 @@ function SupportPage() {
               <InfoLine label="Mode" value={state.setup?.devMode ? 'Development' : 'Production'} />
               <InfoLine label="Profiles" value={state.setup?.activeProfiles || 'default'} />
             </div>
-          </SurfacePanel>
+          </SupportPanel>
 
-          <SurfacePanel>
+          <SupportPanel>
             <SectionHeader compact icon={FileText} title="Version" description="Included in support context." />
             <div className="mt-4 grid gap-2 text-sm">
               <InfoLine label="Version" value={summary?.version?.version || 'Unknown'} />
@@ -259,16 +259,16 @@ function SupportPage() {
               <InfoLine label="Updates" value={summary?.version?.updateMessage || 'Update status unavailable.'} />
               <InfoLine label="Generated" value={formatDate(state.bundle?.generatedAt || summary?.checkedAt)} />
             </div>
-          </SurfacePanel>
+          </SupportPanel>
 
           {showAdvancedMetrics && (
-            <SurfacePanel>
+            <SupportPanel>
               <SectionHeader compact icon={Copy} title="Support bundle preview" description="Shown after you generate a bundle." />
-              <pre className="mt-4 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-950/70 p-4 text-xs leading-5 text-slate-400">{state.bundle?.bundleText || 'Generate a support bundle to preview redacted details.'}</pre>
-            </SurfacePanel>
+              <pre className="mt-4 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-lg border border-sky-400/25 bg-slate-950/70 p-4 text-xs leading-5 text-slate-400">{state.bundle?.bundleText || 'Generate a support bundle to preview redacted details.'}</pre>
+            </SupportPanel>
           )}
 
-          <SurfacePanel>
+          <SupportPanel>
             <SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." />
             <div className="mt-4 grid gap-2">
               <RelatedLink to="/settings" title="Settings" detail="Host setup checks and service-user guidance." />
@@ -276,7 +276,7 @@ function SupportPage() {
               <RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />
               {showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}
             </div>
-          </SurfacePanel>
+          </SupportPanel>
         </aside>
       </div>
     </PageShell>
@@ -285,7 +285,7 @@ function SupportPage() {
 
 function StatusBadge({ children, ready }: { children: string; ready: boolean }) {
   return (
-    <Badge className={cn('px-3 py-1.5 text-sm font-black', ready ? 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100' : 'border-amber-300/25 bg-amber-500/15 text-amber-100')} variant="outline">
+    <Badge className={cn('px-3 py-1.5 text-sm font-black', ready ? 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100' : 'border-orange-400/45 bg-orange-500/10 text-orange-200')} variant="outline">
       {ready ? <ShieldCheck className="size-4" /> : <AlertTriangle className="size-4" />}
       {children}
     </Badge>
@@ -295,7 +295,7 @@ function StatusBadge({ children, ready }: { children: string; ready: boolean }) 
 function SummaryRow({ label, tone, value }: { label: string; tone: string; value: string }) {
   const tones = {
     success: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
-    warning: 'border-amber-300/20 bg-amber-500/10 text-amber-100',
+    warning: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
     neutral: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
   } as Record<string, string>;
   return (
@@ -309,9 +309,9 @@ function SummaryRow({ label, tone, value }: { label: string; tone: string; value
 function DiagnosticAction({ busy = false, detail, icon: Icon, label, onClick }: { busy?: boolean; detail: string; icon: LucideIcon; label: string; onClick: () => void }) {
   return (
     <DisabledAction className="w-full" disabled={busy} reason="Project OS is already preparing support information.">
-      <button className="w-full rounded-lg border border-white/10 bg-slate-950/70 p-5 text-left shadow-po-panel transition hover:border-sky-300/30 hover:bg-slate-900/80" disabled={busy} onClick={onClick} type="button">
+      <button className="w-full rounded-xl border border-sky-400/30 bg-slate-900 p-5 text-left shadow-xl shadow-slate-950/30 transition hover:border-cyan-300/45 hover:bg-slate-800" disabled={busy} onClick={onClick} type="button">
         <div className="flex items-center justify-between gap-3">
-          <span className="grid size-10 place-items-center rounded-lg border border-sky-300/20 bg-sky-500/10 text-sky-100">
+          <span className="grid size-10 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/10 text-cyan-100">
             {busy ? <RefreshCw className="size-5 animate-spin" /> : <Icon className="size-5" />}
           </span>
           <span className="text-sm font-bold uppercase text-slate-500">Action</span>
@@ -325,9 +325,9 @@ function DiagnosticAction({ busy = false, detail, icon: Icon, label, onClick }: 
 
 function AdvancedSection({ children, defaultOpen, icon: Icon, title }: { children: ReactNode; defaultOpen: boolean; icon: LucideIcon; title: string }) {
   return (
-    <Collapsible className="rounded-lg border border-white/10 bg-slate-950/70 p-5 shadow-po-panel" defaultOpen={defaultOpen}>
+    <Collapsible className="rounded-2xl border border-sky-400/30 bg-slate-900 p-5 text-slate-50 shadow-xl shadow-slate-950/30" defaultOpen={defaultOpen}>
       <CollapsibleTrigger className="flex w-full cursor-pointer items-center gap-3 text-left font-black text-white">
-        <span className="grid size-9 place-items-center rounded-lg border border-white/10 bg-slate-900 text-sky-300"><Icon className="size-4" /></span>
+        <span className="grid size-9 place-items-center rounded-lg border border-sky-400/25 bg-slate-800 text-cyan-200"><Icon className="size-4" /></span>
         {title}
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-4 grid gap-3">{children}</CollapsibleContent>
@@ -337,7 +337,7 @@ function AdvancedSection({ children, defaultOpen, icon: Icon, title }: { childre
 
 function ResourceLine({ resource, technical = false }: { resource: ObservedServiceView; technical?: boolean }) {
   return (
-    <div className="rounded-lg border border-slate-700/45 bg-slate-900/45 p-3">
+    <SupportInset>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-bold text-white">{resource.displayName}</p>
@@ -353,20 +353,20 @@ function ResourceLine({ resource, technical = false }: { resource: ObservedServi
           <span>Actions: {resource.availableActions.map((action) => action.label || humanize(action.id)).join(', ') || 'None'}</span>
         </div>
       )}
-    </div>
+    </SupportInset>
   );
 }
 
 function RepairLine({ app }: { app: AppRuntimeView }) {
   const repairEvents = (app.recentEvents || []).filter((event) => event.type.includes('repair') || event.type.includes('health') || event.type.includes('private_access')).slice(0, 3);
   return (
-    <div className="rounded-lg border border-slate-700/45 bg-slate-900/45 p-3">
+    <SupportInset>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-bold text-white">{app.appName}</p>
           <p className="mt-1 text-sm text-slate-400">{app.remediation?.summary || app.healthSnapshot?.detail || 'Project OS has not recorded repair detail for this app.'}</p>
         </div>
-        <Badge className={cn('border-slate-600/60 bg-slate-950/60 text-slate-300', app.remediation?.tone === 'critical' && 'border-red-300/25 bg-red-500/10 text-red-100', app.remediation?.tone === 'warning' && 'border-amber-300/25 bg-amber-500/10 text-amber-100', app.remediation?.tone === 'success' && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')} variant="outline">
+        <Badge className={cn('border-slate-600/60 bg-slate-950/60 text-slate-300', app.remediation?.tone === 'critical' && 'border-red-400/40 bg-red-500/10 text-red-200', app.remediation?.tone === 'warning' && 'border-orange-400/45 bg-orange-500/10 text-orange-200', app.remediation?.tone === 'success' && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')} variant="outline">
           {app.remediation?.label || app.friendlyStatus}
         </Badge>
       </div>
@@ -381,6 +381,41 @@ function RepairLine({ app }: { app: AppRuntimeView }) {
           {repairEvents.map((event) => <span key={event.id}>{formatDate(event.createdAt)} - {humanize(event.type)}: {event.message}</span>)}
         </div>
       )}
+    </SupportInset>
+  );
+}
+
+function DiagnosticsLoadingState() {
+  return (
+    <PageShell>
+      <Surface className="grid min-h-[520px] place-items-center p-8 text-center" tone="panel">
+        <div className="grid justify-items-center gap-3">
+          <span className="grid size-12 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/10 text-cyan-100">
+            <RefreshCw className="size-5 animate-spin" />
+          </span>
+          <div>
+            <p className="font-black text-white">Loading diagnostics</p>
+            <p className="mt-1 max-w-md text-sm leading-6 text-sky-100/80">Checking health, setup state, found apps, and recent logs.</p>
+          </div>
+        </div>
+      </Surface>
+    </PageShell>
+  );
+}
+
+function DiagnosticsErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="border-b border-red-400/40 bg-red-500/10 px-6 py-4 text-red-100">
+      <div className="flex gap-3">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-current">Diagnostics could not refresh</p>
+          <p className="mt-1 text-sm leading-6 text-current/80">{message}</p>
+          <ProjectDarkControlButton className="mt-3 border-red-300/30 text-red-100 hover:bg-red-500/20" onClick={onRetry} size="sm" type="button">
+            Try again
+          </ProjectDarkControlButton>
+        </div>
+      </div>
     </div>
   );
 }
