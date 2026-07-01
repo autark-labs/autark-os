@@ -6,11 +6,11 @@ import type { MarketplaceApp } from '@/types/marketplace';
 
 export function AppImage({ app, size = 'default' }: { app: MarketplaceApp; size?: 'default' | 'large' }) {
   return (
-    <span className={cn('grid shrink-0 place-items-center overflow-hidden rounded-lg border border-po-border bg-po-surface-inset shadow-po-card', size === 'large' ? 'size-22' : 'size-14')}>
+    <span className={cn('grid shrink-0 place-items-center overflow-hidden rounded-lg border border-sky-400/25 bg-slate-950 shadow-lg shadow-slate-950/20', size === 'large' ? 'size-22' : 'size-14')}>
       {app.image ? (
         <img alt="" className="h-full w-full object-cover" src={app.image} />
       ) : (
-        <span className="text-lg font-bold text-po-brand">{app.name.slice(0, 1)}</span>
+        <span className="text-lg font-bold text-cyan-200">{app.name.slice(0, 1)}</span>
       )}
     </span>
   );
@@ -19,7 +19,7 @@ export function AppImage({ app, size = 'default' }: { app: MarketplaceApp; size?
 export function CatalogConfidenceBadge({ app }: { app: MarketplaceApp }) {
   const verified = catalogVerified(app);
   return (
-    <Badge className={cn('gap-1', verified ? 'border-po-success-border bg-po-success-soft text-po-success' : 'border-po-warning-border bg-po-warning-soft text-po-warning')} variant="outline">
+    <Badge className={cn('gap-1', verified ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200')} variant="outline">
       {verified ? <ShieldCheck className="size-3" /> : <TriangleAlert className="size-3" />}
       {verified ? 'Verified' : 'Validation needed'}
     </Badge>
@@ -44,23 +44,23 @@ export function SupportBadge({ level }: { level: string }) {
 function supportTone(level: string) {
   switch (level) {
     case 'Ready':
-      return 'border-po-success-border bg-po-success-soft text-po-success';
+      return 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200';
     case 'Advanced':
-      return 'border-po-warning-border bg-po-warning-soft text-po-warning';
+      return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
     case 'Needs testing':
-      return 'border-po-info-border bg-po-info-soft text-po-brand';
+      return 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200';
     case 'Experimental':
-      return 'border-po-danger-border bg-po-danger-soft text-po-danger';
+      return 'border-red-400/35 bg-red-500/10 text-red-200';
     default:
-      return 'border-po-border bg-po-surface-soft text-po-text-secondary';
+      return 'border-sky-400/25 bg-slate-800 text-slate-300';
   }
 }
 
 export function StatusLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-po-text-muted">{label}</span>
-      <span className="inline-flex items-center gap-1 text-po-success">
+      <span className="text-slate-400">{label}</span>
+      <span className="inline-flex items-center gap-1 text-emerald-200">
         <Check className="size-3" />
         {value}
       </span>
@@ -70,9 +70,9 @@ export function StatusLine({ label, value }: { label: string; value: string }) {
 
 export function FriendlyStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-po-border bg-po-surface-soft p-4">
-      <span className="text-xs text-po-text-muted">{label}</span>
-      <p className="mt-1 font-bold text-po-text">{value}</p>
+    <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
+      <span className="text-xs text-slate-400">{label}</span>
+      <p className="mt-1 font-bold text-slate-50">{value}</p>
     </div>
   );
 }
@@ -80,18 +80,18 @@ export function FriendlyStat({ label, value }: { label: string; value: string })
 export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid gap-1">
-      <span className="text-xs text-po-text-muted">{label}</span>
-      <strong className="text-sm text-po-text">{value}</strong>
+      <span className="text-xs text-slate-400">{label}</span>
+      <strong className="text-sm text-slate-50">{value}</strong>
     </div>
   );
 }
 
 export function InfoCard({ title, items }: { title: string; items: string[] }) {
   return (
-    <Card className="rounded-lg border-po-border bg-po-surface-soft py-0 text-po-text">
+    <Card className="rounded-lg border-sky-400/25 bg-slate-800 py-0 text-slate-50">
       <CardContent className="p-4">
-        <h4 className="font-bold text-po-text">{title}</h4>
-        <ul className="mt-3 grid gap-2 pl-5 text-sm text-po-text-muted">
+        <h4 className="font-bold text-slate-50">{title}</h4>
+        <ul className="mt-3 grid gap-2 pl-5 text-sm text-slate-400">
           {items.map((item) => <li className="list-disc" key={item}>{item}</li>)}
         </ul>
       </CardContent>
@@ -102,8 +102,8 @@ export function InfoCard({ title, items }: { title: string; items: string[] }) {
 export function Config({ label, value }: { label: string; value: string }) {
   return (
     <>
-      <dt className="font-bold text-po-text-secondary">{label}</dt>
-      <dd className="m-0 text-po-text-muted">{value}</dd>
+      <dt className="font-bold text-slate-300">{label}</dt>
+      <dd className="m-0 text-slate-400">{value}</dd>
     </>
   );
 }

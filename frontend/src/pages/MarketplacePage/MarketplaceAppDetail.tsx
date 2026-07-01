@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { JobProgress } from '@/components/project-os/JobProgress';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +17,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { backupSafetyWarning } from '@/lib/backupSafety';
-import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import { currentJobStepText, terminalJob } from '@/repositories/jobRepository';
 import type { DiscoverAppView, DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
@@ -79,23 +79,23 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
   }
 
   return (
-    <Card className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border-po-border bg-po-surface text-po-text shadow-po-panel">
+    <Card className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border-sky-400/25 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
       <CardContent className="grid gap-5 p-5">
-        <Button className={poButtonClass('quiet', 'w-fit')} onClick={onBack} type="button" variant="outline">
+        <ProjectDarkControlButton className="w-fit" onClick={onBack} type="button">
           <ArrowLeft className="size-4" />
           Back to apps
-        </Button>
+        </ProjectDarkControlButton>
 
         <div className="grid gap-4 sm:grid-cols-[88px_minmax(0,1fr)]">
           <AppImage app={app} size="large" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <h3 className="text-2xl font-bold text-po-text">{app.name}</h3>
+              <h3 className="text-2xl font-bold text-slate-50">{app.name}</h3>
               <Badge className={stateBadgeClass(appView.statusTone)} variant="outline">{appView.stateLabel}</Badge>
               <SupportBadge level={app.supportLevel} />
             </div>
-            <p className="mt-2 text-sm text-po-text-secondary">{app.description}</p>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-po-text-muted">
+            <p className="mt-2 text-sm text-slate-300">{app.description}</p>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
               <span>{app.category}</span>
               <span>{app.difficulty}</span>
               <span>{app.installTime}</span>
@@ -104,46 +104,46 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {app.tags.map((tag) => <Badge className="border-po-border bg-po-surface-soft text-po-text-secondary" key={tag} variant="outline">{tag}</Badge>)}
+          {app.tags.map((tag) => <Badge className="border-sky-400/25 bg-slate-800 text-slate-300" key={tag} variant="outline">{tag}</Badge>)}
         </div>
 
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           {isInstalled ? (
-            <Button asChild className="bg-po-success text-sidebar-primary-foreground hover:bg-po-success/90">
+            <ProjectPrimaryButton asChild>
               <Link to="/apps">
                 <CheckCircle2 className="size-4" />
                 View in My Apps
               </Link>
-            </Button>
+            </ProjectPrimaryButton>
           ) : needsExistingServiceReview ? (
             <>
               {appView.reviewExistingHref ? (
-                <Button asChild className="bg-po-warning text-sidebar-primary-foreground hover:bg-po-warning/90">
+                <ProjectWarningButton asChild>
                   <Link to={appView.reviewExistingHref}>
                     <TriangleAlert className="size-4" />
                     Review existing service
                   </Link>
-                </Button>
+                </ProjectWarningButton>
               ) : (
                 <DisabledAction disabled reason="Project OS cannot open the existing service review yet. Refresh existing apps and try again.">
-                  <Button className="bg-po-warning text-sidebar-primary-foreground" disabled type="button">
+                  <ProjectWarningButton disabled type="button">
                     <TriangleAlert className="size-4" />
                     Review existing service
-                  </Button>
+                  </ProjectWarningButton>
                 </DisabledAction>
               )}
               <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
-                <Button className={poButtonClass('quiet')} disabled={installDisabled} onClick={openDuplicateWarning} type="button" variant="outline">
+                <ProjectDarkControlButton disabled={installDisabled} onClick={openDuplicateWarning} type="button">
                   Install second copy
-                </Button>
+                </ProjectDarkControlButton>
               </DisabledAction>
             </>
           ) : (
             <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
-              <Button className={poButtonClass('primary')} disabled={installDisabled} onClick={openInstallReview} type="button">
+              <ProjectPrimaryButton disabled={installDisabled} onClick={openInstallReview} type="button">
                 {installing ? <Loader2 className="size-4 animate-spin" /> : null}
                 {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish install choices' : 'Install'}
-              </Button>
+              </ProjectPrimaryButton>
             </DisabledAction>
           )}
           <DocsSourceMenu app={app} />
@@ -164,9 +164,9 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
         )}
         {(installJob || backupJob || installing) && <InlineInstallStatus app={app} backupJob={backupJob} installedApp={installedApp} installing={installing} job={installJob} onCreateBackup={onCreateBackup} />}
 
-        <section className="rounded-lg border border-po-border bg-po-surface-soft p-4">
-          <h4 className="font-bold text-po-text">About</h4>
-          <p className="mt-2 text-sm leading-6 text-po-text-secondary">{app.plainLanguage}</p>
+        <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
+          <h4 className="font-bold text-slate-50">About</h4>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{app.plainLanguage}</p>
         </section>
 
         <div className="grid gap-4">
@@ -174,8 +174,8 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
           <InfoCard title="Best for" items={app.bestFor} />
         </div>
 
-        <section className="rounded-lg border border-po-border bg-po-surface-soft p-4">
-          <h4 className="font-bold text-po-text">App details</h4>
+        <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
+          <h4 className="font-bold text-slate-50">App details</h4>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <Stat label="Version" value={app.version || 'Unavailable'} />
             <Stat label="Size" value={app.size || 'Unavailable'} />
@@ -186,14 +186,14 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
           </div>
         </section>
 
-        <Collapsible className="rounded-lg border border-po-border bg-po-surface-soft p-4">
-          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-3 text-left font-bold text-po-text">
+        <Collapsible className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
+          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-3 text-left font-bold text-slate-50">
             Advanced app info
-            <ChevronDown className="size-4 text-po-text-muted" />
+            <ChevronDown className="size-4 text-slate-400" />
           </CollapsibleTrigger>
           <CollapsibleContent>
             <div className="mt-4 grid gap-4">
-              {app.technicalSummary && <p className="text-sm leading-6 text-po-text-secondary">{app.technicalSummary}</p>}
+              {app.technicalSummary && <p className="text-sm leading-6 text-slate-300">{app.technicalSummary}</p>}
               {app.requirements.length > 0 && <InfoCard title="Requirements" items={app.requirements} />}
               {app.includes.length > 0 && <InfoCard title="Included services" items={app.includes} />}
               {app.usage.notes.length > 0 && <InfoCard title="Good to know" items={app.usage.notes} />}
@@ -209,43 +209,43 @@ function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button className={poButtonClass('quiet')} type="button" variant="outline">
+        <ProjectDarkControlButton type="button">
           Docs + source
           <ChevronDown className="size-4" />
-        </Button>
+        </ProjectDarkControlButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64 border-po-border bg-popover text-popover-foreground">
+      <DropdownMenuContent align="start" className="w-64 border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
         <DropdownMenuLabel>{app.name}</DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-po-border" />
+        <DropdownMenuSeparator className="bg-sky-400/20" />
         {app.sourceUrl ? (
-          <DropdownMenuItem asChild className="focus:bg-po-surface-hover focus:text-popover-foreground">
+          <DropdownMenuItem asChild className="focus:bg-slate-700 focus:text-white">
             <a href={app.sourceUrl} rel="noreferrer" target="_blank">
               <ExternalLink className="mr-2 size-4" />
               View source
-              <span className="ml-auto text-xs text-po-text-muted">{app.source}</span>
+              <span className="ml-auto text-xs text-slate-400">{app.source}</span>
             </a>
           </DropdownMenuItem>
         ) : (
           <DisabledAction className="w-full" disabled reason="This catalog app does not publish a source URL yet.">
-            <DropdownMenuItem className="focus:bg-po-surface-hover focus:text-popover-foreground" disabled>
+            <DropdownMenuItem className="focus:bg-slate-700 focus:text-white" disabled>
               View source
-              <span className="ml-auto text-xs text-po-text-muted">Unavailable</span>
+              <span className="ml-auto text-xs text-slate-400">Unavailable</span>
             </DropdownMenuItem>
           </DisabledAction>
         )}
         {app.documentationUrl ? (
-          <DropdownMenuItem asChild className="focus:bg-po-surface-hover focus:text-popover-foreground">
+          <DropdownMenuItem asChild className="focus:bg-slate-700 focus:text-white">
             <a href={app.documentationUrl} rel="noreferrer" target="_blank">
               <BookOpen className="mr-2 size-4" />
               Read docs
-              <span className="ml-auto text-xs text-po-text-muted">External</span>
+              <span className="ml-auto text-xs text-slate-400">External</span>
             </a>
           </DropdownMenuItem>
         ) : (
           <DisabledAction className="w-full" disabled reason="This catalog app does not publish documentation yet.">
-            <DropdownMenuItem className="focus:bg-po-surface-hover focus:text-popover-foreground" disabled>
+            <DropdownMenuItem className="focus:bg-slate-700 focus:text-white" disabled>
               Read docs
-              <span className="ml-auto text-xs text-po-text-muted">Unavailable</span>
+              <span className="ml-auto text-xs text-slate-400">Unavailable</span>
             </DropdownMenuItem>
           </DisabledAction>
         )}
@@ -256,12 +256,12 @@ function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
 
 function InstallCautionNotice({ app }: { app: MarketplaceApp }) {
   return (
-    <section className="rounded-lg border border-po-warning-border bg-po-warning-soft p-4">
+    <section className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-4">
       <div className="flex items-start gap-3">
-        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-po-warning" />
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-orange-200" />
         <div>
-          <h4 className="font-bold text-po-text">Review before installing</h4>
-          <p className="mt-1 text-sm leading-6 text-po-text-secondary">{app.supportSummary}</p>
+          <h4 className="font-bold text-slate-50">Review before installing</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-300">{app.supportSummary}</p>
         </div>
       </div>
     </section>
@@ -270,9 +270,9 @@ function InstallCautionNotice({ app }: { app: MarketplaceApp }) {
 
 function ExistingServiceNotice({ appView }: { appView: DiscoverAppView }) {
   return (
-    <section className="rounded-lg border border-po-warning-border bg-po-warning-soft p-4 text-sm text-po-warning">
+    <section className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-4 text-sm text-orange-200">
       <div className="flex items-start gap-3">
-        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-po-warning" />
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-orange-200" />
         <div>
           <h4 className="font-bold text-current">{appView.stateLabel}</h4>
           <p className="mt-1 leading-6 text-current/80">{appView.stateDescription}</p>
@@ -289,19 +289,19 @@ function ExistingServiceNotice({ appView }: { appView: DiscoverAppView }) {
 }
 
 function stateBadgeClass(tone: string) {
-  if (tone === 'success') return 'border-po-success-border bg-po-success-soft text-po-success';
-  if (tone === 'warning') return 'border-po-warning-border bg-po-warning-soft text-po-warning';
-  if (tone === 'danger') return 'border-po-danger-border bg-po-danger-soft text-po-danger';
-  if (tone === 'info') return 'border-po-info-border bg-po-info-soft text-po-brand';
-  if (tone === 'observed') return 'border-po-warning-border bg-po-warning-soft text-po-warning';
-  return 'border-po-border bg-po-surface-soft text-po-text-secondary';
+  if (tone === 'success') return 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200';
+  if (tone === 'warning') return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
+  if (tone === 'danger') return 'border-red-400/35 bg-red-500/10 text-red-200';
+  if (tone === 'info') return 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200';
+  if (tone === 'observed') return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
+  return 'border-sky-400/25 bg-slate-800 text-slate-300';
 }
 
 function InstallBlockedNotice({ message }: { message: string }) {
   return (
-    <section className="rounded-lg border border-po-warning-border bg-po-warning-soft p-4 text-sm text-po-warning">
+    <section className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-4 text-sm text-orange-200">
       <div className="flex items-start gap-3">
-        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-po-warning" />
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-orange-200" />
         <div>
           <h4 className="font-bold text-current">Another install is active</h4>
           <p className="mt-1 leading-6 text-current/80">{message}</p>
@@ -313,25 +313,25 @@ function InstallBlockedNotice({ message }: { message: string }) {
 
 function RecoveryInstallNotice({ disabled, mode: _mode, onReinstallCurrent }: { disabled: boolean; mode: string; onReinstallCurrent: () => void | Promise<void> }) {
   return (
-    <section className="rounded-lg border border-po-warning-border bg-po-warning-soft p-4">
+    <section className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-4">
       <div className="flex items-start gap-3">
-        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-po-warning" />
+        <TriangleAlert className="mt-0.5 size-5 shrink-0 text-orange-200" />
         <div className="min-w-0">
-          <h4 className="font-bold text-po-text">Reinstall requested</h4>
-          <p className="mt-1 text-sm leading-6 text-po-text-secondary">
+          <h4 className="font-bold text-slate-50">Reinstall requested</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-300">
             {backupSafetyWarning('reinstall')}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button asChild className={poButtonClass('quiet')} size="sm" type="button" variant="outline">
+            <ProjectDarkControlButton asChild size="sm" type="button">
               <Link to="/backups">
                 <Archive className="size-3.5" />
                 Open Backups
               </Link>
-            </Button>
+            </ProjectDarkControlButton>
             <DisabledAction disabled={disabled} reason="Wait for the active install or reinstall job to finish.">
-              <Button className="bg-po-warning text-sidebar-primary-foreground hover:bg-po-warning/90" disabled={disabled} onClick={onReinstallCurrent} size="sm" type="button">
+              <ProjectWarningButton disabled={disabled} onClick={onReinstallCurrent} size="sm" type="button">
                 I backed up, reinstall
-              </Button>
+              </ProjectWarningButton>
             </DisabledAction>
           </div>
         </div>
@@ -345,21 +345,21 @@ function InstalledAppNotice({ app }: { app: DiscoverInstalledAppSummary | null }
     return null;
   }
   return (
-    <section className="rounded-lg border border-po-success-border bg-po-success-soft p-4">
+    <section className="rounded-lg border border-emerald-300/35 bg-emerald-500/10 p-4">
       <div className="flex items-start gap-3">
-        <CheckCircle2 className="mt-0.5 size-5 text-po-success" />
+        <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" />
         <div className="min-w-0">
-          <h4 className="font-bold text-po-text">Already installed</h4>
-          <p className="mt-1 text-sm text-po-text-secondary">{app.appName} is already managed by Project OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
+          <h4 className="font-bold text-slate-50">Already installed</h4>
+          <p className="mt-1 text-sm text-slate-300">{app.appName} is already managed by Project OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {app.accessUrl && (
-              <Button asChild className="bg-po-success text-sidebar-primary-foreground hover:bg-po-success/90" size="sm">
+              <ProjectPrimaryButton asChild size="sm">
                 <a href={app.accessUrl} rel="noreferrer" target="_blank">Open app</a>
-              </Button>
+              </ProjectPrimaryButton>
             )}
-            <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
+            <ProjectDarkControlButton asChild size="sm">
               <Link to="/apps">Manage in My Apps</Link>
-            </Button>
+            </ProjectDarkControlButton>
           </div>
         </div>
       </div>
@@ -387,12 +387,12 @@ function InlineInstallStatus({
     const succeeded = job.status === 'succeeded';
     const failed = job.status === 'failed';
     return (
-      <section className={cn('rounded-lg border p-4', succeeded ? 'border-po-success-border bg-po-success-soft' : failed ? 'border-po-danger-border bg-po-danger-soft' : 'border-po-info-border bg-po-info-soft')}>
+      <section className={cn('rounded-lg border p-4', succeeded ? 'border-emerald-300/35 bg-emerald-500/10' : failed ? 'border-red-400/35 bg-red-500/10' : 'border-cyan-300/35 bg-cyan-400/10')}>
         <div className="flex items-start gap-3">
-          {running ? <Loader2 className="mt-0.5 size-5 animate-spin text-po-brand" /> : succeeded ? <CheckCircle2 className="mt-0.5 size-5 text-po-success" /> : <TriangleAlert className="mt-0.5 size-5 text-po-danger" />}
+          {running ? <Loader2 className="mt-0.5 size-5 animate-spin text-cyan-200" /> : succeeded ? <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" /> : <TriangleAlert className="mt-0.5 size-5 text-red-200" />}
           <div className="min-w-0 flex-1">
-            <h4 className="font-bold text-po-text">{succeeded ? `${app.name} is ready` : failed ? `${app.name} did not finish installing` : `Installing ${app.name}`}</h4>
-            <p className={cn('mt-1 text-sm', succeeded ? 'text-po-success' : failed ? 'text-po-danger' : 'text-po-brand')}>
+            <h4 className="font-bold text-slate-50">{succeeded ? `${app.name} is ready` : failed ? `${app.name} did not finish installing` : `Installing ${app.name}`}</h4>
+            <p className={cn('mt-1 text-sm', succeeded ? 'text-emerald-200' : failed ? 'text-red-200' : 'text-cyan-200')}>
               {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Project OS stopped before making this app available.' : currentJobStepText(job, 'Project OS is working on this job.')}
             </p>
             {running && <JobProgress className="mt-4" job={job} subjectLabel={app.name} />}
@@ -400,26 +400,26 @@ function InlineInstallStatus({
             {succeeded && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {(installedApp?.accessUrl || app.accessUrl) && (
-                  <Button asChild className="bg-po-success text-sidebar-primary-foreground hover:bg-po-success/90" size="sm">
+                  <ProjectPrimaryButton asChild size="sm">
                     <a href={installedApp?.accessUrl || app.accessUrl} rel="noreferrer" target="_blank">Open {app.name}</a>
-                  </Button>
+                  </ProjectPrimaryButton>
                 )}
                 {installedApp && shouldOfferFirstBackup(installedApp) && (
                   <DisabledAction disabled={backupJob ? !terminalJob(backupJob) : false} reason="Project OS is already creating the first backup for this app.">
-                    <Button className={poButtonClass('quiet')} disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appId)} size="sm" type="button" variant="outline">
+                    <ProjectDarkControlButton disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appId)} size="sm" type="button">
                       {backupJob && !terminalJob(backupJob) ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
                       {backupJob?.status === 'succeeded' ? 'Backup created' : backupJob && !terminalJob(backupJob) ? 'Creating backup' : 'Create first backup'}
-                    </Button>
+                    </ProjectDarkControlButton>
                   </DisabledAction>
                 )}
-                <Button asChild className={poButtonClass('quiet')} size="sm" variant="outline">
+                <ProjectDarkControlButton asChild size="sm">
                   <Link to="/apps">View in My Apps</Link>
-                </Button>
+                </ProjectDarkControlButton>
               </div>
             )}
             {failed && (
-              <Collapsible className="mt-4 rounded-lg border border-po-danger-border bg-po-surface-soft p-3 text-sm text-po-danger">
-                <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-po-text">View details</CollapsibleTrigger>
+              <Collapsible className="mt-4 rounded-lg border border-red-400/35 bg-slate-800 p-3 text-sm text-red-200">
+                <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-slate-50">View details</CollapsibleTrigger>
                 <CollapsibleContent>
                 <div className="mt-2 grid gap-1">
                   {job.steps.map((step) => <p key={step.id}>{step.label}: {step.message || step.status}</p>)}
@@ -435,12 +435,12 @@ function InlineInstallStatus({
 
   if (installing) {
     return (
-      <section className="rounded-lg border border-po-info-border bg-po-info-soft p-4">
+      <section className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 p-4">
         <div className="flex items-center gap-3">
-          <Loader2 className="size-5 animate-spin text-po-brand" />
+          <Loader2 className="size-5 animate-spin text-cyan-200" />
           <div>
-            <h4 className="font-bold text-po-text">Installing with safe defaults</h4>
-            <p className="mt-1 text-sm text-po-text-secondary">Project OS is creating storage, choosing the saved access settings, and starting the app.</p>
+            <h4 className="font-bold text-slate-50">Installing with safe defaults</h4>
+            <p className="mt-1 text-sm text-slate-300">Project OS is creating storage, choosing the saved access settings, and starting the app.</p>
           </div>
         </div>
       </section>
@@ -455,12 +455,12 @@ function JobStepList({ job }: { job: ProjectOsJob }) {
     <div className="mt-4 grid gap-2">
       {job.steps.map((step) => (
         <div className="flex items-start gap-2 text-sm" key={step.id}>
-          <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border text-[0.65rem] font-bold', step.status === 'succeeded' ? 'border-po-success-border bg-po-success-soft text-po-success' : step.status === 'failed' ? 'border-po-danger-border bg-po-danger-soft text-po-danger' : step.status === 'running' ? 'border-po-info-border bg-po-info-soft text-po-brand' : 'border-po-border bg-po-surface-soft text-po-text-muted')}>
+          <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border text-[0.65rem] font-bold', step.status === 'succeeded' ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : step.status === 'failed' ? 'border-red-400/35 bg-red-500/10 text-red-200' : step.status === 'running' ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200' : 'border-sky-400/25 bg-slate-800 text-slate-400')}>
             {step.status === 'succeeded' ? 'ok' : step.status === 'failed' ? '!' : step.status === 'running' ? '...' : ''}
           </span>
           <span>
-            <span className="block font-semibold text-po-text">{step.label}</span>
-            {step.message && <span className="block leading-5 text-po-text-muted">{step.message}</span>}
+            <span className="block font-semibold text-slate-50">{step.label}</span>
+            {step.message && <span className="block leading-5 text-slate-400">{step.message}</span>}
           </span>
         </div>
       ))}
@@ -474,20 +474,20 @@ function shouldOfferFirstBackup(_app: DiscoverInstalledAppSummary) {
 
 function CatalogConfidenceCard({ app }: { app: MarketplaceApp }) {
   return (
-    <section className="rounded-lg border border-po-border bg-po-surface-soft p-4">
+    <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h4 className="font-bold text-po-text">Catalog confidence</h4>
-          <p className="mt-1 text-sm leading-6 text-po-text-muted">{app.supportSummary}</p>
+          <h4 className="font-bold text-slate-50">Catalog confidence</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-400">{app.supportSummary}</p>
         </div>
         <SupportBadge level={app.supportLevel} />
       </div>
       <div className="mt-4 grid gap-2">
         {app.smokeTests.map((test) => (
-          <div className="grid gap-2 rounded-lg border border-po-border bg-po-surface p-3 sm:grid-cols-[minmax(160px,0.7fr)_minmax(140px,0.6fr)_1fr]" key={test.label}>
-            <span className="font-semibold text-po-text-secondary">{test.label}</span>
+          <div className="grid gap-2 rounded-lg border border-sky-400/25 bg-slate-900 p-3 sm:grid-cols-[minmax(160px,0.7fr)_minmax(140px,0.6fr)_1fr]" key={test.label}>
+            <span className="font-semibold text-slate-300">{test.label}</span>
             <span className={cn('text-sm font-semibold', smokeStatusTone(test.status))}>{test.status}</span>
-            <span className="text-sm leading-5 text-po-text-muted">{test.detail}</span>
+            <span className="text-sm leading-5 text-slate-400">{test.detail}</span>
           </div>
         ))}
       </div>
@@ -498,13 +498,13 @@ function CatalogConfidenceCard({ app }: { app: MarketplaceApp }) {
 function smokeStatusTone(status: string) {
   switch (status) {
     case 'Passed':
-      return 'text-po-success';
+      return 'text-emerald-200';
     case 'Blocked':
-      return 'text-po-danger';
+      return 'text-red-200';
     case 'Not applicable':
-      return 'text-po-text-muted';
+      return 'text-slate-400';
     default:
-      return 'text-po-warning';
+      return 'text-orange-200';
   }
 }
 

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { TriangleAlert } from 'lucide-react';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
+import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import {
   Dialog,
   DialogContent,
@@ -22,30 +23,30 @@ type DuplicateInstallWarningDialogProps = {
 export function DuplicateInstallWarningDialog({ appName, onInstallCopy, onOpenChange, open, reviewHref }: DuplicateInstallWarningDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-po-border bg-popover text-popover-foreground sm:max-w-lg">
+      <DialogContent className="border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 sm:max-w-lg">
         <DialogHeader>
-          <div className="mb-2 grid size-10 place-items-center rounded-lg border border-po-warning-border bg-po-warning-soft text-po-warning">
+          <div className="mb-2 grid size-10 place-items-center rounded-lg border border-orange-400/40 bg-orange-500/10 text-orange-200">
             <TriangleAlert className="size-5" />
           </div>
           <DialogTitle>Install a second copy?</DialogTitle>
-          <DialogDescription className="leading-6 text-muted-foreground">
+          <DialogDescription className="leading-6 text-slate-400">
             Project OS already sees {appName} on your system. Installing another copy can cause confusing behavior across your network, especially from phones, TVs, or other devices that discover services automatically. Pin or adopt the existing service when possible. Install a second copy only if you intentionally want two separate instances.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="gap-2 border-po-border bg-po-surface-soft">
+        <DialogFooter className="gap-2 border-sky-400/25 bg-slate-800">
           {reviewHref ? (
-            <Button asChild className="bg-po-warning text-sidebar-primary-foreground hover:bg-po-warning/90">
+            <ProjectWarningButton asChild>
               <Link to={reviewHref}>Review existing service</Link>
-            </Button>
+            </ProjectWarningButton>
           ) : (
             <DisabledAction disabled reason="Project OS cannot open the existing service review yet. Refresh existing apps and try again.">
-              <Button className="bg-po-surface-inset text-po-text-secondary" disabled type="button">
+              <Button className="bg-slate-950 text-slate-300" disabled type="button">
                 Review existing service
               </Button>
             </DisabledAction>
           )}
           <Button
-            className="border-po-border bg-po-surface text-po-text-secondary hover:bg-po-surface-hover hover:text-po-text"
+            className="border-sky-400/25 bg-slate-900 text-slate-300 hover:bg-slate-700 hover:text-slate-50"
             onClick={() => {
               onOpenChange(false);
               onInstallCopy();

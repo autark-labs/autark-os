@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Bell, CheckCircle2, Filter, Info, RefreshCw, Search, Sparkles, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageShell } from '@/components/layout/PageShell';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
+import { Surface } from '@/components/primitives/Surface';
 import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { JobProgress } from '@/components/project-os/JobProgress';
-import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
-import { PageShell } from '@/components/project-os/ProjectOSComponents';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { poButtonClass, poCardClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import {
   useDiscoverAppsQuery,
@@ -65,6 +65,37 @@ type StarterRecommendation = {
   notes: string[];
   readiness: 'ready' | 'blocked' | 'review';
 };
+
+function DiscoverLoadingState() {
+  return (
+    <PageShell>
+      <Surface className="flex min-h-[24rem] items-center justify-center p-6 text-center" tone="panel">
+        <div className="max-w-md">
+          <RefreshCw className="mx-auto size-8 animate-spin text-cyan-200" />
+          <h1 className="mt-4 text-2xl font-black text-white">Loading Discover</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-400">Checking the catalog, installed apps, and recent marketplace activity.</p>
+        </div>
+      </Surface>
+    </PageShell>
+  );
+}
+
+function DiscoverErrorState({ message, onRetry, title = 'Discover needs attention', className }: { message: string; onRetry: () => void; title?: string; className?: string }) {
+  return (
+    <Surface className={cn('border-red-400/35 bg-red-500/10 p-4 text-red-100', className)} tone="danger">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-black text-white">{title}</h2>
+          <p className="mt-1 text-sm leading-6 text-red-100/85">{message}</p>
+        </div>
+        <ProjectDarkControlButton onClick={onRetry} type="button">
+          <RefreshCw className="size-4" />
+          Retry
+        </ProjectDarkControlButton>
+      </div>
+    </Surface>
+  );
+}
 
 function MarketplacePage() {
   const { showAdvancedMetrics } = useProjectSettings();
@@ -319,13 +350,13 @@ function MarketplacePage() {
 
   if (!selectedApp) {
     return (
-      <PageShell>
-        {discoverError ? (
-          <PageErrorState message={discoverError} onRetry={refreshDiscover} title="Discover catalog could not load" />
-        ) : (
-          <PageLoadingState label="Loading marketplace" sublabel="Checking the catalog, installed apps, and recent marketplace activity." />
-        )}
-      </PageShell>
+      discoverError ? (
+        <PageShell>
+          <DiscoverErrorState message={discoverError} onRetry={refreshDiscover} title="Discover catalog could not load" />
+        </PageShell>
+      ) : (
+        <DiscoverLoadingState />
+      )
     );
   }
 
@@ -340,7 +371,7 @@ function MarketplacePage() {
 
       <CanonicalRecommendedAction />
 
-      {discoverError && <PageErrorState className="mb-5" message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
+      {discoverError && <DiscoverErrorState className="mb-5" message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
       <InstallJobBanner apps={apps} installJob={installJob} selectedAppId={selectedApp.id} />
 
       {showStartHere && (
@@ -353,24 +384,24 @@ function MarketplacePage() {
 
       <div className="mb-6 grid gap-4">
         <label className="relative block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-po-text-muted" />
-          <Input className="h-13 border-po-border bg-po-surface pl-11 text-po-text placeholder:text-po-text-muted focus-visible:border-po-info-border focus-visible:ring-po-info/30" onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name, purpose, or category..." type="search" value={searchQuery} />
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Input className="h-13 border-sky-400/25 bg-slate-900 pl-11 text-slate-50 placeholder:text-slate-400 focus-visible:border-cyan-300/35 focus-visible:ring-cyan-300/30" onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name, purpose, or category..." type="search" value={searchQuery} />
         </label>
         <div aria-label="Discover filters" className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-2 text-sm text-po-text-muted">
+          <span className="inline-flex items-center gap-2 text-sm text-slate-400">
             <Filter className="size-4" />
             {showAdvancedMetrics ? 'Show' : basicCatalogMode === 'all-safe' ? 'Safe apps' : 'Starter catalog'}
           </span>
           {showAdvancedMetrics && categories.map((category) => (
-            <Button className={cn('h-9 border-po-border bg-po-surface-soft px-4 text-po-text-secondary hover:bg-po-surface-hover hover:text-po-text', selectedCategory === category && 'border-po-info-border bg-po-info-soft text-po-brand hover:bg-po-info-soft/80')} key={category} onClick={() => setSelectedCategory(category)} type="button" variant="outline">
+            <Button className={cn('h-9 border-sky-400/25 bg-slate-800 px-4 text-slate-300 hover:bg-slate-700 hover:text-slate-50', selectedCategory === category && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15')} key={category} onClick={() => setSelectedCategory(category)} type="button" variant="outline">
               {category}
             </Button>
           ))}
-          <Button className={cn('h-9 border-po-border bg-po-surface-soft px-4 text-po-text-secondary hover:bg-po-surface-hover hover:text-po-text', hideInstalled && 'border-po-info-border bg-po-info-soft text-po-brand hover:bg-po-info-soft/80')} onClick={() => setHideInstalled((value) => !value)} type="button" variant="outline">
+          <Button className={cn('h-9 border-sky-400/25 bg-slate-800 px-4 text-slate-300 hover:bg-slate-700 hover:text-slate-50', hideInstalled && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15')} onClick={() => setHideInstalled((value) => !value)} type="button" variant="outline">
             {hideInstalled ? 'Showing new apps only' : 'Hide installed'}
           </Button>
           {canRestoreStartHere && (
-            <Button className="h-9 border-po-border bg-po-surface-soft px-4 text-po-text-secondary hover:bg-po-surface-hover hover:text-po-text" onClick={restoreStartHere} type="button" variant="outline">
+            <Button className="h-9 border-sky-400/25 bg-slate-800 px-4 text-slate-300 hover:bg-slate-700 hover:text-slate-50" onClick={restoreStartHere} type="button" variant="outline">
               Show Start here
             </Button>
           )}
@@ -394,7 +425,7 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
   }
   if (installJob.status === 'failed') {
     return (
-      <div className="mb-5 rounded-lg border border-po-danger-border bg-po-danger-soft p-4 text-sm text-po-danger">
+      <div className="mb-5 rounded-lg border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-200">
         <p className="font-semibold text-current">Install failed for {appNameForJob(installJob, apps)}</p>
         <p className="mt-1">{installJob.error?.message || 'Project OS could not finish the install.'}</p>
       </div>
@@ -402,7 +433,7 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
   }
   if (installJob.status === 'succeeded') {
     return (
-      <div className="mb-5 rounded-lg border border-po-success-border bg-po-success-soft p-4 text-sm text-po-success">
+      <div className="mb-5 rounded-lg border border-emerald-300/35 bg-emerald-500/10 p-4 text-sm text-emerald-200">
         <p className="font-semibold text-current">{appNameForJob(installJob, apps)} is ready</p>
         <p className="mt-1">Open the app or create a first restore point before experimenting.</p>
       </div>
@@ -423,16 +454,16 @@ function DiscoverGuidedHeader({
   onRefresh: () => void;
 }) {
   return (
-    <header className="mb-5 overflow-hidden rounded-2xl border border-po-border bg-po-surface p-5 text-po-text shadow-po-panel">
+    <header className="mb-5 overflow-hidden rounded-2xl border border-sky-400/25 bg-slate-900 p-5 text-slate-50 shadow-xl shadow-slate-950/30">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex max-w-3xl gap-4">
-          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl border border-po-info-border bg-po-info-soft text-po-brand sm:grid">
+          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
             <Sparkles className="size-6" />
           </span>
           <div>
-            <Badge className="border-po-info-border bg-po-info-soft text-po-brand" variant="outline">Discover</Badge>
-            <h2 className="mt-3 text-3xl font-bold leading-none text-po-text md:text-4xl">Discover Apps</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-po-text-muted">
+            <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline">Discover</Badge>
+            <h2 className="mt-3 text-3xl font-bold leading-none text-slate-50 md:text-4xl">Discover Apps</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
               Install useful self-hosted apps without managing Docker by hand.
             </p>
           </div>
@@ -441,22 +472,22 @@ function DiscoverGuidedHeader({
         <div className="flex flex-wrap gap-2 xl:justify-end">
           <Dialog>
             <DialogTrigger asChild>
-              <Button className={poButtonClass('quiet')} type="button" variant="outline">
+              <ProjectDarkControlButton type="button">
                 <Info className="size-4" />
                 How installs work
-              </Button>
+              </ProjectDarkControlButton>
             </DialogTrigger>
-            <DialogContent className="border-po-border bg-popover text-popover-foreground sm:max-w-lg">
+            <DialogContent className="border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>How Project OS installs apps</DialogTitle>
                 <DialogDescription className="text-muted-foreground">
                   Project OS shows a plan before anything changes, then prepares the app with managed storage, local access, health checks, and backup defaults.
                 </DialogDescription>
               </DialogHeader>
-              <ol className="grid gap-3 text-sm text-po-text-secondary">
+              <ol className="grid gap-3 text-sm text-slate-300">
                 {['Pick an app that fits what you want to do.', 'Review setup choices and any host readiness notes.', 'Confirm the install plan before Project OS changes this server.', 'Open the app from My Apps and create a first restore point.'].map((step, index) => (
                   <li className="grid grid-cols-[28px_1fr] gap-3" key={step}>
-                    <span className="grid size-7 place-items-center rounded-full border border-po-info-border bg-po-info-soft text-xs font-bold text-po-brand">{index + 1}</span>
+                    <span className="grid size-7 place-items-center rounded-full border border-cyan-300/35 bg-cyan-400/10 text-xs font-bold text-cyan-200">{index + 1}</span>
                     <span className="leading-6">{step}</span>
                   </li>
                 ))}
@@ -464,35 +495,35 @@ function DiscoverGuidedHeader({
             </DialogContent>
           </Dialog>
 
-          <Button className={poButtonClass('quiet')} onClick={onRefresh} type="button" variant="outline">
+          <ProjectDarkControlButton onClick={onRefresh} type="button">
             <RefreshCw className="size-4" />
             Refresh
-          </Button>
+          </ProjectDarkControlButton>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button aria-label="Discover activity" className={poButtonClass('quietIcon')} size="icon" type="button" variant="outline">
+              <ProjectDarkControlButton aria-label="Discover activity" size="icon" type="button">
                 <Bell className="size-4" />
-              </Button>
+              </ProjectDarkControlButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72 border-po-border bg-popover text-popover-foreground">
+            <DropdownMenuContent align="end" className="w-72 border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
               <DropdownMenuLabel>Discover activity</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-po-border" />
+              <DropdownMenuSeparator className="bg-sky-400/20" />
               <div className="grid max-h-80 gap-2 overflow-y-auto px-2 py-1.5 text-sm">
-                <div className="rounded-md border border-po-border bg-po-surface-soft p-2 text-xs text-po-text-muted">
+                <div className="rounded-md border border-sky-400/25 bg-slate-800 p-2 text-xs text-slate-400">
                   {appCount} apps shown - Last checked {lastRefreshAt ? lastRefreshAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not yet'}
                 </div>
                 {marketplaceActivity.length ? marketplaceActivity.map((event) => (
-                  <div className="rounded-md border border-po-border bg-po-surface-soft p-2" key={event.id}>
+                  <div className="rounded-md border border-sky-400/25 bg-slate-800 p-2" key={event.id}>
                     <div className="flex items-center justify-between gap-2">
                       <span className={cn('text-xs font-semibold uppercase tracking-wide', marketplaceActivityTone(event.level))}>{event.outcome.replace('_', ' ')}</span>
-                      <span className="text-xs text-po-text-muted">{formatMarketplaceActivityTime(event.createdAt)}</span>
+                      <span className="text-xs text-slate-400">{formatMarketplaceActivityTime(event.createdAt)}</span>
                     </div>
-                    <p className="mt-1 font-medium text-po-text">{event.title}</p>
-                    {event.message && <p className="mt-1 line-clamp-2 text-xs leading-5 text-po-text-muted">{event.message}</p>}
+                    <p className="mt-1 font-medium text-slate-50">{event.title}</p>
+                    {event.message && <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{event.message}</p>}
                   </div>
                 )) : (
-                  <div className="rounded-md border border-po-border bg-po-surface-soft p-3 text-sm text-po-text-muted">
+                  <div className="rounded-md border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-400">
                     No Discover activity has been recorded yet.
                   </div>
                 )}
@@ -502,9 +533,9 @@ function DiscoverGuidedHeader({
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-po-info-border bg-po-info-soft p-4">
-        <p className="text-xs font-semibold uppercase tracking-normal text-po-brand">Recommended path</p>
-        <p className="mt-2 text-sm leading-6 text-po-text-secondary">
+      <div className="mt-5 rounded-xl border border-cyan-300/35 bg-cyan-400/10 p-4">
+        <p className="text-xs font-semibold uppercase tracking-normal text-cyan-200">Recommended path</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
           Pick an app, review the setup, and Project OS will prepare storage, networking, health checks, and backups.
         </p>
       </div>
@@ -515,53 +546,53 @@ function DiscoverGuidedHeader({
 function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss: () => void; onSelect: (appId: string) => void; recommendations: StarterRecommendation[] }) {
   const blocked = recommendations.some((recommendation) => recommendation.readiness === 'blocked');
   return (
-    <section className="mb-5 rounded-2xl border border-po-info-border bg-po-info-soft p-5 shadow-po-panel">
+    <section className="mb-5 rounded-2xl border border-cyan-300/35 bg-cyan-400/10 p-5 shadow-xl shadow-slate-950/30">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-normal text-po-brand">Start here</p>
-          <h3 className="mt-2 text-2xl font-black text-po-text">Start with these apps</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-po-text-muted">
+          <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Start here</p>
+          <h3 className="mt-2 text-2xl font-black text-slate-50">Start with these apps</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
             Reliable first installs based on your onboarding choices, with a few safe defaults when you have not picked starter apps yet.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={blocked ? 'border-po-warning-border bg-po-warning-soft text-po-warning' : 'border-po-info-border bg-po-info-soft text-po-brand'} variant="outline">
+          <Badge className={blocked ? 'border-orange-400/40 bg-orange-500/10 text-orange-200' : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200'} variant="outline">
             {blocked ? 'Readiness review needed' : 'Ready to review'}
           </Badge>
-          <Button aria-label="Hide Start here" className={poButtonClass('quietIcon')} onClick={onDismiss} size="icon" type="button" variant="outline">
+          <ProjectDarkControlButton aria-label="Hide Start here" onClick={onDismiss} size="icon" type="button">
             <X className="size-4" />
-          </Button>
+          </ProjectDarkControlButton>
         </div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {recommendations.map((recommendation) => (
-          <article className={poCardClass('normal', 'bg-po-surface')} key={recommendation.app.id}>
+          <article className="rounded-xl border border-sky-400/25 bg-slate-900 p-4 text-slate-50 shadow-lg shadow-slate-950/20" key={recommendation.app.id}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h4 className="font-bold text-po-text">{recommendation.app.name}</h4>
-                <p className="mt-1 text-sm text-po-text-muted">{recommendation.app.shortValue || recommendation.app.plainLanguage}</p>
+                <h4 className="font-bold text-slate-50">{recommendation.app.name}</h4>
+                <p className="mt-1 text-sm text-slate-400">{recommendation.app.shortValue || recommendation.app.plainLanguage}</p>
               </div>
               {recommendation.installed ? (
-                <Badge className="border-po-info-border bg-po-info-soft text-po-brand" variant="outline">Installed</Badge>
+                <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline">Installed</Badge>
               ) : (
-                <Badge className={recommendation.readiness === 'ready' ? 'border-po-info-border bg-po-info-soft text-po-brand' : recommendation.readiness === 'blocked' ? 'border-po-warning-border bg-po-warning-soft text-po-warning' : 'border-po-info-border bg-po-info-soft text-po-brand'} variant="outline">
+                <Badge className={recommendation.readiness === 'ready' ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200' : recommendation.readiness === 'blocked' ? 'border-orange-400/40 bg-orange-500/10 text-orange-200' : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200'} variant="outline">
                   {recommendation.readiness === 'ready' ? 'Ready' : recommendation.readiness === 'blocked' ? 'Needs setup' : 'Review'}
                 </Badge>
               )}
             </div>
-            <div className="mt-3 grid gap-2 text-sm text-po-text-secondary">
+            <div className="mt-3 grid gap-2 text-sm text-slate-300">
               {recommendation.notes.map((note) => (
                 <div className="flex gap-2" key={note}>
-                  {recommendation.readiness === 'ready' ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-po-brand" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-po-warning" />}
+                  {recommendation.readiness === 'ready' ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-cyan-200" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-200" />}
                   <span>{note}</span>
                 </div>
               ))}
             </div>
             <DisabledAction className="mt-4 w-full" disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
-              <Button className={poButtonClass('primary', 'w-full')} disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} type="button">
+              <ProjectPrimaryButton className="w-full" disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} type="button">
                 <Sparkles className="size-4" />
                 {recommendation.installed ? 'Already installed' : 'Review install'}
-              </Button>
+              </ProjectPrimaryButton>
             </DisabledAction>
           </article>
         ))}

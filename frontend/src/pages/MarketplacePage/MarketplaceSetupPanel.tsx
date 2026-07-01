@@ -1,12 +1,12 @@
 import { CheckCircle2, HelpCircle, Info, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { poButtonClass } from '@/lib/projectOsStyleKit';
 import { cn } from '@/lib/utils';
 import type { DiscoverInstallIssue, DiscoverInstallPreview, DiscoverSetupInput, DiscoverSetupSchema } from '@/types/discover';
 import type { MarketplaceApp } from '@/types/marketplace';
@@ -45,18 +45,18 @@ export function MarketplaceSetupPanel({
   }
 
   return (
-    <section className="grid gap-4 rounded-lg border border-po-border bg-po-surface-soft p-4">
+    <section className="grid gap-4 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Badge className="border-po-info-border bg-po-info-soft text-po-brand" variant="outline">
+          <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline">
             Guided setup
           </Badge>
-          <h4 className="mt-3 font-bold text-po-text">Choose how {app.name} should start</h4>
-          <p className="mt-1 text-sm leading-6 text-po-text-muted">
+          <h4 className="mt-3 font-bold text-slate-50">Choose how {app.name} should start</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-400">
             These choices come from Project OS and are checked on the server before install.
           </p>
         </div>
-        <Badge className={preview?.valid ?? true ? 'border-po-success-border bg-po-success-soft text-po-success' : 'border-po-warning-border bg-po-warning-soft text-po-warning'} variant="outline">
+        <Badge className={preview?.valid ?? true ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200'} variant="outline">
           {preview?.valid ?? true ? 'Ready to review' : 'Needs a choice'}
         </Badge>
       </div>
@@ -69,13 +69,13 @@ export function MarketplaceSetupPanel({
           }
           if (group.id === 'advanced') {
             return (
-              <Collapsible className="grid gap-3 rounded-lg border border-po-border bg-po-surface p-3" key={group.id}>
+              <Collapsible className="grid gap-3 rounded-lg border border-sky-400/25 bg-slate-900 p-3" key={group.id}>
                 <CollapsibleTrigger className="flex w-full cursor-pointer items-start justify-between gap-3 text-left">
                   <span>
-                    <span className="block text-sm font-bold text-po-text">{group.label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-po-text-muted">{group.description}</span>
+                    <span className="block text-sm font-bold text-slate-50">{group.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-400">{group.description}</span>
                   </span>
-                  <Badge className="border-po-border bg-po-surface-soft text-po-text-secondary" variant="outline">Optional</Badge>
+                  <Badge className="border-sky-400/25 bg-slate-800 text-slate-300" variant="outline">Optional</Badge>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="mt-3 grid gap-3">
@@ -94,10 +94,10 @@ export function MarketplaceSetupPanel({
             );
           }
           return (
-            <div className="grid gap-3 rounded-lg border border-po-border bg-po-surface p-3" key={group.id}>
+            <div className="grid gap-3 rounded-lg border border-sky-400/25 bg-slate-900 p-3" key={group.id}>
               <div>
-                <h5 className="text-sm font-bold text-po-text">{group.label}</h5>
-                <p className="mt-1 text-xs leading-5 text-po-text-muted">{group.description}</p>
+                <h5 className="text-sm font-bold text-slate-50">{group.label}</h5>
+                <p className="mt-1 text-xs leading-5 text-slate-400">{group.description}</p>
               </div>
               <div className="grid gap-3">
                 {inputs.map((input) => (
@@ -116,9 +116,9 @@ export function MarketplaceSetupPanel({
       </div>
 
       {preview && preview.blockingIssues.length > 0 && (
-        <div className="rounded-lg border border-po-warning-border bg-po-warning-soft p-3 text-sm text-po-warning">
+        <div className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-3 text-sm text-orange-200">
           <div className="flex items-start gap-2">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-po-warning" />
+            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-orange-200" />
             <div>
               <p className="font-semibold text-current">Finish setup before installing</p>
               <ul className="mt-1 grid gap-1 leading-6">
@@ -143,13 +143,13 @@ export function InstallPlanPreview({ preview }: { preview: DiscoverInstallPrevie
   } as const;
 
   return (
-    <section className="grid gap-4 rounded-lg border border-po-border bg-po-surface-soft p-4">
+    <section className="grid gap-4 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="font-bold text-po-text">Install preview</h4>
-          <p className="mt-1 text-sm leading-6 text-po-text-muted">Plain-language summary from the backend before Project OS changes this server.</p>
+          <h4 className="font-bold text-slate-50">Install preview</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-400">Plain-language summary from the backend before Project OS changes this server.</p>
         </div>
-        <Badge className={preview?.valid ?? true ? 'border-po-success-border bg-po-success-soft text-po-success' : 'border-po-warning-border bg-po-warning-soft text-po-warning'} variant="outline">
+        <Badge className={preview?.valid ?? true ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200'} variant="outline">
           {preview?.valid ?? true ? 'Ready' : 'Needs setup'}
         </Badge>
       </div>
@@ -158,16 +158,16 @@ export function InstallPlanPreview({ preview }: { preview: DiscoverInstallPrevie
         {sections.map((section) => {
           const Icon = icons[section.id as keyof typeof icons] ?? Info;
           return (
-            <div className="rounded-lg border border-po-border bg-po-surface p-3" key={section.id}>
+            <div className="rounded-lg border border-sky-400/25 bg-slate-900 p-3" key={section.id}>
               <div className="flex items-center gap-2">
-                <Icon className="size-4 text-po-brand" />
-                <h5 className="text-sm font-bold text-po-text">{section.title}</h5>
+                <Icon className="size-4 text-cyan-200" />
+                <h5 className="text-sm font-bold text-slate-50">{section.title}</h5>
               </div>
-              <ul className="mt-2 grid gap-2 text-sm leading-6 text-po-text-secondary">
+              <ul className="mt-2 grid gap-2 text-sm leading-6 text-slate-300">
                 {section.items.map((item) => (
-                  <li className={cn(item.tone === 'warning' && 'text-po-warning', item.tone === 'success' && 'text-po-success')} key={item.label}>
+                  <li className={cn(item.tone === 'warning' && 'text-orange-200', item.tone === 'success' && 'text-emerald-200')} key={item.label}>
                     {item.label}
-                    {item.description && <span className="mt-0.5 block text-xs leading-5 text-po-text-muted">{item.description}</span>}
+                    {item.description && <span className="mt-0.5 block text-xs leading-5 text-slate-400">{item.description}</span>}
                   </li>
                 ))}
               </ul>
@@ -177,7 +177,7 @@ export function InstallPlanPreview({ preview }: { preview: DiscoverInstallPrevie
       </div>
 
       {preview && preview.warnings.length > 0 && (
-        <div className="rounded-lg border border-po-warning-border bg-po-warning-soft p-3 text-sm leading-6 text-po-warning">
+        <div className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-3 text-sm leading-6 text-orange-200">
           {preview.warnings.map((warning) => <p key={warning.fieldId}>{warning.message}</p>)}
         </div>
       )}
@@ -195,9 +195,9 @@ export function SetupSummaryList({
   return (
     <dl className="grid gap-2 sm:grid-cols-2">
       {schema.inputs.filter((input) => shouldShowInput(input, answers)).map((input) => (
-        <div className="rounded-lg border border-po-border bg-po-surface-soft p-3" key={input.id}>
-          <dt className="text-xs font-semibold uppercase tracking-normal text-po-text-muted">{input.label}</dt>
-          <dd className="mt-1 text-sm font-medium text-po-text">{displayValue(input, answers[input.id])}</dd>
+        <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3" key={input.id}>
+          <dt className="text-xs font-semibold uppercase tracking-normal text-slate-400">{input.label}</dt>
+          <dd className="mt-1 text-sm font-medium text-slate-50">{displayValue(input, answers[input.id])}</dd>
         </div>
       ))}
     </dl>
@@ -220,15 +220,15 @@ function SetupField({
   return (
     <div className="grid gap-2 text-sm">
       <span className="flex items-center justify-between gap-3">
-        <label className="font-semibold text-po-text-secondary" htmlFor={inputId}>{input.label}</label>
+        <label className="font-semibold text-slate-300" htmlFor={inputId}>{input.label}</label>
         {input.help && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button aria-label={`${input.label} help`} className={poButtonClass('quietIcon')} size="icon" type="button" variant="outline">
+              <ProjectDarkControlButton aria-label={`${input.label} help`} size="icon" type="button">
                 <HelpCircle className="size-4" />
-              </Button>
+              </ProjectDarkControlButton>
             </PopoverTrigger>
-            <PopoverContent className="border-po-border bg-popover text-popover-foreground">
+            <PopoverContent className="border-sky-400/30 bg-slate-900 text-slate-100 shadow-xl shadow-slate-950/30">
               <p className="text-sm leading-6">{input.help}</p>
             </PopoverContent>
           </Popover>
@@ -238,24 +238,24 @@ function SetupField({
       {input.type === 'choice' && (
         <>
           <Select value={String(value ?? '')} onValueChange={onChange}>
-            <SelectTrigger className={cn('h-10 w-full border-po-border bg-po-surface text-po-text', problem && 'border-po-warning-border')} id={inputId}>
+            <SelectTrigger className={cn('h-10 w-full border-sky-400/25 bg-slate-900 text-slate-50', problem && 'border-orange-400/40')} id={inputId}>
               <SelectValue placeholder="Choose an option" />
             </SelectTrigger>
-            <SelectContent className="border-po-border bg-popover text-popover-foreground">
+            <SelectContent className="border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
               {input.options?.map((option) => (
-                <SelectItem className="focus:bg-po-surface-hover focus:text-popover-foreground" key={option.value} value={option.value}>
+                <SelectItem className="focus:bg-slate-700 focus:text-white" key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {selectedOption?.description && <span className="text-xs leading-5 text-po-text-muted">{selectedOption.description}</span>}
+          {selectedOption?.description && <span className="text-xs leading-5 text-slate-400">{selectedOption.description}</span>}
         </>
       )}
 
       {input.type !== 'choice' && (
         <Input
-          className={cn('border-po-border bg-po-surface text-po-text placeholder:text-po-text-muted', problem && 'border-po-warning-border')}
+          className={cn('border-sky-400/25 bg-slate-900 text-slate-50 placeholder:text-slate-400', problem && 'border-orange-400/40')}
           id={inputId}
           inputMode={input.type === 'number-or-auto' ? 'numeric' : undefined}
           onChange={(event) => onChange(input.type === 'number-or-auto' ? normalizePortValue(event.target.value) : event.target.value)}
@@ -267,8 +267,8 @@ function SetupField({
 
       {problem && (
         <>
-          <Separator className="bg-po-warning-border" />
-          <span className="text-xs leading-5 text-po-warning">{problem.message}</span>
+          <Separator className="bg-orange-400/40" />
+          <span className="text-xs leading-5 text-orange-200">{problem.message}</span>
         </>
       )}
     </div>
