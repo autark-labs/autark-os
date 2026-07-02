@@ -20,6 +20,8 @@ test('applications page destructive actions use a shared plan-confirm-run dialog
   assert.match(destructiveActions, /requiresTextConfirmation\?: string/);
   assert.match(destructiveActions, /blockedReasons: string\[\]/);
   assert.match(destructiveActions, /mapUninstallPlanToDestructiveActionPlan/);
+  assert.doesNotMatch(destructiveActions, /requiresConfirmation/);
+  assert.match(destructiveActions, /needsConfirmation/);
 
   assert.match(dialog, /export function DestructiveActionDialog/);
   assert.match(dialog, /AlertDialog/);

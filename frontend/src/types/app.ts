@@ -381,6 +381,5 @@ export type UninstallPlan = {
   safetyCheckpointMessage?: string;
   willStop: string[];
   willKeep: string[];
-  requiresConfirmation: string[];
-  needsConfirmation?: string[];
+  needsConfirmation: string[];
 };

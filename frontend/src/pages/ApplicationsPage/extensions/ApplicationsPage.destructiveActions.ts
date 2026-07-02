@@ -13,8 +13,9 @@ export type DestructiveActionPlan = {
 };
 
 export function mapUninstallPlanToDestructiveActionPlan(plan: UninstallPlan): DestructiveActionPlan {
+  const confirmationItems = plan.needsConfirmation ?? [];
   const warnings = [
-    ...plan.requiresConfirmation,
+    ...confirmationItems,
     ...(plan.safetyCheckpointMessage ? [plan.safetyCheckpointMessage] : []),
   ];
 
@@ -30,7 +31,7 @@ export function mapUninstallPlanToDestructiveActionPlan(plan: UninstallPlan): De
       'Refresh app state',
     ],
     warnings,
-    blockedReasons: plan.needsConfirmation ?? [],
+    blockedReasons: confirmationItems,
     runLabel: 'Keep data and uninstall',
   };
 }
