@@ -125,7 +125,7 @@ Do not paste long terminal logs into chat unless support asks. The support bundl
 
 Use these only when you need the technical details:
 
-- [Beta installation guide](./beta-installation.md): source install, release bundle, update, uninstall, and support bundle commands.
+- [Beta testing repository](https://github.com/autark-labs/project-os/): source install, release bundle, update, uninstall, and support bundle commands.
 - [Service user installation](./service-user-installation.md): system user, systemd service, Docker access, and Tailscale operator setup.
 - [Local development](./local-development.md): source checkout and developer workflow.
 

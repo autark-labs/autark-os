@@ -47,12 +47,12 @@ Start with the [non-technical install guide](docs/non-technical-install-guide.md
 
 ### Beta Testers
 
-Use the [beta installation guide](docs/beta-installation.md) for source installs, release-bundle installs, SSD runtime setup, update, uninstall, and support-bundle commands.
+Use the [Project OS GitHub repository](https://github.com/autark-labs/project-os/) for beta testing, source installs, release-bundle installs, updates, uninstall, and support-bundle commands.
 
 Short source install path:
 
 ```bash
-git clone <project-os-repo-url>
+git clone https://github.com/autark-labs/project-os.git
 cd project-os
 ./scripts/bootstrap-project-os.sh
 ```
@@ -155,7 +155,7 @@ docs/          User guides, runtime architecture, development plans
 
 - [Docs index](docs/README.md)
 - [Non-technical install guide](docs/non-technical-install-guide.md)
-- [Beta installation guide](docs/beta-installation.md)
+- [Beta testing repository](https://github.com/autark-labs/project-os/)
 - [Local development](docs/local-development.md)
 - [Marketplace runtime architecture](docs/marketplace-runtime.md)
 - [Manifest authoring checklist](docs/manifest-authoring-checklist.md)

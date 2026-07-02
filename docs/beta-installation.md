@@ -31,7 +31,7 @@ Docker is required for Marketplace app installs. Project OS can run without Tail
 From a checked-out repository:
 
 ```bash
-git clone <project-os-repo-url>
+git clone https://github.com/autark-labs/project-os.git
 cd project-os
 ./scripts/bootstrap-project-os.sh
 ```

@@ -7,7 +7,7 @@ Use this page as the map. The README at the repository root is the public landin
 ## Start Here
 
 - [Install Project OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
-- [Beta installation guide](./beta-installation.md): source install, release-bundle install, SSD runtime setup, update, uninstall, and support commands.
+- [Beta testing repository](https://github.com/autark-labs/project-os/): source install, release-bundle install, update, uninstall, and support commands.
 - [Local development](./local-development.md): run the backend and frontend separately during development.
 
 ## Runtime And Operations
