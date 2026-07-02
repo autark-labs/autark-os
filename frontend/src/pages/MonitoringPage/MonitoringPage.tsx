@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight, Clock3, Cpu, Database, Download, Filter, HardDrive, HeartPulse, Loader2, MemoryStick, Server, ShieldCheck, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -8,8 +7,9 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
+import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
+import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { Badge } from '@/components/ui/badge';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -57,21 +57,8 @@ type AppTrendPoint = {
   memory: number;
 };
 
-function MonitoringPanel({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  return (
-    <Surface as="section" className={cn('p-5', className)} id={id} tone="panel">
-      {children}
-    </Surface>
-  );
-}
-
-function MonitoringInset({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <Surface className={cn('p-3', className)} tone="muted">
-      {children}
-    </Surface>
-  );
-}
+const MonitoringPanel = ProjectPanel;
+const MonitoringInset = ProjectInset;
 
 function MonitoringPage() {
   const { showAdvancedMetrics } = useProjectSettings();
@@ -786,12 +773,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return (
-    <MonitoringInset className={cn('text-center', compact ? 'p-4' : 'p-8')}>
-      <p className="font-bold text-white">{title}</p>
-      <p className="mt-1 text-sm text-slate-400">{message}</p>
-    </MonitoringInset>
-  );
+  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 function MonitoringErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {

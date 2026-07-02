@@ -22,3 +22,28 @@ export type SurfaceProps = HTMLAttributes<HTMLElement> & {
 export function Surface({ as: Component = 'section', className, tone = 'panel', ...props }: SurfaceProps) {
   return <Component className={cn(surfaceToneClass[tone], className)} {...props} />;
 }
+
+export function ProjectPanel({ as = 'section', className, tone = 'panel', ...props }: SurfaceProps) {
+  return <Surface as={as} className={cn('p-5', className)} tone={tone} {...props} />;
+}
+
+export function ProjectInset({
+  className,
+  interactive = false,
+  tone = 'muted',
+  ...props
+}: SurfaceProps & {
+  interactive?: boolean;
+}) {
+  return (
+    <Surface
+      className={cn(
+        'p-3',
+        interactive && 'transition hover:-translate-y-0.5 hover:border-cyan-300/45 hover:bg-slate-700 hover:shadow-lg hover:shadow-cyan-950/20',
+        className,
+      )}
+      tone={tone}
+      {...props}
+    />
+  );
+}

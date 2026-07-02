@@ -1,8 +1,9 @@
 import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ProjectEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
+import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { NetworkDiagnosticsReport } from '@/types/network';
 import { diagnosticTone } from './extensions/NetworkPage.theme';
@@ -21,7 +22,7 @@ export function NetworkPanel({
   title?: ReactNode;
 }) {
   return (
-    <Surface className={cn('grid gap-4 p-5 shadow-slate-950/20', className)} tone="panel">
+    <ProjectPanel className={cn('grid gap-4 shadow-slate-950/20', className)}>
       {(title || description || action) && (
         <div className="flex flex-col justify-between gap-3 border-b border-sky-400/20 pb-4 md:flex-row md:items-start">
           <div>
@@ -32,7 +33,7 @@ export function NetworkPanel({
         </div>
       )}
       {children}
-    </Surface>
+    </ProjectPanel>
   );
 }
 
@@ -46,16 +47,9 @@ export function NetworkInset({
   interactive?: boolean;
 }) {
   return (
-    <Surface
-      className={cn(
-        'p-3',
-        interactive && 'transition hover:-translate-y-0.5 hover:border-cyan-300/45 hover:bg-slate-700 hover:shadow-lg hover:shadow-cyan-950/20',
-        className,
-      )}
-      tone="muted"
-    >
+    <ProjectInset className={className} interactive={interactive}>
       {children}
-    </Surface>
+    </ProjectInset>
   );
 }
 
@@ -122,13 +116,13 @@ export function AccessLine({ label, value }: { label: string; value: string }) {
 
 export function EmptyState({ icon: Icon, text, title }: { icon: LucideIcon; text: string; title: string }) {
   return (
-    <div className="grid justify-items-center rounded-xl border border-sky-400/25 bg-slate-800 p-6 text-center">
-      <span className="grid size-12 place-items-center rounded-lg border border-sky-400/20 bg-slate-900 text-sky-100/75">
-        <Icon className="size-5" />
-      </span>
-      <h3 className="mt-3 font-semibold text-slate-50">{title}</h3>
-      <p className="mt-1 max-w-md text-sm text-sky-100/70">{text}</p>
-    </div>
+    <ProjectEmptyState
+      className="min-h-0 rounded-xl border-sky-400/25 bg-slate-800 p-6"
+      description={text}
+      icon={<Icon className="size-5" />}
+      mediaClassName="border border-sky-400/20 bg-slate-900 text-sky-100/75"
+      title={title}
+    />
   );
 }
 

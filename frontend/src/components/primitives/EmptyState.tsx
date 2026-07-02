@@ -6,6 +6,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { ProjectInset } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 
 export function ProjectEmptyState({
@@ -34,3 +35,21 @@ export function ProjectEmptyState({
   );
 }
 
+export function ProjectInlineEmptyState({
+  className,
+  compact = false,
+  description,
+  title,
+}: {
+  className?: string;
+  compact?: boolean;
+  description: string;
+  title: string;
+}) {
+  return (
+    <ProjectInset className={cn('text-center', compact ? 'p-4' : 'p-8', className)}>
+      <p className="font-bold text-white">{title}</p>
+      <p className="mt-1 text-sm text-slate-400">{description}</p>
+    </ProjectInset>
+  );
+}

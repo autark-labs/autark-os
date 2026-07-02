@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
 import { AlertTriangle, Archive, CheckCircle2, Copy, Database, FolderSearch, HardDrive, Info, Loader2, PackageOpen, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
+import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
+import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,21 +19,8 @@ import { cn } from '@/lib/utils';
 import { useCleanupOrphanMutation, useStorageReportRepository } from '@/repositories/storageRepository';
 import type { AppStorageUsage, OrphanedStorage, StorageRecommendation, StorageReport, StorageUsage } from '@/types/system';
 
-function StoragePanel({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  return (
-    <Surface as="section" className={cn('p-5', className)} id={id} tone="panel">
-      {children}
-    </Surface>
-  );
-}
-
-function StorageInset({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <Surface className={cn('p-3', className)} tone="muted">
-      {children}
-    </Surface>
-  );
-}
+const StoragePanel = ProjectPanel;
+const StorageInset = ProjectInset;
 
 function StoragePage() {
   const { showAdvancedMetrics } = useProjectSettings();
@@ -451,12 +438,7 @@ function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string
 }
 
 function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return (
-    <StorageInset className={cn('text-center', compact ? 'p-4' : 'p-8')}>
-      <p className="font-bold text-white">{title}</p>
-      <p className="mt-1 text-sm text-slate-400">{message}</p>
-    </StorageInset>
-  );
+  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 function StorageLoadingState() {

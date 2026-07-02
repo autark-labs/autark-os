@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
+import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
 import {
   Popover,
@@ -137,21 +137,8 @@ const settingHelp: Record<string, SettingHelp> = {
   },
 };
 
-function SettingsPanel({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <Surface as="section" className={cn('p-5', className)} tone="panel">
-      {children}
-    </Surface>
-  );
-}
-
-function SettingsInset({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <Surface className={cn('p-3', className)} tone="muted">
-      {children}
-    </Surface>
-  );
-}
+const SettingsPanel = ProjectPanel;
+const SettingsInset = ProjectInset;
 
 function SettingsLoadingState() {
   return (

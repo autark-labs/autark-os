@@ -15,120 +15,114 @@
   line-height: 1.5;
   text-rendering: optimizeLegibility;
 
-  /* Project OS design tokens */
-  --po-bg-app: #0d1728;
-  --po-bg-page: #93b8ca;
-  --po-bg-page-soft: #c9dfe8;
-  --po-bg-mesh:
-    radial-gradient(circle at 18% 0%, rgb(34 211 238 / 0.16), transparent 28rem),
-    radial-gradient(circle at 92% 8%, rgb(8 145 178 / 0.12), transparent 24rem),
-    linear-gradient(135deg, #93b8ca 0%, #b1ccd8 48%, #7fa8bb 100%);
-  --po-bg-sidebar: #0d1728;
-  --po-hero-automation:
-    radial-gradient(circle at top left, rgb(34 211 238 / 0.18), transparent 32%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-hero-backups:
-    radial-gradient(circle at top left, rgb(5 150 105 / 0.16), transparent 30%),
-    radial-gradient(circle at top right, rgb(34 211 238 / 0.14), transparent 28%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-hero-devices:
-    radial-gradient(circle at top left, rgb(34 211 238 / 0.18), transparent 30%),
-    radial-gradient(circle at top right, rgb(15 118 110 / 0.14), transparent 28%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-hero-monitoring:
-    radial-gradient(circle at top left, rgb(194 65 12 / 0.16), transparent 34%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-hero-overview:
-    radial-gradient(circle at 15% 0%, rgb(34 211 238 / 0.18), transparent 32%),
-    radial-gradient(circle at 85% 8%, rgb(15 118 110 / 0.14), transparent 28%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-hero-marketplace:
-    linear-gradient(135deg, rgb(8 145 178 / 0.24), rgb(18 35 58 / 0.78) 45%, rgb(15 118 110 / 0.16));
-  --po-hero-marketplace-handoff:
-    linear-gradient(135deg, rgb(5 150 105 / 0.22), rgb(18 35 58 / 0.78) 48%, rgb(34 211 238 / 0.16));
-  --po-hero-app-spotlight:
-    linear-gradient(135deg, rgb(8 145 178 / 0.24), rgb(18 35 58 / 0.76) 42%, rgb(15 118 110 / 0.18));
-  --po-hero-settings:
+  /* Project OS product tokens. These are the source of truth for app-level styling. */
+  --app-page: var(--color-slate-800);
+  --app-surface: var(--color-slate-950);
+  --app-panel: var(--color-slate-900);
+  --app-panel-muted: var(--color-slate-800);
+  --app-panel-hover: var(--color-slate-700);
+  --app-border: var(--color-sky-400);
+  --app-border-muted: rgb(56 189 248 / 0.25);
+  --app-border-strong: rgb(56 189 248 / 0.4);
+  --app-text: var(--color-slate-50);
+  --app-text-secondary: var(--color-slate-300);
+  --app-text-muted: var(--color-slate-400);
+  --app-text-disabled: var(--color-slate-500);
+  --app-accent: var(--color-cyan-300);
+  --app-accent-strong: var(--color-cyan-200);
+  --app-success: var(--color-emerald-300);
+  --app-warning: var(--color-orange-500);
+  --app-danger: var(--color-red-600);
+  --app-info: var(--color-cyan-300);
+  --app-teal: var(--color-teal-400);
+  --app-shadow-sm: 0 8px 24px rgb(2 6 23 / 0.14);
+  --app-shadow-md: 0 18px 54px rgb(2 6 23 / 0.2);
+  --app-shadow-lg: 0 28px 90px rgb(2 6 23 / 0.28);
+  --app-shadow-sidebar: 10px 0 42px rgb(2 6 23 / 0.28);
+  --app-brand-gradient: linear-gradient(135deg, var(--color-cyan-300) 0%, var(--color-sky-500) 58%, var(--color-cyan-200) 100%);
+  --app-hero-default:
     radial-gradient(circle at top left, rgb(34 211 238 / 0.16), transparent 30%),
     radial-gradient(circle at top right, rgb(148 163 184 / 0.12), transparent 28%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-hero-storage:
-    radial-gradient(circle at top left, rgb(15 118 110 / 0.16), transparent 30%),
-    radial-gradient(circle at top right, rgb(194 65 12 / 0.12), transparent 28%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-hero-support:
-    radial-gradient(circle at top left, rgb(34 211 238 / 0.18), transparent 32%),
-    radial-gradient(circle at top right, rgb(8 145 178 / 0.16), transparent 28%),
-    linear-gradient(135deg, rgb(13 23 40 / 0.96), rgb(18 35 58 / 0.94));
-  --po-overview-side-overlay: linear-gradient(90deg, rgb(13 23 40 / 0.48) 0%, rgb(13 23 40 / 0.12) 46%, rgb(13 23 40 / 0.24) 100%);
-  --po-overview-vertical-overlay: linear-gradient(180deg, rgb(13 23 40 / 0.03) 0%, rgb(13 23 40 / 0) 40%, rgb(13 23 40 / 0.34) 100%);
-  --po-overview-bottom-fade: linear-gradient(180deg, transparent, #0d1728 90%);
-  --po-card-amber-gradient: linear-gradient(135deg, #dfc1a9, #d5e6ee);
-  --po-card-accent-gradient: linear-gradient(135deg, #b8d3df, #d5e6ee);
-  --po-card-red-gradient: linear-gradient(135deg, #e7b8b8, #d5e6ee);
-  --po-card-hover-sheen: linear-gradient(135deg, rgb(255 255 255 / 0.28), transparent 48%, transparent);
+    linear-gradient(135deg, rgb(15 23 42 / 0.98), rgb(30 41 59 / 0.94));
 
-  --po-surface-base: #d5e6ee;
-  --po-surface-soft: #e4eef3;
-  --po-surface-elevated: #f1f7fa;
-  --po-surface-inset: #12233a;
-  --po-surface-hover: #c5dce7;
-
-  --po-border-subtle: rgb(14 116 144 / 0.2);
-  --po-border-strong: rgb(14 116 144 / 0.34);
-  --po-border-accent: rgb(34 211 238 / 0.6);
-
-  --po-text-primary: #0f172a;
-  --po-text-secondary: #33536a;
-  --po-text-muted: #567184;
-  --po-text-disabled: #7f98a8;
-
-  --po-brand: #0891b2;
-  --po-brand-strong: #22d3ee;
+  /* Legacy po-* compatibility aliases. Do not add new consumers. */
+  --po-bg-app: var(--app-surface);
+  --po-bg-page: var(--app-page);
+  --po-bg-page-soft: var(--app-panel-muted);
+  --po-bg-mesh: linear-gradient(135deg, var(--app-page) 0%, var(--app-panel-muted) 100%);
+  --po-bg-sidebar: var(--app-surface);
+  --po-hero-automation: var(--app-hero-default);
+  --po-hero-backups: var(--app-hero-default);
+  --po-hero-devices: var(--app-hero-default);
+  --po-hero-monitoring: var(--app-hero-default);
+  --po-hero-overview: var(--app-hero-default);
+  --po-hero-marketplace: var(--app-hero-default);
+  --po-hero-marketplace-handoff: var(--app-hero-default);
+  --po-hero-app-spotlight: var(--app-hero-default);
+  --po-hero-settings: var(--app-hero-default);
+  --po-hero-storage: var(--app-hero-default);
+  --po-hero-support: var(--app-hero-default);
+  --po-overview-side-overlay: linear-gradient(90deg, rgb(15 23 42 / 0.5) 0%, rgb(15 23 42 / 0.12) 46%, rgb(15 23 42 / 0.24) 100%);
+  --po-overview-vertical-overlay: linear-gradient(180deg, rgb(15 23 42 / 0.03) 0%, rgb(15 23 42 / 0) 40%, rgb(15 23 42 / 0.34) 100%);
+  --po-overview-bottom-fade: linear-gradient(180deg, transparent, var(--app-surface) 90%);
+  --po-card-amber-gradient: linear-gradient(135deg, var(--color-orange-200), var(--color-sky-100));
+  --po-card-accent-gradient: linear-gradient(135deg, var(--color-sky-200), var(--color-cyan-100));
+  --po-card-red-gradient: linear-gradient(135deg, var(--color-red-200), var(--color-sky-100));
+  --po-card-hover-sheen: linear-gradient(135deg, rgb(255 255 255 / 0.16), transparent 48%, transparent);
+  --po-surface-base: var(--app-panel);
+  --po-surface-soft: var(--app-panel-muted);
+  --po-surface-elevated: var(--app-panel-hover);
+  --po-surface-inset: var(--app-panel-muted);
+  --po-surface-hover: var(--app-panel-hover);
+  --po-border-subtle: var(--app-border-muted);
+  --po-border-strong: var(--app-border-strong);
+  --po-border-accent: rgb(103 232 249 / 0.6);
+  --po-text-primary: var(--app-text);
+  --po-text-secondary: var(--app-text-secondary);
+  --po-text-muted: var(--app-text-muted);
+  --po-text-disabled: var(--app-text-disabled);
+  --po-brand: var(--app-accent);
+  --po-brand-strong: var(--app-accent-strong);
   --po-brand-soft: rgb(34 211 238 / 0.14);
-  --po-brand-gradient: linear-gradient(135deg, #0891b2 0%, #0e7490 58%, #22d3ee 100%);
-
-  --po-success: #059669;
-  --po-success-soft: rgb(5 150 105 / 0.13);
+  --po-brand-gradient: var(--app-brand-gradient);
+  --po-success: var(--app-success);
+  --po-success-soft: rgb(16 185 129 / 0.12);
   --po-success-border: rgb(16 185 129 / 0.3);
-  --po-warning: #c2410c;
-  --po-warning-soft: rgb(194 65 12 / 0.13);
+  --po-warning: var(--app-warning);
+  --po-warning-soft: rgb(249 115 22 / 0.13);
   --po-warning-border: rgb(249 115 22 / 0.34);
-  --po-danger: #dc2626;
+  --po-danger: var(--app-danger);
   --po-danger-soft: rgb(220 38 38 / 0.13);
   --po-danger-border: rgb(248 113 113 / 0.34);
-  --po-info: #22d3ee;
+  --po-info: var(--app-info);
   --po-info-soft: rgb(34 211 238 / 0.14);
   --po-info-border: rgb(34 211 238 / 0.34);
-  --po-teal: #0f766e;
-  --po-teal-soft: rgb(15 118 110 / 0.13);
+  --po-teal: var(--app-teal);
+  --po-teal-soft: rgb(20 184 166 / 0.13);
   --po-teal-border: rgb(20 184 166 / 0.3);
-
-  --po-accent-overview: #0891b2;
-  --po-accent-applications: #22d3ee;
-  --po-accent-marketplace: #0891b2;
-  --po-accent-network: #0f766e;
-  --po-accent-storage: #0f766e;
-  --po-accent-backups: #059669;
-  --po-accent-monitoring: #c2410c;
-  --po-accent-automation: #0e7490;
-  --po-accent-settings: #567184;
-  --po-accent-support: #22d3ee;
-
+  --po-accent-overview: var(--app-info);
+  --po-accent-applications: var(--app-info);
+  --po-accent-marketplace: var(--app-info);
+  --po-accent-network: var(--app-teal);
+  --po-accent-storage: var(--app-teal);
+  --po-accent-backups: var(--app-success);
+  --po-accent-monitoring: var(--app-warning);
+  --po-accent-automation: var(--app-info);
+  --po-accent-settings: var(--app-text-muted);
+  --po-accent-support: var(--app-info);
   --po-radius-xs: 0.375rem;
   --po-radius-sm: 0.5rem;
   --po-radius-md: 0.75rem;
   --po-radius-lg: 1rem;
   --po-radius-xl: 1.25rem;
   --po-radius-full: 9999px;
-
-  --po-shadow-sm: 0 8px 24px rgb(8 47 73 / 0.12);
-  --po-shadow-md: 0 18px 54px rgb(8 47 73 / 0.16);
-  --po-shadow-lg: 0 28px 90px rgb(8 47 73 / 0.22);
-  --po-shadow-frame: 0 24px 80px rgb(8 47 73 / 0.18);
-  --po-shadow-panel: 0 18px 60px rgb(8 47 73 / 0.18);
-  --po-shadow-card: 0 18px 50px rgb(8 47 73 / 0.14);
-  --po-shadow-sidebar: 10px 0 42px rgb(2 6 23 / 0.28);
+  --po-shadow-sm: var(--app-shadow-sm);
+  --po-shadow-md: var(--app-shadow-md);
+  --po-shadow-lg: var(--app-shadow-lg);
+  --po-shadow-frame: var(--app-shadow-lg);
+  --po-shadow-panel: var(--app-shadow-md);
+  --po-shadow-card: var(--app-shadow-md);
+  --po-shadow-sidebar: var(--app-shadow-sidebar);
   --po-glow-brand: 0 0 0 1px rgb(34 211 238 / 0.24), 0 18px 55px rgb(8 145 178 / 0.24);
   --po-glow-success: 0 0 0 1px rgb(16 185 129 / 0.2), 0 14px 42px rgb(5 150 105 / 0.18);
   --po-glow-warning: 0 0 0 1px rgb(249 115 22 / 0.22), 0 14px 42px rgb(194 65 12 / 0.18);
@@ -141,31 +135,17 @@
   --po-pulse-danger: 0 0 0 5px rgb(220 38 38 / 0.14);
   --po-pulse-info: 0 0 0 5px rgb(34 211 238 / 0.15);
   --po-pulse-teal: 0 0 0 5px rgb(15 118 110 / 0.14);
-  --po-pulse-neutral: 0 0 0 5px rgb(86 113 132 / 0.12);
-
+  --po-pulse-neutral: 0 0 0 5px rgb(148 163 184 / 0.14);
   --po-space-page-x: clamp(1.25rem, 2vw, 2rem);
   --po-space-page-y: clamp(1.25rem, 2vw, 2rem);
   --po-space-section: 1.25rem;
   --po-space-card: 1.25rem;
-
   --po-type-hero: clamp(2.25rem, 4vw, 4rem);
   --po-type-h1: clamp(2rem, 3vw, 3rem);
   --po-type-h2: 1.5rem;
   --po-type-body: 0.9375rem;
   --po-type-small: 0.8125rem;
   --po-type-caption: 0.75rem;
-
-  /* Lean Project OS app-surface tokens for new reusable primitives. */
-  --app-surface: var(--color-slate-950);
-  --app-panel: var(--color-slate-900);
-  --app-panel-muted: var(--color-slate-800);
-  --app-border: var(--color-sky-400);
-  --app-text: var(--color-slate-50);
-  --app-text-muted: var(--color-sky-100);
-  --app-accent: var(--color-cyan-300);
-  --app-success: var(--color-emerald-300);
-  --app-warning: var(--color-orange-500);
-  --app-danger: var(--color-red-600);
 
   --background: oklch(0.73 0.045 220);
   --foreground: oklch(0.18 0.035 245);
@@ -348,14 +328,14 @@
 }
 
 html {
-  background: var(--po-bg-app);
+  background: var(--app-page);
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: var(--po-bg-app);
+  background: var(--app-page);
 }
 
 button,
@@ -365,7 +345,7 @@ input {
 
 ::selection {
   background: rgb(34 211 238 / 0.32);
-  color: var(--po-text-primary);
+  color: var(--app-text);
 }
 
 .po-page-tall {

@@ -1,10 +1,10 @@
 import { AlertTriangle, AppWindow, Archive, CalendarClock, CheckCircle2, Clock3, Info, Layers3, Loader2, Play, RotateCcw, ShieldCheck, Sparkles, TimerReset } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
+import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import {
   Dialog,
   DialogContent,
@@ -27,21 +27,8 @@ import {
   formatBackupDate,
 } from './BackupsPage.logic';
 
-export function BackupPanel({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  return (
-    <Surface as="section" className={cn('p-5', className)} id={id} tone="panel">
-      {children}
-    </Surface>
-  );
-}
-
-export function BackupInset({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <Surface className={cn('p-3', className)} tone="muted">
-      {children}
-    </Surface>
-  );
-}
+export const BackupPanel = ProjectPanel;
+export const BackupInset = ProjectInset;
 
 export function ProtectionPanel({ latestRestore, report }: { latestRestore: RestorePoint | null; report: BackupReport | null }) {
   const protectedPercent = report?.totalApps ? Math.round((report.protectedApps / report.totalApps) * 100) : 0;
@@ -315,12 +302,7 @@ export function SectionHeader({ compact = false, description, icon: Icon, title 
 }
 
 export function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return (
-    <BackupInset className={cn('text-center', compact ? 'p-4' : 'p-8')}>
-      <p className="font-bold text-white">{title}</p>
-      <p className="mt-1 text-sm text-slate-400">{message}</p>
-    </BackupInset>
-  );
+  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 export function AttentionCard({ app }: { app: AppBackupStatus }) {

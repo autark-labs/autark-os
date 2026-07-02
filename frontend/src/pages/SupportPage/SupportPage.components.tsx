@@ -1,29 +1,15 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, Copy, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
+import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { SupportFinding, SupportLogLine, SupportRedactionRule } from '@/types/system';
 import { humanize } from './SupportPage.logic';
 
-export function SupportPanel({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
-  return (
-    <Surface as="section" className={cn('p-5', className)} id={id} tone="panel">
-      {children}
-    </Surface>
-  );
-}
-
-export function SupportInset({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <Surface className={cn('p-3', className)} tone="muted">
-      {children}
-    </Surface>
-  );
-}
+export const SupportPanel = ProjectPanel;
+export const SupportInset = ProjectInset;
 
 export function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'red' | 'slate' | 'cyan' | 'sky'; value: string }) {
   const tones = {
