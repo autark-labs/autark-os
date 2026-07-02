@@ -125,8 +125,7 @@ Do not paste long terminal logs into chat unless support asks. The support bundl
 
 Use these only when you need the technical details:
 
-- [Street-to-seat installation](./street-to-seat-installation.md): full host bootstrap flow and packaging direction.
-- [Installer Technical Implementation](./installer-technical-implementation.md): release bundle, GUI contract, update, uninstall, and support bundle internals.
+- [Beta installation guide](./beta-installation.md): source install, release bundle, update, uninstall, and support bundle commands.
 - [Service user installation](./service-user-installation.md): system user, systemd service, Docker access, and Tailscale operator setup.
 - [Local development](./local-development.md): source checkout and developer workflow.
 

@@ -53,4 +53,4 @@ Use this checklist before adding or updating a catalog app manifest.
 - `MarketplaceCatalogServiceTests.everyCatalogManifestGeneratesAnInstallPlan` passes.
 - `MarketplaceCatalogServiceTests.everyCatalogManifestDeclaresAccessExpectations` passes.
 - New validation failures should be handled in `ManifestValidatorTests`.
-- Run `backend/./gradlew test` before considering a manifest ready.
+- Run `cd backend && ./gradlew test` before considering a manifest ready.

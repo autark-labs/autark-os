@@ -39,8 +39,9 @@ assert "One-command installer" in guide
 assert "Advanced CLI" in guide
 assert "curl -fsSL https://install.project-os.dev | bash" in guide
 assert "project-os support-bundle --output" in guide
-assert "[Street-to-seat installation](./street-to-seat-installation.md)" in guide
-assert "[Installer Technical Implementation](./installer-technical-implementation.md)" in guide
+assert "[Beta installation guide](./beta-installation.md)" in guide
+assert "[Street-to-seat installation](./street-to-seat-installation.md)" not in guide
+assert "[Installer Technical Implementation](./installer-technical-implementation.md)" not in guide
 
 first_code = re.search(r"```(?:bash|text)?\n(.*?)\n```", guide, re.S)
 assert first_code, "guide should include at least one command block"
@@ -55,4 +56,5 @@ assert "Save support report" in attention_section
 
 assert "docs/non-technical-install-guide.md" in readme
 assert "./non-technical-install-guide.md" in docs_index
+assert "./beta-installation.md" in docs_index
 PY

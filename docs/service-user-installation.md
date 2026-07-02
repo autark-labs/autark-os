@@ -4,8 +4,10 @@ Project OS should run as a stable system service user on homelab hosts. The boot
 
 ## Script
 
+From the repository root:
+
 ```bash
-sudo /home/jack/Desktop/project-os-v2/scripts/install-project-os-service.sh
+sudo ./scripts/install-project-os-service.sh
 ```
 
 The script is idempotent and safe to rerun. It preserves `/var/lib/project-os`.
@@ -27,15 +29,15 @@ project-os version
 Useful modes:
 
 ```bash
-sudo /home/jack/Desktop/project-os-v2/scripts/install-project-os-service.sh --dry-run
-sudo /home/jack/Desktop/project-os-v2/scripts/install-project-os-service.sh --check
-sudo /home/jack/Desktop/project-os-v2/scripts/install-project-os-service.sh --no-start
+sudo ./scripts/install-project-os-service.sh --dry-run
+sudo ./scripts/install-project-os-service.sh --check
+sudo ./scripts/install-project-os-service.sh --no-start
 ```
 
 Install runtime data on a specific disk or mount:
 
 ```bash
-sudo /home/jack/Desktop/project-os-v2/scripts/install-project-os-service.sh \
+sudo ./scripts/install-project-os-service.sh \
   --runtime-dir /mnt/project-os-ssd/project-os
 ```
 
@@ -44,7 +46,7 @@ The runtime directory contains the SQLite database, app runtime files, generated
 Additional path overrides:
 
 ```bash
-sudo /home/jack/Desktop/project-os-v2/scripts/install-project-os-service.sh \
+sudo ./scripts/install-project-os-service.sh \
   --runtime-dir /mnt/project-os-ssd/project-os \
   --install-dir /mnt/project-os-ssd/project-os-bin \
   --log-dir /mnt/project-os-ssd/project-os-logs
@@ -87,7 +89,7 @@ backend/build/libs/*.jar
 You can also pass one explicitly:
 
 ```bash
-sudo PROJECT_OS_BACKEND_JAR=/path/to/project-os.jar /home/jack/Desktop/project-os-v2/scripts/install-project-os-service.sh
+sudo PROJECT_OS_BACKEND_JAR=/path/to/project-os.jar ./scripts/install-project-os-service.sh
 ```
 
 If no jar exists, the service unit is installed but not started.

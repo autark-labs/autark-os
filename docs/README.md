@@ -1,42 +1,48 @@
-# Project OS Docs
+# Project OS Documentation
 
-This folder tracks the current Project OS architecture, beta installation notes, implementation plans, and working design references.
+This folder contains user guides, beta installation notes, runtime architecture, manifest guidance, and development planning records.
 
-## Current Architecture And Beta Docs
+Use this page as the map. The README at the repository root is the public landing page.
 
-- [Non-technical install guide](./non-technical-install-guide.md): Normal-user path from choosing an installer to opening Project OS and installing the first app.
-- [Install smoke test playbook](./install-smoke-test-playbook.md): Repeatable donor-machine install checks with isolated smoke service paths.
-- [Marketplace runtime architecture](./marketplace-runtime.md): Core runtime model, manifest boundaries, API surface, and catalog principles.
-- [Installation flow and hardening](./installation-flow-and-hardening.md): Current one-click install flow, hardening already implemented, and known gaps.
-- [Manifest authoring checklist](./manifest-authoring-checklist.md): Required manifest fields, access expectations, install readiness, and test expectations.
-- [Service user installation](./service-user-installation.md): System service-user setup, durable host paths, systemd, Docker, and Tailscale operator requirements.
-- [Street-to-seat installation](./street-to-seat-installation.md): Full host bootstrap flow, production packaging, helper command, and future public installer model.
-- [Local development](./local-development.md): Opt-in Spring `dev` profile, mock Tailscale behavior, and local frontend/backend commands.
-- [Pi beta install and next development](./pi-beta-install-and-next-development.md): Real-device beta findings, installer simplification, release/update planning, SSD runtime behavior, manifest expansion, autowire setup, network bug follow-up, and future developer deploy ideas.
-- [Implemented page temporary functionality audit](./implemented-page-temporary-functionality-audit.md): Known temporary or limited behavior in implemented pages, excluding intentional placeholder pages.
-- [Update manager smoke targets](./update-manager-smoke-targets.md): Vaultwarden and Jellyfin smoke checks for app update policy, checkpoints, health, and rollback.
+## Start Here
 
-## Planning Archive
+- [Install Project OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
+- [Beta installation guide](./beta-installation.md): source install, release-bundle install, SSD runtime setup, update, uninstall, and support commands.
+- [Local development](./local-development.md): run the backend and frontend separately during development.
 
-- [Marketplace install stories](./plans/marketplace-install-stories.md): Story-driven implementation slices for marketplace installation.
-- [Access reliability and self-healing plan](./plans/access-reliability-self-healing-plan.md): Private access reliability, service health, repair workflows, and user-facing stability plan.
-- [User-facing hardening stories](./plans/user-facing-hardening-stories.md): Page stories for monitoring, setup health, devices, storage, backups, manifest health, private access cleanup, and support diagnostics.
-- [Frontend simplification and automation plan](./plans/frontend-simplification-plan.md): Guided actions, default-first installs, page ownership, auto-refresh, safety checkpoints, and basic/advanced presentation.
-- [Backup page refactor plan](./plans/backup-page-refactor-plan.md): Routine and manual backup UX and restore timeline planning.
-- [Implemented page cleanup stories](./plans/implemented-page-cleanup-stories.md): Story backlog for temporary or limited behavior in implemented pages.
-- [Appliance hardening next stories](./plans/appliance-hardening-next-stories.md): Six follow-up stories for CLI onboarding, release installers, network map v2, restore simulation, update management, and safe automation activation.
+## Runtime And Operations
 
-## Design References
+- [Marketplace runtime architecture](./marketplace-runtime.md): how catalog manifests become managed local apps.
+- [Manifest authoring checklist](./manifest-authoring-checklist.md): required fields and review checks before adding or updating a catalog app.
+- [Service user installation](./service-user-installation.md): `projectos` service user, durable host paths, systemd, Docker, and Tailscale operator setup.
+- [Application state prune list](./application-state-prune-list.md): active cleanup list for legacy app-state surfaces.
 
-- [Marketplace mockup](./initialDevelopment/Marketplace.png)
-- [Applications page reference](./applicationsPageWorking/ApplicationsPage.png)
-- [Network page reference](./networkPageWorking/networkPage.png)
-- [Network page v2 reference](./networkPageWorking/NetworkPageV2.png)
+## Current UI Reference Screenshots
 
-## Documentation Conventions
+Screenshots in [current-app-state](./current-app-state/) capture the present UI during active development. They are useful for visual QA, but they are not product documentation.
 
-- Keep architecture documents focused on stable boundaries and tradeoffs.
-- Put implementation sequencing in dedicated plan or story documents under `docs/plans`.
-- Keep user-facing behavior separate from low-level technical notes when possible.
-- Update [installation-flow-and-hardening.md](./installation-flow-and-hardening.md) when a planned reliability feature becomes implemented behavior.
-- Update [pi-beta-install-and-next-development.md](./pi-beta-install-and-next-development.md) after real-device install tests.
+## Development Notes
+
+The `docs/development/` folder contains working implementation plans, refactor notes, and stabilization stories. These files are useful for ongoing engineering work, but they may describe temporary states or completed slices.
+
+Start with the [development notes index](./development/README.md), then use these active references:
+
+- [MVP stabilization and maintainability plan](./development/mvp-stabilization-plan.md)
+- [Apps behavior overhaul](./development/appsBehaviorOverhaul.md)
+- [Application page rebuild final stories](./development/appPageRebuildFinalized.md)
+- [Database migration discipline](./development/database-migrations.md)
+- [Stability overhaul](./development/stabilityOverhaul.md)
+
+Historical planning records live under:
+
+- [Superpowers specs](./superpowers/specs/)
+- [Superpowers plans](./superpowers/plans/)
+- [Refactor snapshot](./development/refactor-snapshot-2026-06-20/)
+
+## Documentation Rules
+
+- Keep user guides task-oriented and written in plain language.
+- Keep architecture docs focused on stable boundaries and tradeoffs.
+- Keep implementation sequencing in development notes.
+- Do not link to planned docs until the file exists.
+- Prefer one clear entry point per audience: user, beta tester, developer, or maintainer.
