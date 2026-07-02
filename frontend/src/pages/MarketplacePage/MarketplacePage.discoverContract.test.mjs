@@ -58,3 +58,13 @@ test('marketplace page reads discover data and jobs through the repository layer
   assert.match(jobRepository, /JobsAPIClient\.get/);
   assert.match(repository, /invalidateApplicationState/);
 });
+
+test('marketplace detail deep-links found services and installed apps into My Apps', () => {
+  const detail = source('MarketplaceAppDetail.tsx');
+
+  assert.match(detail, /applicationDeepLinkForManagedApp/);
+  assert.match(detail, /applicationDeepLinkForObservedService/);
+  assert.doesNotMatch(detail, /reviewHref=\{appView\.reviewExistingHref\}/);
+  assert.doesNotMatch(detail, /<Link to="\/apps">View in My Apps<\/Link>/);
+  assert.doesNotMatch(detail, /<Link to="\/apps">Manage in My Apps<\/Link>/);
+});

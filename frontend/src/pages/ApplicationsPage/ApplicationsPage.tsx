@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
@@ -30,6 +31,11 @@ import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
 import { ApplicationWarningButton } from './components/ApplicationButtons';
 import { mapUninstallPlanToDestructiveActionPlan } from './extensions/ApplicationsPage.destructiveActions';
+import {
+  filterForApplicationDeepLinkTarget,
+  findApplicationDeepLinkTarget,
+  parseApplicationsDeepLink,
+} from './extensions/ApplicationsPage.deepLinks';
 import { buildApplicationSurfaceItems } from './extensions/ApplicationsPage.liveModel';
 import { operationStateForItem } from './extensions/ApplicationsPage.operations';
 import type {
@@ -45,6 +51,7 @@ type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'back
 export const ApplicationsPage = () => {
   const { viewMode } = useProjectSettings();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const appState = useApplicationStateRepository();
   const jobsQuery = useProjectOsJobsQuery();
   const [query, setQuery] = useState('');
@@ -55,7 +62,9 @@ export const ApplicationsPage = () => {
   const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
   const [trackedAppJobIds, setTrackedAppJobIds] = useState<string[]>([]);
+  const appliedDeepLinkKeyRef = useRef('');
   const railRef = useRef<HTMLDivElement | null>(null);
+  const deepLinkTarget = useMemo(() => parseApplicationsDeepLink(location.search), [location.search]);
 
   const items = useMemo(() => {
     const liveItems = buildApplicationSurfaceItems({
@@ -127,6 +136,28 @@ export const ApplicationsPage = () => {
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
+
+  useEffect(() => {
+    if (!deepLinkTarget.kind || !deepLinkTarget.id) {
+      appliedDeepLinkKeyRef.current = '';
+      return;
+    }
+
+    if (!items.length || appliedDeepLinkKeyRef.current === deepLinkTarget.key) {
+      return;
+    }
+
+    const targetItem = findApplicationDeepLinkTarget(items, deepLinkTarget);
+    if (!targetItem || !canCloseManagement()) {
+      return;
+    }
+
+    setQuery('');
+    setFilter(filterForApplicationDeepLinkTarget(targetItem) as ApplicationFilter);
+    setSelectedId(targetItem.id);
+    setManagementOpen(true);
+    appliedDeepLinkKeyRef.current = deepLinkTarget.key;
+  }, [canCloseManagement, deepLinkTarget, items]);
 
   useEffect(() => {
     if (!items.length) {

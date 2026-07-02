@@ -22,6 +22,10 @@ import { currentJobStepText, terminalJob } from '@/repositories/jobRepository';
 import type { DiscoverAppView, DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
+import {
+  applicationDeepLinkForManagedApp,
+  applicationDeepLinkForObservedService,
+} from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { InstallWizard } from './MarketplaceInstallWizard';
 import { AppImage, InfoCard, Stat, SupportBadge } from './MarketplacePage.shared';
 import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
@@ -57,6 +61,10 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
   const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
+  const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId) : '/apps';
+  const reviewExistingHref = appView.observedService
+    ? applicationDeepLinkForObservedService(appView.observedService)
+    : appView.reviewExistingHref;
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`
@@ -110,16 +118,16 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
           {isInstalled ? (
             <ProjectPrimaryButton asChild>
-              <Link to="/apps">
+              <Link to={installedAppHref}>
                 <CheckCircle2 className="size-4" />
                 View in My Apps
               </Link>
             </ProjectPrimaryButton>
           ) : needsExistingServiceReview ? (
             <>
-              {appView.reviewExistingHref ? (
+              {reviewExistingHref ? (
                 <ProjectWarningButton asChild>
-                  <Link to={appView.reviewExistingHref}>
+                  <Link to={reviewExistingHref}>
                     <TriangleAlert className="size-4" />
                     Review existing service
                   </Link>
@@ -151,10 +159,10 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
         </div>
 
         {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
-        {needsExistingServiceReview && <ExistingServiceNotice appView={appView} />}
+        {needsExistingServiceReview && <ExistingServiceNotice appView={appView} reviewHref={reviewExistingHref} />}
         {requiresInstallCaution(app) && !isInstalled && <InstallCautionNotice app={app} />}
-        <DuplicateInstallWarningDialog appName={app.name} onInstallCopy={acknowledgeDuplicateInstall} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={appView.reviewExistingHref} />
-        {isInstalled && <InstalledAppNotice app={installedApp} />}
+        <DuplicateInstallWarningDialog appName={app.name} onInstallCopy={acknowledgeDuplicateInstall} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={reviewExistingHref} />
+        {isInstalled && <InstalledAppNotice app={installedApp} manageHref={installedAppHref} />}
         {isInstalled && recoveryMode && recoveryMode !== 'reset-reinstall' && (
           <RecoveryInstallNotice
             disabled={installLocked || installing}
@@ -268,7 +276,7 @@ function InstallCautionNotice({ app }: { app: MarketplaceApp }) {
   );
 }
 
-function ExistingServiceNotice({ appView }: { appView: DiscoverAppView }) {
+function ExistingServiceNotice({ appView, reviewHref }: { appView: DiscoverAppView; reviewHref: string | null }) {
   return (
     <section className="rounded-lg border border-orange-400/40 bg-orange-500/10 p-4 text-sm text-orange-200">
       <div className="flex items-start gap-3">
@@ -277,9 +285,9 @@ function ExistingServiceNotice({ appView }: { appView: DiscoverAppView }) {
           <h4 className="font-bold text-current">{appView.stateLabel}</h4>
           <p className="mt-1 leading-6 text-current/80">{appView.stateDescription}</p>
           <p className="mt-2 leading-6 text-current/80">Project OS already sees this app on your system. Installing another copy can cause confusing behavior across your network, especially from phones, TVs, or other devices that discover services automatically. Pin or adopt the existing service when possible. Install a second copy only if you intentionally want two separate instances.</p>
-          {appView.reviewExistingHref && (
+          {reviewHref && (
             <Button asChild className="mt-3" size="sm" variant="outline">
-              <Link to={appView.reviewExistingHref}>Review existing service</Link>
+              <Link to={reviewHref}>Review existing service</Link>
             </Button>
           )}
         </div>
@@ -340,7 +348,7 @@ function RecoveryInstallNotice({ disabled, mode: _mode, onReinstallCurrent }: { 
   );
 }
 
-function InstalledAppNotice({ app }: { app: DiscoverInstalledAppSummary | null }) {
+function InstalledAppNotice({ app, manageHref }: { app: DiscoverInstalledAppSummary | null; manageHref: string }) {
   if (!app) {
     return null;
   }
@@ -358,7 +366,7 @@ function InstalledAppNotice({ app }: { app: DiscoverInstalledAppSummary | null }
               </ProjectPrimaryButton>
             )}
             <ProjectDarkControlButton asChild size="sm">
-              <Link to="/apps">Manage in My Apps</Link>
+              <Link to={manageHref}>Manage in My Apps</Link>
             </ProjectDarkControlButton>
           </div>
         </div>
@@ -413,7 +421,7 @@ function InlineInstallStatus({
                   </DisabledAction>
                 )}
                 <ProjectDarkControlButton asChild size="sm">
-                  <Link to="/apps">View in My Apps</Link>
+                  <Link to={applicationDeepLinkForManagedApp(installedApp?.appId || app.id)}>View in My Apps</Link>
                 </ProjectDarkControlButton>
               </div>
             )}
