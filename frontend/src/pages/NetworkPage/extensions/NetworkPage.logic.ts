@@ -1,7 +1,7 @@
 import { MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import type { AppRuntimeView } from '@/types/app';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationItem, PrivateAccessReconciliationReport, TailscaleDevice, TailscaleStatus } from '@/types/network';
-import type { AppExposureGroup, AppExposureLevel, NetworkDeviceView, NetworkIssueView, NetworkNodeAppDetail, NetworkNodeData, NetworkNodeStatus, NetworkPosture, PrivateAppAccess } from './NetworkPage.types';
+import type { AppExposureGroup, AppExposureLevel, NetworkDeviceView, NetworkIssueView, NetworkNodeStatus, NetworkPosture, PrivateAppAccess } from './NetworkPage.types';
 import { privateAccessUrlForApp } from './NetworkPage.privateAccess.js';
 
 export function buildNetworkPosture({
@@ -227,106 +227,6 @@ export function buildDeviceViews(tailscale: TailscaleStatus | null, tailnetDevic
   });
 }
 
-export function getNodeDetails(
-  nodeId: string,
-  context: {
-    apps: AppRuntimeView[];
-    exposureGroups?: Record<AppExposureLevel, AppExposureGroup>;
-    devices: NetworkDeviceView[];
-    privateAppAccess: PrivateAppAccess[];
-    reconciliation?: PrivateAccessReconciliationReport | null;
-    runningApps: AppRuntimeView[];
-    tailscale: TailscaleStatus | null;
-  },
-): NetworkNodeData {
-  const connected = Boolean(context.tailscale?.connected);
-  const details: Record<string, NetworkNodeData> = {
-    internet: {
-      detail: 'Public web access',
-      insight: 'Project OS should favor private links first. Public exposure can be added later as an intentional advanced action.',
-      kind: 'internet',
-      label: 'Internet',
-      status: 'neutral',
-    },
-    'project-os': {
-      detail: connected ? context.tailscale?.dnsName || context.tailscale?.deviceName || 'Connected' : 'Connect this device first',
-      insight: connected ? 'This device is ready to coordinate private access for your installed apps.' : 'Start here: connect Project OS to Tailscale so it can create private app paths.',
-      kind: 'project-os',
-      label: 'Project OS',
-      status: connected ? 'connected' : 'warning',
-    },
-    router: {
-      detail: 'Your home network',
-      insight: 'Local access stays available at home. Private access adds a safer path for phones and laptops when you are away.',
-      kind: 'router',
-      label: 'Home Network',
-      status: 'connected',
-    },
-    apps: {
-      count: context.runningApps.length,
-      detail: `${context.runningApps.length} ready now`,
-      insight: 'Running apps are the best candidates for private links. Stopped apps will stay hidden from access checks until they are started.',
-      kind: 'apps',
-      label: 'Running Apps',
-      status: context.runningApps.length > 0 ? 'connected' : 'neutral',
-    },
-    'private-apps': {
-      count: context.privateAppAccess.length,
-      detail: `${context.privateAppAccess.length} configured`,
-      insight: 'These apps are selected for private access. The next phase will verify each link against live Tailscale peer data.',
-      kind: 'private-apps',
-      label: 'Private Apps',
-      status: connected && context.privateAppAccess.length > 0 ? 'connected' : 'warning',
-    },
-    devices: {
-      count: context.devices.length,
-      detail: connected ? `${context.devices.filter((device) => device.status === 'connected').length} online now` : 'Waiting for setup',
-      deviceDetails: context.devices.map((device) => ({
-        connectionType: device.connectionType,
-        dnsName: device.dnsName,
-        ipAddress: device.ipAddress,
-        label: device.label,
-        lastSeen: device.lastSeen || device.detail,
-        status: device.status,
-        statusLabel: device.statusLabel,
-      })),
-      insight: connected ? 'This list is now backed by Tailscale peer data, including online state and connection path.' : 'Connect Project OS to Tailscale to see phones, laptops, and other devices.',
-      kind: 'devices',
-      label: 'Your Devices',
-      status: connected ? 'connected' : 'warning',
-    },
-    'public-apps': exposureDetails(context.exposureGroups?.public, 'public-apps', 'Wider Internet Apps', 'Apps in this area are reachable from outside your home network. Keep this list intentionally small.', context.reconciliation),
-    'network-apps': exposureDetails(context.exposureGroups?.tailnet, 'network-apps', 'Tailnet Apps', 'Apps in this area are reachable by trusted devices through Tailscale.', context.reconciliation),
-    lan: exposureDetails(context.exposureGroups?.lan, 'lan', 'Local Network Apps', 'Apps in this area are reachable from trusted devices on your home network.', context.reconciliation),
-    'local-apps': exposureDetails(context.exposureGroups?.local, 'local-apps', 'Local Only Apps', 'Apps in this area stay on the Project OS host. Other devices should not be able to open them directly.', context.reconciliation),
-  };
-  return details[nodeId] || details['project-os'];
-}
-
-export function getRecommendedActions(node: NetworkNodeData, connected: boolean, privateAppCount: number) {
-  if (!connected) {
-    return ['Connect Project OS to Tailscale.', 'Then choose which apps should be available privately.'];
-  }
-  if (node.kind === 'public-apps') {
-    return node.count && node.count > 0
-      ? ['Confirm each public app is intentionally exposed.', 'Prefer private links for apps that do not need the wider internet.']
-      : ['No apps are exposed to the wider internet.', 'Keep public access as an intentional advanced choice.'];
-  }
-  if (node.kind === 'network-apps') {
-    return ['These apps are reachable from trusted devices.', 'Use private links when you want access away from home.'];
-  }
-  if (node.kind === 'local-apps') {
-    return ['These apps stay on the Project OS host.', 'Move an app to private access only when other devices should open it.'];
-  }
-  if (node.kind === 'private-apps' && privateAppCount === 0) {
-    return ['Use the Private Apps tab below.', 'Turn on private access for the apps you use away from home.'];
-  }
-  if (node.kind === 'devices') {
-    return ['Add your phone or laptop to the same tailnet.', 'Use online and last-seen status to confirm private links are reachable.'];
-  }
-  return ['Review private links before sharing them.', 'Keep advanced networking changes intentional and reversible.'];
-}
-
 function classifyAppExposure(app: AppRuntimeView, tailscale: TailscaleStatus | null): AppExposureLevel {
   if (app.desiredAccess?.mode === 'public') {
     return 'public';
@@ -361,51 +261,11 @@ function classifyAppExposure(app: AppRuntimeView, tailscale: TailscaleStatus | n
   }
 }
 
-function exposureDetails(group: AppExposureGroup | undefined, kind: NetworkNodeData['kind'], label: string, fallbackInsight: string, reconciliation?: PrivateAccessReconciliationReport | null): NetworkNodeData {
-  return {
-    appDetails: buildNodeAppDetails(group?.apps ?? [], reconciliation),
-    count: group?.apps.length ?? 0,
-    detail: group?.detail ?? 'No apps in this area',
-    insight: group?.apps.length ? `${fallbackInsight} Apps here: ${group.apps.slice(0, 4).map((app) => app.appName).join(', ')}${group.apps.length > 4 ? ', and more.' : '.'}` : fallbackInsight,
-    kind,
-    label,
-    status: group?.status ?? 'neutral',
-  };
-}
-
-export function buildNodeAppDetails(apps: AppRuntimeView[], reconciliation?: PrivateAccessReconciliationReport | null): NetworkNodeAppDetail[] {
-  const reconciliationByAppId = new Map((reconciliation?.apps || []).map((item) => [item.appId, item]));
-  return apps.map((app) => buildNodeAppDetail(app, reconciliationByAppId.get(app.appId) || null));
-}
-
-function buildNodeAppDetail(app: AppRuntimeView, reconciliation: PrivateAccessReconciliationItem | null): NetworkNodeAppDetail {
-  const privateStatus = reconciliation?.status || app.observedAccess?.privateLinkStatus || null;
-  return {
-    appId: app.appId,
-    appName: app.appName,
-    exposureLabel: app.desiredAccess?.label || desiredExposureLabel(app),
-    expectedLocalPort: reconciliation?.expectedLocalPort ?? app.desiredAccess?.expectedLocalPort ?? app.settings?.expectedLocalPort ?? null,
-    observedLocalPort: reconciliation?.expectedPort ?? app.observedAccess?.localPort ?? null,
-    privateMapping: reconciliation?.desiredMapping || reconciliation?.target || app.observedAccess?.privateUrl || app.settings?.privateAccessUrl || null,
-    privateStatus,
-    lastCheckedAt: app.observedAccess?.lastAccessCheckAt || app.healthSnapshot?.checkedAt || null,
-    lastVerifiedAt: reconciliation?.verifiedAt || app.observedAccess?.lastSuccessfulAccessAt || null,
-    repairNeeded: Boolean(privateStatus && !['configured', 'healthy', 'not_enabled', 'waiting'].includes(privateStatus)),
-  };
-}
-
 function groupHasPrivateLinkIssue(apps: AppRuntimeView[], reconciliationByAppId: Map<string, PrivateAccessReconciliationItem>) {
   return apps.some((app) => {
     const item = reconciliationByAppId.get(app.appId);
     return item != null && !['healthy', 'waiting'].includes(item.status);
   });
-}
-
-function desiredExposureLabel(app: AppRuntimeView) {
-  if (app.desiredAccess?.mode === 'public') return 'Wider internet';
-  if (app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private' || app.settings?.tailscaleEnabled) return 'Tailnet';
-  if (app.desiredAccess?.mode === 'network') return 'Local network';
-  return 'This device only';
 }
 
 function isLocalhost(hostname: string) {

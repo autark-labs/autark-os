@@ -1,47 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
-import type { Node } from '@xyflow/react';
 import type { AppRuntimeView } from '@/types/app';
 import type { PrivateAccessReconciliationItem } from '@/types/network';
 
-export type NetworkNodeKind = 'internet' | 'project-os' | 'router' | 'apps' | 'private-apps' | 'devices' | 'lan' | 'public-apps' | 'network-apps' | 'local-apps';
 export type NetworkNodeStatus = 'connected' | 'warning' | 'neutral';
-
-export type NetworkNodeData = {
-  appDetails?: NetworkNodeAppDetail[];
-  count?: number;
-  detail: string;
-  deviceDetails?: NetworkNodeDeviceDetail[];
-  insight: string;
-  items?: string[];
-  kind: NetworkNodeKind;
-  label: string;
-  status: NetworkNodeStatus;
-};
-
-export type NetworkFlowNode = Node<NetworkNodeData, 'networkNode'>;
-
-export type NetworkNodeAppDetail = {
-  appId: string;
-  appName: string;
-  exposureLabel: string;
-  expectedLocalPort: number | null;
-  observedLocalPort: number | null;
-  privateMapping: string | null;
-  privateStatus: string | null;
-  lastCheckedAt: string | null;
-  lastVerifiedAt: string | null;
-  repairNeeded: boolean;
-};
-
-export type NetworkNodeDeviceDetail = {
-  connectionType: string;
-  dnsName: string;
-  ipAddress: string;
-  label: string;
-  lastSeen: string;
-  status: NetworkNodeStatus;
-  statusLabel: string;
-};
 
 export type NetworkAction = {
   label: string;

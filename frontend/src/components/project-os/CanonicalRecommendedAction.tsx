@@ -22,7 +22,7 @@ export function CanonicalRecommendedAction({ className }: CanonicalRecommendedAc
 
   return (
     <div className={cn('mb-5', className)}>
-      <RecommendedActionSurface
+      <PrimaryActionCard
         action={recommendedAction.primaryAction}
         body={recommendedAction.body}
         dismissible={recommendedAction.dismissible}
@@ -33,7 +33,7 @@ export function CanonicalRecommendedAction({ className }: CanonicalRecommendedAc
   );
 }
 
-function RecommendedActionSurface({
+function PrimaryActionCard({
   action,
   body,
   dismissible,
