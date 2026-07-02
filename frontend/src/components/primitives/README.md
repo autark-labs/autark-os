@@ -50,4 +50,4 @@ Settings uses `PageShell`, `Surface`, shared Project OS button primitives, and `
 
 Discover uses `PageShell`, `Surface`, `SearchFilterBar`, shared Project OS button primitives, and Marketplace-local card, wizard, and setup components under `pages/MarketplacePage`. Keep catalog-specific presentation local because Discover needs app-store density, install review dialogs, and guided setup controls that should not leak into operational pages.
 
-Avoid importing the legacy broad `ProjectOSComponents` styling helpers into pages as they are cleaned up. If a page needs one of those patterns, copy the visual decision into a small primitive or feature component and keep `className` available for layout tweaks.
+Avoid adding broad page-specific styling helpers as pages are cleaned up. If a page needs a repeated pattern, move the visual decision into a small primitive or feature component and keep `className` available for layout tweaks.

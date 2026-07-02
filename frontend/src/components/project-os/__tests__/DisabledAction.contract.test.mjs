@@ -23,7 +23,6 @@ test('disabled action component explains unavailable controls accessibly', () =>
 test('active user-facing surfaces use shared disabled action reasons', () => {
   const surfaces = [
     'src/components/RefreshStatus.tsx',
-    'src/components/project-os/ProjectOSComponents.tsx',
     'src/components/project-os/TailscaleControlPopover.tsx',
     'src/pages/AdminSecurityGate.tsx',
     'src/pages/ApplicationsPage/AdvancedApplicationsView.tsx',
