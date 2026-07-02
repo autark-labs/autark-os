@@ -180,7 +180,7 @@ export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, 
   const details = point ? restorePointDetails(point, apps, plan) : null;
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-2xl border-sky-400/30 bg-slate-900 text-slate-100">
+      <DialogContent className="min-w-200 border-sky-400/30 bg-slate-900 text-slate-100">
         <DialogHeader>
           <DialogTitle>{details?.title || 'Restore point details'}</DialogTitle>
           <DialogDescription className="text-slate-400">Review what this backup contains before verifying or restoring it.</DialogDescription>
@@ -194,7 +194,6 @@ export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, 
             </div>
             <InfoBlock title="Included apps" values={details.includedApps.length ? details.includedApps : ['No matching installed apps were found for this restore point.']} />
             <InfoBlock title="Verification" values={[details.verification, point.verificationMessage || 'No verification note recorded.', `Checksum: ${details.checksum}`]} />
-            <InfoBlock title="Restore preview" values={[details.restoreSummary]} />
             <InfoBlock tone="warning" title="Warnings" values={details.warnings} />
             <InfoBlock title="Stored at" values={[details.location]} />
           </div>

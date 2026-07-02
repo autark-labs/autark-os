@@ -335,7 +335,7 @@ function BackupsPage() {
                   </TabsList>
                 </Tabs>
               </div>
-              <div className="mt-5 min-h-[520px]">
+              <div className="mt-3 min-h-[400px]">
                 {restoreView === 'timeline' ? (
                   <RoutineTimeline apps={report.apps} latestRestore={latestRestore} nextRun={report.settings.nextRoutineRun} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} points={routineRestorePoints} running={running} />
                 ) : (
