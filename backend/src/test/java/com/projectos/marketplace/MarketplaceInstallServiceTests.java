@@ -280,6 +280,48 @@ class MarketplaceInstallServiceTests {
     }
 
     @Test
+    void failedInstallAfterComposeStartsRecordsVisibleFailedInstallWithoutBlockingNextInstallAttempt() {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
+        InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
+        ObservedServiceRepository observedRepository = new ObservedServiceRepository(runtimeLayout);
+        MarketplaceInstallService failedInstallService = installService(
+                runtimeLayout,
+                repository,
+                observedRepository,
+                null,
+                new FakeDockerComposeExecutor(List.of(new DockerContainerStatus("project-os-vaultwarden", "vaultwarden", "exited", "", "Exited (1) 2 seconds ago", ""))));
+
+        InstallResult failedResult = failedInstallService.install(manifest);
+
+        assertThat(failedResult.status()).isEqualTo("failed");
+        assertThat(repository.findById("vaultwarden")).isEmpty();
+        assertThat(observedRepository.findAll())
+                .singleElement()
+                .satisfies(service -> {
+                    assertThat(service.catalogAppId()).isEqualTo("vaultwarden");
+                    assertThat(service.ownershipState()).isEqualTo("failed_install");
+                    assertThat(service.runtimeState()).isEqualTo("failed");
+                    assertThat(service.displayName()).isEqualTo("Vaultwarden");
+                    assertThat(service.metadataJson()).contains("stopped or reported unhealthy");
+                });
+
+        MarketplaceInstallService successfulInstallService = installService(
+                runtimeLayout,
+                repository,
+                observedRepository,
+                null,
+                new FakeDockerComposeExecutor());
+
+        InstallResult successfulResult = successfulInstallService.install(manifest);
+
+        assertThat(successfulResult.status()).isEqualTo("installed");
+        assertThat(repository.findById("vaultwarden")).isPresent();
+        assertThat(observedRepository.findAll()).isEmpty();
+    }
+
+    @Test
     void installsWhenContainerIsRunningButHealthCheckIsStillStarting() throws Exception {
         ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -483,6 +525,15 @@ class MarketplaceInstallServiceTests {
             InstalledAppRepository repository,
             ObservedServiceRepository observedRepository,
             AppRuntimeMetadataWriter metadataWriter) {
+        return installService(runtimeLayout, repository, observedRepository, metadataWriter, new FakeDockerComposeExecutor());
+    }
+
+    private MarketplaceInstallService installService(
+            RuntimeLayout runtimeLayout,
+            InstalledAppRepository repository,
+            ObservedServiceRepository observedRepository,
+            AppRuntimeMetadataWriter metadataWriter,
+            DockerComposeExecutor dockerComposeExecutor) {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
         ObservedServiceService observedService = new ObservedServiceService(
                 observedRepository,
@@ -492,7 +543,7 @@ class MarketplaceInstallServiceTests {
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
                 new ComposeRenderer(runtimeLayout),
-                new FakeDockerComposeExecutor(),
+                dockerComposeExecutor,
                 repository,
                 customizationResolver,
                 new FakePostInstallProvisioner(),

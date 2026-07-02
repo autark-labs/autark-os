@@ -61,7 +61,7 @@ public final class ApplicationBehaviorStates {
         return switch (userStatus) {
             case ObservedServiceStatus.CONFLICT -> "blocked";
             case ObservedServiceStatus.OWNED_ELSEWHERE -> "conflict";
-            case ObservedServiceStatus.RECOVERABLE, ObservedServiceStatus.FOUND -> "needs_review";
+            case ObservedServiceStatus.RECOVERABLE, ObservedServiceStatus.FOUND, ObservedServiceStatus.FAILED_INSTALL -> "needs_review";
             default -> "none";
         };
     }

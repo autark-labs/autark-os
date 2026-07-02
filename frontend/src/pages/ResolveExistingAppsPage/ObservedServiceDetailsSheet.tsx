@@ -293,8 +293,8 @@ function planList(value: unknown) {
 function stateBadgeClass(service: ObservedServiceView) {
   return cn(
     service.userStatus === 'pinned_external' && 'border-sky-300/25 bg-sky-500/10 text-sky-100',
-    service.userStatus === 'recoverable' && 'border-amber-300/25 bg-amber-500/10 text-amber-100',
+    (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') && 'border-amber-300/25 bg-amber-500/10 text-amber-100',
     (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') && 'border-red-300/25 bg-red-500/10 text-red-100',
-    !['pinned_external', 'recoverable', 'managed_elsewhere', 'blocked'].includes(service.userStatus) && 'border-slate-600 bg-slate-800/60 text-slate-300',
+    !['pinned_external', 'recoverable', 'failed_install', 'managed_elsewhere', 'blocked'].includes(service.userStatus) && 'border-slate-600 bg-slate-800/60 text-slate-300',
   );
 }

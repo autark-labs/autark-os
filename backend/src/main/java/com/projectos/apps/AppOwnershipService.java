@@ -66,14 +66,16 @@ public class AppOwnershipService {
                 .orElse(null);
         ObservedService recoverable = matchingObserved(manifest.id(), observedServices, service -> "legacy_project_os".equals(service.ownershipState())).orElse(null);
         ObservedService managedElsewhere = matchingObserved(manifest.id(), observedServices, service -> "foreign_project_os".equals(service.ownershipState())).orElse(null);
+        ObservedService failedInstall = matchingObserved(manifest.id(), observedServices, service -> "failed_install".equals(service.ownershipState())).orElse(null);
         ObservedService blocked = matchingObserved(manifest.id(), observedServices, service -> "unknown_conflict".equals(service.ownershipState())).orElse(null);
         ObservedService pinned = matchingObserved(manifest.id(), observedServices, service -> "pinned".equals(service.userVisibility())).orElse(null);
         ObservedService found = matchingObserved(manifest.id(), observedServices, service -> !"owned_managed".equals(service.ownershipState())).orElse(null);
 
-        AppOwnershipState state = state(installed, recoverable, managedElsewhere, blocked, pinned, found);
+        AppOwnershipState state = state(installed, recoverable, managedElsewhere, failedInstall, blocked, pinned, found);
         ObservedService observedService = switch (state) {
             case RECOVERABLE -> recoverable;
             case MANAGED_ELSEWHERE -> managedElsewhere;
+            case FAILED_INSTALL -> failedInstall;
             case BLOCKED -> blocked;
             case PINNED_EXTERNAL -> pinned;
             case FOUND_ON_SERVER -> found;
@@ -121,6 +123,7 @@ public class AppOwnershipService {
             InstalledApp installed,
             ObservedService recoverable,
             ObservedService managedElsewhere,
+            ObservedService failedInstall,
             ObservedService blocked,
             ObservedService pinned,
             ObservedService found) {
@@ -132,6 +135,9 @@ public class AppOwnershipService {
         }
         if (managedElsewhere != null) {
             return AppOwnershipState.MANAGED_ELSEWHERE;
+        }
+        if (failedInstall != null) {
+            return AppOwnershipState.FAILED_INSTALL;
         }
         if (blocked != null) {
             return AppOwnershipState.BLOCKED;
@@ -172,6 +178,7 @@ public class AppOwnershipService {
             String reviewExistingHref) {
         return switch (state) {
             case INSTALLED_MANAGED -> installedActions(installed);
+            case FAILED_INSTALL -> List.of(reviewSetup(appId));
             case PINNED_EXTERNAL, FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> existingServiceActions(appId, observedService, reviewExistingHref);
             case COMING_SOON -> List.of(unavailable());
             default -> List.of(reviewSetup(appId));
@@ -200,6 +207,7 @@ public class AppOwnershipService {
             String reviewExistingHref) {
         return switch (state) {
             case INSTALLED_MANAGED -> manage(appId);
+            case FAILED_INSTALL -> reviewSetup(appId);
             case PINNED_EXTERNAL, FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> reviewExisting(reviewExistingHref);
             case COMING_SOON -> unavailable();
             default -> reviewSetup(appId);
@@ -245,6 +253,7 @@ public class AppOwnershipService {
             case RECOVERABLE -> "Recoverable";
             case MANAGED_ELSEWHERE -> "Managed elsewhere";
             case BLOCKED -> "Blocked";
+            case FAILED_INSTALL -> "Install failed";
             case COMING_SOON -> "Coming soon";
             default -> "Available";
         };
@@ -254,7 +263,7 @@ public class AppOwnershipService {
         return switch (state) {
             case INSTALLED_MANAGED -> "Managed by this Project OS installation.";
             case PINNED_EXTERNAL -> "Pinned to My Apps. Project OS can open it but does not manage its runtime.";
-            case FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> observedService == null ? "" : observedService.userStatusDescription();
+            case FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED, FAILED_INSTALL -> observedService == null ? "" : observedService.userStatusDescription();
             case COMING_SOON -> "This app is not available yet.";
             default -> "Ready to review before install.";
         };
@@ -264,7 +273,7 @@ public class AppOwnershipService {
         return switch (state) {
             case INSTALLED_MANAGED -> "success";
             case PINNED_EXTERNAL -> "info";
-            case RECOVERABLE -> "warning";
+            case RECOVERABLE, FAILED_INSTALL -> "warning";
             case MANAGED_ELSEWHERE, BLOCKED -> "danger";
             default -> "neutral";
         };
@@ -275,7 +284,7 @@ public class AppOwnershipService {
             case INSTALLED_MANAGED -> "success";
             case PINNED_EXTERNAL -> "info";
             case FOUND_ON_SERVER -> "observed";
-            case RECOVERABLE -> "warning";
+            case RECOVERABLE, FAILED_INSTALL -> "warning";
             case MANAGED_ELSEWHERE, BLOCKED -> "danger";
             case COMING_SOON -> "muted";
             default -> "neutral";

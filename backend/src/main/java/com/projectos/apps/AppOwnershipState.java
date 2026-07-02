@@ -10,6 +10,7 @@ public enum AppOwnershipState {
     RECOVERABLE("recoverable"),
     MANAGED_ELSEWHERE("managed_elsewhere"),
     BLOCKED("blocked"),
+    FAILED_INSTALL("failed_install"),
     COMING_SOON("coming_soon");
 
     private final String value;

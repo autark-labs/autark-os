@@ -150,6 +150,41 @@ public class ObservedServiceService {
                 .toList();
     }
 
+    public void recordFailedInstall(ApplicationManifest manifest, String accessUrl, String runtimePath, String composeProject, String message, List<String> logs) {
+        if (repository == null || manifest == null) {
+            return;
+        }
+        Instant now = Instant.now();
+        ProjectOsIdentity identity = currentIdentity.get();
+        repository.upsert(new ObservedService(
+                "project-os-install:" + manifest.id(),
+                ObservedServiceSource.PROJECT_OS_INSTALL,
+                manifest.id(),
+                manifest.name(),
+                cleanToNull(accessUrl),
+                blankDefault(manifest.category(), "Applications"),
+                "LAN",
+                manifest.id(),
+                "project_os_failed_install",
+                "failed_install",
+                "observed",
+                "failed",
+                false,
+                identity.instanceId(),
+                now,
+                now,
+                null,
+                null,
+                failedInstallMetadata(runtimePath, composeProject, message, logs)));
+    }
+
+    public void clearFailedInstall(String catalogAppId) {
+        if (repository == null || catalogAppId == null || catalogAppId.isBlank()) {
+            return;
+        }
+        repository.deleteFailedInstall(catalogAppId);
+    }
+
     public ObservedServiceAdoptionPlan adoptionPlan(String id) {
         ObservedService service = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
@@ -325,7 +360,9 @@ public class ObservedServiceService {
                 pinned,
                 managedByThisProjectOs,
                 adoptable(service),
-                service.catalogAppId() != null && !"owned_managed".equals(service.ownershipState()),
+                service.catalogAppId() != null
+                        && !"owned_managed".equals(service.ownershipState())
+                        && !"failed_install".equals(service.ownershipState()),
                 actions(service),
                 metadata(service));
     }
@@ -376,6 +413,9 @@ public class ObservedServiceService {
         if ("unknown_conflict".equals(service.ownershipState())) {
             return ObservedServiceStatus.CONFLICT;
         }
+        if ("failed_install".equals(service.ownershipState())) {
+            return ObservedServiceStatus.FAILED_INSTALL;
+        }
         if ("pinned".equals(service.userVisibility())) {
             return ObservedServiceStatus.PINNED;
         }
@@ -389,6 +429,7 @@ public class ObservedServiceService {
             case ObservedServiceStatus.RECOVERABLE -> "Recoverable";
             case ObservedServiceStatus.OWNED_ELSEWHERE -> "Owned elsewhere";
             case ObservedServiceStatus.CONFLICT -> "Conflict";
+            case ObservedServiceStatus.FAILED_INSTALL -> "Install failed";
             default -> "Found";
         };
     }
@@ -400,6 +441,7 @@ public class ObservedServiceService {
             case ObservedServiceStatus.RECOVERABLE -> "Project OS found recoverable app metadata for this service.";
             case ObservedServiceStatus.OWNED_ELSEWHERE -> "Owned by another Project OS installation.";
             case ObservedServiceStatus.CONFLICT -> "This service may block installing a managed copy.";
+            case ObservedServiceStatus.FAILED_INSTALL -> "Project OS started creating this app but did not finish. Review setup or click install again when ready.";
             default -> "Found on this server.";
         };
     }
@@ -408,6 +450,12 @@ public class ObservedServiceService {
         java.util.ArrayList<ObservedServiceAction> actions = new java.util.ArrayList<>();
         if (service.url() != null && !service.url().isBlank()) {
             actions.add(new ObservedServiceAction("open", "Open", "external", service.url(), null, false, ""));
+        }
+        if ("failed_install".equals(service.ownershipState())) {
+            if (service.catalogAppId() != null && !service.catalogAppId().isBlank()) {
+                actions.add(new ObservedServiceAction("review_setup", "Review setup", "route", "/discover?app=" + encode(service.catalogAppId()), null, false, ""));
+            }
+            return List.copyOf(actions);
         }
         if ("pinned".equals(service.userVisibility())) {
             actions.add(new ObservedServiceAction("unpin", "Unpin from My Apps", "api", "/api/observed-services/" + encode(service.id()) + "/unpin", "POST", false, ""));
@@ -429,6 +477,19 @@ public class ObservedServiceService {
     private static boolean adoptable(ObservedService service) {
         return ObservedServiceSource.DOCKER.equals(service.source())
                 && ("legacy_project_os".equals(service.ownershipState()) || "foreign_project_os".equals(service.ownershipState()));
+    }
+
+    private String failedInstallMetadata(String runtimePath, String composeProject, String message, List<String> logs) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("runtimePath", blankDefault(runtimePath, ""));
+        metadata.put("composeProject", blankDefault(composeProject, ""));
+        metadata.put("failureMessage", blankDefault(message, "Install failed after Project OS started creating runtime resources."));
+        metadata.put("logTail", logs == null ? List.of() : logs.stream().skip(Math.max(0, logs.size() - 20)).toList());
+        try {
+            return objectMapper.writeValueAsString(metadata);
+        } catch (java.io.IOException exception) {
+            return "{}";
+        }
     }
 
     private static Map<String, String> metadata(ObservedService service) {
@@ -455,5 +516,13 @@ public class ObservedServiceService {
 
     private static String encode(String value) {
         return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static String cleanToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private static String blankDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 }

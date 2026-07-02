@@ -9,6 +9,7 @@ export type AppOwnershipState =
   | 'recoverable'
   | 'managed_elsewhere'
   | 'blocked'
+  | 'failed_install'
   | 'coming_soon'
   | string;
 

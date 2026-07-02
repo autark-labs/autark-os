@@ -338,13 +338,14 @@ function stateLabel(service: ObservedServiceView) {
   if (service.userStatus === 'recoverable') return 'Recoverable';
   if (service.userStatus === 'managed_elsewhere') return 'Managed elsewhere';
   if (service.userStatus === 'blocked') return 'Blocked';
+  if (service.userStatus === 'failed_install') return 'Install failed';
   return 'Found';
 }
 
 function stateTone(service: ObservedServiceView): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
   if (service.managedByThisProjectOs) return 'success';
   if (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') return 'danger';
-  if (service.userStatus === 'recoverable') return 'warning';
+  if (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') return 'warning';
   if (service.pinned || service.userStatus === 'pinned_external') return 'info';
   return 'neutral';
 }

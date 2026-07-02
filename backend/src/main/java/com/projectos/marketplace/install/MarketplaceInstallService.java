@@ -145,12 +145,14 @@ public class MarketplaceInstallService {
                     null,
                     setupGuide(manifest, existingApp.accessUrl(), null, PostInstallProvisioningResult.empty()));
         }
+        Path appRoot = null;
+        String composeProject = "";
         try {
             String appInstanceId = newAppInstanceId();
-            String composeProject = composeProject(manifest);
+            composeProject = composeProject(manifest);
             activityInfo("install_started", "Installing " + manifest.name(), "Project OS is preparing storage, networking, and containers for " + manifest.name() + ".", manifest.id());
             recordStep(steps, sink, InstallStep.completed("Preparing app", "Validated manifest and generated install plan."));
-            Path appRoot = directoryManager.prepare(manifest);
+            appRoot = directoryManager.prepare(manifest);
             recordStep(steps, sink, InstallStep.completed("Creating safe storage", appRoot.toString()));
 
             packageCopier.copyManifest(manifest, appRoot);
@@ -163,6 +165,7 @@ public class MarketplaceInstallService {
             if (!composeResult.successful()) {
                 recordStep(steps, sink, InstallStep.failed("Starting services", "Docker Compose exited with code " + composeResult.exitCode()));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", String.join("\n", composeResult.output()));
+                recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, "Docker Compose failed to start the app.", logs);
                 activityWarning("install_failed", "Install failed for " + manifest.name(), "Docker Compose could not start the app containers.", manifest.id());
                 return new InstallResult(manifest.id(), manifest.name(), "failed", "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
             }
@@ -172,6 +175,7 @@ public class MarketplaceInstallService {
             if (!startupCheck.ready()) {
                 recordStep(steps, sink, InstallStep.failed("Checking app health", startupCheck.detail()));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", startupCheck.detail());
+                recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, startupCheck.detail(), logs);
                 activityWarning("install_failed", "Install needs attention for " + manifest.name(), startupCheck.detail(), manifest.id());
                 return new InstallResult(manifest.id(), manifest.name(), "failed", startupCheck.detail(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
             }
@@ -195,6 +199,7 @@ public class MarketplaceInstallService {
                 String message = "Project OS could not confirm that this app is managed by this installation. The install was stopped so we do not show a service as installed when it is not under Project OS control.";
                 recordStep(steps, sink, InstallStep.failed("Confirming ownership", message));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", message);
+                recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, message, logs);
                 activityWarning("install_failed", "Install ownership check failed for " + manifest.name(), message, manifest.id());
                 return new InstallResult(manifest.id(), manifest.name(), "failed", message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
             }
@@ -215,6 +220,7 @@ public class MarketplaceInstallService {
                     runtimeConfiguration.storageSubfolders(),
                     runtimeConfiguration.backup()));
             installedAppRepository.recordEvent(manifest.id(), "installed", manifest.name() + " installed successfully.");
+            clearFailedPartialInstall(manifest.id());
             activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Project OS.", manifest.id());
 
             return new InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Project-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
@@ -225,8 +231,9 @@ public class MarketplaceInstallService {
             } catch (RuntimeException ignored) {
                 // Preserve the original install failure for the API response.
             }
+            recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, exception.getMessage(), logs);
             activityError("install_failed", "Install failed for " + manifest.name(), exception.getMessage(), manifest.id(), exception);
-            return new InstallResult(manifest.id(), manifest.name(), "failed", exception.getMessage(), manifest.accessUrl(), plan, steps, logs, null, setupGuide(manifest, manifest.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            return new InstallResult(manifest.id(), manifest.name(), "failed", exception.getMessage(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
         }
     }
 
@@ -243,6 +250,7 @@ public class MarketplaceInstallService {
         observedServiceService.refresh();
         return observedServiceService.matchingCatalogServices(manifest.id()).stream()
                 .filter(service -> !"owned_managed".equals(service.ownershipState()))
+                .filter(service -> !"failed_install".equals(service.ownershipState()))
                 .toList();
     }
 
@@ -272,6 +280,40 @@ public class MarketplaceInstallService {
                         || service.projectOsInstanceId() == null
                         || service.projectOsInstanceId().isBlank()
                         || currentInstanceId.equals(service.projectOsInstanceId())));
+    }
+
+    private void recordFailedPartialInstall(
+            ApplicationManifest manifest,
+            ResolvedRuntimeConfiguration runtimeConfiguration,
+            Path appRoot,
+            String composeProject,
+            String message,
+            List<String> logs) {
+        if (observedServiceService == null || appRoot == null) {
+            return;
+        }
+        try {
+            observedServiceService.recordFailedInstall(
+                    manifest,
+                    runtimeConfiguration.accessUrl(),
+                    appRoot.toString(),
+                    composeProject,
+                    message,
+                    logs);
+        } catch (RuntimeException ignored) {
+            // Preserve the original install failure for the API response.
+        }
+    }
+
+    private void clearFailedPartialInstall(String appId) {
+        if (observedServiceService == null) {
+            return;
+        }
+        try {
+            observedServiceService.clearFailedInstall(appId);
+        } catch (RuntimeException ignored) {
+            // Install success should not be hidden by cleanup of an old failed marker.
+        }
     }
 
     private void recordStep(List<InstallStep> steps, Consumer<InstallStep> sink, InstallStep step) {

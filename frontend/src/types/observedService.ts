@@ -7,6 +7,7 @@ export type ObservedServiceUserStatus =
   | 'recoverable'
   | 'managed_elsewhere'
   | 'blocked'
+  | 'failed_install'
   | 'available'
   | 'coming_soon'
   | string;

@@ -88,7 +88,7 @@ function managedAppSurfaceItem(
 
 function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSurfaceItem {
   const pinned = service.pinned || service.userStatus === 'pinned_external';
-  const needsReview = ['recoverable', 'managed_elsewhere', 'blocked'].includes(service.userStatus) || !pinned;
+  const needsReview = ['recoverable', 'managed_elsewhere', 'blocked', 'failed_install'].includes(service.userStatus) || !pinned;
   const managementState = backendManagementState(service.managementState ?? (pinned ? 'linked' : 'found'));
   const readinessState = backendReadinessState(service.readinessState ?? observedReadinessState(service, pinned));
   const attentionState = backendAttentionState(service.attentionState ?? observedAttentionState(service, needsReview));
@@ -326,6 +326,14 @@ function managedNextAction(
 }
 
 function observedNextAction(service: ObservedServiceView): ApplicationNextAction {
+  if (service.userStatus === 'failed_install') {
+    return {
+      description: service.userStatusDescription || 'Review this failed install before trying again.',
+      id: 'review_found_service',
+      label: 'Review install',
+    };
+  }
+
   if (service.userStatus === 'recoverable') {
     return {
       description: service.userStatusDescription || 'Review this service before recovering it into Project OS.',

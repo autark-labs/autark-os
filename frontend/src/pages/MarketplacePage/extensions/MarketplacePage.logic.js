@@ -205,6 +205,7 @@ function cardToneForState(state) {
   if (state === 'pinned_external') return 'info';
   if (state === 'found_on_server') return 'observed';
   if (state === 'recoverable') return 'warning';
+  if (state === 'failed_install') return 'warning';
   if (state === 'managed_elsewhere' || state === 'blocked') return 'danger';
   if (state === 'coming_soon') return 'muted';
   return 'neutral';

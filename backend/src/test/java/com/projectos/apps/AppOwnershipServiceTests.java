@@ -194,6 +194,24 @@ class AppOwnershipServiceTests {
     }
 
     @Test
+    void failedInstallObservedServiceIsVisibleWithoutBlockingDeliberateInstall() {
+        ObservedServiceRepository observedRepository = observedRepository();
+        observedRepository.upsert(observed("project-os-install:vaultwarden", "vaultwarden", "failed_install", "observed"));
+
+        AppOwnershipView view = service(installedRepository(), observedRepository).app("vaultwarden").orElseThrow();
+
+        assertThat(view.state()).isEqualTo(AppOwnershipState.FAILED_INSTALL);
+        assertThat(view.stateLabel()).isEqualTo("Install failed");
+        assertThat(view.statusTone()).isEqualTo("warning");
+        assertThat(view.installCopyWarningRequired()).isFalse();
+        assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("review_setup", "Review setup", "route", "/discover?app=vaultwarden", null, false, ""));
+        assertThat(view.availableActions()).extracting(AppOwnershipAction::id).containsExactly("review_setup");
+        assertThat(view.observedService()).isNotNull();
+        assertThat(view.observedService().userStatus()).isEqualTo("failed_install");
+        assertThat(view.observedService().userStatusLabel()).isEqualTo("Install failed");
+    }
+
+    @Test
     void ownershipProjectionReadsCachedObservedServicesWithoutScanningHost() {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("manual:vaultwarden", "vaultwarden", "external", "pinned"));

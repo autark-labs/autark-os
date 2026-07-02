@@ -21,6 +21,7 @@ export function resolveExistingServiceActions(service) {
 }
 
 function servicePriority(service) {
+  if (service.userStatus === 'failed_install') return 0;
   if (service.userStatus === 'recoverable') return 0;
   if (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') return 1;
   if (service.userStatus === 'found_on_server') return 2;

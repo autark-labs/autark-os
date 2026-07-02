@@ -150,6 +150,16 @@ public class ObservedServiceRepository extends DatabaseBackedRepository {
                 """, cleanToNull(projectOsInstanceId), now.toString(), id);
     }
 
+    public void deleteFailedInstall(String catalogAppId) {
+        migrate();
+        executeUpdate("""
+                delete from observed_services
+                where catalog_app_id = ?
+                  and source = 'project_os_install'
+                  and ownership_state = 'failed_install'
+                """, cleanToNull(catalogAppId));
+    }
+
     private boolean executeUpdate(String sql, String... values) {
         try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
             for (int index = 0; index < values.length; index++) {

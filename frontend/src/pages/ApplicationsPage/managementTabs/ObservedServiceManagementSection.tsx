@@ -243,6 +243,12 @@ function planList(value: unknown) {
 }
 
 function observedServiceCopy(item: ApplicationSurfaceItem) {
+  if (item.userStatus === 'failed_install') {
+    return {
+      title: 'Install failed',
+      description: item.userStatusDescription || 'Project OS started creating this app but did not finish. Review setup or click install again when ready.',
+    };
+  }
   if (item.userStatus === 'recoverable') {
     return {
       title: 'Recoverable service',
