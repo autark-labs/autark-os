@@ -304,7 +304,7 @@ public class AppOwnershipService {
     }
 
     private String myAppsFocusHref(String kind, String id) {
-        return "/apps?focus=" + encode(kind + ":" + id);
+        return "/apps?focus=" + encode(kind + ":" + id) + "&panel=manage";
     }
 
     private String normalizeToken(String value) {

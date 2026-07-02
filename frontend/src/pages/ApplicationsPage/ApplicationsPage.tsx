@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
@@ -32,6 +32,7 @@ import { AdvancedApplicationsView } from './AdvancedApplicationsView';
 import { ApplicationWarningButton } from './components/ApplicationButtons';
 import { mapUninstallPlanToDestructiveActionPlan } from './extensions/ApplicationsPage.destructiveActions';
 import {
+  applicationDeepLinkForSurfaceItem,
   filterForApplicationDeepLinkTarget,
   findApplicationDeepLinkTarget,
   parseApplicationsDeepLink,
@@ -43,6 +44,7 @@ import type {
   ApplicationSettingsAction,
   ApplicationSettingsFormValues,
   ApplicationSettingsImpact,
+  ApplicationSurfaceItem,
 } from './extensions/ApplicationsPage.types';
 
 type ApplicationFilter = 'all' | 'managed' | 'pinned' | 'found' | 'needs_review';
@@ -52,6 +54,7 @@ export const ApplicationsPage = () => {
   const { viewMode } = useProjectSettings();
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
   const appState = useApplicationStateRepository();
   const jobsQuery = useProjectOsJobsQuery();
   const [query, setQuery] = useState('');
@@ -137,6 +140,37 @@ export const ApplicationsPage = () => {
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
 
+  const focusApplicationItem = useCallback((item: ApplicationSurfaceItem, managementOpen = false) => {
+    setSelectedId(item.id);
+    setManagementOpen(managementOpen);
+    navigate(applicationDeepLinkForSurfaceItem(item, { panel: managementOpen ? 'manage' : null }), { replace: true });
+  }, [navigate]);
+
+  const handleSelectItem = useCallback((id: string) => {
+    const item = items.find((candidate) => candidate.id === id);
+    if (item) {
+      focusApplicationItem(item);
+    }
+  }, [focusApplicationItem, items]);
+
+  const clearApplicationFocus = useCallback(() => {
+    appliedDeepLinkKeyRef.current = '';
+    setManagementOpen(false);
+    navigate('/apps', { replace: true });
+  }, [navigate]);
+
+  const handleManagementOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      clearApplicationFocus();
+      return;
+    }
+    if (selectedItem) {
+      focusApplicationItem(selectedItem, true);
+      return;
+    }
+    setManagementOpen(true);
+  }, [clearApplicationFocus, focusApplicationItem, selectedItem]);
+
   useEffect(() => {
     if (!deepLinkTarget.kind || !deepLinkTarget.id) {
       appliedDeepLinkKeyRef.current = '';
@@ -155,7 +189,7 @@ export const ApplicationsPage = () => {
     setQuery('');
     setFilter(filterForApplicationDeepLinkTarget(targetItem) as ApplicationFilter);
     setSelectedId(targetItem.id);
-    setManagementOpen(true);
+    setManagementOpen(deepLinkTarget.panel === 'manage');
     appliedDeepLinkKeyRef.current = deepLinkTarget.key;
   }, [canCloseManagement, deepLinkTarget, items]);
 
@@ -216,7 +250,7 @@ export const ApplicationsPage = () => {
       }
 
       if (canCloseManagement()) {
-        setManagementOpen(false);
+        clearApplicationFocus();
       }
     };
 
@@ -225,7 +259,7 @@ export const ApplicationsPage = () => {
       scrollTimers.forEach((timer) => window.clearTimeout(timer));
       document.removeEventListener('pointerdown', handlePointerDown);
     };
-  }, [canCloseManagement, managementOpen]);
+  }, [canCloseManagement, clearApplicationFocus, managementOpen]);
 
   useEffect(() => {
     if (!trackedAppJobIds.length) {
@@ -511,8 +545,9 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    setSelectedId(id);
-    setManagementOpen(true);
+    if (item) {
+      focusApplicationItem(item, true);
+    }
     void invalidateApplicationState(queryClient);
   };
 
@@ -555,13 +590,12 @@ export const ApplicationsPage = () => {
             <ApplicationWarningButton
               disabled={!nextReviewItem}
               onClick={() => {
-                if (nextReviewItem) {
-                  setQuery('');
-                  setFilter('needs_review');
-                  setSelectedId(nextReviewItem.id);
-                  setManagementOpen(true);
-                }
-              }}
+                  if (nextReviewItem) {
+                    setQuery('');
+                    setFilter('needs_review');
+                    focusApplicationItem(nextReviewItem, true);
+                  }
+                }}
               title={nextReviewItem ? 'Open the next app or service that needs review.' : 'No apps or services need review.'}
               type="button"
             >
@@ -598,7 +632,7 @@ export const ApplicationsPage = () => {
             emptyState={emptyState}
             items={visibleItems}
             managementOpen={managementOpen}
-            onSelect={setSelectedId}
+            onSelect={handleSelectItem}
             selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
           />
         ) : (
@@ -609,7 +643,7 @@ export const ApplicationsPage = () => {
               emptyState={emptyState}
               items={visibleItems}
               managementOpen={managementOpen}
-              onSelect={setSelectedId}
+              onSelect={handleSelectItem}
               selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
             />
           </div>
@@ -621,7 +655,7 @@ export const ApplicationsPage = () => {
           item={selectedItem}
           managementOpen={managementOpen}
           canCloseManagement={canCloseManagement}
-          onManagementOpenChange={setManagementOpen}
+          onManagementOpenChange={handleManagementOpenChange}
           settingsLoadingByItemId={settingsLoadingByAppId}
           ref={railRef}
         />

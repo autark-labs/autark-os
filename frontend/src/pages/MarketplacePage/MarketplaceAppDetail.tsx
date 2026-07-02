@@ -25,6 +25,7 @@ import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/market
 import {
   applicationDeepLinkForManagedApp,
   applicationDeepLinkForObservedService,
+  applicationRouteWithManagementPanel,
 } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { InstallWizard } from './MarketplaceInstallWizard';
 import { AppImage, InfoCard, Stat, SupportBadge } from './MarketplacePage.shared';
@@ -62,9 +63,10 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
   const isInstalled = Boolean(installedApp);
   const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
   const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId) : '/apps';
+  const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId, { panel: 'manage' }) : '/apps';
   const reviewExistingHref = appView.observedService
-    ? applicationDeepLinkForObservedService(appView.observedService)
-    : appView.reviewExistingHref;
+    ? applicationDeepLinkForObservedService(appView.observedService, { panel: 'manage' })
+    : applicationRouteWithManagementPanel(appView.reviewExistingHref);
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`
@@ -162,7 +164,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
         {needsExistingServiceReview && <ExistingServiceNotice appView={appView} reviewHref={reviewExistingHref} />}
         {requiresInstallCaution(app) && !isInstalled && <InstallCautionNotice app={app} />}
         <DuplicateInstallWarningDialog appName={app.name} onInstallCopy={acknowledgeDuplicateInstall} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={reviewExistingHref} />
-        {isInstalled && <InstalledAppNotice app={installedApp} manageHref={installedAppHref} />}
+        {isInstalled && <InstalledAppNotice app={installedApp} manageHref={manageInstalledAppHref} />}
         {isInstalled && recoveryMode && recoveryMode !== 'reset-reinstall' && (
           <RecoveryInstallNotice
             disabled={installLocked || installing}

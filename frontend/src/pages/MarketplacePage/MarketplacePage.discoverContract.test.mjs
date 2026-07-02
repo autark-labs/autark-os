@@ -64,6 +64,7 @@ test('marketplace detail deep-links found services and installed apps into My Ap
 
   assert.match(detail, /applicationDeepLinkForManagedApp/);
   assert.match(detail, /applicationDeepLinkForObservedService/);
+  assert.match(detail, /applicationRouteWithManagementPanel/);
   assert.doesNotMatch(detail, /reviewHref=\{appView\.reviewExistingHref\}/);
   assert.doesNotMatch(detail, /<Link to="\/apps">View in My Apps<\/Link>/);
   assert.doesNotMatch(detail, /<Link to="\/apps">Manage in My Apps<\/Link>/);

@@ -72,10 +72,10 @@ test('marketplaceVisibleAppViews hides only canonical current-instance installs'
 test('marketplacePrimaryRoute follows My Apps management and existing-service actions', () => {
   assert.equal(marketplacePrimaryRoute({
     primaryAction: { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false },
-  }), '/apps?focus=managed%3Avaultwarden');
+  }), '/apps?focus=managed%3Avaultwarden&panel=manage');
   assert.equal(marketplacePrimaryRoute({
     primaryAction: { id: 'review_existing', kind: 'route', href: '/apps?focus=service%3Adocker%3Avaultwarden', disabled: false },
-  }), '/apps?focus=service%3Adocker%3Avaultwarden');
+  }), '/apps?focus=service%3Adocker%3Avaultwarden&panel=manage');
   assert.equal(marketplacePrimaryRoute({
     primaryAction: { id: 'review_setup', kind: 'route', href: '/discover?app=vaultwarden', disabled: false },
   }), null);

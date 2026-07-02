@@ -91,7 +91,7 @@ class AppOwnershipServiceTests {
                     assertThat(view.installed()).isTrue();
                     assertThat(view.ownedByCurrentInstance()).isTrue();
                     assertThat(view.installCopyWarningRequired()).isFalse();
-                    assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("manage", "Manage", "route", "/apps?focus=managed%3Avaultwarden", null, false, ""));
+                    assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("manage", "Manage", "route", "/apps?focus=managed%3Avaultwarden&panel=manage", null, false, ""));
                     assertThat(view.installedApp()).isEqualTo(new DiscoverInstalledAppSummary("vaultwarden", "Family Passwords", "Ready", "http://localhost:8090"));
                     assertThat(view.observedService()).isNull();
                 });
@@ -102,7 +102,7 @@ class AppOwnershipServiceTests {
                     assertThat(view.installed()).isFalse();
                     assertThat(view.ownedByCurrentInstance()).isFalse();
                     assertThat(view.installCopyWarningRequired()).isTrue();
-                    assertThat(view.reviewExistingHref()).isEqualTo("/apps?focus=service%3Adocker%3Afound_jellyfin");
+                    assertThat(view.reviewExistingHref()).isEqualTo("/apps?focus=service%3Adocker%3Afound_jellyfin&panel=manage");
                     assertThat(view.primaryAction().id()).isEqualTo("review_existing");
                     assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("review_existing", "install_copy");
                     assertThat(view.installedApp()).isNull();
@@ -141,7 +141,7 @@ class AppOwnershipServiceTests {
         assertThat(view.installed()).isFalse();
         assertThat(view.ownedByCurrentInstance()).isFalse();
         assertThat(view.installCopyWarningRequired()).isTrue();
-        assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("review_existing", "Review existing service", "route", "/apps?focus=service%3Amanual%3Ajellyfin", null, false, ""));
+        assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("review_existing", "Review existing service", "route", "/apps?focus=service%3Amanual%3Ajellyfin&panel=manage", null, false, ""));
         assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("open", "review_existing", "install_copy");
         assertThat(view.observedService()).isNotNull();
         assertThat(view.observedService().id()).isEqualTo(pinned.id());
@@ -176,7 +176,7 @@ class AppOwnershipServiceTests {
         assertThat(view.state()).isEqualTo(AppOwnershipState.PINNED_EXTERNAL);
         assertThat(view.installed()).isFalse();
         assertThat(view.observedService()).isNotNull();
-        assertThat(view.primaryAction().href()).isEqualTo("/apps?focus=service%3Amanual%3Avaultwarden");
+        assertThat(view.primaryAction().href()).isEqualTo("/apps?focus=service%3Amanual%3Avaultwarden&panel=manage");
     }
 
     @Test
@@ -190,7 +190,7 @@ class AppOwnershipServiceTests {
         assertThat(view.stateLabel()).isEqualTo("Found on server");
         assertThat(view.cardTone()).isEqualTo("observed");
         assertThat(view.installCopyWarningRequired()).isTrue();
-        assertThat(view.reviewExistingHref()).isEqualTo("/apps?focus=service%3Adocker%3Avaultwarden");
+        assertThat(view.reviewExistingHref()).isEqualTo("/apps?focus=service%3Adocker%3Avaultwarden&panel=manage");
     }
 
     @Test

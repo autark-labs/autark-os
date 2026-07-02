@@ -1,5 +1,7 @@
 export const START_HERE_DISMISSAL_KEY = 'project-os:discover:start-here-dismissed:v1';
 
+import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks.js';
+
 /**
  * @param {{ apps?: unknown[]; hideInstalled?: boolean; installedAppIds?: Set<string>; searchQuery?: string; selectedCategory?: string; sortBy?: string }} params
  */
@@ -47,7 +49,7 @@ export function marketplacePrimaryRoute(view = {}) {
     return null;
   }
   if (action.id === 'manage' || action.id === 'review_existing') {
-    return action.href;
+    return applicationRouteWithManagementPanel(action.href);
   }
   return null;
 }

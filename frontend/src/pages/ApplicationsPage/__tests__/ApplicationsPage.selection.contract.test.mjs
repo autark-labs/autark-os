@@ -36,3 +36,15 @@ test('empty selection is not cleared after a deep-link effect schedules a real s
 
   assert.match(page, /if \(!selectedId\) {\s+return;\s+}/);
 });
+
+test('applications page keeps app focus in the route and clears it when management closes', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+
+  assert.match(page, /const navigate = useNavigate\(\)/);
+  assert.match(page, /applicationDeepLinkForSurfaceItem/);
+  assert.match(page, /navigate\(applicationDeepLinkForSurfaceItem\(item, \{ panel: managementOpen \? 'manage' : null \}\), \{ replace: true \}\)/);
+  assert.match(page, /navigate\('\/apps', \{ replace: true \}\)/);
+  assert.match(page, /setManagementOpen\(deepLinkTarget\.panel === 'manage'\)/);
+  assert.match(page, /onSelect=\{handleSelectItem\}/);
+  assert.match(page, /onManagementOpenChange=\{handleManagementOpenChange\}/);
+});
