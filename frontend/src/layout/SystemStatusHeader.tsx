@@ -64,11 +64,11 @@ function SystemStatusHeader() {
     };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-po-border bg-po-sidebar px-4 py-2 text-sidebar-foreground shadow-po-sm md:px-6" aria-label="System status">
+    <header className="sticky top-0 z-20 border-b border-sky-400/25 bg-slate-950 px-4 py-2 text-slate-50 shadow-lg shadow-slate-950/20 md:px-6" aria-label="System status">
       <div className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="m-0 truncate text-sm font-semibold text-sidebar-foreground">Project OS</p>
-          <p className="m-0 hidden truncate text-xs text-sidebar-foreground/58 sm:block">
+          <p className="m-0 truncate text-sm font-semibold text-white">Project OS</p>
+          <p className="m-0 hidden truncate text-xs text-slate-400 sm:block">
             {doctor?.lanUrl ? `LAN ${doctor.lanUrl}` : checkedAt}
           </p>
         </div>
@@ -77,7 +77,7 @@ function SystemStatusHeader() {
           {activeJob && <GlobalJobPopover job={activeJob} />}
           <StatusPopover loading={loading} service={dockerService} />
           <TailscaleControlPopover check={tailscaleCheck} loading={loading} />
-          <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-sidebar-foreground/62 sm:inline-flex">
+          <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-slate-400 sm:inline-flex">
             {error ? 'Status unavailable' : checkedAt}
           </span>
         </div>
@@ -92,7 +92,7 @@ function GlobalJobPopover({ job }: { job: ProjectOsJob }) {
       <PopoverTrigger asChild>
         <Button
           aria-label={`${jobTypeLabel(job.type)} in progress`}
-          className="h-8 gap-2 rounded-lg border border-po-info-border bg-po-info-soft px-2.5 text-xs text-po-brand-strong shadow-po-sm hover:bg-po-info-soft/80"
+          className="h-8 gap-2 rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-2.5 text-xs text-cyan-200 shadow-sm shadow-cyan-950/20 hover:bg-cyan-400/15"
           size="sm"
           type="button"
           variant="outline"
@@ -102,10 +102,10 @@ function GlobalJobPopover({ job }: { job: ProjectOsJob }) {
           <span className="font-semibold">{jobTypeLabel(job.type)}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(92vw,24rem)] gap-3 border-sidebar-border bg-po-sidebar p-3 text-sidebar-foreground shadow-po-md">
+      <PopoverContent align="end" className="w-[min(92vw,24rem)] gap-3 border-sky-400/25 bg-slate-950 p-3 text-slate-50 shadow-xl shadow-slate-950/30">
         <PopoverHeader>
           <PopoverTitle className="text-sm">Project OS is working</PopoverTitle>
-          <PopoverDescription className="text-xs text-po-text-muted">
+          <PopoverDescription className="text-xs text-slate-400">
             This progress follows you while you move around the app.
           </PopoverDescription>
         </PopoverHeader>
@@ -122,8 +122,8 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
   const statusTone = healthy ? 'info' : 'error';
   const StatusIcon = statusTone === 'info' ? CheckCircle2 : CircleAlert;
   const toneClass = statusTone === 'info'
-    ? 'border-po-info-border bg-po-info-soft text-po-brand-strong hover:bg-po-info-soft/80'
-    : 'border-po-danger-border bg-po-danger-soft text-po-danger hover:bg-po-danger-soft/80';
+    ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15'
+    : 'border-red-400/35 bg-red-500/10 text-red-200 hover:bg-red-500/15';
   const statusLabel = healthy ? service.healthyLabel : service.needsAttentionLabel;
   const summary = healthy ? service.healthySummary : service.needsAttentionSummary;
 
@@ -137,33 +137,33 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
           type="button"
           variant="outline"
         >
-          <span className={cn('size-2 rounded-full', statusTone === 'info' && 'bg-po-info shadow-po-info-glow', statusTone === 'error' && 'bg-po-danger shadow-po-danger-glow')} />
+          <span className={cn('size-2 rounded-full', statusTone === 'info' && 'bg-cyan-300 shadow-lg shadow-cyan-400/30', statusTone === 'error' && 'bg-red-400 shadow-lg shadow-red-500/30')} />
           <Icon data-icon="inline-start" />
           <span className="hidden font-semibold sm:inline">{service.label}</span>
           <span className="font-semibold">{loading && unavailable ? 'Checking' : statusLabel}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(92vw,20rem)] gap-3 border-sidebar-border bg-po-sidebar p-3 text-sidebar-foreground shadow-po-md">
+      <PopoverContent align="end" className="w-[min(92vw,20rem)] gap-3 border-sky-400/25 bg-slate-950 p-3 text-slate-50 shadow-xl shadow-slate-950/30">
         <PopoverHeader>
           <PopoverTitle className="flex items-center gap-2 text-sm">
-            <StatusIcon className={cn('size-4', statusTone === 'info' && 'text-po-brand-strong', statusTone === 'error' && 'text-po-danger')} />
+            <StatusIcon className={cn('size-4', statusTone === 'info' && 'text-cyan-200', statusTone === 'error' && 'text-red-300')} />
             {service.label} {statusLabel.toLowerCase()}
           </PopoverTitle>
-          <PopoverDescription className="text-xs text-po-text-muted">
+          <PopoverDescription className="text-xs text-slate-400">
             {summary}
           </PopoverDescription>
         </PopoverHeader>
 
-        <div className="rounded-po-sm border border-sidebar-border bg-po-surface-inset p-2 text-xs">
-          <p className="m-0 font-semibold text-sidebar-foreground">{service.check?.message || 'Project OS is checking this service.'}</p>
-          <p className="m-0 mt-1 text-sidebar-foreground/62">{service.check?.detail || 'Status details will appear after the next health check.'}</p>
+        <div className="rounded-lg border border-sky-400/25 bg-slate-900 p-2 text-xs">
+          <p className="m-0 font-semibold text-white">{service.check?.message || 'Project OS is checking this service.'}</p>
+          <p className="m-0 mt-1 text-slate-400">{service.check?.detail || 'Status details will appear after the next health check.'}</p>
           {!healthy && (
-            <p className="m-0 mt-2 rounded-po-xs border border-sidebar-border bg-po-sidebar px-2 py-1 font-mono text-[0.72rem] text-sidebar-foreground">
+            <p className="m-0 mt-2 rounded-md border border-sky-400/25 bg-slate-950 px-2 py-1 font-mono text-[0.72rem] text-slate-200">
               {service.command}
             </p>
           )}
           {!healthy && service.optional && (
-            <p className="m-0 mt-2 text-sidebar-foreground/62">You can keep using Project OS locally and set this up later.</p>
+            <p className="m-0 mt-2 text-slate-400">You can keep using Project OS locally and set this up later.</p>
           )}
         </div>
 

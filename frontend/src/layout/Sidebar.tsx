@@ -14,7 +14,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
-import { ViewModeToggle } from '@/components/project-os/ProjectOSComponents';
+import { Button } from '@/components/ui/button';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import type { ProjectVersionInfo, SystemSetupStatus } from '@/types/system';
@@ -86,23 +86,23 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   return (
     <aside className={cn(
-      'z-30 hidden h-screen flex-col border-r border-po-border bg-po-sidebar text-sidebar-foreground shadow-po-sidebar transition-[padding] duration-300 lg:sticky lg:top-0 lg:flex',
+      'z-30 hidden h-screen flex-col border-r border-sky-400/25 bg-slate-950 text-slate-50 shadow-xl shadow-slate-950/30 transition-[padding] duration-300 lg:sticky lg:top-0 lg:flex',
       collapsed ? 'items-center p-2' : 'p-3',
     )}>
       <div className={cn('mb-4 flex w-full items-center gap-3 lg:mb-6', collapsed ? 'px-0 lg:justify-center' : 'px-2')}>
-        <div className={cn('grid place-items-center rounded-lg bg-po-brand font-black text-sidebar-primary-foreground shadow-po-info-glow', collapsed ? 'size-9 text-sm' : 'size-10')}>
+        <div className={cn('grid place-items-center rounded-lg border border-cyan-300/35 bg-cyan-300 font-black text-slate-950 shadow-lg shadow-cyan-950/30', collapsed ? 'size-9 text-sm' : 'size-10')}>
           P
         </div>
         {!collapsed && <div className="min-w-0">
-          <p className="m-0 text-xs font-semibold text-po-brand-strong">Project OS</p>
-          <h1 className="m-0 text-base font-bold leading-none text-sidebar-foreground">Console</h1>
+          <p className="m-0 text-xs font-semibold text-cyan-200">Project OS</p>
+          <h1 className="m-0 text-base font-bold leading-none text-white">Console</h1>
         </div>}
       </div>
 
       <button
         aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         className={cn(
-          'mb-5 hidden items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground/70 transition hover:border-po-border-accent hover:bg-sidebar-accent/80 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-info lg:inline-flex',
+          'mb-5 hidden items-center justify-center rounded-lg border border-sky-400/30 bg-slate-900 text-sky-100/70 transition hover:border-cyan-300/45 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 lg:inline-flex',
           collapsed ? 'size-9' : 'h-8 w-full gap-2',
         )}
         onClick={onToggleCollapse}
@@ -126,10 +126,10 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   aria-label={item.label}
                   className={({ isActive: navActive }) =>
                     cn(
-                      'group flex min-h-10 shrink-0 items-center rounded-lg text-sm font-medium text-sidebar-foreground/82 no-underline transition hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-info',
+                      'group flex min-h-10 shrink-0 items-center rounded-lg text-sm font-medium text-slate-300 no-underline transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
                       collapsed ? 'gap-2 px-3 lg:w-10 lg:justify-center lg:px-0' : 'gap-3 px-3',
                       (navActive || isActive) &&
-                        'bg-po-brand text-sidebar-primary-foreground shadow-po-info-glow hover:bg-po-brand',
+                        'bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-950/30 hover:bg-cyan-200 hover:text-slate-950',
                     )
                   }
                   key={item.label}
@@ -140,9 +140,9 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                     <>
                       <span
                         className={cn(
-                          'grid place-items-center rounded-md text-sidebar-foreground/60 transition group-hover:text-sidebar-foreground',
+                          'grid place-items-center rounded-md text-sky-200/70 transition group-hover:text-cyan-100',
                           collapsed ? 'size-7 bg-transparent' : 'size-7',
-                          (navActive || isActive) && 'text-sidebar-primary-foreground',
+                          (navActive || isActive) && 'text-slate-950 group-hover:text-slate-950',
                         )}
                       >
                         <Icon className="size-4" />
@@ -161,47 +161,78 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         <div className="mt-6 hidden gap-3 lg:mt-auto lg:grid">
           <button
             aria-label={`Switch to ${viewMode === 'advanced' ? 'Basic' : 'Advanced'} view`}
-            className="grid size-9 place-items-center rounded-lg border border-sidebar-border bg-sidebar-accent text-xs font-bold text-sidebar-accent-foreground transition hover:border-po-border-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-po-info"
+            className="grid size-9 place-items-center rounded-lg border border-sky-400/30 bg-slate-900 text-xs font-bold text-sky-100 transition hover:border-cyan-300/45 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
             onClick={() => setViewMode(viewMode === 'advanced' ? 'basic' : 'advanced')}
             title={`View mode: ${viewMode === 'advanced' ? 'Advanced' : 'Basic'}`}
             type="button"
           >
             {viewMode === 'advanced' ? 'A' : 'B'}
           </button>
-          <div className={cn('mx-auto size-2 rounded-full', setupReady ? 'bg-po-info shadow-po-info-glow' : 'bg-po-warning shadow-po-warning-glow')} title={setupReady ? 'Ready for your apps' : 'Setup needs attention'} />
+          <div className={cn('mx-auto size-2 rounded-full', setupReady ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} title={setupReady ? 'Ready for your apps' : 'Setup needs attention'} />
         </div>
-      ) : <div className="mt-6 hidden rounded-xl border border-sidebar-border bg-sidebar-accent p-3 shadow-po-sm lg:mt-auto lg:block">
+      ) : <div className="mt-6 hidden rounded-xl border border-sky-400/25 bg-slate-900 p-3 shadow-lg shadow-slate-950/20 lg:mt-auto lg:block">
         <div className="flex items-start gap-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-po-info-soft text-po-brand-strong">
+          <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 text-cyan-200">
             <Settings className="size-4" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-bold text-sidebar-foreground">{deviceName}</span>
-              <span className="shrink-0 rounded-full border border-sidebar-border bg-po-surface-inset px-2 py-0.5 text-xs font-semibold text-sidebar-foreground/68">{versionLabel}</span>
+              <span className="truncate text-sm font-bold text-white">{deviceName}</span>
+              <span className="shrink-0 rounded-full border border-sky-400/25 bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">{versionLabel}</span>
             </div>
-            <p className="mt-1 truncate text-xs text-sidebar-foreground/62">{setup?.devMode ? 'Development mode' : 'Project OS appliance'}</p>
+            <p className="mt-1 truncate text-xs text-slate-400">{setup?.devMode ? 'Development mode' : 'Project OS appliance'}</p>
           </div>
         </div>
-        <div className="mt-3 grid gap-2 rounded-lg border border-sidebar-border bg-po-surface-inset p-2 text-xs text-sidebar-foreground/70">
+        <div className="mt-3 grid gap-2 rounded-lg border border-sky-400/20 bg-slate-800 p-2 text-xs text-slate-300">
           <div className="flex items-center gap-2">
-            <span className={cn('size-2 rounded-full', setupReady ? 'bg-po-info shadow-po-info-glow' : 'bg-po-warning shadow-po-warning-glow')} />
+            <span className={cn('size-2 rounded-full', setupReady ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} />
             <span>{setupReady ? 'Ready for your apps' : 'Setup needs attention'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className={cn('size-2 rounded-full', updateCurrent ? 'bg-po-info shadow-po-info-glow' : 'bg-po-warning shadow-po-warning-glow')} />
+            <span className={cn('size-2 rounded-full', updateCurrent ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} />
             <span>{updateCurrent ? 'Up to date' : 'Update available'}</span>
           </div>
         </div>
         <div className="mt-3 grid gap-2">
-          <div className="flex items-center justify-between gap-2 text-xs text-sidebar-foreground/68">
+          <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
             <span>View mode</span>
-            <span className="font-semibold text-sidebar-foreground">{viewMode === 'advanced' ? 'Advanced' : 'Basic'}</span>
+            <span className="font-semibold text-white">{viewMode === 'advanced' ? 'Advanced' : 'Basic'}</span>
           </div>
-          <ViewModeToggle />
+          <SidebarViewModeToggle viewMode={viewMode} onChange={setViewMode} />
         </div>
       </div>}
     </aside>
+  );
+}
+
+function SidebarViewModeToggle({ onChange, viewMode }: { onChange: (value: 'basic' | 'advanced') => void; viewMode: 'basic' | 'advanced' }) {
+  const advanced = viewMode === 'advanced';
+
+  return (
+    <div className="grid grid-cols-2 rounded-lg border border-sky-400/25 bg-slate-800 p-1 text-xs font-semibold">
+      <Button
+        className={cn(
+          'h-7 rounded-md px-2 text-xs',
+          !advanced ? 'bg-cyan-300 text-slate-950 shadow-md shadow-cyan-950/25 hover:bg-cyan-200' : 'bg-transparent text-slate-400 hover:bg-slate-700 hover:text-white',
+        )}
+        onClick={() => onChange('basic')}
+        type="button"
+        variant="ghost"
+      >
+        Basic
+      </Button>
+      <Button
+        className={cn(
+          'h-7 rounded-md px-2 text-xs',
+          advanced ? 'bg-cyan-300 text-slate-950 shadow-md shadow-cyan-950/25 hover:bg-cyan-200' : 'bg-transparent text-slate-400 hover:bg-slate-700 hover:text-white',
+        )}
+        onClick={() => onChange('advanced')}
+        type="button"
+        variant="ghost"
+      >
+        Advanced
+      </Button>
+    </div>
   );
 }
 

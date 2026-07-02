@@ -25,14 +25,14 @@ function AppShell() {
 
   return (
     <div className={cn(
-      'grid min-h-screen grid-cols-1 bg-po-bg text-po-text transition-[grid-template-columns] duration-300',
+      'grid min-h-screen grid-cols-1 bg-slate-950 text-slate-50 transition-[grid-template-columns] duration-300',
       sidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[210px_minmax(0,1fr)]',
     )}>
       <MobileAppBar />
       <div className="hidden lg:block">
         <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
       </div>
-      <main className="min-w-0 bg-po-bg-mesh">
+      <main className="min-w-0 bg-slate-800">
         <div className="hidden lg:block">
           <SystemStatusHeader />
         </div>
