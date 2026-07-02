@@ -29,8 +29,8 @@ export function NetworkNodeDetails({
   const hasRepairableApps = selectedNode.appDetails?.some((app) => app.repairNeeded) ?? false;
 
   return (
-    <Card className="border-white/10 bg-slate-950/65 py-0 text-slate-100">
-      <CardHeader className="border-b border-white/10 p-5">
+    <Card className="border-sky-400/30 bg-slate-900 py-0 text-slate-100 shadow-xl shadow-slate-950/30">
+      <CardHeader className="border-b border-sky-400/25 p-5">
         <div className="flex items-start gap-3">
           <span className={cn('grid size-10 shrink-0 place-items-center rounded-lg border', statusTone(selectedNode.status, 'soft'))}>
             <Icon className="size-5" />
@@ -49,7 +49,7 @@ export function NetworkNodeDetails({
         <section className="grid gap-3">
           <ReviewBlock label="What this is" value={review.represents} />
           <ReviewBlock label="Safety check" tone={selectedNode.status} value={review.safety} />
-          <p className="rounded-lg border border-white/10 bg-slate-900/45 p-3 text-sm leading-6 text-slate-300">{selectedNode.insight}</p>
+          <p className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm leading-6 text-slate-300">{selectedNode.insight}</p>
         </section>
 
         {selectedNode.appDetails && selectedNode.appDetails.length > 0 && (
@@ -65,7 +65,7 @@ export function NetworkNodeDetails({
             </div>
             <div className="grid max-h-[360px] gap-2 overflow-y-auto pr-1">
               {selectedNode.appDetails.map((app) => (
-                <div className="rounded-lg border border-white/10 bg-slate-900/45 p-3" key={app.appId}>
+                <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3" key={app.appId}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">{app.appName}</p>
@@ -96,7 +96,7 @@ export function NetworkNodeDetails({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Affected devices</p>
             <div className="grid max-h-[320px] gap-2 overflow-y-auto pr-1">
               {selectedNode.deviceDetails.map((device) => (
-                <div className="rounded-lg border border-white/10 bg-slate-900/45 p-3" key={`${device.label}-${device.ipAddress || device.dnsName}`}>
+                <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3" key={`${device.label}-${device.ipAddress || device.dnsName}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-white">{device.label}</p>
@@ -120,8 +120,8 @@ export function NetworkNodeDetails({
         <div className="grid gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recommended action</p>
           {actions.map((action) => (
-            <div className="flex gap-3 rounded-lg border border-white/10 bg-slate-900/45 p-3 text-sm text-slate-300" key={action}>
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-violet-300" />
+            <div className="flex gap-3 rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-300" key={action}>
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-cyan-200" />
               <span>{action}</span>
             </div>
           ))}
@@ -139,7 +139,7 @@ export function NetworkNodeDetails({
 
 function ReviewBlock({ label, tone = 'neutral', value }: { label: string; tone?: NetworkNodeData['status']; value: string }) {
   return (
-    <div className={cn('rounded-lg border p-3', tone === 'warning' ? 'border-amber-300/20 bg-amber-500/10' : 'border-white/10 bg-slate-900/45')}>
+    <div className={cn('rounded-lg border p-3', tone === 'warning' ? 'border-amber-300/20 bg-amber-500/10' : 'border-sky-400/25 bg-slate-800')}>
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
       <p className={cn('mt-1 text-sm leading-6', tone === 'warning' ? 'text-amber-100' : 'text-slate-300')}>{value}</p>
     </div>

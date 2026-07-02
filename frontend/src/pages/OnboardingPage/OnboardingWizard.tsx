@@ -4,13 +4,14 @@ import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Network, ServerCog, Sh
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { cn } from '@/lib/utils';
 import type { OnboardingState, SystemSetupStatus } from '@/types/system';
 import { Link } from 'react-router-dom';
 
@@ -114,8 +115,8 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
 
   if (!state) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-950 text-slate-300">
-        <Loader2 className="size-6 animate-spin text-violet-300" />
+      <main className="grid min-h-screen place-items-center bg-slate-800 text-slate-300">
+        <Loader2 className="size-6 animate-spin text-cyan-200" />
       </main>
     );
   }
@@ -138,10 +139,10 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
       : readiness.summary;
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.26),transparent_34%),linear-gradient(135deg,#020617,#0f172a)] p-4 text-slate-100 md:p-8">
+    <main className="min-h-screen bg-slate-800 p-4 text-slate-100 md:p-8">
       <section className="mx-auto grid max-w-6xl gap-5">
-        <header className="rounded-lg border border-white/10 bg-slate-950/70 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] md:p-8">
-          <Badge className="border-violet-400/30 bg-violet-500/15 text-violet-100">First boot</Badge>
+        <header className="rounded-2xl border border-sky-400/30 bg-slate-900 p-6 shadow-xl shadow-slate-950/30 md:p-8">
+          <Badge className="border-cyan-300/30 bg-cyan-400/10 text-cyan-100">First boot</Badge>
           <h1 className="mt-4 text-4xl font-black tracking-normal text-white md:text-6xl">Set up your homelab</h1>
           <p className="mt-3 max-w-3xl text-base text-slate-300">Project OS will check this device, prepare safe defaults, and point you to the apps that make sense first.</p>
           {error && <div className="mt-4 rounded-lg border border-red-300/20 bg-red-500/10 p-3 text-sm text-red-100">{error}</div>}
@@ -164,22 +165,22 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   </p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button asChild className="bg-violet-600 text-white hover:bg-violet-500">
+                  <ProjectPrimaryButton asChild>
                     <Link to="/resolve-existing-apps">Recover existing apps</Link>
-                  </Button>
-                  <Button asChild variant="outline">
+                  </ProjectPrimaryButton>
+                  <ProjectDarkControlButton asChild>
                     <Link to="/home">Abort setup</Link>
-                  </Button>
+                  </ProjectDarkControlButton>
                   {setupStatus?.devMode && showAdvancedMetrics && (
                     <Badge className="border-sky-300/25 bg-sky-500/10 px-3 py-2 text-sky-100" variant="outline">Separate development instance allowed</Badge>
                   )}
                 </div>
                 {showAdvancedMetrics && Boolean(existingInstall?.resources?.length) && (
-                  <Collapsible className="mt-3 rounded-lg border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+                  <Collapsible className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
                     <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-white">Advanced found-app details</CollapsibleTrigger>
                     <CollapsibleContent className="mt-3 grid gap-2">
                       {existingInstall?.resources.map((resource) => (
-                        <div className="rounded-lg border border-white/10 bg-slate-950/55 p-3" key={resource.id}>
+                        <div className="rounded-lg border border-sky-400/25 bg-slate-900 p-3" key={resource.id}>
                           <p className="font-semibold text-white">{resource.label}</p>
                           <p className="mt-1 text-slate-400">{resource.summary}</p>
                           <p className="mt-1 text-xs text-slate-500">Owner: {resource.ownerInstanceId || 'Unknown'}</p>
@@ -192,7 +193,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             )}
 
             <WizardCard icon={ServerCog} title="Name this device" text="This name appears in Project OS and helps identify the box on your network.">
-              <Input className="max-w-md border-slate-700 bg-slate-950/70 text-white" onChange={(event) => setDeviceName(event.target.value)} value={deviceName} />
+              <Input className="max-w-md border-sky-400/25 bg-slate-800 text-white" onChange={(event) => setDeviceName(event.target.value)} value={deviceName} />
             </WizardCard>
 
             <WizardCard icon={ShieldCheck} title="Device readiness" text={readiness.summary}>
@@ -205,7 +206,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </div>
               <div className="mb-3 grid gap-2 md:grid-cols-2">
                 {readiness.groups.map((group) => (
-                  <div className="rounded-lg border border-white/10 bg-slate-950/55 p-3" key={group.id}>
+                  <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3" key={group.id}>
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-semibold text-white">{group.label}</span>
                       <Badge className={group.status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : group.status === 'warning' ? 'bg-amber-500/15 text-amber-100' : 'bg-slate-700 text-slate-200'}>{readinessLabel(group.status)}</Badge>
@@ -216,14 +217,14 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </div>
               <div className="grid gap-2 md:grid-cols-2">
                 {checks.map((check) => (
-                  <div className="rounded-lg border border-white/10 bg-slate-950/55 p-3" key={check.id}>
+                  <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3" key={check.id}>
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-semibold text-white">{check.label}</span>
                       <Badge className={check.status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : check.status === 'warning' ? 'bg-amber-500/15 text-amber-100' : 'bg-slate-700 text-slate-200'}>{check.status}</Badge>
                     </div>
                     <p className="mt-1 text-sm text-slate-400">{check.message}</p>
                     {check.actionLabel && (
-                      <p className="mt-2 text-xs font-semibold text-violet-200">{check.actionLabel}: {check.actionCommand || 'Open the linked setup step'}</p>
+                      <p className="mt-2 text-xs font-semibold text-cyan-200">{check.actionLabel}: {check.actionCommand || 'Open the linked setup step'}</p>
                     )}
                   </div>
                 ))}
@@ -251,7 +252,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   onClick={() => setPrivateAccessChoice('already-connected')}
                 />
               </div>
-              <div className="mt-3 rounded-lg border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+              <div className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
                 <div>LAN setup URL: <span className="font-semibold text-white">{state.doctor.lanUrl}</span></div>
                 {privateAccessChoice === 'setup-now' && (
                   <div className="mt-3 grid gap-2 text-slate-400">
@@ -297,10 +298,10 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 />
               </div>
               {backupPosture === 'external' && (
-                <div className="mt-3 rounded-lg border border-white/10 bg-slate-950/55 p-4">
+                <div className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
                   <label className="block text-sm font-semibold text-white" htmlFor="backup-destination">Backup destination</label>
                   <Input
-                    className="mt-2 border-slate-700 bg-slate-950/70 text-white"
+                    className="mt-2 border-sky-400/25 bg-slate-900 text-white"
                     id="backup-destination"
                     onChange={(event) => setBackupDestination(event.target.value)}
                     placeholder="/mnt/backup-drive/project-os-backups"
@@ -310,7 +311,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 </div>
               )}
               {backupPosture !== 'later' && (
-                <label className="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-slate-950/55 p-4">
+                <label className="mt-3 flex items-center gap-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
                   <Checkbox checked={automaticBackups} onCheckedChange={(checked) => setAutomaticBackups(Boolean(checked))} />
                   <span>
                     <span className="block font-semibold text-white">Run routine backups</span>
@@ -318,7 +319,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   </span>
                 </label>
               )}
-              <Collapsible className="mt-3 rounded-lg border border-white/10 bg-slate-950/45 p-4 text-sm text-slate-300">
+              <Collapsible className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
                 <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-white">Advanced backup details</CollapsibleTrigger>
                 <CollapsibleContent className="mt-3 grid gap-2 text-slate-400">
                   <p>Project OS runtime path: {state.runtimePath}</p>
@@ -331,7 +332,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             <WizardCard icon={Sparkles} title="Recommended starter apps" text="These are suggestions only. Project OS will not install them until you confirm from Marketplace.">
               <div className="grid gap-3 md:grid-cols-3">
                 {starterApps.map((app) => (
-                  <button className={`rounded-lg border p-4 text-left transition ${selectedApps.includes(app.id) ? 'border-violet-300/50 bg-violet-500/15' : 'border-white/10 bg-slate-950/55 hover:bg-slate-900'}`} key={app.id} onClick={() => toggleApp(app.id)} type="button">
+                  <button className={cn('rounded-lg border p-4 text-left transition', selectedApps.includes(app.id) ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} key={app.id} onClick={() => toggleApp(app.id)} type="button">
                     <span className="font-semibold text-white">{app.label}</span>
                     <span className="mt-1 block text-sm text-slate-400">{app.detail}</span>
                   </button>
@@ -340,7 +341,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             </WizardCard>
           </div>
 
-          <aside className="h-fit rounded-lg border border-white/10 bg-slate-950/70 p-5">
+          <aside className="h-fit rounded-2xl border border-sky-400/30 bg-slate-900 p-5 shadow-xl shadow-slate-950/30">
             <h2 className="text-lg font-bold text-white">Setup summary</h2>
             <div className="mt-4 grid gap-3 text-sm">
               <SummaryLine label="Device" value={deviceName} />
@@ -350,7 +351,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <SummaryLine label="Starter apps" value={`${selectedApps.length} selected`} />
             </div>
             {readiness.finishAnywayRequiresAdvanced && readiness.canCompleteOnboarding && (
-              <Collapsible className="mt-4 rounded-lg border border-white/10 bg-slate-950/55 p-3 text-sm text-slate-300">
+              <Collapsible className="mt-4 rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-300">
                 <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-white">Advanced finish</CollapsibleTrigger>
                 <CollapsibleContent asChild>
                   <label className="mt-3 flex items-center gap-3">
@@ -361,10 +362,10 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </Collapsible>
             )}
             <DisabledAction className="mt-5 w-full" disabled={finishDisabled} reason={finishDisabledReason}>
-              <Button className="w-full bg-violet-600 text-white hover:bg-violet-500" disabled={finishDisabled} onClick={finish} type="button">
+              <ProjectPrimaryButton className="w-full" disabled={finishDisabled} onClick={finish} type="button">
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                 {readiness.finishAnywayRequiresAdvanced && advancedFinish ? 'Finish anyway' : 'Finish setup'}
-              </Button>
+              </ProjectPrimaryButton>
             </DisabledAction>
             {!readiness.canCompleteOnboarding && <p className="mt-3 text-sm text-amber-200">{readiness.summary}</p>}
           </aside>
@@ -391,10 +392,10 @@ async function persistSetupProgress(privateAccessChoice: PrivateAccessChoice) {
 
 function WizardCard({ children, icon: Icon, text, title }: { children: ReactNode; icon: typeof ServerCog; text: string; title: string }) {
   return (
-    <Card className="border-white/10 bg-slate-950/65 py-0 text-slate-100">
+    <Card className="border-sky-400/30 bg-slate-900 py-0 text-slate-100 shadow-xl shadow-slate-950/30">
       <CardContent className="p-5">
         <div className="mb-4 flex gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-violet-500/15 text-violet-100">
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-cyan-300/30 bg-cyan-400/10 text-cyan-100">
             <Icon className="size-5" />
           </div>
           <div>
@@ -410,7 +411,7 @@ function WizardCard({ children, icon: Icon, text, title }: { children: ReactNode
 
 function BackupChoice({ active, detail, label, onClick }: { active: boolean; detail: string; label: string; onClick: () => void }) {
   return (
-    <button className={`rounded-lg border p-4 text-left transition ${active ? 'border-emerald-300/50 bg-emerald-500/15' : 'border-white/10 bg-slate-950/55 hover:bg-slate-900'}`} onClick={onClick} type="button">
+    <button className={cn('rounded-lg border p-4 text-left transition', active ? 'border-emerald-300/50 bg-emerald-500/15' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} onClick={onClick} type="button">
       <span className="font-semibold text-white">{label}</span>
       <span className="mt-1 block text-sm text-slate-400">{detail}</span>
     </button>
@@ -419,7 +420,7 @@ function BackupChoice({ active, detail, label, onClick }: { active: boolean; det
 
 function PrivateAccessChoiceCard({ active, detail, label, onClick }: { active: boolean; detail: string; label: string; onClick: () => void }) {
   return (
-    <button className={`rounded-lg border p-4 text-left transition ${active ? 'border-sky-300/50 bg-sky-500/15' : 'border-white/10 bg-slate-950/55 hover:bg-slate-900'}`} onClick={onClick} type="button">
+    <button className={cn('rounded-lg border p-4 text-left transition', active ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} onClick={onClick} type="button">
       <span className="font-semibold text-white">{label}</span>
       <span className="mt-1 block text-sm text-slate-400">{detail}</span>
     </button>
@@ -428,7 +429,7 @@ function PrivateAccessChoiceCard({ active, detail, label, onClick }: { active: b
 
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3 border-b border-white/10 pb-2">
+    <div className="flex justify-between gap-3 border-b border-sky-400/20 pb-2">
       <span className="text-slate-400">{label}</span>
       <span className="text-right font-semibold text-white">{value}</span>
     </div>

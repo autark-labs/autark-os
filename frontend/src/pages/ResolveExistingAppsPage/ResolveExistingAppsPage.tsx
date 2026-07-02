@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ExternalLink, Pin, RefreshCw, ShieldAlert } from 'lucide-react';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
+import { PageShell } from '@/components/layout/PageShell';
 import { DisabledAction } from '@/components/project-os/DisabledAction';
-import { PageErrorState, PageLoadingState } from '@/components/project-os/PageState';
-import { PageSection, PageShell, SoftCard, StatusPill } from '@/components/project-os/ProjectOSComponents';
-import { Button } from '@/components/ui/button';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
+import { StatusPill } from '@/components/primitives/StatusPill';
+import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import { setApplicationStateFromActionResultCache, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
@@ -95,34 +97,53 @@ function ResolveExistingAppsPage() {
     <PageShell>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="m-0 text-3xl font-bold text-po-text">Resolve Existing Apps</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-po-text-muted">
+          <h1 className="m-0 text-3xl font-bold text-white">Resolve Existing Apps</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
             Review services Project OS found on this server before installing duplicate managed apps.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <DisabledAction disabled={appState.isFetching} reason="Project OS is already refreshing existing apps.">
-            <Button disabled={appState.isFetching} onClick={() => void refreshObservedServices()} type="button" variant="outline">
+            <ProjectDarkControlButton disabled={appState.isFetching} onClick={() => void refreshObservedServices()} type="button">
               <RefreshCw className={cn('size-4', appState.isFetching && 'animate-spin')} />
               Refresh
-            </Button>
+            </ProjectDarkControlButton>
           </DisabledAction>
-          <Button asChild>
+          <ProjectPrimaryButton asChild>
             <Link to="/apps">My Apps</Link>
-          </Button>
+          </ProjectPrimaryButton>
         </div>
       </div>
 
-      {error && <PageErrorState message={error} onRetry={() => void refreshObservedServices()} title="Existing apps could not load" />}
+      {error && (
+        <Surface className="border-red-400/35 bg-red-500/10 p-4 text-red-100" tone="danger">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-black text-white">Existing apps could not load</h2>
+              <p className="mt-1 text-sm leading-6 text-red-100/85">{error}</p>
+            </div>
+            <ProjectDarkControlButton className="border-red-300/30 text-red-100 hover:bg-red-500/20" onClick={() => void refreshObservedServices()} type="button">
+              Retry
+            </ProjectDarkControlButton>
+          </div>
+        </Surface>
+      )}
 
       {appState.isLoading ? (
-        <PageLoadingState label="Loading existing apps" sublabel="Checking observed services and ownership state." />
+        <Surface className="grid min-h-[22rem] place-items-center p-8 text-center" tone="panel">
+          <div>
+            <RefreshCw className="mx-auto size-7 animate-spin text-cyan-200" />
+            <p className="mt-4 text-base font-black text-white">Loading existing apps</p>
+            <p className="mt-1 text-sm leading-6 text-slate-400">Checking observed services and ownership state.</p>
+          </div>
+        </Surface>
       ) : (
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(360px,0.8fr)_minmax(0,1.2fr)]">
-          <PageSection
-            description="Select a found or pinned service to review safe actions."
-            title={`${visibleServices.length} observed service${visibleServices.length === 1 ? '' : 's'}`}
-          >
+          <ResolvePanel>
+            <div>
+              <h2 className="text-lg font-bold text-white">{visibleServices.length} observed service{visibleServices.length === 1 ? '' : 's'}</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-400">Select a found or pinned service to review safe actions.</p>
+            </div>
             {visibleServices.length ? (
               <div className="grid gap-3">
                 {visibleServices.map((service) => (
@@ -137,12 +158,12 @@ function ResolveExistingAppsPage() {
                 ))}
               </div>
             ) : (
-              <SoftCard>
-                <p className="m-0 font-bold text-po-text">No unresolved existing apps</p>
-                <p className="m-0 mt-1 text-sm text-po-text-muted">Project OS is not prompting for any non-managed services right now.</p>
-              </SoftCard>
+              <ResolveCard>
+                <p className="m-0 font-bold text-white">No unresolved existing apps</p>
+                <p className="m-0 mt-1 text-sm text-slate-400">Project OS is not prompting for any non-managed services right now.</p>
+              </ResolveCard>
             )}
-          </PageSection>
+          </ResolvePanel>
 
           <ServiceDetailsPreview
             busy={Boolean(selectedService && busyId === selectedService.id)}
@@ -180,13 +201,13 @@ function ServiceSummaryCard({
   const actions = resolveExistingServiceActions(service);
   const canPin = actions.some((action) => action.id === 'pin');
   return (
-    <SoftCard className={cn(selected && 'ring-2 ring-po-brand')} interactive>
+    <ResolveCard className={cn('transition hover:-translate-y-0.5 hover:border-cyan-300/45 hover:bg-slate-800', selected && 'border-cyan-300/45 shadow-lg shadow-cyan-950/30 ring-1 ring-cyan-300/40')}>
       <button className="w-full text-left" onClick={onReview} type="button">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="m-0 text-lg font-bold text-po-text">{service.displayName}</h2>
+          <h2 className="m-0 text-lg font-bold text-white">{service.displayName}</h2>
           <StatusPill tone={stateTone(service)}>{stateLabel(service)}</StatusPill>
         </div>
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-po-text-muted">{service.userStatusDescription || 'Project OS found this service on the server.'}</p>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Project OS found this service on the server.'}</p>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <Detail label="Runtime" value={service.runtimeState || 'Unknown'} />
           <Detail label="Catalog match" value={service.catalogAppId || 'Unmatched'} />
@@ -194,27 +215,27 @@ function ServiceSummaryCard({
       </button>
       <div className="mt-4 flex flex-wrap gap-2">
         {service.url && (
-          <Button asChild size="sm" variant="outline">
+          <ProjectDarkControlButton asChild size="sm">
             <a href={service.url} rel="noreferrer" target="_blank">
               <ExternalLink className="size-4" />
               Open
             </a>
-          </Button>
+          </ProjectDarkControlButton>
         )}
-        <Button onClick={onReview} size="sm" type="button">
+        <ProjectPrimaryButton onClick={onReview} size="sm" type="button">
           <ShieldAlert className="size-4" />
           Review
-        </Button>
+        </ProjectPrimaryButton>
         {canPin && (
           <DisabledAction disabled={busy} reason="Project OS is already pinning this service.">
-            <Button disabled={busy} onClick={onPin} size="sm" type="button" variant="outline">
+            <ProjectDarkControlButton disabled={busy} onClick={onPin} size="sm" type="button">
               <Pin className="size-4" />
               Pin to My Apps
-            </Button>
+            </ProjectDarkControlButton>
           </DisabledAction>
         )}
       </div>
-    </SoftCard>
+    </ResolveCard>
   );
 }
 
@@ -231,10 +252,10 @@ function ServiceDetailsPreview({
 }) {
   if (!service) {
     return (
-      <SoftCard>
-        <p className="m-0 font-bold text-po-text">No service selected</p>
-        <p className="mt-1 text-sm text-po-text-muted">Select a found or pinned service to review actions.</p>
-      </SoftCard>
+      <ResolveCard>
+        <p className="m-0 font-bold text-white">No service selected</p>
+        <p className="mt-1 text-sm text-slate-400">Select a found or pinned service to review actions.</p>
+      </ResolveCard>
     );
   }
 
@@ -242,23 +263,24 @@ function ServiceDetailsPreview({
   const canPin = actions.some((action) => action.id === 'pin');
 
   return (
-    <PageSection title="Service Details">
-      <SoftCard>
+    <ResolvePanel>
+      <h2 className="text-lg font-bold text-white">Service Details</h2>
+      <ResolveCard>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="m-0 text-2xl font-bold text-po-text">{service.displayName}</h2>
+              <h3 className="m-0 text-2xl font-bold text-white">{service.displayName}</h3>
               <StatusPill tone={stateTone(service)}>{stateLabel(service)}</StatusPill>
             </div>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-po-text-muted">{service.userStatusDescription || 'Project OS found this service on the server.'}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Project OS found this service on the server.'}</p>
           </div>
           {service.url && (
-            <Button asChild variant="outline">
+            <ProjectDarkControlButton asChild>
               <a href={service.url} rel="noreferrer" target="_blank">
                 <ExternalLink className="size-4" />
                 Open
               </a>
-            </Button>
+            </ProjectDarkControlButton>
           )}
         </div>
 
@@ -269,37 +291,45 @@ function ServiceDetailsPreview({
           <Detail label="Catalog match" value={service.catalogAppId || 'Unmatched'} />
         </dl>
 
-        <div className="mt-5 grid gap-3 rounded-lg border border-po-border bg-po-surface-inset p-4">
-          <h3 className="m-0 text-base font-bold text-po-text">Available Actions</h3>
+        <div className="mt-5 grid gap-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
+          <h3 className="m-0 text-base font-bold text-white">Available Actions</h3>
           <div className="flex flex-wrap gap-2">
             <DisabledAction disabled={!onReview} reason="Select a found service before reviewing details.">
-              <Button disabled={!onReview} onClick={onReview} type="button">
+              <ProjectPrimaryButton disabled={!onReview} onClick={onReview} type="button">
                 <ShieldAlert className="size-4" />
                 Review service details
-              </Button>
+              </ProjectPrimaryButton>
             </DisabledAction>
             {canPin && (
               <DisabledAction disabled={busy || !onPin} reason={busy ? 'Project OS is already pinning this service.' : 'Select a found service before pinning it.'}>
-                <Button disabled={busy || !onPin} onClick={onPin} type="button" variant="outline">
+                <ProjectDarkControlButton disabled={busy || !onPin} onClick={onPin} type="button">
                   <Pin className="size-4" />
                   Pin to My Apps
-                </Button>
+                </ProjectDarkControlButton>
               </DisabledAction>
             )}
           </div>
         </div>
-      </SoftCard>
-    </PageSection>
+      </ResolveCard>
+    </ResolvePanel>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-bold uppercase tracking-normal text-po-text-muted">{label}</dt>
-      <dd className="m-0 mt-1 truncate text-po-text" title={value}>{value || 'Unknown'}</dd>
+      <dt className="text-xs font-bold uppercase tracking-normal text-slate-500">{label}</dt>
+      <dd className="m-0 mt-1 truncate text-slate-200" title={value}>{value || 'Unknown'}</dd>
     </div>
   );
+}
+
+function ResolvePanel({ children }: { children: ReactNode }) {
+  return <Surface className="grid gap-4 p-5" tone="panel">{children}</Surface>;
+}
+
+function ResolveCard({ children, className }: { children: ReactNode; className?: string }) {
+  return <Surface className={cn('p-4', className)} tone="muted">{children}</Surface>;
 }
 
 function stateLabel(service: ObservedServiceView) {

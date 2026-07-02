@@ -252,7 +252,7 @@ export function NetworkMap({
       { id: 'network-apps-project-os', source: 'network-apps', sourceHandle: 'right', target: 'project-os', targetHandle: 'left', animated: connected && tailnetApps.apps.length > 0, style: privateEdge, type: 'smoothstep' },
       { id: 'router-lan-apps', source: 'router', sourceHandle: 'right', target: 'lan', targetHandle: 'left', animated: lanApps.apps.length > 0, style: { stroke: '#22c55e', strokeWidth: 2.25 }, type: 'smoothstep' },
       { id: 'lan-apps-project-os', source: 'lan', sourceHandle: 'right', target: 'project-os', targetHandle: 'bottom', animated: false, style: { stroke: '#22c55e', strokeDasharray: '7 7', strokeWidth: 2 }, type: 'smoothstep' },
-      { id: 'project-os-local-apps', source: 'project-os', sourceHandle: 'bottom', target: 'local-apps', targetHandle: 'top', animated: false, style: { stroke: '#a78bfa', strokeDasharray: '6 6', strokeWidth: 2 }, type: 'smoothstep' },
+      { id: 'project-os-local-apps', source: 'project-os', sourceHandle: 'bottom', target: 'local-apps', targetHandle: 'top', animated: false, style: { stroke: '#22d3ee', strokeDasharray: '6 6', strokeWidth: 2 }, type: 'smoothstep' },
     ];
   }, [connected, lanApps.apps.length, publicApps.apps.length, tailnetApps.apps.length]);
   const [nodes, setNodes, onNodesChange] = useNodesState<NetworkDiagramNode>(graphNodes);
@@ -267,7 +267,7 @@ export function NetworkMap({
   }, [graphEdges, setEdges]);
 
   return (
-    <Card className="min-h-[760px] overflow-hidden border-white/10 bg-slate-950/55 py-0 text-slate-100 shadow-po-panel">
+    <Card className="min-h-[760px] overflow-hidden border-sky-400/30 bg-slate-900 py-0 text-slate-100 shadow-xl shadow-slate-950/30">
       <CardContent className="relative h-[760px] p-0">
         <MapZoneChips />
         <MapLegend />
@@ -288,7 +288,7 @@ export function NetworkMap({
           proOptions={{ hideAttribution: true }}
         >
           <Background color="rgba(148,163,184,0.45)" gap={22} size={1} />
-          <Controls className="!bottom-5 !left-5 !border !border-white/10 !bg-slate-950/85 [&_button]:!border-white/10 [&_button]:!bg-slate-950 [&_button]:!text-slate-100 [&_button:hover]:!bg-slate-800 [&_button_svg]:!fill-slate-100" />
+          <Controls className="!bottom-5 !left-5 !border !border-sky-400/25 !bg-slate-900 [&_button]:!border-sky-400/25 [&_button]:!bg-slate-900 [&_button]:!text-slate-100 [&_button:hover]:!bg-slate-800 [&_button_svg]:!fill-slate-100" />
         </ReactFlow>
       </CardContent>
     </Card>
@@ -300,13 +300,13 @@ function NetworkFlowNodeCard({ data, selected }: NodeProps) {
   const Icon = networkNodeIcons[nodeData.kind];
 
   return (
-    <div className={cn('group grid h-[104px] rounded-lg border px-3.5 py-3 shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:border-violet-300/45', statusTone(nodeData.status, 'node'), selected && 'ring-2 ring-violet-300/70')} style={{ width: NODE_WIDTH }}>
+    <div className={cn('group grid h-[104px] rounded-lg border px-3.5 py-3 shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:border-cyan-300/45', statusTone(nodeData.status, 'node'), selected && 'ring-2 ring-cyan-300/70')} style={{ width: NODE_WIDTH }}>
       <FlowHandle id="top" position={Position.Top} type="target" />
       <FlowHandle id="bottom" position={Position.Bottom} type="source" />
       <FlowHandle id="left" position={Position.Left} type="target" />
       <FlowHandle id="right" position={Position.Right} type="source" />
       <div className="flex items-center gap-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-slate-950/45">
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-sky-400/25 bg-slate-800">
           <Icon className="size-[18px]" />
         </span>
         <span className="min-w-0">
@@ -341,7 +341,7 @@ function SecurityZoneNode({ data }: NodeProps) {
     public: 'border-orange-400/30 bg-orange-500/5 text-orange-100',
     tailnet: 'border-sky-400/35 bg-sky-500/5 text-sky-100',
     lan: 'border-emerald-400/25 bg-emerald-500/5 text-emerald-100',
-    local: 'border-violet-400/25 bg-violet-500/5 text-violet-100',
+    local: 'border-cyan-400/25 bg-cyan-500/5 text-cyan-100',
   };
   return (
     <div className={cn('rounded-xl border border-dashed px-4 py-3', tones[zone.tone])} style={{ width: LANE_WIDTH, height: LANE_HEIGHT }}>
@@ -353,12 +353,12 @@ function SecurityZoneNode({ data }: NodeProps) {
 
 function MapZoneChips() {
   return (
-    <div className="absolute left-5 top-5 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-slate-950/90 px-3 py-2 text-xs text-slate-300 shadow-lg backdrop-blur">
+    <div className="absolute left-5 top-5 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-sky-400/25 bg-slate-900 px-3 py-2 text-xs text-slate-300 shadow-lg shadow-slate-950/30">
       <span className="mr-1 text-slate-400">Zones</span>
       <ZoneChip className="border-orange-400/25 bg-orange-500/10 text-orange-200" label="Internet" />
       <ZoneChip className="border-sky-400/25 bg-sky-500/10 text-sky-200" label="My Devices" />
       <ZoneChip className="border-emerald-400/25 bg-emerald-500/10 text-emerald-200" label="Home Network" />
-      <ZoneChip className="border-violet-400/25 bg-violet-500/10 text-violet-200" label="This Server" />
+      <ZoneChip className="border-cyan-400/25 bg-cyan-500/10 text-cyan-200" label="This Server" />
     </div>
   );
 }
@@ -369,12 +369,12 @@ function ZoneChip({ className, label }: { className: string; label: string }) {
 
 function MapLegend() {
   return (
-    <div className="absolute bottom-5 left-5 z-10 grid gap-2 rounded-lg border border-white/10 bg-slate-950/90 px-3 py-2 text-xs text-slate-300 shadow-lg backdrop-blur">
+    <div className="absolute bottom-5 left-5 z-10 grid gap-2 rounded-lg border border-sky-400/25 bg-slate-900 px-3 py-2 text-xs text-slate-300 shadow-lg shadow-slate-950/30">
       <div className="flex flex-wrap gap-3">
         <LegendLine color="bg-orange-400" label="Public access" />
         <LegendLine color="bg-sky-400" label="Private device access" />
         <LegendLine color="bg-emerald-400" label="At-home access" />
-        <LegendLine color="bg-violet-400" label="Server-only boundary" />
+        <LegendLine color="bg-cyan-400" label="Server-only boundary" />
       </div>
       <p className="text-slate-500">Pan the canvas to explore. Zones stay fixed so access boundaries stay clear.</p>
     </div>

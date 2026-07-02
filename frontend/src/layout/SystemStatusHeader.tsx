@@ -132,7 +132,7 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
       <PopoverTrigger asChild>
         <Button
           aria-label={`${service.label}: ${loading && unavailable ? 'checking' : statusLabel}`}
-          className={cn('h-8 gap-2 rounded-lg border px-2.5 text-xs shadow-po-sm', toneClass)}
+          className={cn('h-8 gap-2 rounded-lg border px-2.5 text-xs shadow-sm shadow-slate-950/20', toneClass)}
           size="sm"
           type="button"
           variant="outline"

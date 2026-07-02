@@ -10,7 +10,7 @@ export function NetworkPostureHeader({ posture }: { posture: NetworkPosture }) {
   const tone = posture.status === 'ready' ? 'connected' : 'warning';
 
   return (
-    <Card className="overflow-hidden border-white/10 bg-slate-950/65 py-0 text-slate-100 shadow-po-panel">
+    <Card className="overflow-hidden border-sky-400/30 bg-slate-900 py-0 text-slate-100 shadow-xl shadow-slate-950/30">
       <CardContent className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="flex min-w-0 gap-4">
           <span className={cn('grid size-12 shrink-0 place-items-center rounded-lg border', statusTone(tone, 'soft'))}>
@@ -25,7 +25,7 @@ export function NetworkPostureHeader({ posture }: { posture: NetworkPosture }) {
             </div>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{posture.summary}</p>
             {posture.primaryAction && (
-              <div className="mt-4 rounded-lg border border-white/10 bg-slate-900/55 p-3">
+              <div className="mt-4 rounded-lg border border-sky-400/25 bg-slate-800 p-3">
                 <p className="text-sm font-semibold text-white">{posture.primaryAction.label}</p>
                 <p className="mt-1 text-sm text-slate-400">{posture.primaryAction.detail}</p>
               </div>
@@ -45,7 +45,7 @@ export function NetworkPostureHeader({ posture }: { posture: NetworkPosture }) {
 
 function PostureMetric({ icon: Icon, label, value }: { icon: typeof Lock; label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-slate-900/55 p-3">
+    <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3">
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
         <Icon className="size-4 text-slate-500" />

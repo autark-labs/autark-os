@@ -23,7 +23,7 @@ const SupportPage = lazy(() => import('./pages/SupportPage/SupportPage'));
 
 function PageFallback() {
   return (
-    <div className="grid min-h-[420px] place-items-center rounded-po-lg border border-po-border bg-po-surface-soft text-sm text-po-text-muted shadow-po-md">
+    <div className="grid min-h-[420px] place-items-center rounded-2xl border border-sky-400/30 bg-slate-900 text-sm text-slate-400 shadow-xl shadow-slate-950/30">
       Loading page
     </div>
   );
