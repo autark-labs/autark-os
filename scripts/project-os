@@ -605,7 +605,7 @@ apply_release_bundle_update() {
   trap rollback_update ERR
 
   copy_update_file "${bundle_dir}/backend/project-os-backend.jar" "${backend_jar}" 0
-  for script_name in project-os bootstrap-project-os.sh install-project-os-service.sh install-project-os.sh project-os-gui-installer.sh; do
+  for script_name in project-os project-os-fileops bootstrap-project-os.sh install-project-os-service.sh install-project-os.sh project-os-gui-installer.sh; do
     if [[ -f "${bundle_dir}/scripts/${script_name}" ]]; then
       copy_update_file "${bundle_dir}/scripts/${script_name}" "${install_dir}/bin/${script_name}" 0
       chmod +x "${install_dir}/bin/${script_name}"

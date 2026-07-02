@@ -6,12 +6,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.projectos.activity.ActivityLogRepository;
 import com.projectos.activity.ActivityLogService;
+import com.projectos.fileops.LocalProjectOsFileOperations;
+import com.projectos.fileops.ProjectOsFileOpsService;
 import com.projectos.marketplace.catalog.ManifestValidator;
 import com.projectos.marketplace.catalog.ManifestYamlReader;
 import com.projectos.marketplace.catalog.MarketplaceCatalogService;
@@ -114,6 +118,28 @@ class BackupServiceCanonicalAppTests {
         });
     }
 
+    @Test
+    void restoreUsesProjectOsFileOpsServiceForAppDataReplacement() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
+        BackupRepository backupRepository = new BackupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/project-os-full-test.zip");
+        Files.createDirectories(archive.getParent());
+        writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
+        RestorePoint point = backupRepository.record("__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
+        RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
+        BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService);
+
+        RestoreResult result = service.restore(point.id(), "homepage");
+
+        assertThat(result.status()).isEqualTo("completed");
+        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|full|" + archive.toAbsolutePath().normalize());
+    }
+
     private AppLifecycleService appLifecycleService(RuntimeLayout runtimeLayout, InstalledAppRepository repository, MarketplaceCatalogService catalogService, BackupRepository backupRepository) {
         return new AppLifecycleService(
                 repository,
@@ -129,6 +155,10 @@ class BackupServiceCanonicalAppTests {
     }
 
     private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService) {
+        return backupService(runtimeLayout, installedRepository, backupRepository, catalogService, new ProjectOsFileOpsService(runtimeLayout, new LocalProjectOsFileOperations()));
+    }
+
+    private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService, ProjectOsFileOpsService fileOpsService) {
         return new BackupService(
                 runtimeLayout,
                 installedRepository,
@@ -139,7 +169,16 @@ class BackupServiceCanonicalAppTests {
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository),
                 catalogService,
                 () -> List.of(appInstance("homepage", "Homepage")),
-                new RuntimeFileOperations());
+                new RuntimeFileOperations(),
+                fileOpsService);
+    }
+
+    private void writeZip(Path archive, String entryName, String content) throws Exception {
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            zip.putNextEntry(new ZipEntry(entryName));
+            zip.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
     }
 
     private AppInstanceView appInstance(String appId, String name) {
@@ -208,6 +247,19 @@ class BackupServiceCanonicalAppTests {
         @Override
         public List<ContainerTelemetry> stats(List<String> containerNames) {
             return List.of();
+        }
+    }
+
+    private static class RecordingFileOpsService extends ProjectOsFileOpsService {
+        private final List<String> restoreCalls = new java.util.ArrayList<>();
+
+        RecordingFileOpsService(RuntimeLayout runtimeLayout) {
+            super(runtimeLayout, new LocalProjectOsFileOperations());
+        }
+
+        @Override
+        public void restoreAppData(Path archive, String scope, String appId) {
+            restoreCalls.add(appId + "|" + scope + "|" + archive.toAbsolutePath().normalize());
         }
     }
 }

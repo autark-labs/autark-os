@@ -83,6 +83,38 @@ class SystemSetupServiceTests {
     }
 
     @Test
+    void reportsFileOpsSetupCommandWhenHelperPermissionIsMissing() {
+        SystemSetupService service = new SystemSetupService(
+                runtimeLayout(),
+                new FakeTailscaleService(TailscaleStatus.notInstalled()),
+                command -> {
+                    String joined = String.join(" ", command);
+                    if (joined.startsWith("docker ")) {
+                        return new SystemSetupService.CommandResult(0, "27.0.0");
+                    }
+                    if (joined.equals("sudo -n project-os-fileops --help")) {
+                        return new SystemSetupService.CommandResult(1, "sudo: a password is required");
+                    }
+                    if (joined.equals("systemctl is-active project-os")) {
+                        return new SystemSetupService.CommandResult(3, "inactive");
+                    }
+                    return new SystemSetupService.CommandResult(0, "{}");
+                });
+
+        SystemSetupStatus status = service.status();
+
+        assertThat(status.checks())
+                .filteredOn(check -> check.id().equals("fileops"))
+                .singleElement()
+                .satisfies(check -> {
+                    assertThat(check.status()).isEqualTo("warning");
+                    assertThat(check.message()).contains("file operations");
+                    assertThat(check.actionCommand()).contains("install-project-os-service.sh");
+                });
+    }
+
+
+    @Test
     void devModeReportsLocalProcessNotesInsteadOfProductionWarnings() {
         SystemSetupService service = new SystemSetupService(
                 runtimeLayout(),

@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+"""Bounded privileged file operations for Project OS.
+
+This helper is designed to be called through a narrow sudoers rule. It refuses
+arbitrary paths and only operates under the configured Project OS runtime and
+backup roots.
+"""
+
+from __future__ import annotations
+
+import argparse
+import grp
+import os
+from pathlib import Path
+import pwd
+import re
+import shutil
+import stat
+import sys
+import zipfile
+
+APP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def die(message: str) -> None:
+    print(f"project-os-fileops: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def resolved(path: str | Path) -> Path:
+    return Path(path).expanduser().resolve(strict=False)
+
+
+def require_inside(path: Path, root: Path, label: str) -> Path:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        die(f"{label} must stay under {root}")
+    return path
+
+
+def require_app_id(app_id: str) -> str:
+    if not APP_ID_RE.match(app_id or ""):
+        die("invalid app id")
+    return app_id
+
+
+def app_root(args: argparse.Namespace) -> Path:
+    app_id = require_app_id(args.app)
+    return require_inside(args.runtime_root / "apps" / app_id, args.runtime_root / "apps", "app runtime path")
+
+
+def backup_path(args: argparse.Namespace, value: str, label: str = "backup path") -> Path:
+    path = resolved(value)
+    return require_inside(path, args.backup_root, label)
+
+
+def clear_contents(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    for child in path.iterdir():
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink(missing_ok=True)
+
+
+def is_zip_symlink(info: zipfile.ZipInfo) -> bool:
+    mode = info.external_attr >> 16
+    return stat.S_IFMT(mode) == stat.S_IFLNK
+
+
+def safe_archive_name(name: str) -> bool:
+    candidate = Path(name)
+    return bool(name) and not candidate.is_absolute() and ".." not in candidate.parts
+
+
+def restore_app_data(args: argparse.Namespace) -> None:
+    destination = app_root(args)
+    archive = backup_path(args, args.archive, "restore archive")
+    scope = args.scope or "app"
+    clear_contents(destination)
+    with zipfile.ZipFile(archive) as restore_zip:
+        for info in restore_zip.infolist():
+            if info.is_dir():
+                continue
+            if is_zip_symlink(info):
+                die(f"restore archive contains unsupported symlink: {info.filename}")
+            name = info.filename
+            if scope == "full":
+                prefix = f"{args.app}/"
+                if not name.startswith(prefix):
+                    continue
+                name = name[len(prefix):]
+            if not safe_archive_name(name):
+                die(f"restore archive contains unsafe path: {info.filename}")
+            target = require_inside(destination / name, destination, "restore target")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with restore_zip.open(info) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+    print(f"restored {args.app}")
+
+
+def clear_runtime(args: argparse.Namespace) -> None:
+    clear_contents(app_root(args))
+    print(f"cleared {args.app}")
+
+
+def create_safety_archive(args: argparse.Namespace) -> None:
+    source = app_root(args)
+    destination = backup_path(args, args.destination, "archive destination")
+    if destination.suffix != ".zip":
+        die("archive destination must be a .zip file")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        if source.exists():
+            for path in source.rglob("*"):
+                if path.is_symlink() or not path.is_file():
+                    continue
+                archive.write(path, path.relative_to(source).as_posix())
+    print(f"archived {args.app}")
+
+
+def create_full_archive(args: argparse.Namespace) -> None:
+    destination = backup_path(args, args.destination, "archive destination")
+    if destination.suffix != ".zip":
+        die("archive destination must be a .zip file")
+    app_ids = [require_app_id(app.strip()) for app in (args.apps or "").split(",") if app.strip()]
+    if not app_ids:
+        die("--apps must include at least one app id")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for app_id in app_ids:
+            source = require_inside(args.runtime_root / "apps" / app_id, args.runtime_root / "apps", "app runtime path")
+            if not source.exists():
+                continue
+            for path in source.rglob("*"):
+                if path.is_symlink() or not path.is_file():
+                    continue
+                relative = Path(app_id) / path.relative_to(source)
+                archive.write(path, relative.as_posix())
+    print(f"archived {','.join(app_ids)}")
+
+
+def delete_backup(args: argparse.Namespace) -> None:
+    path = backup_path(args, args.path)
+    if path.suffix != ".zip":
+        die("only .zip backup files can be deleted")
+    if path.is_dir():
+        die("backup path is a directory")
+    path.unlink(missing_ok=True)
+    print(f"deleted {path}")
+
+
+def repair_runtime_ownership(args: argparse.Namespace) -> None:
+    root = app_root(args)
+    uid = pwd.getpwnam(args.user).pw_uid
+    gid = grp.getgrnam(args.group).gr_gid
+    for current_root, directories, files in os.walk(root, followlinks=False):
+        os.chown(current_root, uid, gid)
+        for name in directories + files:
+            path = Path(current_root) / name
+            if path.is_symlink():
+                continue
+            os.chown(path, uid, gid)
+    print(f"repaired ownership for {args.app}")
+
+
+def parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Project OS bounded file operations")
+    parser.add_argument("operation", choices=[
+        "clear-runtime",
+        "restore-app-data",
+        "create-safety-archive",
+        "create-full-archive",
+        "delete-backup",
+        "repair-runtime-ownership",
+    ])
+    parser.add_argument("--runtime-root", required=True)
+    parser.add_argument("--backup-root", required=True)
+    parser.add_argument("--app")
+    parser.add_argument("--archive")
+    parser.add_argument("--scope", choices=["app", "full"], default="app")
+    parser.add_argument("--destination")
+    parser.add_argument("--apps")
+    parser.add_argument("--path")
+    parser.add_argument("--user")
+    parser.add_argument("--group")
+    return parser
+
+
+def main(argv: list[str]) -> int:
+    args = parser().parse_args(argv)
+    args.runtime_root = resolved(args.runtime_root)
+    args.backup_root = require_inside(resolved(args.backup_root), args.runtime_root, "backup root")
+    if args.operation in {"clear-runtime", "restore-app-data", "create-safety-archive", "repair-runtime-ownership"} and not args.app:
+        die("--app is required")
+    if args.operation == "restore-app-data" and not args.archive:
+        die("--archive is required")
+    if args.operation == "create-safety-archive" and not args.destination:
+        die("--destination is required")
+    if args.operation == "create-full-archive" and (not args.apps or not args.destination):
+        die("--apps and --destination are required")
+    if args.operation == "delete-backup" and not args.path:
+        die("--path is required")
+    if args.operation == "repair-runtime-ownership" and (not args.user or not args.group):
+        die("--user and --group are required")
+
+    operations = {
+        "clear-runtime": clear_runtime,
+        "restore-app-data": restore_app_data,
+        "create-safety-archive": create_safety_archive,
+        "create-full-archive": create_full_archive,
+        "delete-backup": delete_backup,
+        "repair-runtime-ownership": repair_runtime_ownership,
+    }
+    operations[args.operation](args)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

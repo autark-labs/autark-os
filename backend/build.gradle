@@ -51,11 +51,13 @@ tasks.register('buildFrontend', Exec) {
 	outputs.dir frontendDistDir
 }
 
-tasks.register('copyFrontendAssets', Copy) {
+tasks.register('copyFrontendAssets', Sync) {
 	group = 'build'
 	description = 'Copy frontend build output into Spring Boot static resources.'
 	dependsOn tasks.named('buildFrontend')
-	from frontendDistDir
+	from(frontendDistDir) {
+		exclude 'app-images/**'
+	}
 	into generatedFrontendResources.map { it.dir('static') }
 }
 

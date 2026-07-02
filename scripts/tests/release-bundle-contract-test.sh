@@ -24,6 +24,7 @@ bundle_dir="${tmp_dir}/project-os-1.2.3"
 [[ -f "${bundle_dir}/SHA256SUMS" ]]
 [[ -x "${bundle_dir}/scripts/install-project-os.sh" ]]
 [[ -x "${bundle_dir}/scripts/project-os-gui-installer.sh" ]]
+[[ -x "${bundle_dir}/scripts/project-os-fileops" ]]
 
 grep -q '^PROJECT_OS_VERSION=1.2.3$' "${bundle_dir}/project-os-release.env"
 grep -q '^PROJECT_OS_UPDATE_CHANNEL=beta$' "${bundle_dir}/project-os-release.env"
@@ -33,6 +34,7 @@ grep -q 'project-os-release.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'project-os-provenance.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/install-project-os.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/project-os-gui-installer.sh' "${bundle_dir}/SHA256SUMS"
+grep -q 'scripts/project-os-fileops' "${bundle_dir}/SHA256SUMS"
 
 python3 - "${bundle_dir}/project-os-release.json" "${bundle_dir}/project-os-provenance.json" <<'PY'
 import json
@@ -48,6 +50,7 @@ assert release["releaseNotesUrl"] == "https://example.invalid/project-os/1.2.3"
 assert "x86_64" in release["supportedArchitectures"]
 assert "backend/project-os-backend.jar" in release["artifacts"]
 assert "scripts/project-os-gui-installer.sh" in release["artifacts"]
+assert "scripts/project-os-fileops" in release["artifacts"]
 assert provenance["schemaVersion"] == 1
 assert provenance["signatureStatus"] == "unsigned-reserved"
 PY

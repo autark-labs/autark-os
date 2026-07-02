@@ -13,6 +13,7 @@ JAVA_BIN="${PROJECT_OS_JAVA_BIN:-/usr/bin/java}"
 SERVER_PORT="${PROJECT_OS_SERVER_PORT:-8082}"
 BACKEND_JAR="${PROJECT_OS_BACKEND_JAR:-}"
 CLI_LINK="${PROJECT_OS_CLI_LINK:-/usr/local/bin/project-os}"
+SUDOERS_FILE="${PROJECT_OS_SUDOERS_FILE:-/etc/sudoers.d/project-os-fileops}"
 PROJECT_OS_VERSION="${PROJECT_OS_VERSION:-0.0.1-SNAPSHOT}"
 PROJECT_OS_BUILD_SHA="${PROJECT_OS_BUILD_SHA:-}"
 PROJECT_OS_BUILD_DATE="${PROJECT_OS_BUILD_DATE:-}"
@@ -30,6 +31,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TARGET_BACKEND_JAR="${INSTALL_DIR}/backend/project-os-backend.jar"
 INSTALLED_SETUP_SCRIPT="${INSTALL_DIR}/bin/install-project-os-service.sh"
 INSTALLED_CLI="${INSTALL_DIR}/bin/project-os"
+INSTALLED_FILEOPS_HELPER="${PROJECT_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/project-os-fileops}"
 
 usage() {
   cat <<USAGE
@@ -53,7 +55,8 @@ Environment overrides:
   PROJECT_OS_CONFIG_DIR, PROJECT_OS_LOG_DIR, PROJECT_OS_INSTALL_DIR,
   PROJECT_OS_BACKEND_JAR, PROJECT_OS_JAVA_BIN, PROJECT_OS_SERVER_PORT,
   PROJECT_OS_SERVICE_NAME, PROJECT_OS_SERVICE_FILE, PROJECT_OS_CLI_LINK,
-  PROJECT_OS_VERSION, PROJECT_OS_BUILD_SHA, PROJECT_OS_BUILD_DATE
+  PROJECT_OS_FILEOPS_HELPER, PROJECT_OS_SUDOERS_FILE, PROJECT_OS_VERSION,
+  PROJECT_OS_BUILD_SHA, PROJECT_OS_BUILD_DATE
 USAGE
 }
 
@@ -88,6 +91,7 @@ refresh_derived_paths() {
   TARGET_BACKEND_JAR="${INSTALL_DIR}/backend/project-os-backend.jar"
   INSTALLED_SETUP_SCRIPT="${INSTALL_DIR}/bin/install-project-os-service.sh"
   INSTALLED_CLI="${INSTALL_DIR}/bin/project-os"
+  INSTALLED_FILEOPS_HELPER="${PROJECT_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/project-os-fileops}"
 }
 
 require_absolute_path() {
@@ -210,7 +214,7 @@ require_root_or_reexec() {
   fi
   command_exists sudo || die "This installer needs root privileges. Install sudo or rerun as root."
   log "Requesting administrator privileges."
-  exec sudo --preserve-env=PROJECT_OS_USER,PROJECT_OS_GROUP,PROJECT_OS_RUNTIME_DIR,PROJECT_OS_CONFIG_DIR,PROJECT_OS_LOG_DIR,PROJECT_OS_INSTALL_DIR,PROJECT_OS_BACKEND_JAR,PROJECT_OS_JAVA_BIN,PROJECT_OS_SERVER_PORT,PROJECT_OS_SERVICE_NAME,PROJECT_OS_SERVICE_FILE,PROJECT_OS_CLI_LINK,PROJECT_OS_VERSION,PROJECT_OS_BUILD_SHA,PROJECT_OS_BUILD_DATE,PROJECT_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
+  exec sudo --preserve-env=PROJECT_OS_USER,PROJECT_OS_GROUP,PROJECT_OS_RUNTIME_DIR,PROJECT_OS_CONFIG_DIR,PROJECT_OS_LOG_DIR,PROJECT_OS_INSTALL_DIR,PROJECT_OS_BACKEND_JAR,PROJECT_OS_JAVA_BIN,PROJECT_OS_SERVER_PORT,PROJECT_OS_SERVICE_NAME,PROJECT_OS_SERVICE_FILE,PROJECT_OS_CLI_LINK,PROJECT_OS_FILEOPS_HELPER,PROJECT_OS_SUDOERS_FILE,PROJECT_OS_VERSION,PROJECT_OS_BUILD_SHA,PROJECT_OS_BUILD_DATE,PROJECT_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
 }
 
 status_line() {
@@ -455,6 +459,41 @@ install_cli() {
   fi
 }
 
+install_fileops_helper() {
+  local helper_source="${REPO_ROOT}/scripts/project-os-fileops"
+  if [[ ! -f "${helper_source}" ]]; then
+    warn "Project OS file operations helper is missing from ${helper_source}."
+    return 0
+  fi
+  run install -o root -g root -m 0755 "${helper_source}" "${INSTALLED_FILEOPS_HELPER}"
+  log "Installed Project OS file operations helper to ${INSTALLED_FILEOPS_HELPER}."
+}
+
+configure_fileops_privilege() {
+  local sudoers_dir
+  sudoers_dir="$(dirname "${SUDOERS_FILE}")"
+  local rule="${PROJECT_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_FILEOPS_HELPER} *"
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    run install -d -o root -g root -m 0755 "${sudoers_dir}"
+    log "Would allow ${PROJECT_OS_USER} to run ${INSTALLED_FILEOPS_HELPER} through sudo without a password."
+    return 0
+  fi
+
+  install -d -o root -g root -m 0755 "${sudoers_dir}"
+  local tmp_file
+  tmp_file="$(mktemp)"
+  {
+    printf '# Project OS bounded app-data file operations.\n'
+    printf '%s\n' "${rule}"
+  } >"${tmp_file}"
+  if command_exists visudo; then
+    visudo -cf "${tmp_file}" >/dev/null
+  fi
+  install -o root -g root -m 0440 "${tmp_file}" "${SUDOERS_FILE}"
+  rm -f "${tmp_file}"
+  log "Configured sudo access for Project OS file operations at ${SUDOERS_FILE}."
+}
+
 configure_docker_access() {
   if [[ "${SKIP_DOCKER}" -eq 1 ]]; then
     log "Skipping Docker group setup."
@@ -542,12 +581,13 @@ write_env_file() {
   local tmp_file
   tmp_file="$(mktemp)"
   if [[ -f "${env_file}" ]]; then
-    grep -v -E '^(PROJECT_OS_RUNTIME_ROOT|PROJECT_OS_INSTALL_DIR|PROJECT_OS_BACKEND_JAR|PROJECT_OS_VERSION|PROJECT_OS_BUILD_SHA|PROJECT_OS_BUILD_DATE|SERVER_PORT|PROJECT_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
+    grep -v -E '^(PROJECT_OS_RUNTIME_ROOT|PROJECT_OS_INSTALL_DIR|PROJECT_OS_BACKEND_JAR|PROJECT_OS_FILEOPS_HELPER|PROJECT_OS_VERSION|PROJECT_OS_BUILD_SHA|PROJECT_OS_BUILD_DATE|SERVER_PORT|PROJECT_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
   fi
   cat >>"${tmp_file}" <<EOF
 PROJECT_OS_RUNTIME_ROOT=${RUNTIME_DIR}
 PROJECT_OS_INSTALL_DIR=${INSTALL_DIR}
 PROJECT_OS_BACKEND_JAR=${TARGET_BACKEND_JAR}
+PROJECT_OS_FILEOPS_HELPER=${INSTALLED_FILEOPS_HELPER}
 PROJECT_OS_VERSION=${PROJECT_OS_VERSION}
 PROJECT_OS_BUILD_SHA=$(build_sha)
 PROJECT_OS_BUILD_DATE=$(build_date)
@@ -589,7 +629,7 @@ EnvironmentFile=-${CONFIG_DIR}/project-os.env
 ExecStart=${JAVA_BIN} -jar ${TARGET_BACKEND_JAR}
 Restart=on-failure
 RestartSec=5
-NoNewPrivileges=true
+NoNewPrivileges=false
 
 [Install]
 WantedBy=multi-user.target
@@ -638,6 +678,8 @@ main() {
   ensure_directories
   install_setup_script
   install_cli
+  install_fileops_helper
+  configure_fileops_privilege
   configure_docker_access
   configure_tailscale_operator
   install_backend_jar || true

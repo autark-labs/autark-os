@@ -16,6 +16,7 @@ current_jar="${install_dir}/backend/project-os-backend.jar"
 mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/scripts"
 printf 'old backend jar\n' >"${current_jar}"
 printf 'old project-os helper\n' >"${install_dir}/bin/project-os"
+printf 'old fileops helper\n' >"${install_dir}/bin/project-os-fileops"
 printf 'old bootstrap\n' >"${install_dir}/bin/bootstrap-project-os.sh"
 cat >"${config_file}" <<ENV
 PROJECT_OS_INSTALL_DIR=${install_dir}
@@ -31,6 +32,7 @@ ENV
 
 printf 'new backend jar\n' >"${bundle_dir}/backend/project-os-backend.jar"
 printf 'new project-os helper\n' >"${bundle_dir}/scripts/project-os"
+printf 'new fileops helper\n' >"${bundle_dir}/scripts/project-os-fileops"
 printf 'new bootstrap\n' >"${bundle_dir}/scripts/bootstrap-project-os.sh"
 printf 'new service installer\n' >"${bundle_dir}/scripts/install-project-os-service.sh"
 cat >"${bundle_dir}/project-os-release.json" <<JSON
@@ -45,7 +47,7 @@ cat >"${bundle_dir}/project-os-release.json" <<JSON
   "bundleUrl": "file://${bundle_dir}"
 }
 JSON
-(cd "${bundle_dir}" && sha256sum backend/project-os-backend.jar scripts/project-os scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh project-os-release.json > SHA256SUMS)
+(cd "${bundle_dir}" && sha256sum backend/project-os-backend.jar scripts/project-os scripts/project-os-fileops scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh project-os-release.json > SHA256SUMS)
 
 check_json="$(PROJECT_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/project-os" update --check --metadata-url "file://${bundle_dir}/project-os-release.json" --json)"
 PROJECT_OS_UPDATE_JSON="${check_json}" BUNDLE_DIR="${bundle_dir}" python3 - <<'PY'
@@ -69,6 +71,7 @@ PROJECT_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/project-os" update
 
 grep -q 'new backend jar' "${current_jar}"
 grep -q 'new project-os helper' "${install_dir}/bin/project-os"
+grep -q 'new fileops helper' "${install_dir}/bin/project-os-fileops"
 grep -q 'new bootstrap' "${install_dir}/bin/bootstrap-project-os.sh"
 grep -q 'PROJECT_OS_VERSION=1.1.0' "${config_file}"
 grep -q 'PROJECT_OS_BUILD_SHA=new-sha' "${config_file}"

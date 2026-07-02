@@ -42,7 +42,7 @@ class AppRuntimeMetadataWriterTests {
         assertThat(metadata.catalogAppId()).isEqualTo("vaultwarden");
         assertThat(metadata.instanceId()).isEqualTo("pos_abcdef1234567890");
         assertThat(metadata.composeProject()).isEqualTo("projectos_homelab-box_vaultwarden");
-        assertThat(metadata.manifestVersion()).isEqualTo("1.32.0");
+        assertThat(metadata.manifestVersion()).isEqualTo("1.36.0");
         assertThat(metadata.createdAt()).isEqualTo(Instant.parse("2026-06-20T13:00:00Z"));
         assertThat(Files.readString(appRoot.resolve("project-os-app.json")))
                 .contains("\"appInstanceId\" : \"appinst_vaultwarden\"")

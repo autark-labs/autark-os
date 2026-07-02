@@ -88,6 +88,7 @@ public class SystemSetupService {
         checks.add(serviceUserCheck(runAsUser));
         checks.add(runtimeCheck());
         checks.add(dockerCheck());
+        checks.add(fileOpsCheck());
         checks.add(tailscaleCheck());
         checks.add(tailscaleOperatorCheck(runAsUser));
         checks.add(systemdCheck());
@@ -145,6 +146,18 @@ public class SystemSetupService {
             return ok(SystemCapabilityCatalog.DOCKER, "Docker", "Project OS can talk to Docker.", firstLine(docker), null, null);
         }
         return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is installed but Project OS cannot access it.", firstLine(docker), "Run service setup", installCommand());
+    }
+
+    private SystemSetupCheck fileOpsCheck() {
+        if (devMode) {
+            return neutral(SystemCapabilityCatalog.FILEOPS, "File operations", "Dev mode uses local file operations first.", "Production setup installs a bounded helper for root-owned app data.", null, null);
+        }
+        String helper = fileOpsHelperCommand();
+        CommandResult result = run("sudo", "-n", helper, "--help");
+        if (result.successful()) {
+            return ok(SystemCapabilityCatalog.FILEOPS, "File operations", "Project OS can repair root-owned app data.", "Backups, restores, and app cleanup can use the bounded helper.", null, null);
+        }
+        return warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Project OS cannot run bounded file operations yet.", firstLine(result), "Run service setup", installCommand());
     }
 
     private SystemSetupCheck tailscaleCheck() {
@@ -282,6 +295,11 @@ public class SystemSetupService {
             return "not available";
         }
         return firstLine(result);
+    }
+
+    private String fileOpsHelperCommand() {
+        String helper = System.getenv("PROJECT_OS_FILEOPS_HELPER");
+        return helper == null || helper.isBlank() ? "project-os-fileops" : helper;
     }
 
     private SystemSetupExistingInstallReport existingInstallReport(ProjectOsIdentity identity) {

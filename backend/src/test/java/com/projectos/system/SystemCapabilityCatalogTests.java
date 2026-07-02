@@ -19,7 +19,10 @@ class SystemCapabilityCatalogTests {
     @Test
     void centralizesReadinessGroupsAndSupportRoutes() {
         assertThat(SystemCapabilityCatalog.APP_INSTALL_CHECKS)
-                .containsExactly(SystemCapabilityCatalog.DOCKER, SystemCapabilityCatalog.SERVICE_USER);
+                .containsExactly(
+                        SystemCapabilityCatalog.DOCKER,
+                        SystemCapabilityCatalog.SERVICE_USER,
+                        SystemCapabilityCatalog.FILEOPS);
         assertThat(SystemCapabilityCatalog.PRIVATE_ACCESS_CHECKS)
                 .containsExactly(SystemCapabilityCatalog.TAILSCALE, SystemCapabilityCatalog.TAILSCALE_OPERATOR);
 

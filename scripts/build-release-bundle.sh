@@ -38,6 +38,7 @@ The bundle layout is:
   scripts/install-project-os.sh
   scripts/project-os-gui-installer.sh
   scripts/project-os
+  scripts/project-os-fileops
 USAGE
 }
 
@@ -211,7 +212,8 @@ write_release_json() {
     "scripts/install-project-os-service.sh",
     "scripts/install-project-os.sh",
     "scripts/project-os-gui-installer.sh",
-    "scripts/project-os"
+    "scripts/project-os",
+    "scripts/project-os-fileops"
   ],
   "signatureStatus": "unsigned-reserved"
 }
@@ -247,18 +249,20 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/install-project-os.sh" "${OUTPUT_DIR}/scripts/install-project-os.sh"
   run_cmd cp "${SCRIPT_DIR}/project-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/project-os-gui-installer.sh"
   run_cmd cp "${SCRIPT_DIR}/project-os" "${OUTPUT_DIR}/scripts/project-os"
+  run_cmd cp "${SCRIPT_DIR}/project-os-fileops" "${OUTPUT_DIR}/scripts/project-os-fileops"
   run_cmd chmod +x \
     "${OUTPUT_DIR}/scripts/bootstrap-project-os.sh" \
     "${OUTPUT_DIR}/scripts/install-project-os-service.sh" \
     "${OUTPUT_DIR}/scripts/install-project-os.sh" \
     "${OUTPUT_DIR}/scripts/project-os-gui-installer.sh" \
-    "${OUTPUT_DIR}/scripts/project-os"
+    "${OUTPUT_DIR}/scripts/project-os" \
+    "${OUTPUT_DIR}/scripts/project-os-fileops"
   write_metadata
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '+ cd %q && sha256sum backend/project-os-backend.jar scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh scripts/install-project-os.sh scripts/project-os-gui-installer.sh scripts/project-os project-os-release.env project-os-release.json project-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
+    printf '+ cd %q && sha256sum backend/project-os-backend.jar scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh scripts/install-project-os.sh scripts/project-os-gui-installer.sh scripts/project-os scripts/project-os-fileops project-os-release.env project-os-release.json project-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
   else
-    (cd "${OUTPUT_DIR}" && sha256sum backend/project-os-backend.jar scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh scripts/install-project-os.sh scripts/project-os-gui-installer.sh scripts/project-os project-os-release.env project-os-release.json project-os-provenance.json > SHA256SUMS)
+    (cd "${OUTPUT_DIR}" && sha256sum backend/project-os-backend.jar scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh scripts/install-project-os.sh scripts/project-os-gui-installer.sh scripts/project-os scripts/project-os-fileops project-os-release.env project-os-release.json project-os-provenance.json > SHA256SUMS)
   fi
 }
 

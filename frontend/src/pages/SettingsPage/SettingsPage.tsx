@@ -216,7 +216,7 @@ function SettingsPage() {
     void load();
   }, []);
 
-  const requiredChecks = useMemo(() => state.setup?.checks?.filter((check) => ['service-user', 'runtime-root', 'docker', 'tailscale', 'tailscale-operator'].includes(check.id)) ?? [], [state.setup]);
+  const requiredChecks = useMemo(() => state.setup?.checks?.filter((check) => ['service-user', 'runtime-root', 'docker', 'fileops', 'tailscale', 'tailscale-operator'].includes(check.id)) ?? [], [state.setup]);
   const advancedChecks = useMemo(() => state.setup?.checks?.filter((check) => !requiredChecks.includes(check)) ?? [], [requiredChecks, state.setup]);
   const activeGroupId = defaultSettingsGroup(activeGroup) as SettingsGroupId;
   const activeGroupMeta = topLevelSettingsGroups.find((group) => group.id === activeGroupId) || topLevelSettingsGroups[0];

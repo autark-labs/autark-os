@@ -15,7 +15,6 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,6 +27,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.projectos.activity.ActivityLogService;
+import com.projectos.fileops.LocalProjectOsFileOperations;
+import com.projectos.fileops.ProjectOsFileOpsService;
 import com.projectos.marketplace.catalog.MarketplaceCatalogService;
 import com.projectos.marketplace.install.AppActionResult;
 import com.projectos.marketplace.install.AppLifecycleService;
@@ -63,6 +64,7 @@ public class BackupService {
     private final MarketplaceCatalogService catalogService;
     private final AppInstanceViewProvider appInstanceViewProvider;
     private final RuntimeFileOperations fileOperations;
+    private final ProjectOsFileOpsService fileOpsService;
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService) {
         this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, () -> installedAppRepository.findAll().stream()
@@ -87,8 +89,12 @@ public class BackupService {
                 .toList(), new RuntimeFileOperations());
     }
 
-    @Autowired
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations) {
+        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, new ProjectOsFileOpsService(runtimeLayout, new LocalProjectOsFileOperations()));
+    }
+
+    @Autowired
+    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, ProjectOsFileOpsService fileOpsService) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
@@ -99,6 +105,7 @@ public class BackupService {
         this.catalogService = catalogService;
         this.appInstanceViewProvider = appInstanceViewProvider;
         this.fileOperations = fileOperations;
+        this.fileOpsService = fileOpsService;
     }
 
     public BackupReport report() {
@@ -311,7 +318,7 @@ public class BackupService {
             validateBackup(source);
             Files.createDirectories(backupRoot().resolve(app.appId()));
             Path destination = backupRoot().resolve(app.appId()).resolve(app.appId() + "-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
-            long size = fileOperations.zipDirectory(source, destination);
+            long size = fileOpsService.createSafetyArchive(app.appId(), destination);
             RestorePoint point = backupRepository.record(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), destination.toString(), "completed", size, "Backup completed.");
             point = verifyRestorePoint(point).restorePoint();
             activityLogService.success("backup", cleanSource(backupSource) + "_app_backup", "Backup completed", app.appName() + " backup is ready.", app.appId());
@@ -344,11 +351,7 @@ public class BackupService {
     }
 
     private long zipApps(List<InstalledApp> apps, Path destination) throws IOException {
-        Map<String, Path> sources = new LinkedHashMap<>();
-        for (InstalledApp app : apps) {
-            sources.put(app.appId(), Path.of(app.runtimePath()).toAbsolutePath().normalize());
-        }
-        return fileOperations.zipDirectories(sources, destination);
+        return fileOpsService.createFullArchive(apps.stream().map(InstalledApp::appId).toList(), destination);
     }
 
     private List<InstalledApp> affectedApps(RestorePoint point, String targetAppId) {
@@ -403,13 +406,11 @@ public class BackupService {
             if (Files.exists(destination) && fileOperations.directorySize(destination) > 0) {
                 Files.createDirectories(backupRoot().resolve("pre-restore"));
                 Path safety = backupRoot().resolve("pre-restore").resolve(app.appId() + "-pre-restore-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
-                long size = fileOperations.zipDirectory(destination, safety);
+                long size = fileOpsService.createSafetyArchive(app.appId(), safety);
                 backupRepository.record(app.appId(), app.appName(), "app", "pre_restore", app.appId(), safety.toString(), "completed", size, "Safety backup created before restore.");
                 logs.add("Created safety backup for " + app.appName() + ".");
             }
-            deleteContents(destination);
-            Files.createDirectories(destination);
-            unzipRestore(point, app, destination);
+            fileOpsService.restoreAppData(Path.of(point.path()), point.scope(), app.appId());
             installedAppRepository.recordEvent(app.appId(), "restore_completed", "Restored data from restore point #" + point.id() + ".");
             activityLogService.success("backup", "restore_app", "Restored " + app.appName(), "Restored data from restore point #" + point.id() + ".", app.appId());
             logs.add("Restored " + app.appName() + ".");
