@@ -300,6 +300,9 @@ public class ApplicationStateService {
     }
 
     private boolean failedLifecycleJobStillRelevant(ProjectOsJob job, AppRuntimeView app) {
+        if (isFailedFullRestore(job)) {
+            return false;
+        }
         if (job != null && List.of("backup", "backup_verify", "backup_restore").contains(job.type())) {
             return true;
         }
@@ -309,6 +312,13 @@ public class ApplicationStateService {
         }
         String friendlyStatus = app.friendlyStatus() == null ? "" : app.friendlyStatus();
         return !List.of("Ready", "Starting", "Paused").contains(friendlyStatus);
+    }
+
+    private boolean isFailedFullRestore(ProjectOsJob job) {
+        return job != null
+                && "backup_restore".equals(job.type())
+                && "failed".equals(job.status())
+                && "all".equals(restoreTarget(job.subjectId()));
     }
 
     private String operationKind(String type) {

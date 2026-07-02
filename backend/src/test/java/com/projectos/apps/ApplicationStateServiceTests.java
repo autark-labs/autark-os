@@ -321,6 +321,46 @@ class ApplicationStateServiceTests {
     }
 
     @Test
+    void snapshotDoesNotPinFailedFullRestoreOnEveryManagedApp() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("restore-1", "backup_restore", "42:all", "failed", "restore_data")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps())
+                .extracting(app -> app.operationState().kind())
+                .containsExactly("idle", "idle");
+        assertThat(state.runtimeApps().getFirst().availableActions())
+                .extracting(action -> action.id())
+                .contains("stop", "restart");
+        assertThat(state.runtimeApps().get(1).availableActions())
+                .extracting(action -> action.id())
+                .contains("stop", "restart");
+    }
+
+    @Test
+    void snapshotKeepsFailedTargetedRestoreVisibleOnTargetApp() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("restore-1", "backup_restore", "42:vaultwarden", "failed", "restore_data")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("idle");
+        assertThat(state.runtimeApps().get(1).operationState().kind()).isEqualTo("failed");
+        assertThat(state.runtimeApps().get(1).operationState().label()).isEqualTo("Restoring");
+    }
+
+    @Test
     void snapshotKeepsFailedBackupVisibleOnReadyApp() {
         ApplicationStateService service = new ApplicationStateService(
                 List::of,

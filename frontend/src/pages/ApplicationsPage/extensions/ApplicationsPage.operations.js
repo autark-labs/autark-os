@@ -170,6 +170,9 @@ function restoreTarget(subjectId) {
 }
 
 function failedJobStillRelevant(item, job) {
+  if (isFailedFullRestore(job)) {
+    return false;
+  }
   if (!['start_app', 'stop_app', 'restart_app', 'repair_app'].includes(job.type)) {
     return true;
   }
@@ -180,6 +183,10 @@ function failedJobStillRelevant(item, job) {
     return false;
   }
   return item?.attentionState !== 'none' || ['stopped', 'unreachable', 'unknown'].includes(item?.readinessState);
+}
+
+function isFailedFullRestore(job) {
+  return job?.type === 'backup_restore' && job.status === 'failed' && restoreTarget(job.subjectId) === 'all';
 }
 
 function currentJobStepText(job) {

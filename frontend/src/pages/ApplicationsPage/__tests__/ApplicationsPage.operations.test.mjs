@@ -114,6 +114,27 @@ test('operationStateForItem maps relevant failed durable jobs and ignores jobs f
   ]), {
     kind: 'idle',
   });
+
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
+    {
+      ...job('restore-failed', 'backup_restore', '42:all', 'failed', 'restore_data'),
+      error: { message: 'Restore failed for Home Assistant.' },
+    },
+  ]), {
+    kind: 'idle',
+  });
+
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
+    {
+      ...job('restore-failed', 'backup_restore', '42:vaultwarden', 'failed', 'restore_data'),
+      error: { message: 'Restore failed for Vaultwarden.' },
+    },
+  ]), {
+    kind: 'failed',
+    label: 'Action failed',
+    message: 'Restore failed for Vaultwarden.',
+    jobId: 'restore-failed',
+  });
 });
 
 test('operationStateForItem does not resurrect stale failed lifecycle jobs after recovery', () => {

@@ -310,6 +310,24 @@ test('project os job helper clears restore overlay after restore completes', () 
   assert.equal(updated.managedApps[0].userStatus, 'Ready');
 });
 
+test('project os job helper clears full restore overlay after full restore fails', () => {
+  const state = {
+    runtimeApps: [
+      { ...runtimeApp('homepage', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' }, availableActions: [{ id: 'restart', label: 'Restart' }] },
+      { ...runtimeApp('vaultwarden', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' }, availableActions: [{ id: 'restart', label: 'Restart' }] },
+    ],
+    managedApps: [
+      { catalogAppId: 'homepage', name: 'Homepage', userStatus: 'Ready' },
+      { catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' },
+    ],
+  };
+
+  const updated = setProjectOsJobInState(state, restoreJob('42:all', 'failed'));
+
+  assert.deepEqual(updated.runtimeApps.map((app) => app.operationState.kind), ['idle', 'idle']);
+  assert.deepEqual(updated.managedApps.map((app) => app.userStatus), ['Ready', 'Ready']);
+});
+
 function restoreJob(subjectId, status) {
   return {
     jobId: 'restore-1',

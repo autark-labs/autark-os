@@ -173,6 +173,15 @@ function restoreTarget(subjectId) {
 
 function operationStateFromProjectOsJob(job) {
   if (job.status === 'failed') {
+    if (isFailedFullRestore(job)) {
+      return {
+        kind: 'idle',
+        label: 'Idle',
+        jobId: job.jobId,
+        currentStep: currentProjectOsJobStepText(job),
+        message: currentProjectOsJobStepText(job),
+      };
+    }
     return {
       kind: 'failed',
       label: operationLabel(job.type),
@@ -290,6 +299,10 @@ function currentProjectOsJobStepText(job) {
     ?? job.steps?.find((candidate) => candidate.status === 'running')
     ?? job.steps?.find((candidate) => candidate.status === 'pending');
   return step?.message || step?.label || '';
+}
+
+function isFailedFullRestore(job) {
+  return job?.type === 'backup_restore' && job.status === 'failed' && restoreTarget(job.subjectId) === 'all';
 }
 
 export function setRuntimeAppStatusInState(state, appId, status) {
