@@ -113,10 +113,10 @@ export function setProjectOsJobInState(state, job) {
   }
 
   const operation = operationStateFromProjectOsJob(job);
-  const runtimeApps = (state.runtimeApps ?? []).map((app) => app.appId === job.subjectId
+  const runtimeApps = (state.runtimeApps ?? []).map((app) => jobTargetsApp(job, app.appId)
     ? runtimeAppWithOperation(app, operation)
     : app);
-  const managedApps = (state.managedApps ?? []).map((app) => app.catalogAppId === job.subjectId
+  const managedApps = (state.managedApps ?? []).map((app) => jobTargetsApp(job, app.catalogAppId)
     ? managedAppWithOperation(app, operation)
     : app);
 
@@ -146,7 +146,29 @@ export function setRuntimeAppInState(state, app) {
 }
 
 function lifecycleJobTypes() {
-  return new Set(['install_app', 'repair_app', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'uninstall_app']);
+  return new Set(['install_app', 'repair_app', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app']);
+}
+
+function jobTargetsApp(job, appId) {
+  if (!job || !appId) {
+    return false;
+  }
+  if (job.subjectId === appId) {
+    return true;
+  }
+  if (job.type !== 'backup_restore') {
+    return false;
+  }
+  const target = restoreTarget(job.subjectId);
+  return target === 'all' || target === appId;
+}
+
+function restoreTarget(subjectId) {
+  if (!subjectId) {
+    return '';
+  }
+  const separator = subjectId.indexOf(':');
+  return separator < 0 ? subjectId : subjectId.slice(separator + 1);
 }
 
 function operationStateFromProjectOsJob(job) {
@@ -157,6 +179,15 @@ function operationStateFromProjectOsJob(job) {
       jobId: job.jobId,
       currentStep: '',
       message: job.error?.message || 'Project OS could not finish this action.',
+    };
+  }
+  if (job.status !== 'queued' && job.status !== 'running') {
+    return {
+      kind: 'idle',
+      label: 'Idle',
+      jobId: job.jobId,
+      currentStep: currentProjectOsJobStepText(job),
+      message: currentProjectOsJobStepText(job),
     };
   }
 
@@ -195,6 +226,7 @@ function operationKind(type) {
   if (type === 'repair_app') return 'repairing';
   if (type === 'install_app') return 'installing';
   if (type === 'backup' || type === 'backup_verify') return 'backing_up';
+  if (type === 'backup_restore') return 'restoring';
   if (type === 'uninstall_app') return 'uninstalling';
   return 'idle';
 }
@@ -206,6 +238,7 @@ function operationLabel(type) {
   if (type === 'repair_app') return 'Repairing';
   if (type === 'install_app') return 'Installing';
   if (type === 'backup' || type === 'backup_verify') return 'Creating backup';
+  if (type === 'backup_restore') return 'Restoring';
   if (type === 'uninstall_app') return 'Uninstalling safely';
   return 'Working';
 }

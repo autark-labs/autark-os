@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
@@ -24,6 +25,10 @@ import {
   useVerifyRestorePointMutation,
 } from '@/repositories/backupRepository';
 import { terminalJob } from '@/repositories/jobRepository';
+import {
+  invalidateApplicationState,
+  setProjectOsJobInApplicationStateCache,
+} from '@/repositories/applicationStateRepository';
 import type { AppBackupStatus, BackupReport, RestorePlan, RestorePoint } from '@/types/backup';
 import type { ProjectOsJob } from '@/types/jobs';
 import {
@@ -46,6 +51,7 @@ import { backupJobRunningId, backupPageViewModel, capitalizeBackupLabel, formatB
 type RestoreView = 'timeline' | 'list';
 
 function BackupsPage() {
+  const queryClient = useQueryClient();
   const { showAdvancedMetrics } = useProjectSettings();
   const [running, setRunning] = useState<string | null>(null);
   const [restorePlan, setRestorePlan] = useState<RestorePlan | null>(null);
@@ -88,6 +94,7 @@ function BackupsPage() {
 
   useEffect(() => {
     if (activeJobQuery.data) {
+      setProjectOsJobInApplicationStateCache(queryClient, activeJobQuery.data);
       setActiveJob(activeJobQuery.data);
       if (terminalJob(activeJobQuery.data)) {
         if (activeJobQuery.data.status === 'failed') {
@@ -98,9 +105,12 @@ function BackupsPage() {
         }
         setRunning(null);
         void refreshBackupReport();
+        if (activeJobQuery.data.type === 'backup_restore') {
+          void invalidateApplicationState(queryClient);
+        }
       }
     }
-  }, [activeJobQuery.data, refreshBackupReport]);
+  }, [activeJobQuery.data, queryClient, refreshBackupReport]);
 
   useEffect(() => {
     if (activeJobQuery.error) {

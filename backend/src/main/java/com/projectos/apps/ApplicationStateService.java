@@ -236,7 +236,7 @@ public class ApplicationStateService {
 
     private AppRuntimeView runtimeApp(AppRuntimeView app, int displayOrder, List<ProjectOsJob> operationJobs) {
         ProjectOsJob job = operationJobs.stream()
-                .filter(candidate -> app.appId().equals(candidate.subjectId()))
+                .filter(candidate -> jobTargetsApp(candidate, app.appId()))
                 .findFirst()
                 .orElse(null);
         AppOperationView operation = operationState(job, app);
@@ -258,7 +258,29 @@ public class ApplicationStateService {
         if (job == null || !List.of("queued", "running", "failed", "succeeded", "cancelled", "canceled").contains(job.status())) {
             return false;
         }
-        return List.of("start_app", "stop_app", "restart_app", "repair_app", "backup", "backup_verify", "uninstall_app").contains(job.type());
+        return List.of("start_app", "stop_app", "restart_app", "repair_app", "backup", "backup_verify", "backup_restore", "uninstall_app").contains(job.type());
+    }
+
+    private boolean jobTargetsApp(ProjectOsJob job, String appId) {
+        if (job == null || appId == null || appId.isBlank()) {
+            return false;
+        }
+        if (appId.equals(job.subjectId())) {
+            return true;
+        }
+        if (!"backup_restore".equals(job.type())) {
+            return false;
+        }
+        String restoreTarget = restoreTarget(job.subjectId());
+        return "all".equals(restoreTarget) || appId.equals(restoreTarget);
+    }
+
+    private String restoreTarget(String subjectId) {
+        if (subjectId == null || subjectId.isBlank()) {
+            return "";
+        }
+        int separator = subjectId.indexOf(':');
+        return separator < 0 ? subjectId : subjectId.substring(separator + 1);
     }
 
     private AppOperationView operationState(ProjectOsJob job, AppRuntimeView app) {
@@ -278,7 +300,7 @@ public class ApplicationStateService {
     }
 
     private boolean failedLifecycleJobStillRelevant(ProjectOsJob job, AppRuntimeView app) {
-        if (job != null && List.of("backup", "backup_verify").contains(job.type())) {
+        if (job != null && List.of("backup", "backup_verify", "backup_restore").contains(job.type())) {
             return true;
         }
         String readinessState = app.readinessState() == null ? "" : app.readinessState();
@@ -296,6 +318,7 @@ public class ApplicationStateService {
             case "restart_app" -> "restarting";
             case "repair_app" -> "repairing";
             case "backup", "backup_verify" -> "backing_up";
+            case "backup_restore" -> "restoring";
             case "uninstall_app" -> "uninstalling";
             default -> "idle";
         };
@@ -308,6 +331,7 @@ public class ApplicationStateService {
             case "restart_app" -> "Restarting";
             case "repair_app" -> "Repairing";
             case "backup", "backup_verify" -> "Creating backup";
+            case "backup_restore" -> "Restoring";
             case "uninstall_app" -> "Uninstalling safely";
             default -> "Working";
         };

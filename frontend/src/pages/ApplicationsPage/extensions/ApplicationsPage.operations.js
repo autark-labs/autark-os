@@ -131,15 +131,42 @@ function operationStateFromJob(job) {
       currentStep: currentJobStepText(job),
     };
   }
+  if (job.type === 'backup_restore') {
+    return {
+      kind: 'restoring',
+      label: 'Restoring',
+      jobId: job.jobId,
+      currentStep: currentJobStepText(job),
+    };
+  }
   return { kind: 'idle' };
 }
 
 function jobsForItem(item, jobs) {
   const itemIds = new Set([item?.id, item?.sourceId].filter(Boolean));
   return (Array.isArray(jobs) ? jobs : [])
-    .filter((job) => itemIds.has(job.subjectId))
-    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'backup', 'backup_verify', 'uninstall_app'].includes(job.type))
+    .filter((job) => jobTargetsItem(job, itemIds))
+    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app'].includes(job.type))
     .toSorted((left, right) => jobTime(right) - jobTime(left));
+}
+
+function jobTargetsItem(job, itemIds) {
+  if (itemIds.has(job.subjectId)) {
+    return true;
+  }
+  if (job.type !== 'backup_restore') {
+    return false;
+  }
+  const target = restoreTarget(job.subjectId);
+  return target === 'all' || itemIds.has(target);
+}
+
+function restoreTarget(subjectId) {
+  if (!subjectId) {
+    return '';
+  }
+  const separator = subjectId.indexOf(':');
+  return separator < 0 ? subjectId : subjectId.slice(separator + 1);
 }
 
 function failedJobStillRelevant(item, job) {

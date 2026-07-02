@@ -274,6 +274,55 @@ test('project os job helper maps install and backup work for existing apps', () 
   assert.equal(backingUp.runtimeApps[0].friendlyStatus, 'Ready');
 });
 
+test('project os job helper maps restore work by restore target subject', () => {
+  const state = {
+    runtimeApps: [runtimeApp('homepage', 'Ready'), runtimeApp('vaultwarden', 'Ready')],
+    managedApps: [
+      { catalogAppId: 'homepage', name: 'Homepage', userStatus: 'Ready' },
+      { catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' },
+    ],
+  };
+
+  const targeted = setProjectOsJobInState(state, restoreJob('42:vaultwarden', 'running'));
+
+  assert.equal(targeted.runtimeApps[0].operationState?.kind, undefined);
+  assert.equal(targeted.runtimeApps[1].operationState.kind, 'restoring');
+  assert.equal(targeted.runtimeApps[1].operationState.label, 'Restoring');
+  assert.deepEqual(targeted.runtimeApps[1].availableActions, []);
+  assert.equal(targeted.managedApps[1].userStatus, 'Ready');
+
+  const fullRestore = setProjectOsJobInState(state, restoreJob('42:all', 'running'));
+
+  assert.deepEqual(fullRestore.runtimeApps.map((app) => app.operationState.kind), ['restoring', 'restoring']);
+  assert.deepEqual(fullRestore.managedApps.map((app) => app.userStatus), ['Ready', 'Ready']);
+});
+
+test('project os job helper clears restore overlay after restore completes', () => {
+  const state = {
+    runtimeApps: [{ ...runtimeApp('vaultwarden', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' } }],
+    managedApps: [{ catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' }],
+  };
+
+  const updated = setProjectOsJobInState(state, restoreJob('42:vaultwarden', 'succeeded'));
+
+  assert.equal(updated.runtimeApps[0].operationState.kind, 'idle');
+  assert.equal(updated.runtimeApps[0].friendlyStatus, 'Ready');
+  assert.equal(updated.managedApps[0].userStatus, 'Ready');
+});
+
+function restoreJob(subjectId, status) {
+  return {
+    jobId: 'restore-1',
+    type: 'backup_restore',
+    subjectId,
+    status,
+    currentStep: 'restore_data',
+    steps: [{ id: 'restore_data', label: 'Restoring app data', status: 'running' }],
+    createdAt: updatedAt,
+    updatedAt,
+  };
+}
+
 function runtimeApp(appId, friendlyStatus, healthSnapshot = null) {
   return {
     appId,

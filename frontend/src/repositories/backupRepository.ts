@@ -8,6 +8,10 @@ import {
   useProjectOsJobQuery as useSharedProjectOsJobQuery,
   useProjectOsJobsQuery,
 } from './jobRepository';
+import {
+  invalidateApplicationState,
+  setProjectOsJobInApplicationStateCache,
+} from './applicationStateRepository';
 
 export const backupQueryKeys = {
   all: ['backups'] as const,
@@ -98,7 +102,9 @@ export function useRestoreBackupMutation() {
     mutationFn: ({ restorePointId, appId }) => BackupAPIClient.restore(restorePointId, appId),
     onSuccess: (job) => {
       setProjectOsJobCache(queryClient, job);
+      setProjectOsJobInApplicationStateCache(queryClient, job);
       void invalidateBackupQueries(queryClient);
+      void invalidateApplicationState(queryClient);
     },
   });
 }

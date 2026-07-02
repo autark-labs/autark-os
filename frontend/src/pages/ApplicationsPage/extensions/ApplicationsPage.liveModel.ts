@@ -255,7 +255,7 @@ function backendOperationState(value: AppRuntimeView['operationState']): AppOper
       jobId: value.jobId || undefined,
     };
   }
-  if (value.kind === 'starting' || value.kind === 'stopping' || value.kind === 'restarting' || value.kind === 'repairing' || value.kind === 'saving_settings' || value.kind === 'backing_up' || value.kind === 'uninstalling') {
+  if (value.kind === 'starting' || value.kind === 'stopping' || value.kind === 'restarting' || value.kind === 'repairing' || value.kind === 'saving_settings' || value.kind === 'backing_up' || value.kind === 'restoring' || value.kind === 'uninstalling') {
     return {
       kind: value.kind,
       label: value.label || operationLabel(value.kind),
@@ -273,6 +273,7 @@ function operationLabel(kind: string) {
   if (kind === 'repairing') return 'Repairing';
   if (kind === 'saving_settings') return 'Saving settings';
   if (kind === 'backing_up') return 'Creating backup';
+  if (kind === 'restoring') return 'Restoring';
   if (kind === 'uninstalling') return 'Uninstalling safely';
   return 'Working';
 }

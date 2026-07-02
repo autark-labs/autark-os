@@ -11,7 +11,7 @@ export type AppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked'
 export type AppOperationState =
   | { kind: 'idle' }
   | {
-    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'uninstalling';
+    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'restoring' | 'uninstalling';
     label: string;
     jobId?: string;
     currentStep?: string;

@@ -69,7 +69,13 @@ public class BackupController {
     @PostMapping("/restore-points/{id}/restore")
     public ProjectOsJob restore(@PathVariable long id, @RequestBody(required = false) RestoreRequest request) {
         String appId = request == null ? null : request.appId();
-        return jobService.start("backup_restore", restoreSubject(id, appId), restoreSteps(), () -> restoreOutcome(backupService.restore(id, appId)));
+        ProjectOsJob job = jobService.start("backup_restore", restoreSubject(id, appId), restoreSteps(), () -> {
+            RestoreResult result = backupService.restore(id, appId);
+            invalidateApplicationState();
+            return restoreOutcome(result);
+        });
+        invalidateApplicationState();
+        return job;
     }
 
     private java.util.List<ProjectOsJobStep> backupSteps() {

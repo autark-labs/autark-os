@@ -60,6 +60,24 @@ test('operationStateForItem maps durable jobs by app subject and current step', 
   });
 
   assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
+    job('restore-1', 'backup_restore', '42:vaultwarden', 'running', 'restore_data'),
+  ]), {
+    kind: 'restoring',
+    label: 'Restoring',
+    jobId: 'restore-1',
+    currentStep: 'Restoring app data',
+  });
+
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
+    job('restore-2', 'backup_restore', '42:all', 'running', 'restore_data'),
+  ]), {
+    kind: 'restoring',
+    label: 'Restoring',
+    jobId: 'restore-2',
+    currentStep: 'Restoring app data',
+  });
+
+  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
     job('repair-1', 'repair_app', 'vaultwarden', 'running', 'repair'),
   ]), {
     kind: 'repairing',
@@ -164,6 +182,7 @@ function job(jobId, type, subjectId, status, currentStep, updatedAt = '2026-06-2
       { id: 'run', label: 'Run command', message: 'Running app command', status: currentStep === 'run' ? 'running' : 'pending' },
       { id: 'wait', label: 'Wait for readiness', message: 'Waiting for app readiness', status: currentStep === 'wait' ? 'running' : 'pending' },
       { id: 'archive', label: 'Create archive', message: 'Writing backup archive', status: currentStep === 'archive' ? 'running' : 'pending' },
+      { id: 'restore_data', label: 'Restore data', message: 'Restoring app data', status: currentStep === 'restore_data' ? 'running' : 'pending' },
       { id: 'remove', label: 'Remove app', message: 'Removing containers', status: currentStep === 'remove' ? 'running' : 'pending' },
       { id: 'repair', label: 'Run repair', message: 'Repairing app', status: currentStep === 'repair' ? 'running' : 'pending' },
     ],

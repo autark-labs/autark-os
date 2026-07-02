@@ -283,6 +283,44 @@ class ApplicationStateServiceTests {
     }
 
     @Test
+    void snapshotOverlaysRestoreJobOnTargetApp() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("restore-1", "backup_restore", "42:vaultwarden", "running", "restore_data")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("idle");
+        assertThat(state.runtimeApps().get(1).operationState().kind()).isEqualTo("restoring");
+        assertThat(state.runtimeApps().get(1).operationState().label()).isEqualTo("Restoring");
+        assertThat(state.runtimeApps().get(1).availableActions()).isEmpty();
+    }
+
+    @Test
+    void snapshotOverlaysFullRestoreJobOnEveryManagedApp() {
+        ApplicationStateService service = new ApplicationStateService(
+                List::of,
+                () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                () -> List.of(lifecycleJob("restore-1", "backup_restore", "42:all", "running", "restore_data")));
+
+        ApplicationState state = service.refreshNow();
+
+        assertThat(state.runtimeApps())
+                .extracting(app -> app.operationState().kind())
+                .containsExactly("restoring", "restoring");
+        assertThat(state.runtimeApps())
+                .extracting(app -> app.operationState().label())
+                .containsExactly("Restoring", "Restoring");
+    }
+
+    @Test
     void snapshotKeepsFailedBackupVisibleOnReadyApp() {
         ApplicationStateService service = new ApplicationStateService(
                 List::of,

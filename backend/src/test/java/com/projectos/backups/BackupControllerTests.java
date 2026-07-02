@@ -1,9 +1,9 @@
 package com.projectos.backups;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,14 +51,14 @@ class BackupControllerTests {
         assertThat(job.steps()).extracting(ProjectOsJobStep::id)
                 .containsExactly("prepare_backup", "copy_data", "verify_backup", "finish");
         verify(backupService, never()).run("vaultwarden");
-        verify(applicationStateService, atLeastOnce()).invalidate();
+        verify(applicationStateService, times(1)).invalidate();
 
         jobService.runQueuedJobsNow();
 
         ProjectOsJob completed = jobService.findById(job.jobId()).orElseThrow();
         assertThat(completed.status()).isEqualTo("succeeded");
         verify(backupService).run("vaultwarden");
-        verify(applicationStateService, atLeastOnce()).invalidate();
+        verify(applicationStateService, times(2)).invalidate();
     }
 
     @Test
@@ -117,6 +117,7 @@ class BackupControllerTests {
         assertThat(job.steps()).extracting(ProjectOsJobStep::id)
                 .containsExactly("validate_restore_point", "stop_apps", "create_safety_backup", "restore_data", "start_apps", "finish");
         verify(backupService, never()).restore(42L, "vaultwarden");
+        verify(applicationStateService, times(1)).invalidate();
 
         jobService.runQueuedJobsNow();
 
@@ -125,6 +126,7 @@ class BackupControllerTests {
         assertThat(completed.steps()).extracting(ProjectOsJobStep::status)
                 .containsExactly("succeeded", "succeeded", "succeeded", "succeeded", "succeeded", "succeeded");
         verify(backupService).restore(42L, "vaultwarden");
+        verify(applicationStateService, times(2)).invalidate();
     }
 
     private ProjectOsJobService jobService() {
