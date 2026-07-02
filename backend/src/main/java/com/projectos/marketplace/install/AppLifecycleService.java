@@ -944,7 +944,7 @@ public class AppLifecycleService {
                         : privateAccessCheck(app.appId(), settings.privateAccessUrl())
                 : AppAccessCheck.notConfigured(app.appId());
         settings = updateAccessCheckTimestamps(app, settings, localCheck);
-        AppHealthSnapshot snapshot = buildHealthSnapshot(app, runtime, manifest, localCheck, privateCheck);
+        AppHealthSnapshot snapshot = buildHealthSnapshot(app, runtime, manifest, settings, localCheck, privateCheck);
         repository.healthFor(app.appId())
                 .filter(previous -> !previous.status().equals(snapshot.status()))
                 .ifPresent(previous -> {
@@ -983,14 +983,16 @@ public class AppLifecycleService {
         return updated;
     }
 
-    private AppHealthSnapshot buildHealthSnapshot(InstalledApp app, AppRuntimeStatus runtime, ApplicationManifest manifest, AppAccessCheck localCheck, AppAccessCheck privateCheck) {
+    private AppHealthSnapshot buildHealthSnapshot(InstalledApp app, AppRuntimeStatus runtime, ApplicationManifest manifest, InstallSettings settings, AppAccessCheck localCheck, AppAccessCheck privateCheck) {
         Instant now = Instant.now();
         HealthManifest health = healthContract(manifest);
         Duration startupGracePeriod = Duration.ofSeconds(health.startupGraceSeconds());
         boolean startupGrace = "Starting".equals(runtime.friendlyStatus()) && app.installedAt().plus(startupGracePeriod).isAfter(now);
         boolean localRequired = shouldCheckLocalAccess(manifest, localCheck.url());
         boolean localBroken = localRequired && "unreachable".equals(localCheck.status());
-        boolean privateBroken = manifest != null && isPrivateRequired(manifest) && !"reachable".equals(privateCheck.status());
+        boolean privateBroken = settings != null
+                && "required".equals(settings.privateAccessRequirement())
+                && !"reachable".equals(privateCheck.status());
         boolean privateEnabledBroken = !"not_configured".equals(privateCheck.status()) && "unreachable".equals(privateCheck.status());
         boolean containerOnly = Set.of("container", "no-web-ui", "none").contains(health.type());
 
@@ -1199,13 +1201,13 @@ public class AppLifecycleService {
     private InstallSettings normalizeSettings(InstallSettings settings, InstalledApp app, ApplicationManifest manifest, String accessUrl) {
         AccessManifest accessManifest = manifest == null ? AccessManifest.defaults() : manifest.access();
         String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : accessManifest.defaultMode());
-        String requirement = sanitizePrivateAccessRequirement(settings.privateAccessRequirement(), isPrivateRequired(manifest));
+        String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
         Integer expectedPort = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(accessUrl) : settings.expectedLocalPort();
         String expectedProtocol = sanitizeProtocol(settings.expectedProtocol(), accessUrl);
         InstallSettings normalized = new InstallSettings(
                 accessUrl == null ? settings.accessUrl() : accessUrl,
                 settings.privateAccessUrl(),
-                settings.tailscaleEnabled() || isPrivateRequired(manifest),
+                settings.tailscaleEnabled(),
                 settings.storageSubfolders() == null ? Map.of() : settings.storageSubfolders(),
                 settings.backup() == null ? BackupPolicy.defaults() : settings.backup(),
                 desiredMode,
@@ -1225,7 +1227,7 @@ public class AppLifecycleService {
 
     private AccessDesiredState desiredAccessState(InstallSettings settings, ApplicationManifest manifest, String accessUrl) {
         String mode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : null);
-        String requirement = sanitizePrivateAccessRequirement(settings.privateAccessRequirement(), isPrivateRequired(manifest));
+        String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
         boolean privateRecommended = manifest != null && manifest.access().privateAccessRecommended();
         return new AccessDesiredState(
                 mode,
@@ -1312,8 +1314,15 @@ public class AppLifecycleService {
         };
     }
 
-    private boolean isPrivateRequired(ApplicationManifest manifest) {
-        return manifest != null && manifest.usage().privateHttpsRequired();
+    private String privateAccessRequirement(String requestedRequirement, ApplicationManifest manifest) {
+        boolean recommendedByCatalog = manifest != null && manifest.usage().privateHttpsRequired();
+        if (recommendedByCatalog && (requestedRequirement == null
+                || requestedRequirement.isBlank()
+                || "optional".equalsIgnoreCase(requestedRequirement))) {
+            return "recommended";
+        }
+        String fallback = recommendedByCatalog ? "recommended" : "optional";
+        return sanitizePrivateAccessRequirement(firstPresent(requestedRequirement, fallback), false);
     }
 
     private String accessModeLabel(String mode) {

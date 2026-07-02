@@ -465,8 +465,8 @@ function JobStepList({ job }: { job: ProjectOsJob }) {
     <div className="mt-4 grid gap-2">
       {job.steps.map((step) => (
         <div className="flex items-start gap-2 text-sm" key={step.id}>
-          <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border text-[0.65rem] font-bold', step.status === 'succeeded' ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : step.status === 'failed' ? 'border-red-400/35 bg-red-500/10 text-red-200' : step.status === 'running' ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200' : 'border-sky-400/25 bg-slate-800 text-slate-400')}>
-            {step.status === 'succeeded' ? 'ok' : step.status === 'failed' ? '!' : step.status === 'running' ? '...' : ''}
+          <span className={cn('mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border text-[0.65rem] font-bold', step.status === 'succeeded' ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : step.status === 'failed' ? 'border-red-400/35 bg-red-500/10 text-red-200' : step.status === 'warning' ? 'border-orange-400/35 bg-orange-500/10 text-orange-200' : step.status === 'running' ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200' : 'border-sky-400/25 bg-slate-800 text-slate-400')}>
+            {step.status === 'succeeded' ? 'ok' : step.status === 'failed' ? '!' : step.status === 'warning' ? '!' : step.status === 'running' ? '...' : ''}
           </span>
           <span>
             <span className="block font-semibold text-slate-50">{step.label}</span>

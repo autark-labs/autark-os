@@ -21,6 +21,7 @@ import com.projectos.marketplace.install.DockerComposeExecutor;
 import com.projectos.marketplace.install.DockerComposeResult;
 import com.projectos.marketplace.install.InstallSettings;
 import com.projectos.marketplace.install.InstalledApp;
+import com.projectos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.projectos.marketplace.install.InstalledAppRepository;
 import com.projectos.marketplace.install.PostInstallGuideBuilder;
 import com.projectos.marketplace.install.PrivateAccessReconciliationItem;
@@ -66,6 +67,16 @@ class PrivateAccessReconciliationServiceTests {
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", appRoot.toString(), "project-os-vaultwarden", "http://localhost:8090", Instant.parse("2026-06-11T00:00:00Z")));
+        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+                "vaultwarden",
+                "appinst_vaultwarden",
+                "vaultwarden",
+                "pos_test",
+                appRoot.toString(),
+                "ready",
+                "owned",
+                Instant.parse("2026-06-11T00:00:00Z"),
+                Instant.parse("2026-06-11T00:00:00Z")));
     }
 
     @Test

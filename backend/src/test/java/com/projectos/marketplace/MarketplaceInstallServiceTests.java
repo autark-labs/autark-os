@@ -391,6 +391,47 @@ class MarketplaceInstallServiceTests {
     }
 
     @Test
+    void installsLanReadyAppWhenRecommendedPrivateAccessIsNotReady() {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        ApplicationManifest manifest = catalogService.findById("obsidian-livesync").orElseThrow();
+        InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
+        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
+        MarketplaceInstallService installService = new MarketplaceInstallService(
+                new InstallPlanService(runtimeLayout, customizationResolver),
+                new RuntimeDirectoryManager(runtimeLayout),
+                new CatalogPackageCopier(),
+                new ComposeRenderer(runtimeLayout),
+                new FakeDockerComposeExecutor(List.of(new DockerContainerStatus("project-os-obsidian-livesync", "obsidian-livesync", "running", "", "Up 2 minutes", "0.0.0.0:5984->5984/tcp"))),
+                repository,
+                customizationResolver,
+                new FakePostInstallProvisioner(),
+                new PostInstallGuideBuilder(),
+                new FailingTailscaleService());
+
+        InstallResult result = installService.install(manifest);
+
+        assertThat(result.status()).isEqualTo("installed");
+        assertThat(repository.findById("obsidian-livesync")).isPresent();
+        assertThat(result.steps())
+                .filteredOn(step -> step.label().equals("Creating private HTTPS link"))
+                .singleElement()
+                .satisfies(step -> {
+                    assertThat(step.status()).isEqualTo("warning");
+                    assertThat(step.detail()).contains("Private access needs setup");
+                });
+        assertThat(repository.settingsFor("obsidian-livesync")).hasValueSatisfying(settings -> {
+            assertThat(settings.accessUrl()).isEqualTo("http://localhost:5984");
+            assertThat(settings.privateAccessUrl()).isNull();
+            assertThat(settings.tailscaleEnabled()).isTrue();
+            assertThat(settings.privateAccessRequirement()).isEqualTo("recommended");
+            assertThat(settings.desiredAccessMode()).isEqualTo("private");
+            assertThat(settings.expectedLocalPort()).isEqualTo(5984);
+            assertThat(settings.expectedProtocol()).isEqualTo("http");
+        });
+    }
+
+    @Test
     void rendersMultiServiceComposeForPaperless() throws Exception {
         ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -695,6 +736,15 @@ class MarketplaceInstallServiceTests {
             lastLocalPort = localPort;
             lastHttpsPort = httpsPort;
             return new TailscaleServeResult(true, "https://project-os.example.ts.net:" + httpsPort, "Private HTTPS link is ready.", List.of("fake tailscale serve " + localPort));
+        }
+    }
+
+    private static final class FailingTailscaleService extends FakeTailscaleService {
+        @Override
+        public TailscaleServeResult serveHttps(int localPort, int httpsPort) {
+            lastLocalPort = localPort;
+            lastHttpsPort = httpsPort;
+            return new TailscaleServeResult(false, null, "Sign in to Tailscale before Project OS can create the private HTTPS link.", List.of("tailscale serve failed"));
         }
     }
 }

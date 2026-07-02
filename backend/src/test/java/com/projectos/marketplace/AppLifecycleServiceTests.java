@@ -735,6 +735,42 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void privateHttpsCatalogHintNormalizesToRecommendedPrivateAccess() throws Exception {
+        Path appRoot = runtimeRoot.resolve("apps/obsidian-livesync");
+        Files.createDirectories(appRoot);
+        Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
+        repository.save(new InstalledApp(
+                "obsidian-livesync",
+                "Obsidian LiveSync",
+                "Installed",
+                appRoot.toString(),
+                "project-os-obsidian-livesync",
+                "http://localhost:5984",
+                Instant.parse("2026-06-11T00:00:00Z")));
+        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+                "obsidian-livesync",
+                "appinst_obsidian_livesync",
+                "obsidian-livesync",
+                "pos_test",
+                appRoot.toString(),
+                "ready",
+                "owned",
+                Instant.parse("2026-06-11T00:00:00Z"),
+                Instant.parse("2026-06-11T00:00:00Z")));
+
+        AppRuntimeView app = service.updateSettings("obsidian-livesync", new InstallSettings(
+                "http://localhost:5984",
+                null,
+                false,
+                java.util.Map.of(),
+                BackupPolicy.defaults()));
+
+        assertThat(app.settings().tailscaleEnabled()).isFalse();
+        assertThat(app.settings().privateAccessRequirement()).isEqualTo("recommended");
+        assertThat(app.desiredAccess().privateAccessRequirement()).isEqualTo("recommended");
+    }
+
+    @Test
     void settingsPlanBlocksStorageFolderChangesUntilMigrationExists() {
         AppSettingsChangePlan plan = service.settingsChangePlan("vaultwarden", new InstallSettings(
                 "http://localhost:8090",

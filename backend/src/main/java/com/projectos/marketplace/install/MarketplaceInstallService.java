@@ -184,10 +184,10 @@ public class MarketplaceInstallService {
             logs.addAll(privateAccess.output());
             if (privateAccess.configured()) {
                 recordStep(steps, sink, InstallStep.completed("Creating private HTTPS link", privateAccess.privateUrl()));
-            } else if (manifest.usage().privateHttpsRequired()) {
-                recordStep(steps, sink, InstallStep.failed("Creating private HTTPS link", privateAccess.message()));
-            } else if (runtimeConfiguration.tailscaleEnabled()) {
-                recordStep(steps, sink, InstallStep.completed("Creating private HTTPS link", privateAccess.message()));
+            } else if (privateAccessRequested(manifest, runtimeConfiguration)) {
+                recordStep(steps, sink, InstallStep.warning(
+                        "Creating private HTTPS link",
+                        "Private access needs setup. " + privateAccess.message()));
             }
             PostInstallProvisioningResult provisioningResult = postInstallProvisioner.provision(manifest, runtimeConfiguration.accessUrl());
             provisioningResult.steps().forEach(step -> recordStep(steps, sink, step));
@@ -213,12 +213,7 @@ public class MarketplaceInstallService {
                     runtimeConfiguration.accessUrl(),
                     Instant.now()));
             saveOwnershipMetadata(manifest, appRoot, runtimeMetadata, startupCheck.warmingUp() ? "starting" : "ready");
-            installedAppRepository.saveSettings(manifest.id(), new InstallSettings(
-                    runtimeConfiguration.accessUrl(),
-                    privateAccess.privateUrl(),
-                    runtimeConfiguration.tailscaleEnabled() || manifest.usage().privateHttpsRequired(),
-                    runtimeConfiguration.storageSubfolders(),
-                    runtimeConfiguration.backup()));
+            installedAppRepository.saveSettings(manifest.id(), installSettings(manifest, runtimeConfiguration, privateAccess));
             installedAppRepository.recordEvent(manifest.id(), "installed", manifest.name() + " installed successfully.");
             clearFailedPartialInstall(manifest.id());
             activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Project OS.", manifest.id());
@@ -365,8 +360,7 @@ public class MarketplaceInstallService {
     }
 
     private TailscaleServeResult configurePrivateAccess(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {
-        boolean requested = runtimeConfiguration.tailscaleEnabled() || manifest.usage().privateHttpsRequired();
-        if (!requested) {
+        if (!privateAccessRequested(manifest, runtimeConfiguration)) {
             return new TailscaleServeResult(false, null, "Private HTTPS access was not requested.", List.of());
         }
         Integer hostPort = portFromAccessUrl(runtimeConfiguration.accessUrl());
@@ -377,8 +371,47 @@ public class MarketplaceInstallService {
         return tailscaleService.serveHttps(hostPort, privateHttpsPort);
     }
 
+    private InstallSettings installSettings(
+            ApplicationManifest manifest,
+            ResolvedRuntimeConfiguration runtimeConfiguration,
+            TailscaleServeResult privateAccess) {
+        String accessUrl = runtimeConfiguration.accessUrl();
+        boolean privateAccessDesired = privateAccessRequested(manifest, runtimeConfiguration);
+        return new InstallSettings(
+                accessUrl,
+                privateAccess.privateUrl(),
+                privateAccessDesired,
+                runtimeConfiguration.storageSubfolders(),
+                runtimeConfiguration.backup(),
+                privateAccessDesired ? "private" : "local",
+                manifest.usage().privateHttpsRequired() ? "recommended" : "optional",
+                portFromAccessUrl(accessUrl),
+                protocolFromAccessUrl(accessUrl),
+                null,
+                null,
+                null,
+                null,
+                true);
+    }
+
+    private boolean privateAccessRequested(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {
+        return runtimeConfiguration.tailscaleEnabled() || manifest.usage().privateHttpsRequired();
+    }
+
     private Integer portFromAccessUrl(String accessUrl) {
         return AppPrivateAccessPorts.portFromUrl(accessUrl);
+    }
+
+    private String protocolFromAccessUrl(String accessUrl) {
+        if (accessUrl == null || accessUrl.isBlank()) {
+            return "http";
+        }
+        try {
+            String scheme = java.net.URI.create(accessUrl).getScheme();
+            return "https".equalsIgnoreCase(scheme) ? "https" : "http";
+        } catch (IllegalArgumentException exception) {
+            return "http";
+        }
     }
 
     private void activityInfo(String action, String title, String message, String appId) {
