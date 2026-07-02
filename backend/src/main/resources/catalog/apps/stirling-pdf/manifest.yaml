@@ -8,7 +8,7 @@ metadata:
   downloads: 1.1M
   rating: '4.7'
   image: /app-images/stirling-pdf.svg
-  version: latest
+  version: 2.14.0
   lastUpdated: Recently
   size: 690 MB
   maintainer: Stirling Tools
@@ -97,7 +97,7 @@ access:
 runtime:
   containerName: stirling-pdf
   composeProject: project-os-stirling-pdf
-  image: frooodle/s-pdf:latest
+  image: stirlingtools/stirling-pdf:2.14.0
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/stirling-pdf
   ports:
@@ -108,7 +108,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=stirling-pdf
-    - project-os.version=latest
+    - project-os.version=2.14.0
   backupPaths:
     - config
   privileged: false

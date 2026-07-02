@@ -8,7 +8,7 @@ metadata:
   downloads: 820K
   rating: '4.8'
   image: /app-images/immich.svg
-  version: 1.125.7
+  version: 3.0.0
   lastUpdated: 1 week ago
   size: 1.4 GB
   maintainer: Immich Team
@@ -98,7 +98,7 @@ access:
 runtime:
   containerName: immich-server
   composeProject: project-os-immich
-  image: ghcr.io/immich-app/immich-server:v1.125.7
+  image: ghcr.io/immich-app/immich-server:v3.0.0
   network: project-os-media
   runtimeRoot: /var/lib/project-os/apps/immich
   ports:
@@ -109,7 +109,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=immich
-    - project-os.version=1.125.7
+    - project-os.version=3.0.0
   backupPaths:
     - data
     - postgres

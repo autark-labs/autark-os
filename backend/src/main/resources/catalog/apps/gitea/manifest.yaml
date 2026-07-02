@@ -8,7 +8,7 @@ metadata:
   downloads: 1.9M
   rating: '4.7'
   image: /app-images/gitea.svg
-  version: latest
+  version: 1.26.4
   lastUpdated: Recently
   size: 250 MB
   maintainer: Gitea
@@ -98,7 +98,7 @@ access:
 runtime:
   containerName: gitea
   composeProject: project-os-gitea
-  image: gitea/gitea:latest
+  image: gitea/gitea:1.26.4
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/gitea
   ports:
@@ -109,7 +109,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=gitea
-    - project-os.version=latest
+    - project-os.version=1.26.4
   backupPaths:
     - data
   privileged: false

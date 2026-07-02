@@ -8,7 +8,7 @@ metadata:
   downloads: 2.4M
   rating: '4.7'
   image: /app-images/qbittorrent.svg
-  version: latest
+  version: 5.2.2
   lastUpdated: Recently
   size: 180 MB
   maintainer: LinuxServer.io
@@ -155,7 +155,7 @@ health:
 runtime:
   containerName: qbittorrent
   composeProject: project-os-qbittorrent
-  image: lscr.io/linuxserver/qbittorrent:latest
+  image: lscr.io/linuxserver/qbittorrent:5.2.2
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/qbittorrent
   ports:
@@ -173,7 +173,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=qbittorrent
-    - project-os.version=latest
+    - project-os.version=5.2.2
   backupPaths:
     - config
   privileged: false

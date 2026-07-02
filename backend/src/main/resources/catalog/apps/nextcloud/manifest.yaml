@@ -8,7 +8,7 @@ metadata:
   downloads: 3.2M
   rating: '4.7'
   image: /app-images/nextcloud.svg
-  version: stable
+  version: 34.0.1
   lastUpdated: Recently
   size: 650 MB
   maintainer: Nextcloud Community
@@ -123,7 +123,7 @@ health:
 runtime:
   containerName: nextcloud
   composeProject: project-os-nextcloud
-  image: nextcloud:stable
+  image: nextcloud:34.0.1
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/nextcloud
   ports:
@@ -134,7 +134,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=nextcloud
-    - project-os.version=stable
+    - project-os.version=34.0.1
   backupPaths:
     - html
     - data

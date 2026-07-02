@@ -8,7 +8,7 @@ metadata:
   downloads: 900K
   rating: '4.8'
   image: /app-images/homepage.svg
-  version: latest
+  version: 1.13.2
   lastUpdated: Recently
   size: 180 MB
   maintainer: Homepage Community
@@ -145,7 +145,7 @@ health:
 runtime:
   containerName: homepage
   composeProject: project-os-homepage
-  image: ghcr.io/gethomepage/homepage:latest
+  image: ghcr.io/gethomepage/homepage:v1.13.2
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/homepage
   ports:
@@ -155,7 +155,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=homepage
-    - project-os.version=latest
+    - project-os.version=1.13.2
   backupPaths:
     - config
   privileged: false

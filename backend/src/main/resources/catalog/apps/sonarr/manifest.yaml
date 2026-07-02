@@ -8,7 +8,7 @@ metadata:
   downloads: 2.2M
   rating: '4.8'
   image: /app-images/sonarr.svg
-  version: latest
+  version: 4.0.19.2979
   lastUpdated: Recently
   size: 210 MB
   maintainer: Sonarr Community
@@ -157,7 +157,7 @@ health:
 runtime:
   containerName: sonarr
   composeProject: project-os-sonarr
-  image: lscr.io/linuxserver/sonarr:latest
+  image: lscr.io/linuxserver/sonarr:version-4.0.19.2979
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/sonarr
   ports:
@@ -173,7 +173,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=sonarr
-    - project-os.version=latest
+    - project-os.version=4.0.19.2979
   backupPaths:
     - config
   privileged: false

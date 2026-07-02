@@ -8,7 +8,7 @@ metadata:
   downloads: 620K
   rating: '4.7'
   image: /app-images/memos.svg
-  version: stable
+  version: 0.29.1
   lastUpdated: Recently
   size: 120 MB
   maintainer: Memos Community
@@ -97,7 +97,7 @@ access:
 runtime:
   containerName: memos
   composeProject: project-os-memos
-  image: ghcr.io/usememos/memos:stable
+  image: ghcr.io/usememos/memos:0.29.1
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/memos
   ports:
@@ -107,7 +107,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=memos
-    - project-os.version=stable
+    - project-os.version=0.29.1
   backupPaths:
     - data
   privileged: false

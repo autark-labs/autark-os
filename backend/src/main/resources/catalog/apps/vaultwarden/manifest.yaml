@@ -8,7 +8,7 @@ metadata:
   downloads: 1.2M
   rating: '4.9'
   image: /app-images/vaultwarden.svg
-  version: 1.32.0
+  version: 1.36.0
   lastUpdated: 2 days ago
   size: 72 MB
   maintainer: Vaultwarden Community
@@ -98,7 +98,7 @@ access:
 runtime:
   containerName: vaultwarden
   composeProject: project-os-vaultwarden
-  image: vaultwarden/server:1.32.0
+  image: vaultwarden/server:1.36.0
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/vaultwarden
   ports:
@@ -108,7 +108,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=vaultwarden
-    - project-os.version=1.32.0
+    - project-os.version=1.36.0
   backupPaths:
     - data
   privileged: false

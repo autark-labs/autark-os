@@ -8,7 +8,7 @@ metadata:
   downloads: 4.1M
   rating: '4.8'
   image: /app-images/grafana.svg
-  version: latest
+  version: 13.1.0
   lastUpdated: Recently
   size: 390 MB
   maintainer: Grafana Labs
@@ -148,7 +148,7 @@ health:
 runtime:
   containerName: grafana
   composeProject: project-os-grafana
-  image: grafana/grafana-oss:latest
+  image: grafana/grafana:13.1.0
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/grafana
   ports:
@@ -158,7 +158,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=grafana
-    - project-os.version=latest
+    - project-os.version=13.1.0
   backupPaths:
     - data
   privileged: false

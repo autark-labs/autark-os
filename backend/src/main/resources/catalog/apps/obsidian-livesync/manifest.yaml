@@ -8,7 +8,7 @@ metadata:
   downloads: 540K
   rating: '4.6'
   image: /app-images/obsidian-livesync.svg
-  version: '3'
+  version: 3.5.2.1
   lastUpdated: Recently
   size: 190 MB
   maintainer: Apache CouchDB
@@ -178,7 +178,7 @@ health:
 runtime:
   containerName: obsidian-livesync
   composeProject: project-os-obsidian-livesync
-  image: couchdb:3
+  image: couchdb:3.5.2.1
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/obsidian-livesync
   ports:
@@ -193,7 +193,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=obsidian-livesync
-    - project-os.version=3
+    - project-os.version=3.5.2.1
   backupPaths:
     - data
     - config

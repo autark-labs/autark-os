@@ -8,7 +8,7 @@ metadata:
   downloads: 980K
   rating: '4.8'
   image: /app-images/adguard-home.svg
-  version: 0.107.55
+  version: 0.107.77
   lastUpdated: 3 days ago
   size: 85 MB
   maintainer: AdGuard
@@ -117,7 +117,7 @@ usage:
 runtime:
   containerName: adguard-home
   composeProject: project-os-adguard-home
-  image: adguard/adguardhome:v0.107.55
+  image: adguard/adguardhome:v0.107.77
   network: host
   runtimeRoot: /var/lib/project-os/apps/adguard-home
   ports:
@@ -130,7 +130,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=adguard-home
-    - project-os.version=0.107.55
+    - project-os.version=0.107.77
   backupPaths:
     - work
     - conf

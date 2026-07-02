@@ -8,7 +8,7 @@ metadata:
   downloads: 1.6M
   rating: '4.8'
   image: /app-images/syncthing.svg
-  version: latest
+  version: 2.1.1
   lastUpdated: Recently
   size: 95 MB
   maintainer: Syncthing Foundation
@@ -125,7 +125,7 @@ health:
 runtime:
   containerName: syncthing
   composeProject: project-os-syncthing
-  image: syncthing/syncthing:latest
+  image: syncthing/syncthing:2.1.1
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/syncthing
   ports:
@@ -139,7 +139,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=syncthing
-    - project-os.version=latest
+    - project-os.version=2.1.1
   backupPaths:
     - config
   privileged: false

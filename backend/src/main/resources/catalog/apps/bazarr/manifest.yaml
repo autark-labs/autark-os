@@ -8,7 +8,7 @@ metadata:
   downloads: 880K
   rating: '4.6'
   image: /app-images/bazarr.svg
-  version: latest
+  version: 1.5.6
   lastUpdated: Recently
   size: 190 MB
   maintainer: Bazarr Community
@@ -123,7 +123,7 @@ health:
 runtime:
   containerName: bazarr
   composeProject: project-os-bazarr
-  image: lscr.io/linuxserver/bazarr:latest
+  image: lscr.io/linuxserver/bazarr:version-v1.5.6
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/bazarr
   ports:
@@ -139,7 +139,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=bazarr
-    - project-os.version=latest
+    - project-os.version=1.5.6
   backupPaths:
     - config
   privileged: false

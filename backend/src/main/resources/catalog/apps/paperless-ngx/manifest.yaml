@@ -8,7 +8,7 @@ metadata:
   downloads: 1.4M
   rating: '4.8'
   image: /app-images/paperless-ngx.svg
-  version: latest
+  version: 2.20.15
   lastUpdated: Recently
   size: 820 MB
   maintainer: Paperless-ngx Community
@@ -126,7 +126,7 @@ health:
 runtime:
   containerName: paperless-ngx
   composeProject: project-os-paperless-ngx
-  image: ghcr.io/paperless-ngx/paperless-ngx:latest
+  image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/paperless-ngx
   ports:
@@ -139,7 +139,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=paperless-ngx
-    - project-os.version=latest
+    - project-os.version=2.20.15
   backupPaths:
     - data
     - media
@@ -150,7 +150,7 @@ runtime:
   services:
     - name: web
       containerName: project-os-paperless-ngx-web
-      image: ghcr.io/paperless-ngx/paperless-ngx:latest
+      image: ghcr.io/paperless-ngx/paperless-ngx:2.20.15
       ports:
         - 8010:8000
       volumes:

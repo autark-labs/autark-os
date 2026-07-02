@@ -8,7 +8,7 @@ metadata:
   downloads: 3.5M
   rating: '4.8'
   image: /app-images/prometheus.svg
-  version: latest
+  version: 3.13.0
   lastUpdated: Recently
   size: 280 MB
   maintainer: Prometheus Authors
@@ -123,7 +123,7 @@ health:
 runtime:
   containerName: prometheus
   composeProject: project-os-prometheus
-  image: prom/prometheus:latest
+  image: prom/prometheus:v3.13.0
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/prometheus
   ports:
@@ -134,7 +134,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=prometheus
-    - project-os.version=latest
+    - project-os.version=3.13.0
   backupPaths:
     - config
   privileged: false

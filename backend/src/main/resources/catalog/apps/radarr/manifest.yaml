@@ -8,7 +8,7 @@ metadata:
   downloads: 2.1M
   rating: '4.8'
   image: /app-images/radarr.svg
-  version: latest
+  version: 6.2.1.10461
   lastUpdated: Recently
   size: 210 MB
   maintainer: Radarr Community
@@ -157,7 +157,7 @@ health:
 runtime:
   containerName: radarr
   composeProject: project-os-radarr
-  image: lscr.io/linuxserver/radarr:latest
+  image: lscr.io/linuxserver/radarr:version-6.2.1.10461
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/radarr
   ports:
@@ -173,7 +173,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=radarr
-    - project-os.version=latest
+    - project-os.version=6.2.1.10461
   backupPaths:
     - config
   privileged: false

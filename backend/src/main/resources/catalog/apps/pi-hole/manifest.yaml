@@ -8,7 +8,7 @@ metadata:
   downloads: 3.8M
   rating: '4.8'
   image: /app-images/pi-hole.svg
-  version: latest
+  version: 2026.06.0
   lastUpdated: Recently
   size: 220 MB
   maintainer: Pi-hole Community
@@ -127,7 +127,7 @@ health:
 runtime:
   containerName: pi-hole
   composeProject: project-os-pi-hole
-  image: pihole/pihole:latest
+  image: pihole/pihole:2026.06.0
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/pi-hole
   ports:
@@ -142,7 +142,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=pi-hole
-    - project-os.version=latest
+    - project-os.version=2026.06.0
   backupPaths:
     - etc-pihole
     - etc-dnsmasq

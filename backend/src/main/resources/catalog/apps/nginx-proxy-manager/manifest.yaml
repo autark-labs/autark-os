@@ -8,7 +8,7 @@ metadata:
   downloads: 2.5M
   rating: '4.7'
   image: /app-images/nginx-proxy-manager.svg
-  version: latest
+  version: 2.15.1
   lastUpdated: Recently
   size: 330 MB
   maintainer: Nginx Proxy Manager Community
@@ -122,7 +122,7 @@ health:
 runtime:
   containerName: nginx-proxy-manager
   composeProject: project-os-nginx-proxy-manager
-  image: jc21/nginx-proxy-manager:latest
+  image: jc21/nginx-proxy-manager:2.15.1
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/nginx-proxy-manager
   ports:
@@ -135,7 +135,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=nginx-proxy-manager
-    - project-os.version=latest
+    - project-os.version=2.15.1
   backupPaths:
     - data
     - letsencrypt

@@ -8,7 +8,7 @@ metadata:
   downloads: 2.8M
   rating: '4.7'
   image: /app-images/netdata.svg
-  version: stable
+  version: 2.10.3
   lastUpdated: Recently
   size: 420 MB
   maintainer: Netdata
@@ -122,7 +122,7 @@ health:
 runtime:
   containerName: netdata
   composeProject: project-os-netdata
-  image: netdata/netdata:stable
+  image: netdata/netdata:v2.10.3
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/netdata
   ports:
@@ -134,7 +134,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=netdata
-    - project-os.version=stable
+    - project-os.version=2.10.3
   backupPaths:
     - config
   privileged: false

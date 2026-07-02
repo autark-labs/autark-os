@@ -8,7 +8,7 @@ metadata:
   downloads: 3.1M
   rating: '4.9'
   image: /app-images/home-assistant.svg
-  version: '2026.6'
+  version: 2026.7.0
   lastUpdated: Today
   size: 1.1 GB
   maintainer: Open Home Foundation
@@ -98,7 +98,7 @@ access:
 runtime:
   containerName: home-assistant
   composeProject: project-os-home-assistant
-  image: ghcr.io/home-assistant/home-assistant:2026.6
+  image: ghcr.io/home-assistant/home-assistant:2026.7.0
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/home-assistant
   ports:
@@ -108,7 +108,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=home-assistant
-    - project-os.version=2026.6
+    - project-os.version=2026.7.0
   backupPaths:
     - config
   privileged: false

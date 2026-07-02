@@ -8,7 +8,7 @@ metadata:
   downloads: 1.1M
   rating: '4.7'
   image: /app-images/prowlarr.svg
-  version: latest
+  version: 2.4.0.5397
   lastUpdated: Recently
   size: 190 MB
   maintainer: Prowlarr Community
@@ -153,7 +153,7 @@ health:
 runtime:
   containerName: prowlarr
   composeProject: project-os-prowlarr
-  image: lscr.io/linuxserver/prowlarr:latest
+  image: lscr.io/linuxserver/prowlarr:version-2.4.0.5397
   network: project-os-apps
   runtimeRoot: /var/lib/project-os/apps/prowlarr
   ports:
@@ -167,7 +167,7 @@ runtime:
   labels:
     - project-os.managed=true
     - project-os.app-id=prowlarr
-    - project-os.version=latest
+    - project-os.version=2.4.0.5397
   backupPaths:
     - config
   privileged: false
