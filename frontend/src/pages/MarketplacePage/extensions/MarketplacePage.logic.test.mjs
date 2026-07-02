@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   START_HERE_DISMISSAL_KEY,
+  marketplacePrimaryRoute,
   marketplaceVisibleAppViews,
   marketplaceVisibleApps,
   optionsFromInstalledSettings,
@@ -66,6 +67,21 @@ test('marketplaceVisibleAppViews hides only canonical current-instance installs'
   });
 
   assert.deepEqual(visible.map((view) => view.id), ['homepage', 'jellyfin']);
+});
+
+test('marketplacePrimaryRoute follows My Apps management and existing-service actions', () => {
+  assert.equal(marketplacePrimaryRoute({
+    primaryAction: { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false },
+  }), '/apps?focus=managed%3Avaultwarden');
+  assert.equal(marketplacePrimaryRoute({
+    primaryAction: { id: 'review_existing', kind: 'route', href: '/apps?focus=service%3Adocker%3Avaultwarden', disabled: false },
+  }), '/apps?focus=service%3Adocker%3Avaultwarden');
+  assert.equal(marketplacePrimaryRoute({
+    primaryAction: { id: 'review_setup', kind: 'route', href: '/discover?app=vaultwarden', disabled: false },
+  }), null);
+  assert.equal(marketplacePrimaryRoute({
+    primaryAction: { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: true },
+  }), null);
 });
 
 test('marketplaceVisibleApps applies supported sort modes', () => {

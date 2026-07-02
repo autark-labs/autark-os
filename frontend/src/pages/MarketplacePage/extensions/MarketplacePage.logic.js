@@ -41,6 +41,17 @@ export function marketplaceVisibleAppViews({
     .sort((left, right) => (appOrder.get(left.app.id) ?? 0) - (appOrder.get(right.app.id) ?? 0));
 }
 
+export function marketplacePrimaryRoute(view = {}) {
+  const action = view.primaryAction;
+  if (!action || action.disabled || action.kind !== 'route' || !action.href) {
+    return null;
+  }
+  if (action.id === 'manage' || action.id === 'review_existing') {
+    return action.href;
+  }
+  return null;
+}
+
 /**
  * @param {unknown[]} apps
  * @param {string[]} recommendedApps

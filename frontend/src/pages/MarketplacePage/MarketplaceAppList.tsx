@@ -1,4 +1,5 @@
 import { CheckCircle2, ChevronDown, Clock3, Info, Loader2, MoreHorizontal, SlidersHorizontal, Sparkles, Zap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
@@ -18,7 +19,7 @@ import { cn } from '@/lib/utils';
 import type { DiscoverAppView } from '@/types/discover';
 import type { MarketplaceApp } from '@/types/marketplace';
 import { sortOptions } from './extensions/MarketplacePage.constants';
-import { marketplaceCardToneClass } from './extensions/MarketplacePage.logic';
+import { marketplaceCardToneClass, marketplacePrimaryRoute } from './extensions/MarketplacePage.logic';
 import { AppImage } from './MarketplacePage.shared';
 
 type MarketplaceAppListProps = {
@@ -82,6 +83,13 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
   const actionLabel = marketplaceActionLabel(app);
   const primaryDisabled = !installing && app.primaryAction.disabled;
   const primaryDisabledReason = app.primaryAction.reason || 'This app action is not available right now.';
+  const primaryRoute = marketplacePrimaryRoute(app);
+  const primaryActionContent = (
+    <>
+      {installing ? <Loader2 className="size-3.5 animate-spin" /> : primaryActionId === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
+      {installing ? 'Installing' : actionLabel}
+    </>
+  );
   return (
     <div className={cn('group relative grid min-h-[258px] overflow-hidden rounded-xl border p-4 text-slate-50 shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/35', marketplaceCardToneClass(app), isSelected && 'border-cyan-300/35 outline outline-1 outline-cyan-300/40 shadow-lg shadow-cyan-950/30')}>
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
@@ -107,10 +115,15 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
       <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-sky-400/25 pt-3">
         <div className="min-w-0 text-xs text-slate-400">{app.serviceKindLabel}</div>
         <DisabledAction disabled={primaryDisabled} reason={primaryDisabledReason}>
-          <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && 'border-cyan-300/35 bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-950/30 hover:bg-cyan-200', primaryActionId === 'manage' && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15', primaryActionId === 'review_existing' && 'border-orange-400/40 bg-orange-500/10 text-orange-200 hover:bg-orange-500/15')} disabled={primaryDisabled} onClick={onSelect} type="button" variant={actionVariant}>
-            {installing ? <Loader2 className="size-3.5 animate-spin" /> : primaryActionId === 'manage' ? <CheckCircle2 className="size-3.5" /> : <Sparkles className="size-3.5" />}
-            {installing ? 'Installing' : actionLabel}
-          </Button>
+          {primaryRoute && !primaryDisabled ? (
+            <Button asChild className={cn('h-8 px-3 text-xs', primaryActionId === 'manage' && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15', primaryActionId === 'review_existing' && 'border-orange-400/40 bg-orange-500/10 text-orange-200 hover:bg-orange-500/15')} variant={actionVariant}>
+              <Link to={primaryRoute}>{primaryActionContent}</Link>
+            </Button>
+          ) : (
+            <Button className={cn('h-8 px-3 text-xs', primaryActionId === 'review_setup' && 'border-cyan-300/35 bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-950/30 hover:bg-cyan-200', primaryActionId === 'manage' && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15', primaryActionId === 'review_existing' && 'border-orange-400/40 bg-orange-500/10 text-orange-200 hover:bg-orange-500/15')} disabled={primaryDisabled} onClick={onSelect} type="button" variant={actionVariant}>
+              {primaryActionContent}
+            </Button>
+          )}
         </DisabledAction>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -134,16 +147,15 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
 
 function BasicAppStoreCard({ app, installing, isSelected, onSelect }: { app: DiscoverAppView; installing: boolean; isSelected: boolean; onSelect: () => void }) {
   const actionLabel = marketplaceActionLabel(app);
-  return (
-    <button
-      className={cn(
-        'group grid min-h-[190px] w-full content-between rounded-xl border border-sky-400/25 bg-slate-900 p-4 text-left text-slate-50 shadow-lg shadow-slate-950/20 transition',
-        'hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-slate-700 hover:shadow-lg hover:shadow-cyan-950/30',
-        isSelected && 'border-cyan-300/35 outline outline-1 outline-cyan-300/40 shadow-lg shadow-cyan-950/30',
-      )}
-      onClick={onSelect}
-      type="button"
-    >
+  const primaryRoute = marketplacePrimaryRoute(app);
+  const cardClassName = cn(
+    'group grid min-h-[190px] w-full content-between rounded-xl border border-sky-400/25 bg-slate-900 p-4 text-left text-slate-50 shadow-lg shadow-slate-950/20 transition',
+    'hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-slate-700 hover:shadow-lg hover:shadow-cyan-950/30',
+    isSelected && 'border-cyan-300/35 outline outline-1 outline-cyan-300/40 shadow-lg shadow-cyan-950/30',
+  );
+  const ctaClassName = 'mt-4 grid h-10 place-items-center rounded-lg bg-cyan-300 px-4 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-950/30 transition group-hover:bg-cyan-200';
+  const content = (
+    <>
       <span className="grid gap-4">
         <span className="flex items-start gap-3">
           <span className="grid size-16 shrink-0 place-items-center rounded-xl border border-sky-400/25 bg-slate-800 shadow-sm shadow-slate-950/20">
@@ -176,12 +188,30 @@ function BasicAppStoreCard({ app, installing, isSelected, onSelect }: { app: Dis
         </span>
       </span>
 
-      <span className="mt-4 grid h-10 place-items-center rounded-lg bg-cyan-300 px-4 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-950/30 transition group-hover:bg-cyan-200">
+      <span className={ctaClassName}>
         <span className="inline-flex items-center gap-2">
           {installing && <Loader2 className="size-3.5 animate-spin" />}
           {installing ? 'Installing' : actionLabel}
         </span>
       </span>
+    </>
+  );
+
+  if (primaryRoute) {
+    return (
+      <Link className={cardClassName} to={primaryRoute}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      className={cardClassName}
+      onClick={onSelect}
+      type="button"
+    >
+      {content}
     </button>
   );
 }

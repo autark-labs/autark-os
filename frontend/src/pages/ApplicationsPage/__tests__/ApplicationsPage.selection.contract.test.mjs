@@ -17,3 +17,22 @@ test('applications page does not silently fall back to the first visible item', 
   assert.match(page, /selectedItem = items\.find\(\(item\) => item\.id === selectedId\) \?\? null/);
   assert.match(page, /selectedItemIsVisible/);
 });
+
+test('details rail renders the selected item even when grid visibility is changing', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+
+  assert.doesNotMatch(page, /item=\{selectedItemIsVisible \? selectedItem : null\}/);
+  assert.match(page, /item=\{selectedItem\}/);
+});
+
+test('deep-link selection can reapply after selected item temporarily disappears', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+
+  assert.match(page, /appliedDeepLinkKeyRef\.current = '';\s+setSelectedId\(''\);/);
+});
+
+test('empty selection is not cleared after a deep-link effect schedules a real selection', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+
+  assert.match(page, /if \(!selectedId\) {\s+return;\s+}/);
+});

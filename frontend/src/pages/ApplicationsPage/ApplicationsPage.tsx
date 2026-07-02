@@ -160,14 +160,18 @@ export const ApplicationsPage = () => {
   }, [canCloseManagement, deepLinkTarget, items]);
 
   useEffect(() => {
+    if (!selectedId) {
+      return;
+    }
+
     if (!items.length) {
-      if (selectedId) {
-        setSelectedId('');
-      }
+      appliedDeepLinkKeyRef.current = '';
+      setSelectedId('');
       return;
     }
 
     if (!items.some((item) => item.id === selectedId)) {
+      appliedDeepLinkKeyRef.current = '';
       setSelectedId('');
     }
   }, [items, selectedId]);
@@ -614,7 +618,7 @@ export const ApplicationsPage = () => {
         <ApplicationDetailsRail
           actions={actions}
           actionLoadingByItemId={actionLoadingByAppId}
-          item={selectedItemIsVisible ? selectedItem : null}
+          item={selectedItem}
           managementOpen={managementOpen}
           canCloseManagement={canCloseManagement}
           onManagementOpenChange={setManagementOpen}
