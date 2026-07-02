@@ -47,20 +47,35 @@ Start with the [non-technical install guide](docs/non-technical-install-guide.md
 
 ### Beta Testers
 
-Use the [Project OS GitHub repository](https://github.com/autark-labs/project-os/) for beta testing, source installs, release-bundle installs, updates, uninstall, and support-bundle commands.
+Use the [Project OS GitHub Releases page](https://github.com/autark-labs/project-os/releases) for beta builds.
 
-Short source install path:
+Recommended executable installer:
 
 ```bash
-git clone https://github.com/autark-labs/project-os.git
-cd project-os
-./scripts/bootstrap-project-os.sh
+chmod +x Project-OS-Installer-<version>-amd64.run
+./Project-OS-Installer-<version>-amd64.run
 ```
 
-On Debian, Ubuntu, and Raspberry Pi OS, the installer can attempt supported dependency setup:
+On Linux desktops, the `.run` installer can show a graphical confirmation before opening a terminal for install progress. On servers and SSH sessions, it falls back to the guided terminal installer.
+
+Debian/Ubuntu package install:
 
 ```bash
-./scripts/bootstrap-project-os.sh --auto-install-deps
+sudo apt install ./project-os_<version>_amd64.deb
+```
+
+General tarball install:
+
+```bash
+tar -xzf project-os-<version>.tar.gz
+cd project-os-<version>
+./scripts/project-os install
+```
+
+Verify downloaded artifacts:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
 ```
 
 Open Project OS after install:
@@ -141,6 +156,18 @@ cd ../backend
 ./gradlew bootJar
 ```
 
+Build release artifacts for GitHub Releases:
+
+```bash
+VERSION=0.1.0-beta.2
+
+scripts/build-release-artifacts.sh \
+  --version "$VERSION" \
+  --channel beta \
+  --release-notes-url "https://github.com/autark-labs/project-os/releases/tag/v$VERSION" \
+  --output-dir "release/artifacts-$VERSION"
+```
+
 ## Project Shape
 
 ```text
@@ -163,8 +190,9 @@ docs/          User guides, runtime architecture, development plans
 
 ## Known Beta Gaps
 
-- Public download, signing, and versioned update delivery are not finished.
-- GUI installer flow is planned, but the current beta primarily uses scripts and release bundles.
+- Public download hosting is through GitHub Releases for beta builds.
+- The Linux `.run` installer is guided and executable, but it is not a polished native desktop wizard yet.
+- Artifact signing is reserved but not finished.
 - Dependency automation is focused on Debian, Ubuntu, and Raspberry Pi OS.
 - App catalog coverage is still early and should be tested app by app.
 - Public network exposure should remain an intentional advanced workflow.

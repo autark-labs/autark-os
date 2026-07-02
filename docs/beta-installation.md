@@ -1,16 +1,18 @@
 # Beta Installation Guide
 
-This guide is for beta testers and developers installing Project OS from this repository or from a locally built release bundle.
+This guide is for beta testers and developers installing Project OS from GitHub Release artifacts, this repository, or a locally built release bundle.
 
 For the intended normal-user path, start with [Install Project OS](./non-technical-install-guide.md). That guide describes the GUI and one-command installer flow Project OS is moving toward.
 
 ## Install Options
 
-Project OS is moving toward three install paths:
+Project OS beta releases publish three Linux install artifacts:
 
-- **GUI installer:** the intended non-technical path. Planned, not yet available as a public beta artifact.
-- **One-command installer:** the intended remote-support and terminal path. The public download URL is planned.
-- **Advanced CLI install:** the current beta path from source or a local release bundle.
+- **Guided executable installer:** `Project-OS-Installer-<version>-<arch>.run`, the recommended non-technical beta path.
+- **Debian package:** `project-os_<version>_<arch>.deb`, the apt-based path for Debian, Ubuntu, and Raspberry Pi OS users who want package-manager installation.
+- **General tarball:** `project-os-<version>.tar.gz`, the fallback path for support, advanced users, and hosts where package installation is not desired.
+
+Advanced source installs remain available for development.
 
 ## Requirements
 
@@ -25,6 +27,94 @@ Tested beta target:
 - Node.js and Yarn 1.x when installing from source
 
 Docker is required for Marketplace app installs. Project OS can run without Tailscale, but private HTTPS links will not work until Tailscale is installed, connected, and configured for the `projectos` operator.
+
+## Install From GitHub Release Artifacts
+
+Download the release files from:
+
+```text
+https://github.com/autark-labs/project-os/releases
+```
+
+Verify checksums from the folder containing the downloaded artifacts:
+
+```bash
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+### Guided Executable Installer
+
+Use this first for normal beta testing:
+
+```bash
+chmod +x Project-OS-Installer-<version>-amd64.run
+./Project-OS-Installer-<version>-amd64.run
+```
+
+When launched from a Linux desktop with `zenity` and a terminal available, the `.run` installer shows a graphical confirmation and opens a terminal for progress. On minimal servers or SSH sessions, it falls back to the same guided terminal installer.
+
+Preview host changes first:
+
+```bash
+./Project-OS-Installer-<version>-amd64.run --dry-run
+```
+
+Extract the bundled release for support or inspection:
+
+```bash
+./Project-OS-Installer-<version>-amd64.run --extract-only ./project-os-release
+```
+
+### Debian Package
+
+Use this on Debian, Ubuntu, or Raspberry Pi OS when you want apt to install the package:
+
+```bash
+sudo apt install ./project-os_<version>_amd64.deb
+```
+
+The package installs a release payload under `/usr/lib/project-os/release`, then runs the same service installer used by other install paths. The active service files and helper commands are installed under `/opt/project-os`, `/etc/project-os`, `/var/lib/project-os`, and `/var/log/project-os`.
+
+### General Tarball
+
+Use this for support, manual inspection, or non-package beta installs:
+
+```bash
+tar -xzf project-os-<version>.tar.gz
+cd project-os-<version>
+./scripts/project-os install
+```
+
+Preview host changes first:
+
+```bash
+./scripts/project-os install --dry-run
+```
+
+## Build Release Artifacts
+
+Maintainers can build all GitHub-hostable artifacts with one command:
+
+```bash
+VERSION=0.1.0-beta.2
+
+./scripts/build-release-artifacts.sh \
+  --version "$VERSION" \
+  --channel beta \
+  --release-notes-url "https://github.com/autark-labs/project-os/releases/tag/v$VERSION" \
+  --output-dir "release/artifacts-$VERSION"
+```
+
+The output folder contains:
+
+- `Project-OS-Installer-<version>-<arch>.run`
+- `project-os_<version>_<arch>.deb`
+- `project-os-<version>.tar.gz`
+- `project-os-artifacts.json`
+- `SHA256SUMS`
+- the expanded `project-os-<version>/` release bundle used to create the artifacts
+
+Upload the `.run`, `.deb`, `.tar.gz`, `project-os-artifacts.json`, and `SHA256SUMS` files to the GitHub Release.
 
 ## Install From Source
 
