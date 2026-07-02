@@ -17,7 +17,7 @@ export function applicationDeepLinkForObservedService(service, options = {}) {
 
 export function parseApplicationsDeepLink(search = '') {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-  const rawFocus = params.get('focus') || '';
+  const rawFocus = params.get('focus') || legacyFocusParam(params);
   const separatorIndex = rawFocus.indexOf(':');
   const rawKind = separatorIndex >= 0 ? rawFocus.slice(0, separatorIndex) : '';
   const id = separatorIndex >= 0 ? rawFocus.slice(separatorIndex + 1).trim() : '';
@@ -39,6 +39,18 @@ export function parseApplicationsDeepLink(search = '') {
     kind,
     tab,
   };
+}
+
+function legacyFocusParam(params) {
+  const serviceId = params.get('service');
+  if (serviceId) {
+    return `service:${serviceId}`;
+  }
+  const appId = params.get('app');
+  if (appId) {
+    return `managed:${appId}`;
+  }
+  return '';
 }
 
 export function findApplicationDeepLinkTarget(items, target) {

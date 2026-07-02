@@ -180,9 +180,9 @@ public class AppOwnershipService {
 
     private List<AppOwnershipAction> installedActions(InstalledApp installed) {
         if (installed.accessUrl() == null || installed.accessUrl().isBlank()) {
-            return List.of(manage());
+            return List.of(manage(installed.appId()));
         }
-        return List.of(manage(), open(installed.accessUrl()));
+        return List.of(manage(installed.appId()), open(installed.accessUrl()));
     }
 
     private List<AppOwnershipAction> existingServiceActions(String appId, ObservedService observedService, String reviewExistingHref) {
@@ -199,7 +199,7 @@ public class AppOwnershipService {
             ObservedService observedService,
             String reviewExistingHref) {
         return switch (state) {
-            case INSTALLED_MANAGED -> manage();
+            case INSTALLED_MANAGED -> manage(appId);
             case PINNED_EXTERNAL, FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> reviewExisting(reviewExistingHref);
             case COMING_SOON -> unavailable();
             default -> reviewSetup(appId);
@@ -208,7 +208,7 @@ public class AppOwnershipService {
 
     private String reviewExistingHref(ObservedService observedService) {
         if (observedService != null) {
-            return "/apps?service=" + encode(observedService.id());
+            return myAppsFocusHref("service", observedService.id());
         }
         return null;
     }
@@ -217,8 +217,8 @@ public class AppOwnershipService {
         return new AppOwnershipAction("review_setup", "Review setup", "route", "/discover?app=" + encode(appId), null, false, "");
     }
 
-    private AppOwnershipAction manage() {
-        return new AppOwnershipAction("manage", "Manage", "route", "/apps", null, false, "");
+    private AppOwnershipAction manage(String appId) {
+        return new AppOwnershipAction("manage", "Manage", "route", myAppsFocusHref("managed", appId), null, false, "");
     }
 
     private AppOwnershipAction open(String url) {
@@ -301,6 +301,10 @@ public class AppOwnershipService {
 
     private String encode(String value) {
         return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private String myAppsFocusHref(String kind, String id) {
+        return "/apps?focus=" + encode(kind + ":" + id);
     }
 
     private String normalizeToken(String value) {

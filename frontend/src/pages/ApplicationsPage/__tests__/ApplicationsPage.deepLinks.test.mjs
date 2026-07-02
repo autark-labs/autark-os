@@ -39,6 +39,21 @@ test('parses My Apps deep links into stable focus targets', () => {
   assert.equal(parseApplicationsDeepLink('?focus=unknown%3Athing').kind, null);
 });
 
+test('parses legacy My Apps app and service query params as focus targets', () => {
+  assert.deepEqual(parseApplicationsDeepLink('?service=docker%3Avaultwarden'), {
+    id: 'docker:vaultwarden',
+    key: 'service:docker:vaultwarden:',
+    kind: 'service',
+    tab: null,
+  });
+  assert.deepEqual(parseApplicationsDeepLink('?app=vaultwarden'), {
+    id: 'vaultwarden',
+    key: 'managed:vaultwarden:',
+    kind: 'managed',
+    tab: null,
+  });
+});
+
 test('matches deep-link targets without falling back to another app', () => {
   const items = [
     {
