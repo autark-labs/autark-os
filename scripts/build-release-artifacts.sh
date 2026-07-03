@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="${PROJECT_OS_VERSION:-0.0.1-SNAPSHOT}"
-CHANNEL="${PROJECT_OS_UPDATE_CHANNEL:-beta}"
-RELEASE_NOTES_URL="${PROJECT_OS_RELEASE_NOTES_URL:-}"
-SUPPORTED_ARCHITECTURES="${PROJECT_OS_SUPPORTED_ARCHITECTURES:-x86_64,aarch64,arm64}"
-ARCHITECTURE="${PROJECT_OS_PACKAGE_ARCHITECTURE:-}"
+VERSION="${AUTARK_OS_VERSION:-0.0.1-SNAPSHOT}"
+CHANNEL="${AUTARK_OS_UPDATE_CHANNEL:-beta}"
+RELEASE_NOTES_URL="${AUTARK_OS_RELEASE_NOTES_URL:-}"
+SUPPORTED_ARCHITECTURES="${AUTARK_OS_SUPPORTED_ARCHITECTURES:-x86_64,aarch64,arm64}"
+ARCHITECTURE="${AUTARK_OS_PACKAGE_ARCHITECTURE:-}"
 OUTPUT_DIR=""
 SKIP_BUILD=0
 DRY_RUN=0
@@ -32,20 +32,20 @@ Options:
   -h, --help        Show this help.
 
 Artifacts:
-  project-os-VERSION.tar.gz
-  project-os_VERSION_ARCH.deb
+  autark-os-VERSION.tar.gz
+  autark-os_VERSION_ARCH.deb
   Autark-OS-Installer-VERSION-ARCH.run
-  project-os-artifacts.json
+  autark-os-artifacts.json
   SHA256SUMS
 USAGE
 }
 
 log() {
-  printf '[project-os artifacts] %s\n' "$*"
+  printf '[autark-os artifacts] %s\n' "$*"
 }
 
 die() {
-  printf '[project-os artifacts] error: %s\n' "$*" >&2
+  printf '[autark-os artifacts] error: %s\n' "$*" >&2
   exit 1
 }
 
@@ -155,18 +155,18 @@ parse_args() {
 }
 
 artifact_names() {
-  BUNDLE_NAME="project-os-${VERSION}"
+  BUNDLE_NAME="autark-os-${VERSION}"
   BUNDLE_DIR="${OUTPUT_DIR}/${BUNDLE_NAME}"
   TARBALL="${OUTPUT_DIR}/${BUNDLE_NAME}.tar.gz"
-  DEB="${OUTPUT_DIR}/project-os_${VERSION}_${ARCHITECTURE}.deb"
+  DEB="${OUTPUT_DIR}/autark-os_${VERSION}_${ARCHITECTURE}.deb"
   RUN_INSTALLER="${OUTPUT_DIR}/Autark-OS-Installer-${VERSION}-${ARCHITECTURE}.run"
-  ARTIFACT_MANIFEST="${OUTPUT_DIR}/project-os-artifacts.json"
+  ARTIFACT_MANIFEST="${OUTPUT_DIR}/autark-os-artifacts.json"
   CHECKSUMS="${OUTPUT_DIR}/SHA256SUMS"
 }
 
 print_dry_run() {
   cat <<DRYRUN
-[project-os artifacts] Would build release artifacts.
+[autark-os artifacts] Would build release artifacts.
 + ${SCRIPT_DIR}/build-release-bundle.sh --version ${VERSION} --channel ${CHANNEL} --release-notes-url ${RELEASE_NOTES_URL} --supported-architectures ${SUPPORTED_ARCHITECTURES} --output-dir ${BUNDLE_DIR}$([[ "${SKIP_BUILD}" -eq 1 ]] && printf ' --skip-build')
 + tar -czf ${TARBALL} -C ${OUTPUT_DIR} ${BUNDLE_NAME}
 + dpkg-deb --root-owner-group --build <deb-root> ${DEB}
@@ -200,11 +200,11 @@ package_tarball() {
 }
 
 build_sha() {
-  awk -F= '$1 == "PROJECT_OS_BUILD_SHA" {print $2; exit}' "${BUNDLE_DIR}/project-os-release.env" 2>/dev/null || true
+  awk -F= '$1 == "AUTARK_OS_BUILD_SHA" {print $2; exit}' "${BUNDLE_DIR}/autark-os-release.env" 2>/dev/null || true
 }
 
 build_date() {
-  awk -F= '$1 == "PROJECT_OS_BUILD_DATE" {print $2; exit}' "${BUNDLE_DIR}/project-os-release.env" 2>/dev/null || true
+  awk -F= '$1 == "AUTARK_OS_BUILD_DATE" {print $2; exit}' "${BUNDLE_DIR}/autark-os-release.env" 2>/dev/null || true
 }
 
 installed_size_kb() {
@@ -215,7 +215,7 @@ write_deb_control() {
   local deb_root="$1"
   local size_kb="$2"
   cat >"${deb_root}/DEBIAN/control" <<CONTROL
-Package: project-os
+Package: autark-os
 Version: ${VERSION}
 Section: admin
 Priority: optional
@@ -223,7 +223,7 @@ Architecture: ${ARCHITECTURE}
 Maintainer: Autark Labs <support@autarklabs.local>
 Depends: bash, sudo, systemd, curl, ca-certificates, openjdk-21-jre-headless | java-runtime
 Installed-Size: ${size_kb}
-Homepage: https://github.com/autark-labs/project-os
+Homepage: https://github.com/autark-labs/autark-os
 Description: Calm local control center for self-hosted apps
  Autark-OS installs and manages supported self-hosted apps with Docker
  Compose, private access, backups, restore, and guided recovery.
@@ -237,11 +237,11 @@ write_deb_scripts() {
 set -euo pipefail
 
 if [[ "\${1:-configure}" == "configure" ]]; then
-  PROJECT_OS_BACKEND_JAR=/usr/lib/project-os/release/backend/project-os-backend.jar \\
-  PROJECT_OS_VERSION=${VERSION} \\
-  PROJECT_OS_BUILD_SHA=$(build_sha) \\
-  PROJECT_OS_BUILD_DATE=$(build_date) \\
-    /usr/lib/project-os/release/scripts/install-project-os-service.sh
+  AUTARK_OS_BACKEND_JAR=/usr/lib/autark-os/release/backend/autark-os-backend.jar \\
+  AUTARK_OS_VERSION=${VERSION} \\
+  AUTARK_OS_BUILD_SHA=$(build_sha) \\
+  AUTARK_OS_BUILD_DATE=$(build_date) \\
+    /usr/lib/autark-os/release/scripts/install-autark-os-service.sh
 fi
 POSTINST
   cat >"${deb_root}/DEBIAN/prerm" <<'PRERM'
@@ -250,7 +250,7 @@ set -euo pipefail
 
 if [[ "${1:-}" == "remove" || "${1:-}" == "deconfigure" ]]; then
   if command -v systemctl >/dev/null 2>&1; then
-    systemctl stop project-os.service >/dev/null 2>&1 || true
+    systemctl stop autark-os.service >/dev/null 2>&1 || true
   fi
 fi
 PRERM
@@ -263,10 +263,10 @@ package_deb() {
   work_dir="$(mktemp -d)"
   trap 'rm -rf "${work_dir}"' RETURN
   deb_root="${work_dir}/deb-root"
-  payload_dir="${deb_root}/usr/lib/project-os/release"
+  payload_dir="${deb_root}/usr/lib/autark-os/release"
   mkdir -p "${payload_dir}" "${deb_root}/DEBIAN"
   cp -a "${BUNDLE_DIR}/." "${payload_dir}/"
-  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/project-os" "${payload_dir}/scripts/project-os-fileops"
+  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os" "${payload_dir}/scripts/autark-os-fileops"
   size_kb="$(installed_size_kb "${deb_root}/usr")"
   write_deb_control "${deb_root}" "${size_kb}"
   write_deb_scripts "${deb_root}"
@@ -281,13 +281,13 @@ write_run_header() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PROJECT_OS_INSTALLER_VERSION="__PROJECT_OS_VERSION__"
-PROJECT_OS_INSTALLER_ARCHITECTURE="__PROJECT_OS_ARCHITECTURE__"
-PAYLOAD_MARKER="__PROJECT_OS_PAYLOAD_BELOW__"
+AUTARK_OS_INSTALLER_VERSION="__AUTARK_OS_VERSION__"
+AUTARK_OS_INSTALLER_ARCHITECTURE="__AUTARK_OS_ARCHITECTURE__"
+PAYLOAD_MARKER="__AUTARK_OS_PAYLOAD_BELOW__"
 
 usage() {
   cat <<USAGE
-Autark-OS Installer ${PROJECT_OS_INSTALLER_VERSION}
+Autark-OS Installer ${AUTARK_OS_INSTALLER_VERSION}
 
 Usage: $0 [options]
 
@@ -321,7 +321,7 @@ extract_payload() {
 
 launch_terminal_for_desktop() {
   [[ "$#" -eq 0 ]] || return 1
-  [[ "${PROJECT_OS_FORCE_TERMINAL:-0}" != "1" ]] || return 1
+  [[ "${AUTARK_OS_FORCE_TERMINAL:-0}" != "1" ]] || return 1
   [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] || return 1
   command_exists zenity || return 1
 
@@ -333,7 +333,7 @@ launch_terminal_for_desktop() {
 
   local self command
   self="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
-  command="PROJECT_OS_FORCE_TERMINAL=1 $(printf '%q' "${self}"); printf '\\nAutark-OS installer finished. Press Enter to close. '; read -r _"
+  command="AUTARK_OS_FORCE_TERMINAL=1 $(printf '%q' "${self}"); printf '\\nAutark-OS installer finished. Press Enter to close. '; read -r _"
 
   if command_exists x-terminal-emulator; then
     x-terminal-emulator -e bash -lc "${command}" &
@@ -389,18 +389,18 @@ main() {
   trap 'rm -rf "${temp_dir}"' EXIT
   extract_payload "${temp_dir}"
 
-  printf 'Autark-OS Installer %s\n' "${PROJECT_OS_INSTALLER_VERSION}"
+  printf 'Autark-OS Installer %s\n' "${AUTARK_OS_INSTALLER_VERSION}"
   printf 'This installer will check this device, install Autark-OS, and start the service.\n'
-  "${temp_dir}/scripts/project-os" install --release-bundle "${temp_dir}" --guided "${install_args[@]}"
+  "${temp_dir}/scripts/autark-os" install --release-bundle "${temp_dir}" --guided "${install_args[@]}"
 }
 
 main "$@"
 exit 0
-__PROJECT_OS_PAYLOAD_BELOW__
+__AUTARK_OS_PAYLOAD_BELOW__
 RUNHEADER
   sed -i \
-    -e "s/__PROJECT_OS_VERSION__/${VERSION}/g" \
-    -e "s/__PROJECT_OS_ARCHITECTURE__/${ARCHITECTURE}/g" \
+    -e "s/__AUTARK_OS_VERSION__/${VERSION}/g" \
+    -e "s/__AUTARK_OS_ARCHITECTURE__/${ARCHITECTURE}/g" \
     "${RUN_INSTALLER}"
 }
 
@@ -423,7 +423,7 @@ write_artifact_manifest() {
   cat >"${ARTIFACT_MANIFEST}" <<JSON
 {
   "schemaVersion": 1,
-  "name": "project-os",
+  "name": "autark-os",
   "version": "$(json_escape "${VERSION}")",
   "channel": "$(json_escape "${CHANNEL}")",
   "architecture": "$(json_escape "${ARCHITECTURE}")",
@@ -434,7 +434,7 @@ write_artifact_manifest() {
       "type": "tarball",
       "fileName": "$(json_escape "${tar_name}")",
       "sha256": "$(sha256_for "${TARBALL}")",
-      "installHint": "tar -xzf ${tar_name} && cd ${BUNDLE_NAME} && ./scripts/project-os install"
+      "installHint": "tar -xzf ${tar_name} && cd ${BUNDLE_NAME} && ./scripts/autark-os install"
     },
     {
       "type": "debian-package",

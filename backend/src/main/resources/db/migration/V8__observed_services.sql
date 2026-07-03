@@ -12,7 +12,7 @@ create table if not exists observed_services (
     user_visibility text not null default 'observed',
     runtime_state text not null default 'unknown',
     health_check_enabled boolean not null default false,
-    project_os_instance_id text,
+    autark_os_instance_id text,
     first_seen_at text not null,
     last_seen_at text not null,
     pinned_at text,

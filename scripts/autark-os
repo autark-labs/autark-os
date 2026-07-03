@@ -1,0 +1,1570 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SERVICE_NAME="${AUTARK_OS_SERVICE_NAME:-autark-os}"
+BASE_URL_OVERRIDE="${AUTARK_OS_BASE_URL:-}"
+CONFIG_FILE="${AUTARK_OS_CONFIG_FILE:-/etc/autark-os/autark-os.env}"
+DEFAULT_PORT="${AUTARK_OS_DEFAULT_PORT:-8082}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVICE_FILE="${AUTARK_OS_SERVICE_FILE:-/etc/systemd/system/${SERVICE_NAME}.service}"
+CLI_LINK="${AUTARK_OS_CLI_LINK:-/usr/local/bin/autark-os}"
+
+usage() {
+  cat <<USAGE
+Usage: autark-os <command>
+
+Commands:
+  install    Install Autark-OS or print a shared install plan.
+  doctor     Check host setup, service health, and core API readiness. Use --json for scripts.
+  setup      Start or resume the first-boot setup flow.
+  repair     Check installed Autark-OS and print recovery actions.
+  update     Check or run Autark-OS update flow.
+  uninstall  Remove Autark-OS service paths through the guided uninstall flow.
+  support-bundle
+             Export redacted installer/setup diagnostics for support.
+  where      Show install, runtime, config, log, service, and helper paths.
+  status     Show systemd status for ${SERVICE_NAME}.service.
+  logs       Follow backend logs.
+  start      Start ${SERVICE_NAME}.service.
+  stop       Stop ${SERVICE_NAME}.service.
+  restart    Restart ${SERVICE_NAME}.service.
+  version    Print Autark-OS version, build, install path, and runtime path.
+  port       Print the configured Autark-OS service port.
+  url        Print the local Autark-OS URL.
+  help       Show this help.
+
+Environment:
+  AUTARK_OS_SERVICE_NAME  Override the systemd service name.
+  AUTARK_OS_BASE_URL      Override the local API URL.
+  AUTARK_OS_CONFIG_FILE   Override the service env file. Defaults to /etc/autark-os/autark-os.env.
+  AUTARK_OS_DEFAULT_PORT  Fallback port when config cannot be read. Defaults to 8082.
+USAGE
+}
+
+log() {
+  printf '[autark-os] %s\n' "$*"
+}
+
+die() {
+  printf '[autark-os] error: %s\n' "$*" >&2
+  exit 1
+}
+
+has_command() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+configured_value() {
+  local key="$1"
+  if [[ -r "${CONFIG_FILE}" ]]; then
+    awk -F= -v key="${key}" '$1 == key {print $2; exit}' "${CONFIG_FILE}"
+  fi
+}
+
+systemd_environment_value() {
+  local key="$1"
+  has_command systemctl || return 0
+  systemctl show "${SERVICE_NAME}.service" -p Environment --value 2>/dev/null \
+    | tr ' ' '\n' \
+    | awk -F= -v key="${key}" '$1 == key {print $2; exit}'
+}
+
+port_from_base_url() {
+  local value="$1"
+  [[ "${value}" =~ :([0-9]+)(/|$) ]] || return 0
+  printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+resolve_port() {
+  local port=""
+  if [[ -n "${BASE_URL_OVERRIDE}" ]]; then
+    port="$(port_from_base_url "${BASE_URL_OVERRIDE}")"
+  fi
+  [[ -n "${port}" ]] || port="$(configured_value SERVER_PORT)"
+  [[ -n "${port}" ]] || port="$(systemd_environment_value SERVER_PORT)"
+  [[ -n "${port}" ]] || port="${DEFAULT_PORT}"
+  printf '%s\n' "${port}"
+}
+
+resolve_base_url() {
+  if [[ -n "${BASE_URL_OVERRIDE}" ]]; then
+    printf '%s\n' "${BASE_URL_OVERRIDE}"
+    return 0
+  fi
+  printf 'http://localhost:%s\n' "$(resolve_port)"
+}
+
+api_get() {
+  local path="$1"
+  local base_url
+  base_url="$(resolve_base_url)"
+  curl -fsS "${base_url}${path}"
+}
+
+api_post() {
+  local path="$1"
+  local body="${2:-{}}"
+  local base_url
+  base_url="$(resolve_base_url)"
+  curl -fsS -X POST -H 'Content-Type: application/json' -d "${body}" "${base_url}${path}"
+}
+
+api_put() {
+  local path="$1"
+  local body="$2"
+  local base_url
+  base_url="$(resolve_base_url)"
+  curl -fsS -X PUT -H 'Content-Type: application/json' -d "${body}" "${base_url}${path}"
+}
+
+json_value() {
+  local key="$1"
+  local file="$2"
+  sed -nE "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"([^\"]*)\".*/\\1/p" "${file}" | head -n 1
+}
+
+json_bool() {
+  local key="$1"
+  local file="$2"
+  sed -nE "s/.*\"${key}\"[[:space:]]*:[[:space:]]*(true|false).*/\\1/p" "${file}" | head -n 1
+}
+
+json_array_strings() {
+  local key="$1"
+  local file="$2"
+  sed -nE "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\\[([^]]*)\\].*/\\1/p" "${file}" \
+    | head -n 1 \
+    | tr ',' '\n' \
+    | sed -E 's/^[[:space:]]*"//; s/"[[:space:]]*$//; /^$/d'
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+json_string() {
+  printf '"%s"' "$(json_escape "$1")"
+}
+
+json_string_array() {
+  local first=1
+  printf '['
+  for value in "$@"; do
+    if [[ "${first}" -eq 0 ]]; then
+      printf ','
+    fi
+    first=0
+    json_string "${value}"
+  done
+  printf ']'
+}
+
+file_url_path() {
+  local value="$1"
+  case "${value}" in
+    file://*) printf '%s\n' "${value#file://}" ;;
+    *) printf '%s\n' "${value}" ;;
+  esac
+}
+
+json_list() {
+  local first=1
+  printf '['
+  for value in "$@"; do
+    if [[ "${first}" -eq 0 ]]; then
+      printf ','
+    fi
+    first=0
+    printf '"%s"' "$(json_escape "${value}")"
+  done
+  printf ']'
+}
+
+read_default() {
+  local prompt="$1"
+  local default_value="$2"
+  local value
+  if [[ -n "${default_value}" ]]; then
+    read -r -p "${prompt} [${default_value}]: " value
+    printf '%s\n' "${value:-${default_value}}"
+  else
+    read -r -p "${prompt}: " value
+    printf '%s\n' "${value}"
+  fi
+}
+
+confirm_default_yes() {
+  local prompt="$1"
+  local value
+  read -r -p "${prompt} [Y/n]: " value
+  case "${value,,}" in
+    n|no) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+confirm_default_no() {
+  local prompt="$1"
+  local value
+  read -r -p "${prompt} [y/N]: " value
+  case "${value,,}" in
+    y|yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+print_setup_next_step() {
+  local base_url
+  base_url="$(resolve_base_url)"
+  log "Open Autark-OS: ${base_url}"
+  log "Run 'autark-os doctor' if the page is not reachable."
+}
+
+bootstrap_installer() {
+  if [[ -x "${SCRIPT_DIR}/bootstrap-autark-os.sh" ]]; then
+    printf '%s\n' "${SCRIPT_DIR}/bootstrap-autark-os.sh"
+    return 0
+  fi
+  if [[ -x "$(pwd)/scripts/bootstrap-autark-os.sh" ]]; then
+    printf '%s\n' "$(pwd)/scripts/bootstrap-autark-os.sh"
+    return 0
+  fi
+  return 1
+}
+
+running_from_release_bundle() {
+  [[ -r "${SCRIPT_DIR}/../autark-os-release.json" && -d "${SCRIPT_DIR}/../backend" ]]
+}
+
+has_install_artifact_arg() {
+  local arg
+  for arg in "$@"; do
+    case "${arg}" in
+      --release-bundle|--release-bundle=*|--release-jar|--release-jar=*)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+has_arg() {
+  local needle="$1"
+  shift
+  local arg
+  for arg in "$@"; do
+    [[ "${arg}" == "${needle}" ]] && return 0
+  done
+  return 1
+}
+
+has_prefixed_arg() {
+  local needle="$1"
+  shift
+  local arg
+  for arg in "$@"; do
+    [[ "${arg}" == "${needle}" || "${arg}" == "${needle}="* ]] && return 0
+  done
+  return 1
+}
+
+release_bundle_arg() {
+  local previous="" arg
+  for arg in "$@"; do
+    if [[ "${previous}" == "--release-bundle" ]]; then
+      printf '%s\n' "${arg}"
+      return 0
+    fi
+    case "${arg}" in
+      --release-bundle=*)
+        printf '%s\n' "${arg#*=}"
+        return 0
+        ;;
+    esac
+    previous="${arg}"
+  done
+  return 1
+}
+
+verify_release_bundle_checksums() {
+  local bundle_dir="$1"
+  local checksum_file="${bundle_dir}/SHA256SUMS"
+  [[ -r "${checksum_file}" ]] || return 0
+  has_command sha256sum || die "sha256sum is required to verify release bundle checksums."
+  log "Verifying release bundle checksums."
+  (cd "${bundle_dir}" && sha256sum -c SHA256SUMS --ignore-missing >/dev/null)
+}
+
+install_command() {
+  local guided=0
+  local yes=0
+  local args=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --guided)
+        guided=1
+        ;;
+      --yes)
+        yes=1
+        ;;
+      -h|--help)
+        cat <<INSTALL_USAGE
+Usage: autark-os install [options]
+
+Examples:
+  autark-os install
+  autark-os install --guided
+  autark-os install --plan --json
+  autark-os install --release-bundle /path/to/autark-os-release
+
+Routes to bootstrap-autark-os.sh so portable and installed CLI flows share
+the same pre-install doctor, plan, dependency, and service installer logic.
+
+Common options:
+  --guided             Use the interactive installer surface. Default for normal installs.
+  --plan               Print the install plan without changing the host.
+  --doctor             Check whether this host is ready before installing.
+  --json               With --plan or --doctor, print JSON.
+  --dry-run            Preview install actions without changing the host.
+  --yes                Confirm guided prompts where supported.
+  --auto-install-deps  Install supported host dependencies.
+  --release-bundle DIR Install from a packaged release bundle.
+  --release-jar FILE   Install this backend jar.
+  --runtime-dir DIR    Store runtime data in DIR.
+  --port PORT          Run Autark-OS on PORT.
+  -h, --help           Show this help.
+INSTALL_USAGE
+        return 0
+        ;;
+      *)
+        args+=("$1")
+        ;;
+    esac
+    shift
+  done
+
+  local installer
+  if ! installer="$(bootstrap_installer)"; then
+    log "Portable installer files were not found next to this autark-os command."
+    log "Run from a release bundle, or use ./scripts/bootstrap-autark-os.sh from the source checkout."
+    return 1
+  fi
+
+  local bundle_dir=""
+  if ! has_install_artifact_arg "${args[@]}" && running_from_release_bundle; then
+    bundle_dir="$(cd "${SCRIPT_DIR}/.." && pwd)"
+    args=(--release-bundle "${bundle_dir}" "${args[@]}")
+  else
+    bundle_dir="$(release_bundle_arg "${args[@]}" || true)"
+  fi
+
+  local machine_output=0
+  if has_arg "--json" "${args[@]}"; then
+    machine_output=1
+  fi
+
+  local metadata_only=0
+  if has_arg "--plan" "${args[@]}" || has_arg "--doctor" "${args[@]}"; then
+    metadata_only=1
+  fi
+
+  if [[ "${metadata_only}" -eq 0 && "${machine_output}" -eq 0 ]]; then
+    guided=1
+  fi
+
+  if [[ "${guided}" -eq 1 && "${metadata_only}" -eq 0 ]]; then
+    if ! has_prefixed_arg "--auto-install-deps" "${args[@]}"; then
+      args+=(--auto-install-deps)
+      [[ "${machine_output}" -eq 1 ]] || log "Installing missing supported dependencies by default for the guided install."
+    fi
+    if [[ "${machine_output}" -eq 0 ]]; then
+      log "Unified guided install"
+      log "This command will check this host, install supported dependencies when needed, install Autark-OS, and start the service."
+      log "Use 'autark-os install --plan' or 'autark-os install --dry-run' to preview without installing."
+    fi
+  elif [[ "${guided}" -eq 1 && "${machine_output}" -eq 0 ]]; then
+    log "Guided install uses the shared installer. Review each prompt or run with --plan first."
+  fi
+
+  if [[ -n "${bundle_dir}" && "${machine_output}" -eq 0 ]]; then
+    verify_release_bundle_checksums "${bundle_dir}"
+  fi
+  local dry_run_install=0
+  if has_arg "--dry-run" "${args[@]}"; then
+    dry_run_install=1
+  fi
+  if [[ "${guided}" -eq 1 && "${metadata_only}" -eq 0 && "${machine_output}" -eq 0 && "${dry_run_install}" -eq 0 && "${yes}" -eq 0 ]]; then
+    log "Install Autark-OS and supported dependencies on this host?"
+    if ! confirm_default_no "Install Autark-OS and supported dependencies on this host?"; then
+      log "Installation cancelled."
+      return 1
+    fi
+  fi
+
+  local env_args=()
+  if [[ -n "${bundle_dir}" && "${machine_output}" -eq 0 ]]; then
+    env_args+=("AUTARK_OS_RELEASE_VERIFIED=1")
+  fi
+  if [[ "${guided}" -eq 1 && "${metadata_only}" -eq 0 && "${machine_output}" -eq 0 && "${dry_run_install}" -eq 0 && "${yes}" -eq 0 ]]; then
+    env_args+=("AUTARK_OS_TAILSCALE_ONBOARDING=1")
+  fi
+  env "${env_args[@]}" "${installer}" "${args[@]}"
+}
+
+repair_command() {
+  case "${1:-}" in
+    -h|--help)
+      cat <<REPAIR_USAGE
+Usage: autark-os repair [options]
+
+Checks installed Autark-OS and prints recovery actions. Deeper automated
+repair steps are planned for the lifecycle phase.
+
+Options:
+  --json     Print doctor JSON when the backend is reachable.
+  -h, --help Show this help.
+REPAIR_USAGE
+      return 0
+      ;;
+  esac
+
+  log "Checking installed Autark-OS before repair."
+  if doctor "$@"; then
+    log "No automatic repair action is required by this helper."
+    return 0
+  fi
+  log "Recovery actions:"
+  log "  autark-os status"
+  log "  autark-os logs"
+  log "  autark-os restart"
+  return 1
+}
+
+release_metadata_file() {
+  local metadata_url="$1"
+  local metadata_path
+  [[ -n "${metadata_url}" ]] || return 1
+  metadata_path="$(file_url_path "${metadata_url}")"
+  [[ -r "${metadata_path}" ]] || die "Release metadata is not readable: ${metadata_url}"
+  printf '%s\n' "${metadata_path}"
+}
+
+update_check() {
+  local metadata_url="$1"
+  local json_output="$2"
+  local current_version available_version channel release_notes bundle_url update_available="false"
+  current_version="$(configured_value AUTARK_OS_VERSION)"
+  [[ -n "${current_version}" ]] || current_version="unknown"
+
+  if [[ -n "${metadata_url}" ]]; then
+    local metadata_file
+    metadata_file="$(release_metadata_file "${metadata_url}")"
+    available_version="$(json_value version "${metadata_file}")"
+    channel="$(json_value channel "${metadata_file}")"
+    release_notes="$(json_value releaseNotesUrl "${metadata_file}")"
+    bundle_url="$(json_value bundleUrl "${metadata_file}")"
+  else
+    available_version=""
+    channel="$(configured_value AUTARK_OS_UPDATE_CHANNEL)"
+    release_notes=""
+    bundle_url=""
+  fi
+  [[ -n "${available_version}" && "${available_version}" != "${current_version}" ]] && update_available="true"
+
+  if [[ "${json_output}" -eq 1 ]]; then
+    printf '{'
+    printf '"schemaVersion":1'
+    printf ',"currentVersion":'
+    json_string "${current_version}"
+    printf ',"availableVersion":'
+    json_string "${available_version}"
+    printf ',"updateAvailable":%s' "${update_available}"
+    printf ',"channel":'
+    json_string "${channel}"
+    printf ',"releaseNotesUrl":'
+    json_string "${release_notes}"
+    printf ',"releaseBundleUrl":'
+    json_string "${bundle_url}"
+    printf ',"requiresSourceCheckout":false'
+    printf ',"requiresNodeYarnOrGit":false'
+    printf '}\n'
+    return 0
+  fi
+
+  print_version_line "Current version" "${current_version}"
+  print_version_line "Available version" "${available_version:-unknown}"
+  print_version_line "Update available" "${update_available}"
+  print_version_line "Channel" "${channel:-unknown}"
+  [[ -n "${release_notes}" ]] && print_version_line "Release notes" "${release_notes}"
+}
+
+verify_release_bundle() {
+  local bundle_dir="$1"
+  [[ -d "${bundle_dir}" ]] || die "--release-bundle must be a directory: ${bundle_dir}"
+  [[ -r "${bundle_dir}/autark-os-release.json" ]] || die "Release metadata missing: ${bundle_dir}/autark-os-release.json"
+  [[ -r "${bundle_dir}/backend/autark-os-backend.jar" ]] || die "Backend jar missing: ${bundle_dir}/backend/autark-os-backend.jar"
+  if [[ -r "${bundle_dir}/SHA256SUMS" ]]; then
+    has_command sha256sum || die "sha256sum is required to verify release bundle checksums."
+    (cd "${bundle_dir}" && sha256sum -c SHA256SUMS --ignore-missing >/dev/null)
+  else
+    log "No SHA256SUMS found in release bundle; continuing without checksum verification."
+  fi
+}
+
+replace_env_value() {
+  local file="$1"
+  shift
+  local tmp_file key pattern
+  tmp_file="$(mktemp)"
+  pattern="^("
+  for key in "$@"; do
+    pattern+="${key}|"
+  done
+  pattern="${pattern%|})="
+  if [[ -f "${file}" ]]; then
+    grep -v -E "${pattern}" "${file}" >"${tmp_file}" || true
+  fi
+  cat "${tmp_file}" >"${file}"
+  rm -f "${tmp_file}"
+}
+
+copy_update_file() {
+  local source="$1"
+  local target="$2"
+  local dry_run="$3"
+  if [[ "${dry_run}" -eq 1 ]]; then
+    log "Would replace ${target} from ${source}"
+    return 0
+  fi
+  mkdir -p "$(dirname "${target}")"
+  cp "${source}" "${target}"
+}
+
+apply_release_bundle_update() {
+  local release_bundle="$1"
+  local yes="$2"
+  local dry_run="$3"
+  local skip_service_restart="$4"
+  local bundle_dir install_dir runtime_dir config_dir backend_jar release_json
+  bundle_dir="$(cd "${release_bundle}" && pwd)"
+  verify_release_bundle "${bundle_dir}"
+
+  install_dir="$(configured_value AUTARK_OS_INSTALL_DIR)"
+  runtime_dir="$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+  config_dir="$(configured_value AUTARK_OS_CONFIG_DIR)"
+  backend_jar="$(configured_value AUTARK_OS_BACKEND_JAR)"
+  [[ -n "${install_dir}" ]] || install_dir="/opt/autark-os"
+  [[ -n "${runtime_dir}" ]] || runtime_dir="/var/lib/autark-os"
+  [[ -n "${config_dir}" ]] || config_dir="$(dirname "${CONFIG_FILE}")"
+  [[ -n "${backend_jar}" ]] || backend_jar="${install_dir}/backend/autark-os-backend.jar"
+  release_json="${bundle_dir}/autark-os-release.json"
+
+  local new_version new_sha new_date previous_version previous_sha previous_date timestamp snapshot_dir previous_jar
+  new_version="$(json_value version "${release_json}")"
+  new_sha="$(json_value buildSha "${release_json}")"
+  new_date="$(json_value buildDate "${release_json}")"
+  previous_version="$(configured_value AUTARK_OS_VERSION)"
+  previous_sha="$(configured_value AUTARK_OS_BUILD_SHA)"
+  previous_date="$(configured_value AUTARK_OS_BUILD_DATE)"
+  timestamp="$(date -u +%Y%m%d%H%M%S)"
+  snapshot_dir="${runtime_dir}/updates/pre-update-${timestamp}"
+  previous_jar="${snapshot_dir}/autark-os-backend-previous.jar"
+
+  if [[ "${yes}" -ne 1 && "${dry_run}" -ne 1 ]]; then
+    if ! confirm_default_yes "Update Autark-OS to ${new_version:-unknown} from ${bundle_dir}?"; then
+      log "Update cancelled."
+      return 1
+    fi
+  fi
+
+  if [[ "${dry_run}" -eq 1 ]]; then
+    log "Would verify release bundle: ${bundle_dir}"
+    log "Would create pre-update snapshot: ${snapshot_dir}"
+    log "Would keep previous backend jar: ${previous_jar}"
+    log "Would replace backend jar: ${backend_jar}"
+    log "Would replace helper scripts under ${install_dir}/bin"
+    [[ "${skip_service_restart}" -eq 1 ]] && log "Would skip service restart." || log "Would restart ${SERVICE_NAME}.service and run post-update doctor."
+    return 0
+  fi
+
+  mkdir -p "${snapshot_dir}" "${install_dir}/bin"
+  [[ -f "${CONFIG_FILE}" ]] && cp "${CONFIG_FILE}" "${snapshot_dir}/autark-os.env"
+  cp "${release_json}" "${snapshot_dir}/autark-os-release.json"
+  if [[ -f "${backend_jar}" ]]; then
+    cp "${backend_jar}" "${previous_jar}"
+  else
+    previous_jar=""
+  fi
+
+  local rollback_needed=1
+  rollback_update() {
+    if [[ "${rollback_needed}" -eq 1 && -n "${previous_jar}" && -f "${previous_jar}" ]]; then
+      cp "${previous_jar}" "${backend_jar}" || true
+    fi
+  }
+  trap rollback_update ERR
+
+  copy_update_file "${bundle_dir}/backend/autark-os-backend.jar" "${backend_jar}" 0
+  for script_name in autark-os autark-os-fileops bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh; do
+    if [[ -f "${bundle_dir}/scripts/${script_name}" ]]; then
+      copy_update_file "${bundle_dir}/scripts/${script_name}" "${install_dir}/bin/${script_name}" 0
+      chmod +x "${install_dir}/bin/${script_name}"
+    fi
+  done
+
+  mkdir -p "${config_dir}"
+  replace_env_value "${CONFIG_FILE}" \
+    AUTARK_OS_VERSION AUTARK_OS_BUILD_SHA AUTARK_OS_BUILD_DATE \
+    AUTARK_OS_PREVIOUS_VERSION AUTARK_OS_PREVIOUS_BUILD_SHA AUTARK_OS_PREVIOUS_BUILD_DATE AUTARK_OS_PREVIOUS_BACKEND_JAR AUTARK_OS_PRE_UPDATE_SNAPSHOT_DIR
+  cat >>"${CONFIG_FILE}" <<EOF
+AUTARK_OS_VERSION=${new_version}
+AUTARK_OS_BUILD_SHA=${new_sha}
+AUTARK_OS_BUILD_DATE=${new_date}
+AUTARK_OS_PREVIOUS_VERSION=${previous_version}
+AUTARK_OS_PREVIOUS_BUILD_SHA=${previous_sha}
+AUTARK_OS_PREVIOUS_BUILD_DATE=${previous_date}
+AUTARK_OS_PREVIOUS_BACKEND_JAR=${previous_jar}
+AUTARK_OS_PRE_UPDATE_SNAPSHOT_DIR=${snapshot_dir}
+EOF
+
+  if [[ "${skip_service_restart}" -eq 1 ]]; then
+    log "Updated Autark-OS files and metadata. Service restart skipped."
+  else
+    if has_command systemctl; then
+      sudo systemctl restart "${SERVICE_NAME}.service"
+    fi
+    doctor || log "Post-update doctor needs review."
+  fi
+  rollback_needed=0
+  trap - ERR
+}
+
+update_command() {
+  local check=0
+  local json_output=0
+  local metadata_url="${AUTARK_OS_UPDATE_METADATA_URL:-}"
+  local release_bundle=""
+  local yes=0
+  local dry_run=0
+  local skip_service_restart=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --check)
+        check=1
+        ;;
+      --json)
+        json_output=1
+        ;;
+      --metadata-url)
+        shift
+        [[ $# -gt 0 ]] || die "--metadata-url requires a URL or path."
+        metadata_url="$1"
+        ;;
+      --metadata-url=*)
+        metadata_url="${1#*=}"
+        ;;
+      --release-bundle)
+        shift
+        [[ $# -gt 0 ]] || die "--release-bundle requires a directory."
+        release_bundle="$1"
+        ;;
+      --release-bundle=*)
+        release_bundle="${1#*=}"
+        ;;
+      --yes)
+        yes=1
+        ;;
+      --dry-run)
+        dry_run=1
+        ;;
+      --skip-service-restart)
+        skip_service_restart=1
+        ;;
+      -h|--help)
+        cat <<UPDATE_USAGE
+Usage: autark-os update [options]
+
+Checks or runs the Autark-OS release-bundle update flow.
+
+Options:
+  --check                  Check release metadata for an available version.
+  --json                   With --check, print machine-readable JSON.
+  --metadata-url URL       Release metadata URL or file:// path.
+  --release-bundle DIR     Apply update from a local release bundle.
+  --yes                    Run non-interactively.
+  --dry-run                Print update actions without changing files.
+  --skip-service-restart   Replace files and metadata without restarting service.
+  -h, --help               Show this help.
+UPDATE_USAGE
+        return 0
+        ;;
+      *)
+        log "Unknown update option: $1"
+        return 1
+        ;;
+    esac
+    shift
+  done
+
+  if [[ "${check}" -eq 1 ]]; then
+    update_check "${metadata_url}" "${json_output}"
+    return 0
+  fi
+
+  [[ -n "${release_bundle}" ]] || die "autark-os update requires --release-bundle for this release-bundle update slice."
+  apply_release_bundle_update "${release_bundle}" "${yes}" "${dry_run}" "${skip_service_restart}"
+}
+
+redact_stream() {
+  sed -E \
+    -e 's/([A-Za-z0-9_]*(TOKEN|Token|token|PASSWORD|Password|password|SECRET|Secret|secret|AUTH_KEY|auth_key|API_KEY|api_key|CREDENTIAL|credential|PRIVATE_KEY|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*)[^[:space:]",}]+/\1[redacted]/g' \
+    -e 's/(Authorization:[[:space:]]*Bearer[[:space:]]+)[^[:space:]]+/\1[redacted]/g' \
+    -e 's/(Bearer[[:space:]]+)[A-Za-z0-9._~+\/=-]+/\1[redacted]/g' \
+    -e 's/("([^"]*(token|password|secret|authKey|auth_key|apiKey|api_key|credential|privateKey|private_key)[^"]*)"[[:space:]]*:[[:space:]]*")[^"]*(")/\1[redacted]\4/g'
+}
+
+redact_file_to() {
+  local source="$1"
+  local target="$2"
+  if [[ -r "${source}" ]]; then
+    redact_stream <"${source}" >"${target}"
+  else
+    printf 'Unavailable: %s\n' "${source}" >"${target}"
+  fi
+}
+
+write_json_unavailable() {
+  local target="$1"
+  local source="$2"
+  local message="$3"
+  printf '{"schemaVersion":1,"status":"unavailable","source":' >"${target}"
+  json_string "${source}" >>"${target}"
+  printf ',"message":' >>"${target}"
+  json_string "${message}" >>"${target}"
+  printf '}\n' >>"${target}"
+}
+
+support_bundle_run_bootstrap_json() {
+  local mode="$1"
+  local target="$2"
+  local release_bundle="$3"
+  local state_dir="$4"
+  local installer
+  if ! installer="$(bootstrap_installer)"; then
+    write_json_unavailable "${target}" "bootstrap-autark-os.sh ${mode} --json" "bootstrap installer was not found next to this command"
+    return 0
+  fi
+
+  local args=("${mode}" "--json")
+  [[ -n "${release_bundle}" ]] && args+=(--release-bundle "${release_bundle}")
+  [[ -n "${state_dir}" ]] && args+=(--state-dir "${state_dir}")
+  if "${installer}" "${args[@]}" >"${target}.raw" 2>"${target}.err"; then
+    redact_file_to "${target}.raw" "${target}"
+  else
+    write_json_unavailable "${target}" "${installer} ${mode} --json" "$(head -n 5 "${target}.err" | tr '\n' ' ')"
+  fi
+  rm -f "${target}.raw" "${target}.err"
+}
+
+support_bundle_run_autark_os_doctor() {
+  local target="$1"
+  if "$0" doctor --json >"${target}.raw" 2>"${target}.err"; then
+    redact_file_to "${target}.raw" "${target}"
+  else
+    write_json_unavailable "${target}" "autark-os doctor --json" "$(head -n 5 "${target}.err" | tr '\n' ' ')"
+  fi
+  rm -f "${target}.raw" "${target}.err"
+}
+
+write_disk_summary() {
+  local target="$1"
+  {
+    printf 'Autark-OS relevant disk summary\n'
+    printf 'Config file: %s\n' "${CONFIG_FILE}"
+    printf 'Install path: %s\n' "$(configured_value AUTARK_OS_INSTALL_DIR)"
+    printf 'Runtime path: %s\n' "$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+    printf 'Log path: %s\n' "$(configured_value AUTARK_OS_LOG_DIR)"
+    if has_command df; then
+      df -h "$(configured_value AUTARK_OS_RUNTIME_ROOT 2>/dev/null || printf /)" 2>/dev/null || df -h / 2>/dev/null || true
+    else
+      printf 'df unavailable\n'
+    fi
+  } | redact_stream >"${target}"
+}
+
+write_dependency_states() {
+  local plan_file="$1"
+  local target="$2"
+  if has_command python3; then
+    python3 - "${plan_file}" >"${target}" <<'PY'
+import json
+import sys
+
+try:
+    plan = json.load(open(sys.argv[1]))
+except Exception as exc:
+    print(json.dumps({"schemaVersion": 1, "status": "unavailable", "message": str(exc)}))
+    raise SystemExit(0)
+
+dependencies = plan.get("dependencies", [])
+print(json.dumps({"schemaVersion": 1, "source": "install-plan.json", "dependencies": dependencies}, separators=(",", ":")))
+PY
+  else
+    printf '{"schemaVersion":1,"source":"install-plan.json","message":"python3 unavailable; inspect install-plan.json dependencies"}\n' >"${target}"
+  fi
+}
+
+write_selected_options() {
+  local state_dir="$1"
+  local target="$2"
+  local state_file="${state_dir}/installer-state.json"
+  if [[ -n "${state_dir}" && -r "${state_file}" && "$(has_command python3 && printf yes || true)" == "yes" ]]; then
+    python3 - "${state_file}" >"${target}.raw" <<'PY'
+import json
+import sys
+
+state = json.load(open(sys.argv[1]))
+selected = state.get("selectedOptions") or {
+    "runtimeDir": state.get("runtimeDir") or state.get("selectedRuntimeDir") or "",
+    "installDir": state.get("installDir") or "",
+    "configDir": state.get("configDir") or "",
+    "logDir": state.get("logDir") or "",
+    "port": state.get("port") or "",
+    "status": state.get("status") or "",
+    "lastCompletedStage": state.get("lastCompletedStage") or "",
+}
+print(json.dumps(selected, separators=(",", ":")))
+PY
+    redact_file_to "${target}.raw" "${target}"
+    rm -f "${target}.raw"
+    return 0
+  fi
+
+  printf '{'
+  printf '"schemaVersion":1'
+  printf ',"runtimeDir":'
+  json_string "$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+  printf ',"installDir":'
+  json_string "$(configured_value AUTARK_OS_INSTALL_DIR)"
+  printf ',"configDir":'
+  json_string "$(configured_value AUTARK_OS_CONFIG_DIR)"
+  printf ',"logDir":'
+  json_string "$(configured_value AUTARK_OS_LOG_DIR)"
+  printf ',"port":'
+  json_string "$(resolve_port)"
+  printf '}\n'
+}
+
+write_service_status() {
+  local target="$1"
+  if has_command systemctl; then
+    {
+      systemctl is-active "${SERVICE_NAME}.service" 2>/dev/null || true
+      systemctl status "${SERVICE_NAME}.service" --no-pager 2>/dev/null || true
+    } | redact_stream >"${target}"
+  else
+    printf 'systemctl unavailable\n' >"${target}"
+  fi
+}
+
+write_support_manifest() {
+  local target="$1"
+  local bundle_name="$2"
+  shift 2
+  local files=("$@")
+  {
+    printf '{'
+    printf '"schemaVersion":1'
+    printf ',"bundleType":"installer-support"'
+    printf ',"generatedAt":'
+    json_string "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf ',"bundleName":'
+    json_string "${bundle_name}"
+    printf ',"serviceName":'
+    json_string "${SERVICE_NAME}.service"
+    printf ',"redacted":true'
+    printf ',"supportConsoleCompatible":true'
+    printf ',"files":'
+    json_string_array "${files[@]}"
+    printf '}\n'
+  } >"${target}"
+}
+
+support_bundle_command() {
+  local output=""
+  local release_bundle=""
+  local state_dir=""
+  local installer_log=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --output)
+        shift
+        [[ $# -gt 0 ]] || die "--output requires a file path."
+        output="$1"
+        ;;
+      --output=*)
+        output="${1#*=}"
+        ;;
+      --release-bundle)
+        shift
+        [[ $# -gt 0 ]] || die "--release-bundle requires a directory."
+        release_bundle="$1"
+        ;;
+      --release-bundle=*)
+        release_bundle="${1#*=}"
+        ;;
+      --state-dir)
+        shift
+        [[ $# -gt 0 ]] || die "--state-dir requires a directory."
+        state_dir="$1"
+        ;;
+      --state-dir=*)
+        state_dir="${1#*=}"
+        ;;
+      --installer-log)
+        shift
+        [[ $# -gt 0 ]] || die "--installer-log requires a file path."
+        installer_log="$1"
+        ;;
+      --installer-log=*)
+        installer_log="${1#*=}"
+        ;;
+      -h|--help)
+        cat <<SUPPORT_USAGE
+Usage: autark-os support-bundle [options]
+
+Export a redacted installer/setup support archive. The command is safe to run
+after failed or successful installs and does not change the host.
+
+Options:
+  --output FILE          Write the .tar.gz archive to FILE.
+  --release-bundle DIR  Include release metadata and run installer plan checks for DIR.
+  --state-dir DIR       Include redacted installer state and selected options.
+  --installer-log FILE  Include a redacted installer stage log.
+  -h, --help            Show this help.
+SUPPORT_USAGE
+        return 0
+        ;;
+      *)
+        log "Unknown support-bundle option: $1"
+        return 1
+        ;;
+    esac
+    shift
+  done
+
+  has_command tar || die "tar is required to write a support bundle archive."
+  local timestamp tmp_dir bundle_name bundle_dir archive_output
+  timestamp="$(date -u +%Y%m%d%H%M%S)"
+  bundle_name="autark-os-installer-support-${timestamp}"
+  tmp_dir="$(mktemp -d)"
+  bundle_dir="${tmp_dir}/${bundle_name}"
+  archive_output="${output:-$(pwd)/${bundle_name}.tar.gz}"
+  mkdir -p "${bundle_dir}" "$(dirname "${archive_output}")"
+
+  local files=(
+    install-plan.json
+    pre-install-doctor.json
+    post-install-doctor.json
+    os-release.txt
+    architecture.txt
+    disk-summary.txt
+    dependency-states.json
+    service-status.txt
+    selected-options.json
+    config-redacted.env
+    installer-stage.log
+    release-metadata.json
+  )
+
+  support_bundle_run_bootstrap_json --plan "${bundle_dir}/install-plan.json" "${release_bundle}" ""
+  support_bundle_run_bootstrap_json --doctor "${bundle_dir}/pre-install-doctor.json" "${release_bundle}" ""
+  support_bundle_run_autark_os_doctor "${bundle_dir}/post-install-doctor.json"
+  if [[ -r /etc/os-release ]]; then
+    redact_file_to /etc/os-release "${bundle_dir}/os-release.txt"
+  else
+    printf 'os-release unavailable\n' >"${bundle_dir}/os-release.txt"
+  fi
+  uname -m >"${bundle_dir}/architecture.txt" 2>/dev/null || printf 'unknown\n' >"${bundle_dir}/architecture.txt"
+  write_disk_summary "${bundle_dir}/disk-summary.txt"
+  write_dependency_states "${bundle_dir}/install-plan.json" "${bundle_dir}/dependency-states.json"
+  write_service_status "${bundle_dir}/service-status.txt"
+  write_selected_options "${state_dir}" "${bundle_dir}/selected-options.json"
+  redact_file_to "${CONFIG_FILE}" "${bundle_dir}/config-redacted.env"
+  if [[ -n "${installer_log}" ]]; then
+    redact_file_to "${installer_log}" "${bundle_dir}/installer-stage.log"
+  elif [[ -n "$(configured_value AUTARK_OS_LOG_DIR)" && -r "$(configured_value AUTARK_OS_LOG_DIR)/installer.log" ]]; then
+    redact_file_to "$(configured_value AUTARK_OS_LOG_DIR)/installer.log" "${bundle_dir}/installer-stage.log"
+  else
+    printf 'No installer stage log was available.\n' >"${bundle_dir}/installer-stage.log"
+  fi
+  if [[ -n "${release_bundle}" && -r "${release_bundle}/autark-os-release.json" ]]; then
+    redact_file_to "${release_bundle}/autark-os-release.json" "${bundle_dir}/release-metadata.json"
+  else
+    printf '{"schemaVersion":1,"version":' >"${bundle_dir}/release-metadata.json"
+    json_string "$(configured_value AUTARK_OS_VERSION)" >>"${bundle_dir}/release-metadata.json"
+    printf ',"buildSha":' >>"${bundle_dir}/release-metadata.json"
+    json_string "$(configured_value AUTARK_OS_BUILD_SHA)" >>"${bundle_dir}/release-metadata.json"
+    printf '}\n' >>"${bundle_dir}/release-metadata.json"
+  fi
+  write_support_manifest "${bundle_dir}/manifest.json" "${bundle_name}" "${files[@]}"
+
+  tar -czf "${archive_output}" -C "${tmp_dir}" "${bundle_name}"
+  rm -rf "${tmp_dir}"
+  log "Support bundle written: ${archive_output}"
+}
+
+uninstall_command() {
+  local plan_only=0
+  local json_output=0
+  local dry_run=0
+  local yes=0
+  local remove_config=0
+  local remove_logs=0
+  local remove_data=0
+  local typed_confirmation=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --plan)
+        plan_only=1
+        ;;
+      --json)
+        json_output=1
+        ;;
+      --dry-run)
+        dry_run=1
+        ;;
+      --yes)
+        yes=1
+        ;;
+      --remove-config)
+        remove_config=1
+        ;;
+      --remove-logs)
+        remove_logs=1
+        ;;
+      --remove-data)
+        remove_data=1
+        remove_config=1
+        remove_logs=1
+        ;;
+      --confirm-delete-data)
+        shift
+        [[ $# -gt 0 ]] || die "--confirm-delete-data requires DELETE-AUTARK-OS-DATA."
+        typed_confirmation="$1"
+        ;;
+      --confirm-delete-data=*)
+        typed_confirmation="${1#*=}"
+        ;;
+      -h|--help)
+        cat <<UNINSTALL_USAGE
+Usage: autark-os uninstall [options]
+
+Safely remove Autark-OS service and binaries. Runtime data is preserved by
+default.
+
+Options:
+  --plan                 Print what would be removed and preserved.
+  --json                 With --plan, print machine-readable JSON.
+  --dry-run              Print removal actions without changing the host.
+  --yes                  Run non-interactively.
+  --remove-config        Also remove Autark-OS config.
+  --remove-logs          Also remove Autark-OS logs.
+  --remove-data          Also remove runtime data, apps, backups, and database.
+  --confirm-delete-data DELETE-AUTARK-OS-DATA
+                         Required with --remove-data.
+  -h, --help             Show this help.
+UNINSTALL_USAGE
+        return 0
+        ;;
+      *)
+        log "Unknown uninstall option: $1"
+        return 1
+        ;;
+    esac
+    shift
+  done
+
+  if [[ "${remove_data}" -eq 1 && "${typed_confirmation}" != "DELETE-AUTARK-OS-DATA" ]]; then
+    log "Destructive uninstall requires: --confirm-delete-data DELETE-AUTARK-OS-DATA"
+    return 1
+  fi
+
+  local install_dir runtime_dir config_dir log_dir mode
+  install_dir="$(configured_value AUTARK_OS_INSTALL_DIR)"
+  runtime_dir="$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+  config_dir="$(configured_value AUTARK_OS_CONFIG_DIR)"
+  log_dir="$(configured_value AUTARK_OS_LOG_DIR)"
+  [[ -n "${install_dir}" ]] || install_dir="/opt/autark-os"
+  [[ -n "${runtime_dir}" ]] || runtime_dir="/var/lib/autark-os"
+  [[ -n "${config_dir}" ]] || config_dir="$(dirname "${CONFIG_FILE}")"
+  [[ -n "${log_dir}" ]] || log_dir="/var/log/autark-os"
+
+  mode="preserve-runtime-data"
+  [[ "${remove_config}" -eq 1 || "${remove_logs}" -eq 1 ]] && mode="remove-config-and-logs"
+  [[ "${remove_data}" -eq 1 ]] && mode="remove-all-data"
+
+  local remove_paths=("${SERVICE_FILE}" "${CLI_LINK}" "${install_dir}")
+  local preserve_paths=()
+  if [[ "${remove_config}" -eq 1 ]]; then
+    remove_paths+=("${config_dir}")
+  else
+    preserve_paths+=("${config_dir}")
+  fi
+  if [[ "${remove_logs}" -eq 1 ]]; then
+    remove_paths+=("${log_dir}")
+  else
+    preserve_paths+=("${log_dir}")
+  fi
+  if [[ "${remove_data}" -eq 1 ]]; then
+    remove_paths+=("${runtime_dir}")
+  else
+    preserve_paths+=("${runtime_dir}")
+  fi
+
+  local app_count=0
+  if [[ -d "${runtime_dir}/apps" ]]; then
+    app_count="$(find "${runtime_dir}/apps" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+  fi
+
+  if [[ "${plan_only}" -eq 1 && "${json_output}" -eq 1 ]]; then
+    printf '{'
+    printf '"schemaVersion":1'
+    printf ',"mode":'
+    json_string "${mode}"
+    printf ',"serviceName":'
+    json_string "${SERVICE_NAME}.service"
+    printf ',"requiresTypedConfirmation":%s' "$([[ "${remove_data}" -eq 1 ]] && printf true || printf false)"
+    printf ',"typedConfirmation":'
+    json_string "${typed_confirmation}"
+    printf ',"removePaths":'
+    json_string_array "${remove_paths[@]}"
+    printf ',"preservePaths":'
+    json_string_array "${preserve_paths[@]}"
+    printf ',"dockerResources":{"installedAppsDetected":%s,"appCount":%s,"warning":' "$([[ "${app_count}" != "0" ]] && printf true || printf false)" "${app_count}"
+    json_string "Managed app containers and volumes may remain in Docker. Review installed apps before destructive removal."
+    printf '}'
+    printf ',"supportReport":{"offeredBeforeRemoval":true,"command":"autark-os doctor --json"}'
+    printf ',"actions":['
+    printf '{"id":"offer-support-report","label":"Offer support report before removal","mutatesHost":false},'
+    printf '{"id":"stop-service","label":"Stop Autark-OS service","mutatesHost":true},'
+    printf '{"id":"remove-binaries","label":"Remove Autark-OS binaries","mutatesHost":true}'
+    if [[ "${remove_config}" -eq 1 ]]; then
+      printf ',{"id":"remove-config","label":"Remove Autark-OS config","mutatesHost":true}'
+    fi
+    if [[ "${remove_logs}" -eq 1 ]]; then
+      printf ',{"id":"remove-logs","label":"Remove Autark-OS logs","mutatesHost":true}'
+    fi
+    if [[ "${remove_data}" -eq 1 ]]; then
+      printf ',{"id":"remove-runtime-data","label":"Remove runtime data, apps, backups, and database","mutatesHost":true}'
+    fi
+    printf ']'
+    printf '}\n'
+    return 0
+  fi
+
+  if [[ "${plan_only}" -eq 1 ]]; then
+    log "Uninstall mode: ${mode}"
+    log "Service to stop: ${SERVICE_NAME}.service"
+    for path in "${remove_paths[@]}"; do
+      log "Would remove: ${path}"
+    done
+    for path in "${preserve_paths[@]}"; do
+      log "Would preserve: ${path}"
+    done
+    log "Support report offered before removal: autark-os doctor --json"
+    [[ "${app_count}" != "0" ]] && log "Managed app folders detected: ${app_count}. Review Docker resources before removal."
+    return 0
+  fi
+
+  if [[ "${dry_run}" -eq 1 ]]; then
+    log "Would stop service: ${SERVICE_NAME}.service"
+    for path in "${remove_paths[@]}"; do
+      log "Would remove: ${path}"
+    done
+    for path in "${preserve_paths[@]}"; do
+      log "Would preserve: ${path}"
+    done
+    log "Would offer support report before removal: autark-os doctor --json"
+    return 0
+  fi
+
+  if [[ "${yes}" -ne 1 ]]; then
+    if ! confirm_default_yes "Remove Autark-OS service and binaries while preserving runtime data?"; then
+      log "Uninstall cancelled."
+      return 1
+    fi
+  fi
+
+  log "Stopping ${SERVICE_NAME}.service if present."
+  if has_command systemctl; then
+    sudo systemctl disable --now "${SERVICE_NAME}.service" >/dev/null 2>&1 || true
+  fi
+  for path in "${remove_paths[@]}"; do
+    [[ -n "${path}" && "${path}" != "/" ]] || die "Refusing to remove unsafe path: ${path}"
+    log "Removing ${path}"
+    sudo rm -rf "${path}"
+  done
+  for path in "${preserve_paths[@]}"; do
+    log "Preserved ${path}"
+  done
+}
+
+print_where_line() {
+  local label="$1"
+  local value="$2"
+  printf '%-18s %s\n' "${label}:" "${value:-unknown}"
+}
+
+where_info() {
+  print_where_line "Config file" "${CONFIG_FILE}"
+  print_where_line "Service" "${SERVICE_NAME}.service"
+  print_where_line "Port" "$(resolve_port)"
+  print_where_line "URL" "$(resolve_base_url)"
+  print_where_line "Install path" "$(configured_value AUTARK_OS_INSTALL_DIR)"
+  print_where_line "Runtime path" "$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+  print_where_line "Backend jar" "$(configured_value AUTARK_OS_BACKEND_JAR)"
+  print_where_line "Setup command" "$(configured_value AUTARK_OS_SETUP_COMMAND)"
+  if has_command command; then
+    print_where_line "CLI path" "$(command -v autark-os || true)"
+  fi
+}
+
+print_version_line() {
+  local label="$1"
+  local value="$2"
+  printf '%-16s %s\n' "${label}:" "${value:-unknown}"
+}
+
+version() {
+  local tmp_file
+  tmp_file="$(mktemp)"
+  if api_get /api/system/version >"${tmp_file}" 2>/dev/null; then
+    print_version_line "Version" "$(json_value version "${tmp_file}")"
+    print_version_line "Build SHA" "$(json_value buildSha "${tmp_file}")"
+    print_version_line "Build date" "$(json_value buildDate "${tmp_file}")"
+    print_version_line "Install path" "$(json_value installPath "${tmp_file}")"
+    print_version_line "Runtime path" "$(json_value runtimePath "${tmp_file}")"
+    print_version_line "Backend jar" "$(json_value backendJar "${tmp_file}")"
+    print_version_line "Update channel" "$(json_value updateChannel "${tmp_file}")"
+    print_version_line "Update status" "$(json_value updateStatus "${tmp_file}")"
+    print_version_line "Previous version" "$(configured_value AUTARK_OS_PREVIOUS_VERSION)"
+    print_version_line "Previous jar" "$(configured_value AUTARK_OS_PREVIOUS_BACKEND_JAR)"
+    rm -f "${tmp_file}"
+    return 0
+  fi
+  rm -f "${tmp_file}"
+  print_version_line "Version" "$(configured_value AUTARK_OS_VERSION)"
+  print_version_line "Build SHA" "$(configured_value AUTARK_OS_BUILD_SHA)"
+  print_version_line "Build date" "$(configured_value AUTARK_OS_BUILD_DATE)"
+  print_version_line "Install path" "$(configured_value AUTARK_OS_INSTALL_DIR)"
+  print_version_line "Runtime path" "$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+  print_version_line "Backend jar" "$(configured_value AUTARK_OS_BACKEND_JAR)"
+  print_version_line "Previous version" "$(configured_value AUTARK_OS_PREVIOUS_VERSION)"
+  print_version_line "Previous jar" "$(configured_value AUTARK_OS_PREVIOUS_BACKEND_JAR)"
+  print_version_line "Update status" "backend unavailable"
+}
+
+doctor() {
+  local json_output=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json)
+        json_output=1
+        ;;
+      -h|--help)
+        cat <<DOCTOR_USAGE
+Usage: autark-os doctor [options]
+
+Options:
+  --json     Print the backend doctor payload without human-readable status text.
+  -h, --help Show this help.
+DOCTOR_USAGE
+        return 0
+        ;;
+      *)
+        log "Unknown doctor option: $1"
+        return 1
+        ;;
+    esac
+    shift
+  done
+
+  local base_url
+  base_url="$(resolve_base_url)"
+
+  if [[ "${json_output}" -eq 1 ]]; then
+    api_get /api/system/doctor
+    printf '\n'
+    return 0
+  fi
+
+  log "Checking Autark-OS at ${base_url}."
+
+  if has_command systemctl; then
+    if systemctl is-active --quiet "${SERVICE_NAME}.service"; then
+      log "System service: active"
+    else
+      log "System service: $(systemctl is-active "${SERVICE_NAME}.service" 2>/dev/null || true)"
+    fi
+  else
+    log "System service: systemctl unavailable"
+  fi
+
+  if api_get /api/health >/dev/null; then
+    log "Backend API: reachable"
+  else
+    log "Backend API: not reachable"
+    return 1
+  fi
+
+  if api_get /api/system/doctor >/tmp/autark-os-doctor.json 2>/dev/null; then
+    if grep -q '"status":"ready"' /tmp/autark-os-doctor.json; then
+      log "Device setup: ready"
+    else
+      log "Device setup: review needed"
+      cat /tmp/autark-os-doctor.json
+      printf '\n'
+    fi
+  elif api_get /api/system/setup-status >/tmp/autark-os-setup-status.json; then
+    log "Host setup: legacy setup status"
+    cat /tmp/autark-os-setup-status.json
+    printf '\n'
+  else
+    log "Device setup: unavailable"
+    return 1
+  fi
+
+  if api_get /api/marketplace/apps >/dev/null; then
+    log "Marketplace catalog: reachable"
+  else
+    log "Marketplace catalog: unavailable"
+    return 1
+  fi
+
+  if api_get /api/activity?limit=1 >/dev/null; then
+    log "Activity log: reachable"
+  else
+    log "Activity log: unavailable"
+    return 1
+  fi
+
+  log "Open Autark-OS: ${base_url}"
+}
+
+setup() {
+  local non_interactive=0
+  local print_next_step=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --non-interactive)
+        non_interactive=1
+        ;;
+      --print-next-step)
+        print_next_step=1
+        ;;
+      -h|--help)
+        cat <<SETUP_USAGE
+Usage: autark-os setup [options]
+
+Options:
+  --non-interactive  Complete setup using current backend defaults.
+  --print-next-step  Print the browser URL and support command without changing setup state.
+  -h, --help         Show this help.
+SETUP_USAGE
+        return 0
+        ;;
+      *)
+        log "Unknown setup option: $1"
+        return 1
+        ;;
+    esac
+    shift
+  done
+
+  if [[ "${print_next_step}" -eq 1 ]]; then
+    print_setup_next_step
+    return 0
+  fi
+
+  local base_url
+  local onboarding_file
+  local doctor_file
+  base_url="$(resolve_base_url)"
+  onboarding_file="$(mktemp)"
+  doctor_file="$(mktemp)"
+
+  if ! api_get /api/system/onboarding >"${onboarding_file}" 2>/dev/null; then
+    rm -f "${onboarding_file}" "${doctor_file}"
+    log "Backend is not reachable at ${base_url}."
+    if has_command systemctl; then
+      log "Service state: $(systemctl is-active "${SERVICE_NAME}.service" 2>/dev/null || true)"
+    fi
+    log "Try:"
+    log "  autark-os doctor"
+    log "  autark-os status"
+    log "  autark-os logs"
+    return 1
+  fi
+
+  api_get /api/system/doctor >"${doctor_file}" 2>/dev/null || cp "${onboarding_file}" "${doctor_file}"
+
+  local status
+  local device_name
+  local runtime_path
+  local backup_destination
+  local tailscale_connected
+  local automatic_backups
+  local lan_url
+  status="$(json_value status "${onboarding_file}")"
+  device_name="$(json_value deviceName "${onboarding_file}")"
+  runtime_path="$(json_value runtimePath "${onboarding_file}")"
+  backup_destination="$(json_value backupDestination "${onboarding_file}")"
+  tailscale_connected="$(json_bool tailscaleConnected "${onboarding_file}")"
+  automatic_backups="$(json_bool automaticBackupsEnabled "${onboarding_file}")"
+  lan_url="$(json_value lanUrl "${doctor_file}")"
+  [[ -n "${lan_url}" ]] || lan_url="${base_url}"
+
+  log "Autark-OS first-boot setup"
+  log "Current status: ${status:-unknown}"
+  log "Browser URL: ${lan_url}"
+  log "Runtime data: ${runtime_path:-unknown}"
+
+  if [[ "${status}" == "complete" && "${non_interactive}" -eq 0 ]]; then
+    if ! confirm_default_yes "Setup is already complete. Review and save it again?"; then
+      print_setup_next_step
+      rm -f "${onboarding_file}" "${doctor_file}"
+      return 0
+    fi
+  fi
+
+  if [[ "${non_interactive}" -eq 0 ]]; then
+    printf '\nDevice readiness:\n'
+    if grep -q '"status":"warning"' "${doctor_file}"; then
+      log "Some setup checks need review. Run 'autark-os doctor' for full details."
+    else
+      log "Core setup checks look ready."
+    fi
+    printf '\n'
+    device_name="$(read_default "Device name" "${device_name:-Autark-OS}")"
+    if [[ "${tailscale_connected}" == "true" ]]; then
+      log "Tailscale is connected. Private app links can be created."
+    else
+      log "Tailscale is not connected yet. Private links can be finished later from Network."
+      log "If you want private access now, run: sudo tailscale up"
+    fi
+    log "Runtime storage is currently: ${runtime_path:-unknown}"
+    backup_destination="$(read_default "Backup destination" "${backup_destination:-${runtime_path}/backups}")"
+    if confirm_default_yes "Turn on routine backups?"; then
+      automatic_backups=true
+    else
+      automatic_backups=false
+    fi
+  fi
+
+  local recommended=()
+  if [[ "${non_interactive}" -eq 1 ]]; then
+    while IFS= read -r app_id; do
+      recommended+=("${app_id}")
+    done < <(json_array_strings recommendedApps "${onboarding_file}")
+    [[ "${#recommended[@]}" -gt 0 ]] || recommended=(vaultwarden jellyfin homepage)
+  else
+    printf '\nRecommended starter apps:\n'
+    local app_id
+    for app_id in vaultwarden jellyfin homepage; do
+      if confirm_default_yes "Recommend ${app_id}?"; then
+        recommended+=("${app_id}")
+      fi
+    done
+  fi
+
+  local body
+  body="$(printf '{"status":"in_progress","currentStep":5,"deviceName":"%s","backupDestination":"%s","automaticBackupsEnabled":%s,"recommendedApps":%s,"completedSteps":["device","doctor","tailscale","storage","backups","apps"]}' \
+    "$(json_escape "${device_name:-Autark-OS}")" \
+    "$(json_escape "${backup_destination:-}")" \
+    "${automatic_backups:-true}" \
+    "$(json_list "${recommended[@]}")")"
+
+  if ! api_put /api/system/onboarding "${body}" >/dev/null; then
+    rm -f "${onboarding_file}" "${doctor_file}"
+    log "Could not save setup choices."
+    return 1
+  fi
+  if ! api_post /api/system/onboarding/complete '{}' >/dev/null; then
+    rm -f "${onboarding_file}" "${doctor_file}"
+    log "Could not mark setup complete."
+    return 1
+  fi
+
+  rm -f "${onboarding_file}" "${doctor_file}"
+  log "Setup complete."
+  print_setup_next_step
+}
+
+case "${1:-help}" in
+  install)
+    shift || true
+    install_command "$@"
+    ;;
+  doctor)
+    shift || true
+    doctor "$@"
+    ;;
+  setup)
+    shift || true
+    setup "$@"
+    ;;
+  repair)
+    shift || true
+    repair_command "$@"
+    ;;
+  update)
+    shift || true
+    update_command "$@"
+    ;;
+  uninstall)
+    shift || true
+    uninstall_command "$@"
+    ;;
+  support-bundle)
+    shift || true
+    support_bundle_command "$@"
+    ;;
+  where)
+    where_info
+    ;;
+  status)
+    systemctl status "${SERVICE_NAME}.service" --no-pager
+    ;;
+  logs)
+    journalctl -u "${SERVICE_NAME}.service" -f
+    ;;
+  start)
+    sudo systemctl start "${SERVICE_NAME}.service"
+    ;;
+  stop)
+    sudo systemctl stop "${SERVICE_NAME}.service"
+    ;;
+  restart)
+    sudo systemctl restart "${SERVICE_NAME}.service"
+    ;;
+  version)
+    version
+    ;;
+  port)
+    resolve_port
+    ;;
+  url)
+    resolve_base_url
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac

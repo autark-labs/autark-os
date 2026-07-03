@@ -22,13 +22,13 @@ chmod +x "${fake_bin}/sudo"
 
 cat >"${fake_bin}/tailscale" <<'SH'
 #!/usr/bin/env bash
-log_file="${PROJECT_OS_FAKE_TAILSCALE_LOG}"
+log_file="${AUTARK_OS_FAKE_TAILSCALE_LOG}"
 case "${1:-}" in
   version)
     printf '1.98.4\n'
     ;;
   status)
-    if [[ -f "${PROJECT_OS_FAKE_TAILSCALE_CONNECTED}" ]]; then
+    if [[ -f "${AUTARK_OS_FAKE_TAILSCALE_CONNECTED}" ]]; then
       exit 0
     fi
     exit 1
@@ -36,9 +36,9 @@ case "${1:-}" in
   up)
     printf 'tailscale %s\n' "$*" >>"${log_file}"
     printf 'Scan this QR code or open this link to sign in:\n'
-    printf 'https://login.tailscale.com/a/fake-project-os-login\n'
+    printf 'https://login.tailscale.com/a/fake-autark-os-login\n'
     printf '[fake qr code]\n'
-    touch "${PROJECT_OS_FAKE_TAILSCALE_CONNECTED}"
+    touch "${AUTARK_OS_FAKE_TAILSCALE_CONNECTED}"
     ;;
   set)
     printf 'tailscale %s\n' "$*" >>"${log_file}"
@@ -76,13 +76,13 @@ SH
   chmod +x "${fake_bin}/${command_name}"
 done
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 printf 'fake jar\n' >"${fake_jar}"
 
 tailscale_log="${tmp_dir}/tailscale.log"
 tailscale_connected="${tmp_dir}/tailscale-connected"
 
-connect_output="$(printf '1\n' | env PROJECT_OS_TAILSCALE_ONBOARDING=1 PROJECT_OS_TAILSCALE_ONBOARDING_ALLOW_NON_TTY=1 PROJECT_OS_TAILSCALE_ONBOARDING_ONLY=1 PROJECT_OS_ASSUME_DEPENDENCIES_INSTALLED=1 PROJECT_OS_FAKE_TAILSCALE_LOG="${tailscale_log}" PROJECT_OS_FAKE_TAILSCALE_CONNECTED="${tailscale_connected}" PROJECT_OS_SERVICE_FILE="${tmp_dir}/connect.service" PROJECT_OS_CLI_LINK="${tmp_dir}/project-os-connect" PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-project-os.sh" \
+connect_output="$(printf '1\n' | env AUTARK_OS_TAILSCALE_ONBOARDING=1 AUTARK_OS_TAILSCALE_ONBOARDING_ALLOW_NON_TTY=1 AUTARK_OS_TAILSCALE_ONBOARDING_ONLY=1 AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED=1 AUTARK_OS_FAKE_TAILSCALE_LOG="${tailscale_log}" AUTARK_OS_FAKE_TAILSCALE_CONNECTED="${tailscale_connected}" AUTARK_OS_SERVICE_FILE="${tmp_dir}/connect.service" AUTARK_OS_CLI_LINK="${tmp_dir}/autark-os-connect" PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-autark-os.sh" \
   --release-jar "${fake_jar}" \
   --runtime-dir "${tmp_dir}/connect-runtime" \
   --install-dir "${tmp_dir}/connect-install" \
@@ -93,12 +93,12 @@ connect_output="$(printf '1\n' | env PROJECT_OS_TAILSCALE_ONBOARDING=1 PROJECT_O
 
 grep -q 'Private access setup with Tailscale' <<<"${connect_output}"
 grep -q 'Create an account or sign in with Tailscale' <<<"${connect_output}"
-grep -q 'https://login.tailscale.com/a/fake-project-os-login' <<<"${connect_output}"
+grep -q 'https://login.tailscale.com/a/fake-autark-os-login' <<<"${connect_output}"
 grep -q 'Tailscale sign-in detected.' <<<"${connect_output}"
 grep -q -- 'tailscale up --qr --qr-format=small' "${tailscale_log}"
 
 rm -f "${tailscale_log}" "${tailscale_connected}"
-skip_output="$(printf '2\n' | env PROJECT_OS_TAILSCALE_ONBOARDING=1 PROJECT_OS_TAILSCALE_ONBOARDING_ALLOW_NON_TTY=1 PROJECT_OS_TAILSCALE_ONBOARDING_ONLY=1 PROJECT_OS_ASSUME_DEPENDENCIES_INSTALLED=1 PROJECT_OS_FAKE_TAILSCALE_LOG="${tailscale_log}" PROJECT_OS_FAKE_TAILSCALE_CONNECTED="${tailscale_connected}" PROJECT_OS_SERVICE_FILE="${tmp_dir}/skip.service" PROJECT_OS_CLI_LINK="${tmp_dir}/project-os-skip" PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-project-os.sh" \
+skip_output="$(printf '2\n' | env AUTARK_OS_TAILSCALE_ONBOARDING=1 AUTARK_OS_TAILSCALE_ONBOARDING_ALLOW_NON_TTY=1 AUTARK_OS_TAILSCALE_ONBOARDING_ONLY=1 AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED=1 AUTARK_OS_FAKE_TAILSCALE_LOG="${tailscale_log}" AUTARK_OS_FAKE_TAILSCALE_CONNECTED="${tailscale_connected}" AUTARK_OS_SERVICE_FILE="${tmp_dir}/skip.service" AUTARK_OS_CLI_LINK="${tmp_dir}/autark-os-skip" PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-autark-os.sh" \
   --release-jar "${fake_jar}" \
   --runtime-dir "${tmp_dir}/skip-runtime" \
   --install-dir "${tmp_dir}/skip-install" \

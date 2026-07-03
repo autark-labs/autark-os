@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { JobProgress } from '@/components/project-os/JobProgress';
-import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
-import { ThemeSelectorPopover } from '@/components/project-os/ThemeSelectorPopover';
+import { JobProgress } from '@/components/autark-os/JobProgress';
+import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
+import { ThemeSelectorPopover } from '@/components/autark-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -14,9 +14,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { jobTypeLabel, useGlobalActiveProjectOsJob } from '@/repositories/jobRepository';
+import { jobTypeLabel, useGlobalActiveAutarkOsJob } from '@/repositories/jobRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import type { SystemSetupCheck } from '@/types/system';
 
 type HeaderService = {
@@ -37,7 +37,7 @@ type HeaderService = {
 
 function SystemStatusHeader() {
   const doctorQuery = useSystemDoctorQuery();
-  const activeJobQuery = useGlobalActiveProjectOsJob();
+  const activeJobQuery = useGlobalActiveAutarkOsJob();
   const doctor = doctorQuery.data ?? null;
   const activeJob = activeJobQuery.activeJob;
   const loading = doctorQuery.isLoading;
@@ -59,7 +59,7 @@ function SystemStatusHeader() {
       href: '/diagnostics',
       externalHref: 'https://docs.docker.com/engine/',
       externalLabel: 'Docker docs',
-      command: dockerCheck?.actionCommand || 'project-os doctor',
+      command: dockerCheck?.actionCommand || 'autark-os doctor',
       optional: false,
       icon: Boxes,
     };
@@ -85,7 +85,7 @@ function SystemStatusHeader() {
   );
 }
 
-function GlobalJobPopover({ job }: { job: ProjectOsJob }) {
+function GlobalJobPopover({ job }: { job: AutarkOsJob }) {
   return (
     <Popover>
       <PopoverTrigger asChild>

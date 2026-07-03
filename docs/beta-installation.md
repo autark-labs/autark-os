@@ -9,8 +9,8 @@ For the intended normal-user path, start with [Install Autark-OS](./non-technica
 Autark-OS beta releases publish three Linux install artifacts:
 
 - **Guided executable installer:** `Autark-OS-Installer-<version>-<arch>.run`, the recommended non-technical beta path.
-- **Debian package:** `project-os_<version>_<arch>.deb`, the apt-based path for Debian, Ubuntu, and Raspberry Pi OS users who want package-manager installation.
-- **General tarball:** `project-os-<version>.tar.gz`, the fallback path for support, advanced users, and hosts where package installation is not desired.
+- **Debian package:** `autark-os_<version>_<arch>.deb`, the apt-based path for Debian, Ubuntu, and Raspberry Pi OS users who want package-manager installation.
+- **General tarball:** `autark-os-<version>.tar.gz`, the fallback path for support, advanced users, and hosts where package installation is not desired.
 
 Advanced source installs remain available for development.
 
@@ -26,14 +26,14 @@ Tested beta target:
 - Tailscale for private links and remote access workflows
 - Node.js and Yarn 1.x when installing from source
 
-Docker is required for Marketplace app installs. Autark-OS can run without Tailscale, but private HTTPS links will not work until Tailscale is installed, connected, and configured for the `projectos` operator.
+Docker is required for Marketplace app installs. Autark-OS can run without Tailscale, but private HTTPS links will not work until Tailscale is installed, connected, and configured for the `autarkos` operator.
 
 ## Install From GitHub Release Artifacts
 
 Download the release files from:
 
 ```text
-https://github.com/autark-labs/project-os/releases
+https://github.com/autark-labs/autark-os/releases
 ```
 
 Verify checksums from the folder containing the downloaded artifacts:
@@ -62,7 +62,7 @@ Preview host changes first:
 Extract the bundled release for support or inspection:
 
 ```bash
-./Autark-OS-Installer-<version>-amd64.run --extract-only ./project-os-release
+./Autark-OS-Installer-<version>-amd64.run --extract-only ./autark-os-release
 ```
 
 ### Debian Package
@@ -70,25 +70,25 @@ Extract the bundled release for support or inspection:
 Use this on Debian, Ubuntu, or Raspberry Pi OS when you want apt to install the package:
 
 ```bash
-sudo apt install ./project-os_<version>_amd64.deb
+sudo apt install ./autark-os_<version>_amd64.deb
 ```
 
-The package installs a release payload under `/usr/lib/project-os/release`, then runs the same service installer used by other install paths. The active service files and helper commands are installed under `/opt/project-os`, `/etc/project-os`, `/var/lib/project-os`, and `/var/log/project-os`.
+The package installs a release payload under `/usr/lib/autark-os/release`, then runs the same service installer used by other install paths. The active service files and helper commands are installed under `/opt/autark-os`, `/etc/autark-os`, `/var/lib/autark-os`, and `/var/log/autark-os`.
 
 ### General Tarball
 
 Use this for support, manual inspection, or non-package beta installs:
 
 ```bash
-tar -xzf project-os-<version>.tar.gz
-cd project-os-<version>
-./scripts/project-os install
+tar -xzf autark-os-<version>.tar.gz
+cd autark-os-<version>
+./scripts/autark-os install
 ```
 
 Preview host changes first:
 
 ```bash
-./scripts/project-os install --dry-run
+./scripts/autark-os install --dry-run
 ```
 
 ## Build Release Artifacts
@@ -101,41 +101,41 @@ VERSION=0.1.0-beta.2
 ./scripts/build-release-artifacts.sh \
   --version "$VERSION" \
   --channel beta \
-  --release-notes-url "https://github.com/autark-labs/project-os/releases/tag/v$VERSION" \
+  --release-notes-url "https://github.com/autark-labs/autark-os/releases/tag/v$VERSION" \
   --output-dir "release/artifacts-$VERSION"
 ```
 
 The output folder contains:
 
 - `Autark-OS-Installer-<version>-<arch>.run`
-- `project-os_<version>_<arch>.deb`
-- `project-os-<version>.tar.gz`
-- `project-os-artifacts.json`
+- `autark-os_<version>_<arch>.deb`
+- `autark-os-<version>.tar.gz`
+- `autark-os-artifacts.json`
 - `SHA256SUMS`
-- the expanded `project-os-<version>/` release bundle used to create the artifacts
+- the expanded `autark-os-<version>/` release bundle used to create the artifacts
 
-Upload the `.run`, `.deb`, `.tar.gz`, `project-os-artifacts.json`, and `SHA256SUMS` files to the GitHub Release.
+Upload the `.run`, `.deb`, `.tar.gz`, `autark-os-artifacts.json`, and `SHA256SUMS` files to the GitHub Release.
 
 ## Install From Source
 
 From a checked-out repository:
 
 ```bash
-git clone https://github.com/autark-labs/project-os.git
-cd project-os
-./scripts/bootstrap-project-os.sh
+git clone https://github.com/autark-labs/autark-os.git
+cd autark-os
+./scripts/bootstrap-autark-os.sh
 ```
 
 On Debian, Ubuntu, and Raspberry Pi OS, Autark-OS can attempt to install supported host dependencies:
 
 ```bash
-./scripts/bootstrap-project-os.sh --auto-install-deps
+./scripts/bootstrap-autark-os.sh --auto-install-deps
 ```
 
 Preview host changes first:
 
 ```bash
-./scripts/bootstrap-project-os.sh --auto-install-deps --dry-run
+./scripts/bootstrap-autark-os.sh --auto-install-deps --dry-run
 ```
 
 The bootstrap script will:
@@ -144,12 +144,12 @@ The bootstrap script will:
 - run backend tests
 - build the React frontend
 - package the frontend into the Spring Boot backend jar
-- create the `projectos` system user and group
-- create durable host folders under `/opt/project-os`, `/var/lib/project-os`, `/etc/project-os`, and `/var/log/project-os`
-- install `project-os.service`
-- install the `project-os` helper command
+- create the `autarkos` system user and group
+- create durable host folders under `/opt/autark-os`, `/var/lib/autark-os`, `/etc/autark-os`, and `/var/log/autark-os`
+- install `autark-os.service`
+- install the `autark-os` helper command
 - grant Docker group access to the service user when Docker is available
-- configure the `projectos` Tailscale operator when Tailscale is available and connected
+- configure the `autarkos` Tailscale operator when Tailscale is available and connected
 - start Autark-OS on port `8082`
 
 Open Autark-OS:
@@ -174,39 +174,39 @@ Build a local bundle on a development machine:
 ./scripts/build-release-bundle.sh
 ```
 
-Copy the generated `release/project-os-<version>` folder to the target host, then install from inside the bundle:
+Copy the generated `release/autark-os-<version>` folder to the target host, then install from inside the bundle:
 
 ```bash
-cd /absolute/path/to/project-os-<version>
-./scripts/project-os install --guided --auto-install-deps
+cd /absolute/path/to/autark-os-<version>
+./scripts/autark-os install --guided --auto-install-deps
 ```
 
 Preview target-host changes without mutating the host:
 
 ```bash
-cd /absolute/path/to/project-os-<version>
-./scripts/project-os install --auto-install-deps --dry-run
+cd /absolute/path/to/autark-os-<version>
+./scripts/autark-os install --auto-install-deps --dry-run
 ```
 
 Preview the install plan:
 
 ```bash
-./scripts/project-os install --plan
-./scripts/project-os install --plan --json
+./scripts/autark-os install --plan
+./scripts/autark-os install --plan --json
 ```
 
 Run preinstall checks:
 
 ```bash
-./scripts/project-os install --doctor
-./scripts/project-os install --doctor --json
+./scripts/autark-os install --doctor
+./scripts/autark-os install --doctor --json
 ```
 
 The older bootstrap entry point still works for troubleshooting:
 
 ```bash
-./scripts/bootstrap-project-os.sh \
-  --release-bundle /absolute/path/to/project-os-<version> \
+./scripts/bootstrap-autark-os.sh \
+  --release-bundle /absolute/path/to/autark-os-<version> \
   --auto-install-deps
 ```
 
@@ -214,11 +214,11 @@ The older bootstrap entry point still works for troubleshooting:
 
 A release bundle contains:
 
-- `backend/project-os-backend.jar`
+- `backend/autark-os-backend.jar`
 - installer/helper scripts
-- `project-os-release.env` build metadata
-- `project-os-release.json` release metadata
-- `project-os-provenance.json` provenance placeholder
+- `autark-os-release.env` build metadata
+- `autark-os-release.json` release metadata
+- `autark-os-provenance.json` provenance placeholder
 - `SHA256SUMS` checksums
 
 Release-bundle mode verifies checksums when present, installs the prebuilt backend jar, and skips frontend dependency installation and source builds.
@@ -232,7 +232,7 @@ Use an SSD-backed runtime directory on small devices like Raspberry Pi hosts:
 ```bash
 findmnt
 df -h
-./scripts/bootstrap-project-os.sh --runtime-dir /mnt/project-os-ssd/project-os
+./scripts/bootstrap-autark-os.sh --runtime-dir /mnt/autark-os-ssd/autark-os
 ```
 
 Use the real mount path for the SSD. Prefer a stable mount configured in `/etc/fstab` by filesystem UUID instead of a temporary desktop auto-mount path such as `/media/<user>/<drive-name>`.
@@ -240,18 +240,18 @@ Use the real mount path for the SSD. Prefer a stable mount configured in `/etc/f
 Preview the target without changing the host:
 
 ```bash
-./scripts/bootstrap-project-os.sh \
+./scripts/bootstrap-autark-os.sh \
   --dry-run \
   --install-only \
-  --runtime-dir /mnt/project-os-ssd/project-os
+  --runtime-dir /mnt/autark-os-ssd/autark-os
 ```
 
-The default binary install path remains `/opt/project-os`. If binaries should also live on the SSD:
+The default binary install path remains `/opt/autark-os`. If binaries should also live on the SSD:
 
 ```bash
-./scripts/bootstrap-project-os.sh \
-  --runtime-dir /mnt/project-os-ssd/project-os \
-  --install-dir /mnt/project-os-ssd/project-os-bin
+./scripts/bootstrap-autark-os.sh \
+  --runtime-dir /mnt/autark-os-ssd/autark-os \
+  --install-dir /mnt/autark-os-ssd/autark-os-bin
 ```
 
 ## Verify The Install
@@ -259,38 +259,38 @@ The default binary install path remains `/opt/project-os`. If binaries should al
 Run:
 
 ```bash
-project-os doctor
-project-os doctor --json
-project-os where
-project-os status
-project-os url
+autark-os doctor
+autark-os doctor --json
+autark-os where
+autark-os status
+autark-os url
 ```
 
 Check the service-user setup directly:
 
 ```bash
-sudo /opt/project-os/bin/install-project-os-service.sh --check
+sudo /opt/autark-os/bin/install-autark-os-service.sh --check
 ```
 
 Follow backend logs:
 
 ```bash
-project-os logs
+autark-os logs
 ```
 
 Useful service commands:
 
 ```bash
-project-os setup
-project-os setup --non-interactive
-project-os setup --print-next-step
-project-os start
-project-os stop
-project-os restart
-project-os version
-project-os where
-project-os port
-project-os url
+autark-os setup
+autark-os setup --non-interactive
+autark-os setup --print-next-step
+autark-os start
+autark-os stop
+autark-os restart
+autark-os version
+autark-os where
+autark-os port
+autark-os url
 ```
 
 ## Support Bundle
@@ -298,17 +298,17 @@ project-os url
 Export a redacted support bundle when an install fails or support asks for a setup summary:
 
 ```bash
-project-os support-bundle --output ./project-os-support.tar.gz
+autark-os support-bundle --output ./autark-os-support.tar.gz
 ```
 
 For a failed guided or release-bundle install, include installer state, release metadata, and stage logs when available:
 
 ```bash
-project-os support-bundle \
-  --release-bundle /absolute/path/to/project-os-<version> \
-  --state-dir /tmp/project-os-installer-state \
-  --installer-log /var/log/project-os/installer.log \
-  --output ./project-os-support.tar.gz
+autark-os support-bundle \
+  --release-bundle /absolute/path/to/autark-os-<version> \
+  --state-dir /tmp/autark-os-installer-state \
+  --installer-log /var/log/autark-os/installer.log \
+  --output ./autark-os-support.tar.gz
 ```
 
 The bundle includes doctor results, the shared install plan, OS and disk summaries, dependency states, service status, selected installer options, and redacted config/log snippets. Tokens, auth keys, passwords, bearer tokens, and common secret values are masked before the archive is written.
@@ -317,15 +317,15 @@ The bundle includes doctor results, the shared install plan, OS and disk summari
 
 The installer checks for Docker and Tailscale and prints warnings when they are missing. On Debian, Ubuntu, and Raspberry Pi OS, `--auto-install-deps` can attempt supported dependency installation.
 
-If Docker is missing, Autark-OS can still start, but Marketplace installs will fail until Docker is installed and available to the `projectos` service user.
+If Docker is missing, Autark-OS can still start, but Marketplace installs will fail until Docker is installed and available to the `autarkos` service user.
 
 If Tailscale is missing or not connected, Autark-OS can still manage local apps, but private HTTPS links will not work.
 
 After installing or connecting Tailscale, rerun:
 
 ```bash
-sudo /opt/project-os/bin/install-project-os-service.sh
-project-os restart
+sudo /opt/autark-os/bin/install-autark-os-service.sh
+autark-os restart
 ```
 
 ## Update A Beta Install
@@ -333,27 +333,27 @@ project-os restart
 Check release metadata:
 
 ```bash
-project-os update --check --metadata-url file:///absolute/path/to/project-os-release.json
-project-os update --check --metadata-url file:///absolute/path/to/project-os-release.json --json
+autark-os update --check --metadata-url file:///absolute/path/to/autark-os-release.json
+autark-os update --check --metadata-url file:///absolute/path/to/autark-os-release.json --json
 ```
 
 Apply an update from a verified local release bundle:
 
 ```bash
-project-os update --release-bundle /absolute/path/to/project-os-<version> --yes
+autark-os update --release-bundle /absolute/path/to/autark-os-<version> --yes
 ```
 
 Preview changes without changing the host:
 
 ```bash
-project-os update --release-bundle /absolute/path/to/project-os-<version> --dry-run
+autark-os update --release-bundle /absolute/path/to/autark-os-<version> --dry-run
 ```
 
 Source rebuild updates remain available for development:
 
 ```bash
 git pull
-./scripts/bootstrap-project-os.sh
+./scripts/bootstrap-autark-os.sh
 ```
 
 ## Uninstall A Beta Install
@@ -361,46 +361,46 @@ git pull
 Preview the safe uninstall plan:
 
 ```bash
-project-os uninstall --plan
-project-os uninstall --plan --json
+autark-os uninstall --plan
+autark-os uninstall --plan --json
 ```
 
 Remove Autark-OS service files and binaries while preserving runtime data, apps, backups, and the SQLite database:
 
 ```bash
-project-os uninstall
+autark-os uninstall
 ```
 
 Run without changing the host:
 
 ```bash
-project-os uninstall --dry-run --yes
+autark-os uninstall --dry-run --yes
 ```
 
 Also remove config and logs while preserving runtime data:
 
 ```bash
-project-os uninstall --remove-config --remove-logs
+autark-os uninstall --remove-config --remove-logs
 ```
 
 Remove all Autark-OS runtime data only when you intend to delete app data, backups, installed app records, and the SQLite database:
 
 ```bash
-project-os uninstall --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA
+autark-os uninstall --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA
 ```
 
 Manual cleanup remains available if the helper command is unavailable:
 
 ```bash
-sudo systemctl disable --now project-os.service
-sudo rm -rf /opt/project-os
+sudo systemctl disable --now autark-os.service
+sudo rm -rf /opt/autark-os
 ```
 
-The installer creates a `projectos` system user and group. Remove them only after deleting or reassigning any files they own:
+The installer creates a `autarkos` system user and group. Remove them only after deleting or reassigning any files they own:
 
 ```bash
-sudo userdel projectos
-sudo groupdel projectos
+sudo userdel autarkos
+sudo groupdel autarkos
 ```
 
 ## Known Beta Gaps

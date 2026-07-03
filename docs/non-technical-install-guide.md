@@ -13,7 +13,7 @@ Use this when you are sitting near the device or can open its desktop. The GUI i
 Use this when you are following guided instructions in a terminal or a support person is helping remotely. The public command is planned to be:
 
 ```bash
-curl -fsSL https://install.project-os.dev | bash
+curl -fsSL https://install.autark-os.dev | bash
 ```
 
 The beta repository can preview this path from a local release bundle, but public download and signing are not finished yet.
@@ -51,7 +51,7 @@ For the one-command installer path, paste the install command from the release p
 During the current beta, a support person may give you a local release bundle instead. From inside that bundle, the closest command is:
 
 ```bash
-./scripts/project-os install --guided
+./scripts/autark-os install --guided
 ```
 
 If the installer asks whether to install missing supported dependencies, choose **yes** when you are on Debian, Ubuntu, or Raspberry Pi OS and you trust the Autark-OS release source.
@@ -108,15 +108,15 @@ If the installer says the device needs attention, start with the message on scre
 To save a support report, use the installer’s **Save support report** action. If you are in a terminal, run:
 
 ```bash
-project-os support-bundle --output ./project-os-support.tar.gz
+autark-os support-bundle --output ./autark-os-support.tar.gz
 ```
 
 If Autark-OS is installed but the page will not open, these commands are useful for support:
 
 ```bash
-project-os doctor
-project-os status
-project-os logs
+autark-os doctor
+autark-os status
+autark-os logs
 ```
 
 Do not paste long terminal logs into chat unless support asks. The support bundle is designed to include the useful details with secrets masked.
@@ -125,7 +125,7 @@ Do not paste long terminal logs into chat unless support asks. The support bundl
 
 Use these only when you need the technical details:
 
-- [Beta testing repository](https://github.com/autark-labs/project-os/): source install, release bundle, update, uninstall, and support bundle commands.
+- [Beta testing repository](https://github.com/autark-labs/autark-os/): source install, release bundle, update, uninstall, and support bundle commands.
 - [Service user installation](./service-user-installation.md): system user, systemd service, Docker access, and Tailscale operator setup.
 - [Local development](./local-development.md): source checkout and developer workflow.
 

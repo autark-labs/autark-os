@@ -139,7 +139,7 @@ test('shouldShowStartHereSection hides dismissed or fully installed starter reco
     { app: app({ id: 'jellyfin' }), installed: false },
   ];
 
-  assert.equal(START_HERE_DISMISSAL_KEY, 'project-os:discover:start-here-dismissed:v1');
+  assert.equal(START_HERE_DISMISSAL_KEY, 'autark-os:discover:start-here-dismissed:v1');
   assert.equal(shouldShowStartHereSection(recommendations, false), true);
   assert.equal(shouldShowStartHereSection(recommendations, true), false);
   assert.equal(shouldShowStartHereSection(recommendations.map((recommendation) => ({ ...recommendation, installed: true })), false), false);

@@ -4,8 +4,8 @@ import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
-import { JobProgress } from '@/components/project-os/JobProgress';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { JobProgress } from '@/components/autark-os/JobProgress';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -20,7 +20,7 @@ import { backupSafetyWarning } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
 import { currentJobStepText, terminalJob } from '@/repositories/jobRepository';
 import type { DiscoverAppView, DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
 import {
   applicationDeepLinkForManagedApp,
@@ -34,8 +34,8 @@ import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
 type AppDetailProps = {
   app: MarketplaceApp;
   appView: DiscoverAppView;
-  backupJob: ProjectOsJob | null;
-  installJob: ProjectOsJob | null;
+  backupJob: AutarkOsJob | null;
+  installJob: AutarkOsJob | null;
   installOptions: InstallOptions;
   installPlan: InstallPlan | null;
   installLocked: boolean;
@@ -369,10 +369,10 @@ function InlineInstallStatus({
   onCreateBackup,
 }: {
   app: MarketplaceApp;
-  backupJob: ProjectOsJob | null;
+  backupJob: AutarkOsJob | null;
   installedApp: DiscoverInstalledAppSummary | null;
   installing: boolean;
-  job: ProjectOsJob | null;
+  job: AutarkOsJob | null;
   onCreateBackup: (appId: string) => Promise<void>;
 }) {
   if (job) {
@@ -443,7 +443,7 @@ function InlineInstallStatus({
   return null;
 }
 
-function JobStepList({ job }: { job: ProjectOsJob }) {
+function JobStepList({ job }: { job: AutarkOsJob }) {
   return (
     <div className="mt-4 grid gap-2">
       {job.steps.map((step) => (

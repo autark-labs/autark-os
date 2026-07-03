@@ -106,7 +106,7 @@ Prefer clear names over clever abstractions.
 Good:
 
 ```ts
-const isForeignProjectOsApp = app.ownershipState === "foreign_project_os";
+const isForeignAutarkOsApp = app.ownershipState === "foreign_autark_os";
 const canRecoverApp = app.availableActions.includes("recover");
 ```
 

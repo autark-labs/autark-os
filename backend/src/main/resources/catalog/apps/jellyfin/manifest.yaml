@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: jellyfin
     - label: Network
-      value: project-os-media
+      value: autark-os-media
     - label: Ports
       value: 8096:8096
     - label: Data storage
-      value: /var/lib/project-os/apps/jellyfin/config
+      value: /var/lib/autark-os/apps/jellyfin/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -97,20 +97,20 @@ access:
     - Private access helps phones and laptops stream while away without opening a public port.
 runtime:
   containerName: jellyfin
-  composeProject: project-os-jellyfin
+  composeProject: autark-os-jellyfin
   image: jellyfin/jellyfin:10.11.11
-  network: project-os-media
-  runtimeRoot: /var/lib/project-os/apps/jellyfin
+  network: autark-os-media
+  runtimeRoot: /var/lib/autark-os/apps/jellyfin
   ports:
     - 8096:8096
   volumes:
-    - /var/lib/project-os/apps/jellyfin/config:/config
-    - /var/lib/project-os/apps/jellyfin/cache:/cache
-    - /var/lib/project-os/apps/jellyfin/media:/media
+    - /var/lib/autark-os/apps/jellyfin/config:/config
+    - /var/lib/autark-os/apps/jellyfin/cache:/cache
+    - /var/lib/autark-os/apps/jellyfin/media:/media
   labels:
-    - project-os.managed=true
-    - project-os.app-id=jellyfin
-    - project-os.version=10.11.11
+    - autark-os.managed=true
+    - autark-os.app-id=jellyfin
+    - autark-os.version=10.11.11
   backupPaths:
     - config
   privileged: false

@@ -111,8 +111,8 @@ test('applications page management panel uses canonical runtime data instead of 
 
   assert.doesNotMatch(panel, /appManagementMock/);
   assert.doesNotMatch(panel, /127\.0\.0\.1:\$\{8000 \+ seed\}/);
-  assert.doesNotMatch(panel, /project-os-\$\{item\.id\}/);
-  assert.doesNotMatch(panel, /\/var\/lib\/project-os\/apps\/\$\{item\.id\}/);
+  assert.doesNotMatch(panel, /autark-os-\$\{item\.id\}/);
+  assert.doesNotMatch(panel, /\/var\/lib\/autark-os\/apps\/\$\{item\.id\}/);
   assert.doesNotMatch(panel, /Just now/);
   assert.doesNotMatch(panel, /Today/);
   assert.doesNotMatch(panel, /State checked/);

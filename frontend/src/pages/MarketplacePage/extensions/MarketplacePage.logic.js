@@ -1,4 +1,4 @@
-export const START_HERE_DISMISSAL_KEY = 'project-os:discover:start-here-dismissed:v1';
+export const START_HERE_DISMISSAL_KEY = 'autark-os:discover:start-here-dismissed:v1';
 
 import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks.js';
 

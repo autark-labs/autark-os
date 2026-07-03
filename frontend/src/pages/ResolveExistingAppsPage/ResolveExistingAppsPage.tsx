@@ -6,7 +6,7 @@ import { ExternalLink, Pin, RefreshCw, ShieldAlert } from 'lucide-react';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { PageShell } from '@/components/layout/PageShell';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { StatusPill } from '@/components/primitives/StatusPill';
 import { Surface } from '@/components/primitives/Surface';
@@ -328,7 +328,7 @@ function ResolveCard({ children, className }: { children: ReactNode; className?:
 }
 
 function stateLabel(service: ObservedServiceView) {
-  if (service.managedByThisProjectOs) return 'Managed';
+  if (service.managedByThisAutarkOs) return 'Managed';
   if (service.pinned || service.userStatus === 'pinned_external') return 'Pinned';
   if (service.userStatus === 'recoverable') return 'Recoverable';
   if (service.userStatus === 'managed_elsewhere') return 'Managed elsewhere';
@@ -338,7 +338,7 @@ function stateLabel(service: ObservedServiceView) {
 }
 
 function stateTone(service: ObservedServiceView): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
-  if (service.managedByThisProjectOs) return 'success';
+  if (service.managedByThisAutarkOs) return 'success';
   if (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') return 'danger';
   if (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') return 'warning';
   if (service.pinned || service.userStatus === 'pinned_external') return 'info';

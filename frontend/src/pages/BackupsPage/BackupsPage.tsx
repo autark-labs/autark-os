@@ -4,9 +4,9 @@ import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDri
 import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
-import { JobProgress } from '@/components/project-os/JobProgress';
+import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useBackupReportRepository,
   useBackupJobsQuery,
-  useProjectOsJobQuery,
+  useAutarkOsJobQuery,
   useRestoreBackupMutation,
   useRestorePlanMutation,
   useRunAppBackupMutation,
@@ -27,10 +27,10 @@ import {
 import { terminalJob } from '@/repositories/jobRepository';
 import {
   invalidateApplicationState,
-  setProjectOsJobInApplicationStateCache,
+  setAutarkOsJobInApplicationStateCache,
 } from '@/repositories/applicationStateRepository';
 import type { AppBackupStatus, BackupReport, RestorePlan, RestorePoint } from '@/types/backup';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import {
   ActionCard,
   AppBackupCard,
@@ -60,11 +60,11 @@ function BackupsPage() {
   const [detailPoint, setDetailPoint] = useState<RestorePoint | null>(null);
   const [restoreTargetAppId, setRestoreTargetAppId] = useState<string | null>(null);
   const [restoreView, setRestoreView] = useState<RestoreView>('timeline');
-  const [activeJob, setActiveJob] = useState<ProjectOsJob | null>(null);
+  const [activeJob, setActiveJob] = useState<AutarkOsJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const backupJobsQuery = useBackupJobsQuery();
   const recoveredActiveJob = useMemo(() => {
-    const recovered = selectActiveBackupJob(backupJobsQuery.data ?? []) as ProjectOsJob | null;
+    const recovered = selectActiveBackupJob(backupJobsQuery.data ?? []) as AutarkOsJob | null;
     if (activeJob && terminalJob(activeJob) && recovered?.jobId === activeJob.jobId) {
       return null;
     }
@@ -79,7 +79,7 @@ function BackupsPage() {
   const restoreDetailPlanMutation = useRestorePlanMutation();
   const restoreBackupMutation = useRestoreBackupMutation();
   const verifyRestorePointMutation = useVerifyRestorePointMutation();
-  const activeJobQuery = useProjectOsJobQuery(currentActiveJob && !terminalJob(currentActiveJob) ? currentActiveJob.jobId : null);
+  const activeJobQuery = useAutarkOsJobQuery(currentActiveJob && !terminalJob(currentActiveJob) ? currentActiveJob.jobId : null);
   const report = backupReport.report;
   const pageError = error ?? (backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null);
   const refreshBackupReport = backupReport.refresh;
@@ -94,7 +94,7 @@ function BackupsPage() {
 
   useEffect(() => {
     if (activeJobQuery.data) {
-      setProjectOsJobInApplicationStateCache(queryClient, activeJobQuery.data);
+      setAutarkOsJobInApplicationStateCache(queryClient, activeJobQuery.data);
       setActiveJob(activeJobQuery.data);
       if (terminalJob(activeJobQuery.data)) {
         if (activeJobQuery.data.status === 'failed') {
@@ -137,7 +137,7 @@ function BackupsPage() {
     await runBackup('routine', () => runRoutineBackupMutation.mutateAsync());
   }
 
-  async function runBackup(id: string, action: () => Promise<ProjectOsJob>) {
+  async function runBackup(id: string, action: () => Promise<AutarkOsJob>) {
     setRunning(id);
     setError(null);
     try {
@@ -411,7 +411,7 @@ function BackupsPage() {
   );
 }
 
-function BackupJobBanner({ job }: { job: ProjectOsJob }) {
+function BackupJobBanner({ job }: { job: AutarkOsJob }) {
   return (
     <div className="border-b border-cyan-300/30 bg-cyan-400/10 px-6 py-4">
       <JobProgress job={job} subjectLabel={backupSubjectLabel(job)} />
@@ -454,7 +454,7 @@ function BackupsErrorState({ message, onRetry }: { message: string; onRetry: () 
   );
 }
 
-function backupSubjectLabel(job: ProjectOsJob) {
+function backupSubjectLabel(job: AutarkOsJob) {
   if (job.subjectId === '__full__') {
     return 'all apps';
   }

@@ -1,8 +1,8 @@
-export const themeStorageKey = 'project-os.theme';
+export const themeStorageKey = 'autark-os.theme';
 
 export const defaultThemeId = 'project-slate';
 
-export const projectOsThemes = [
+export const autarkOsThemes = [
   {
     id: 'project-slate',
     label: 'Project Slate',
@@ -25,7 +25,7 @@ export const projectOsThemes = [
   },
 ];
 
-const themeIds = new Set(projectOsThemes.map((theme) => theme.id));
+const themeIds = new Set(autarkOsThemes.map((theme) => theme.id));
 
 export function resolveThemeId(value) {
   return themeIds.has(value) ? value : defaultThemeId;

@@ -5,12 +5,12 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 runtime_dir="${tmp_dir}/runtime"
 state_dir="${tmp_dir}/state"
 printf 'fake jar for gui installer completion handoff test\n' >"${fake_jar}"
 
-output="$("${repo_root}/scripts/project-os-gui-installer.sh" \
+output="$("${repo_root}/scripts/autark-os-gui-installer.sh" \
   --preview \
   --json \
   --release-jar "${fake_jar}" \
@@ -47,15 +47,15 @@ assert handoff["onboardingHandoff"]["privateAccessState"] == handoff["summary"][
 assert handoff["onboardingHandoff"]["backupPosture"] == handoff["summary"]["backupPosture"]
 
 assert {action["id"] for action in handoff["actions"]} == {
-    "open-project-os",
+    "open-autark-os",
     "copy-url",
     "save-support-report",
     "finish",
 }
-assert handoff["actions"][0]["id"] == "open-project-os"
+assert handoff["actions"][0]["id"] == "open-autark-os"
 assert handoff["actions"][0]["url"] == handoff["summary"]["localUrl"]
 assert handoff["recoveryCommands"]["visualPriority"] == "secondary"
-assert "project-os status" in handoff["recoveryCommands"]["commands"]
-assert "project-os logs" in handoff["recoveryCommands"]["commands"]
+assert "autark-os status" in handoff["recoveryCommands"]["commands"]
+assert "autark-os logs" in handoff["recoveryCommands"]["commands"]
 assert any(os.environ["STATE_DIR"] in command for command in handoff["recoveryCommands"]["commands"])
 PY

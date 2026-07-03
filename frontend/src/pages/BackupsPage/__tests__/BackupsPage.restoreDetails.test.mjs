@@ -12,7 +12,7 @@ test('summarizes full restore points with included app names and checksum', () =
     verificationStatus: 'verified',
     restoreConfidence: 'high',
     checksumSha256: 'abc123',
-    path: '/var/lib/project-os/backups/1.zip',
+    path: '/var/lib/autark-os/backups/1.zip',
   }, [
     { appId: 'vaultwarden', appName: 'Vaultwarden' },
     { appId: 'jellyfin', appName: 'Jellyfin' },

@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: gitea
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 3002:3000, 2222:22
     - label: Data storage
-      value: /var/lib/project-os/apps/gitea/data
+      value: /var/lib/autark-os/apps/gitea/data
     - label: Backup
       value: Repositories daily
     - label: Access
@@ -97,19 +97,19 @@ access:
     - SSH Git access can stay local or be used privately through trusted network paths.
 runtime:
   containerName: gitea
-  composeProject: project-os-gitea
+  composeProject: autark-os-gitea
   image: gitea/gitea:1.26.4
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/gitea
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/gitea
   ports:
     - 3002:3000
     - "2222:22"
   volumes:
-    - /var/lib/project-os/apps/gitea/data:/data
+    - /var/lib/autark-os/apps/gitea/data:/data
   labels:
-    - project-os.managed=true
-    - project-os.app-id=gitea
-    - project-os.version=1.26.4
+    - autark-os.managed=true
+    - autark-os.app-id=gitea
+    - autark-os.version=1.26.4
   backupPaths:
     - data
   privileged: false

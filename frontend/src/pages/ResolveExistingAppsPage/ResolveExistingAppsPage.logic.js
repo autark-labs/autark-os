@@ -1,6 +1,6 @@
 export function visibleResolveExistingServices(services = []) {
   return services
-    .filter((service) => !service.managedByThisProjectOs && service.userStatus !== 'installed_managed')
+    .filter((service) => !service.managedByThisAutarkOs && service.userStatus !== 'installed_managed')
     .sort((left, right) => servicePriority(left) - servicePriority(right) || left.displayName.localeCompare(right.displayName));
 }
 

@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: bazarr
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 6767:6767
     - label: Data storage
-      value: /var/lib/project-os/apps/bazarr/config
+      value: /var/lib/autark-os/apps/bazarr/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -122,24 +122,24 @@ health:
   description: Autark-OS checks that the Bazarr dashboard answers before calling it ready.
 runtime:
   containerName: bazarr
-  composeProject: project-os-bazarr
+  composeProject: autark-os-bazarr
   image: lscr.io/linuxserver/bazarr:version-v1.5.6
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/bazarr
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/bazarr
   ports:
     - 6767:6767
   volumes:
-    - /var/lib/project-os/apps/bazarr/config:/config
-    - /var/lib/project-os/apps/bazarr/movies:/movies
-    - /var/lib/project-os/apps/bazarr/tv:/tv
+    - /var/lib/autark-os/apps/bazarr/config:/config
+    - /var/lib/autark-os/apps/bazarr/movies:/movies
+    - /var/lib/autark-os/apps/bazarr/tv:/tv
   environment:
     - PUID=1000
     - PGID=1000
     - TZ=UTC
   labels:
-    - project-os.managed=true
-    - project-os.app-id=bazarr
-    - project-os.version=1.5.6
+    - autark-os.managed=true
+    - autark-os.app-id=bazarr
+    - autark-os.version=1.5.6
   backupPaths:
     - config
   privileged: false

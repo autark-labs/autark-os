@@ -6,9 +6,9 @@ import { PageShell } from '@/components/layout/PageShell';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
-import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
-import { JobProgress } from '@/components/project-os/JobProgress';
+import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { JobProgress } from '@/components/autark-os/JobProgress';
 import {
   Dialog,
   DialogContent,
@@ -41,7 +41,7 @@ import {
 import { terminalJob } from '@/repositories/jobRepository';
 import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView } from '@/types/discover';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
 import { categories } from './extensions/MarketplacePage.constants';
 import {
@@ -108,8 +108,8 @@ function MarketplacePage() {
   const [marketplaceError, setMarketplaceError] = useState('');
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
-  const [installJob, setInstallJob] = useState<ProjectOsJob | null>(null);
-  const [backupJob, setBackupJob] = useState<ProjectOsJob | null>(null);
+  const [installJob, setInstallJob] = useState<AutarkOsJob | null>(null);
+  const [backupJob, setBackupJob] = useState<AutarkOsJob | null>(null);
   const [duplicateAcknowledgedAppId, setDuplicateAcknowledgedAppId] = useState<string | null>(null);
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
   const recoveryAppId = searchParams.get('app');
@@ -438,7 +438,7 @@ function MarketplacePage() {
   );
 }
 
-function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverAppView[]; installJob: ProjectOsJob | null; selectedAppId: string }) {
+function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverAppView[]; installJob: AutarkOsJob | null; selectedAppId: string }) {
   if (!installJob || installJob.subjectId !== selectedAppId) {
     return null;
   }
@@ -632,6 +632,6 @@ function readStartHereDismissed() {
   return window.localStorage.getItem(START_HERE_DISMISSAL_KEY) === 'true';
 }
 
-function appNameForJob(job: ProjectOsJob, apps: DiscoverAppView[]) {
+function appNameForJob(job: AutarkOsJob, apps: DiscoverAppView[]) {
   return apps.find((app) => app.id === job.subjectId)?.name || job.subjectId || 'this app';
 }

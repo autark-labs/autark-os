@@ -12,13 +12,13 @@ function source(relativePath) {
 test('theme selector is app-wide and lives in the system top bar', () => {
   const app = source('src/App.tsx');
   const header = source('src/layout/SystemStatusHeader.tsx');
-  const selector = source('src/components/project-os/ThemeSelectorPopover.tsx');
+  const selector = source('src/components/autark-os/ThemeSelectorPopover.tsx');
   const styles = source('src/styles.css');
 
   assert.match(app, /ThemeProvider/);
   assert.match(header, /ThemeSelectorPopover/);
   assert.match(selector, /useTheme/);
-  assert.match(selector, /projectOsThemes/);
+  assert.match(selector, /autarkOsThemes/);
   assert.match(styles, /data-theme="project-slate"/);
   assert.match(styles, /data-theme="harbor"/);
   assert.match(styles, /data-theme="forest"/);

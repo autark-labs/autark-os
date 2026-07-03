@@ -13,8 +13,6 @@ The following names, logos, and identifiers are considered trademarks of Autark 
 * Autark
 * Autark Labs
 * Autark-OS
-* Autark-OS
-* ProjectOS
 * Future Autark Labs product names
 * Autark Labs logos and visual marks
 * Autark-OS logos and visual marks

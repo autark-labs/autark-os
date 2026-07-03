@@ -47,16 +47,16 @@ test('marketplace page reads discover data and jobs through the repository layer
   assert.match(repository, /useDiscoverInstallPreviewQuery/);
   assert.match(repository, /useDiscoverInstallMutation/);
   assert.match(repository, /useDiscoverBackupMutation/);
-  assert.match(repository, /setProjectOsJobInApplicationStateCache\(queryClient, job\)/);
+  assert.match(repository, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(repository, /useDiscoverJobQuery/);
   assert.match(repository, /useDiscoverJobsQuery/);
   assert.match(repository, /DiscoverAPIClient\.listApps/);
-  assert.match(repository, /useProjectOsJobsQuery/);
-  assert.match(repository, /useProjectOsJobQuery/);
+  assert.match(repository, /useAutarkOsJobsQuery/);
+  assert.match(repository, /useAutarkOsJobQuery/);
   assert.doesNotMatch(repository, /JobsAPIClient/);
   assert.match(jobRepository, /JobsAPIClient\.list/);
   assert.match(jobRepository, /JobsAPIClient\.get/);
-  assert.match(repository, /invalidateApplicationState/);
+  assert.match(repository, /invalidateDiscoverQueries\(queryClient\)/);
 });
 
 test('marketplace detail deep-links found services and installed apps into My Apps', () => {

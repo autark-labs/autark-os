@@ -128,7 +128,7 @@ function applicationDeepLink(kind, id, options = {}) {
 
 function parseAppRelativeUrl(href) {
   try {
-    return new URL(href, 'http://project-os.local');
+    return new URL(href, 'http://autark-os.local');
   } catch {
     return null;
   }

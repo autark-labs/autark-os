@@ -84,7 +84,7 @@ yarn dev
 If the backend is not running on `8082`:
 
 ```bash
-PROJECT_OS_BACKEND_URL=http://localhost:8092 yarn dev
+AUTARK_OS_BACKEND_URL=http://localhost:8092 yarn dev
 ```
 
 ## Validation Before Opening A PR

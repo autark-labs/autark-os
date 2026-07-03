@@ -32,7 +32,7 @@ function OverviewPage() {
   const observedServices = appState.observedServices;
   const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
   const pinnedServices = useMemo(() => observedServices.filter((service) => service.userStatus === 'pinned_external'), [observedServices]);
-  const observedNeedingReview = useMemo(() => observedServices.filter((service) => !service.managedByThisProjectOs && service.userStatus !== 'pinned_external'), [observedServices]);
+  const observedNeedingReview = useMemo(() => observedServices.filter((service) => !service.managedByThisAutarkOs && service.userStatus !== 'pinned_external'), [observedServices]);
   const majorActivity = useMemo(() => homeMajorActivity(home.activity, 5) as ActivityLog[], [home.activity]);
   const showActivityLogLink = shouldShowActivityLogLink(viewMode, majorActivity);
   const primaryAction = home.recommendedAction?.id === 'no-action-needed' ? null : home.recommendedAction;

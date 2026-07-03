@@ -1,7 +1,7 @@
 import { AlertTriangle, AppWindow, Archive, CalendarClock, CheckCircle2, Clock3, Info, Layers3, Loader2, Play, RotateCcw, ShieldCheck, Sparkles, TimerReset } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';

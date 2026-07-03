@@ -5,7 +5,7 @@ import type { ProjectSettings } from '@/types/system';
 
 export type ViewMode = 'basic' | 'advanced';
 
-const viewModeStorageKey = 'project-os.viewMode';
+const viewModeStorageKey = 'autark-os.viewMode';
 
 type ProjectSettingsContextValue = {
   loading: boolean;

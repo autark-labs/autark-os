@@ -1,12 +1,12 @@
 spring:
   application:
-    name: project-os-backend
+    name: autark-os-backend
 
 server:
   port: 8082
 
-project-os:
-  runtime-root: ../runtime/project-os
+autark-os:
+  runtime-root: ../runtime/autark-os
   guardian:
     enabled: true
     initial-delay-ms: 10000

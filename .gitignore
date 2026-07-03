@@ -30,10 +30,10 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local Project OS runtime data
+# Local Autark-OS runtime data
 runtime/
 runtime/**/*
-runtime/project-os/project-os.db
+runtime/autark-os/autark-os.db
 *.db
 *.db-shm
 *.db-wal

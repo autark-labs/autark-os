@@ -1,5 +1,5 @@
 {
-  "deviceName": "project-os-test",
+  "deviceName": "autark-os-test",
   "instanceId": "pos_test",
   "lanUrl": "http://localhost:8082",
   "setup": {

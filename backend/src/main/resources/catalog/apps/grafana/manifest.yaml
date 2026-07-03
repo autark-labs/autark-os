@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: grafana
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 3004:3000
     - label: Data storage
-      value: /var/lib/project-os/apps/grafana/data
+      value: /var/lib/autark-os/apps/grafana/data
     - label: Backup
       value: Dashboards daily
     - label: Access
@@ -147,18 +147,18 @@ health:
   description: Autark-OS checks that the Grafana login page answers before calling it ready.
 runtime:
   containerName: grafana
-  composeProject: project-os-grafana
+  composeProject: autark-os-grafana
   image: grafana/grafana:13.1.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/grafana
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/grafana
   ports:
     - 3004:3000
   volumes:
-    - /var/lib/project-os/apps/grafana/data:/var/lib/grafana
+    - /var/lib/autark-os/apps/grafana/data:/var/lib/grafana
   labels:
-    - project-os.managed=true
-    - project-os.app-id=grafana
-    - project-os.version=13.1.0
+    - autark-os.managed=true
+    - autark-os.app-id=grafana
+    - autark-os.version=13.1.0
   backupPaths:
     - data
   privileged: false

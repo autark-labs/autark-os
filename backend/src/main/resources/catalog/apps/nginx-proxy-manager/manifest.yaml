@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: nginx-proxy-manager
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8181:81, 8088:80, 8443:443
     - label: Data storage
-      value: /var/lib/project-os/apps/nginx-proxy-manager/data
+      value: /var/lib/autark-os/apps/nginx-proxy-manager/data
     - label: Backup
       value: Proxy config daily
     - label: Access
@@ -121,21 +121,21 @@ health:
   description: Autark-OS checks that the admin UI answers before calling it ready.
 runtime:
   containerName: nginx-proxy-manager
-  composeProject: project-os-nginx-proxy-manager
+  composeProject: autark-os-nginx-proxy-manager
   image: jc21/nginx-proxy-manager:2.15.1
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/nginx-proxy-manager
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/nginx-proxy-manager
   ports:
     - 8181:81
     - 8088:80
     - 8443:443
   volumes:
-    - /var/lib/project-os/apps/nginx-proxy-manager/data:/data
-    - /var/lib/project-os/apps/nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+    - /var/lib/autark-os/apps/nginx-proxy-manager/data:/data
+    - /var/lib/autark-os/apps/nginx-proxy-manager/letsencrypt:/etc/letsencrypt
   labels:
-    - project-os.managed=true
-    - project-os.app-id=nginx-proxy-manager
-    - project-os.version=2.15.1
+    - autark-os.managed=true
+    - autark-os.app-id=nginx-proxy-manager
+    - autark-os.version=2.15.1
   backupPaths:
     - data
     - letsencrypt

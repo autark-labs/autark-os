@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: freshrss
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8086:80
     - label: Data storage
-      value: /var/lib/project-os/apps/freshrss/data
+      value: /var/lib/autark-os/apps/freshrss/data
     - label: Backup
       value: Feed data daily
     - label: Access
@@ -121,19 +121,19 @@ health:
   description: Autark-OS checks that the FreshRSS web app answers before calling it ready.
 runtime:
   containerName: freshrss
-  composeProject: project-os-freshrss
+  composeProject: autark-os-freshrss
   image: freshrss/freshrss:1.29.1
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/freshrss
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/freshrss
   ports:
     - 8086:80
   volumes:
-    - /var/lib/project-os/apps/freshrss/data:/var/www/FreshRSS/data
-    - /var/lib/project-os/apps/freshrss/extensions:/var/www/FreshRSS/extensions
+    - /var/lib/autark-os/apps/freshrss/data:/var/www/FreshRSS/data
+    - /var/lib/autark-os/apps/freshrss/extensions:/var/www/FreshRSS/extensions
   labels:
-    - project-os.managed=true
-    - project-os.app-id=freshrss
-    - project-os.version=1.29.1
+    - autark-os.managed=true
+    - autark-os.app-id=freshrss
+    - autark-os.version=1.29.1
   backupPaths:
     - data
     - extensions

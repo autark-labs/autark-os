@@ -3,7 +3,7 @@ import { ExternalLink, Loader2, Pin, PinOff, RotateCcw, Search, ShieldAlert } fr
 import { Link } from 'react-router-dom';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { showActionErrorNotification } from '@/lib/actionNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';

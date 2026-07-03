@@ -1,6 +1,6 @@
 alter table installed_apps add column app_instance_id text not null default '';
 alter table installed_apps add column catalog_app_id text not null default '';
-alter table installed_apps add column project_os_instance_id text not null default '';
+alter table installed_apps add column autark_os_instance_id text not null default '';
 alter table installed_apps add column runtime_path_or_hash text not null default '';
 alter table installed_apps add column install_state text not null default 'ownership_uncertain';
 alter table installed_apps add column ownership_status text not null default 'ownership_uncertain';

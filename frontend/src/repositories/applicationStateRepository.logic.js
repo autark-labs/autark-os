@@ -82,7 +82,7 @@ export function setObservedServicePinnedInState(state, serviceId, pinned) {
     ...state,
     observedServices,
     pinnedExternalServices: observedServices.filter((service) => service.pinned || service.userStatus === 'pinned_external'),
-    foundServices: observedServices.filter((service) => !service.managedByThisProjectOs && !service.pinned && service.userStatus !== 'pinned_external'),
+    foundServices: observedServices.filter((service) => !service.managedByThisAutarkOs && !service.pinned && service.userStatus !== 'pinned_external'),
   };
 }
 
@@ -103,16 +103,16 @@ export function setObservedServiceAdoptedInState(state, serviceId) {
     managedApps: upsertByKey(state.managedApps ?? [], managedApp, (app) => app.catalogAppId),
     observedServices,
     pinnedExternalServices: observedServices.filter((item) => item.pinned || item.userStatus === 'pinned_external'),
-    foundServices: observedServices.filter((item) => !item.managedByThisProjectOs && !item.pinned && item.userStatus !== 'pinned_external'),
+    foundServices: observedServices.filter((item) => !item.managedByThisAutarkOs && !item.pinned && item.userStatus !== 'pinned_external'),
   };
 }
 
-export function setProjectOsJobInState(state, job) {
+export function setAutarkOsJobInState(state, job) {
   if (!state || !job?.subjectId || !lifecycleJobTypes().has(job.type)) {
     return state;
   }
 
-  const operation = operationStateFromProjectOsJob(job);
+  const operation = operationStateFromAutarkOsJob(job);
   const runtimeApps = (state.runtimeApps ?? []).map((app) => jobTargetsApp(job, app.appId)
     ? runtimeAppWithOperation(app, operation)
     : app);
@@ -171,15 +171,15 @@ function restoreTarget(subjectId) {
   return separator < 0 ? subjectId : subjectId.slice(separator + 1);
 }
 
-function operationStateFromProjectOsJob(job) {
+function operationStateFromAutarkOsJob(job) {
   if (job.status === 'failed') {
     if (isFailedFullRestore(job)) {
       return {
         kind: 'idle',
         label: 'Idle',
         jobId: job.jobId,
-        currentStep: currentProjectOsJobStepText(job),
-        message: currentProjectOsJobStepText(job),
+        currentStep: currentAutarkOsJobStepText(job),
+        message: currentAutarkOsJobStepText(job),
       };
     }
     return {
@@ -195,8 +195,8 @@ function operationStateFromProjectOsJob(job) {
       kind: 'idle',
       label: 'Idle',
       jobId: job.jobId,
-      currentStep: currentProjectOsJobStepText(job),
-      message: currentProjectOsJobStepText(job),
+      currentStep: currentAutarkOsJobStepText(job),
+      message: currentAutarkOsJobStepText(job),
     };
   }
 
@@ -204,8 +204,8 @@ function operationStateFromProjectOsJob(job) {
     kind: operationKind(job.type),
     label: operationLabel(job.type),
     jobId: job.jobId,
-    currentStep: currentProjectOsJobStepText(job),
-    message: currentProjectOsJobStepText(job),
+    currentStep: currentAutarkOsJobStepText(job),
+    message: currentAutarkOsJobStepText(job),
   };
 }
 
@@ -294,7 +294,7 @@ function runtimeStateForOperation(operation, current) {
   return current;
 }
 
-function currentProjectOsJobStepText(job) {
+function currentAutarkOsJobStepText(job) {
   const step = job.steps?.find((candidate) => candidate.id === job.currentStep)
     ?? job.steps?.find((candidate) => candidate.status === 'running')
     ?? job.steps?.find((candidate) => candidate.status === 'pending');
@@ -443,7 +443,7 @@ function observedServiceAsManaged(service) {
     managementState: 'managed',
     readinessState: service.readinessState ?? (service.runtimeState === 'running' ? 'ready' : 'starting'),
     attentionState: 'none',
-    managedByThisProjectOs: true,
+    managedByThisAutarkOs: true,
     pinned: false,
   };
 }

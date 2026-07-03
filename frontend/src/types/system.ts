@@ -1,4 +1,4 @@
-import type { ProjectOsAction, ProjectOsIssue } from './app';
+import type { AutarkOsAction, AutarkOsIssue } from './app';
 
 export type SystemMetrics = {
   deviceName: string;
@@ -71,7 +71,7 @@ export type SystemSummary = {
   apps: AppsSummary;
   backups: BackupSummary;
   storage: StorageSummary;
-  issues: ProjectOsIssue[];
+  issues: AutarkOsIssue[];
   updatedAt: string;
 };
 
@@ -80,8 +80,8 @@ export type RecommendedAction = {
   severity: 'success' | 'info' | 'warning' | 'critical' | string;
   title: string;
   body: string;
-  primaryAction?: ProjectOsAction | null;
-  secondaryAction?: ProjectOsAction | null;
+  primaryAction?: AutarkOsAction | null;
+  secondaryAction?: AutarkOsAction | null;
   sourceIssueIds: string[];
   dismissible: boolean;
 };
@@ -356,7 +356,7 @@ export type SupportSummary = {
   version: ProjectVersionInfo;
   recentFailures: number;
   findings: SupportFinding[];
-  unifiedIssues: ProjectOsIssue[];
+  unifiedIssues: AutarkOsIssue[];
   redactionRules: SupportRedactionRule[];
   commands: SupportCommand[];
   checkedAt: string;

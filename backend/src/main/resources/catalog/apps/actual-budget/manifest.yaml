@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: actual-budget
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 5006:5006
     - label: Data storage
-      value: /var/lib/project-os/apps/actual-budget/data
+      value: /var/lib/autark-os/apps/actual-budget/data
     - label: Backup
       value: Budget data daily
     - label: Access
@@ -121,18 +121,18 @@ health:
   description: Autark-OS checks that the Actual Budget app answers before calling it ready.
 runtime:
   containerName: actual-budget
-  composeProject: project-os-actual-budget
+  composeProject: autark-os-actual-budget
   image: actualbudget/actual-server:26.6.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/actual-budget
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/actual-budget
   ports:
     - 5006:5006
   volumes:
-    - /var/lib/project-os/apps/actual-budget/data:/data
+    - /var/lib/autark-os/apps/actual-budget/data:/data
   labels:
-    - project-os.managed=true
-    - project-os.app-id=actual-budget
-    - project-os.version=26.6.0
+    - autark-os.managed=true
+    - autark-os.app-id=actual-budget
+    - autark-os.version=26.6.0
   backupPaths:
     - data
   privileged: false

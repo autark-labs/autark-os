@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { HelpCircle, TriangleAlert } from 'lucide-react';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';

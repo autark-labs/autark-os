@@ -5,17 +5,17 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 printf 'fake jar for install plan test\n' >"${fake_jar}"
 
-output="$("${repo_root}/scripts/bootstrap-project-os.sh" \
+output="$("${repo_root}/scripts/bootstrap-autark-os.sh" \
   --plan \
   --json \
   --release-jar "${fake_jar}" \
-  --runtime-dir /tmp/project-os-runtime \
-  --install-dir /tmp/project-os-install \
-  --config-dir /tmp/project-os-config \
-  --log-dir /tmp/project-os-logs \
+  --runtime-dir /tmp/autark-os-runtime \
+  --install-dir /tmp/autark-os-install \
+  --config-dir /tmp/autark-os-config \
+  --log-dir /tmp/autark-os-logs \
   --port 9090)"
 
 PLAN_JSON="${output}" python3 - "${fake_jar}" <<'PY'
@@ -30,10 +30,10 @@ assert plan["schemaVersion"] == 1
 assert plan["mode"] == "release-jar"
 assert plan["audience"] == "advanced-cli"
 assert plan["service"]["port"] == 9090
-assert plan["paths"]["runtimeDir"] == "/tmp/project-os-runtime"
-assert plan["paths"]["installDir"] == "/tmp/project-os-install"
-assert plan["paths"]["configDir"] == "/tmp/project-os-config"
-assert plan["paths"]["logDir"] == "/tmp/project-os-logs"
+assert plan["paths"]["runtimeDir"] == "/tmp/autark-os-runtime"
+assert plan["paths"]["installDir"] == "/tmp/autark-os-install"
+assert plan["paths"]["configDir"] == "/tmp/autark-os-config"
+assert plan["paths"]["logDir"] == "/tmp/autark-os-logs"
 assert plan["artifact"]["backendJar"] == fake_jar
 assert "install Autark-OS system service" in plan["actions"]
 assert any(dep["name"] == "Java" for dep in plan["dependencies"])

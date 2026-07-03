@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download, Loader2, Pin, PinOff, RotateCcw, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

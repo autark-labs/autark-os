@@ -12,7 +12,7 @@ const baseSettings = {
 test('shouldApplyProjectSettingsToApps only changes when app defaults changed', () => {
   assert.equal(shouldApplyProjectSettingsToApps(null, baseSettings), true);
   assert.equal(shouldApplyProjectSettingsToApps(baseSettings, baseSettings), false);
-  assert.equal(shouldApplyProjectSettingsToApps(baseSettings, { ...baseSettings, deviceName: 'project-os-renamed' }), false);
+  assert.equal(shouldApplyProjectSettingsToApps(baseSettings, { ...baseSettings, deviceName: 'autark-os-renamed' }), false);
   assert.equal(shouldApplyProjectSettingsToApps(baseSettings, { ...baseSettings, automaticRepairEnabled: false }), true);
   assert.equal(shouldApplyProjectSettingsToApps(baseSettings, { ...baseSettings, automaticBackupsEnabled: false }), true);
   assert.equal(shouldApplyProjectSettingsToApps(baseSettings, { ...baseSettings, backupFrequency: 'weekly' }), true);

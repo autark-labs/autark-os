@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import {
   Popover,
   PopoverContent,
@@ -463,7 +463,7 @@ function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRu
 function SecurityPanel({ setup }: { setup: SystemSetupStatus | null }) {
   return (
     <SettingsGroup description="Configure security and access options." title="Security">
-      <ReadOnlyRow label="Service user" note="Recommended production user for backend operations." value={setup?.expectedUser || 'projectos'} />
+      <ReadOnlyRow label="Service user" note="Recommended production user for backend operations." value={setup?.expectedUser || 'autarkos'} />
       <ReadOnlyRow label="Docker socket access" note="Required for Autark-OS to manage containers." value={setup?.dockerVersion ? 'Available' : 'Not detected'} />
     </SettingsGroup>
   );
@@ -700,7 +700,7 @@ function settingsForApp(app: AppRuntimeView): InstallSettings {
 }
 
 function apiOrigin(setup: SystemSetupStatus | null) {
-  const configured = import.meta.env.VITE_PROJECT_OS_BACKEND_URL as string | undefined;
+  const configured = import.meta.env.VITE_AUTARK_OS_BACKEND_URL as string | undefined;
   if (configured) return configured;
   return `${window.location.protocol}//${window.location.hostname}:${setup?.backendPort || '8082'}`;
 }

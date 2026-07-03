@@ -76,11 +76,11 @@ technical:
     - label: Container name
       value: homepage
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 3003:3000
     - label: Data storage
-      value: /var/lib/project-os/apps/homepage/config
+      value: /var/lib/autark-os/apps/homepage/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -118,7 +118,7 @@ setup:
       value: "{accessUrl}"
       sensitive: false
   integrations:
-    - id: homepage-project-os-apps
+    - id: homepage-autark-os-apps
       name: List Autark-OS apps
       targetAppId: ""
       description: Let Homepage display apps managed by Autark-OS so users have one friendly launch page.
@@ -144,18 +144,18 @@ health:
   description: Autark-OS checks that the Homepage dashboard answers before calling it ready.
 runtime:
   containerName: homepage
-  composeProject: project-os-homepage
+  composeProject: autark-os-homepage
   image: ghcr.io/gethomepage/homepage:v1.13.2
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/homepage
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/homepage
   ports:
     - 3003:3000
   volumes:
-    - /var/lib/project-os/apps/homepage/config:/app/config
+    - /var/lib/autark-os/apps/homepage/config:/app/config
   labels:
-    - project-os.managed=true
-    - project-os.app-id=homepage
-    - project-os.version=1.13.2
+    - autark-os.managed=true
+    - autark-os.app-id=homepage
+    - autark-os.version=1.13.2
   backupPaths:
     - config
   privileged: false

@@ -7,14 +7,14 @@ Use this page as the map. The README at the repository root is the public landin
 ## Start Here
 
 - [Install Autark-OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
-- [Beta testing repository](https://github.com/autark-labs/project-os/): source install, release-bundle install, update, uninstall, and support commands.
+- [Beta testing repository](https://github.com/autark-labs/autark-os/): source install, release-bundle install, update, uninstall, and support commands.
 - [Local development](./local-development.md): run the backend and frontend separately during development.
 
 ## Runtime And Operations
 
 - [Marketplace runtime architecture](./marketplace-runtime.md): how catalog manifests become managed local apps.
 - [Manifest authoring checklist](./manifest-authoring-checklist.md): required fields and review checks before adding or updating a catalog app.
-- [Service user installation](./service-user-installation.md): `projectos` service user, durable host paths, systemd, Docker, and Tailscale operator setup.
+- [Service user installation](./service-user-installation.md): `autarkos` service user, durable host paths, systemd, Docker, and Tailscale operator setup.
 - [Application state prune list](./application-state-prune-list.md): active cleanup list for legacy app-state surfaces.
 
 ## Current UI Reference Screenshots

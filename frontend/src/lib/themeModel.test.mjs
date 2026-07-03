@@ -3,7 +3,7 @@ import test from 'node:test';
 import {
   applyThemeToDocument,
   defaultThemeId,
-  projectOsThemes,
+  autarkOsThemes,
   readStoredTheme,
   resolveThemeId,
   storeTheme,
@@ -12,8 +12,8 @@ import {
 
 test('theme model exposes four stable Autark-OS themes', () => {
   assert.equal(defaultThemeId, 'project-slate');
-  assert.deepEqual(projectOsThemes.map((theme) => theme.id), ['project-slate', 'harbor', 'forest', 'ember']);
-  assert.equal(new Set(projectOsThemes.map((theme) => theme.id)).size, 4);
+  assert.deepEqual(autarkOsThemes.map((theme) => theme.id), ['project-slate', 'harbor', 'forest', 'ember']);
+  assert.equal(new Set(autarkOsThemes.map((theme) => theme.id)).size, 4);
 });
 
 test('theme model reads, validates, stores, and applies themes', () => {

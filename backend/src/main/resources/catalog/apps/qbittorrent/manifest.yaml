@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: qbittorrent
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8085:8080, 6881:6881
     - label: Data storage
-      value: /var/lib/project-os/apps/qbittorrent/config
+      value: /var/lib/autark-os/apps/qbittorrent/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -154,26 +154,26 @@ health:
   description: Autark-OS checks that the qBittorrent web UI answers before calling it ready.
 runtime:
   containerName: qbittorrent
-  composeProject: project-os-qbittorrent
+  composeProject: autark-os-qbittorrent
   image: lscr.io/linuxserver/qbittorrent:5.2.2
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/qbittorrent
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/qbittorrent
   ports:
     - 8085:8080
     - 6881:6881/tcp
     - 6881:6881/udp
   volumes:
-    - /var/lib/project-os/apps/qbittorrent/config:/config
-    - /var/lib/project-os/apps/qbittorrent/downloads:/downloads
+    - /var/lib/autark-os/apps/qbittorrent/config:/config
+    - /var/lib/autark-os/apps/qbittorrent/downloads:/downloads
   environment:
     - PUID=1000
     - PGID=1000
     - TZ=UTC
     - WEBUI_PORT=8080
   labels:
-    - project-os.managed=true
-    - project-os.app-id=qbittorrent
-    - project-os.version=5.2.2
+    - autark-os.managed=true
+    - autark-os.app-id=qbittorrent
+    - autark-os.version=5.2.2
   backupPaths:
     - config
   privileged: false

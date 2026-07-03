@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: prometheus
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 9090:9090
     - label: Data storage
-      value: /var/lib/project-os/apps/prometheus/data
+      value: /var/lib/autark-os/apps/prometheus/data
     - label: Backup
       value: Config daily
     - label: Access
@@ -122,19 +122,19 @@ health:
   description: Autark-OS checks the Prometheus readiness endpoint before calling it ready.
 runtime:
   containerName: prometheus
-  composeProject: project-os-prometheus
+  composeProject: autark-os-prometheus
   image: prom/prometheus:v3.13.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/prometheus
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/prometheus
   ports:
     - 9090:9090
   volumes:
-    - /var/lib/project-os/apps/prometheus/config:/etc/prometheus
-    - /var/lib/project-os/apps/prometheus/data:/prometheus
+    - /var/lib/autark-os/apps/prometheus/config:/etc/prometheus
+    - /var/lib/autark-os/apps/prometheus/data:/prometheus
   labels:
-    - project-os.managed=true
-    - project-os.app-id=prometheus
-    - project-os.version=3.13.0
+    - autark-os.managed=true
+    - autark-os.app-id=prometheus
+    - autark-os.version=3.13.0
   backupPaths:
     - config
   privileged: false

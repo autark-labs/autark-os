@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { CanonicalRecommendedAction } from '@/components/project-os/CanonicalRecommendedAction';
-import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
+import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
+import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
 import { PageShell } from '@/components/layout/PageShell';
 import { StatusPill } from '@/components/primitives/StatusPill';
 import { Surface } from '@/components/primitives/Surface';

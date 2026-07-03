@@ -3,36 +3,36 @@ import type { ReactNode } from 'react';
 import {
   applyThemeToDocument,
   defaultThemeId,
-  projectOsThemes,
+  autarkOsThemes,
   readStoredTheme,
   resolveThemeId,
   storeTheme,
 } from '@/lib/themeModel';
 
-export type ProjectOsThemeId = 'project-slate' | 'harbor' | 'forest' | 'ember';
+export type AutarkOsThemeId = 'project-slate' | 'harbor' | 'forest' | 'ember';
 
 type ThemeContextValue = {
-  theme: ProjectOsThemeId;
-  themes: typeof projectOsThemes;
-  setTheme: (theme: ProjectOsThemeId) => void;
+  theme: AutarkOsThemeId;
+  themes: typeof autarkOsThemes;
+  setTheme: (theme: AutarkOsThemeId) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ProjectOsThemeId>(() => {
+  const [theme, setThemeState] = useState<AutarkOsThemeId>(() => {
     if (typeof window === 'undefined') {
-      return defaultThemeId as ProjectOsThemeId;
+      return defaultThemeId as AutarkOsThemeId;
     }
-    return (readStoredTheme(window.localStorage) ?? defaultThemeId) as ProjectOsThemeId;
+    return (readStoredTheme(window.localStorage) ?? defaultThemeId) as AutarkOsThemeId;
   });
 
   useEffect(() => {
     applyThemeToDocument(document, theme);
   }, [theme]);
 
-  const setTheme = useCallback((nextTheme: ProjectOsThemeId) => {
-    const resolved = resolveThemeId(nextTheme) as ProjectOsThemeId;
+  const setTheme = useCallback((nextTheme: AutarkOsThemeId) => {
+    const resolved = resolveThemeId(nextTheme) as AutarkOsThemeId;
     setThemeState(resolved);
     if (typeof window !== 'undefined') {
       storeTheme(resolved, window.localStorage);
@@ -41,7 +41,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ThemeContextValue>(() => ({
     theme,
-    themes: projectOsThemes,
+    themes: autarkOsThemes,
     setTheme,
   }), [setTheme, theme]);
 

@@ -5,10 +5,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 printf 'fake jar for doctor test\n' >"${fake_jar}"
 
-output="$("${repo_root}/scripts/bootstrap-project-os.sh" \
+output="$("${repo_root}/scripts/bootstrap-autark-os.sh" \
   --doctor \
   --json \
   --release-jar "${fake_jar}" \

@@ -1,0 +1,9 @@
+package com.autarkos.system;
+
+public record InstallStorageSafety(
+        String status,
+        String message,
+        long minimumRecommendedFreeBytes,
+        long currentFreeBytes,
+        boolean installAllowed) {
+}

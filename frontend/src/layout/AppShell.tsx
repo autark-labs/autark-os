@@ -5,7 +5,7 @@ import MobileAppBar from './MobileAppBar';
 import Sidebar from './Sidebar';
 import SystemStatusHeader from './SystemStatusHeader';
 
-const sidebarCollapsedStorageKey = 'project-os.sidebarCollapsed';
+const sidebarCollapsedStorageKey = 'autark-os.sidebarCollapsed';
 
 function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {

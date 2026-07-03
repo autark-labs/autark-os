@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: netdata
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 19999:19999
     - label: Data storage
-      value: /var/lib/project-os/apps/netdata/config
+      value: /var/lib/autark-os/apps/netdata/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -121,20 +121,20 @@ health:
   description: Autark-OS checks that the Netdata dashboard answers before calling it ready.
 runtime:
   containerName: netdata
-  composeProject: project-os-netdata
+  composeProject: autark-os-netdata
   image: netdata/netdata:v2.10.3
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/netdata
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/netdata
   ports:
     - 19999:19999
   volumes:
-    - /var/lib/project-os/apps/netdata/config:/etc/netdata
-    - /var/lib/project-os/apps/netdata/lib:/var/lib/netdata
-    - /var/lib/project-os/apps/netdata/cache:/var/cache/netdata
+    - /var/lib/autark-os/apps/netdata/config:/etc/netdata
+    - /var/lib/autark-os/apps/netdata/lib:/var/lib/netdata
+    - /var/lib/autark-os/apps/netdata/cache:/var/cache/netdata
   labels:
-    - project-os.managed=true
-    - project-os.app-id=netdata
-    - project-os.version=2.10.3
+    - autark-os.managed=true
+    - autark-os.app-id=netdata
+    - autark-os.version=2.10.3
   backupPaths:
     - config
   privileged: false

@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORT="${PROJECT_OS_BACKEND_PORT:-8082}"
-SERVICE_NAME="${PROJECT_OS_SERVICE_NAME:-project-os}"
+PORT="${AUTARK_OS_BACKEND_PORT:-8082}"
+SERVICE_NAME="${AUTARK_OS_SERVICE_NAME:-autark-os}"
 AUTO_PORT=0
 STOP_SERVICE=0
 STATUS_ONLY=0
@@ -20,8 +20,8 @@ Options:
   -h, --help        Show this help.
 
 Environment:
-  PROJECT_OS_BACKEND_PORT      Default backend port for dev mode. Defaults to 8082.
-  PROJECT_OS_SERVICE_NAME      Production systemd service name. Defaults to project-os.
+  AUTARK_OS_BACKEND_PORT      Default backend port for dev mode. Defaults to 8082.
+  AUTARK_OS_SERVICE_NAME      Production systemd service name. Defaults to autark-os.
 
 Examples:
   ./scripts/dev-backend.sh
@@ -32,11 +32,11 @@ USAGE
 }
 
 log() {
-  printf '[project-os dev] %s\n' "$*"
+  printf '[autark-os dev] %s\n' "$*"
 }
 
 die() {
-  printf '[project-os dev] error: %s\n' "$*" >&2
+  printf '[autark-os dev] error: %s\n' "$*" >&2
   exit 1
 }
 
@@ -156,7 +156,7 @@ if port_busy "${PORT}"; then
 fi
 
 log "Starting backend with SPRING_PROFILES_ACTIVE=dev on port ${PORT}."
-log "Frontend proxy for this backend: PROJECT_OS_BACKEND_URL=http://localhost:${PORT} yarn dev"
+log "Frontend proxy for this backend: AUTARK_OS_BACKEND_URL=http://localhost:${PORT} yarn dev"
 
 export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-dev}"
 export SERVER_PORT="${PORT}"

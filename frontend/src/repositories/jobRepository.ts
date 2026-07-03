@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { JobsAPIClient } from '@/api/JobsAPIClient';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import {
   JOB_FAMILIES,
   activeJobs,
@@ -30,8 +30,8 @@ export const jobQueryKeys = {
   job: (jobId: string | null) => ['jobs', 'job', jobId] as const,
 };
 
-export function useProjectOsJobsQuery() {
-  return useQuery<ProjectOsJob[]>({
+export function useAutarkOsJobsQuery() {
+  return useQuery<AutarkOsJob[]>({
     queryKey: jobQueryKeys.all,
     queryFn: () => JobsAPIClient.list(),
     refetchInterval: 1_200,
@@ -39,8 +39,8 @@ export function useProjectOsJobsQuery() {
   });
 }
 
-export function useProjectOsJobQuery(jobId: string | null) {
-  return useQuery<ProjectOsJob>({
+export function useAutarkOsJobQuery(jobId: string | null) {
+  return useQuery<AutarkOsJob>({
     queryKey: jobQueryKeys.job(jobId),
     queryFn: () => JobsAPIClient.get(jobId || ''),
     enabled: Boolean(jobId),
@@ -48,44 +48,44 @@ export function useProjectOsJobQuery(jobId: string | null) {
   });
 }
 
-export function useActiveProjectOsJob(types: string[] = []) {
-  const jobsQuery = useProjectOsJobsQuery();
-  const activeJob = latestActiveJob(jobsQuery.data ?? [], types) as ProjectOsJob | null;
+export function useActiveAutarkOsJob(types: string[] = []) {
+  const jobsQuery = useAutarkOsJobsQuery();
+  const activeJob = latestActiveJob(jobsQuery.data ?? [], types) as AutarkOsJob | null;
   return {
     ...jobsQuery,
     activeJob,
-    activeJobs: activeJobs(jobsQuery.data ?? [], types) as ProjectOsJob[],
+    activeJobs: activeJobs(jobsQuery.data ?? [], types) as AutarkOsJob[],
   };
 }
 
-export function useGlobalActiveProjectOsJob() {
-  return useActiveProjectOsJob([
+export function useGlobalActiveAutarkOsJob() {
+  return useActiveAutarkOsJob([
     ...JOB_FAMILIES.appLifecycle,
     ...JOB_FAMILIES.backup,
   ]);
 }
 
-export function setProjectOsJobCache(queryClient: QueryClient, job?: ProjectOsJob | null) {
+export function setAutarkOsJobCache(queryClient: QueryClient, job?: AutarkOsJob | null) {
   if (!job) {
     return;
   }
   queryClient.setQueryData(jobQueryKeys.job(job.jobId), job);
-  queryClient.setQueryData<ProjectOsJob[] | undefined>(jobQueryKeys.all, (current) => upsertJob(current, job));
+  queryClient.setQueryData<AutarkOsJob[] | undefined>(jobQueryKeys.all, (current) => upsertJob(current, job));
 }
 
-export function invalidateProjectOsJobs(queryClient: QueryClient) {
+export function invalidateAutarkOsJobs(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: jobQueryKeys.all });
 }
 
-export function useProjectOsJobCache() {
+export function useAutarkOsJobCache() {
   const queryClient = useQueryClient();
   return {
-    invalidateJobs: () => invalidateProjectOsJobs(queryClient),
-    setJob: (job?: ProjectOsJob | null) => setProjectOsJobCache(queryClient, job),
+    invalidateJobs: () => invalidateAutarkOsJobs(queryClient),
+    setJob: (job?: AutarkOsJob | null) => setAutarkOsJobCache(queryClient, job),
   };
 }
 
-function upsertJob(current: ProjectOsJob[] | undefined, job: ProjectOsJob) {
+function upsertJob(current: AutarkOsJob[] | undefined, job: AutarkOsJob) {
   const jobs = current ?? [];
   const found = jobs.some((candidate) => candidate.jobId === job.jobId);
   if (!found) {

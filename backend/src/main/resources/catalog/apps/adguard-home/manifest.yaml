@@ -82,7 +82,7 @@ technical:
     - label: Ports
       value: 53, 80, 3000
     - label: Data storage
-      value: /var/lib/project-os/apps/adguard-home/work
+      value: /var/lib/autark-os/apps/adguard-home/work
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -116,21 +116,21 @@ usage:
     - Keep the admin dashboard private.
 runtime:
   containerName: adguard-home
-  composeProject: project-os-adguard-home
+  composeProject: autark-os-adguard-home
   image: adguard/adguardhome:v0.107.77
   network: host
-  runtimeRoot: /var/lib/project-os/apps/adguard-home
+  runtimeRoot: /var/lib/autark-os/apps/adguard-home
   ports:
     - 53:53/tcp
     - 53:53/udp
     - 3000:3000
   volumes:
-    - /var/lib/project-os/apps/adguard-home/work:/opt/adguardhome/work
-    - /var/lib/project-os/apps/adguard-home/conf:/opt/adguardhome/conf
+    - /var/lib/autark-os/apps/adguard-home/work:/opt/adguardhome/work
+    - /var/lib/autark-os/apps/adguard-home/conf:/opt/adguardhome/conf
   labels:
-    - project-os.managed=true
-    - project-os.app-id=adguard-home
-    - project-os.version=0.107.77
+    - autark-os.managed=true
+    - autark-os.app-id=adguard-home
+    - autark-os.version=0.107.77
   backupPaths:
     - work
     - conf

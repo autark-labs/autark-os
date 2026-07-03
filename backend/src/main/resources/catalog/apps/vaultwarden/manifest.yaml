@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: vaultwarden
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8090:80
     - label: Data storage
-      value: /var/lib/project-os/apps/vaultwarden/data
+      value: /var/lib/autark-os/apps/vaultwarden/data
     - label: Backup
       value: Daily encrypted snapshot
     - label: Access
@@ -97,18 +97,18 @@ access:
     - First-run setup creates the first vault account and admin preferences.
 runtime:
   containerName: vaultwarden
-  composeProject: project-os-vaultwarden
+  composeProject: autark-os-vaultwarden
   image: vaultwarden/server:1.36.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/vaultwarden
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/vaultwarden
   ports:
     - 8090:80
   volumes:
-    - /var/lib/project-os/apps/vaultwarden/data:/data
+    - /var/lib/autark-os/apps/vaultwarden/data:/data
   labels:
-    - project-os.managed=true
-    - project-os.app-id=vaultwarden
-    - project-os.version=1.36.0
+    - autark-os.managed=true
+    - autark-os.app-id=vaultwarden
+    - autark-os.version=1.36.0
   backupPaths:
     - data
   privileged: false

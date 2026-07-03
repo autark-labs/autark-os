@@ -18,7 +18,7 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   assert.match(page, /InstalledAppsAPIClient\.runAction\(appId, action\)/);
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, data\)/);
   assert.match(page, /actionLoadingByAppId/);
-  assert.match(page, /useProjectOsJobsQuery\(\)/);
+  assert.match(page, /useAutarkOsJobsQuery\(\)/);
   assert.match(page, /operationStateForItem\(/);
   assert.match(page, /settingsLoadingByAppId\[itemId\]/);
   assert.match(page, /showActionNotification\(\{[\s\S]*App action started/);
@@ -141,7 +141,7 @@ test('applications page runs repair only from canonical available actions', () =
   const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
   assert.match(types, /onRepair: \(id: string\) => void/);
-  assert.ok(api.includes('post<ProjectOsJob>(`/api/apps/${appId}/repair`)'));
+  assert.ok(api.includes('post<AutarkOsJob>(`/api/apps/${appId}/repair`)'));
   assert.match(page, /InstalledAppsAPIClient\.repair\(appId\)/);
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /title: 'Repair started'/);

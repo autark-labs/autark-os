@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: sonarr
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8989:8989
     - label: Data storage
-      value: /var/lib/project-os/apps/sonarr/config
+      value: /var/lib/autark-os/apps/sonarr/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -156,24 +156,24 @@ health:
   description: Autark-OS checks that the Sonarr dashboard answers before calling it ready.
 runtime:
   containerName: sonarr
-  composeProject: project-os-sonarr
+  composeProject: autark-os-sonarr
   image: lscr.io/linuxserver/sonarr:version-4.0.19.2979
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/sonarr
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/sonarr
   ports:
     - 8989:8989
   volumes:
-    - /var/lib/project-os/apps/sonarr/config:/config
-    - /var/lib/project-os/apps/sonarr/tv:/tv
-    - /var/lib/project-os/apps/sonarr/downloads:/downloads
+    - /var/lib/autark-os/apps/sonarr/config:/config
+    - /var/lib/autark-os/apps/sonarr/tv:/tv
+    - /var/lib/autark-os/apps/sonarr/downloads:/downloads
   environment:
     - PUID=1000
     - PGID=1000
     - TZ=UTC
   labels:
-    - project-os.managed=true
-    - project-os.app-id=sonarr
-    - project-os.version=4.0.19.2979
+    - autark-os.managed=true
+    - autark-os.app-id=sonarr
+    - autark-os.version=4.0.19.2979
   backupPaths:
     - config
   privileged: false

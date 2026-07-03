@@ -34,7 +34,7 @@ export function buildApplicationSurfaceItems({
       telemetryByAppId[app.appId] ?? app.telemetry,
     )),
     ...observedServices
-      .filter((service) => !service.managedByThisProjectOs && service.userStatus !== 'installed_managed')
+      .filter((service) => !service.managedByThisAutarkOs && service.userStatus !== 'installed_managed')
       .map(observedServiceSurfaceItem),
   ].slice().sort(compareSurfaceItems);
 }

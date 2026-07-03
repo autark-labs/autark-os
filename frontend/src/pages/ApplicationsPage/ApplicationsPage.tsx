@@ -19,7 +19,7 @@ import {
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
-import { terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
+import { terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
 import { invalidateBackupQueries } from '@/repositories/backupRepository';
 import type { AppRuntimeView, AppSettingsChangePlan, InstallSettings } from '@/types/app';
@@ -55,7 +55,7 @@ export const ApplicationsPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const appState = useApplicationStateRepository();
-  const jobsQuery = useProjectOsJobsQuery();
+  const jobsQuery = useAutarkOsJobsQuery();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ApplicationFilter>('all');
   const [managementOpen, setManagementOpen] = useState(false);

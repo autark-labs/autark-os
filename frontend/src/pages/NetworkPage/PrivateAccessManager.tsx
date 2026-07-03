@@ -17,7 +17,7 @@ import {
   ProjectPrimaryButton,
   ProjectWarningButton,
 } from '@/components/primitives/ProjectButtons';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView } from '@/types/app';
 import type { PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';

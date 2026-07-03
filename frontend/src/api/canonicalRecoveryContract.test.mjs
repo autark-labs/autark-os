@@ -12,7 +12,7 @@ function source(relativePath) {
 test('frontend recovery flows do not use legacy ownership or host inventory clients', () => {
   assert.equal(existsSync(resolve(root, 'src/api/AppOwnershipAPIClient.ts')), false);
   assert.equal(existsSync(resolve(root, 'src/api/HostInventoryAPIClient.ts')), false);
-  assert.equal(existsSync(resolve(root, 'src/components/project-os/FoundResourcesBanner.tsx')), false);
+  assert.equal(existsSync(resolve(root, 'src/components/autark-os/FoundResourcesBanner.tsx')), false);
   assert.equal(existsSync(resolve(root, 'src/types/host.ts')), false);
 
   const appOwnershipTypes = source('src/types/appOwnership.ts');

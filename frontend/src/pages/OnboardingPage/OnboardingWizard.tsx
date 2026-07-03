@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Network, ServerCog, ShieldCheck, Sparkles } from 'lucide-react';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -161,7 +161,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                   <p className="mt-1 opacity-85">
                     {existingInstall?.conflict
                       ? 'Recover or review these apps before creating another production instance.'
-                      : `Development mode is using the isolated instance ${setupStatus?.instanceSlug || 'project-os-dev'}.`}
+                      : `Development mode is using the isolated instance ${setupStatus?.instanceSlug || 'autark-os-dev'}.`}
                   </p>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -304,7 +304,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     className="mt-2 border-sky-400/25 bg-slate-900 text-white"
                     id="backup-destination"
                     onChange={(event) => setBackupDestination(event.target.value)}
-                    placeholder="/mnt/backup-drive/project-os-backups"
+                    placeholder="/mnt/backup-drive/autark-os-backups"
                     value={backupDestination}
                   />
                   <p className="mt-2 text-sm text-slate-400">Use an absolute path on a mounted drive. Autark-OS will check that it can create and write this folder before setup finishes.</p>

@@ -98,14 +98,14 @@ Future versions may support remote catalogs and signed manifests. The local cata
 Managed app files live under the Autark-OS runtime directory:
 
 ```text
-/var/lib/project-os/
+/var/lib/autark-os/
 ├── apps/
 │   ├── syncthing/
 │   └── vaultwarden/
 ├── backups/
 ├── catalog/
 ├── logs/
-└── project-os.db
+└── autark-os.db
 ```
 
 Apps should not write arbitrary host paths. Autark-OS owns placement, labels, generated Compose files, and backup paths.

@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: radarr
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 7878:7878
     - label: Data storage
-      value: /var/lib/project-os/apps/radarr/config
+      value: /var/lib/autark-os/apps/radarr/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -156,24 +156,24 @@ health:
   description: Autark-OS checks that the Radarr dashboard answers before calling it ready.
 runtime:
   containerName: radarr
-  composeProject: project-os-radarr
+  composeProject: autark-os-radarr
   image: lscr.io/linuxserver/radarr:version-6.2.1.10461
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/radarr
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/radarr
   ports:
     - 7878:7878
   volumes:
-    - /var/lib/project-os/apps/radarr/config:/config
-    - /var/lib/project-os/apps/radarr/movies:/movies
-    - /var/lib/project-os/apps/radarr/downloads:/downloads
+    - /var/lib/autark-os/apps/radarr/config:/config
+    - /var/lib/autark-os/apps/radarr/movies:/movies
+    - /var/lib/autark-os/apps/radarr/downloads:/downloads
   environment:
     - PUID=1000
     - PGID=1000
     - TZ=UTC
   labels:
-    - project-os.managed=true
-    - project-os.app-id=radarr
-    - project-os.version=6.2.1.10461
+    - autark-os.managed=true
+    - autark-os.app-id=radarr
+    - autark-os.version=6.2.1.10461
   backupPaths:
     - config
   privileged: false

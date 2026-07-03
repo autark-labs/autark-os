@@ -52,12 +52,12 @@ export type DeviceTrustUpdateRequest = {
 };
 
 export type DeviceReachability = {
-  status: 'verified_from_project_os' | 'partial' | 'needs_attention' | 'not_expected' | 'no_private_apps' | 'offline' | 'needs_setup' | string;
+  status: 'verified_from_autark_os' | 'partial' | 'needs_attention' | 'not_expected' | 'no_private_apps' | 'offline' | 'needs_setup' | string;
   label: string;
   detail: string;
   online: boolean;
   trusted: boolean;
-  verifiedFromProjectOs: boolean;
+  verifiedFromAutarkOs: boolean;
   reachablePrivateApps: number;
   expectedPrivateApps: number;
   checkedAt: string;

@@ -78,11 +78,11 @@ technical:
     - label: Stack name
       value: immich
     - label: Network
-      value: project-os-media
+      value: autark-os-media
     - label: Ports
       value: 2283:2283
     - label: Data storage
-      value: /var/lib/project-os/apps/immich/data
+      value: /var/lib/autark-os/apps/immich/data
     - label: Backup
       value: Database daily, media weekly
     - label: Access
@@ -97,19 +97,19 @@ access:
     - First-run setup connects mobile apps and admin account preferences.
 runtime:
   containerName: immich-server
-  composeProject: project-os-immich
+  composeProject: autark-os-immich
   image: ghcr.io/immich-app/immich-server:v3.0.0
-  network: project-os-media
-  runtimeRoot: /var/lib/project-os/apps/immich
+  network: autark-os-media
+  runtimeRoot: /var/lib/autark-os/apps/immich
   ports:
     - 2283:2283
   volumes:
-    - /var/lib/project-os/apps/immich/data:/usr/src/app/upload
-    - /var/lib/project-os/apps/immich/postgres:/var/lib/postgresql/data
+    - /var/lib/autark-os/apps/immich/data:/usr/src/app/upload
+    - /var/lib/autark-os/apps/immich/postgres:/var/lib/postgresql/data
   labels:
-    - project-os.managed=true
-    - project-os.app-id=immich
-    - project-os.version=3.0.0
+    - autark-os.managed=true
+    - autark-os.app-id=immich
+    - autark-os.version=3.0.0
   backupPaths:
     - data
     - postgres

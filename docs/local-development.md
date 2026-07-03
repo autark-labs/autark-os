@@ -16,7 +16,7 @@ The script runs the backend with:
 SPRING_PROFILES_ACTIVE=dev SERVER_PORT=8082 ./backend/gradlew -p backend bootRun
 ```
 
-Production mode is usually installed as `project-os.service`. If that service is active, it normally owns `8082`.
+Production mode is usually installed as `autark-os.service`. If that service is active, it normally owns `8082`.
 
 To check the current state:
 
@@ -45,7 +45,7 @@ To use a specific local backend port:
 The installed service remains production-oriented and may be enabled on reboot. If you stopped it for a dev session, restart it when you want to return to production:
 
 ```bash
-sudo systemctl start project-os.service
+sudo systemctl start autark-os.service
 ```
 
 ## Frontend
@@ -61,7 +61,7 @@ If the dev backend is not on `8082`, point Vite at it:
 
 ```bash
 cd frontend
-PROJECT_OS_BACKEND_URL=http://localhost:8092 yarn dev
+AUTARK_OS_BACKEND_URL=http://localhost:8092 yarn dev
 ```
 
 ## What Dev Mode Changes

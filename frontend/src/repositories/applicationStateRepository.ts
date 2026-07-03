@@ -14,7 +14,7 @@ import {
   removeManagedAppFromState,
   observedServices,
   ownershipViews,
-  setProjectOsJobInState,
+  setAutarkOsJobInState,
   setObservedServicePinnedInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
@@ -24,7 +24,7 @@ import {
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry, AppUpdateStatus } from '@/types/app';
 import type { AppOwnershipView } from '@/types/appOwnership';
 import type { ObservedServiceView } from '@/types/observedService';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 
 export {
   accessByAppId,
@@ -38,7 +38,7 @@ export {
   removeManagedAppFromState,
   observedServices,
   ownershipViews,
-  setProjectOsJobInState,
+  setAutarkOsJobInState,
   setObservedServicePinnedInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
@@ -132,11 +132,11 @@ export function invalidateApplicationState(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: applicationStateQueryKey });
 }
 
-export function setProjectOsJobInApplicationStateCache(queryClient: QueryClient, job?: ProjectOsJob | null) {
+export function setAutarkOsJobInApplicationStateCache(queryClient: QueryClient, job?: AutarkOsJob | null) {
   if (!job) {
     return;
   }
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setProjectOsJobInState(current, job));
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setAutarkOsJobInState(current, job));
 }
 
 export function setRuntimeAppInApplicationStateCache(queryClient: QueryClient, app: AppRuntimeView) {

@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
@@ -429,8 +429,8 @@ function hasRepairDetail(app: AppRuntimeView) {
 
 function labelForOwnership(value: string) {
   if (value === 'owned_managed') return 'Installed';
-  if (value === 'foreign_project_os') return 'Found on this server';
-  if (value === 'legacy_project_os') return 'Recoverable Autark-OS app';
+  if (value === 'foreign_autark_os') return 'Found on this server';
+  if (value === 'legacy_autark_os') return 'Recoverable Autark-OS app';
   if (value === 'external_docker') return 'Existing Docker app';
   return humanize(value || 'unknown');
 }

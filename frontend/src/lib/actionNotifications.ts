@@ -1,5 +1,5 @@
 import { toast } from 'sonner';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic';
 
 export type ActionNotificationResult = {
@@ -27,7 +27,7 @@ export function showActionErrorNotification(error: unknown, fallbackTitle = 'Act
   return showNotification(actionNotificationFromError(error, fallbackTitle) as ActionNotification);
 }
 
-export function showJobNotification(job: ProjectOsJob) {
+export function showJobNotification(job: AutarkOsJob) {
   return showNotification(actionNotificationFromJob(job) as ActionNotification);
 }
 

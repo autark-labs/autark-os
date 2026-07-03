@@ -16,7 +16,7 @@ test('primary pages render canonical recommended action through shared component
     'src/pages/NetworkPage/NetworkPage.tsx',
   ];
 
-  assert.equal(existsSync(resolve(root, 'src/components/project-os/CanonicalRecommendedAction.tsx')), true);
+  assert.equal(existsSync(resolve(root, 'src/components/autark-os/CanonicalRecommendedAction.tsx')), true);
   assert.equal(existsSync(resolve(root, 'src/repositories/recommendedActionRepository.ts')), true);
 
   for (const pagePath of pages) {
@@ -26,7 +26,7 @@ test('primary pages render canonical recommended action through shared component
   }
 
   const repository = source('src/repositories/recommendedActionRepository.ts');
-  const component = source('src/components/project-os/CanonicalRecommendedAction.tsx');
+  const component = source('src/components/autark-os/CanonicalRecommendedAction.tsx');
 
   assert.match(repository, /recommendedActionQueryKeys/);
   assert.match(repository, /SystemAPIClient\.recommendedAction/);
@@ -36,7 +36,7 @@ test('primary pages render canonical recommended action through shared component
 });
 
 test('recommended actions never render a generic unavailable button', () => {
-  const component = source('src/components/project-os/CanonicalRecommendedAction.tsx');
+  const component = source('src/components/autark-os/CanonicalRecommendedAction.tsx');
 
   assert.doesNotMatch(component, /This action is not available yet/);
   assert.doesNotMatch(component, /DisabledAction/);

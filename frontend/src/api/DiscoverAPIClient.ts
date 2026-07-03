@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import type { DiscoverAppView, DiscoverInstallPreview, DiscoverInstallRequestOptions, DiscoverSetupSchema } from '@/types/discover';
 import { buildDiscoverInstallRequest } from './DiscoverAPIClient.logic';
 
@@ -25,7 +25,7 @@ export const DiscoverAPIClient = {
   },
 
   async install(appId: string, answers: Record<string, unknown>, options: DiscoverInstallRequestOptions = {}) {
-    const response = await httpClient.post<ProjectOsJob>(`/api/discover/apps/${appId}/install`, buildDiscoverInstallRequest(answers, options));
+    const response = await httpClient.post<AutarkOsJob>(`/api/discover/apps/${appId}/install`, buildDiscoverInstallRequest(answers, options));
     return response.data;
   },
 };

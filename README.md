@@ -47,7 +47,7 @@ Start with the [non-technical install guide](docs/non-technical-install-guide.md
 
 ### Beta Testers
 
-Use the [Autark-OS GitHub Releases page](https://github.com/autark-labs/project-os/releases) for beta builds.
+Use the [Autark-OS GitHub Releases page](https://github.com/autark-labs/autark-os/releases) for beta builds.
 
 Recommended executable installer:
 
@@ -61,15 +61,15 @@ On Linux desktops, the `.run` installer can show a graphical confirmation before
 Debian/Ubuntu package install:
 
 ```bash
-sudo apt install ./project-os_<version>_amd64.deb
+sudo apt install ./autark-os_<version>_amd64.deb
 ```
 
 General tarball install:
 
 ```bash
-tar -xzf project-os-<version>.tar.gz
-cd project-os-<version>
-./scripts/project-os install
+tar -xzf autark-os-<version>.tar.gz
+cd autark-os-<version>
+./scripts/autark-os install
 ```
 
 Verify downloaded artifacts:
@@ -105,7 +105,7 @@ yarn dev
 If the backend is not on `8082`, point the frontend at it:
 
 ```bash
-PROJECT_OS_BACKEND_URL=http://localhost:8092 yarn dev
+AUTARK_OS_BACKEND_URL=http://localhost:8092 yarn dev
 ```
 
 ## Requirements
@@ -126,22 +126,22 @@ Docker is required for Marketplace app installs. Tailscale is optional for local
 Check the installed service:
 
 ```bash
-project-os doctor
-project-os status
-project-os where
-project-os url
+autark-os doctor
+autark-os status
+autark-os where
+autark-os url
 ```
 
 Follow logs:
 
 ```bash
-project-os logs
+autark-os logs
 ```
 
 Create a redacted support bundle:
 
 ```bash
-project-os support-bundle --output ./project-os-support.tar.gz
+autark-os support-bundle --output ./autark-os-support.tar.gz
 ```
 
 Build and test from source:
@@ -164,7 +164,7 @@ VERSION=0.1.0-beta.2
 scripts/build-release-artifacts.sh \
   --version "$VERSION" \
   --channel beta \
-  --release-notes-url "https://github.com/autark-labs/project-os/releases/tag/v$VERSION" \
+  --release-notes-url "https://github.com/autark-labs/autark-os/releases/tag/v$VERSION" \
   --output-dir "release/artifacts-$VERSION"
 ```
 
@@ -183,7 +183,7 @@ docs/          User guides, runtime architecture, development plans
 - [Docs index](docs/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Non-technical install guide](docs/non-technical-install-guide.md)
-- [Beta testing repository](https://github.com/autark-labs/project-os/)
+- [Beta testing repository](https://github.com/autark-labs/autark-os/)
 - [Local development](docs/local-development.md)
 - [Marketplace runtime architecture](docs/marketplace-runtime.md)
 - [Manifest authoring checklist](docs/manifest-authoring-checklist.md)

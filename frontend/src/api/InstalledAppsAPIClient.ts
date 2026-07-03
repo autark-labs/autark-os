@@ -1,6 +1,6 @@
 import { httpClient } from './httpClient';
 import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, AppUpdateResult, AppUpdateStatus, InstallSettings, UninstallPlan } from '@/types/app';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 
 export type InstalledAppLifecycleAction = 'start' | 'stop' | 'restart';
 export type InstalledAppAction = InstalledAppLifecycleAction | 'repair';
@@ -62,12 +62,12 @@ export const InstalledAppsAPIClient = {
   },
 
   async runAction(appId: string, action: InstalledAppLifecycleAction) {
-    const response = await httpClient.post<ProjectOsJob>(`/api/apps/${appId}/${action}`);
+    const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/${action}`);
     return response.data;
   },
 
   async repair(appId: string) {
-    const response = await httpClient.post<ProjectOsJob>(`/api/apps/${appId}/repair`);
+    const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/repair`);
     return response.data;
   },
 
@@ -107,7 +107,7 @@ export const InstalledAppsAPIClient = {
   },
 
   async uninstall(appId: string) {
-    const response = await httpClient.post<ProjectOsJob>(`/api/apps/${appId}/uninstall`);
+    const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/uninstall`);
     return response.data;
   },
 };

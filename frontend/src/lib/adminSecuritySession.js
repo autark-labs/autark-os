@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'project-os-admin-token';
+const STORAGE_KEY = 'autark-os-admin-token';
 
 export function readAdminToken(storage = globalThis.localStorage) {
   try {

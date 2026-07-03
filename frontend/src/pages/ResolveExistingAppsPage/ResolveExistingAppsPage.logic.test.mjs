@@ -9,7 +9,7 @@ function service(overrides = {}) {
   return {
     id: 'obs_vaultwarden',
     displayName: 'Vaultwarden',
-    managedByThisProjectOs: false,
+    managedByThisAutarkOs: false,
     pinned: false,
     userStatus: 'found_on_server',
     userStatusLabel: 'Found',
@@ -21,7 +21,7 @@ function service(overrides = {}) {
 
 test('visibleResolveExistingServices keeps observed services visible except current managed apps', () => {
   const services = [
-    service({ id: 'managed', managedByThisProjectOs: true, userStatus: 'installed_managed' }),
+    service({ id: 'managed', managedByThisAutarkOs: true, userStatus: 'installed_managed' }),
     service({ id: 'found' }),
     service({ id: 'pinned', pinned: true, userStatus: 'pinned_external' }),
   ];

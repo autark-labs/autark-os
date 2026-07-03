@@ -2,10 +2,10 @@
 set -Eeuo pipefail
 
 OUTPUT_DIR=""
-VERSION="${PROJECT_OS_VERSION:-0.0.1-SNAPSHOT}"
-CHANNEL="${PROJECT_OS_UPDATE_CHANNEL:-beta}"
-RELEASE_NOTES_URL="${PROJECT_OS_RELEASE_NOTES_URL:-}"
-SUPPORTED_ARCHITECTURES="${PROJECT_OS_SUPPORTED_ARCHITECTURES:-x86_64,aarch64,arm64}"
+VERSION="${AUTARK_OS_VERSION:-0.0.1-SNAPSHOT}"
+CHANNEL="${AUTARK_OS_UPDATE_CHANNEL:-beta}"
+RELEASE_NOTES_URL="${AUTARK_OS_RELEASE_NOTES_URL:-}"
+SUPPORTED_ARCHITECTURES="${AUTARK_OS_SUPPORTED_ARCHITECTURES:-x86_64,aarch64,arm64}"
 SKIP_BUILD=0
 DRY_RUN=0
 
@@ -20,7 +20,7 @@ Build a local Autark-OS release bundle that can be installed without Node.js
 or Yarn on the target host.
 
 Options:
-  --output-dir DIR  Directory where the bundle should be created. Default: release/project-os-VERSION.
+  --output-dir DIR  Directory where the bundle should be created. Default: release/autark-os-VERSION.
   --version VALUE   Release version metadata. Default: ${VERSION}.
   --channel VALUE   Release channel metadata. Default: ${CHANNEL}.
   --release-notes-url URL Release notes URL metadata.
@@ -30,24 +30,24 @@ Options:
   -h, --help        Show this help.
 
 The bundle layout is:
-  project-os-release.env
+  autark-os-release.env
   SHA256SUMS
-  backend/project-os-backend.jar
-  scripts/bootstrap-project-os.sh
-  scripts/install-project-os-service.sh
-  scripts/install-project-os.sh
-  scripts/project-os-gui-installer.sh
-  scripts/project-os
-  scripts/project-os-fileops
+  backend/autark-os-backend.jar
+  scripts/bootstrap-autark-os.sh
+  scripts/install-autark-os-service.sh
+  scripts/install-autark-os.sh
+  scripts/autark-os-gui-installer.sh
+  scripts/autark-os
+  scripts/autark-os-fileops
 USAGE
 }
 
 log() {
-  printf '[project-os release] %s\n' "$*"
+  printf '[autark-os release] %s\n' "$*"
 }
 
 die() {
-  printf '[project-os release] error: %s\n' "$*" >&2
+  printf '[autark-os release] error: %s\n' "$*" >&2
   exit 1
 }
 
@@ -124,14 +124,14 @@ parse_args() {
     esac
     shift
   done
-  [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${REPO_ROOT}/release/project-os-${VERSION}"
+  [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${REPO_ROOT}/release/autark-os-${VERSION}"
   if [[ "${OUTPUT_DIR}" != /* ]]; then
     OUTPUT_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
   fi
 }
 
 find_backend_jar() {
-  find "${REPO_ROOT}/backend/build/libs" -maxdepth 1 -type f -name 'project-os-backend*.jar' ! -name '*plain*.jar' | sort | head -n 1
+  find "${REPO_ROOT}/backend/build/libs" -maxdepth 1 -type f -name 'autark-os-backend*.jar' ! -name '*plain*.jar' | sort | head -n 1
 }
 
 build_project() {
@@ -155,23 +155,23 @@ write_metadata() {
   build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     cat <<META
-+ cat > ${OUTPUT_DIR}/project-os-release.env
-PROJECT_OS_VERSION=${VERSION}
-PROJECT_OS_BUILD_SHA=${build_sha}
-PROJECT_OS_BUILD_DATE=${build_date}
-PROJECT_OS_UPDATE_CHANNEL=${CHANNEL}
-PROJECT_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
-PROJECT_OS_SUPPORTED_ARCHITECTURES=${SUPPORTED_ARCHITECTURES}
++ cat > ${OUTPUT_DIR}/autark-os-release.env
+AUTARK_OS_VERSION=${VERSION}
+AUTARK_OS_BUILD_SHA=${build_sha}
+AUTARK_OS_BUILD_DATE=${build_date}
+AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
+AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
+AUTARK_OS_SUPPORTED_ARCHITECTURES=${SUPPORTED_ARCHITECTURES}
 META
     return 0
   fi
-  cat >"${OUTPUT_DIR}/project-os-release.env" <<META
-PROJECT_OS_VERSION=${VERSION}
-PROJECT_OS_BUILD_SHA=${build_sha}
-PROJECT_OS_BUILD_DATE=${build_date}
-PROJECT_OS_UPDATE_CHANNEL=${CHANNEL}
-PROJECT_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
-PROJECT_OS_SUPPORTED_ARCHITECTURES=${SUPPORTED_ARCHITECTURES}
+  cat >"${OUTPUT_DIR}/autark-os-release.env" <<META
+AUTARK_OS_VERSION=${VERSION}
+AUTARK_OS_BUILD_SHA=${build_sha}
+AUTARK_OS_BUILD_DATE=${build_date}
+AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
+AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
+AUTARK_OS_SUPPORTED_ARCHITECTURES=${SUPPORTED_ARCHITECTURES}
 META
   write_release_json "${build_sha}" "${build_date}"
   write_provenance_json "${build_sha}" "${build_date}"
@@ -196,10 +196,10 @@ json_architectures() {
 write_release_json() {
   local build_sha="$1"
   local build_date="$2"
-  cat >"${OUTPUT_DIR}/project-os-release.json" <<JSON
+  cat >"${OUTPUT_DIR}/autark-os-release.json" <<JSON
 {
   "schemaVersion": 1,
-  "name": "project-os",
+  "name": "autark-os",
   "version": "${VERSION}",
   "channel": "${CHANNEL}",
   "buildSha": "${build_sha}",
@@ -207,13 +207,13 @@ write_release_json() {
   "releaseNotesUrl": "${RELEASE_NOTES_URL}",
   "supportedArchitectures": $(json_architectures),
   "artifacts": [
-    "backend/project-os-backend.jar",
-    "scripts/bootstrap-project-os.sh",
-    "scripts/install-project-os-service.sh",
-    "scripts/install-project-os.sh",
-    "scripts/project-os-gui-installer.sh",
-    "scripts/project-os",
-    "scripts/project-os-fileops"
+    "backend/autark-os-backend.jar",
+    "scripts/bootstrap-autark-os.sh",
+    "scripts/install-autark-os-service.sh",
+    "scripts/install-autark-os.sh",
+    "scripts/autark-os-gui-installer.sh",
+    "scripts/autark-os",
+    "scripts/autark-os-fileops"
   ],
   "signatureStatus": "unsigned-reserved"
 }
@@ -223,7 +223,7 @@ JSON
 write_provenance_json() {
   local build_sha="$1"
   local build_date="$2"
-  cat >"${OUTPUT_DIR}/project-os-provenance.json" <<JSON
+  cat >"${OUTPUT_DIR}/autark-os-provenance.json" <<JSON
 {
   "schemaVersion": 1,
   "buildSha": "${build_sha}",
@@ -243,26 +243,26 @@ create_bundle() {
   log "Creating release bundle at ${OUTPUT_DIR}."
   run_cmd rm -rf "${OUTPUT_DIR}"
   run_cmd mkdir -p "${OUTPUT_DIR}/backend" "${OUTPUT_DIR}/scripts"
-  run_cmd cp "${jar}" "${OUTPUT_DIR}/backend/project-os-backend.jar"
-  run_cmd cp "${SCRIPT_DIR}/bootstrap-project-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-project-os.sh"
-  run_cmd cp "${SCRIPT_DIR}/install-project-os-service.sh" "${OUTPUT_DIR}/scripts/install-project-os-service.sh"
-  run_cmd cp "${SCRIPT_DIR}/install-project-os.sh" "${OUTPUT_DIR}/scripts/install-project-os.sh"
-  run_cmd cp "${SCRIPT_DIR}/project-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/project-os-gui-installer.sh"
-  run_cmd cp "${SCRIPT_DIR}/project-os" "${OUTPUT_DIR}/scripts/project-os"
-  run_cmd cp "${SCRIPT_DIR}/project-os-fileops" "${OUTPUT_DIR}/scripts/project-os-fileops"
+  run_cmd cp "${jar}" "${OUTPUT_DIR}/backend/autark-os-backend.jar"
+  run_cmd cp "${SCRIPT_DIR}/bootstrap-autark-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh"
+  run_cmd cp "${SCRIPT_DIR}/install-autark-os-service.sh" "${OUTPUT_DIR}/scripts/install-autark-os-service.sh"
+  run_cmd cp "${SCRIPT_DIR}/install-autark-os.sh" "${OUTPUT_DIR}/scripts/install-autark-os.sh"
+  run_cmd cp "${SCRIPT_DIR}/autark-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh"
+  run_cmd cp "${SCRIPT_DIR}/autark-os" "${OUTPUT_DIR}/scripts/autark-os"
+  run_cmd cp "${SCRIPT_DIR}/autark-os-fileops" "${OUTPUT_DIR}/scripts/autark-os-fileops"
   run_cmd chmod +x \
-    "${OUTPUT_DIR}/scripts/bootstrap-project-os.sh" \
-    "${OUTPUT_DIR}/scripts/install-project-os-service.sh" \
-    "${OUTPUT_DIR}/scripts/install-project-os.sh" \
-    "${OUTPUT_DIR}/scripts/project-os-gui-installer.sh" \
-    "${OUTPUT_DIR}/scripts/project-os" \
-    "${OUTPUT_DIR}/scripts/project-os-fileops"
+    "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh" \
+    "${OUTPUT_DIR}/scripts/install-autark-os-service.sh" \
+    "${OUTPUT_DIR}/scripts/install-autark-os.sh" \
+    "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh" \
+    "${OUTPUT_DIR}/scripts/autark-os" \
+    "${OUTPUT_DIR}/scripts/autark-os-fileops"
   write_metadata
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '+ cd %q && sha256sum backend/project-os-backend.jar scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh scripts/install-project-os.sh scripts/project-os-gui-installer.sh scripts/project-os scripts/project-os-fileops project-os-release.env project-os-release.json project-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
+    printf '+ cd %q && sha256sum backend/autark-os-backend.jar scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
   else
-    (cd "${OUTPUT_DIR}" && sha256sum backend/project-os-backend.jar scripts/bootstrap-project-os.sh scripts/install-project-os-service.sh scripts/install-project-os.sh scripts/project-os-gui-installer.sh scripts/project-os scripts/project-os-fileops project-os-release.env project-os-release.json project-os-provenance.json > SHA256SUMS)
+    (cd "${OUTPUT_DIR}" && sha256sum backend/autark-os-backend.jar scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS)
   fi
 }
 
@@ -273,10 +273,10 @@ Release bundle ready:
   ${OUTPUT_DIR}
 
 Install it on a target host:
-  ${OUTPUT_DIR}/scripts/bootstrap-project-os.sh --release-bundle ${OUTPUT_DIR} --auto-install-deps
+  ${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh --release-bundle ${OUTPUT_DIR} --auto-install-deps
 
 Preview target-host changes first:
-  ${OUTPUT_DIR}/scripts/bootstrap-project-os.sh --release-bundle ${OUTPUT_DIR} --auto-install-deps --dry-run
+  ${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh --release-bundle ${OUTPUT_DIR} --auto-install-deps --dry-run
 
 NEXT
 }

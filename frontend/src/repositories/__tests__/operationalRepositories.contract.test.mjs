@@ -39,9 +39,9 @@ test('operational pages use repository hooks instead of page-local polling', () 
   assert.match(backupRepository, /backupQueryKeys/);
   assert.match(backupRepository, /useBackupReportRepository/);
   assert.match(backupRepository, /useBackupJobsQuery/);
-  assert.match(backupRepository, /useProjectOsJobQuery/);
-  assert.match(backupRepository, /useProjectOsJobsQuery/);
-  assert.match(backupRepository, /useSharedProjectOsJobQuery/);
+  assert.match(backupRepository, /useAutarkOsJobQuery/);
+  assert.match(backupRepository, /useAutarkOsJobsQuery/);
+  assert.match(backupRepository, /useSharedAutarkOsJobQuery/);
   assert.doesNotMatch(backupRepository, /JobsAPIClient/);
 
   assert.match(jobRepository, /JobsAPIClient\.list/);

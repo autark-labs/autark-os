@@ -3,7 +3,7 @@ import { AlertTriangle, Archive, CheckCircle2, Copy, Database, FolderSearch, Har
 import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';

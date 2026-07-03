@@ -5,11 +5,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 runtime_dir="${tmp_dir}/runtime"
 printf 'fake jar for gui installer storage choice test\n' >"${fake_jar}"
 
-output="$("${repo_root}/scripts/project-os-gui-installer.sh" \
+output="$("${repo_root}/scripts/autark-os-gui-installer.sh" \
   --preview \
   --json \
   --release-jar "${fake_jar}" \
@@ -31,7 +31,7 @@ runtime_dir = os.environ["RUNTIME_DIR"]
 assert storage["id"] == "storage-choice"
 assert storage["selectedRuntimeDir"] == runtime_dir
 assert storage["selectedRuntimeDir"] == contract["plan"]["paths"]["runtimeDir"]
-assert storage["whatProjectOsStores"] == ["apps", "app data", "backups", "restore points"]
+assert storage["whatAutarkOsStores"] == ["apps", "app data", "backups", "restore points"]
 assert storage["supportDetails"]["planJsonIncluded"] is True
 assert storage["recommendation"]["path"] == plan_storage["recommendation"]["path"]
 assert storage["recommendation"]["badge"] in {"Recommended", "Use with care", "Manual choice"}

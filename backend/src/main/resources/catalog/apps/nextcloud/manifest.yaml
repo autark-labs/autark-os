@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: nextcloud
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8084:80
     - label: Data storage
-      value: /var/lib/project-os/apps/nextcloud/data
+      value: /var/lib/autark-os/apps/nextcloud/data
     - label: Backup
       value: Config and files daily
     - label: Access
@@ -122,19 +122,19 @@ health:
   description: Autark-OS checks that the Nextcloud web setup answers before calling it ready.
 runtime:
   containerName: nextcloud
-  composeProject: project-os-nextcloud
+  composeProject: autark-os-nextcloud
   image: nextcloud:34.0.1
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/nextcloud
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/nextcloud
   ports:
     - 8084:80
   volumes:
-    - /var/lib/project-os/apps/nextcloud/html:/var/www/html
-    - /var/lib/project-os/apps/nextcloud/data:/var/www/html/data
+    - /var/lib/autark-os/apps/nextcloud/html:/var/www/html
+    - /var/lib/autark-os/apps/nextcloud/data:/var/www/html/data
   labels:
-    - project-os.managed=true
-    - project-os.app-id=nextcloud
-    - project-os.version=34.0.1
+    - autark-os.managed=true
+    - autark-os.app-id=nextcloud
+    - autark-os.version=34.0.1
   backupPaths:
     - html
     - data

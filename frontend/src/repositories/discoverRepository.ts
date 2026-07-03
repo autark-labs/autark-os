@@ -5,20 +5,20 @@ import { DiscoverAPIClient } from '@/api/DiscoverAPIClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView, DiscoverInstallPreview, DiscoverInstallRequestOptions } from '@/types/discover';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
 import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
 import { invalidateBackupQueries } from './backupRepository';
 import {
   JOB_FAMILIES,
   latestActiveJob,
-  useProjectOsJobQuery,
-  useProjectOsJobsQuery,
+  useAutarkOsJobQuery,
+  useAutarkOsJobsQuery,
 } from './jobRepository';
 import { useSystemDoctorQuery } from './systemRepository';
 
-export function latestActiveDiscoverJob(jobs: ProjectOsJob[], types: string[] = JOB_FAMILIES.discover) {
-  return latestActiveJob(jobs, types) as ProjectOsJob | null;
+export function latestActiveDiscoverJob(jobs: AutarkOsJob[], types: string[] = JOB_FAMILIES.discover) {
+  return latestActiveJob(jobs, types) as AutarkOsJob | null;
 }
 
 export type DiscoverReadiness = {
@@ -109,7 +109,7 @@ export function useDiscoverInstallPreviewQuery(appId: string | null, answers: Re
 
 export function useDiscoverInstallMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectOsJob, unknown, DiscoverInstallMutationInput>({
+  return useMutation<AutarkOsJob, unknown, DiscoverInstallMutationInput>({
     mutationFn: ({ appId, answers, options = {} }) => DiscoverAPIClient.install(appId, answers, options),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
@@ -120,7 +120,7 @@ export function useDiscoverInstallMutation() {
 
 export function useDiscoverBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectOsJob, unknown, string>({
+  return useMutation<AutarkOsJob, unknown, string>({
     mutationFn: (appId) => BackupAPIClient.run(appId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
@@ -131,11 +131,11 @@ export function useDiscoverBackupMutation() {
 }
 
 export function useDiscoverJobQuery(jobId: string | null) {
-  return useProjectOsJobQuery(jobId);
+  return useAutarkOsJobQuery(jobId);
 }
 
 export function useDiscoverJobsQuery() {
-  return useProjectOsJobsQuery();
+  return useAutarkOsJobsQuery();
 }
 
 export function invalidateDiscoverQueries(queryClient: QueryClient) {

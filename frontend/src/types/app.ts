@@ -4,7 +4,7 @@ export type BackupPolicy = {
   retention: number;
 };
 
-export type ProjectOsAction = {
+export type AutarkOsAction = {
   id: string;
   label: string;
   method?: string | null;
@@ -14,7 +14,7 @@ export type ProjectOsAction = {
   danger: boolean;
 };
 
-export type ProjectOsIssue = {
+export type AutarkOsIssue = {
   id: string;
   scope: 'system' | 'app' | 'backup' | 'access' | 'storage' | 'setup' | string;
   subjectId: string;
@@ -22,8 +22,8 @@ export type ProjectOsIssue = {
   reasonCode: string;
   title: string;
   summary: string;
-  primaryAction?: ProjectOsAction | null;
-  secondaryActions: ProjectOsAction[];
+  primaryAction?: AutarkOsAction | null;
+  secondaryActions: AutarkOsAction[];
   advancedDetails: Record<string, unknown>;
 };
 
@@ -64,8 +64,8 @@ export type AppInstanceView = {
   backupState: 'backup_disabled' | 'backup_enabled_no_restore_point' | 'protected_by_restore_point' | 'backup_failed' | 'restore_in_progress' | string;
   localUrl: string;
   privateUrl: string;
-  issues: ProjectOsIssue[];
-  actions: ProjectOsAction[];
+  issues: AutarkOsIssue[];
+  actions: AutarkOsAction[];
   remediation?: AppRemediationView | null;
   updatedAt: string;
 };
@@ -225,7 +225,7 @@ export type AppRuntimeView = {
   operationState?: BackendAppOperationState | null;
   sortKey?: string;
   displayOrder?: number;
-  availableActions?: ProjectOsAction[];
+  availableActions?: AutarkOsAction[];
   technicalStatus: string;
   healthCheck: string;
   runtimePath: string;
@@ -248,8 +248,8 @@ export type AppRuntimeView = {
   canonicalOwnershipState?: string;
   canonicalAccessState?: string;
   canonicalBackupState?: string;
-  canonicalIssues?: ProjectOsIssue[];
-  canonicalActions?: ProjectOsAction[];
+  canonicalIssues?: AutarkOsIssue[];
+  canonicalActions?: AutarkOsAction[];
   remediation?: AppRemediationView | null;
 };
 

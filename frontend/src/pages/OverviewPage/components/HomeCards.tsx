@@ -10,7 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Surface } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
-import type { ProjectOsAction, ProjectOsIssue } from '@/types/app';
+import type { AutarkOsAction, AutarkOsIssue } from '@/types/app';
 
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'teal' | 'neutral';
 
@@ -118,7 +118,7 @@ export function HomeActionCard({
   severity = 'info',
   title,
 }: {
-  action?: ProjectOsAction | null;
+  action?: AutarkOsAction | null;
   body: ReactNode;
   className?: string;
   dismissible?: boolean;
@@ -152,7 +152,7 @@ export function HomeIssueBanner({
   issue,
 }: {
   className?: string;
-  issue: ProjectOsIssue;
+  issue: AutarkOsIssue;
 }) {
   const tone = issueTone(issue.severity);
   const Icon = issueIcon(issue.severity);
@@ -350,7 +350,7 @@ export function HomeActionButton({
   fallbackRoute,
   variant = 'default',
 }: {
-  action?: ProjectOsAction | null;
+  action?: AutarkOsAction | null;
   className?: string;
   fallbackRoute?: string;
   variant?: 'default' | 'dark';

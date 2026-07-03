@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: pi-hole
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 5353:53/tcp, 5353:53/udp, 8081:80
     - label: Data storage
-      value: /var/lib/project-os/apps/pi-hole/etc-pihole
+      value: /var/lib/autark-os/apps/pi-hole/etc-pihole
     - label: Backup
       value: DNS settings daily
     - label: Access
@@ -126,23 +126,23 @@ health:
   description: Autark-OS checks that the Pi-hole dashboard answers before calling it ready.
 runtime:
   containerName: pi-hole
-  composeProject: project-os-pi-hole
+  composeProject: autark-os-pi-hole
   image: pihole/pihole:2026.06.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/pi-hole
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/pi-hole
   ports:
     - 5353:53/tcp
     - 5353:53/udp
     - 8081:80
   volumes:
-    - /var/lib/project-os/apps/pi-hole/etc-pihole:/etc/pihole
-    - /var/lib/project-os/apps/pi-hole/etc-dnsmasq:/etc/dnsmasq.d
+    - /var/lib/autark-os/apps/pi-hole/etc-pihole:/etc/pihole
+    - /var/lib/autark-os/apps/pi-hole/etc-dnsmasq:/etc/dnsmasq.d
   environment:
     - TZ=UTC
   labels:
-    - project-os.managed=true
-    - project-os.app-id=pi-hole
-    - project-os.version=2026.06.0
+    - autark-os.managed=true
+    - autark-os.app-id=pi-hole
+    - autark-os.version=2026.06.0
   backupPaths:
     - etc-pihole
     - etc-dnsmasq

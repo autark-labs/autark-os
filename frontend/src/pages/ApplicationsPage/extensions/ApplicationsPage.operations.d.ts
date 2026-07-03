@@ -1,4 +1,4 @@
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import type {
   ApplicationRuntimeAction,
   ApplicationSettingsAction,
@@ -10,7 +10,7 @@ export function operationStateForItem(
   item: Pick<ApplicationSurfaceItem, 'id' | 'sourceId'>,
   localAction: ApplicationRuntimeAction | null,
   settingsAction: ApplicationSettingsAction | null,
-  jobs: ProjectOsJob[],
+  jobs: AutarkOsJob[],
 ): AppOperationState;
 
 export function runtimeControlsDisabled(

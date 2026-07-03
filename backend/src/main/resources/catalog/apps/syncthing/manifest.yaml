@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: syncthing
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8384:8384, 22000, 21027/udp
     - label: Data storage
-      value: /var/lib/project-os/apps/syncthing/config
+      value: /var/lib/autark-os/apps/syncthing/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -124,22 +124,22 @@ health:
   description: Autark-OS checks that the Syncthing dashboard answers before calling it ready.
 runtime:
   containerName: syncthing
-  composeProject: project-os-syncthing
+  composeProject: autark-os-syncthing
   image: syncthing/syncthing:2.1.1
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/syncthing
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/syncthing
   ports:
     - 8384:8384
     - 22000:22000/tcp
     - 22000:22000/udp
     - 21027:21027/udp
   volumes:
-    - /var/lib/project-os/apps/syncthing/config:/var/syncthing/config
-    - /var/lib/project-os/apps/syncthing/data:/var/syncthing/data
+    - /var/lib/autark-os/apps/syncthing/config:/var/syncthing/config
+    - /var/lib/autark-os/apps/syncthing/data:/var/syncthing/data
   labels:
-    - project-os.managed=true
-    - project-os.app-id=syncthing
-    - project-os.version=2.1.1
+    - autark-os.managed=true
+    - autark-os.app-id=syncthing
+    - autark-os.version=2.1.1
   backupPaths:
     - config
   privileged: false

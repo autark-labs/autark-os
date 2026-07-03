@@ -1,12 +1,12 @@
 {
-  "name": "project-os-frontend",
+  "name": "autark-os-frontend",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "check:ui-tokens": "node scripts/check-project-os-ui-tokens.mjs",
+    "check:ui-tokens": "node scripts/check-autark-os-ui-tokens.mjs",
     "test": "vite test",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",

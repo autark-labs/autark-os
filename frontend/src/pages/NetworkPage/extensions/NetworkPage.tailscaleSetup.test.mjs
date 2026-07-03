@@ -43,7 +43,7 @@ test('reassures connected users without repeating sign-in prompts', () => {
 test('adds serve permission and magic dns tasks after connection', () => {
   const tasks = tailscaleSetupTasks({
     tailscale: { installed: true, connected: true, dnsName: null },
-    setup: { checks: [{ id: 'tailscale-operator', status: 'warning', detail: 'operator missing', actionCommand: 'sudo tailscale set --operator=projectos' }] },
+    setup: { checks: [{ id: 'tailscale-operator', status: 'warning', detail: 'operator missing', actionCommand: 'sudo tailscale set --operator=autarkos' }] },
   });
 
   assert.equal(tasks.find((task) => task.id === 'serve-permission')?.status, 'warning');

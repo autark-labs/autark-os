@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: prowlarr
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 9696:9696
     - label: Data storage
-      value: /var/lib/project-os/apps/prowlarr/config
+      value: /var/lib/autark-os/apps/prowlarr/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -152,22 +152,22 @@ health:
   description: Autark-OS checks that the Prowlarr dashboard answers before calling it ready.
 runtime:
   containerName: prowlarr
-  composeProject: project-os-prowlarr
+  composeProject: autark-os-prowlarr
   image: lscr.io/linuxserver/prowlarr:version-2.4.0.5397
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/prowlarr
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/prowlarr
   ports:
     - 9696:9696
   volumes:
-    - /var/lib/project-os/apps/prowlarr/config:/config
+    - /var/lib/autark-os/apps/prowlarr/config:/config
   environment:
     - PUID=1000
     - PGID=1000
     - TZ=UTC
   labels:
-    - project-os.managed=true
-    - project-os.app-id=prowlarr
-    - project-os.version=2.4.0.5397
+    - autark-os.managed=true
+    - autark-os.app-id=prowlarr
+    - autark-os.version=2.4.0.5397
   backupPaths:
     - config
   privileged: false

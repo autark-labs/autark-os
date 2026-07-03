@@ -26,10 +26,10 @@ exit 1
 SH
 chmod +x "${fake_bin}/docker"
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 printf 'fake jar\n' >"${fake_jar}"
 
-output="$(PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-project-os.sh" \
+output="$(PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-autark-os.sh" \
   --release-jar "${fake_jar}" \
   --auto-install-deps \
   --dry-run \
@@ -69,7 +69,7 @@ PRETTY_NAME="Ubuntu 26.04 LTS"
 VERSION_ID="26.04"
 EOF
 
-missing_java_output="$(PROJECT_OS_OS_RELEASE_FIXTURE="${os_release_fixture}" PROJECT_OS_JAVA_BIN="${tmp_dir}/does-not-exist/java" PATH="${missing_java_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-project-os.sh" \
+missing_java_output="$(AUTARK_OS_OS_RELEASE_FIXTURE="${os_release_fixture}" AUTARK_OS_JAVA_BIN="${tmp_dir}/does-not-exist/java" PATH="${missing_java_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-autark-os.sh" \
   --release-jar "${fake_jar}" \
   --auto-install-deps \
   --dry-run \

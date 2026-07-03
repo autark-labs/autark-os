@@ -2,10 +2,10 @@ import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import type { BackupReport, RestorePlan } from '@/types/backup';
-import type { ProjectOsJob } from '@/types/jobs';
+import type { AutarkOsJob } from '@/types/jobs';
 import {
-  useProjectOsJobQuery as useSharedProjectOsJobQuery,
-  useProjectOsJobsQuery,
+  useAutarkOsJobQuery as useSharedAutarkOsJobQuery,
+  useAutarkOsJobsQuery,
 } from './jobRepository';
 import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
 
@@ -45,17 +45,17 @@ export function useBackupReportRepository({ paused = false }: { paused?: boolean
   };
 }
 
-export function useProjectOsJobQuery(jobId: string | null) {
-  return useSharedProjectOsJobQuery(jobId);
+export function useAutarkOsJobQuery(jobId: string | null) {
+  return useSharedAutarkOsJobQuery(jobId);
 }
 
 export function useBackupJobsQuery() {
-  return useProjectOsJobsQuery();
+  return useAutarkOsJobsQuery();
 }
 
 export function useRunAppBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectOsJob, unknown, string>({
+  return useMutation<AutarkOsJob, unknown, string>({
     mutationFn: (appId) => BackupAPIClient.run(appId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
@@ -66,7 +66,7 @@ export function useRunAppBackupMutation() {
 
 export function useRunFullBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectOsJob>({
+  return useMutation<AutarkOsJob>({
     mutationFn: () => BackupAPIClient.runFull(),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
@@ -77,7 +77,7 @@ export function useRunFullBackupMutation() {
 
 export function useRunRoutineBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectOsJob>({
+  return useMutation<AutarkOsJob>({
     mutationFn: () => BackupAPIClient.runRoutine(),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
@@ -94,7 +94,7 @@ export function useRestorePlanMutation() {
 
 export function useRestoreBackupMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectOsJob, unknown, { restorePointId: number; appId?: string | null }>({
+  return useMutation<AutarkOsJob, unknown, { restorePointId: number; appId?: string | null }>({
     mutationFn: ({ restorePointId, appId }) => BackupAPIClient.restore(restorePointId, appId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);
@@ -105,7 +105,7 @@ export function useRestoreBackupMutation() {
 
 export function useVerifyRestorePointMutation() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectOsJob, unknown, number>({
+  return useMutation<AutarkOsJob, unknown, number>({
     mutationFn: (restorePointId) => BackupAPIClient.verify(restorePointId),
     onSuccess: (job) => {
       syncCanonicalAppMutationResult(queryClient, job);

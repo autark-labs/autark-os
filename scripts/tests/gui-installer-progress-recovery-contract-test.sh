@@ -5,11 +5,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 state_dir="${tmp_dir}/state"
 printf 'fake jar for gui installer progress recovery test\n' >"${fake_jar}"
 
-output="$("${repo_root}/scripts/project-os-gui-installer.sh" \
+output="$("${repo_root}/scripts/autark-os-gui-installer.sh" \
   --preview \
   --json \
   --release-jar "${fake_jar}" \
@@ -42,8 +42,8 @@ expected_stages = [
     "verify-release",
     "prepare-dependencies",
     "create-service-user",
-    "install-project-os",
-    "start-project-os",
+    "install-autark-os",
+    "start-autark-os",
     "check-readiness",
 ]
 assert [stage["id"] for stage in progress["stages"]] == expected_stages

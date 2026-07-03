@@ -5,10 +5,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "${tmp_dir}"' EXIT
 
-fake_jar="${tmp_dir}/project-os-backend.jar"
+fake_jar="${tmp_dir}/autark-os-backend.jar"
 printf 'fake jar for gui installer device check test\n' >"${fake_jar}"
 
-output="$("${repo_root}/scripts/project-os-gui-installer.sh" \
+output="$("${repo_root}/scripts/autark-os-gui-installer.sh" \
   --preview \
   --json \
   --release-jar "${fake_jar}" \

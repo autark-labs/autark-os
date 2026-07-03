@@ -44,7 +44,7 @@ export type ObservedServiceView = {
   ownershipState: string;
   runtimeState: string;
   pinned: boolean;
-  managedByThisProjectOs: boolean;
+  managedByThisAutarkOs: boolean;
   adoptable: boolean;
   duplicateInstallWarningRequired: boolean;
   availableActions: ObservedServiceAction[];

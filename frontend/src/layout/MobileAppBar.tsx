@@ -1,8 +1,8 @@
 import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House, LayoutGrid, Loader2, Menu, Settings, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
-import { ThemeSelectorPopover } from '@/components/project-os/ThemeSelectorPopover';
+import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
+import { ThemeSelectorPopover } from '@/components/autark-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
-import { jobTypeLabel, useGlobalActiveProjectOsJob } from '@/repositories/jobRepository';
+import { jobTypeLabel, useGlobalActiveAutarkOsJob } from '@/repositories/jobRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
 import { navigationGroups } from './navigationModel';
 
@@ -47,7 +47,7 @@ function MobileAppBar() {
   const location = useLocation();
   const { viewMode } = useProjectSettings();
   const doctorQuery = useSystemDoctorQuery();
-  const activeJobQuery = useGlobalActiveProjectOsJob();
+  const activeJobQuery = useGlobalActiveAutarkOsJob();
   const navGroups = navigationGroups(viewMode) as NavGroup[];
   const activeJob = activeJobQuery.activeJob;
   const checks = doctorQuery.data?.checks ?? [];

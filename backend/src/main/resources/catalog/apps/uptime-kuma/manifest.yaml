@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: uptime-kuma
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 3001:3001
     - label: Data storage
-      value: /var/lib/project-os/apps/uptime-kuma/data
+      value: /var/lib/autark-os/apps/uptime-kuma/data
     - label: Backup
       value: Monitor data daily
     - label: Access
@@ -96,18 +96,18 @@ access:
     - First-run setup creates the admin account and notification preferences.
 runtime:
   containerName: uptime-kuma
-  composeProject: project-os-uptime-kuma
+  composeProject: autark-os-uptime-kuma
   image: louislam/uptime-kuma:2.4.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/uptime-kuma
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/uptime-kuma
   ports:
     - 3001:3001
   volumes:
-    - /var/lib/project-os/apps/uptime-kuma/data:/app/data
+    - /var/lib/autark-os/apps/uptime-kuma/data:/app/data
   labels:
-    - project-os.managed=true
-    - project-os.app-id=uptime-kuma
-    - project-os.version=2.4.0
+    - autark-os.managed=true
+    - autark-os.app-id=uptime-kuma
+    - autark-os.version=2.4.0
   backupPaths:
     - data
   privileged: false

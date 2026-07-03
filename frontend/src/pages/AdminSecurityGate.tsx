@@ -3,7 +3,7 @@ import { Lock, ShieldCheck } from 'lucide-react';
 import { AdminSecurityAPIClient, type AdminSecurityStatus } from '@/api/AdminSecurityAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { writeAdminToken } from '@/lib/adminSecuritySession';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Input } from '@/components/ui/input';
 

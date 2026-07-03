@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import {
   DropdownMenu,
   DropdownMenuContent,

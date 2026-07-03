@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
@@ -85,7 +85,7 @@ function MonitoringPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `project-os-monitoring-${new Date().toISOString().replaceAll(':', '-')}.json`;
+      link.download = `autark-os-monitoring-${new Date().toISOString().replaceAll(':', '-')}.json`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -169,7 +169,7 @@ function MonitoringPage() {
 
       {showAdvancedMetrics && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-          <ProjectOsMetricsPanel
+          <AutarkOsMetricsPanel
             categoryData={categoryData}
             levelData={levelData}
             reliability={reliability}
@@ -379,7 +379,7 @@ function MiniCount({ label, tone, value }: { label: string; tone: 'green' | 'ora
   );
 }
 
-function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData, reliability, resourceData }: { appTrendData: AppTrendPoint[]; categoryData: ChartPoint[]; history: MonitoringHistory | null; levelData: ChartPoint[]; reliability: AppReliabilitySummary | null; resourceData: ResourcePoint[] }) {
+function AutarkOsMetricsPanel({ appTrendData, categoryData, history, levelData, reliability, resourceData }: { appTrendData: AppTrendPoint[]; categoryData: ChartPoint[]; history: MonitoringHistory | null; levelData: ChartPoint[]; reliability: AppReliabilitySummary | null; resourceData: ResourcePoint[] }) {
   const healthTotal = Math.max(1, reliability?.totalApps ?? 0);
   const healthyPercent = ((reliability?.readyApps ?? 0) / healthTotal) * 100;
   const startingPercent = ((reliability?.startingApps ?? 0) / healthTotal) * 100;

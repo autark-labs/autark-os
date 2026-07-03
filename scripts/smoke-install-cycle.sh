@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-SMOKE_NAME="project-os-smoke"
+SMOKE_NAME="autark-os-smoke"
 PORT="18082"
 BUNDLE_DIR=""
 WORK_DIR=""
@@ -26,23 +26,23 @@ Options:
   --install-deps        With --run, pass --auto-install-deps to the installer.
   --bundle-dir DIR      Use an existing release bundle.
   --work-dir DIR        Store temporary bundle/support output in DIR.
-  --smoke-name NAME     Isolated service/CLI/user prefix. Default: project-os-smoke.
+  --smoke-name NAME     Isolated service/CLI/user prefix. Default: autark-os-smoke.
   --port PORT           Smoke service port. Default: 18082.
   -h, --help            Show this help.
 
 Examples:
   scripts/smoke-install-cycle.sh --dry-run
-  scripts/smoke-install-cycle.sh --run --bundle-dir /path/to/project-os-release
+  scripts/smoke-install-cycle.sh --run --bundle-dir /path/to/autark-os-release
   scripts/smoke-install-cycle.sh --run --install-deps --keep-install
 USAGE
 }
 
 log() {
-  printf '[project-os smoke] %s\n' "$*"
+  printf '[autark-os smoke] %s\n' "$*"
 }
 
 die() {
-  printf '[project-os smoke] error: %s\n' "$*" >&2
+  printf '[autark-os smoke] error: %s\n' "$*" >&2
   exit 1
 }
 
@@ -136,18 +136,18 @@ prepare_bundle() {
   "${REPO_ROOT}/scripts/build-release-bundle.sh" \
     --version "smoke-$(date -u +%Y%m%d%H%M%S)" \
     --channel smoke \
-    --release-notes-url "https://example.invalid/project-os/smoke" \
+    --release-notes-url "https://example.invalid/autark-os/smoke" \
     --output-dir "${BUNDLE_DIR}"
 }
 
 cleanup_smoke_install() {
   local config_file="$1"
   log "Cleaning up ${SMOKE_NAME}."
-  PROJECT_OS_SERVICE_NAME="${SMOKE_NAME}" \
-  PROJECT_OS_CONFIG_FILE="${config_file}" \
-  PROJECT_OS_SERVICE_FILE="/etc/systemd/system/${SMOKE_NAME}.service" \
-  PROJECT_OS_CLI_LINK="/usr/local/bin/${SMOKE_NAME}" \
-    "${REPO_ROOT}/scripts/project-os" uninstall \
+  AUTARK_OS_SERVICE_NAME="${SMOKE_NAME}" \
+  AUTARK_OS_CONFIG_FILE="${config_file}" \
+  AUTARK_OS_SERVICE_FILE="/etc/systemd/system/${SMOKE_NAME}.service" \
+  AUTARK_OS_CLI_LINK="/usr/local/bin/${SMOKE_NAME}" \
+    "${REPO_ROOT}/scripts/autark-os" uninstall \
       --remove-data \
       --confirm-delete-data DELETE-AUTARK-OS-DATA \
       --yes || true
@@ -169,7 +169,7 @@ main() {
   local runtime_dir="/var/lib/${SMOKE_NAME}"
   local config_dir="/etc/${SMOKE_NAME}"
   local log_dir="/var/log/${SMOKE_NAME}"
-  local config_file="${config_dir}/project-os.env"
+  local config_file="${config_dir}/autark-os.env"
   local service_file="/etc/systemd/system/${SMOKE_NAME}.service"
   local cli_link="/usr/local/bin/${SMOKE_NAME}"
   local state_dir="${WORK_DIR}/installer-state"
@@ -198,12 +198,12 @@ main() {
   [[ "${INSTALL_DEPS}" -eq 1 ]] && install_args+=(--auto-install-deps)
   [[ "${RUN_INSTALL}" -eq 0 ]] && install_args+=(--dry-run)
 
-  PROJECT_OS_SERVICE_NAME="${SMOKE_NAME}" \
-  PROJECT_OS_USER="${user_name}" \
-  PROJECT_OS_GROUP="${user_name}" \
-  PROJECT_OS_SERVICE_FILE="${service_file}" \
-  PROJECT_OS_CLI_LINK="${cli_link}" \
-    "${REPO_ROOT}/scripts/bootstrap-project-os.sh" "${install_args[@]}"
+  AUTARK_OS_SERVICE_NAME="${SMOKE_NAME}" \
+  AUTARK_OS_USER="${user_name}" \
+  AUTARK_OS_GROUP="${user_name}" \
+  AUTARK_OS_SERVICE_FILE="${service_file}" \
+  AUTARK_OS_CLI_LINK="${cli_link}" \
+    "${REPO_ROOT}/scripts/bootstrap-autark-os.sh" "${install_args[@]}"
 
   if [[ "${RUN_INSTALL}" -eq 0 ]]; then
     log "Dry run complete. Cleanup command is not needed because no host changes were made."
@@ -212,17 +212,17 @@ main() {
     return 0
   fi
 
-  PROJECT_OS_SERVICE_NAME="${SMOKE_NAME}" \
-  PROJECT_OS_CONFIG_FILE="${config_file}" \
-  PROJECT_OS_SERVICE_FILE="${service_file}" \
-  PROJECT_OS_CLI_LINK="${cli_link}" \
-    "${REPO_ROOT}/scripts/project-os" doctor || true
+  AUTARK_OS_SERVICE_NAME="${SMOKE_NAME}" \
+  AUTARK_OS_CONFIG_FILE="${config_file}" \
+  AUTARK_OS_SERVICE_FILE="${service_file}" \
+  AUTARK_OS_CLI_LINK="${cli_link}" \
+    "${REPO_ROOT}/scripts/autark-os" doctor || true
 
-  PROJECT_OS_SERVICE_NAME="${SMOKE_NAME}" \
-  PROJECT_OS_CONFIG_FILE="${config_file}" \
-  PROJECT_OS_SERVICE_FILE="${service_file}" \
-  PROJECT_OS_CLI_LINK="${cli_link}" \
-    "${REPO_ROOT}/scripts/project-os" support-bundle \
+  AUTARK_OS_SERVICE_NAME="${SMOKE_NAME}" \
+  AUTARK_OS_CONFIG_FILE="${config_file}" \
+  AUTARK_OS_SERVICE_FILE="${service_file}" \
+  AUTARK_OS_CLI_LINK="${cli_link}" \
+    "${REPO_ROOT}/scripts/autark-os" support-bundle \
       --release-bundle "${BUNDLE_DIR}" \
       --state-dir "${state_dir}" \
       --output "${support_file}" || true
@@ -230,7 +230,7 @@ main() {
   log "Support bundle: ${support_file}"
   if [[ "${KEEP_INSTALL}" -eq 1 ]]; then
     log "Keeping smoke install for inspection."
-    log "Cleanup command: PROJECT_OS_SERVICE_NAME=${SMOKE_NAME} PROJECT_OS_CONFIG_FILE=${config_file} ${REPO_ROOT}/scripts/project-os uninstall --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA --yes"
+    log "Cleanup command: AUTARK_OS_SERVICE_NAME=${SMOKE_NAME} AUTARK_OS_CONFIG_FILE=${config_file} ${REPO_ROOT}/scripts/autark-os uninstall --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA --yes"
     return 0
   fi
   cleanup_smoke_install "${config_file}"

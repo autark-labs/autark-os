@@ -9,7 +9,7 @@ import {
   healthByAppId,
   managedRuntimeApps,
   removeManagedAppFromState,
-  setProjectOsJobInState,
+  setAutarkOsJobInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   setObservedServiceAdoptedInState,
@@ -165,7 +165,7 @@ test('observed service adoption helper moves a recoverable service into managed 
   assert.deepEqual(adopted.managedApps.map((app) => [app.catalogAppId, app.name, app.userStatus]), [
     ['vaultwarden', 'Vaultwarden', 'Ready'],
   ]);
-  assert.deepEqual(adopted.observedServices.map((service) => [service.id, service.userStatus, service.managedByThisProjectOs, service.pinned]), [
+  assert.deepEqual(adopted.observedServices.map((service) => [service.id, service.userStatus, service.managedByThisAutarkOs, service.pinned]), [
     ['docker:vaultwarden', 'installed_managed', true, false],
   ]);
 });
@@ -207,7 +207,7 @@ test('runtime app cache helper preserves existing runtime app order', () => {
   assert.deepEqual(updated.runtimeApps.map((app) => app.appId), ['homepage', 'syncthing', 'vaultwarden']);
 });
 
-test('project os job helper applies backend operation state without reordering apps', () => {
+test('autark os job helper applies backend operation state without reordering apps', () => {
   const state = {
     runtimeApps: [
       runtimeApp('homepage', 'Ready'),
@@ -221,7 +221,7 @@ test('project os job helper applies backend operation state without reordering a
     ],
   };
 
-  const updated = setProjectOsJobInState(state, {
+  const updated = setAutarkOsJobInState(state, {
     jobId: 'restart-1',
     type: 'restart_app',
     subjectId: 'syncthing',
@@ -241,13 +241,13 @@ test('project os job helper applies backend operation state without reordering a
   assert.equal(updated.managedApps[1].userStatus, 'Starting');
 });
 
-test('project os job helper maps install and backup work for existing apps', () => {
+test('autark os job helper maps install and backup work for existing apps', () => {
   const state = {
     runtimeApps: [runtimeApp('vaultwarden', 'Ready')],
     managedApps: [{ catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' }],
   };
 
-  const installing = setProjectOsJobInState(state, {
+  const installing = setAutarkOsJobInState(state, {
     jobId: 'install-1',
     type: 'install_app',
     subjectId: 'vaultwarden',
@@ -257,7 +257,7 @@ test('project os job helper maps install and backup work for existing apps', () 
     createdAt: updatedAt,
     updatedAt,
   });
-  const backingUp = setProjectOsJobInState(state, {
+  const backingUp = setAutarkOsJobInState(state, {
     jobId: 'backup-1',
     type: 'backup',
     subjectId: 'vaultwarden',
@@ -274,7 +274,7 @@ test('project os job helper maps install and backup work for existing apps', () 
   assert.equal(backingUp.runtimeApps[0].friendlyStatus, 'Ready');
 });
 
-test('project os job helper maps restore work by restore target subject', () => {
+test('autark os job helper maps restore work by restore target subject', () => {
   const state = {
     runtimeApps: [runtimeApp('homepage', 'Ready'), runtimeApp('vaultwarden', 'Ready')],
     managedApps: [
@@ -283,7 +283,7 @@ test('project os job helper maps restore work by restore target subject', () => 
     ],
   };
 
-  const targeted = setProjectOsJobInState(state, restoreJob('42:vaultwarden', 'running'));
+  const targeted = setAutarkOsJobInState(state, restoreJob('42:vaultwarden', 'running'));
 
   assert.equal(targeted.runtimeApps[0].operationState?.kind, undefined);
   assert.equal(targeted.runtimeApps[1].operationState.kind, 'restoring');
@@ -291,26 +291,26 @@ test('project os job helper maps restore work by restore target subject', () => 
   assert.deepEqual(targeted.runtimeApps[1].availableActions, []);
   assert.equal(targeted.managedApps[1].userStatus, 'Ready');
 
-  const fullRestore = setProjectOsJobInState(state, restoreJob('42:all', 'running'));
+  const fullRestore = setAutarkOsJobInState(state, restoreJob('42:all', 'running'));
 
   assert.deepEqual(fullRestore.runtimeApps.map((app) => app.operationState.kind), ['restoring', 'restoring']);
   assert.deepEqual(fullRestore.managedApps.map((app) => app.userStatus), ['Ready', 'Ready']);
 });
 
-test('project os job helper clears restore overlay after restore completes', () => {
+test('autark os job helper clears restore overlay after restore completes', () => {
   const state = {
     runtimeApps: [{ ...runtimeApp('vaultwarden', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' } }],
     managedApps: [{ catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' }],
   };
 
-  const updated = setProjectOsJobInState(state, restoreJob('42:vaultwarden', 'succeeded'));
+  const updated = setAutarkOsJobInState(state, restoreJob('42:vaultwarden', 'succeeded'));
 
   assert.equal(updated.runtimeApps[0].operationState.kind, 'idle');
   assert.equal(updated.runtimeApps[0].friendlyStatus, 'Ready');
   assert.equal(updated.managedApps[0].userStatus, 'Ready');
 });
 
-test('project os job helper clears full restore overlay after full restore fails', () => {
+test('autark os job helper clears full restore overlay after full restore fails', () => {
   const state = {
     runtimeApps: [
       { ...runtimeApp('homepage', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' }, availableActions: [{ id: 'restart', label: 'Restart' }] },
@@ -322,7 +322,7 @@ test('project os job helper clears full restore overlay after full restore fails
     ],
   };
 
-  const updated = setProjectOsJobInState(state, restoreJob('42:all', 'failed'));
+  const updated = setAutarkOsJobInState(state, restoreJob('42:all', 'failed'));
 
   assert.deepEqual(updated.runtimeApps.map((app) => app.operationState.kind), ['idle', 'idle']);
   assert.deepEqual(updated.managedApps.map((app) => app.userStatus), ['Ready', 'Ready']);
@@ -403,10 +403,10 @@ function observedService(id, userStatus, pinned) {
     userStatus,
     userStatusLabel: userStatus === 'recoverable' ? 'Recoverable' : 'Found',
     userStatusDescription: userStatus === 'recoverable' ? 'Recoverable Autark-OS app.' : 'Found on this server.',
-    ownershipState: userStatus === 'recoverable' ? 'legacy_project_os' : 'external_docker',
+    ownershipState: userStatus === 'recoverable' ? 'legacy_autark_os' : 'external_docker',
     runtimeState: 'running',
     pinned,
-    managedByThisProjectOs: false,
+    managedByThisAutarkOs: false,
     availableActions: [],
   };
 }

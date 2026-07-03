@@ -37,9 +37,9 @@ assert "Recommended path" in guide
 assert "GUI installer" in guide
 assert "One-command installer" in guide
 assert "Advanced CLI" in guide
-assert "curl -fsSL https://install.project-os.dev | bash" in guide
-assert "project-os support-bundle --output" in guide
-assert "[Beta testing repository](https://github.com/autark-labs/project-os/)" in guide
+assert "curl -fsSL https://install.autark-os.dev | bash" in guide
+assert "autark-os support-bundle --output" in guide
+assert "[Beta testing repository](https://github.com/autark-labs/autark-os/)" in guide
 assert "[Street-to-seat installation](./street-to-seat-installation.md)" not in guide
 assert "[Installer Technical Implementation](./installer-technical-implementation.md)" not in guide
 
@@ -56,5 +56,5 @@ assert "Save support report" in attention_section
 
 assert "docs/non-technical-install-guide.md" in readme
 assert "./non-technical-install-guide.md" in docs_index
-assert "https://github.com/autark-labs/project-os/" in docs_index
+assert "https://github.com/autark-labs/autark-os/" in docs_index
 PY

@@ -78,11 +78,11 @@ technical:
     - label: Container name
       value: home-assistant
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8123:8123
     - label: Data storage
-      value: /var/lib/project-os/apps/home-assistant/config
+      value: /var/lib/autark-os/apps/home-assistant/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -97,18 +97,18 @@ access:
     - Private access is recommended for managing your home while away.
 runtime:
   containerName: home-assistant
-  composeProject: project-os-home-assistant
+  composeProject: autark-os-home-assistant
   image: ghcr.io/home-assistant/home-assistant:2026.7.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/home-assistant
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/home-assistant
   ports:
     - 8123:8123
   volumes:
-    - /var/lib/project-os/apps/home-assistant/config:/config
+    - /var/lib/autark-os/apps/home-assistant/config:/config
   labels:
-    - project-os.managed=true
-    - project-os.app-id=home-assistant
-    - project-os.version=2026.7.0
+    - autark-os.managed=true
+    - autark-os.app-id=home-assistant
+    - autark-os.version=2026.7.0
   backupPaths:
     - config
   privileged: false

@@ -14,7 +14,7 @@ Use this checklist before adding or updating a catalog app manifest.
 
 - `runtime.image` is pinned to a specific version or digest when practical.
 - `runtime.containerName` and `runtime.composeProject` are unique.
-- `runtime.runtimeRoot` is exactly `/var/lib/project-os/apps/<app-id>`.
+- `runtime.runtimeRoot` is exactly `/var/lib/autark-os/apps/<app-id>`.
 - `runtime.ports` uses `host:container` or `host:container/protocol`.
 - Preferred host ports do not collide with other manifests for the same protocol.
 - `runtime.volumes` use `host:container` and every host path stays under the app runtime root.

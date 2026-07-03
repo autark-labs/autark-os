@@ -77,11 +77,11 @@ technical:
     - label: Container name
       value: stirling-pdf
     - label: Network
-      value: project-os-apps
+      value: autark-os-apps
     - label: Ports
       value: 8095:8080
     - label: Data storage
-      value: /var/lib/project-os/apps/stirling-pdf/config
+      value: /var/lib/autark-os/apps/stirling-pdf/config
     - label: Backup
       value: Configuration daily
     - label: Access
@@ -96,19 +96,19 @@ access:
     - Public exposure is not recommended because PDFs may contain sensitive information.
 runtime:
   containerName: stirling-pdf
-  composeProject: project-os-stirling-pdf
+  composeProject: autark-os-stirling-pdf
   image: stirlingtools/stirling-pdf:2.14.0
-  network: project-os-apps
-  runtimeRoot: /var/lib/project-os/apps/stirling-pdf
+  network: autark-os-apps
+  runtimeRoot: /var/lib/autark-os/apps/stirling-pdf
   ports:
     - 8095:8080
   volumes:
-    - /var/lib/project-os/apps/stirling-pdf/config:/configs
-    - /var/lib/project-os/apps/stirling-pdf/work:/usr/share/tessdata
+    - /var/lib/autark-os/apps/stirling-pdf/config:/configs
+    - /var/lib/autark-os/apps/stirling-pdf/work:/usr/share/tessdata
   labels:
-    - project-os.managed=true
-    - project-os.app-id=stirling-pdf
-    - project-os.version=2.14.0
+    - autark-os.managed=true
+    - autark-os.app-id=stirling-pdf
+    - autark-os.version=2.14.0
   backupPaths:
     - config
   privileged: false

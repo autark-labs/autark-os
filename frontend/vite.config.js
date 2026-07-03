@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const backendUrl = process.env.PROJECT_OS_BACKEND_URL || process.env.VITE_PROJECT_OS_BACKEND_URL || 'http://localhost:8082';
+const backendUrl = process.env.AUTARK_OS_BACKEND_URL || process.env.VITE_AUTARK_OS_BACKEND_URL || 'http://localhost:8082';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

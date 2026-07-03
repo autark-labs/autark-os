@@ -1,4 +1,4 @@
-project-os:
+autark-os:
   dev-mode: true
   guardian:
     enabled: true
