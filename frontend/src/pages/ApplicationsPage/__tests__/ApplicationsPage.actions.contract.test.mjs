@@ -54,12 +54,13 @@ test('applications page pins and unpins observed services through canonical appl
   assert.match(page, /ObservedServicesAPIClient\.pin\(serviceId\)/);
   assert.match(page, /ObservedServicesAPIClient\.unpin\(serviceId\)/);
   assert.match(page, /setApplicationStateFromActionResultCache\(queryClient, result\)/);
+  assert.match(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId, true\)/);
+  assert.match(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId, false\)/);
+  assert.match(page, /appState\.refresh\(\)/);
   assert.match(page, /showActionNotification\(result/);
   assert.match(page, /showActionErrorNotification\(err, 'Service could not be pinned'\)/);
   assert.match(page, /showActionErrorNotification\(err, 'Service could not be unpinned'\)/);
-  assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId/);
   assert.doesNotMatch(page, /queryClient\.setQueryData\(applicationStateQueryKey, previousState\)/);
-  assert.match(page, /invalidateApplicationState\(queryClient\)/);
 
   assert.match(panel, /ObservedServiceManagementSection/);
   assert.match(observedSection, /actions\.onPinObservedService\(serviceId\)/);
@@ -205,8 +206,7 @@ test('applications page review-next opens the review panel and has an all-clear 
   assert.match(page, /reviewNextButtonLabel/);
   assert.match(page, /nextReviewItem \? 'Review next' : 'All clear'/);
   assert.match(page, /title=\{nextReviewItem \? 'Open the next app or service that needs review\.' : 'No apps or services need review\.'\}/);
-  assert.match(page, /setManagementOpen\(true\)/);
-  assert.match(page, /setSelectedId\(nextReviewItem\.id\)/);
+  assert.match(page, /focusApplicationItem\(nextReviewItem, true\)/);
   assert.match(page, /setFilter\('needs_review'\)/);
 });
 

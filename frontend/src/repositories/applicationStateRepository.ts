@@ -15,6 +15,7 @@ import {
   observedServices,
   ownershipViews,
   setProjectOsJobInState,
+  setObservedServicePinnedInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   telemetryByAppId,
@@ -38,6 +39,7 @@ export {
   observedServices,
   ownershipViews,
   setProjectOsJobInState,
+  setObservedServicePinnedInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   telemetryByAppId,
@@ -120,6 +122,10 @@ export function setApplicationStateFromActionResultCache(queryClient: QueryClien
   }
   setApplicationStateCache(queryClient, result.applicationState);
   return true;
+}
+
+export function setObservedServicePinnedInApplicationStateCache(queryClient: QueryClient, serviceId: string, pinned: boolean) {
+  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setObservedServicePinnedInState(current, serviceId, pinned));
 }
 
 export function invalidateApplicationState(queryClient: QueryClient) {

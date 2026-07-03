@@ -16,6 +16,7 @@ import {
   applicationStateQueryKey,
   invalidateApplicationState,
   setApplicationStateFromActionResultCache,
+  setObservedServicePinnedInApplicationStateCache,
   setProjectOsJobInApplicationStateCache,
   setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
@@ -473,9 +474,12 @@ export const ApplicationsPage = () => {
     try {
       const result = await ObservedServicesAPIClient.pin(serviceId);
       const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+      if (!stateUpdated) {
+        setObservedServicePinnedInApplicationStateCache(queryClient, serviceId, true);
+      }
       showActionNotification(result, result.title || 'Service pinned');
       if (!stateUpdated) {
-        void invalidateApplicationState(queryClient);
+        void appState.refresh();
       }
     } catch (err) {
       showActionErrorNotification(err, 'Service could not be pinned');
@@ -487,9 +491,12 @@ export const ApplicationsPage = () => {
     try {
       const result = await ObservedServicesAPIClient.unpin(serviceId);
       const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+      if (!stateUpdated) {
+        setObservedServicePinnedInApplicationStateCache(queryClient, serviceId, false);
+      }
       showActionNotification(result, result.title || 'Service unpinned');
       if (!stateUpdated) {
-        void invalidateApplicationState(queryClient);
+        void appState.refresh();
       }
     } catch (err) {
       showActionErrorNotification(err, 'Service could not be unpinned');

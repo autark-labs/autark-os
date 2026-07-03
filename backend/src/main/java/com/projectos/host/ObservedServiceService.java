@@ -7,6 +7,8 @@ import com.projectos.api.ApplicationBehaviorStates;
 import com.projectos.marketplace.catalog.MarketplaceCatalogService;
 import com.projectos.marketplace.install.DockerOwnershipService;
 import com.projectos.marketplace.install.InstallSettings;
+import com.projectos.marketplace.install.AppRuntimeMetadata;
+import com.projectos.marketplace.install.AppRuntimeMetadataReader;
 import com.projectos.marketplace.install.InstalledApp;
 import com.projectos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.projectos.marketplace.install.InstalledAppRepository;
@@ -33,6 +35,7 @@ public class ObservedServiceService {
     private final Supplier<ProjectOsIdentity> currentIdentity;
     private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AppRuntimeMetadataReader runtimeMetadataReader = new AppRuntimeMetadataReader();
 
     @Autowired
     public ObservedServiceService(
@@ -91,12 +94,20 @@ public class ObservedServiceService {
     public List<ObservedServiceView> refresh() {
         Instant now = Instant.now();
         if (scanner != null) {
-            for (ObservedService scanned : scanner.scan(now)) {
+            List<ObservedService> scannedServices = scanner.scan(now);
+            for (ObservedService scanned : scannedServices) {
                 ObservedService merged = repository.findBySourceAndFingerprint(scanned.source(), scanned.fingerprint())
                         .map(existing -> merge(existing, scanned))
                         .orElse(scanned);
                 repository.upsert(merged);
             }
+            List<String> dockerFingerprints = scannedServices.stream()
+                    .filter(service -> ObservedServiceSource.DOCKER.equals(service.source()))
+                    .map(ObservedService::fingerprint)
+                    .filter(fingerprint -> fingerprint != null && !fingerprint.isBlank())
+                    .distinct()
+                    .toList();
+            repository.deleteUnpinnedDockerServicesNotIn(dockerFingerprints);
         }
         return list(true);
     }
@@ -242,8 +253,19 @@ public class ObservedServiceService {
         ProjectOsIdentity identity = currentIdentity.get();
         String accessUrl = firstPresent(service.url(), manifest == null ? null : manifest.accessUrl());
         String runtimePath = firstPresent(metadataValue(service, "dataPaths"), metadataValue(service, "runtimePath"), manifest == null ? "" : identity.runtimeRoot() + "/apps/" + appId);
-        String composeProject = firstPresent(metadataValue(service, "composeProject"), service.fingerprint());
-        String appInstanceId = firstPresent(metadataValue(service, "appInstanceId"), "appinst_adopted_" + appId);
+        Optional<AppRuntimeMetadata> runtimeMetadata = runtimeMetadataReader.read(java.nio.file.Path.of(runtimePath))
+                .filter(metadata -> appId.equals(metadata.catalogAppId()));
+        String composeProject = firstPresent(
+                runtimeMetadata.map(AppRuntimeMetadata::composeProject).orElse(""),
+                metadataValue(service, "composeProject"),
+                service.fingerprint());
+        String appInstanceId = firstPresent(
+                runtimeMetadata.map(AppRuntimeMetadata::appInstanceId).orElse(""),
+                metadataValue(service, "appInstanceId"),
+                "appinst_adopted_" + appId);
+        String projectOsInstanceId = firstPresent(
+                runtimeMetadata.map(AppRuntimeMetadata::instanceId).orElse(""),
+                identity.instanceId());
 
         installedAppRepository.save(new InstalledApp(
                 appId,
@@ -257,7 +279,7 @@ public class ObservedServiceService {
                 appId,
                 appInstanceId,
                 appId,
-                identity.instanceId(),
+                projectOsInstanceId,
                 runtimePath,
                 "adopted",
                 "owned",

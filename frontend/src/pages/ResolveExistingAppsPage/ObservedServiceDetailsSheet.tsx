@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import {
   catalogAppIsManaged,
   setApplicationStateFromActionResultCache,
+  setObservedServicePinnedInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan, ObservedServiceView } from '@/types/observedService';
@@ -89,8 +90,14 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
     try {
       const result = await mutation();
       const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+      if (!stateUpdated && actionId === 'pin') {
+        setObservedServicePinnedInApplicationStateCache(queryClient, currentService.id, true);
+      }
+      if (!stateUpdated && actionId === 'unpin') {
+        setObservedServicePinnedInApplicationStateCache(queryClient, currentService.id, false);
+      }
       onActionComplete(result);
-      if (!stateUpdated && options.refresh !== false) {
+      if (!stateUpdated && (options.refresh !== false || actionId === 'pin' || actionId === 'unpin')) {
         await onRefresh();
       }
     } catch (error) {

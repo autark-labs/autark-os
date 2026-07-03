@@ -88,6 +88,86 @@ class ObservedServiceServiceTests {
     }
 
     @Test
+    void refreshRemovesStaleUnpinnedDockerServicesAfterSuccessfulScan() {
+        ObservedServiceRepository repository = repository();
+        repository.upsert(observed("docker:old-project-os-vault", "docker", "old-project-os-vault", "Old Vault", "vaultwarden", "legacy_project_os", "observed"));
+        repository.upsert(observed("docker:pinned-lab-link", "docker", "pinned-lab-link", "Pinned Lab", null, "external_docker", "pinned", Instant.parse("2026-06-21T12:00:00Z")));
+        repository.upsert(observed("manual:gitlab", "manual_url", "http://gitlab.local", "GitLab", "gitlab", "external", "pinned"));
+        ObservedServiceService service = service(repository, List.of(new HostDockerContainer(
+                "current-worker",
+                "worker:latest",
+                "Up 5 seconds",
+                Map.of(),
+                "")));
+
+        service.refresh();
+
+        assertThat(repository.findById("docker:old-project-os-vault")).isEmpty();
+        assertThat(repository.findById("docker:pinned-lab-link")).isPresent();
+        assertThat(repository.findById("manual:gitlab")).isPresent();
+        assertThat(repository.findById("docker:current-worker")).isPresent();
+    }
+
+    @Test
+    void adoptRecoverableServiceUsesRuntimeMetadataWhenObservedMetadataIsIncomplete() throws Exception {
+        ObservedServiceRepository observedRepository = repository();
+        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout());
+        Path appRoot = runtimeRoot.resolve("apps/syncthing");
+        java.nio.file.Files.createDirectories(appRoot);
+        java.nio.file.Files.writeString(appRoot.resolve("project-os-app.json"), """
+                {
+                  "appInstanceId" : "appinst_runtime_syncthing",
+                  "catalogAppId" : "syncthing",
+                  "instanceId" : "current-instance",
+                  "composeProject" : "projectos_dev_current_syncthing",
+                  "manifestVersion" : "2.1.1",
+                  "createdAt" : "2026-06-21T12:00:00Z"
+                }
+                """);
+        observedRepository.upsert(new ObservedService(
+                "docker:project-os-syncthing",
+                "docker",
+                "project-os-syncthing",
+                "syncthing",
+                "http://localhost:8384",
+                "External",
+                "LAN",
+                "syncthing",
+                "inferred",
+                "legacy_project_os",
+                "observed",
+                "running",
+                false,
+                "",
+                Instant.parse("2026-06-21T12:00:00Z"),
+                Instant.parse("2026-06-21T12:00:00Z"),
+                null,
+                null,
+                "{\"containerName\":\"project-os-syncthing\"}"));
+        ObservedServiceService service = new ObservedServiceService(
+                observedRepository,
+                new ObservedServiceScanner(List::of, currentIdentity()),
+                installedRepository,
+                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                currentIdentity(),
+                null);
+
+        ObservedServiceAdoptionPlan plan = service.adoptionPlan("docker:project-os-syncthing");
+        ActionResult result = service.adopt("docker:project-os-syncthing", new ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
+
+        assertThat(result.ok()).isTrue();
+        assertThat(installedRepository.findById("syncthing")).hasValueSatisfying(app -> {
+            assertThat(app.runtimePath()).isEqualTo(appRoot.toString());
+            assertThat(app.composeProject()).isEqualTo("projectos_dev_current_syncthing");
+        });
+        assertThat(installedRepository.ownershipFor("syncthing")).hasValueSatisfying(ownership -> {
+            assertThat(ownership.appInstanceId()).isEqualTo("appinst_runtime_syncthing");
+            assertThat(ownership.projectOsInstanceId()).isEqualTo("current-instance");
+            assertThat(ownership.runtimePathOrHash()).isEqualTo(appRoot.toString());
+        });
+    }
+
+    @Test
     void observedServiceViewsExposeCanonicalApplicationStates() {
         ObservedServiceRepository repository = repository();
         repository.upsert(observed("docker:managed", "docker", "managed", "Managed", "homepage", "owned_managed", "observed", "running"));

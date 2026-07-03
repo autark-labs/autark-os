@@ -440,6 +440,7 @@ public class ApplicationStateService {
         if (observedServiceService == null) {
             return List.of();
         }
+        observedServiceService.refresh();
         return observedServiceService.observedServices();
     }
 

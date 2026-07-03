@@ -12,7 +12,11 @@ import { StatusPill } from '@/components/primitives/StatusPill';
 import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
-import { setApplicationStateFromActionResultCache, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import {
+  setApplicationStateFromActionResultCache,
+  setObservedServicePinnedInApplicationStateCache,
+  useApplicationStateRepository,
+} from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
 import {
@@ -74,6 +78,9 @@ function ResolveExistingAppsPage() {
     try {
       const result = await ObservedServicesAPIClient.pin(service.id);
       const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+      if (!stateUpdated) {
+        setObservedServicePinnedInApplicationStateCache(queryClient, service.id, true);
+      }
       showActionNotification(result, result.title || `${service.displayName} pinned`);
       if (!stateUpdated) {
         void appState.refresh();

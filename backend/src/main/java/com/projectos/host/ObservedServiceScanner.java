@@ -88,6 +88,12 @@ public class ObservedServiceScanner {
         metadata.put("status", clean(container.status()));
         metadata.put("ports", clean(container.ports()));
         metadata.put("currentInstanceId", identity.instanceId());
+        putIfPresent(metadata, "composeProject", firstPresent(
+                container.labels().get(DockerOwnershipService.COMPOSE_PROJECT),
+                container.labels().get("com.docker.compose.project")));
+        putIfPresent(metadata, "appInstanceId", container.labels().get(DockerOwnershipService.APP_INSTANCE_ID));
+        putIfPresent(metadata, "projectOsInstanceId", container.labels().get(DockerOwnershipService.INSTANCE_ID));
+        putIfPresent(metadata, "runtimeRootHash", container.labels().get(DockerOwnershipService.RUNTIME_ROOT_HASH));
         return "{"
                 + metadata.entrySet().stream()
                 .map(entry -> "\"" + escape(entry.getKey()) + "\":\"" + escape(entry.getValue()) + "\"")
@@ -159,6 +165,12 @@ public class ObservedServiceScanner {
             }
         }
         return null;
+    }
+
+    private void putIfPresent(Map<String, String> metadata, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            metadata.put(key, value.trim());
+        }
     }
 
     private String clean(String value) {

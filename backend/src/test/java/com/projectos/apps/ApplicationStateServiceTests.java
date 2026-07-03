@@ -96,7 +96,7 @@ class ApplicationStateServiceTests {
     }
 
     @Test
-    void explicitRefreshReadsCachedObservedServicesWithoutScanningHost() {
+    void explicitRefreshRefreshesObservedServicesBeforeBuildingProjection() {
         ObservedServiceRepository repository = repository();
         repository.upsert(pinned("manual:gitlab", "gitlab"));
         CountingObservedServiceService observedServiceService = new CountingObservedServiceService(repository);
@@ -109,7 +109,7 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(observedServiceService.refreshCalls).hasValue(0);
+        assertThat(observedServiceService.refreshCalls).hasValue(1);
         assertThat(state.observedServices())
                 .extracting(ObservedServiceView::id)
                 .containsExactly("manual:gitlab");

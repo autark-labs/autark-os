@@ -226,6 +226,31 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void runtimeViewReconcilesStaleComposeProjectFromRuntimeMetadata() throws Exception {
+        Path metadataFile = runtimeRoot.resolve("apps/vaultwarden/project-os-app.json");
+        Files.writeString(metadataFile, """
+                {
+                  "appInstanceId" : "appinst_vaultwarden_runtime",
+                  "catalogAppId" : "vaultwarden",
+                  "instanceId" : "pos_test",
+                  "composeProject" : "projectos_dev_postest_vaultwarden",
+                  "manifestVersion" : "latest",
+                  "createdAt" : "2026-06-11T00:00:00Z"
+                }
+                """);
+        composeExecutor.requiredProjectName = "projectos_dev_postest_vaultwarden";
+
+        AppRuntimeView app = service.getApp("vaultwarden");
+
+        assertThat(app.friendlyStatus()).isEqualTo("Ready");
+        assertThat(app.readinessState()).isEqualTo("ready");
+        assertThat(repository.findById("vaultwarden")).hasValueSatisfying(saved ->
+                assertThat(saved.composeProject()).isEqualTo("projectos_dev_postest_vaultwarden"));
+        assertThat(repository.ownershipFor("vaultwarden")).hasValueSatisfying(ownership ->
+                assertThat(ownership.appInstanceId()).isEqualTo("appinst_vaultwarden_runtime"));
+    }
+
+    @Test
     void restartRecordsLifecycleEvent() {
         AppActionResult result = service.restart("vaultwarden");
 
@@ -922,6 +947,7 @@ class AppLifecycleServiceTests {
         List<String> failUpOutput = List.of();
         boolean failDown;
         boolean transitionToStarting;
+        String requiredProjectName;
 
         @Override
         public DockerComposeResult up(Path composeFile, String projectName) {
@@ -964,6 +990,9 @@ class AppLifecycleServiceTests {
 
         @Override
         public List<DockerContainerStatus> containers(Path composeFile, String projectName) {
+            if (requiredProjectName != null && !requiredProjectName.equals(projectName)) {
+                return List.of();
+            }
             return containers;
         }
 

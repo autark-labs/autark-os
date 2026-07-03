@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -158,6 +159,29 @@ public class ObservedServiceRepository extends DatabaseBackedRepository {
                   and source = 'project_os_install'
                   and ownership_state = 'failed_install'
                 """, cleanToNull(catalogAppId));
+    }
+
+    public void deleteUnpinnedDockerServicesNotIn(Collection<String> fingerprints) {
+        migrate();
+        if (fingerprints == null || fingerprints.isEmpty()) {
+            return;
+        }
+        String placeholders = fingerprints.stream().map(ignored -> "?").collect(java.util.stream.Collectors.joining(", "));
+        String sql = """
+                delete from observed_services
+                where source = 'docker'
+                  and coalesce(user_visibility, 'observed') != 'pinned'
+                  and fingerprint not in (
+                """ + placeholders + ")";
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
+            int index = 1;
+            for (String fingerprint : fingerprints) {
+                statement.setString(index++, fingerprint);
+            }
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new InstallationException("Unable to remove stale observed services.", exception);
+        }
     }
 
     private boolean executeUpdate(String sql, String... values) {

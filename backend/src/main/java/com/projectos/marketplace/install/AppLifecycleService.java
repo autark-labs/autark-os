@@ -19,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -62,6 +63,7 @@ public class AppLifecycleService {
     private final ActivityLogService activityLogService;
     private final BackupRepository backupRepository;
     private final AppTelemetryService appTelemetryService;
+    private final AppRuntimeMetadataReader appRuntimeMetadataReader = new AppRuntimeMetadataReader();
     private final AppRuntimeStatusResolver runtimeStatusResolver = new AppRuntimeStatusResolver();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(ACCESS_CHECK_TIMEOUT)
@@ -832,6 +834,7 @@ public class AppLifecycleService {
     }
 
     private AppRuntimeView refresh(InstalledApp app, boolean includeTelemetry) {
+        app = reconcileRuntimeMetadata(app);
         List<DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
         AppRuntimeStatus status = runtimeStatusResolver.normalize(containers);
         repository.updateStatus(app.appId(), status.friendlyStatus());
@@ -1400,6 +1403,51 @@ public class AppLifecycleService {
             }
         }
         return null;
+    }
+
+    private InstalledApp reconcileRuntimeMetadata(InstalledApp app) {
+        return appRuntimeMetadataReader.read(Path.of(app.runtimePath()))
+                .filter(metadata -> app.appId().equals(metadata.catalogAppId()))
+                .map(metadata -> reconcileRuntimeMetadata(app, metadata))
+                .orElse(app);
+    }
+
+    private InstalledApp reconcileRuntimeMetadata(InstalledApp app, AppRuntimeMetadata metadata) {
+        String composeProject = firstPresent(metadata.composeProject(), app.composeProject());
+        InstalledApp reconciled = app;
+        if (!composeProject.equals(app.composeProject())) {
+            reconciled = new InstalledApp(
+                    app.appId(),
+                    app.appName(),
+                    app.status(),
+                    app.runtimePath(),
+                    composeProject,
+                    app.accessUrl(),
+                    app.installedAt());
+            repository.save(reconciled);
+        }
+
+        InstalledAppOwnershipMetadata current = repository.ownershipFor(app.appId()).orElse(null);
+        if (current == null) {
+            return reconciled;
+        }
+        String appInstanceId = firstPresent(metadata.appInstanceId(), current.appInstanceId());
+        String projectOsInstanceId = firstPresent(metadata.instanceId(), current.projectOsInstanceId());
+        if (!Objects.equals(appInstanceId, current.appInstanceId())
+                || !Objects.equals(projectOsInstanceId, current.projectOsInstanceId())
+                || !Objects.equals(app.runtimePath(), current.runtimePathOrHash())) {
+            repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+                    app.appId(),
+                    appInstanceId,
+                    app.appId(),
+                    projectOsInstanceId,
+                    app.runtimePath(),
+                    firstPresent(current.installState(), "ready"),
+                    firstPresent(current.ownershipStatus(), "owned"),
+                    current.createdAt(),
+                    Instant.now()));
+        }
+        return reconciled;
     }
 
     private InstalledApp installedApp(String appId) {
