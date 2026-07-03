@@ -134,6 +134,7 @@ public class BackupService {
                 .filter(point -> "verified".equals(point.verificationStatus()))
                 .findFirst()
                 .orElse(null);
+                
         return new BackupReport(
                 status,
                 headline(status),
@@ -293,8 +294,17 @@ public class BackupService {
         RestorePoint point = backupRepository.findById(restorePointId);
         List<InstalledApp> apps = affectedApps(point, targetAppId);
         List<String> logs = new ArrayList<>();
+        List<RestoreAppResult> results = new ArrayList<>();
         for (InstalledApp app : apps) {
-            restoreApp(point, app, logs);
+            results.add(restoreApp(point, app, logs));
+        }
+        List<RestoreAppResult> restartFailures = results.stream()
+                .filter(result -> result.restartFailure() != null && !result.restartFailure().isBlank())
+                .toList();
+        if (!restartFailures.isEmpty()) {
+            String message = restoreRestartWarningMessage(apps, restartFailures);
+            activityLogService.warning("backup", "restore_restart_failed", "Restore needs attention", message, null);
+            return new RestoreResult(point.id(), "warning", message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
         }
         String message = plan.scope().equals("full")
                 ? "Full restore completed for " + apps.size() + " app(s)."
@@ -393,7 +403,7 @@ public class BackupService {
                 .toList();
     }
 
-    private void restoreApp(RestorePoint point, InstalledApp app, List<String> logs) {
+    private RestoreAppResult restoreApp(RestorePoint point, InstalledApp app, List<String> logs) {
         Path destination = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         try {
             logs.add("Stopping " + app.appName() + ".");
@@ -424,9 +434,23 @@ public class BackupService {
                 AppActionResult start = appLifecycleService.start(app.appId());
                 logs.add(start.message());
             } catch (RuntimeException exception) {
-                logs.add("Project OS could not start " + app.appName() + ": " + userMessage(exception));
+                String message = "Project OS could not start " + app.appName() + ": " + userMessage(exception);
+                logs.add(message);
+                return new RestoreAppResult(app.appId(), app.appName(), message);
             }
         }
+        return new RestoreAppResult(app.appId(), app.appName(), null);
+    }
+
+    private String restoreRestartWarningMessage(List<InstalledApp> apps, List<RestoreAppResult> restartFailures) {
+        if (apps.size() == 1) {
+            return "Data was restored for " + apps.getFirst().appName() + ", but Project OS could not restart it.";
+        }
+        String failedApps = restartFailures.stream()
+                .map(RestoreAppResult::appName)
+                .collect(java.util.stream.Collectors.joining(", "));
+        return "Data was restored for " + apps.size() + " app(s), but Project OS could not restart "
+                + restartFailures.size() + " app(s): " + failedApps + ".";
     }
 
     private void unzipRestore(RestorePoint point, InstalledApp app, Path destination) throws IOException {
@@ -894,6 +918,9 @@ public class BackupService {
     }
 
     private record VerificationUpdate(RestorePoint restorePoint, BackupVerificationResult result) {
+    }
+
+    private record RestoreAppResult(String appId, String appName, String restartFailure) {
     }
 
     private String status(List<AppBackupStatus> apps, int failedBackups) {

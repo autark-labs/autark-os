@@ -28,6 +28,7 @@ import com.projectos.marketplace.install.DockerContainerStatus;
 import com.projectos.marketplace.install.InstallSettings;
 import com.projectos.marketplace.install.InstalledApp;
 import com.projectos.marketplace.install.InstalledAppRepository;
+import com.projectos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.projectos.marketplace.install.PostInstallGuideBuilder;
 import com.projectos.marketplace.install.ContainerTelemetry;
 import com.projectos.marketplace.runtime.ProjectOsRuntimeProperties;
@@ -126,6 +127,7 @@ class BackupServiceCanonicalAppTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
         installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
         Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/project-os-full-test.zip");
         Files.createDirectories(archive.getParent());
@@ -136,7 +138,38 @@ class BackupServiceCanonicalAppTests {
 
         RestoreResult result = service.restore(point.id(), "homepage");
 
-        assertThat(result.status()).isEqualTo("completed");
+        assertThat(result.status()).as(String.join("\n", result.logs())).isEqualTo("completed");
+        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|full|" + archive.toAbsolutePath().normalize());
+    }
+
+    @Test
+    void restoreReportsWarningWhenAppDataRestoresButAppCannotRestart() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
+        BackupRepository backupRepository = new BackupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
+        installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/project-os-full-test.zip");
+        Files.createDirectories(archive.getParent());
+        writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
+        RestorePoint point = backupRepository.record("__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
+        RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
+        BackupService service = backupService(
+                runtimeLayout,
+                installedRepository,
+                backupRepository,
+                catalogService,
+                fileOpsService,
+                new FailingStartDockerComposeExecutor());
+
+        RestoreResult result = service.restore(point.id(), "homepage");
+
+        assertThat(result.status()).isEqualTo("warning");
+        assertThat(result.message()).contains("could not restart");
+        assertThat(result.logs()).anySatisfy(log -> assertThat(log).contains("Project OS could not start Homepage"));
         assertThat(fileOpsService.restoreCalls).containsExactly("homepage|full|" + archive.toAbsolutePath().normalize());
     }
 
@@ -159,6 +192,10 @@ class BackupServiceCanonicalAppTests {
     }
 
     private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService, ProjectOsFileOpsService fileOpsService) {
+        return backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService, new NoopDockerComposeExecutor());
+    }
+
+    private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService, ProjectOsFileOpsService fileOpsService, DockerComposeExecutor composeExecutor) {
         return new BackupService(
                 runtimeLayout,
                 installedRepository,
@@ -166,11 +203,25 @@ class BackupServiceCanonicalAppTests {
                 new ActivityLogService(new ActivityLogRepository(runtimeLayout)),
                 new ProjectSettingsRepository(runtimeLayout),
                 new ProjectSettingsService(new ProjectSettingsRepository(runtimeLayout), new ActivityLogService(new ActivityLogRepository(runtimeLayout))),
-                appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository),
+                appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository, composeExecutor),
                 catalogService,
                 () -> List.of(appInstance("homepage", "Homepage")),
                 new RuntimeFileOperations(),
                 fileOpsService);
+    }
+
+    private AppLifecycleService appLifecycleService(RuntimeLayout runtimeLayout, InstalledAppRepository repository, MarketplaceCatalogService catalogService, BackupRepository backupRepository, DockerComposeExecutor composeExecutor) {
+        return new AppLifecycleService(
+                repository,
+                composeExecutor,
+                catalogService,
+                List::of,
+                runtimeLayout,
+                new PostInstallGuideBuilder(),
+                new TailscaleService(),
+                false,
+                null,
+                backupRepository);
     }
 
     private void writeZip(Path archive, String entryName, String content) throws Exception {
@@ -204,7 +255,21 @@ class BackupServiceCanonicalAppTests {
     private InstalledApp installed(String appId, String name, RuntimeLayout runtimeLayout) throws Exception {
         Path appRoot = runtimeLayout.appRoot(appId);
         Files.createDirectories(appRoot);
+        Files.writeString(appRoot.resolve("compose.yaml"), "services:\n  app:\n    image: test/" + appId + ":latest\n");
         return new InstalledApp(appId, name, "Ready", appRoot.toString(), "project-os-" + appId, "http://localhost:8090", Instant.parse("2026-06-20T12:00:00Z"));
+    }
+
+    private void saveOwned(InstalledAppRepository repository, InstalledApp app) {
+        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+                app.appId(),
+                "appinst_" + app.appId(),
+                app.appId(),
+                "pos_test",
+                app.runtimePath(),
+                "ready",
+                "owned",
+                app.installedAt(),
+                app.installedAt()));
     }
 
     private RuntimeLayout runtimeLayout() {
@@ -247,6 +312,13 @@ class BackupServiceCanonicalAppTests {
         @Override
         public List<ContainerTelemetry> stats(List<String> containerNames) {
             return List.of();
+        }
+    }
+
+    private static class FailingStartDockerComposeExecutor extends NoopDockerComposeExecutor {
+        @Override
+        public DockerComposeResult up(Path composeFile, String projectName) {
+            return new DockerComposeResult(1, List.of("failed to bind host port 0.0.0.0:8080/tcp: address already in use"));
         }
     }
 

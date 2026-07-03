@@ -129,6 +129,33 @@ class BackupControllerTests {
         verify(applicationStateService, times(2)).invalidate();
     }
 
+    @Test
+    void restorePointFailsJobWhenAffectedAppsCannotRestart() {
+        BackupService backupService = mock(BackupService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        ProjectOsJobService jobService = jobService();
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        RestoreResult result = new RestoreResult(
+                42L,
+                "warning",
+                "Data was restored for Vaultwarden, but Project OS could not restart it.",
+                List.of("vaultwarden"),
+                List.of("Restored managed files.", "Project OS could not start Vaultwarden: port 8080 is already in use."),
+                Instant.parse("2026-06-21T12:00:00Z"));
+        when(backupService.restore(42L, "vaultwarden")).thenReturn(result);
+
+        ProjectOsJob job = controller.restore(42L, new RestoreRequest("vaultwarden"));
+
+        jobService.runQueuedJobsNow();
+
+        ProjectOsJob completed = jobService.findById(job.jobId()).orElseThrow();
+        assertThat(completed.status()).isEqualTo("failed");
+        assertThat(completed.error().message()).contains("could not restart");
+        assertThat(completed.steps()).extracting(ProjectOsJobStep::status)
+                .containsExactly("succeeded", "succeeded", "succeeded", "succeeded", "failed", "pending");
+        assertThat(completed.steps().get(4).message()).contains("could not restart");
+    }
+
     private ProjectOsJobService jobService() {
         ProjectOsRuntimeProperties properties = new ProjectOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

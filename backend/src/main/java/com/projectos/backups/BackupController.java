@@ -136,20 +136,24 @@ public class BackupController {
     }
 
     private ProjectOsJobOutcome restoreOutcome(RestoreResult result) {
+        boolean failed = "failed".equals(result.status());
+        boolean warning = "warning".equals(result.status());
         java.util.List<ProjectOsJobStep> steps = java.util.List.of(
                 ProjectOsJobStep.succeeded("validate_restore_point", "Validating restore point", "Restore point is ready."),
                 ProjectOsJobStep.succeeded("stop_apps", "Stopping affected apps", "Affected apps were prepared for restore."),
                 ProjectOsJobStep.succeeded("create_safety_backup", "Creating safety backup", "Current app data was protected before restore."),
-                "failed".equals(result.status())
+                failed
                         ? ProjectOsJobStep.failed("restore_data", "Restoring app data", result.message())
                         : ProjectOsJobStep.succeeded("restore_data", "Restoring app data", result.message()),
-                "failed".equals(result.status())
+                failed
                         ? ProjectOsJobStep.pending("start_apps", "Starting affected apps")
-                        : ProjectOsJobStep.succeeded("start_apps", "Starting affected apps", "Affected apps were started after restore."),
-                "failed".equals(result.status())
+                        : warning
+                                ? ProjectOsJobStep.failed("start_apps", "Starting affected apps", result.message())
+                                : ProjectOsJobStep.succeeded("start_apps", "Starting affected apps", "Affected apps were started after restore."),
+                failed || warning
                         ? ProjectOsJobStep.pending("finish", "Finishing restore")
                         : ProjectOsJobStep.succeeded("finish", "Finishing restore", result.message()));
-        if ("failed".equals(result.status())) {
+        if (failed || warning) {
             return ProjectOsJobOutcome.failed(result.message(), steps);
         }
         return ProjectOsJobOutcome.succeeded(result.message(), steps);
