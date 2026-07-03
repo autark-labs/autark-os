@@ -294,8 +294,8 @@ public class AppOwnershipService {
 
     private String stateDescription(AppOwnershipState state, ObservedServiceView observedService) {
         return switch (state) {
-            case INSTALLED_MANAGED -> "Managed by this Project OS installation.";
-            case PINNED_EXTERNAL -> "Pinned to My Apps. Project OS can open it but does not manage its runtime.";
+            case INSTALLED_MANAGED -> "Managed by this Autark-OS installation.";
+            case PINNED_EXTERNAL -> "Pinned to My Apps. Autark-OS can open it but does not manage its runtime.";
             case FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED, FAILED_INSTALL -> observedService == null ? "" : observedService.userStatusDescription();
             case COMING_SOON -> "This app is not available yet.";
             default -> "Ready to review before install.";

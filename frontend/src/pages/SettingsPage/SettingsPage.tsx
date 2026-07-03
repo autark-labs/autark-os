@@ -82,28 +82,28 @@ const settingHelp: Record<string, SettingHelp> = {
   deviceName: {
     id: 'deviceName',
     title: 'Device name',
-    body: 'This is the friendly name Project OS uses for this homelab device in the interface and generated labels.',
+    body: 'This is the friendly name Autark-OS uses for this homelab device in the interface and generated labels.',
     usedFor: ['Dashboard display', 'Support bundles', 'Network identification', 'Future device discovery'],
     tip: 'Choose a name that is easy to recognize on your network.',
   },
   timeZone: {
     id: 'timeZone',
     title: 'Time zone',
-    body: 'Controls how Project OS stores scheduling preferences for logs, backups, and future automation windows.',
+    body: 'Controls how Autark-OS stores scheduling preferences for logs, backups, and future automation windows.',
     usedFor: ['Backup schedule display', 'Activity timestamps', 'Maintenance windows'],
     tip: 'Use an IANA time zone like America/Chicago for predictable scheduling.',
   },
   startOnBoot: {
     id: 'startOnBoot',
-    title: 'Start Project OS on boot',
-    body: 'Records whether Project OS should be treated as an always-on background service.',
+    title: 'Start Autark-OS on boot',
+    body: 'Records whether Autark-OS should be treated as an always-on background service.',
     usedFor: ['Setup checks', 'Production install expectations', 'Future service management'],
     tip: 'Leave this on for a normal homelab appliance experience.',
   },
   automaticRepairEnabled: {
     id: 'automaticRepairEnabled',
     title: 'Automatic fixes',
-    body: 'Lets Project OS attempt safe repairs such as restarting unhealthy apps or rebuilding missing private links.',
+    body: 'Lets Autark-OS attempt safe repairs such as restarting unhealthy apps or rebuilding missing private links.',
     usedFor: ['App guardian loop', 'Application stability', 'Private link repair'],
     tip: 'This updates installed apps now. Individual app overrides still live in Applications.',
   },
@@ -242,7 +242,7 @@ function SettingsPage() {
         ok: true,
         severity: 'success',
         title: 'Settings saved',
-        message: appDefaultsMessage || 'Project OS settings were saved.',
+        message: appDefaultsMessage || 'Autark-OS settings were saved.',
       }, 'Settings saved');
     } catch (saveError) {
       const message = apiErrorMessage(saveError, 'Settings could not be saved.');
@@ -263,7 +263,7 @@ function SettingsPage() {
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-sky-400/20 bg-slate-900 p-6 md:p-7">
           <div>
             <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Settings</p>
-            <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Project OS controls</h1>
+            <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Autark-OS controls</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, services, app defaults, backups, and advanced host details.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -276,7 +276,7 @@ function SettingsPage() {
                 Refresh
               </ProjectDarkControlButton>
             </DisabledAction>
-            <DisabledAction disabled={!dirty || saving} reason={saving ? 'Project OS is already saving these settings.' : 'Make a change before saving settings.'}>
+            <DisabledAction disabled={!dirty || saving} reason={saving ? 'Autark-OS is already saving these settings.' : 'Make a change before saving settings.'}>
               <ProjectPrimaryButton disabled={!dirty || saving} onClick={() => void save()} type="button">
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 {saving ? 'Saving' : 'Save changes'}
@@ -368,7 +368,7 @@ function GeneralPanel({ draft, onUpdate }: PanelProps) {
       <SettingRow helpId="timeZone" label="Time zone" note="Used for system services, logs, and backup schedules.">
         <SettingsSelect value={draft.timeZone} onChange={(value) => onUpdate({ timeZone: value })} options={[['America/Chicago', '(UTC-06:00) Central Time'], ['America/New_York', '(UTC-05:00) Eastern Time'], ['America/Denver', '(UTC-07:00) Mountain Time'], ['America/Los_Angeles', '(UTC-08:00) Pacific Time'], ['UTC', 'UTC']]} />
       </SettingRow>
-      <SettingRow helpId="language" label="Language" note="Select the language for the Project OS interface.">
+      <SettingRow helpId="language" label="Language" note="Select the language for the Autark-OS interface.">
         <SettingsSelect value={draft.language} onChange={(value) => onUpdate({ language: value })} options={[['en-US', 'English (US)'], ['en-GB', 'English (UK)']]} />
       </SettingRow>
       <SettingRow helpId="temperatureUnit" label="Temperature unit" note="Preferred unit for temperature displays.">
@@ -387,14 +387,14 @@ function GeneralPanel({ draft, onUpdate }: PanelProps) {
 function SystemPanel({ checks, copied, doctor, metrics, onCopy, onUpdate, settings, setup, version }: SystemPanelProps) {
   return (
     <SettingsGroup description="Core service behavior and host readiness." title="System">
-      <SettingRow helpId="startOnBoot" label="Start Project OS on boot" note="Automatically start Project OS services when the system boots.">
+      <SettingRow helpId="startOnBoot" label="Start Autark-OS on boot" note="Automatically start Autark-OS services when the system boots.">
         <Switch checked={settings.startOnBoot} onCheckedChange={(checked) => onUpdate({ startOnBoot: checked })} />
       </SettingRow>
       <ReadOnlyRow label="Run mode" note={`Active profiles: ${setup?.activeProfiles || 'default'}`} value={setup?.devMode ? 'Development' : 'Production'} />
-      <ReadOnlyRow label="Project OS version" note={version?.buildSha ? `Build ${shortSha(version.buildSha)}` : 'Build metadata'} value={version?.version || 'Unknown'} />
+      <ReadOnlyRow label="Autark-OS version" note={version?.buildSha ? `Build ${shortSha(version.buildSha)}` : 'Build metadata'} value={version?.version || 'Unknown'} />
       <ReadOnlyRow label="Readiness" note={doctor?.readiness.summary || 'First-boot readiness status.'} value={doctor?.readiness.headline || setup?.headline || 'Unknown'} />
       <ReadOnlyRow label="Backend API" note="Frontend API origin." value={apiOrigin(setup)} />
-      <ReadOnlyRow label="Runtime folder" note="Where Project OS stores app data and local state." value={metrics?.runtimeRoot || 'Unknown'} />
+      <ReadOnlyRow label="Runtime folder" note="Where Autark-OS stores app data and local state." value={metrics?.runtimeRoot || 'Unknown'} />
       <div className="mt-5 grid gap-3">
         {checks.map((check) => <SetupCheckRow check={check} copied={copied} key={check.id} onCopy={onCopy} />)}
       </div>
@@ -419,7 +419,7 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
   return (
     <SettingsGroup description="Manage storage locations and thresholds." title="Storage">
       <ReadOnlyRow label="Data root" note="Location for app data and persistent storage." value={metrics?.runtimeRoot || 'Unknown'} />
-      <ReadOnlyRow label="Runtime disk used" note="Project OS data usage on the runtime disk." value={percentLabel(metrics?.runtimeUsedPercent)} />
+      <ReadOnlyRow label="Runtime disk used" note="Autark-OS data usage on the runtime disk." value={percentLabel(metrics?.runtimeUsedPercent)} />
       <ReadOnlyRow label="Runtime disk free" note="Available space for app data and backups." value={formatBytes(metrics?.runtimeUsableBytes ?? 0)} />
     </SettingsGroup>
   );
@@ -432,7 +432,7 @@ function BackupsPanel({ apps, backupRoot, draft, onUpdate }: PanelProps & { apps
       <SettingRow helpId="automaticBackupsEnabled" label="Automatic backups" note="Back up all supported app data on a schedule.">
         <Switch checked={draft.automaticBackupsEnabled} onCheckedChange={(checked) => onUpdate({ automaticBackupsEnabled: checked })} />
       </SettingRow>
-      <SettingRow helpId="automaticBackupsEnabled" label="Backup frequency" note="How often Project OS should create automatic backups.">
+      <SettingRow helpId="automaticBackupsEnabled" label="Backup frequency" note="How often Autark-OS should create automatic backups.">
         <SettingsSelect value={draft.backupFrequency} onChange={(value) => onUpdate({ backupFrequency: value })} options={[['hourly', 'Hourly'], ['daily', 'Daily'], ['weekly', 'Weekly']]} />
       </SettingRow>
       <SettingRow helpId="automaticBackupsEnabled" label="Backup time" note="Preferred time for scheduled backups.">
@@ -451,7 +451,7 @@ function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRu
   const autoRepairApps = apps.filter((app) => settingsForApp(app).autoRepairEnabled ?? true).length;
   return (
     <SettingsGroup description="Configure app defaults and automatic management." title="Applications">
-      <SettingRow helpId="automaticRepairEnabled" label="Automatic fixes" note="Allow Project OS to try safe repairs when apps become unhealthy.">
+      <SettingRow helpId="automaticRepairEnabled" label="Automatic fixes" note="Allow Autark-OS to try safe repairs when apps become unhealthy.">
         <Switch checked={draft.automaticRepairEnabled} onCheckedChange={(checked) => onUpdate({ automaticRepairEnabled: checked })} />
       </SettingRow>
       <ReadOnlyRow label="Repair coverage" note="Installed apps currently allowing automatic fixes." value={`${autoRepairApps}/${apps.length}`} />
@@ -464,7 +464,7 @@ function SecurityPanel({ setup }: { setup: SystemSetupStatus | null }) {
   return (
     <SettingsGroup description="Configure security and access options." title="Security">
       <ReadOnlyRow label="Service user" note="Recommended production user for backend operations." value={setup?.expectedUser || 'projectos'} />
-      <ReadOnlyRow label="Docker socket access" note="Required for Project OS to manage containers." value={setup?.dockerVersion ? 'Available' : 'Not detected'} />
+      <ReadOnlyRow label="Docker socket access" note="Required for Autark-OS to manage containers." value={setup?.dockerVersion ? 'Available' : 'Not detected'} />
     </SettingsGroup>
   );
 }
@@ -484,17 +484,17 @@ function RemoteAccessPanel({ apps, draft, onUpdate, setup }: PanelProps & { apps
 
 function AdvancedPanel({ checks, copied, metrics, onCopy, setup, version }: SystemPanelProps) {
   return (
-    <SettingsGroup description="Low-level Project OS values for power users." title="Advanced">
+    <SettingsGroup description="Low-level Autark-OS values for power users." title="Advanced">
       <div className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-4 text-sm leading-6 text-cyan-100">
         Advanced details expose host checks, raw paths, and runtime facts for troubleshooting.
       </div>
-      <ReadOnlyRow label="Installed version" note={version?.buildDate ? `Built ${version.buildDate}` : 'Current Project OS build.'} value={version?.version || 'Unknown'} />
+      <ReadOnlyRow label="Installed version" note={version?.buildDate ? `Built ${version.buildDate}` : 'Current Autark-OS build.'} value={version?.version || 'Unknown'} />
       <ReadOnlyRow label="Build" note="Used when sharing support details." value={version?.buildSha || 'Unknown'} />
       <ReadOnlyRow label="Backend port" note="Local API port." value={setup?.backendPort || '8082'} />
-      <ReadOnlyRow label="Install path" note="Where Project OS binaries are installed." value={version?.installPath || 'Unknown'} />
+      <ReadOnlyRow label="Install path" note="Where Autark-OS binaries are installed." value={version?.installPath || 'Unknown'} />
       <ReadOnlyRow label="Backend jar" note="Active backend artifact path." value={version?.backendJar || 'Unknown'} />
       <ReadOnlyRow label="Java" note="Backend runtime version." value={metrics?.javaVersion || 'Unknown'} />
-      <ReadOnlyRow label="Processors" note="CPU processors visible to Project OS." value={`${metrics?.availableProcessors ?? 0}`} />
+      <ReadOnlyRow label="Processors" note="CPU processors visible to Autark-OS." value={`${metrics?.availableProcessors ?? 0}`} />
       <div className="mt-5 grid gap-3">
         {checks.map((check) => <SetupCheckRow check={check} copied={copied} key={check.id} onCopy={onCopy} />)}
       </div>

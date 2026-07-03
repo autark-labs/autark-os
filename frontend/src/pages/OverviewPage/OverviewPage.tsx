@@ -36,7 +36,7 @@ function OverviewPage() {
   const majorActivity = useMemo(() => homeMajorActivity(home.activity, 5) as ActivityLog[], [home.activity]);
   const showActivityLogLink = shouldShowActivityLogLink(viewMode, majorActivity);
   const primaryAction = home.recommendedAction?.id === 'no-action-needed' ? null : home.recommendedAction;
-  const deviceName = home.summary?.deviceName || 'Project OS';
+  const deviceName = home.summary?.deviceName || 'Autark-OS';
   const pageLoading = home.isLoading || appState.isLoading;
 
   return (
@@ -60,7 +60,7 @@ function OverviewPage() {
           ) : (
             <HomeActionCard
               action={{ id: 'open-discover', label: apps.length ? 'Discover apps' : 'Install your first app', route: '/discover', confirmationRequired: false, danger: false }}
-              body={apps.length ? 'Project OS does not see anything urgent right now.' : 'Start with a verified app and Project OS will guide the setup.'}
+              body={apps.length ? 'Autark-OS does not see anything urgent right now.' : 'Start with a verified app and Autark-OS will guide the setup.'}
               severity="success"
               title={apps.length ? 'Everything important looks good' : 'Start with Discover'}
             />
@@ -76,7 +76,7 @@ function OverviewPage() {
                   <div className="min-w-0">
                     <p className="m-0 text-sm font-bold text-slate-50">Services found on this server</p>
                     <p className="m-0 mt-1 text-sm leading-5 text-sky-100/70">
-                      Project OS found {observedNeedingReview.length} service{observedNeedingReview.length === 1 ? '' : 's'} that need review before they are treated as managed apps.
+                      Autark-OS found {observedNeedingReview.length} service{observedNeedingReview.length === 1 ? '' : 's'} that need review before they are treated as managed apps.
                     </p>
                   </div>
                 </div>
@@ -126,7 +126,7 @@ function OverviewPage() {
 
           {pinnedServices.length > 0 && (
             <HomeSection
-              description="Pinned services Project OS can open or check but does not own."
+              description="Pinned services Autark-OS can open or check but does not own."
               title="Pinned External Services"
             >
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

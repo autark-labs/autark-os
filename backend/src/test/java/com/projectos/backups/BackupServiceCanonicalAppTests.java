@@ -169,7 +169,7 @@ class BackupServiceCanonicalAppTests {
 
         assertThat(result.status()).isEqualTo("warning");
         assertThat(result.message()).contains("could not restart");
-        assertThat(result.logs()).anySatisfy(log -> assertThat(log).contains("Project OS could not start Homepage"));
+        assertThat(result.logs()).anySatisfy(log -> assertThat(log).contains("Autark-OS could not start Homepage"));
         assertThat(fileOpsService.restoreCalls).containsExactly("homepage|full|" + archive.toAbsolutePath().normalize());
     }
 

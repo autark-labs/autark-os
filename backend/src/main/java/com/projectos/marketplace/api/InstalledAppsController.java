@@ -151,7 +151,7 @@ public class InstalledAppsController {
         ProjectOsJob created = jobService.startWithJob("repair_app", id, repairJobSteps(), job -> {
             List<ProjectOsJobStep> inspecting = repairJobSteps().stream()
                     .map(step -> "inspect_app".equals(step.id())
-                            ? ProjectOsJobStep.running(step.id(), step.label(), "Project OS is checking the app before repair.")
+                            ? ProjectOsJobStep.running(step.id(), step.label(), "Autark-OS is checking the app before repair.")
                             : step)
                     .toList();
             jobService.recordProgress(job.jobId(), inspecting);
@@ -376,7 +376,7 @@ public class InstalledAppsController {
             Thread.sleep(1_000);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new IllegalStateException("Project OS stopped waiting for app readiness.", exception);
+            throw new IllegalStateException("Autark-OS stopped waiting for app readiness.", exception);
         }
     }
 
@@ -406,11 +406,11 @@ public class InstalledAppsController {
 
     private String lifecycleRunMessage(String action) {
         return switch (action) {
-            case "start" -> "Project OS is starting the app.";
-            case "stop" -> "Project OS is pausing the app.";
-            case "restart" -> "Project OS is restarting the app.";
-            case "repair" -> "Project OS is repairing the app.";
-            default -> "Project OS is running the app command.";
+            case "start" -> "Autark-OS is starting the app.";
+            case "stop" -> "Autark-OS is pausing the app.";
+            case "restart" -> "Autark-OS is restarting the app.";
+            case "repair" -> "Autark-OS is repairing the app.";
+            default -> "Autark-OS is running the app command.";
         };
     }
 
@@ -446,11 +446,11 @@ public class InstalledAppsController {
 
     private String lifecycleTimeoutMessage(String action) {
         if ("repair".equals(action)) {
-            return "Project OS ran repair, but the app did not report recovered in time.";
+            return "Autark-OS ran repair, but the app did not report recovered in time.";
         }
         return "stop".equals(action)
-                ? "Project OS paused the app command, but the app did not report paused in time."
-                : "Project OS ran the app command, but the app did not report ready in time.";
+                ? "Autark-OS paused the app command, but the app did not report paused in time."
+                : "Autark-OS ran the app command, but the app did not report ready in time.";
     }
 
     private AppAccessCheck cachedAccessCheck(AppRuntimeView app) {

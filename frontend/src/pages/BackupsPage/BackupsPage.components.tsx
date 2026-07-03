@@ -202,7 +202,7 @@ export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, 
           <ProjectDarkControlButton onClick={onClose} type="button">Close</ProjectDarkControlButton>
           {point && (
             <>
-              <DisabledAction disabled={running === `verify-${point.id}`} reason="Project OS is already verifying this restore point.">
+              <DisabledAction disabled={running === `verify-${point.id}`} reason="Autark-OS is already verifying this restore point.">
                 <ProjectDarkControlButton disabled={running === `verify-${point.id}`} onClick={() => onVerify(point)} type="button">
                   {running === `verify-${point.id}` ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
                   Verify
@@ -229,7 +229,7 @@ export function RestoreDialog({ appOptions, loading, onClose, onRestore, onTarge
       <DialogContent className="max-w-2xl border-sky-400/30 bg-slate-900 text-slate-100">
         <DialogHeader>
           <DialogTitle>{plan?.title || 'Restore backup'}</DialogTitle>
-          <DialogDescription className="text-slate-400">{plan?.summary || 'Review what Project OS will restore before continuing.'}</DialogDescription>
+          <DialogDescription className="text-slate-400">{plan?.summary || 'Review what Autark-OS will restore before continuing.'}</DialogDescription>
         </DialogHeader>
         {point?.scope === 'full' && (
           <BackupInset>
@@ -257,7 +257,7 @@ export function RestoreDialog({ appOptions, loading, onClose, onRestore, onTarge
               <>
                 <InfoBlock title="Archive verification" values={[`${plan.restoreConfidence}: ${plan.verificationMessage || 'No verification details recorded yet.'}`]} />
                 <InfoBlock tone={plan.simulation.status === 'failed' || plan.simulation.status === 'warning' ? 'warning' : 'default'} title="Restore simulation" values={[plan.simulation.message, ...plan.simulation.details]} />
-                <InfoBlock title="Steps Project OS will take" values={plan.steps} />
+                <InfoBlock title="Steps Autark-OS will take" values={plan.steps} />
                 <InfoBlock title="Backup contract check" values={plan.dryRunDetails.length ? plan.dryRunDetails : ['No app-specific backup contract details were found.']} />
               </>
             )}
@@ -346,7 +346,7 @@ function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, run
               One app
             </ProjectDarkControlButton>
           </DisabledAction>
-          <DisabledAction disabled={running} reason="Project OS is already verifying this restore point.">
+          <DisabledAction disabled={running} reason="Autark-OS is already verifying this restore point.">
             <ProjectDarkControlButton disabled={running} onClick={() => onVerify(point)} size="sm" type="button">
               {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
               Verify
@@ -389,7 +389,7 @@ function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, running 
             Restore app
           </ProjectDarkControlButton>
         </DisabledAction>
-        <DisabledAction disabled={running} reason="Project OS is already verifying this restore point.">
+        <DisabledAction disabled={running} reason="Autark-OS is already verifying this restore point.">
           <ProjectDarkControlButton disabled={running} onClick={() => onVerify(point)} size="sm" type="button">
             {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
             Verify

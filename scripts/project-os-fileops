@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Bounded privileged file operations for Project OS.
+"""Bounded privileged file operations for Autark-OS.
 
 This helper is designed to be called through a narrow sudoers rule. It refuses
-arbitrary paths and only operates under the configured Project OS runtime and
+arbitrary paths and only operates under the configured Autark-OS runtime and
 backup roots.
 """
 
@@ -166,7 +166,7 @@ def repair_runtime_ownership(args: argparse.Namespace) -> None:
 
 
 def parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Project OS bounded file operations")
+    parser = argparse.ArgumentParser(description="Autark-OS bounded file operations")
     parser.add_argument("operation", choices=[
         "clear-runtime",
         "restore-app-data",

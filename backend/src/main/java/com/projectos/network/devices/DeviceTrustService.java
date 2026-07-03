@@ -52,8 +52,8 @@ public class DeviceTrustService {
         String reportStatus = status.connected() ? "ready" : "needs_setup";
         String headline = status.connected() ? "Tailnet devices are visible" : "Connect Tailscale to see device access";
         String summary = status.connected()
-                ? onlineDevices + " online, " + trustedDevices + " trusted, " + verifiedDevices + " checked against Project OS private links."
-                : "Project OS needs Tailscale before it can show which devices should access private apps.";
+                ? onlineDevices + " online, " + trustedDevices + " trusted, " + verifiedDevices + " checked against Autark-OS private links."
+                : "Autark-OS needs Tailscale before it can show which devices should access private apps.";
 
         return new DeviceAccessReport(reportStatus, headline, summary, status, reconciliation, views, onboardingSteps(), checkedAt);
     }
@@ -75,30 +75,30 @@ public class DeviceTrustService {
     }
 
     private DeviceTrustMetadata defaultMetadata(TailscaleDevice device, Instant checkedAt) {
-        String group = device.self() ? "Project OS host" : "Tailnet devices";
+        String group = device.self() ? "Autark-OS host" : "Tailnet devices";
         return new DeviceTrustMetadata(device.id(), "", group, true, "", checkedAt);
     }
 
     private DeviceReachability reachability(TailscaleDevice device, DeviceTrustMetadata metadata, TailscaleStatus status, int healthyPrivateApps, int expectedPrivateApps, Instant checkedAt) {
         if (!status.connected()) {
-            return new DeviceReachability("needs_setup", "Needs Tailscale", "Connect Project OS to Tailscale before checking private access.", device.online(), metadata.trusted(), false, 0, expectedPrivateApps, checkedAt);
+            return new DeviceReachability("needs_setup", "Needs Tailscale", "Connect Autark-OS to Tailscale before checking private access.", device.online(), metadata.trusted(), false, 0, expectedPrivateApps, checkedAt);
         }
         if (!device.online()) {
             return new DeviceReachability("offline", "Offline", "This device cannot reach private apps until it reconnects to the tailnet.", false, metadata.trusted(), false, 0, expectedPrivateApps, checkedAt);
         }
         if (!metadata.trusted()) {
-            return new DeviceReachability("not_expected", "Not expected", "This device is online but is not expected to use Project OS private app links.", true, false, false, 0, expectedPrivateApps, checkedAt);
+            return new DeviceReachability("not_expected", "Not expected", "This device is online but is not expected to use Autark-OS private app links.", true, false, false, 0, expectedPrivateApps, checkedAt);
         }
         if (expectedPrivateApps == 0) {
             return new DeviceReachability("no_private_apps", "Ready", "This device is trusted. No private apps are configured yet.", true, true, false, 0, 0, checkedAt);
         }
         if (healthyPrivateApps == expectedPrivateApps) {
-            return new DeviceReachability("verified_from_project_os", "Verified", "Project OS verified its private links. This device should reach them when Tailscale policy allows it.", true, true, true, healthyPrivateApps, expectedPrivateApps, checkedAt);
+            return new DeviceReachability("verified_from_project_os", "Verified", "Autark-OS verified its private links. This device should reach them when Tailscale policy allows it.", true, true, true, healthyPrivateApps, expectedPrivateApps, checkedAt);
         }
         if (healthyPrivateApps > 0) {
-            return new DeviceReachability("partial", "Partial", healthyPrivateApps + " of " + expectedPrivateApps + " private links look ready from Project OS.", true, true, false, healthyPrivateApps, expectedPrivateApps, checkedAt);
+            return new DeviceReachability("partial", "Partial", healthyPrivateApps + " of " + expectedPrivateApps + " private links look ready from Autark-OS.", true, true, false, healthyPrivateApps, expectedPrivateApps, checkedAt);
         }
-        return new DeviceReachability("needs_attention", "Check links", "Project OS cannot verify any private app links from this host yet.", true, true, false, 0, expectedPrivateApps, checkedAt);
+        return new DeviceReachability("needs_attention", "Check links", "Autark-OS cannot verify any private app links from this host yet.", true, true, false, 0, expectedPrivateApps, checkedAt);
     }
 
     private static boolean healthy(PrivateAccessReconciliationItem item) {
@@ -109,7 +109,7 @@ public class DeviceTrustService {
         return List.of(
                 "Install Tailscale on the phone, laptop, or tablet you want to use.",
                 "Sign in with the same Tailscale account or join the same tailnet.",
-                "Open a Project OS private app link from that device.",
+                "Open an Autark-OS private app link from that device.",
                 "Return here to give the device a friendly name and choose whether it should use private apps.");
     }
 }

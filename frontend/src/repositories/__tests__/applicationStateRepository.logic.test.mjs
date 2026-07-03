@@ -51,8 +51,8 @@ test('repository falls back from managed app instances when runtime apps are not
         privateUrl: null,
         remediation: {
           state: 'watching',
-          label: 'Project OS is watching',
-          summary: 'Homepage is ready. If it drifts, Project OS will try safe repair before asking you to intervene.',
+          label: 'Autark-OS is watching',
+          summary: 'Homepage is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.',
           nextActionLabel: 'No action needed',
           tone: 'success',
         },
@@ -227,7 +227,7 @@ test('project os job helper applies backend operation state without reordering a
     subjectId: 'syncthing',
     status: 'queued',
     currentStep: 'run_command',
-    steps: [{ id: 'run_command', label: 'Restart app', status: 'pending', message: 'Project OS is restarting the app.' }],
+    steps: [{ id: 'run_command', label: 'Restart app', status: 'pending', message: 'Autark-OS is restarting the app.' }],
     createdAt: updatedAt,
     updatedAt,
   });
@@ -253,7 +253,7 @@ test('project os job helper maps install and backup work for existing apps', () 
     subjectId: 'vaultwarden',
     status: 'queued',
     currentStep: 'install',
-    steps: [{ id: 'install', label: 'Install app', status: 'pending', message: 'Project OS is installing the app.' }],
+    steps: [{ id: 'install', label: 'Install app', status: 'pending', message: 'Autark-OS is installing the app.' }],
     createdAt: updatedAt,
     updatedAt,
   });
@@ -263,7 +263,7 @@ test('project os job helper maps install and backup work for existing apps', () 
     subjectId: 'vaultwarden',
     status: 'queued',
     currentStep: 'backup',
-    steps: [{ id: 'backup', label: 'Create backup', status: 'pending', message: 'Project OS is creating a backup.' }],
+    steps: [{ id: 'backup', label: 'Create backup', status: 'pending', message: 'Autark-OS is creating a backup.' }],
     createdAt: updatedAt,
     updatedAt,
   });
@@ -402,7 +402,7 @@ function observedService(id, userStatus, pinned) {
     catalogAppId: 'vaultwarden',
     userStatus,
     userStatusLabel: userStatus === 'recoverable' ? 'Recoverable' : 'Found',
-    userStatusDescription: userStatus === 'recoverable' ? 'Recoverable Project OS app.' : 'Found on this server.',
+    userStatusDescription: userStatus === 'recoverable' ? 'Recoverable Autark-OS app.' : 'Found on this server.',
     ownershipState: userStatus === 'recoverable' ? 'legacy_project_os' : 'external_docker',
     runtimeState: 'running',
     pinned,

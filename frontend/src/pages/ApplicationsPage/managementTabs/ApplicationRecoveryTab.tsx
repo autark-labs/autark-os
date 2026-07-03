@@ -25,7 +25,7 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
         <AlertTriangle />
         <AlertTitle>Recovery needed</AlertTitle>
         <AlertDescription className="text-red-50/80">
-          Project OS could not finish the last app action. Review the likely cause, then adjust settings or stop the app before trying again.
+          Autark-OS could not finish the last app action. Review the likely cause, then adjust settings or stop the app before trying again.
         </AlertDescription>
       </Alert>
 
@@ -122,7 +122,7 @@ function explainFailure(message: string) {
   if (lowerMessage.includes('ready') || lowerMessage.includes('reachable')) {
     return {
       title: 'App did not become reachable',
-      description: 'The container command completed, but Project OS could not confirm the app endpoint is ready. Check settings and recent activity before retrying.',
+      description: 'The container command completed, but Autark-OS could not confirm the app endpoint is ready. Check settings and recent activity before retrying.',
     };
   }
 

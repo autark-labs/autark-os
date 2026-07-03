@@ -9,7 +9,7 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('TabsTrigger uses readable Project OS tab text on hover and active states', () => {
+test('TabsTrigger uses readable Autark-OS tab text on hover and active states', () => {
   const tabs = source('src/components/ui/tabs.tsx');
 
   assert.match(tabs, /text-sky-100\/70/);

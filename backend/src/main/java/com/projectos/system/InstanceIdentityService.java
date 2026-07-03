@@ -59,7 +59,7 @@ public class InstanceIdentityService {
             validate(identity);
             return identity;
         } catch (IOException | RuntimeException exception) {
-            throw new IllegalStateException("Project OS identity file is unreadable at " + runtimeLayout.identityPath(), exception);
+            throw new IllegalStateException("Autark-OS identity file is unreadable at " + runtimeLayout.identityPath(), exception);
         }
     }
 
@@ -76,7 +76,7 @@ public class InstanceIdentityService {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(runtimeLayout.identityPath().toFile(), StoredIdentity.from(identity));
             return identity;
         } catch (IOException exception) {
-            throw new IllegalStateException("Project OS identity file could not be created at " + runtimeLayout.identityPath(), exception);
+            throw new IllegalStateException("Autark-OS identity file could not be created at " + runtimeLayout.identityPath(), exception);
         }
     }
 
@@ -88,7 +88,7 @@ public class InstanceIdentityService {
                 || isBlank(identity.runtimeRoot())
                 || isBlank(identity.runtimeRootHash())
                 || identity.createdAt() == null) {
-            throw new IllegalStateException("Project OS identity file is incomplete.");
+            throw new IllegalStateException("Autark-OS identity file is incomplete.");
         }
     }
 

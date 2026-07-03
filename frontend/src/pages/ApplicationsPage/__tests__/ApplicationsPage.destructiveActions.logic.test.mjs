@@ -26,9 +26,9 @@ test('maps backend-shaped uninstall plans without turning normal confirmations i
   const plan = mapUninstallPlanToDestructiveActionPlan({
     appId: 'jellyfin',
     appName: 'Jellyfin',
-    headline: 'Project OS can remove the app while keeping your data on disk.',
+    headline: 'Autark-OS can remove the app while keeping your data on disk.',
     safetyCheckpointPlanned: true,
-    safetyCheckpointMessage: 'Project OS will save a safety checkpoint.',
+    safetyCheckpointMessage: 'Autark-OS will save a safety checkpoint.',
     willStop: ['Stop the app containers'],
     willKeep: ['Application data in /runtime/apps/jellyfin'],
     needsConfirmation: ['Confirm you understand that containers will be removed'],
@@ -37,7 +37,7 @@ test('maps backend-shaped uninstall plans without turning normal confirmations i
   assert.equal(plan.title, 'Uninstall Jellyfin');
   assert.deepEqual(Array.from(plan.warnings), [
     'Confirm you understand that containers will be removed',
-    'Project OS will save a safety checkpoint.',
+    'Autark-OS will save a safety checkpoint.',
   ]);
   assert.deepEqual(Array.from(plan.blockedReasons), []);
   assert.equal(plan.requiresTextConfirmation, 'UNINSTALL');

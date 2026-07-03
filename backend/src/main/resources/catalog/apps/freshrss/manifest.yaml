@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -99,7 +99,7 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open FreshRSS
   headline: Set up private feed reading
-  summary: Project OS starts FreshRSS. Create an account and add feeds from the web setup.
+  summary: Autark-OS starts FreshRSS. Create an account and add feeds from the web setup.
   setupSteps:
     - Open FreshRSS.
     - Create the first user.
@@ -118,7 +118,7 @@ health:
   successLabel: RSS reader is ready
   startingLabel: Starting RSS reader
   failureLabel: FreshRSS is not responding
-  description: Project OS checks that the FreshRSS web app answers before calling it ready.
+  description: Autark-OS checks that the FreshRSS web app answers before calling it ready.
 runtime:
   containerName: freshrss
   composeProject: project-os-freshrss

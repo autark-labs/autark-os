@@ -79,7 +79,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   }, []);
 
   const setupReady = setup?.status === 'ready' || setup?.status === 'ready_with_notes';
-  const deviceName = settings?.deviceName || setup?.runAsUser || 'Project OS';
+  const deviceName = settings?.deviceName || setup?.runAsUser || 'Autark-OS';
   const versionLabel = version?.version ? `v${version.version}` : 'Version unknown';
   const updateCurrent = version?.updateStatus === 'current' || !version?.updateStatus;
   const navGroups = navigationGroups(viewMode) as NavGroup[];
@@ -91,10 +91,10 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     )}>
       <div className={cn('mb-4 flex w-full items-center gap-3 lg:mb-6', collapsed ? 'px-0 lg:justify-center' : 'px-2')}>
         <div className={cn('grid place-items-center rounded-lg border border-cyan-300/35 bg-cyan-300 font-black text-slate-950 shadow-lg shadow-cyan-950/30', collapsed ? 'size-9 text-sm' : 'size-10')}>
-          P
+          A
         </div>
         {!collapsed && <div className="min-w-0">
-          <p className="m-0 text-xs font-semibold text-cyan-200">Project OS</p>
+          <p className="m-0 text-xs font-semibold text-cyan-200">Autark-OS</p>
           <h1 className="m-0 text-base font-bold leading-none text-white">Console</h1>
         </div>}
       </div>
@@ -180,7 +180,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
               <span className="truncate text-sm font-bold text-white">{deviceName}</span>
               <span className="shrink-0 rounded-full border border-sky-400/25 bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-300">{versionLabel}</span>
             </div>
-            <p className="mt-1 truncate text-xs text-slate-400">{setup?.devMode ? 'Development mode' : 'Project OS appliance'}</p>
+            <p className="mt-1 truncate text-xs text-slate-400">{setup?.devMode ? 'Development mode' : 'Autark-OS appliance'}</p>
           </div>
         </div>
         <div className="mt-3 grid gap-2 rounded-lg border border-sky-400/20 bg-slate-800 p-2 text-xs text-slate-300">

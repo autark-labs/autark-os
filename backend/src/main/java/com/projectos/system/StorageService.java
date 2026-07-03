@@ -64,7 +64,7 @@ public class StorageService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Project OS is watching", app.appName() + " is ready. If it drifts, Project OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList(), fileOperations);
     }
@@ -88,7 +88,7 @@ public class StorageService {
         List<InstalledApp> installedApps = managedInstalledApps();
         Set<String> installedIds = installedApps.stream().map(InstalledApp::appId).collect(HashSet::new, Set::add, Set::addAll);
         StorageUsage hostDisk = diskUsage("Host disk", runtimeRoot);
-        StorageUsage runtimeDisk = directoryUsage("Project OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
+        StorageUsage runtimeDisk = directoryUsage("Autark-OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
         StorageUsage backupStorage = directoryUsage("Backups", backupsRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
         List<AppStorageUsage> apps = installedApps.stream()
                 .map(this::appStorage)
@@ -120,11 +120,11 @@ public class StorageService {
         Path appsRoot = runtimeLayout.runtimeRoot().resolve("apps").toAbsolutePath().normalize();
         Path orphanPath = appsRoot.resolve(safeName).normalize();
         if (!orphanPath.startsWith(appsRoot) || !Files.isDirectory(orphanPath)) {
-            throw new com.projectos.marketplace.install.InstallationException("Project OS could not find that unused app data folder.");
+            throw new com.projectos.marketplace.install.InstallationException("Autark-OS could not find that unused app data folder.");
         }
         Set<String> installedIds = managedInstalledApps().stream().map(InstalledApp::appId).collect(HashSet::new, Set::add, Set::addAll);
         if (installedIds.contains(safeName)) {
-            throw new com.projectos.marketplace.install.InstallationException("Project OS will not remove data for an installed app.");
+            throw new com.projectos.marketplace.install.InstallationException("Autark-OS will not remove data for an installed app.");
         }
         try {
             long removedBytes = fileOperations.directorySize(orphanPath);
@@ -153,7 +153,7 @@ public class StorageService {
                     Instant.now());
         } catch (IOException exception) {
             activityLogService.error("system", "storage_cleanup", "Storage cleanup failed", exception.getMessage(), null, exception);
-            throw new com.projectos.marketplace.install.InstallationException("Project OS could not clean up that folder.", exception);
+            throw new com.projectos.marketplace.install.InstallationException("Autark-OS could not clean up that folder.", exception);
         }
     }
 
@@ -250,12 +250,12 @@ public class StorageService {
         if ("critical".equals(status)) {
             recommendations.add(new StorageRecommendation("disk-critical", "danger", "Free up space soon", "The host disk is critically full. Installs, backups, and app updates may fail.", "Review largest apps"));
         } else if (hostDisk.usedPercent() >= 75) {
-            recommendations.add(new StorageRecommendation("disk-warning", "warning", "Storage is getting tight", "Project OS can still run, but new installs and backups may become unreliable.", "Review storage"));
+            recommendations.add(new StorageRecommendation("disk-warning", "warning", "Storage is getting tight", "Autark-OS can still run, but new installs and backups may become unreliable.", "Review storage"));
         } else {
-            recommendations.add(new StorageRecommendation("disk-healthy", "success", "Storage looks healthy", "Project OS has enough free space for normal operation.", null));
+            recommendations.add(new StorageRecommendation("disk-healthy", "success", "Storage looks healthy", "Autark-OS has enough free space for normal operation.", null));
         }
         if (!orphaned.isEmpty()) {
-            recommendations.add(new StorageRecommendation("orphaned-data", "warning", "Unused app data found", "Project OS found folders that do not match an installed app. Review them before cleanup.", "Review unused data"));
+            recommendations.add(new StorageRecommendation("orphaned-data", "warning", "Unused app data found", "Autark-OS found folders that do not match an installed app. Review them before cleanup.", "Review unused data"));
         }
         if (backupStorage.usedBytes() == 0) {
             recommendations.add(new StorageRecommendation("backups-empty", "neutral", "No backup files found", "Backup storage is empty. Run a routine or manual backup to create the first restore point.", "Open backups"));
@@ -284,7 +284,7 @@ public class StorageService {
     }
 
     private String summary(String status, StorageUsage hostDisk, StorageUsage runtimeDisk, int orphanedCount) {
-        String base = "Project OS is using " + readableBytes(runtimeDisk.usedBytes()) + " on a host with " + readableBytes(hostDisk.usableBytes()) + " free.";
+        String base = "Autark-OS is using " + readableBytes(runtimeDisk.usedBytes()) + " on a host with " + readableBytes(hostDisk.usableBytes()) + " free.";
         if ("critical".equals(status)) {
             return base + " Free space is low enough that installs or backups may fail.";
         }

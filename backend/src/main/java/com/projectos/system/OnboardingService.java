@@ -180,15 +180,15 @@ public class OnboardingService {
                 throw new InstallationException("The parent folder for the backup destination does not exist.");
             }
             if (!Files.isWritable(parent)) {
-                throw new InstallationException("Project OS cannot write to the backup destination.");
+                throw new InstallationException("Autark-OS cannot write to the backup destination.");
             }
             Files.createDirectories(normalized);
             if (!Files.isWritable(normalized)) {
-                throw new InstallationException("Project OS cannot write to the backup destination.");
+                throw new InstallationException("Autark-OS cannot write to the backup destination.");
             }
             return normalized.toString();
         } catch (IOException exception) {
-            throw new InstallationException("Project OS could not prepare the backup destination.", exception);
+            throw new InstallationException("Autark-OS could not prepare the backup destination.", exception);
         }
     }
 }

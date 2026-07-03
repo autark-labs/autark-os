@@ -56,7 +56,7 @@ export function ObservedServiceCatalogMatchSection({
         <div>
           <p className="text-sm font-semibold text-sky-50">Catalog match</p>
           <p className="mt-1 text-xs leading-5 text-sky-100/65">
-            Match this service to a catalog app when Project OS guessed wrong or could not identify it.
+            Match this service to a catalog app when Autark-OS guessed wrong or could not identify it.
           </p>
         </div>
         {item.catalogMatchConfidence && (
@@ -126,10 +126,10 @@ function observedActionReason(
     return 'Wait for the current service action to finish.';
   }
   if (action?.disabled) {
-    return action.reason || `Project OS cannot ${fallbackAction} right now.`;
+    return action.reason || `Autark-OS cannot ${fallbackAction} right now.`;
   }
   if (!action) {
-    return `Project OS cannot ${fallbackAction} right now.`;
+    return `Autark-OS cannot ${fallbackAction} right now.`;
   }
   return '';
 }

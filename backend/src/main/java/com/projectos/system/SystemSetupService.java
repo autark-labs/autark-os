@@ -81,7 +81,7 @@ public class SystemSetupService {
         ProjectOsIdentity identity = identitySupplier.get();
         SystemSetupExistingInstallReport existingInstall = existingInstallReport(identity);
         if (existingInstall.conflict()) {
-            checks.add(warn("existing-install", "Existing Project OS install", existingInstall.headline(), existingInstall.summary(), "Recover existing apps", "/resolve-existing-apps"));
+            checks.add(warn("existing-install", "Existing Autark-OS install", existingInstall.headline(), existingInstall.summary(), "Recover existing apps", "/resolve-existing-apps"));
         } else if (!existingInstall.resources().isEmpty()) {
             checks.add(neutral("existing-install", "Development instance", existingInstall.headline(), existingInstall.summary(), null, null));
         }
@@ -119,9 +119,9 @@ public class SystemSetupService {
             return neutral(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Dev mode is running as your local user.", "Current user: " + runAsUser, null, null);
         }
         if (EXPECTED_USER.equals(runAsUser)) {
-            return ok(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Project OS is running as projectos.", "This is the recommended durable host identity.", null, null);
+            return ok(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Autark-OS is running as projectos.", "This is the recommended durable host identity.", null, null);
         }
-        return warn(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Project OS is not running as the projectos service user.", "Current user: " + runAsUser, "Run service setup", installCommand());
+        return warn(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Autark-OS is not running as the projectos service user.", "Current user: " + runAsUser, "Run service setup", installCommand());
     }
 
     private SystemSetupCheck runtimeCheck() {
@@ -129,11 +129,11 @@ public class SystemSetupService {
         try {
             Files.createDirectories(runtimeRoot);
             if (Files.isWritable(runtimeRoot)) {
-                return ok(SystemCapabilityCatalog.RUNTIME_ROOT, "Runtime storage", "Project OS can write to its runtime folder.", runtimeRoot.toString(), null, null);
+                return ok(SystemCapabilityCatalog.RUNTIME_ROOT, "Runtime storage", "Autark-OS can write to its runtime folder.", runtimeRoot.toString(), null, null);
             }
-            return warn(SystemCapabilityCatalog.RUNTIME_ROOT, "Runtime storage", "Project OS cannot write to its runtime folder.", runtimeRoot.toString(), "Repair permissions", installCommand());
+            return warn(SystemCapabilityCatalog.RUNTIME_ROOT, "Runtime storage", "Autark-OS cannot write to its runtime folder.", runtimeRoot.toString(), "Repair permissions", installCommand());
         } catch (IOException exception) {
-            return warn(SystemCapabilityCatalog.RUNTIME_ROOT, "Runtime storage", "Project OS cannot prepare its runtime folder.", exception.getMessage(), "Repair permissions", installCommand());
+            return warn(SystemCapabilityCatalog.RUNTIME_ROOT, "Runtime storage", "Autark-OS cannot prepare its runtime folder.", exception.getMessage(), "Repair permissions", installCommand());
         }
     }
 
@@ -143,9 +143,9 @@ public class SystemSetupService {
             return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is not installed.", "Marketplace app installs need Docker.", "Install Docker", null);
         }
         if (docker.successful()) {
-            return ok(SystemCapabilityCatalog.DOCKER, "Docker", "Project OS can talk to Docker.", firstLine(docker), null, null);
+            return ok(SystemCapabilityCatalog.DOCKER, "Docker", "Autark-OS can talk to Docker.", firstLine(docker), null, null);
         }
-        return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is installed but Project OS cannot access it.", firstLine(docker), "Run service setup", installCommand());
+        return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is installed but Autark-OS cannot access it.", firstLine(docker), "Run service setup", installCommand());
     }
 
     private SystemSetupCheck fileOpsCheck() {
@@ -155,9 +155,9 @@ public class SystemSetupService {
         String helper = fileOpsHelperCommand();
         CommandResult result = run("sudo", "-n", helper, "--help");
         if (result.successful()) {
-            return ok(SystemCapabilityCatalog.FILEOPS, "File operations", "Project OS can repair root-owned app data.", "Backups, restores, and app cleanup can use the bounded helper.", null, null);
+            return ok(SystemCapabilityCatalog.FILEOPS, "File operations", "Autark-OS can repair root-owned app data.", "Backups, restores, and app cleanup can use the bounded helper.", null, null);
         }
-        return warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Project OS cannot run bounded file operations yet.", firstLine(result), "Run service setup", installCommand());
+        return warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Autark-OS cannot run bounded file operations yet.", firstLine(result), "Run service setup", installCommand());
     }
 
     private SystemSetupCheck tailscaleCheck() {
@@ -183,14 +183,14 @@ public class SystemSetupService {
         }
         CommandResult serveStatus = run("tailscale", "serve", "status", "--json");
         if (serveStatus.successful()) {
-            return ok(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Project OS can inspect Tailscale Serve config.", "Serve management should work for private HTTPS links.", null, null);
+            return ok(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Autark-OS can inspect Tailscale Serve config.", "Serve management should work for private HTTPS links.", null, null);
         }
         String detail = firstLine(serveStatus);
         String command = "sudo tailscale set --operator=" + runAsUser;
         if (!EXPECTED_USER.equals(runAsUser)) {
             command = "sudo tailscale set --operator=" + EXPECTED_USER;
         }
-        return warn(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Project OS cannot manage Tailscale Serve yet.", detail, "Grant Serve permission", command);
+        return warn(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Autark-OS cannot manage Tailscale Serve yet.", detail, "Grant Serve permission", command);
     }
 
     private SystemSetupCheck systemdCheck() {
@@ -202,9 +202,9 @@ public class SystemSetupService {
             return neutral(SystemCapabilityCatalog.SYSTEMD, "System service", "Systemd is not available.", "This may be expected in dev or container environments.", null, null);
         }
         if (systemctl.successful()) {
-            return ok(SystemCapabilityCatalog.SYSTEMD, "System service", "Project OS is running as a system service.", "project-os.service is active.", null, null);
+            return ok(SystemCapabilityCatalog.SYSTEMD, "System service", "Autark-OS is running as a system service.", "project-os.service is active.", null, null);
         }
-        return warn(SystemCapabilityCatalog.SYSTEMD, "System service", "Project OS is not running as a system service.", firstLine(systemctl), "Run service setup", installCommand());
+        return warn(SystemCapabilityCatalog.SYSTEMD, "System service", "Autark-OS is not running as a system service.", firstLine(systemctl), "Run service setup", installCommand());
     }
 
     private String overall(List<SystemSetupCheck> checks) {
@@ -219,9 +219,9 @@ public class SystemSetupService {
 
     private String headline(String status) {
         return switch (status) {
-            case "ready" -> "Project OS host setup is ready";
-            case "ready_with_notes" -> "Project OS host setup is mostly ready";
-            default -> "Project OS needs host setup";
+            case "ready" -> "Autark-OS host setup is ready";
+            case "ready_with_notes" -> "Autark-OS host setup is mostly ready";
+            default -> "Autark-OS needs host setup";
         };
     }
 
@@ -229,7 +229,7 @@ public class SystemSetupService {
         return switch (status) {
             case "ready" -> "This host can manage apps, Docker, and private Tailscale links.";
             case "ready_with_notes" -> "Core setup is working, with a few environment-specific notes.";
-            default -> "Run the service-user setup so Project OS can manage Docker and private HTTPS links without manual fixes.";
+            default -> "Run the service-user setup so Autark-OS can manage Docker and private HTTPS links without manual fixes.";
         };
     }
 
@@ -313,8 +313,8 @@ public class SystemSetupService {
                     false,
                     devMode,
                     "ok",
-                    "No existing Project OS install found",
-                    "Setup did not find another Project OS-owned app on this server.",
+                    "No existing Autark-OS install found",
+                    "Setup did not find another Autark-OS-owned app on this server.",
                     List.of(),
                     List.of());
         }
@@ -324,7 +324,7 @@ public class SystemSetupService {
                     true,
                     "info",
                     "Development instance detected",
-                    "Project OS found other Project OS resources, but this development instance is isolated as " + identity.instanceSlug() + ".",
+                    "Autark-OS found other Autark-OS resources, but this development instance is isolated as " + identity.instanceSlug() + ".",
                     resources,
                     List.of(new SystemSetupAction("review_existing_apps", "Review found apps", "/resolve-existing-apps", "secondary")));
         }
@@ -332,8 +332,8 @@ public class SystemSetupService {
                 true,
                 false,
                 "warning",
-                "Existing Project OS install found",
-                "Review apps found on this server before creating another production Project OS instance.",
+                "Existing Autark-OS install found",
+                "Review apps found on this server before creating another production Autark-OS instance.",
                 resources,
                 List.of(
                         new SystemSetupAction("recover_existing_apps", "Recover existing apps", "/resolve-existing-apps", "primary"),

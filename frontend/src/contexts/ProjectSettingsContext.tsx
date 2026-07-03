@@ -38,7 +38,7 @@ export function ProjectSettingsProvider({ children }: { children: ReactNode }) {
         setViewModeState(nextSettings.showAdvancedMetrics ? 'advanced' : 'basic');
       }
     } catch (error) {
-      console.warn('Unable to load Project OS settings.', error);
+      console.warn('Unable to load Autark-OS settings.', error);
     } finally {
       setLoading(false);
     }

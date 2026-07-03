@@ -86,7 +86,7 @@ class CanonicalViewModelContractTests {
                 "no-action-needed",
                 "success",
                 "No action needed",
-                "Project OS does not see anything that needs your attention right now.",
+                "Autark-OS does not see anything that needs your attention right now.",
                 Optional.empty(),
                 Optional.empty(),
                 List.of(),

@@ -128,7 +128,7 @@ function StoragePage() {
                   <SectionHeader icon={HardDrive} title="Advanced filesystem details" description="Exact paths and filesystem totals for troubleshooting." />
                   <div className="mt-5 grid gap-4 lg:grid-cols-3">
                     <UsagePanel usage={report.hostDisk} title="Host disk" />
-                    <UsagePanel usage={report.runtimeDisk} title="Project OS data" />
+                    <UsagePanel usage={report.runtimeDisk} title="Autark-OS data" />
                     <UsagePanel usage={report.backupStorage} title="Backups" />
                   </div>
                 </StoragePanel>
@@ -149,7 +149,7 @@ function StoragePage() {
                 <SectionHeader compact icon={Info} title="Needs attention" />
                 <div className="mt-4 grid gap-3">
                   {report.recommendations.length ? report.recommendations.map((recommendation) => <RecommendationCard key={recommendation.id} recommendation={recommendation} />) : (
-                    <EmptyState compact title="No storage issues" message="Project OS did not find anything that needs storage cleanup right now." />
+                    <EmptyState compact title="No storage issues" message="Autark-OS did not find anything that needs storage cleanup right now." />
                   )}
                 </div>
               </StoragePanel>
@@ -167,7 +167,7 @@ function StoragePage() {
                 <SectionHeader compact icon={FolderSearch} title="Unused data" />
                 <div className="mt-4 grid gap-3">
                   {cleanupCandidates.length ? cleanupCandidates.map((orphan) => <OrphanedRow key={orphan.path} onCleanup={setCleanupTarget} orphan={orphan} showAdvancedMetrics={showAdvancedMetrics} />) : (
-                    <EmptyState compact title="No unused folders" message="Project OS did not find orphaned app data." />
+                    <EmptyState compact title="No unused folders" message="Autark-OS did not find orphaned app data." />
                   )}
                 </div>
               </StoragePanel>
@@ -366,7 +366,7 @@ function CleanupDialog({ confirmation, loading, onChange, onClose, onConfirm, ta
         )}
         <DialogFooter>
           <ProjectDarkControlButton onClick={onClose} type="button">Cancel</ProjectDarkControlButton>
-          <DisabledAction disabled={!canConfirm || loading} reason={loading ? 'Project OS is already preparing this cleanup.' : 'Type the folder name exactly before cleanup can continue.'}>
+          <DisabledAction disabled={!canConfirm || loading} reason={loading ? 'Autark-OS is already preparing this cleanup.' : 'Type the folder name exactly before cleanup can continue.'}>
             <ProjectWarningButton disabled={!canConfirm || loading} onClick={onConfirm} type="button">
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
               Create checkpoint and remove
@@ -480,7 +480,7 @@ function getStorageHero(report: StorageReport | null) {
   if (!report) {
     return {
       action: 'Storage data is unavailable.',
-      summary: 'Project OS could not read disk usage yet. Refresh the page or check Support if this continues.',
+      summary: 'Autark-OS could not read disk usage yet. Refresh the page or check Support if this continues.',
       title: 'Storage status is unknown',
     };
   }
@@ -550,7 +550,7 @@ function shortRecommendation(recommendation: StorageRecommendation) {
 
 function locationLabel(title: string) {
   if (title === 'Host disk') return 'This computer';
-  if (title === 'Project OS data') return 'Managed app data';
+  if (title === 'Autark-OS data') return 'Managed app data';
   if (title === 'Backups') return 'Backup folder';
   return 'Managed location';
 }

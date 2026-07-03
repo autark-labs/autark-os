@@ -32,7 +32,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const { showAdvancedMetrics } = useProjectSettings();
   const [state, setState] = useState<OnboardingState | null>(null);
   const [setupStatus, setSetupStatus] = useState<SystemSetupStatus | null>(null);
-  const [deviceName, setDeviceName] = useState('Project OS');
+  const [deviceName, setDeviceName] = useState('Autark-OS');
   const [automaticBackups, setAutomaticBackups] = useState(true);
   const [backupPosture, setBackupPosture] = useState<BackupPosture>('routine');
   const [backupDestination, setBackupDestination] = useState('');
@@ -51,7 +51,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         }
         setSetupStatus(setup);
         setState(next);
-        setDeviceName(next.deviceName || 'Project OS');
+        setDeviceName(next.deviceName || 'Autark-OS');
         setAutomaticBackups(next.automaticBackupsEnabled);
         const defaultBackupDestination = `${next.runtimePath}/backups`;
         const savedBackupDestination = next.backupDestination || defaultBackupDestination;
@@ -133,7 +133,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const showExistingInstallWarning = Boolean(existingInstall?.conflict || (setupStatus?.devMode && existingInstall?.resources?.length));
   const finishDisabled = saving || !canFinish;
   const finishDisabledReason = saving
-    ? 'Project OS is already saving setup.'
+    ? 'Autark-OS is already saving setup.'
     : readiness.finishAnywayRequiresAdvanced && !advancedFinish
       ? 'Review Advanced finish before continuing with remaining setup items.'
       : readiness.summary;
@@ -144,7 +144,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
         <header className="rounded-2xl border border-sky-400/30 bg-slate-900 p-6 shadow-xl shadow-slate-950/30 md:p-8">
           <Badge className="border-cyan-300/30 bg-cyan-400/10 text-cyan-100">First boot</Badge>
           <h1 className="mt-4 text-4xl font-black tracking-normal text-white md:text-6xl">Set up your homelab</h1>
-          <p className="mt-3 max-w-3xl text-base text-slate-300">Project OS will check this device, prepare safe defaults, and point you to the apps that make sense first.</p>
+          <p className="mt-3 max-w-3xl text-base text-slate-300">Autark-OS will check this device, prepare safe defaults, and point you to the apps that make sense first.</p>
           {error && <div className="mt-4 rounded-lg border border-red-300/20 bg-red-500/10 p-3 text-sm text-red-100">{error}</div>}
         </header>
 
@@ -153,7 +153,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {showExistingInstallWarning && (
               <WizardCard
                 icon={AlertTriangle}
-                title={existingInstall?.headline || 'Existing Project OS install found'}
+                title={existingInstall?.headline || 'Existing Autark-OS install found'}
                 text={existingInstall?.summary || 'Review apps found on this server before continuing setup.'}
               >
                 <div className={`rounded-lg border p-4 text-sm ${existingInstall?.conflict ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-sky-300/25 bg-sky-500/10 text-sky-100'}`}>
@@ -192,7 +192,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </WizardCard>
             )}
 
-            <WizardCard icon={ServerCog} title="Name this device" text="This name appears in Project OS and helps identify the box on your network.">
+            <WizardCard icon={ServerCog} title="Name this device" text="This name appears in Autark-OS and helps identify the box on your network.">
               <Input className="max-w-md border-sky-400/25 bg-slate-800 text-white" onChange={(event) => setDeviceName(event.target.value)} value={deviceName} />
             </WizardCard>
 
@@ -231,7 +231,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               </div>
             </WizardCard>
 
-            <WizardCard icon={Network} title="Private access" text={state.tailscaleConnected ? 'Tailscale is connected, so private app links can be created.' : 'Tailscale is not connected yet. Project OS will keep local access working and guide private access later.'}>
+            <WizardCard icon={Network} title="Private access" text={state.tailscaleConnected ? 'Tailscale is connected, so private app links can be created.' : 'Tailscale is not connected yet. Autark-OS will keep local access working and guide private access later.'}>
               <div className="grid gap-3 lg:grid-cols-3">
                 <PrivateAccessChoiceCard
                   active={privateAccessChoice === 'setup-now'}
@@ -247,7 +247,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 />
                 <PrivateAccessChoiceCard
                   active={privateAccessChoice === 'already-connected'}
-                  detail="Use this when Tailscale is already connected or managed outside Project OS."
+                  detail="Use this when Tailscale is already connected or managed outside Autark-OS."
                   label="I already use Tailscale"
                   onClick={() => setPrivateAccessChoice('already-connected')}
                 />
@@ -256,14 +256,14 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 <div>LAN setup URL: <span className="font-semibold text-white">{state.doctor.lanUrl}</span></div>
                 {privateAccessChoice === 'setup-now' && (
                   <div className="mt-3 grid gap-2 text-slate-400">
-                    <p>{privateAccessGroup?.message || 'Project OS will use Tailscale for private app links.'}</p>
+                    <p>{privateAccessGroup?.message || 'Autark-OS will use Tailscale for private app links.'}</p>
                     {!state.tailscaleConnected && <p>Next action: <span className="font-semibold text-white">{tailscaleCheck?.actionCommand || 'tailscale up'}</span></p>}
                     {state.tailscaleConnected && operatorCheck?.status === 'warning' && <p>Tailscale Serve permission: <span className="font-semibold text-white">{operatorCheck.actionCommand}</span></p>}
                     <p>MagicDNS and HTTPS must be enabled in Tailscale before private app links can use friendly secure names.</p>
                   </div>
                 )}
                 {privateAccessChoice === 'local-only' && <p className="mt-3 text-slate-400">Local-only setup is supported. Network can continue the private-access setup path later.</p>}
-                {privateAccessChoice === 'already-connected' && <p className="mt-3 text-slate-400">{state.tailscaleConnected ? 'Project OS sees Tailscale connected.' : 'Project OS does not see Tailscale connected yet. You can finish local setup and reconnect from Network later.'}</p>}
+                {privateAccessChoice === 'already-connected' && <p className="mt-3 text-slate-400">{state.tailscaleConnected ? 'Autark-OS sees Tailscale connected.' : 'Autark-OS does not see Tailscale connected yet. You can finish local setup and reconnect from Network later.'}</p>}
               </div>
             </WizardCard>
 
@@ -271,7 +271,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <div className="grid gap-3 lg:grid-cols-3">
                 <BackupChoice
                   active={backupPosture === 'routine'}
-                  detail="Project OS keeps app restore points on this device. This helps with app mistakes, but it does not protect against drive failure."
+                  detail="Autark-OS keeps app restore points on this device. This helps with app mistakes, but it does not protect against drive failure."
                   label="Same-device backups"
                   onClick={() => {
                     setBackupPosture('routine');
@@ -280,7 +280,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                 />
                 <BackupChoice
                   active={backupPosture === 'external'}
-                  detail="Use another mounted drive or off-device location. Project OS will store routine restore points there after setup."
+                  detail="Use another mounted drive or off-device location. Autark-OS will store routine restore points there after setup."
                   label="External backup location"
                   onClick={() => {
                     setBackupPosture('external');
@@ -307,7 +307,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
                     placeholder="/mnt/backup-drive/project-os-backups"
                     value={backupDestination}
                   />
-                  <p className="mt-2 text-sm text-slate-400">Use an absolute path on a mounted drive. Project OS will check that it can create and write this folder before setup finishes.</p>
+                  <p className="mt-2 text-sm text-slate-400">Use an absolute path on a mounted drive. Autark-OS will check that it can create and write this folder before setup finishes.</p>
                 </div>
               )}
               {backupPosture !== 'later' && (
@@ -322,14 +322,14 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
               <Collapsible className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
                 <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-white">Advanced backup details</CollapsibleTrigger>
                 <CollapsibleContent className="mt-3 grid gap-2 text-slate-400">
-                  <p>Project OS runtime path: {state.runtimePath}</p>
+                  <p>Autark-OS runtime path: {state.runtimePath}</p>
                   <p>Default backup path: {defaultBackupDestination}</p>
                   <p>Same-device backups are useful restore points, but external backups are safer if the main drive fails.</p>
                 </CollapsibleContent>
               </Collapsible>
             </WizardCard>
 
-            <WizardCard icon={Sparkles} title="Recommended starter apps" text="These are suggestions only. Project OS will not install them until you confirm from Marketplace.">
+            <WizardCard icon={Sparkles} title="Recommended starter apps" text="These are suggestions only. Autark-OS will not install them until you confirm from Marketplace.">
               <div className="grid gap-3 md:grid-cols-3">
                 {starterApps.map((app) => (
                   <button className={cn('rounded-lg border p-4 text-left transition', selectedApps.includes(app.id) ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} key={app.id} onClick={() => toggleApp(app.id)} type="button">

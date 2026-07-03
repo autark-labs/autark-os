@@ -23,7 +23,7 @@ class SystemSummaryServiceTests {
                 "critical",
                 "app_missing_container",
                 "Vaultwarden is missing",
-                "Project OS cannot find the container for this app.",
+                "Autark-OS cannot find the container for this app.",
                 ProjectOsAction.post("repair-vaultwarden", "Repair", "/api/apps/vaultwarden/repair", false, false));
         AppInstanceView ready = app("appinst_homepage", "homepage", "Homepage", "Ready", "http://localhost:3000", List.of());
         AppInstanceView missing = app("appinst_vaultwarden", "vaultwarden", "Vaultwarden", "Missing", "", List.of(missingIssue));
@@ -125,7 +125,7 @@ class SystemSummaryServiceTests {
                 "not installed",
                 "current-instance",
                 "homelab-box",
-                new com.projectos.system.api.SystemSetupExistingInstallReport(false, true, "ok", "No existing Project OS install found", "No existing Project OS install found.", List.of(), List.of()),
+                new com.projectos.system.api.SystemSetupExistingInstallReport(false, true, "ok", "No existing Autark-OS install found", "No existing Autark-OS install found.", List.of(), List.of()),
                 "install",
                 List.of(),
                 Instant.parse("2026-06-20T12:00:00Z"));

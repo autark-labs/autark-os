@@ -1,2 +1,2 @@
-# Placeholder compose file for prowlarr. Project OS renders the runtime compose file from manifest.yaml.
+# Placeholder compose file for prowlarr. Autark-OS renders the runtime compose file from manifest.yaml.
 services: {}

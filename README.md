@@ -1,4 +1,4 @@
-# Project OS
+# Autark-OS
 
 <div align="center">
   <h3>A calm control center for self-hosted apps.</h3>
@@ -11,12 +11,12 @@
 </div>
 
 <p align="center">
-  <img src="docs/current-app-state/homePage.png" alt="Project OS home page screenshot" width="900">
+  <img src="docs/current-app-state/homePage.png" alt="Autark-OS home page screenshot" width="900">
 </p>
 
-Project OS is a local homelab management app for people who want the value of self-hosting without turning every app into a terminal project. It runs on a Linux host, manages apps with Docker Compose, stores state locally in SQLite, and uses Tailscale for private access when available.
+Autark-OS is a local homelab management app for people who want the value of self-hosting without turning every app into a terminal project. It runs on a Linux host, manages apps with Docker Compose, stores state locally in SQLite, and uses Tailscale for private access when available.
 
-Project OS should help users answer four questions quickly:
+Autark-OS should help users answer four questions quickly:
 
 - What is installed?
 - What is ready to use?
@@ -25,17 +25,17 @@ Project OS should help users answer four questions quickly:
 
 ## Current Status
 
-Project OS is ready for controlled beta testing on Linux homelab hosts. It is not yet a polished public installer.
+Autark-OS is ready for controlled beta testing on Linux homelab hosts. It is not yet a polished public installer.
 
-The current beta path supports source installs and local release-bundle installs. The planned normal-user path is a GUI installer that checks the device, asks where app data should live, configures private access, and opens Project OS in the browser.
+The current beta path supports source installs and local release-bundle installs. The planned normal-user path is a GUI installer that checks the device, asks where app data should live, configures private access, and opens Autark-OS in the browser.
 
-## What Project OS Does
+## What Autark-OS Does
 
 - Discovers apps and services already running on the host.
 - Installs supported catalog apps with guided install plans.
 - Shows app readiness, access links, backup status, and recovery actions.
 - Starts, pauses, restarts, repairs, backs up, restores, and uninstalls managed apps.
-- Keeps local app data under a Project OS runtime directory.
+- Keeps local app data under an Autark-OS runtime directory.
 - Uses Tailscale for private links when the host is signed in and configured.
 - Preserves data by default around risky actions.
 
@@ -43,17 +43,17 @@ The current beta path supports source installs and local release-bundle installs
 
 ### Recommended For First-Time Users
 
-Start with the [non-technical install guide](docs/non-technical-install-guide.md). It explains the intended user flow and the current beta limitations without requiring Project OS internals.
+Start with the [non-technical install guide](docs/non-technical-install-guide.md). It explains the intended user flow and the current beta limitations without requiring Autark-OS internals.
 
 ### Beta Testers
 
-Use the [Project OS GitHub Releases page](https://github.com/autark-labs/project-os/releases) for beta builds.
+Use the [Autark-OS GitHub Releases page](https://github.com/autark-labs/project-os/releases) for beta builds.
 
 Recommended executable installer:
 
 ```bash
-chmod +x Project-OS-Installer-<version>-amd64.run
-./Project-OS-Installer-<version>-amd64.run
+chmod +x Autark-OS-Installer-<version>-amd64.run
+./Autark-OS-Installer-<version>-amd64.run
 ```
 
 On Linux desktops, the `.run` installer can show a graphical confirmation before opening a terminal for install progress. On servers and SSH sessions, it falls back to the guided terminal installer.
@@ -78,7 +78,7 @@ Verify downloaded artifacts:
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
-Open Project OS after install:
+Open Autark-OS after install:
 
 ```text
 http://localhost:8082
@@ -119,7 +119,7 @@ Tested beta target:
 - Node.js and Yarn 1.x for source installs
 - Tailscale for private links and remote access workflows
 
-Docker is required for Marketplace app installs. Tailscale is optional for local-only usage, but strongly recommended because private access is a core Project OS workflow.
+Docker is required for Marketplace app installs. Tailscale is optional for local-only usage, but strongly recommended because private access is a core Autark-OS workflow.
 
 ## Common Commands
 
@@ -198,4 +198,4 @@ docs/          User guides, runtime architecture, development plans
 - App catalog coverage is still early and should be tested app by app.
 - Public network exposure should remain an intentional advanced workflow.
 
-Project OS is being built as a guided runtime, not a generic infrastructure dashboard. The product should stay calm, clear, and honest about app ownership, readiness, safety, and recovery.
+Autark-OS is being built as a guided runtime, not a generic infrastructure dashboard. The product should stay calm, clear, and honest about app ownership, readiness, safety, and recovery.

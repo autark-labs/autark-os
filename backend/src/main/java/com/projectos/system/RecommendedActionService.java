@@ -34,7 +34,7 @@ public class RecommendedActionService implements RecommendedActionProvider {
             return new RecommendedAction(
                     "complete-setup",
                     "warning",
-                    "Finish Project OS setup",
+                    "Finish Autark-OS setup",
                     summary.setup().summary(),
                     Optional.of(ProjectOsAction.route("open-setup", "Continue setup", "/setup")),
                     Optional.empty(),
@@ -87,7 +87,7 @@ public class RecommendedActionService implements RecommendedActionProvider {
                 "no-action-needed",
                 "success",
                 "No action needed",
-                "Project OS does not see anything that needs your attention right now.",
+                "Autark-OS does not see anything that needs your attention right now.",
                 Optional.empty(),
                 Optional.empty(),
                 List.of(),

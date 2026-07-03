@@ -27,7 +27,7 @@ public record HealthManifest(
                     "Running in the background",
                     "Starting service",
                     "Service needs attention",
-                    "Project OS checks that the managed container is running.");
+                    "Autark-OS checks that the managed container is running.");
         }
         if (companionService) {
             return new HealthManifest(
@@ -37,7 +37,7 @@ public record HealthManifest(
                     "Ready to connect",
                     "Starting sync service",
                     "Sync service needs attention",
-                    "Project OS checks that the service is running and then shows the connection details.");
+                    "Autark-OS checks that the service is running and then shows the connection details.");
         }
         return new HealthManifest(
                 "http",
@@ -46,6 +46,6 @@ public record HealthManifest(
                 "Ready to open",
                 "Starting up",
                 "App link is not responding",
-                "Project OS checks that the app is running and that its local link answers.");
+                "Autark-OS checks that the app is running and that its local link answers.");
     }
 }

@@ -1,14 +1,14 @@
 # Beta Installation Guide
 
-This guide is for beta testers and developers installing Project OS from GitHub Release artifacts, this repository, or a locally built release bundle.
+This guide is for beta testers and developers installing Autark-OS from GitHub Release artifacts, this repository, or a locally built release bundle.
 
-For the intended normal-user path, start with [Install Project OS](./non-technical-install-guide.md). That guide describes the GUI and one-command installer flow Project OS is moving toward.
+For the intended normal-user path, start with [Install Autark-OS](./non-technical-install-guide.md). That guide describes the GUI and one-command installer flow Autark-OS is moving toward.
 
 ## Install Options
 
-Project OS beta releases publish three Linux install artifacts:
+Autark-OS beta releases publish three Linux install artifacts:
 
-- **Guided executable installer:** `Project-OS-Installer-<version>-<arch>.run`, the recommended non-technical beta path.
+- **Guided executable installer:** `Autark-OS-Installer-<version>-<arch>.run`, the recommended non-technical beta path.
 - **Debian package:** `project-os_<version>_<arch>.deb`, the apt-based path for Debian, Ubuntu, and Raspberry Pi OS users who want package-manager installation.
 - **General tarball:** `project-os-<version>.tar.gz`, the fallback path for support, advanced users, and hosts where package installation is not desired.
 
@@ -26,7 +26,7 @@ Tested beta target:
 - Tailscale for private links and remote access workflows
 - Node.js and Yarn 1.x when installing from source
 
-Docker is required for Marketplace app installs. Project OS can run without Tailscale, but private HTTPS links will not work until Tailscale is installed, connected, and configured for the `projectos` operator.
+Docker is required for Marketplace app installs. Autark-OS can run without Tailscale, but private HTTPS links will not work until Tailscale is installed, connected, and configured for the `projectos` operator.
 
 ## Install From GitHub Release Artifacts
 
@@ -47,8 +47,8 @@ sha256sum -c SHA256SUMS --ignore-missing
 Use this first for normal beta testing:
 
 ```bash
-chmod +x Project-OS-Installer-<version>-amd64.run
-./Project-OS-Installer-<version>-amd64.run
+chmod +x Autark-OS-Installer-<version>-amd64.run
+./Autark-OS-Installer-<version>-amd64.run
 ```
 
 When launched from a Linux desktop with `zenity` and a terminal available, the `.run` installer shows a graphical confirmation and opens a terminal for progress. On minimal servers or SSH sessions, it falls back to the same guided terminal installer.
@@ -56,13 +56,13 @@ When launched from a Linux desktop with `zenity` and a terminal available, the `
 Preview host changes first:
 
 ```bash
-./Project-OS-Installer-<version>-amd64.run --dry-run
+./Autark-OS-Installer-<version>-amd64.run --dry-run
 ```
 
 Extract the bundled release for support or inspection:
 
 ```bash
-./Project-OS-Installer-<version>-amd64.run --extract-only ./project-os-release
+./Autark-OS-Installer-<version>-amd64.run --extract-only ./project-os-release
 ```
 
 ### Debian Package
@@ -107,7 +107,7 @@ VERSION=0.1.0-beta.2
 
 The output folder contains:
 
-- `Project-OS-Installer-<version>-<arch>.run`
+- `Autark-OS-Installer-<version>-<arch>.run`
 - `project-os_<version>_<arch>.deb`
 - `project-os-<version>.tar.gz`
 - `project-os-artifacts.json`
@@ -126,7 +126,7 @@ cd project-os
 ./scripts/bootstrap-project-os.sh
 ```
 
-On Debian, Ubuntu, and Raspberry Pi OS, Project OS can attempt to install supported host dependencies:
+On Debian, Ubuntu, and Raspberry Pi OS, Autark-OS can attempt to install supported host dependencies:
 
 ```bash
 ./scripts/bootstrap-project-os.sh --auto-install-deps
@@ -150,9 +150,9 @@ The bootstrap script will:
 - install the `project-os` helper command
 - grant Docker group access to the service user when Docker is available
 - configure the `projectos` Tailscale operator when Tailscale is available and connected
-- start Project OS on port `8082`
+- start Autark-OS on port `8082`
 
-Open Project OS:
+Open Autark-OS:
 
 ```text
 http://localhost:8082
@@ -225,7 +225,7 @@ Release-bundle mode verifies checksums when present, installs the prebuilt backe
 
 ## Install Runtime Data On An SSD
 
-Project OS stores its SQLite database, app runtime files, Docker Compose projects, backups, and generated service state under the runtime directory.
+Autark-OS stores its SQLite database, app runtime files, Docker Compose projects, backups, and generated service state under the runtime directory.
 
 Use an SSD-backed runtime directory on small devices like Raspberry Pi hosts:
 
@@ -317,9 +317,9 @@ The bundle includes doctor results, the shared install plan, OS and disk summari
 
 The installer checks for Docker and Tailscale and prints warnings when they are missing. On Debian, Ubuntu, and Raspberry Pi OS, `--auto-install-deps` can attempt supported dependency installation.
 
-If Docker is missing, Project OS can still start, but Marketplace installs will fail until Docker is installed and available to the `projectos` service user.
+If Docker is missing, Autark-OS can still start, but Marketplace installs will fail until Docker is installed and available to the `projectos` service user.
 
-If Tailscale is missing or not connected, Project OS can still manage local apps, but private HTTPS links will not work.
+If Tailscale is missing or not connected, Autark-OS can still manage local apps, but private HTTPS links will not work.
 
 After installing or connecting Tailscale, rerun:
 
@@ -365,7 +365,7 @@ project-os uninstall --plan
 project-os uninstall --plan --json
 ```
 
-Remove Project OS service files and binaries while preserving runtime data, apps, backups, and the SQLite database:
+Remove Autark-OS service files and binaries while preserving runtime data, apps, backups, and the SQLite database:
 
 ```bash
 project-os uninstall
@@ -383,10 +383,10 @@ Also remove config and logs while preserving runtime data:
 project-os uninstall --remove-config --remove-logs
 ```
 
-Remove all Project OS runtime data only when you intend to delete app data, backups, installed app records, and the SQLite database:
+Remove all Autark-OS runtime data only when you intend to delete app data, backups, installed app records, and the SQLite database:
 
 ```bash
-project-os uninstall --remove-data --confirm-delete-data DELETE-PROJECT-OS-DATA
+project-os uninstall --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA
 ```
 
 Manual cleanup remains available if the helper command is unavailable:

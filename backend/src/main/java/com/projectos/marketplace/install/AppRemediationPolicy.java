@@ -18,8 +18,8 @@ public final class AppRemediationPolicy {
         if (repairRunning(normalizedRepairStatus)) {
             return new AppRemediationView(
                     "auto_repairing",
-                    "Project OS is repairing",
-                    name + " is not ready yet. Project OS is trying a safe repair before asking you to intervene.",
+                    "Autark-OS is repairing",
+                    name + " is not ready yet. Autark-OS is trying a safe repair before asking you to intervene.",
                     "Wait for repair",
                     "warning");
         }
@@ -37,7 +37,7 @@ public final class AppRemediationPolicy {
             return new AppRemediationView(
                     "repair_failed",
                     "Repair needs review",
-                    "Project OS tried a safe repair, but " + name + " still needs attention. Review the repair details before taking a riskier action.",
+                    "Autark-OS tried a safe repair, but " + name + " still needs attention. Review the repair details before taking a riskier action.",
                     "Review repair",
                     "critical");
         }
@@ -46,7 +46,7 @@ public final class AppRemediationPolicy {
             return new AppRemediationView(
                     "repair_succeeded",
                     "Repair succeeded",
-                    "Project OS recently repaired " + name + ". It is ready now.",
+                    "Autark-OS recently repaired " + name + ". It is ready now.",
                     "No action needed",
                     "success");
         }
@@ -56,14 +56,14 @@ public final class AppRemediationPolicy {
                 return new AppRemediationView(
                         "needs_user_action",
                         "Repair available",
-                        name + " needs attention. Project OS can try a safe repair from Manage.",
+                        name + " needs attention. Autark-OS can try a safe repair from Manage.",
                         "Open Manage",
                         "warning");
             }
             return new AppRemediationView(
                     "needs_user_action",
                     "Needs your review",
-                    name + " needs your review before Project OS can safely recover it.",
+                    name + " needs your review before Autark-OS can safely recover it.",
                     "Open Manage",
                     "critical");
         }
@@ -71,8 +71,8 @@ public final class AppRemediationPolicy {
         if (autoRepairEnabled && healthy(status)) {
             return new AppRemediationView(
                     "watching",
-                    "Project OS is watching",
-                    name + " is ready. If it drifts, Project OS will try safe repair before asking you to intervene.",
+                    "Autark-OS is watching",
+                    name + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.",
                     "No action needed",
                     "success");
         }

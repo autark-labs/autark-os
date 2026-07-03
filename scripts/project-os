@@ -14,12 +14,12 @@ usage() {
 Usage: project-os <command>
 
 Commands:
-  install    Install Project OS or print a shared install plan.
+  install    Install Autark-OS or print a shared install plan.
   doctor     Check host setup, service health, and core API readiness. Use --json for scripts.
   setup      Start or resume the first-boot setup flow.
-  repair     Check installed Project OS and print recovery actions.
-  update     Check or run Project OS update flow.
-  uninstall  Remove Project OS service paths through the guided uninstall flow.
+  repair     Check installed Autark-OS and print recovery actions.
+  update     Check or run Autark-OS update flow.
+  uninstall  Remove Autark-OS service paths through the guided uninstall flow.
   support-bundle
              Export redacted installer/setup diagnostics for support.
   where      Show install, runtime, config, log, service, and helper paths.
@@ -28,9 +28,9 @@ Commands:
   start      Start ${SERVICE_NAME}.service.
   stop       Stop ${SERVICE_NAME}.service.
   restart    Restart ${SERVICE_NAME}.service.
-  version    Print Project OS version, build, install path, and runtime path.
-  port       Print the configured Project OS service port.
-  url        Print the local Project OS URL.
+  version    Print Autark-OS version, build, install path, and runtime path.
+  port       Print the configured Autark-OS service port.
+  url        Print the local Autark-OS URL.
   help       Show this help.
 
 Environment:
@@ -216,7 +216,7 @@ confirm_default_no() {
 print_setup_next_step() {
   local base_url
   base_url="$(resolve_base_url)"
-  log "Open Project OS: ${base_url}"
+  log "Open Autark-OS: ${base_url}"
   log "Run 'project-os doctor' if the page is not reachable."
 }
 
@@ -331,7 +331,7 @@ Common options:
   --release-bundle DIR Install from a packaged release bundle.
   --release-jar FILE   Install this backend jar.
   --runtime-dir DIR    Store runtime data in DIR.
-  --port PORT          Run Project OS on PORT.
+  --port PORT          Run Autark-OS on PORT.
   -h, --help           Show this help.
 INSTALL_USAGE
         return 0
@@ -379,7 +379,7 @@ INSTALL_USAGE
     fi
     if [[ "${machine_output}" -eq 0 ]]; then
       log "Unified guided install"
-      log "This command will check this host, install supported dependencies when needed, install Project OS, and start the service."
+      log "This command will check this host, install supported dependencies when needed, install Autark-OS, and start the service."
       log "Use 'project-os install --plan' or 'project-os install --dry-run' to preview without installing."
     fi
   elif [[ "${guided}" -eq 1 && "${machine_output}" -eq 0 ]]; then
@@ -394,8 +394,8 @@ INSTALL_USAGE
     dry_run_install=1
   fi
   if [[ "${guided}" -eq 1 && "${metadata_only}" -eq 0 && "${machine_output}" -eq 0 && "${dry_run_install}" -eq 0 && "${yes}" -eq 0 ]]; then
-    log "Install Project OS and supported dependencies on this host?"
-    if ! confirm_default_no "Install Project OS and supported dependencies on this host?"; then
+    log "Install Autark-OS and supported dependencies on this host?"
+    if ! confirm_default_no "Install Autark-OS and supported dependencies on this host?"; then
       log "Installation cancelled."
       return 1
     fi
@@ -417,7 +417,7 @@ repair_command() {
       cat <<REPAIR_USAGE
 Usage: project-os repair [options]
 
-Checks installed Project OS and prints recovery actions. Deeper automated
+Checks installed Autark-OS and prints recovery actions. Deeper automated
 repair steps are planned for the lifecycle phase.
 
 Options:
@@ -428,7 +428,7 @@ REPAIR_USAGE
       ;;
   esac
 
-  log "Checking installed Project OS before repair."
+  log "Checking installed Autark-OS before repair."
   if doctor "$@"; then
     log "No automatic repair action is required by this helper."
     return 0
@@ -571,7 +571,7 @@ apply_release_bundle_update() {
   previous_jar="${snapshot_dir}/project-os-backend-previous.jar"
 
   if [[ "${yes}" -ne 1 && "${dry_run}" -ne 1 ]]; then
-    if ! confirm_default_yes "Update Project OS to ${new_version:-unknown} from ${bundle_dir}?"; then
+    if ! confirm_default_yes "Update Autark-OS to ${new_version:-unknown} from ${bundle_dir}?"; then
       log "Update cancelled."
       return 1
     fi
@@ -628,7 +628,7 @@ PROJECT_OS_PRE_UPDATE_SNAPSHOT_DIR=${snapshot_dir}
 EOF
 
   if [[ "${skip_service_restart}" -eq 1 ]]; then
-    log "Updated Project OS files and metadata. Service restart skipped."
+    log "Updated Autark-OS files and metadata. Service restart skipped."
   else
     if has_command systemctl; then
       sudo systemctl restart "${SERVICE_NAME}.service"
@@ -685,7 +685,7 @@ update_command() {
         cat <<UPDATE_USAGE
 Usage: project-os update [options]
 
-Checks or runs the Project OS release-bundle update flow.
+Checks or runs the Autark-OS release-bundle update flow.
 
 Options:
   --check                  Check release metadata for an available version.
@@ -780,7 +780,7 @@ support_bundle_run_project_os_doctor() {
 write_disk_summary() {
   local target="$1"
   {
-    printf 'Project OS relevant disk summary\n'
+    printf 'Autark-OS relevant disk summary\n'
     printf 'Config file: %s\n' "${CONFIG_FILE}"
     printf 'Install path: %s\n' "$(configured_value PROJECT_OS_INSTALL_DIR)"
     printf 'Runtime path: %s\n' "$(configured_value PROJECT_OS_RUNTIME_ROOT)"
@@ -1053,7 +1053,7 @@ uninstall_command() {
         ;;
       --confirm-delete-data)
         shift
-        [[ $# -gt 0 ]] || die "--confirm-delete-data requires DELETE-PROJECT-OS-DATA."
+        [[ $# -gt 0 ]] || die "--confirm-delete-data requires DELETE-AUTARK-OS-DATA."
         typed_confirmation="$1"
         ;;
       --confirm-delete-data=*)
@@ -1063,7 +1063,7 @@ uninstall_command() {
         cat <<UNINSTALL_USAGE
 Usage: project-os uninstall [options]
 
-Safely remove Project OS service and binaries. Runtime data is preserved by
+Safely remove Autark-OS service and binaries. Runtime data is preserved by
 default.
 
 Options:
@@ -1071,10 +1071,10 @@ Options:
   --json                 With --plan, print machine-readable JSON.
   --dry-run              Print removal actions without changing the host.
   --yes                  Run non-interactively.
-  --remove-config        Also remove Project OS config.
-  --remove-logs          Also remove Project OS logs.
+  --remove-config        Also remove Autark-OS config.
+  --remove-logs          Also remove Autark-OS logs.
   --remove-data          Also remove runtime data, apps, backups, and database.
-  --confirm-delete-data DELETE-PROJECT-OS-DATA
+  --confirm-delete-data DELETE-AUTARK-OS-DATA
                          Required with --remove-data.
   -h, --help             Show this help.
 UNINSTALL_USAGE
@@ -1088,8 +1088,8 @@ UNINSTALL_USAGE
     shift
   done
 
-  if [[ "${remove_data}" -eq 1 && "${typed_confirmation}" != "DELETE-PROJECT-OS-DATA" ]]; then
-    log "Destructive uninstall requires: --confirm-delete-data DELETE-PROJECT-OS-DATA"
+  if [[ "${remove_data}" -eq 1 && "${typed_confirmation}" != "DELETE-AUTARK-OS-DATA" ]]; then
+    log "Destructive uninstall requires: --confirm-delete-data DELETE-AUTARK-OS-DATA"
     return 1
   fi
 
@@ -1150,13 +1150,13 @@ UNINSTALL_USAGE
     printf ',"supportReport":{"offeredBeforeRemoval":true,"command":"project-os doctor --json"}'
     printf ',"actions":['
     printf '{"id":"offer-support-report","label":"Offer support report before removal","mutatesHost":false},'
-    printf '{"id":"stop-service","label":"Stop Project OS service","mutatesHost":true},'
-    printf '{"id":"remove-binaries","label":"Remove Project OS binaries","mutatesHost":true}'
+    printf '{"id":"stop-service","label":"Stop Autark-OS service","mutatesHost":true},'
+    printf '{"id":"remove-binaries","label":"Remove Autark-OS binaries","mutatesHost":true}'
     if [[ "${remove_config}" -eq 1 ]]; then
-      printf ',{"id":"remove-config","label":"Remove Project OS config","mutatesHost":true}'
+      printf ',{"id":"remove-config","label":"Remove Autark-OS config","mutatesHost":true}'
     fi
     if [[ "${remove_logs}" -eq 1 ]]; then
-      printf ',{"id":"remove-logs","label":"Remove Project OS logs","mutatesHost":true}'
+      printf ',{"id":"remove-logs","label":"Remove Autark-OS logs","mutatesHost":true}'
     fi
     if [[ "${remove_data}" -eq 1 ]]; then
       printf ',{"id":"remove-runtime-data","label":"Remove runtime data, apps, backups, and database","mutatesHost":true}'
@@ -1193,7 +1193,7 @@ UNINSTALL_USAGE
   fi
 
   if [[ "${yes}" -ne 1 ]]; then
-    if ! confirm_default_yes "Remove Project OS service and binaries while preserving runtime data?"; then
+    if ! confirm_default_yes "Remove Autark-OS service and binaries while preserving runtime data?"; then
       log "Uninstall cancelled."
       return 1
     fi
@@ -1302,7 +1302,7 @@ DOCTOR_USAGE
     return 0
   fi
 
-  log "Checking Project OS at ${base_url}."
+  log "Checking Autark-OS at ${base_url}."
 
   if has_command systemctl; then
     if systemctl is-active --quiet "${SERVICE_NAME}.service"; then
@@ -1352,7 +1352,7 @@ DOCTOR_USAGE
     return 1
   fi
 
-  log "Open Project OS: ${base_url}"
+  log "Open Autark-OS: ${base_url}"
 }
 
 setup() {
@@ -1428,7 +1428,7 @@ SETUP_USAGE
   lan_url="$(json_value lanUrl "${doctor_file}")"
   [[ -n "${lan_url}" ]] || lan_url="${base_url}"
 
-  log "Project OS first-boot setup"
+  log "Autark-OS first-boot setup"
   log "Current status: ${status:-unknown}"
   log "Browser URL: ${lan_url}"
   log "Runtime data: ${runtime_path:-unknown}"
@@ -1449,7 +1449,7 @@ SETUP_USAGE
       log "Core setup checks look ready."
     fi
     printf '\n'
-    device_name="$(read_default "Device name" "${device_name:-Project OS}")"
+    device_name="$(read_default "Device name" "${device_name:-Autark-OS}")"
     if [[ "${tailscale_connected}" == "true" ]]; then
       log "Tailscale is connected. Private app links can be created."
     else
@@ -1483,7 +1483,7 @@ SETUP_USAGE
 
   local body
   body="$(printf '{"status":"in_progress","currentStep":5,"deviceName":"%s","backupDestination":"%s","automaticBackupsEnabled":%s,"recommendedApps":%s,"completedSteps":["device","doctor","tailscale","storage","backups","apps"]}' \
-    "$(json_escape "${device_name:-Project OS}")" \
+    "$(json_escape "${device_name:-Autark-OS}")" \
     "$(json_escape "${backup_destination:-}")" \
     "${automatic_backups:-true}" \
     "$(json_list "${recommended[@]}")")"

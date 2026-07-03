@@ -1,2 +1,2 @@
-# Placeholder compose file for gitea. Project OS renders the runtime compose file from manifest.yaml.
+# Placeholder compose file for gitea. Autark-OS renders the runtime compose file from manifest.yaml.
 services: {}

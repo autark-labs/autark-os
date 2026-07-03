@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -61,9 +61,9 @@ user:
     - Works with Bitwarden browser and mobile apps
     - Encrypted vault storage
     - Optional admin dashboard
-  plainLanguage: Vaultwarden gives you a private password manager that feels familiar if you have used Bitwarden before. Project-OS prepares storage, networking, backups, and private access so the install is approachable.
+  plainLanguage: Vaultwarden gives you a private password manager that feels familiar if you have used Bitwarden before. Autark-OS prepares storage, networking, backups, and private access so the install is approachable.
 technical:
-  summary: Deploys a Vaultwarden container with persistent data, reverse proxy labels, Tailscale access, daily encrypted backups, and a Project-OS managed network.
+  summary: Deploys a Vaultwarden container with persistent data, reverse proxy labels, Tailscale access, daily encrypted backups, and an Autark-OS managed network.
   requirements:
     - 1 CPU core
     - 512 MB RAM

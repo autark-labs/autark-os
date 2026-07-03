@@ -87,16 +87,16 @@ public class NetworkDiagnosticsService {
 
     private NetworkDiagnosticItem installedCheck(TailscaleStatus tailscale) {
         if (tailscale.installed()) {
-            return ok("tailscale-installed", "Tailscale installed", "Private networking is available on this host.", "Project OS can inspect Tailscale locally.", null);
+            return ok("tailscale-installed", "Tailscale installed", "Private networking is available on this host.", "Autark-OS can inspect Tailscale locally.", null);
         }
-        return warn("tailscale-installed", "Tailscale install needed", "Install Tailscale on this host.", "Project OS cannot create private app links until Tailscale is installed.", "Install Tailscale");
+        return warn("tailscale-installed", "Tailscale install needed", "Install Tailscale on this host.", "Autark-OS cannot create private app links until Tailscale is installed.", "Install Tailscale");
     }
 
     private NetworkDiagnosticItem connectedCheck(TailscaleStatus tailscale) {
         if (tailscale.connected()) {
-            return ok("tailscale-connected", "Project OS connected", "This device is joined to your tailnet.", tailscale.message(), null);
+            return ok("tailscale-connected", "Autark-OS connected", "This device is joined to your tailnet.", tailscale.message(), null);
         }
-        return warn("tailscale-connected", "Connect Project OS", "Sign in to Tailscale from this device.", tailscale.message(), "Connect this device");
+        return warn("tailscale-connected", "Connect Autark-OS", "Sign in to Tailscale from this device.", tailscale.message(), "Connect this device");
     }
 
     private NetworkDiagnosticItem dnsCheck(TailscaleStatus tailscale) {
@@ -106,12 +106,12 @@ public class NetworkDiagnosticsService {
         if (tailscale.dnsName() != null && !tailscale.dnsName().isBlank()) {
             return ok("tailscale-dns", "Private DNS ready", "Private app links can use a friendly device name.", tailscale.dnsName(), null);
         }
-        return warn("tailscale-dns", "Private DNS missing", "Project OS will fall back to the Tailscale IP.", "Enable MagicDNS in Tailscale for friendlier private links.", "Check DNS");
+        return warn("tailscale-dns", "Private DNS missing", "Autark-OS will fall back to the Tailscale IP.", "Enable MagicDNS in Tailscale for friendlier private links.", "Check DNS");
     }
 
     private NetworkDiagnosticItem devicesCheck(TailscaleStatus tailscale, List<TailscaleDevice> devices) {
         if (!tailscale.connected()) {
-            return neutral("tailnet-devices", "Devices", "Connect Project OS first.", "Phones and laptops will appear after setup.", null);
+            return neutral("tailnet-devices", "Devices", "Connect Autark-OS first.", "Phones and laptops will appear after setup.", null);
         }
         long online = devices.stream().filter(TailscaleDevice::online).count();
         if (online > 0) {
@@ -145,21 +145,21 @@ public class NetworkDiagnosticsService {
         if (!tailscale.connected()) {
             return warn("private-apps", "Private apps waiting", privateApps.size() + " app(s) are selected for private access.", "Connect Tailscale to activate their private links.", "Connect this device");
         }
-        return ok("private-apps", "Private apps ready", privateApps.size() + " app(s) selected for private access.", "Project OS can show private links for these apps.", null);
+        return ok("private-apps", "Private apps ready", privateApps.size() + " app(s) selected for private access.", "Autark-OS can show private links for these apps.", null);
     }
 
     private NetworkDiagnosticItem appCheck(AppRuntimeView app, AppAccessCheck accessCheck, TailscaleStatus tailscale) {
         if (!tailscale.connected()) {
-            return warn(app.appId(), app.appName(), "Private link is waiting on Tailscale.", "Connect Project OS to activate this app's private access.", "Connect this device");
+            return warn(app.appId(), app.appName(), "Private link is waiting on Tailscale.", "Connect Autark-OS to activate this app's private access.", "Connect this device");
         }
         if (app.accessUrl() == null || app.accessUrl().isBlank()) {
-            return warn(app.appId(), app.appName(), "This app does not have a local link yet.", "Start or repair the app so Project OS can build a private link.", "Repair app link");
+            return warn(app.appId(), app.appName(), "This app does not have a local link yet.", "Start or repair the app so Autark-OS can build a private link.", "Repair app link");
         }
         if (app.settings() == null || app.settings().privateAccessUrl() == null || app.settings().privateAccessUrl().isBlank()) {
             return warn(app.appId(), app.appName(), "Private link has not been created yet.", "Use Repair to create a Tailscale Serve HTTPS link for this app.", "Repair private link");
         }
         if (accessCheck == null || "not_configured".equals(accessCheck.status())) {
-            return warn(app.appId(), app.appName(), "Access check is not configured.", "Project OS needs a local URL before it can confirm private access.", "Repair app link");
+            return warn(app.appId(), app.appName(), "Access check is not configured.", "Autark-OS needs a local URL before it can confirm private access.", "Repair app link");
         }
         if ("reachable".equals(accessCheck.status())) {
             return ok(app.appId(), app.appName(), "Private link is configured.", app.settings().privateAccessUrl(), null);
@@ -185,7 +185,7 @@ public class NetworkDiagnosticsService {
         if ("healthy".equals(status)) {
             return privateAppCount + " private app(s) and " + deviceCount + " tailnet device(s) are ready.";
         }
-        return "Project OS found a few setup items before private access is fully smooth.";
+        return "Autark-OS found a few setup items before private access is fully smooth.";
     }
 
     private NetworkDiagnosticItem ok(String id, String label, String message, String detail, String actionLabel) {

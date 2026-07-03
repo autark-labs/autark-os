@@ -81,5 +81,5 @@ missing_java_output="$(PROJECT_OS_OS_RELEASE_FIXTURE="${os_release_fixture}" PRO
 
 grep -q 'Package manager: apt (compatible, not fully tested on this OS release)' <<<"${missing_java_output}"
 grep -q 'Dry run: service setup assumes Java 21 will be available after dependency installation.' <<<"${missing_java_output}"
-grep -q 'Project OS installation preview completed.' <<<"${missing_java_output}"
+grep -q 'Autark-OS installation preview completed.' <<<"${missing_java_output}"
 grep -q 'LAN URL:' <<<"${missing_java_output}"

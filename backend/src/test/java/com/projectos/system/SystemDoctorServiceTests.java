@@ -49,7 +49,7 @@ class SystemDoctorServiceTests {
     void readinessBlocksCompletionWhenRuntimeStorageIsNotUsable() {
         SystemDoctorService service = service(List.of(
                 ok("service-user"),
-                warn("runtime-root", "Runtime storage", "Project OS cannot write to storage.", "Repair permissions"),
+                warn("runtime-root", "Runtime storage", "Autark-OS cannot write to storage.", "Repair permissions"),
                 ok("docker"),
                 ok("tailscale"),
                 ok("tailscale-operator"),
@@ -106,7 +106,7 @@ class SystemDoctorServiceTests {
         public SystemSetupStatus status() {
             return new SystemSetupStatus(
                     "needs_admin_setup",
-                    "Project OS needs host setup",
+                    "Autark-OS needs host setup",
                     "Review setup.",
                     "jack",
                     "projectos",
@@ -118,7 +118,7 @@ class SystemDoctorServiceTests {
                     "not installed",
                     "current-instance",
                     "homelab-box",
-                    new com.projectos.system.api.SystemSetupExistingInstallReport(false, false, "ok", "No existing Project OS install found", "No existing Project OS install found.", java.util.List.of(), java.util.List.of()),
+                    new com.projectos.system.api.SystemSetupExistingInstallReport(false, false, "ok", "No existing Autark-OS install found", "No existing Autark-OS install found.", java.util.List.of(), java.util.List.of()),
                     "sudo install-project-os-service.sh",
                     checks,
                     java.time.Instant.now());

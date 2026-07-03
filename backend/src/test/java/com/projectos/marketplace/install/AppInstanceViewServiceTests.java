@@ -45,7 +45,7 @@ class AppInstanceViewServiceTests {
         assertThat(view.localUrl()).isEqualTo("http://localhost:8090");
         assertThat(view.privateUrl()).isEqualTo("https://project-os.example.ts.net:12890");
         assertThat(view.remediation().state()).isEqualTo("watching");
-        assertThat(view.remediation().label()).isEqualTo("Project OS is watching");
+        assertThat(view.remediation().label()).isEqualTo("Autark-OS is watching");
         assertThat(view.actions()).extracting(action -> action.id()).contains("open-vaultwarden", "restart-vaultwarden");
         assertThat(view.actions())
                 .filteredOn(action -> action.id().equals("open-vaultwarden"))

@@ -105,7 +105,7 @@ class ManifestValidatorTests {
                 "1.0.0",
                 "Today",
                 "1 MB",
-                "Project-OS",
+                "Autark-OS",
                 "Local",
                 "https://example.com/project-os/test-app",
                 "https://example.com/project-os/test-app/docs",

@@ -41,10 +41,10 @@ Options:
   --dry-run          Print actions without changing the host.
   --check           Report current service-user setup state.
   --no-start        Install files and unit, but do not enable/start systemd service.
-  --runtime-dir DIR  Store Project OS runtime data, database, apps, and backups in DIR.
-  --install-dir DIR  Install Project OS binaries into DIR.
-  --config-dir DIR   Store Project OS host config in DIR.
-  --log-dir DIR      Store Project OS logs in DIR.
+  --runtime-dir DIR  Store Autark-OS runtime data, database, apps, and backups in DIR.
+  --install-dir DIR  Install Autark-OS binaries into DIR.
+  --config-dir DIR   Store Autark-OS host config in DIR.
+  --log-dir DIR      Store Autark-OS logs in DIR.
   --port PORT        Run the production backend on PORT.
   --skip-tailscale  Do not attempt tailscale operator setup.
   --skip-docker     Do not add the project-os user to the docker group.
@@ -237,7 +237,7 @@ path_mount_summary() {
 }
 
 check_state() {
-  log "Checking Project OS service-user setup."
+  log "Checking Autark-OS service-user setup."
   if id "${PROJECT_OS_USER}" >/dev/null 2>&1; then
     status_line "User" "present (${PROJECT_OS_USER})"
   else
@@ -258,7 +258,7 @@ check_state() {
     status_line "Backend jar" "missing (${TARGET_BACKEND_JAR})"
   fi
 
-  status_line "Project OS version" "${PROJECT_OS_VERSION}"
+  status_line "Autark-OS version" "${PROJECT_OS_VERSION}"
   status_line "Build SHA" "$(build_sha)"
   status_line "Build date" "$(build_date)"
 
@@ -273,9 +273,9 @@ check_state() {
   fi
 
   if [[ -f "${INSTALLED_CLI}" ]]; then
-    status_line "Project OS command" "${INSTALLED_CLI}"
+    status_line "Autark-OS command" "${INSTALLED_CLI}"
   else
-    status_line "Project OS command" "missing (${INSTALLED_CLI})"
+    status_line "Autark-OS command" "missing (${INSTALLED_CLI})"
   fi
 
   if [[ -f "${SERVICE_FILE}" ]]; then
@@ -361,10 +361,10 @@ preflight_install_collision() {
   existing_port="$(env_file_value "${env_file}" SERVER_PORT)"
 
   if [[ -n "${existing_runtime}" && "${existing_runtime}" != "${RUNTIME_DIR}" ]]; then
-    die "Existing Project OS config at ${env_file} uses runtime root ${existing_runtime}, but this install requested ${RUNTIME_DIR}. Use the same runtime root, choose a separate config/service name, or rerun with PROJECT_OS_ALLOW_INSTALL_COLLISION=1 if you intentionally want to replace this config."
+    die "Existing Autark-OS config at ${env_file} uses runtime root ${existing_runtime}, but this install requested ${RUNTIME_DIR}. Use the same runtime root, choose a separate config/service name, or rerun with PROJECT_OS_ALLOW_INSTALL_COLLISION=1 if you intentionally want to replace this config."
   fi
   if [[ -n "${existing_port}" && "${existing_port}" != "${SERVER_PORT}" ]]; then
-    die "Existing Project OS config at ${env_file} uses port ${existing_port}, but this install requested ${SERVER_PORT}. Use the same port, choose a separate config/service name, or rerun with PROJECT_OS_ALLOW_INSTALL_COLLISION=1 if you intentionally want to replace this config."
+    die "Existing Autark-OS config at ${env_file} uses port ${existing_port}, but this install requested ${SERVER_PORT}. Use the same port, choose a separate config/service name, or rerun with PROJECT_OS_ALLOW_INSTALL_COLLISION=1 if you intentionally want to replace this config."
   fi
 }
 
@@ -380,7 +380,7 @@ preflight_stale_runtime_without_config() {
   fi
   [[ "${found_runtime}" -eq 1 ]] || return 0
 
-  die "Existing Project OS runtime data was found at ${RUNTIME_DIR}, but no active config exists at ${CONFIG_DIR}/project-os.env. Recover existing apps from the setup page, repair the existing install with the same runtime path, choose a separate development service/config/runtime, or rerun with PROJECT_OS_ALLOW_INSTALL_COLLISION=1 if you intentionally want to replace this runtime."
+  die "Existing Autark-OS runtime data was found at ${RUNTIME_DIR}, but no active config exists at ${CONFIG_DIR}/project-os.env. Recover existing apps from the setup page, repair the existing install with the same runtime path, choose a separate development service/config/runtime, or rerun with PROJECT_OS_ALLOW_INSTALL_COLLISION=1 if you intentionally want to replace this runtime."
 }
 
 build_sha() {
@@ -427,7 +427,7 @@ ensure_user() {
     --gid "${PROJECT_OS_GROUP}" \
     --home-dir "${RUNTIME_DIR}" \
     --shell /usr/sbin/nologin \
-    --comment "Project OS service user" \
+    --comment "Autark-OS service user" \
     "${PROJECT_OS_USER}"
 }
 
@@ -448,25 +448,25 @@ install_setup_script() {
 install_cli() {
   local cli_source="${REPO_ROOT}/scripts/project-os"
   if [[ ! -f "${cli_source}" ]]; then
-    warn "Project OS helper command is missing from ${cli_source}."
+    warn "Autark-OS helper command is missing from ${cli_source}."
     return 0
   fi
   run install -o root -g "${PROJECT_OS_GROUP}" -m 0755 "${cli_source}" "${INSTALLED_CLI}"
-  log "Installed Project OS helper command to ${INSTALLED_CLI}."
+  log "Installed Autark-OS helper command to ${INSTALLED_CLI}."
   if [[ -n "${CLI_LINK}" ]]; then
     run ln -sfn "${INSTALLED_CLI}" "${CLI_LINK}"
-    log "Linked Project OS helper command at ${CLI_LINK}."
+    log "Linked Autark-OS helper command at ${CLI_LINK}."
   fi
 }
 
 install_fileops_helper() {
   local helper_source="${REPO_ROOT}/scripts/project-os-fileops"
   if [[ ! -f "${helper_source}" ]]; then
-    warn "Project OS file operations helper is missing from ${helper_source}."
+    warn "Autark-OS file operations helper is missing from ${helper_source}."
     return 0
   fi
   run install -o root -g root -m 0755 "${helper_source}" "${INSTALLED_FILEOPS_HELPER}"
-  log "Installed Project OS file operations helper to ${INSTALLED_FILEOPS_HELPER}."
+  log "Installed Autark-OS file operations helper to ${INSTALLED_FILEOPS_HELPER}."
 }
 
 configure_fileops_privilege() {
@@ -483,7 +483,7 @@ configure_fileops_privilege() {
   local tmp_file
   tmp_file="$(mktemp)"
   {
-    printf '# Project OS bounded app-data file operations.\n'
+    printf '# Autark-OS bounded app-data file operations.\n'
     printf '%s\n' "${rule}"
   } >"${tmp_file}"
   if command_exists visudo; then
@@ -491,7 +491,7 @@ configure_fileops_privilege() {
   fi
   install -o root -g root -m 0440 "${tmp_file}" "${SUDOERS_FILE}"
   rm -f "${tmp_file}"
-  log "Configured sudo access for Project OS file operations at ${SUDOERS_FILE}."
+  log "Configured sudo access for Autark-OS file operations at ${SUDOERS_FILE}."
 }
 
 configure_docker_access() {
@@ -614,7 +614,7 @@ write_systemd_unit() {
 
   cat >"${SERVICE_FILE}" <<EOF
 [Unit]
-Description=Project OS backend
+Description=Autark-OS backend
 Wants=network-online.target
 After=network-online.target docker.service tailscaled.service
 
@@ -640,7 +640,7 @@ EOF
 
 enable_service() {
   if ! command_exists systemctl; then
-    warn "systemctl is not available. The service file was written, but Project OS was not enabled or started."
+    warn "systemctl is not available. The service file was written, but Autark-OS was not enabled or started."
     return 0
   fi
   run systemctl daemon-reload
@@ -670,7 +670,7 @@ main() {
     exit 0
   fi
 
-  log "Installing Project OS service-user architecture."
+  log "Installing Autark-OS service-user architecture."
   preflight_host
   preflight_install_collision
   ensure_group

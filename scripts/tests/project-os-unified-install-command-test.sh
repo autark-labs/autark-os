@@ -50,10 +50,10 @@ assert plan["service"]["port"] == 9199
 PY
 
 help_output="$("${repo_root}/scripts/project-os" --help)"
-grep -q 'install    Install Project OS or print a shared install plan.' <<<"${help_output}"
-grep -q 'repair     Check installed Project OS and print recovery actions.' <<<"${help_output}"
-grep -q 'update     Check or run Project OS update flow.' <<<"${help_output}"
-grep -q 'uninstall  Remove Project OS service paths through the guided uninstall flow.' <<<"${help_output}"
+grep -q 'install    Install Autark-OS or print a shared install plan.' <<<"${help_output}"
+grep -q 'repair     Check installed Autark-OS and print recovery actions.' <<<"${help_output}"
+grep -q 'update     Check or run Autark-OS update flow.' <<<"${help_output}"
+grep -q 'uninstall  Remove Autark-OS service paths through the guided uninstall flow.' <<<"${help_output}"
 
 install_help="$("${repo_root}/scripts/project-os" install --help)"
 grep -q 'project-os install --guided' <<<"${install_help}"
@@ -107,7 +107,7 @@ single_command_output="$("${bundle_dir}/scripts/project-os" install \
 grep -q 'Unified guided install' <<<"${single_command_output}"
 grep -q 'Verifying release bundle checksums' <<<"${single_command_output}"
 grep -q 'Installing missing supported dependencies by default' <<<"${single_command_output}"
-grep -q 'Project OS installation preview completed.' <<<"${single_command_output}"
+grep -q 'Autark-OS installation preview completed.' <<<"${single_command_output}"
 grep -q 'project-os install --yes' <<<"${single_command_output}"
 [[ "$(grep -c 'Verifying release bundle checksum' <<<"${single_command_output}")" -eq 1 ]]
 grep -q 'LAN URL:' <<<"${single_command_output}"
@@ -129,7 +129,7 @@ if PROJECT_OS_BOOTSTRAP_ARGS_FILE="${args_file}" printf 'n\n' | "${prompt_bundle
   exit 1
 fi
 [[ ! -f "${args_file}" ]]
-grep -q 'Install Project OS and supported dependencies on this host?' /tmp/project-os-prompt-decline.out
+grep -q 'Install Autark-OS and supported dependencies on this host?' /tmp/project-os-prompt-decline.out
 
 PROJECT_OS_BOOTSTRAP_ARGS_FILE="${args_file}" "${prompt_bundle}/scripts/project-os" install --yes >/tmp/project-os-prompt-yes.out
 grep -q -- '--auto-install-deps' "${args_file}"

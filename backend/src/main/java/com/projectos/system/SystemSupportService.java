@@ -309,7 +309,7 @@ public class SystemSupportService {
                     "Monitoring",
                     "warning",
                     "Recent failures recorded",
-                    failures.size() + " recent failure event" + (failures.size() == 1 ? "" : "s") + " appeared in Project OS activity.",
+                    failures.size() + " recent failure event" + (failures.size() == 1 ? "" : "s") + " appeared in Autark-OS activity.",
                     "Open Monitoring",
                     "/monitoring"));
         }
@@ -371,7 +371,7 @@ public class SystemSupportService {
 
     private String userMessage(RuntimeException exception) {
         if (exception.getMessage() == null || exception.getMessage().isBlank()) {
-            return "Project OS could not read this support area.";
+            return "Autark-OS could not read this support area.";
         }
         return exception.getMessage();
     }
@@ -387,7 +387,7 @@ public class SystemSupportService {
         commands.add(new SupportCommand(
                 "service-logs",
                 "View service logs",
-                "Shows recent Project OS backend logs.",
+                "Shows recent Autark-OS backend logs.",
                 "sudo journalctl -u project-os.service -n 120 --no-pager",
                 "local-terminal"));
         commands.add(new SupportCommand(
@@ -398,13 +398,13 @@ public class SystemSupportService {
                 "local-terminal"));
         commands.add(new SupportCommand(
                 "project-version",
-                "Show Project OS version",
+                "Show Autark-OS version",
                 "Prints version, build, install path, and runtime path.",
                 "project-os version",
                 "local-terminal"));
         commands.add(new SupportCommand(
                 "restart-service",
-                "Restart Project OS service",
+                "Restart Autark-OS service",
                 "Restarts the production backend service.",
                 "sudo systemctl restart project-os.service",
                 "local-terminal"));
@@ -501,7 +501,7 @@ public class SystemSupportService {
 
     private String bundleText(SupportContext context, String headline, String summary, SystemMetrics metrics, List<ActivityLog> recentActivity, List<ActivityLog> recentFailures, List<SupportLogLine> logs) {
         return """
-                Project OS Support Bundle
+                Autark-OS Support Bundle
                 Generated: %s
                 Redaction: enabled
 

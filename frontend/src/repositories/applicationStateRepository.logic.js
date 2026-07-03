@@ -187,7 +187,7 @@ function operationStateFromProjectOsJob(job) {
       label: operationLabel(job.type),
       jobId: job.jobId,
       currentStep: '',
-      message: job.error?.message || 'Project OS could not finish this action.',
+      message: job.error?.message || 'Autark-OS could not finish this action.',
     };
   }
   if (job.status !== 'queued' && job.status !== 'running') {
@@ -398,7 +398,7 @@ function serviceWithPinnedState(service, pinned) {
       userStatus: 'pinned_external',
       attentionState: 'none',
       userStatusLabel: 'Pinned',
-      userStatusDescription: 'Pinned to My Apps. Project OS can open it but does not manage its runtime.',
+      userStatusDescription: 'Pinned to My Apps. Autark-OS can open it but does not manage its runtime.',
     };
   }
   if (!pinned && service.userStatus === 'pinned_external') {
@@ -438,7 +438,7 @@ function observedServiceAsManaged(service) {
     ...service,
     userStatus: 'installed_managed',
     userStatusLabel: 'Managed',
-    userStatusDescription: 'Managed by this Project OS installation.',
+    userStatusDescription: 'Managed by this Autark-OS installation.',
     ownershipState: 'owned_managed',
     managementState: 'managed',
     readinessState: service.readinessState ?? (service.runtimeState === 'running' ? 'ready' : 'starting'),
@@ -453,7 +453,7 @@ function runtimeAppFromObservedService(service) {
     appId: service.catalogAppId,
     appName: service.displayName || service.catalogAppId,
     category: service.category || 'Application',
-    description: 'Recovered by Project OS.',
+    description: 'Recovered by Autark-OS.',
     version: '',
     image: null,
     friendlyStatus: service.runtimeState === 'running' ? 'Ready' : 'Starting',

@@ -134,7 +134,7 @@ function SupportPage() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Diagnostics</p>
-              <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">Project OS Diagnostics</h1>
+              <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">Autark-OS Diagnostics</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
                 {headline === 'Ready' ? 'Ready. Health checks, support bundle, and technical logs are available when you need them.' : 'Needs attention. Start with health checks, then use the support bundle or logs if you need more detail.'}
               </p>
@@ -180,7 +180,7 @@ function SupportPage() {
           onClick={() => void generateBundle()}
         />
         <DiagnosticAction
-          detail="Open recent backend logs. Project OS masks secrets before showing them."
+          detail="Open recent backend logs. Autark-OS masks secrets before showing them."
           icon={TerminalSquare}
           label="View technical logs"
           onClick={() => void viewLogs()}
@@ -308,7 +308,7 @@ function SummaryRow({ label, tone, value }: { label: string; tone: string; value
 
 function DiagnosticAction({ busy = false, detail, icon: Icon, label, onClick }: { busy?: boolean; detail: string; icon: LucideIcon; label: string; onClick: () => void }) {
   return (
-    <DisabledAction className="w-full" disabled={busy} reason="Project OS is already preparing support information.">
+    <DisabledAction className="w-full" disabled={busy} reason="Autark-OS is already preparing support information.">
       <button className="w-full rounded-xl border border-sky-400/30 bg-slate-900 p-5 text-left shadow-xl shadow-slate-950/30 transition hover:border-cyan-300/45 hover:bg-slate-800" disabled={busy} onClick={onClick} type="button">
         <div className="flex items-center justify-between gap-3">
           <span className="grid size-10 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/10 text-cyan-100">
@@ -364,7 +364,7 @@ function RepairLine({ app }: { app: AppRuntimeView }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-bold text-white">{app.appName}</p>
-          <p className="mt-1 text-sm text-slate-400">{app.remediation?.summary || app.healthSnapshot?.detail || 'Project OS has not recorded repair detail for this app.'}</p>
+          <p className="mt-1 text-sm text-slate-400">{app.remediation?.summary || app.healthSnapshot?.detail || 'Autark-OS has not recorded repair detail for this app.'}</p>
         </div>
         <Badge className={cn('border-slate-600/60 bg-slate-950/60 text-slate-300', app.remediation?.tone === 'critical' && 'border-red-400/40 bg-red-500/10 text-red-200', app.remediation?.tone === 'warning' && 'border-orange-400/45 bg-orange-500/10 text-orange-200', app.remediation?.tone === 'success' && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')} variant="outline">
           {app.remediation?.label || app.friendlyStatus}
@@ -430,7 +430,7 @@ function hasRepairDetail(app: AppRuntimeView) {
 function labelForOwnership(value: string) {
   if (value === 'owned_managed') return 'Installed';
   if (value === 'foreign_project_os') return 'Found on this server';
-  if (value === 'legacy_project_os') return 'Recoverable Project OS app';
+  if (value === 'legacy_project_os') return 'Recoverable Autark-OS app';
   if (value === 'external_docker') return 'Existing Docker app';
   return humanize(value || 'unknown');
 }

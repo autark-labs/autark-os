@@ -48,7 +48,7 @@ export function JobProgress({ className, compact = false, job, subjectLabel }: J
             </span>
           </div>
           <p className="m-0 mt-1 text-current/80">
-            {failed ? job.error?.message || 'Project OS could not finish this job.' : currentJobStepText(job, running ? 'Project OS is working.' : terminalSummary(job))}
+            {failed ? job.error?.message || 'Autark-OS could not finish this job.' : currentJobStepText(job, running ? 'Autark-OS is working.' : terminalSummary(job))}
           </p>
           {!compact && (
             <>
@@ -68,10 +68,10 @@ export function JobProgress({ className, compact = false, job, subjectLabel }: J
 
 function terminalSummary(job: ProjectOsJob) {
   if (job.status === 'succeeded') {
-    return 'Project OS finished this job.';
+    return 'Autark-OS finished this job.';
   }
   if (job.status === 'cancelled') {
     return 'This job was cancelled.';
   }
-  return 'Project OS is waiting for the next update.';
+  return 'Autark-OS is waiting for the next update.';
 }

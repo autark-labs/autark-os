@@ -269,7 +269,7 @@ function ExistingServiceNotice({ appView, reviewHref }: { appView: DiscoverAppVi
         <div>
           <h4 className="font-bold text-current">{appView.stateLabel}</h4>
           <p className="mt-1 leading-6 text-current/80">{appView.stateDescription}</p>
-          <p className="mt-2 leading-6 text-current/80">Project OS already sees this app on your system. Installing another copy can cause confusing behavior across your network, especially from phones, TVs, or other devices that discover services automatically. Pin or adopt the existing service when possible. Install a second copy only if you intentionally want two separate instances.</p>
+          <p className="mt-2 leading-6 text-current/80">Autark-OS already sees this app on your system. Installing another copy can cause confusing behavior across your network, especially from phones, TVs, or other devices that discover services automatically. Pin or adopt the existing service when possible. Install a second copy only if you intentionally want two separate instances.</p>
           {reviewHref && (
             <Button asChild className="mt-3" size="sm" variant="outline">
               <Link to={reviewHref}>Review existing service</Link>
@@ -343,7 +343,7 @@ function InstalledAppNotice({ app, manageHref }: { app: DiscoverInstalledAppSumm
         <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" />
         <div className="min-w-0">
           <h4 className="font-bold text-slate-50">Already installed</h4>
-          <p className="mt-1 text-sm text-slate-300">{app.appName} is already managed by Project OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
+          <p className="mt-1 text-sm text-slate-300">{app.appName} is already managed by Autark-OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {app.accessUrl && (
               <ProjectPrimaryButton asChild size="sm">
@@ -386,7 +386,7 @@ function InlineInstallStatus({
           <div className="min-w-0 flex-1">
             <h4 className="font-bold text-slate-50">{succeeded ? `${app.name} is ready` : failed ? `${app.name} did not finish installing` : `Installing ${app.name}`}</h4>
             <p className={cn('mt-1 text-sm', succeeded ? 'text-emerald-200' : failed ? 'text-red-200' : 'text-cyan-200')}>
-              {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Project OS stopped before making this app available.' : currentJobStepText(job, 'Project OS is working on this job.')}
+              {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Autark-OS stopped before making this app available.' : currentJobStepText(job, 'Autark-OS is working on this job.')}
             </p>
             {running && <JobProgress className="mt-4" job={job} subjectLabel={app.name} />}
             <JobStepList job={job} />
@@ -398,7 +398,7 @@ function InlineInstallStatus({
                   </ProjectPrimaryButton>
                 )}
                 {installedApp && shouldOfferFirstBackup(installedApp) && (
-                  <DisabledAction disabled={backupJob ? !terminalJob(backupJob) : false} reason="Project OS is already creating the first backup for this app.">
+                  <DisabledAction disabled={backupJob ? !terminalJob(backupJob) : false} reason="Autark-OS is already creating the first backup for this app.">
                     <ProjectDarkControlButton disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appId)} size="sm" type="button">
                       {backupJob && !terminalJob(backupJob) ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
                       {backupJob?.status === 'succeeded' ? 'Backup created' : backupJob && !terminalJob(backupJob) ? 'Creating backup' : 'Create first backup'}
@@ -433,7 +433,7 @@ function InlineInstallStatus({
           <Loader2 className="size-5 animate-spin text-cyan-200" />
           <div>
             <h4 className="font-bold text-slate-50">Installing with safe defaults</h4>
-            <p className="mt-1 text-sm text-slate-300">Project OS is creating storage, choosing the saved access settings, and starting the app.</p>
+            <p className="mt-1 text-sm text-slate-300">Autark-OS is creating storage, choosing the saved access settings, and starting the app.</p>
           </div>
         </div>
       </section>

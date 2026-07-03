@@ -40,9 +40,9 @@ public class ProjectOsDatabase {
                     .migrate();
             migrated = true;
         } catch (IOException exception) {
-            throw new InstallationException("Unable to create Project OS runtime root.", exception);
+            throw new InstallationException("Unable to create Autark-OS runtime root.", exception);
         } catch (RuntimeException exception) {
-            throw new InstallationException("Unable to migrate Project OS database.", exception);
+            throw new InstallationException("Unable to migrate Autark-OS database.", exception);
         }
     }
 

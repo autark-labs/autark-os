@@ -26,7 +26,7 @@ public class DiscoverSetupService {
                 "required",
                 true,
                 manifest.name(),
-                "This is the friendly name Project OS shows in My Apps and Home.",
+                "This is the friendly name Autark-OS shows in My Apps and Home.",
                 List.of(),
                 Map.of()));
         inputs.add(new DiscoverSetupInput(
@@ -46,7 +46,7 @@ public class DiscoverSetupService {
                 "recommended",
                 true,
                 "project_os_default",
-                "Project OS managed storage keeps app files in a predictable folder so backups, restores, and cleanup work safely.",
+                "Autark-OS managed storage keeps app files in a predictable folder so backups, restores, and cleanup work safely.",
                 storageOptions(),
                 Map.of()));
         inputs.add(new DiscoverSetupInput(
@@ -117,8 +117,8 @@ public class DiscoverSetupService {
                             "create_new",
                             "Jellyfin needs a folder where your movies, shows, music, or home videos live.",
                             List.of(
-                                    option("create_new", "Create a new media folder", "Project OS prepares an empty folder for Jellyfin.", true, false),
-                                    option("existing_folder", "Use an existing folder", "Project OS validates the existing folder before install.", false, false),
+                                    option("create_new", "Create a new media folder", "Autark-OS prepares an empty folder for Jellyfin.", true, false),
+                                    option("existing_folder", "Use an existing folder", "Autark-OS validates the existing folder before install.", false, false),
                                     option("later", "Choose later", "Install Jellyfin first and add libraries later.", false, false)),
                             Map.of()),
                     new DiscoverSetupInput(
@@ -169,8 +169,8 @@ public class DiscoverSetupService {
 
     private List<DiscoverSetupOption> storageOptions() {
         return List.of(
-                option("project_os_default", "Project OS managed storage", "Use the default managed app folders.", true, false),
-                option("existing_folder", "Use an existing folder", "Review an existing folder before Project OS treats it as app data.", false, true));
+                option("project_os_default", "Autark-OS managed storage", "Use the default managed app folders.", true, false),
+                option("existing_folder", "Use an existing folder", "Review an existing folder before Autark-OS treats it as app data.", false, true));
     }
 
     private List<DiscoverSetupOption> backupOptions() {

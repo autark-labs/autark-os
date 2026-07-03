@@ -55,10 +55,10 @@ public class PrivateAccessReconciliationService {
                     Instant.now());
         }
         if (!status.installed()) {
-            return unavailableReport("warning", "Install Tailscale to verify private links", "Project OS cannot inspect private app links until Tailscale is installed.", privateApps, "Install Tailscale");
+            return unavailableReport("warning", "Install Tailscale to verify private links", "Autark-OS cannot inspect private app links until Tailscale is installed.", privateApps, "Install Tailscale");
         }
         if (!status.connected()) {
-            return unavailableReport("warning", "Connect Tailscale to verify private links", "Project OS cannot inspect private app links until this device is connected.", privateApps, "Connect this device");
+            return unavailableReport("warning", "Connect Tailscale to verify private links", "Autark-OS cannot inspect private app links until this device is connected.", privateApps, "Connect this device");
         }
 
         TailscaleServeConfig config = tailscaleService.serveConfig();
@@ -83,7 +83,7 @@ public class PrivateAccessReconciliationService {
             throw new InstallationException("Private access port must be between 1 and 65535.");
         }
         if (!knownProjectOsPorts().contains(httpsPort)) {
-            throw new InstallationException("Project OS does not recognize this as one of its managed app ports.");
+            throw new InstallationException("Autark-OS does not recognize this as one of its managed app ports.");
         }
         boolean appStillExpectsPort = runtimeApps.get().stream()
                 .filter(this::wantsPrivateAccess)
@@ -107,7 +107,7 @@ public class PrivateAccessReconciliationService {
                         app.appName(),
                         "waiting",
                         "Waiting for Tailscale",
-                        "Project OS will verify this private link after Tailscale is ready.",
+                        "Autark-OS will verify this private link after Tailscale is ready.",
                         actionLabel,
                         expectedPrivateUrl(app),
                         null,
@@ -132,7 +132,7 @@ public class PrivateAccessReconciliationService {
         String desiredMapping = desiredMapping(expectedHttpsPort, expectedPort);
         List<String> liveMappings = liveMappings(config);
         if (expectedPort == null) {
-            return item(app, "missing", "No local port found", "Start or repair the app so Project OS can find the local browser port.", "Repair app link", expectedUrl, null, null, null, expectedHttpsPort, desiredMapping, liveMappings, "No local published port was available for this app.");
+            return item(app, "missing", "No local port found", "Start or repair the app so Autark-OS can find the local browser port.", "Repair app link", expectedUrl, null, null, null, expectedHttpsPort, desiredMapping, liveMappings, "No local published port was available for this app.");
         }
         if (!config.available()) {
             return item(app, "unknown", "Private link could not be verified", config.message(), "Retry check", expectedUrl, expectedPort, null, null, expectedHttpsPort, desiredMapping, liveMappings, config.message());

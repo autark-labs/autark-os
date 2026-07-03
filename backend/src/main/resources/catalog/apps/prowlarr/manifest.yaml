@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -93,13 +93,13 @@ access:
   requiresFirstRunSetup: true
   notes:
     - Dashboard access should stay private because it stores indexer and app credentials.
-    - Project OS should eventually autowire Prowlarr to Sonarr and Radarr.
+    - Autark-OS should eventually autowire Prowlarr to Sonarr and Radarr.
 usage:
   kind: companion-service
   primaryAction: open-dashboard
   openUrlLabel: Open Prowlarr
   headline: Centralize media indexers
-  summary: Project OS starts Prowlarr. Add indexers and connect compatible media apps from the dashboard.
+  summary: Autark-OS starts Prowlarr. Add indexers and connect compatible media apps from the dashboard.
   setupSteps:
     - Open Prowlarr.
     - Add indexers you are allowed to use.
@@ -137,7 +137,7 @@ setup:
         - Ask for approval before writing app connection settings.
   userSteps:
     - Add only indexers you are allowed to use.
-    - Approve each media-app connection before Project OS changes Prowlarr.
+    - Approve each media-app connection before Autark-OS changes Prowlarr.
   automationCapabilities:
     - Can detect Sonarr and Radarr.
     - Can propose app connection wiring.
@@ -149,7 +149,7 @@ health:
   successLabel: Indexer manager is ready
   startingLabel: Starting indexer manager
   failureLabel: Prowlarr is not responding
-  description: Project OS checks that the Prowlarr dashboard answers before calling it ready.
+  description: Autark-OS checks that the Prowlarr dashboard answers before calling it ready.
 runtime:
   containerName: prowlarr
   composeProject: project-os-prowlarr

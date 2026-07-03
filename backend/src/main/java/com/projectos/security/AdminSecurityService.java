@@ -55,7 +55,7 @@ public class AdminSecurityService {
                     CLAIMED, "false",
                     UPDATED_AT, Instant.now().toString()));
         }
-        return new AdminSecurityStatus(false, false, true, "Claim this Project OS install before making changes.", setupCode);
+        return new AdminSecurityStatus(false, false, true, "Claim this Autark-OS install before making changes.", setupCode);
     }
 
     public AdminSecuritySession claim(AdminClaimRequest request) {
@@ -64,10 +64,10 @@ public class AdminSecurityService {
         }
         AdminSecurityStatus current = status();
         if (current.claimed()) {
-            return AdminSecuritySession.denied("Project OS has already been claimed. Log in instead.");
+            return AdminSecuritySession.denied("Autark-OS has already been claimed. Log in instead.");
         }
         if (request == null || request.setupCode() == null || !constantEquals(current.setupCode(), request.setupCode().trim())) {
-            return AdminSecuritySession.denied("The setup code did not match this Project OS install.");
+            return AdminSecuritySession.denied("The setup code did not match this Autark-OS install.");
         }
         String password = request.password() == null ? "" : request.password();
         if (password.length() < MIN_PASSWORD_LENGTH) {
@@ -80,7 +80,7 @@ public class AdminSecurityService {
                 PASSWORD_SALT, salt,
                 PASSWORD_HASH, hash(password, salt),
                 UPDATED_AT, Instant.now().toString()));
-        return issueSession("Project OS admin setup is complete.");
+        return issueSession("Autark-OS admin setup is complete.");
     }
 
     public AdminSecuritySession login(AdminLoginRequest request) {
@@ -89,7 +89,7 @@ public class AdminSecurityService {
         }
         Map<String, String> values = repository.readAll();
         if (!Boolean.parseBoolean(values.getOrDefault(CLAIMED, "false"))) {
-            return AdminSecuritySession.denied("Claim this Project OS install before logging in.");
+            return AdminSecuritySession.denied("Claim this Autark-OS install before logging in.");
         }
         String password = request == null || request.password() == null ? "" : request.password();
         String salt = values.getOrDefault(PASSWORD_SALT, "");
@@ -97,7 +97,7 @@ public class AdminSecurityService {
         if (salt.isBlank() || expectedHash.isBlank() || !constantEquals(expectedHash, hash(password, salt))) {
             return AdminSecuritySession.denied("Admin password was not accepted.");
         }
-        return issueSession("Logged in to Project OS.");
+        return issueSession("Logged in to Autark-OS.");
     }
 
     public boolean authenticate(String token) {
@@ -137,7 +137,7 @@ public class AdminSecurityService {
             KeySpec spec = new PBEKeySpec(value.toCharArray(), salt.getBytes(java.nio.charset.StandardCharsets.UTF_8), 120_000, 256);
             return Base64.getEncoder().encodeToString(SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded());
         } catch (NoSuchAlgorithmException | InvalidKeySpecException exception) {
-            throw new InstallationException("Unable to protect Project OS admin credentials.", exception);
+            throw new InstallationException("Unable to protect Autark-OS admin credentials.", exception);
         }
     }
 

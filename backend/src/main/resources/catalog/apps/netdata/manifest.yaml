@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -99,7 +99,7 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open Netdata
   headline: View live server metrics
-  summary: Project OS starts Netdata with safe defaults. Open the dashboard to view live host and container metrics.
+  summary: Autark-OS starts Netdata with safe defaults. Open the dashboard to view live host and container metrics.
   setupSteps:
     - Open Netdata.
     - Review CPU, memory, disk, and network charts.
@@ -110,7 +110,7 @@ usage:
       sensitive: false
       qr: false
   notes:
-    - Future Project OS work can add an advanced full-host metrics mode.
+    - Future Autark-OS work can add an advanced full-host metrics mode.
 health:
   type: http
   path: /
@@ -118,7 +118,7 @@ health:
   successLabel: Metrics dashboard is ready
   startingLabel: Starting metrics dashboard
   failureLabel: Netdata is not responding
-  description: Project OS checks that the Netdata dashboard answers before calling it ready.
+  description: Autark-OS checks that the Netdata dashboard answers before calling it ready.
 runtime:
   containerName: netdata
   composeProject: project-os-netdata

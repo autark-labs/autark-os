@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -99,11 +99,11 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open Pi-hole dashboard
   headline: Configure network-wide DNS filtering
-  summary: Project OS starts Pi-hole. Point devices or your router at the DNS port when you are ready to use it.
+  summary: Autark-OS starts Pi-hole. Point devices or your router at the DNS port when you are ready to use it.
   setupSteps:
     - Open the Pi-hole dashboard.
     - Set the admin password if prompted.
-    - Configure your router or devices to use the Project OS host for DNS.
+    - Configure your router or devices to use the Autark-OS host for DNS.
     - Keep dashboard access private.
   fields:
     - label: Dashboard URL
@@ -123,7 +123,7 @@ health:
   successLabel: DNS dashboard is ready
   startingLabel: Starting DNS filtering
   failureLabel: Pi-hole dashboard is not responding
-  description: Project OS checks that the Pi-hole dashboard answers before calling it ready.
+  description: Autark-OS checks that the Pi-hole dashboard answers before calling it ready.
 runtime:
   containerName: pi-hole
   composeProject: project-os-pi-hole

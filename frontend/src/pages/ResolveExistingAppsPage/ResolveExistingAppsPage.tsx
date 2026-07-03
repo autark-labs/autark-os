@@ -94,11 +94,11 @@ function ResolveExistingAppsPage() {
         <div>
           <h1 className="m-0 text-3xl font-bold text-white">Resolve Existing Apps</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-            Review services Project OS found on this server before installing duplicate managed apps.
+            Review services Autark-OS found on this server before installing duplicate managed apps.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <DisabledAction disabled={appState.isFetching} reason="Project OS is already refreshing existing apps.">
+          <DisabledAction disabled={appState.isFetching} reason="Autark-OS is already refreshing existing apps.">
             <ProjectDarkControlButton disabled={appState.isFetching} onClick={() => void refreshObservedServices()} type="button">
               <RefreshCw className={cn('size-4', appState.isFetching && 'animate-spin')} />
               Refresh
@@ -155,7 +155,7 @@ function ResolveExistingAppsPage() {
             ) : (
               <ResolveCard>
                 <p className="m-0 font-bold text-white">No unresolved existing apps</p>
-                <p className="m-0 mt-1 text-sm text-slate-400">Project OS is not prompting for any non-managed services right now.</p>
+                <p className="m-0 mt-1 text-sm text-slate-400">Autark-OS is not prompting for any non-managed services right now.</p>
               </ResolveCard>
             )}
           </ResolvePanel>
@@ -202,7 +202,7 @@ function ServiceSummaryCard({
           <h2 className="m-0 text-lg font-bold text-white">{service.displayName}</h2>
           <StatusPill tone={stateTone(service)}>{stateLabel(service)}</StatusPill>
         </div>
-        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Project OS found this service on the server.'}</p>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Autark-OS found this service on the server.'}</p>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <Detail label="Runtime" value={service.runtimeState || 'Unknown'} />
           <Detail label="Catalog match" value={service.catalogAppId || 'Unmatched'} />
@@ -222,7 +222,7 @@ function ServiceSummaryCard({
           Review
         </ProjectPrimaryButton>
         {canPin && (
-          <DisabledAction disabled={busy} reason="Project OS is already pinning this service.">
+          <DisabledAction disabled={busy} reason="Autark-OS is already pinning this service.">
             <ProjectDarkControlButton disabled={busy} onClick={onPin} size="sm" type="button">
               <Pin className="size-4" />
               Pin to My Apps
@@ -267,7 +267,7 @@ function ServiceDetailsPreview({
               <h3 className="m-0 text-2xl font-bold text-white">{service.displayName}</h3>
               <StatusPill tone={stateTone(service)}>{stateLabel(service)}</StatusPill>
             </div>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Project OS found this service on the server.'}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Autark-OS found this service on the server.'}</p>
           </div>
           {service.url && (
             <ProjectDarkControlButton asChild>
@@ -296,7 +296,7 @@ function ServiceDetailsPreview({
               </ProjectPrimaryButton>
             </DisabledAction>
             {canPin && (
-              <DisabledAction disabled={busy || !onPin} reason={busy ? 'Project OS is already pinning this service.' : 'Select a found service before pinning it.'}>
+              <DisabledAction disabled={busy || !onPin} reason={busy ? 'Autark-OS is already pinning this service.' : 'Select a found service before pinning it.'}>
                 <ProjectDarkControlButton disabled={busy || !onPin} onClick={onPin} type="button">
                   <Pin className="size-4" />
                   Pin to My Apps

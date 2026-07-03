@@ -92,7 +92,7 @@ print_contract_json() {
     },
     {
       "id": "service-install",
-      "label": "Install Project OS service",
+      "label": "Install Autark-OS service",
       "source": "bootstrap-project-os.sh",
       "mutatesHost": true,
       "requiresPrivilege": true
@@ -175,19 +175,19 @@ warning_checks = [check for check in checks if check.get("status") == "warning"]
 status = doctor.get("status", "blocked")
 
 summary_by_status = {
-    "ready": "This device is ready for Project OS.",
+    "ready": "This device is ready for Autark-OS.",
     "ready_with_notes": "This device can continue after you review a few notes.",
-    "blocked": "Project OS needs a few things fixed before installation can continue.",
+    "blocked": "Autark-OS needs a few things fixed before installation can continue.",
 }
 
 issue_messages = {
     "os": "This device is not running a supported Linux version for the guided installer.",
-    "systemd": "This device cannot run Project OS as a background service yet.",
-    "sudo": "Project OS needs permission to install itself as a background service. Start the installer from an administrator account.",
+    "systemd": "This device cannot run Autark-OS as a background service yet.",
+    "sudo": "Autark-OS needs permission to install itself as a background service. Start the installer from an administrator account.",
     "internet": "This device may not be connected to the internet.",
     "runtime-storage": "The selected storage location may not have enough free space for apps and backups.",
-    "port": "The selected Project OS web address is already in use. Choose another port before continuing.",
-    "java": "This device needs Java before Project OS can run.",
+    "port": "The selected Autark-OS web address is already in use. Choose another port before continuing.",
+    "java": "This device needs Java before Autark-OS can run.",
     "docker": "Docker is needed before Marketplace apps can be installed.",
     "docker-compose": "Docker Compose is needed before Marketplace apps can be installed.",
     "tailscale": "Private access can be set up later if Tailscale is not installed now.",
@@ -238,7 +238,7 @@ for index, candidate in enumerate(storage.get("candidates", [])):
         "riskLabel": risk_label(risk, recommended),
         "recommended": recommended,
         "requiresConfirmation": risk in {"medium", "high", "unknown"} or candidate.get("stability") == "unstable",
-        "stores": "Project OS will store apps, app data, backups, and restore points here.",
+        "stores": "Autark-OS will store apps, app data, backups, and restore points here.",
     })
 
 if not candidate_cards:
@@ -257,7 +257,7 @@ if not candidate_cards:
         "riskLabel": risk_label(risk),
         "recommended": False,
         "requiresConfirmation": risk in {"medium", "high", "unknown"},
-        "stores": "Project OS will store apps, app data, backups, and restore points here.",
+        "stores": "Autark-OS will store apps, app data, backups, and restore points here.",
     })
 
 recommendation_risk = recommendation.get("risk", "unknown")
@@ -351,7 +351,7 @@ contract = {
     "storageChoice": {
         "id": "storage-choice",
         "title": "Choose Storage",
-        "summary": "Choose where Project OS keeps apps, app data, backups, and restore points.",
+        "summary": "Choose where Autark-OS keeps apps, app data, backups, and restore points.",
         "selectedRuntimeDir": plan.get("paths", {}).get("runtimeDir", storage.get("runtimePath", "")),
         "whatProjectOsStores": ["apps", "app data", "backups", "restore points"],
         "recommendation": {
@@ -375,13 +375,13 @@ contract = {
     "capabilityChoices": {
         "id": "capability-choices",
         "title": "Choose Capabilities",
-        "summary": "Choose what Project OS should be ready to do. Advanced details show the exact packages and commands.",
+        "summary": "Choose what Autark-OS should be ready to do. Advanced details show the exact packages and commands.",
         "mutatesHostBeforeConfirmation": False,
         "choices": [
             {
                 "id": "install-and-run-apps",
                 "label": "Install and run apps",
-                "summary": "Project OS needs Docker and Docker Compose before it can install Marketplace apps.",
+                "summary": "Autark-OS needs Docker and Docker Compose before it can install Marketplace apps.",
                 "requires": ["Docker", "Docker Compose"],
                 "requiredFor": "Marketplace app installs",
                 "optional": False,
@@ -390,7 +390,7 @@ contract = {
                 "willInstallOrConfigure": [
                     "Docker engine when it is missing on supported hosts",
                     "Docker Compose v2 when it is missing",
-                    "Docker group access for the Project OS service user",
+                    "Docker group access for the Autark-OS service user",
                 ],
             },
             {
@@ -405,13 +405,13 @@ contract = {
                 "dependencies": [dependency_payload("Tailscale")],
                 "willInstallOrConfigure": [
                     "Tailscale when you explicitly choose private device access",
-                    "Tailscale operator permission for the Project OS service user when Tailscale is connected",
+                    "Tailscale operator permission for the Autark-OS service user when Tailscale is connected",
                 ],
             },
             {
                 "id": "local-only",
                 "label": "Keep access local for now",
-                "summary": "Project OS will work on this device and home network first. Private device access can be configured later.",
+                "summary": "Autark-OS will work on this device and home network first. Private device access can be configured later.",
                 "requires": [],
                 "requiredFor": "Local-only install",
                 "optional": True,
@@ -448,17 +448,17 @@ contract = {
     },
     "installProgress": {
         "id": "install-progress",
-        "title": "Install Project OS",
-        "summary": "Project OS will show each step while keeping raw logs in Advanced details.",
+        "title": "Install Autark-OS",
+        "summary": "Autark-OS will show each step while keeping raw logs in Advanced details.",
         "stateDir": state_dir,
         "stages": [
-            stage("download-release", 1, "Download release", "release-download", "Getting the selected Project OS release."),
+            stage("download-release", 1, "Download release", "release-download", "Getting the selected Autark-OS release."),
             stage("verify-release", 2, "Verify release", "release-verify", "Checking release files before anything is installed."),
             stage("prepare-dependencies", 3, "Prepare dependencies", "dependency-install", "Preparing app and private-access requirements."),
-            stage("create-service-user", 4, "Create service user", "service-install", "Creating the Project OS background service account when needed."),
-            stage("install-project-os", 5, "Install Project OS", "service-install", "Installing Project OS files and helper commands."),
-            stage("start-project-os", 6, "Start Project OS", "service-install", "Starting the Project OS background service."),
-            stage("check-readiness", 7, "Check readiness", "post-install-doctor", "Checking that Project OS is ready to open."),
+            stage("create-service-user", 4, "Create service user", "service-install", "Creating the Autark-OS background service account when needed."),
+            stage("install-project-os", 5, "Install Autark-OS", "service-install", "Installing Autark-OS files and helper commands."),
+            stage("start-project-os", 6, "Start Autark-OS", "service-install", "Starting the Autark-OS background service."),
+            stage("check-readiness", 7, "Check readiness", "post-install-doctor", "Checking that Autark-OS is ready to open."),
         ],
         "rawLogs": {
             "advancedDetails": True,
@@ -470,7 +470,7 @@ contract = {
             "recoveryCommand": recovery_command,
             "retryActionId": "retry",
             "resumeActionId": "resume",
-            "failureMessage": "If a step fails, Project OS will show the failed step, whether retry is safe, and how to save a support report.",
+            "failureMessage": "If a step fails, Autark-OS will show the failed step, whether retry is safe, and how to save a support report.",
         },
         "supportReport": {
             "actionId": "save-support-report",
@@ -481,7 +481,7 @@ contract = {
     },
     "completionHandoff": {
         "id": "completion-handoff",
-        "title": "Project OS Is Ready To Open",
+        "title": "Autark-OS Is Ready To Open",
         "summary": {
             "localUrl": local_url,
             "lanUrl": lan_url,
@@ -508,7 +508,7 @@ contract = {
             "message": "First-boot onboarding should show the same storage, private access, and backup posture from the installer summary.",
         },
         "actions": [
-            {"id": "open-project-os", "label": "Open Project OS", "url": local_url, "primary": True},
+            {"id": "open-project-os", "label": "Open Autark-OS", "url": local_url, "primary": True},
             {"id": "copy-url", "label": "Copy URL", "url": local_url, "primary": False},
             {"id": "save-support-report", "label": "Save support report", "primary": False},
             {"id": "finish", "label": "Finish", "primary": False},

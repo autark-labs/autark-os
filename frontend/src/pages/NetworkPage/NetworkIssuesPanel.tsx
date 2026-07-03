@@ -12,7 +12,7 @@ export function NetworkIssuesPanel({ issues }: { issues: NetworkIssueView[] }) {
       title="Issues to review"
     >
         {issues.length === 0 ? (
-          <EmptyState icon={CheckCircle2} title="No network issues found" text="Project OS does not see any private access problems right now." />
+          <EmptyState icon={CheckCircle2} title="No network issues found" text="Autark-OS does not see any private access problems right now." />
         ) : (
           issues.map((issue) => (
             <NetworkInset className="flex gap-3 p-4" key={issue.id}>

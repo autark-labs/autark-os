@@ -23,7 +23,7 @@ if "${repo_root}/scripts/install-project-os-service.sh" \
   exit 1
 fi
 
-grep -q "Existing Project OS config" "${tmp_dir}/collision.out"
+grep -q "Existing Autark-OS config" "${tmp_dir}/collision.out"
 grep -q "PROJECT_OS_ALLOW_INSTALL_COLLISION=1" "${tmp_dir}/collision.out"
 
 PROJECT_OS_ALLOW_INSTALL_COLLISION=1 "${repo_root}/scripts/install-project-os-service.sh" \
@@ -52,5 +52,5 @@ if "${repo_root}/scripts/install-project-os-service.sh" \
   exit 1
 fi
 
-grep -q "Existing Project OS runtime data was found" "${tmp_dir}/stale-runtime.out"
+grep -q "Existing Autark-OS runtime data was found" "${tmp_dir}/stale-runtime.out"
 grep -q "Recover existing apps" "${tmp_dir}/stale-runtime.out"

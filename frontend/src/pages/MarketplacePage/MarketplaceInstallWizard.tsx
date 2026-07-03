@@ -62,7 +62,7 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
       <DialogContent className="max-h-[88vh] overflow-y-auto border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl text-slate-50">Install {app.name}</DialogTitle>
-          <DialogDescription className="text-slate-400">Choose the basics. Project OS will use safe defaults unless you change them.</DialogDescription>
+          <DialogDescription className="text-slate-400">Choose the basics. Autark-OS will use safe defaults unless you change them.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 overflow-y-auto pr-1">
@@ -125,7 +125,7 @@ function InstallationChoicesForm({ answers, issues, onAnswersChange, schema }: {
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-sky-400/25 bg-slate-800 p-4">
         <div>
           <h4 className="font-bold text-slate-50">Installation choices</h4>
-          <p className="mt-1 text-sm leading-6 text-slate-300">These choices need your attention before Project OS starts this app.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-300">These choices need your attention before Autark-OS starts this app.</p>
         </div>
         <span className="rounded-full border border-sky-400/25 bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-300">Required</span>
       </div>
@@ -133,7 +133,7 @@ function InstallationChoicesForm({ answers, issues, onAnswersChange, schema }: {
         {visibleInputs.length ? visibleInputs.map((input) => (
           <InstallationChoiceField input={input} key={input.id} problem={issues.find((issue) => issue.fieldId === input.id)} value={answers[input.id]} onChange={(value) => updateAnswer(input.id, value)} />
         )) : (
-          <p className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-300">No choices are needed for this app. Project OS will use safe defaults.</p>
+          <p className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-300">No choices are needed for this app. Autark-OS will use safe defaults.</p>
         )}
         {advancedInputs.length > 0 && (
           <Collapsible className="rounded-lg border border-sky-400/25 bg-slate-800 p-3">
@@ -191,7 +191,7 @@ function InstallationChoiceField({ input, onChange, problem, value }: { input: D
               ))}
             </SelectContent>
           </Select>
-          <p className={cn('text-xs leading-5 text-slate-300', problem && 'text-orange-200')}>{problem?.message || selectedOption?.description || 'Project OS will use this choice when it prepares the app.'}</p>
+          <p className={cn('text-xs leading-5 text-slate-300', problem && 'text-orange-200')}>{problem?.message || selectedOption?.description || 'Autark-OS will use this choice when it prepares the app.'}</p>
         </>
       ) : (
         <>
@@ -204,7 +204,7 @@ function InstallationChoiceField({ input, onChange, problem, value }: { input: D
             type="text"
             value={String(value ?? '')}
           />
-          <p className={cn('text-xs leading-5 text-slate-300', problem && 'text-orange-200')}>{problem?.message || input.help || 'Project OS will use this value when it prepares the app.'}</p>
+          <p className={cn('text-xs leading-5 text-slate-300', problem && 'text-orange-200')}>{problem?.message || input.help || 'Autark-OS will use this value when it prepares the app.'}</p>
         </>
       )}
     </div>
@@ -228,7 +228,7 @@ function InstallImpactSummary({ app, installPlan, installPreview }: { app: Marke
 
   return (
     <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
-      <h4 className="font-bold text-slate-50">What Project OS will do</h4>
+      <h4 className="font-bold text-slate-50">What Autark-OS will do</h4>
       <ul className="mt-3 grid gap-2 pl-5 text-sm leading-6 text-slate-300">
         {items.map((item) => <li className="list-disc" key={item}>{item}</li>)}
       </ul>
@@ -290,7 +290,7 @@ function InstallCaution({ app }: { app: MarketplaceApp }) {
         <div>
           <h4 className="font-bold text-slate-50">{app.supportLevel} app</h4>
           <p className="mt-1 text-sm leading-6 text-slate-300">{app.supportSummary}</p>
-          <p className="mt-2 text-xs leading-5 text-slate-400">Project OS can still install it, but review the generated plan and smoke-test notes before using it for anything important.</p>
+          <p className="mt-2 text-xs leading-5 text-slate-400">Autark-OS can still install it, but review the generated plan and smoke-test notes before using it for anything important.</p>
         </div>
       </div>
     </section>

@@ -84,7 +84,7 @@ public class BackupService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Project OS is watching", app.appName() + " is ready. If it drifts, Project OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList(), new RuntimeFileOperations());
     }
@@ -192,7 +192,7 @@ public class BackupService {
             return Optional.empty();
         }
         try {
-            activityLogService.info("backup", "scheduled_backup_due", "Routine backup started", "Project OS started the scheduled routine backup window.");
+            activityLogService.info("backup", "scheduled_backup_due", "Routine backup started", "Autark-OS started the scheduled routine backup window.");
             return Optional.of(runAutomatic());
         } finally {
             automaticBackupRunning.set(false);
@@ -237,16 +237,16 @@ public class BackupService {
         if (affected.isEmpty()) {
             warnings.add("No currently installed app matches this restore point.");
         }
-        warnings.add("Current app data will be replaced. Project OS creates a safety backup before restoring.");
+        warnings.add("Current app data will be replaced. Autark-OS creates a safety backup before restoring.");
         for (InstalledApp app : affected) {
             BackupContract contract = backupContract(app);
             dryRunDetails.add(app.appName() + ": " + contract.label() + ". " + contract.summary());
             if (contract.reviewRequired()) {
-                warnings.add(app.appName() + " uses " + contract.label().toLowerCase() + ". Project OS will restore managed files, but database/application consistency should be reviewed after restore.");
+                warnings.add(app.appName() + " uses " + contract.label().toLowerCase() + ". Autark-OS will restore managed files, but database/application consistency should be reviewed after restore.");
             }
         }
         if ("failed".equals(point.verificationStatus())) {
-            warnings.add("Project OS could not verify this restore point: " + point.verificationMessage());
+            warnings.add("Autark-OS could not verify this restore point: " + point.verificationMessage());
         } else if (!"verified".equals(point.verificationStatus())) {
             warnings.add("This restore point has not been verified yet.");
         }
@@ -355,7 +355,7 @@ public class BackupService {
                 throw new InstallationException(app.appName() + " data folder is missing.");
             }
             if (!Files.isReadable(source)) {
-                throw new InstallationException("Project OS cannot read " + app.appName() + " data folder.");
+                throw new InstallationException("Autark-OS cannot read " + app.appName() + " data folder.");
             }
         }
     }
@@ -410,7 +410,7 @@ public class BackupService {
             AppActionResult stop = appLifecycleService.stop(app.appId());
             logs.add(stop.message());
         } catch (RuntimeException exception) {
-            logs.add("Project OS could not stop " + app.appName() + ": " + userMessage(exception));
+            logs.add("Autark-OS could not stop " + app.appName() + ": " + userMessage(exception));
         }
         try {
             if (Files.exists(destination) && fileOperations.directorySize(destination) > 0) {
@@ -434,7 +434,7 @@ public class BackupService {
                 AppActionResult start = appLifecycleService.start(app.appId());
                 logs.add(start.message());
             } catch (RuntimeException exception) {
-                String message = "Project OS could not start " + app.appName() + ": " + userMessage(exception);
+                String message = "Autark-OS could not start " + app.appName() + ": " + userMessage(exception);
                 logs.add(message);
                 return new RestoreAppResult(app.appId(), app.appName(), message);
             }
@@ -444,12 +444,12 @@ public class BackupService {
 
     private String restoreRestartWarningMessage(List<InstalledApp> apps, List<RestoreAppResult> restartFailures) {
         if (apps.size() == 1) {
-            return "Data was restored for " + apps.getFirst().appName() + ", but Project OS could not restart it.";
+            return "Data was restored for " + apps.getFirst().appName() + ", but Autark-OS could not restart it.";
         }
         String failedApps = restartFailures.stream()
                 .map(RestoreAppResult::appName)
                 .collect(java.util.stream.Collectors.joining(", "));
-        return "Data was restored for " + apps.size() + " app(s), but Project OS could not restart "
+        return "Data was restored for " + apps.size() + " app(s), but Autark-OS could not restart "
                 + restartFailures.size() + " app(s): " + failedApps + ".";
     }
 
@@ -488,11 +488,11 @@ public class BackupService {
             return new RestoreSimulationResult("failed", "Only completed restore points can be simulated.", List.of("Backup status is " + point.status() + "."), Instant.now());
         }
         if (affected.isEmpty()) {
-            return new RestoreSimulationResult("failed", "No installed app matches this restore point.", List.of("Project OS could not find a current app for this restore point."), Instant.now());
+            return new RestoreSimulationResult("failed", "No installed app matches this restore point.", List.of("Autark-OS could not find a current app for this restore point."), Instant.now());
         }
         Path zipPath = Path.of(point.path()).toAbsolutePath().normalize();
         if (!Files.isRegularFile(zipPath)) {
-            return new RestoreSimulationResult("failed", "Backup file is missing, so Project OS cannot simulate restore.", List.of(zipPath.toString()), Instant.now());
+            return new RestoreSimulationResult("failed", "Backup file is missing, so Autark-OS cannot simulate restore.", List.of(zipPath.toString()), Instant.now());
         }
 
         List<String> details = new ArrayList<>();
@@ -529,12 +529,12 @@ public class BackupService {
         }
 
         if (failed) {
-            return new RestoreSimulationResult("failed", "Project OS could not prove this restore point can be safely extracted.", details, Instant.now());
+            return new RestoreSimulationResult("failed", "Autark-OS could not prove this restore point can be safely extracted.", details, Instant.now());
         }
         if (reviewRequired) {
             return new RestoreSimulationResult("warning", "File restore simulation passed where supported, but at least one app needs a stronger backup contract.", details, Instant.now());
         }
-        return new RestoreSimulationResult("passed", "Project OS simulated this restore into a temporary folder and found restorable files.", details, Instant.now());
+        return new RestoreSimulationResult("passed", "Autark-OS simulated this restore into a temporary folder and found restorable files.", details, Instant.now());
     }
 
     private SimulationStats extractAppForSimulation(RestorePoint point, InstalledApp app, Path destination) throws IOException {
@@ -670,7 +670,7 @@ public class BackupService {
                     "Unknown backup contract",
                     "needs_review",
                     true,
-                    "Project OS cannot find this app's catalog backup contract.",
+                    "Autark-OS cannot find this app's catalog backup contract.",
                     List.of("Catalog manifest was not found for " + app.appId() + "."));
         }
         List<String> backupPaths = appManifest.runtime().backupPaths();
@@ -685,7 +685,7 @@ public class BackupService {
                     "weak",
                     true,
                     "The manifest does not declare managed backup paths yet.",
-                    List.of("Project OS cannot prove what data should be included."));
+                    List.of("Autark-OS cannot prove what data should be included."));
         }
         if (hasPostgres) {
             return new BackupContract(
@@ -702,7 +702,7 @@ public class BackupService {
                     "Multi-service review",
                     "needs_review",
                     true,
-                    "This app uses multiple containers. Project OS needs a stronger app-specific backup contract before calling it fully protected.",
+                    "This app uses multiple containers. Autark-OS needs a stronger app-specific backup contract before calling it fully protected.",
                     List.of("Declared paths: " + String.join(", ", backupPaths), "Services: " + appManifest.runtime().services().size()));
         }
         if (hasSqlite) {
@@ -711,7 +711,7 @@ public class BackupService {
                     "SQLite/file backup",
                     "standard",
                     false,
-                    "Project OS backs up the declared managed data folder. This is suitable for simple apps using local files or SQLite.",
+                    "Autark-OS backs up the declared managed data folder. This is suitable for simple apps using local files or SQLite.",
                     List.of("Declared paths: " + String.join(", ", backupPaths)));
         }
         return new BackupContract(
@@ -719,7 +719,7 @@ public class BackupService {
                 "File backup",
                 "standard",
                 false,
-                "Project OS backs up the declared managed files for this app.",
+                "Autark-OS backs up the declared managed files for this app.",
                 List.of("Declared paths: " + String.join(", ", backupPaths)));
     }
 
@@ -748,7 +748,7 @@ public class BackupService {
         if (lastRoutine != null && "failed".equals(lastRoutine.status())) {
             return "The latest routine backup failed: " + lastRoutine.message();
         }
-        return "Routine backups are scheduled in the background. Project OS records these runs separately from manual checkpoints.";
+        return "Routine backups are scheduled in the background. Autark-OS records these runs separately from manual checkpoints.";
     }
 
     private String nextRoutineRun(ProjectSettings settings, RestorePoint lastRoutine) {
@@ -800,7 +800,7 @@ public class BackupService {
             throw new InstallationException("App data folder is missing.");
         }
         if (!Files.isReadable(source)) {
-            throw new InstallationException("Project OS cannot read the app data folder.");
+            throw new InstallationException("Autark-OS cannot read the app data folder.");
         }
         Files.createDirectories(backupRoot());
         FileStore store = Files.getFileStore(backupRoot());

@@ -41,7 +41,7 @@ tasks.named('test') {
 
 tasks.register('buildFrontend', Exec) {
 	group = 'build'
-	description = 'Build the Project OS frontend for inclusion in the production backend jar.'
+	description = 'Build the Autark-OS frontend for inclusion in the production backend jar.'
 	workingDir frontendDir
 	commandLine 'yarn', 'build'
 	inputs.files(fileTree(frontendDir) {

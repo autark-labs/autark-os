@@ -49,7 +49,7 @@ for card in storage["cards"]:
     assert card["path"]
     assert card["riskLabel"] in {"Best choice", "Good choice", "Use with care", "Needs review"}
     assert isinstance(card["requiresConfirmation"], bool)
-    assert "Project OS will store apps, app data, backups, and restore points here." == card["stores"]
+    assert "Autark-OS will store apps, app data, backups, and restore points here." == card["stores"]
     if card["risk"] in {"medium", "high", "unknown"}:
         assert card["requiresConfirmation"] is True
 PY

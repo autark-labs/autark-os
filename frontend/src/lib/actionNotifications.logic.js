@@ -58,7 +58,7 @@ function errorMessage(error) {
       return maybeMessage;
     }
   }
-  return 'Project OS could not complete this action. Review diagnostics for details.';
+  return 'Autark-OS could not complete this action. Review diagnostics for details.';
 }
 
 export function notificationToastMethod(severity) {
@@ -84,7 +84,7 @@ function jobOperationLabel(type) {
     case 'update_app':
       return 'Update';
     default:
-      return 'Project OS task';
+      return 'Autark-OS task';
   }
 }
 

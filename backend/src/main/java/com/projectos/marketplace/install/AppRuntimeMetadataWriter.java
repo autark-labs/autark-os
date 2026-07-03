@@ -47,7 +47,7 @@ public class AppRuntimeMetadataWriter {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(appRoot.resolve(METADATA_FILE).toFile(), StoredMetadata.from(metadata));
             return metadata;
         } catch (IOException exception) {
-            throw new InstallationException("Unable to write Project OS runtime metadata for " + manifest.name(), exception);
+            throw new InstallationException("Unable to write Autark-OS runtime metadata for " + manifest.name(), exception);
         }
     }
 

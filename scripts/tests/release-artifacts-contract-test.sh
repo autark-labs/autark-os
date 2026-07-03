@@ -22,7 +22,7 @@ artifacts_dir="${tmp_dir}/artifacts"
 bundle_dir="${artifacts_dir}/project-os-3.4.5"
 tarball="${artifacts_dir}/project-os-3.4.5.tar.gz"
 deb="${artifacts_dir}/project-os_3.4.5_amd64.deb"
-run_installer="${artifacts_dir}/Project-OS-Installer-3.4.5-amd64.run"
+run_installer="${artifacts_dir}/Autark-OS-Installer-3.4.5-amd64.run"
 checksums="${artifacts_dir}/SHA256SUMS"
 artifact_manifest="${artifacts_dir}/project-os-artifacts.json"
 
@@ -54,7 +54,7 @@ grep -q '/usr/lib/project-os/release/scripts/install-project-os-service.sh' "${c
 grep -q 'PROJECT_OS_BACKEND_JAR=/usr/lib/project-os/release/backend/project-os-backend.jar' "${control_dir}/postinst"
 grep -q 'systemctl stop project-os.service' "${control_dir}/prerm"
 
-"${run_installer}" --help | grep -q 'Project OS Installer'
+"${run_installer}" --help | grep -q 'Autark-OS Installer'
 extract_dir="${tmp_dir}/run-extract"
 "${run_installer}" --extract-only "${extract_dir}" >/dev/null
 [[ -x "${extract_dir}/scripts/project-os" ]]
@@ -63,7 +63,7 @@ extract_dir="${tmp_dir}/run-extract"
 
 grep -q 'project-os-3.4.5.tar.gz' "${checksums}"
 grep -q 'project-os_3.4.5_amd64.deb' "${checksums}"
-grep -q 'Project-OS-Installer-3.4.5-amd64.run' "${checksums}"
+grep -q 'Autark-OS-Installer-3.4.5-amd64.run' "${checksums}"
 (cd "${artifacts_dir}" && sha256sum -c SHA256SUMS --ignore-missing >/dev/null)
 
 python3 - "${artifact_manifest}" <<'PY'
@@ -79,5 +79,5 @@ assert manifest["releaseNotesUrl"] == "https://example.invalid/project-os/3.4.5"
 names = {artifact["fileName"] for artifact in manifest["artifacts"]}
 assert "project-os-3.4.5.tar.gz" in names
 assert "project-os_3.4.5_amd64.deb" in names
-assert "Project-OS-Installer-3.4.5-amd64.run" in names
+assert "Autark-OS-Installer-3.4.5-amd64.run" in names
 PY

@@ -97,7 +97,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     "critical",
                     "app_missing_container",
                     item.appName() + " is missing",
-                    "Project OS cannot find the container for this app.",
+                    "Autark-OS cannot find the container for this app.",
                     ProjectOsAction.post("repair-" + item.appId(), "Repair", "/api/apps/" + item.appId() + "/repair", false, false)));
         } else if ("Managed elsewhere".equals(item.status())) {
             issues.add(ProjectOsIssueFactory.appIssue(
@@ -106,7 +106,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     "warning",
                     "app_managed_elsewhere",
                     item.appName() + " is managed elsewhere",
-                    "Project OS found this app, but it belongs to another Project OS instance or an older unscoped install.",
+                    "Autark-OS found this app, but it belongs to another Autark-OS instance or an older unscoped install.",
                     ProjectOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics")));
         } else if ("Needs attention".equals(item.status())) {
             issues.add(ProjectOsIssueFactory.appIssue(
@@ -124,7 +124,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     "info",
                     "app_needs_setup",
                     item.appName() + " needs setup",
-                    "Project OS found app resources without a complete installed app record.",
+                    "Autark-OS found app resources without a complete installed app record.",
                     ProjectOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics")));
         }
         if ("backup_enabled_no_restore_point".equals(backupState)) {
@@ -134,7 +134,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     "info",
                     "backup_enabled_no_restore_point",
                     item.appName() + " is not backed up yet",
-                    "Backup protection is enabled, but Project OS has not created a successful restore point for this app.",
+                    "Backup protection is enabled, but Autark-OS has not created a successful restore point for this app.",
                     ProjectOsAction.route("open-backups-" + item.appId(), "Open backups", "/backups")));
         } else if ("backup_failed".equals(backupState)) {
             issues.add(ProjectOsIssueFactory.backupIssue(

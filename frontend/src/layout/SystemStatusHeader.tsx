@@ -54,7 +54,7 @@ function SystemStatusHeader() {
       healthyLabel: 'Ready',
       needsAttentionLabel: 'Needs setup',
       healthySummary: 'Docker is reachable and ready for Discover installs.',
-      needsAttentionSummary: 'Docker is required before Project OS can install and run apps.',
+      needsAttentionSummary: 'Docker is required before Autark-OS can install and run apps.',
       check: dockerCheck,
       href: '/diagnostics',
       externalHref: 'https://docs.docker.com/engine/',
@@ -103,7 +103,7 @@ function GlobalJobPopover({ job }: { job: ProjectOsJob }) {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(92vw,24rem)] gap-3 border-sky-400/25 bg-slate-950 p-3 text-slate-50 shadow-xl shadow-slate-950/30">
         <PopoverHeader>
-          <PopoverTitle className="text-sm">Project OS is working</PopoverTitle>
+          <PopoverTitle className="text-sm">Autark-OS is working</PopoverTitle>
           <PopoverDescription className="text-xs text-slate-400">
             This progress follows you while you move around the app.
           </PopoverDescription>
@@ -154,7 +154,7 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
         </PopoverHeader>
 
         <div className="rounded-lg border border-sky-400/25 bg-slate-900 p-2 text-xs">
-          <p className="m-0 font-semibold text-white">{service.check?.message || 'Project OS is checking this service.'}</p>
+          <p className="m-0 font-semibold text-white">{service.check?.message || 'Autark-OS is checking this service.'}</p>
           <p className="m-0 mt-1 text-slate-400">{service.check?.detail || 'Status details will appear after the next health check.'}</p>
           {!healthy && (
             <p className="m-0 mt-2 rounded-md border border-sky-400/25 bg-slate-950 px-2 py-1 font-mono text-[0.72rem] text-slate-200">
@@ -162,7 +162,7 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
             </p>
           )}
           {!healthy && service.optional && (
-            <p className="m-0 mt-2 text-slate-400">You can keep using Project OS locally and set this up later.</p>
+            <p className="m-0 mt-2 text-slate-400">You can keep using Autark-OS locally and set this up later.</p>
           )}
         </div>
 

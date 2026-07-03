@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -100,11 +100,11 @@ usage:
   primaryAction: configure-network
   openUrlLabel: Open AdGuard setup
   headline: Point your home devices at AdGuard
-  summary: Project OS starts the DNS filtering service. To protect the whole home, your router or devices need to use this server for DNS.
+  summary: Autark-OS starts the DNS filtering service. To protect the whole home, your router or devices need to use this server for DNS.
   setupSteps:
     - Open AdGuard setup and create the admin account.
     - Choose DNS filtering defaults that match your home.
-    - In your router settings, set this Project OS device as the DNS server.
+    - In your router settings, set this Autark-OS device as the DNS server.
     - If you cannot change router DNS, configure DNS on individual phones, laptops, or smart TVs.
   fields:
     - label: Setup URL
@@ -112,7 +112,7 @@ usage:
       sensitive: false
       qr: true
   notes:
-    - Router setup varies by brand, so Project OS shows the values and keeps advanced network details nearby.
+    - Router setup varies by brand, so Autark-OS shows the values and keeps advanced network details nearby.
     - Keep the admin dashboard private.
 runtime:
   containerName: adguard-home

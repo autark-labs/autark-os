@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -102,7 +102,7 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open Paperless-ngx
   headline: Build a private document archive
-  summary: Project OS starts Paperless-ngx and prepares storage. Create the first admin account and begin adding documents.
+  summary: Autark-OS starts Paperless-ngx and prepares storage. Create the first admin account and begin adding documents.
   setupSteps:
     - Open Paperless-ngx.
     - Create the first admin account if prompted.
@@ -122,7 +122,7 @@ health:
   successLabel: Document archive is ready
   startingLabel: Starting document archive
   failureLabel: Paperless-ngx is not responding
-  description: Project OS checks that the Paperless-ngx web app answers before calling it ready.
+  description: Autark-OS checks that the Paperless-ngx web app answers before calling it ready.
 runtime:
   containerName: paperless-ngx
   composeProject: project-os-paperless-ngx
@@ -179,7 +179,7 @@ runtime:
         successLabel: Document archive is ready
         startingLabel: Starting document archive
         failureLabel: Paperless-ngx is not responding
-        description: Project OS checks that the Paperless-ngx web app answers before calling it ready.
+        description: Autark-OS checks that the Paperless-ngx web app answers before calling it ready.
       privileged: false
     - name: broker
       containerName: project-os-paperless-ngx-broker
@@ -198,7 +198,7 @@ runtime:
         successLabel: Redis broker is ready
         startingLabel: Starting Redis broker
         failureLabel: Redis broker is not responding
-        description: Project OS expects the Redis broker container to keep running.
+        description: Autark-OS expects the Redis broker container to keep running.
       privileged: false
     - name: db
       containerName: project-os-paperless-ngx-db
@@ -220,5 +220,5 @@ runtime:
         successLabel: Database is ready
         startingLabel: Starting database
         failureLabel: Database is not responding
-        description: Project OS expects the PostgreSQL database container to keep running.
+        description: Autark-OS expects the PostgreSQL database container to keep running.
       privileged: false

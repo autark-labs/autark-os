@@ -16,7 +16,7 @@ usage() {
   cat <<USAGE
 Usage: $0 [options]
 
-Build a local Project OS release bundle that can be installed without Node.js
+Build a local Autark-OS release bundle that can be installed without Node.js
 or Yarn on the target host.
 
 Options:

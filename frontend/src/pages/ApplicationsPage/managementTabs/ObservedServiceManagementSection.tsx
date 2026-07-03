@@ -164,11 +164,11 @@ export function ObservedServiceManagementSection({ actions, item }: ObservedServ
             <p className="text-sm font-semibold text-orange-100">Recovery plan</p>
             <p className="mt-1 text-xs leading-5 text-orange-100/75">
               {adoptionAction.disabled
-                ? adoptionAction.reason || 'Project OS cannot recover this service safely yet.'
-                : 'Review what Project OS will change before taking control of this service.'}
+                ? adoptionAction.reason || 'Autark-OS cannot recover this service safely yet.'
+                : 'Review what Autark-OS will change before taking control of this service.'}
             </p>
             <p className="mt-1 text-xs leading-5 text-orange-100/75">
-              Backup protection starts after recovery. Project OS will preserve data by default, then you can create a restore point once the app is managed.
+              Backup protection starts after recovery. Autark-OS will preserve data by default, then you can create a restore point once the app is managed.
             </p>
           </div>
 
@@ -184,9 +184,9 @@ export function ObservedServiceManagementSection({ actions, item }: ObservedServ
           {plan && (
             <div className="grid gap-3 text-sm">
               <p className="rounded-lg border border-orange-300/20 bg-slate-950 p-3 leading-6 text-orange-50/90">
-                {typeof plan.summary === 'string' ? plan.summary : 'Project OS prepared a recovery plan for this service.'}
+                {typeof plan.summary === 'string' ? plan.summary : 'Autark-OS prepared a recovery plan for this service.'}
               </p>
-              <PlanList title="What Project OS will do" items={planList(plan.steps)} />
+              <PlanList title="What Autark-OS will do" items={planList(plan.steps)} />
               <PlanList title="Containers" items={planList(plan.containers)} />
               <PlanList title="Data safety" items={plan.dataPreservation ? [String(plan.dataPreservation)] : planList(plan.dataPaths)} />
               <PlanList title="Warnings" items={planList(plan.warnings)} />
@@ -246,36 +246,36 @@ function observedServiceCopy(item: ApplicationSurfaceItem) {
   if (item.userStatus === 'failed_install') {
     return {
       title: 'Install failed',
-      description: item.userStatusDescription || 'Project OS started creating this app but did not finish. Review setup or click install again when ready.',
+      description: item.userStatusDescription || 'Autark-OS started creating this app but did not finish. Review setup or click install again when ready.',
     };
   }
   if (item.userStatus === 'recoverable') {
     return {
       title: 'Recoverable service',
-      description: item.userStatusDescription || 'Project OS found a service that may be recoverable into this installation.',
+      description: item.userStatusDescription || 'Autark-OS found a service that may be recoverable into this installation.',
     };
   }
   if (item.userStatus === 'managed_elsewhere') {
     return {
       title: 'Owned elsewhere',
-      description: item.userStatusDescription || 'This service appears to be owned by another Project OS installation.',
+      description: item.userStatusDescription || 'This service appears to be owned by another Autark-OS installation.',
     };
   }
   if (item.userStatus === 'blocked' || item.attentionState === 'blocked' || item.attentionState === 'conflict') {
     return {
       title: 'Needs review',
-      description: item.userStatusDescription || 'Project OS found a service conflict that needs review before changes are made.',
+      description: item.userStatusDescription || 'Autark-OS found a service conflict that needs review before changes are made.',
     };
   }
   if (item.managementState === 'linked') {
     return {
       title: 'Linked service',
-      description: 'Project OS can open this service but does not manage its runtime.',
+      description: 'Autark-OS can open this service but does not manage its runtime.',
     };
   }
   return {
     title: 'Found service',
-    description: item.userStatusDescription || 'Project OS found this service on the server.',
+    description: item.userStatusDescription || 'Autark-OS found this service on the server.',
   };
 }
 
@@ -288,10 +288,10 @@ function observedActionReason(
     return 'Wait for the current service action to finish.';
   }
   if (action?.disabled) {
-    return action.reason || `Project OS cannot ${fallbackAction} right now.`;
+    return action.reason || `Autark-OS cannot ${fallbackAction} right now.`;
   }
   if (!action) {
-    return `Project OS cannot ${fallbackAction} right now.`;
+    return `Autark-OS cannot ${fallbackAction} right now.`;
   }
   return '';
 }

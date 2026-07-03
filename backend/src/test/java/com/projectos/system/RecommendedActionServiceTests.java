@@ -84,7 +84,7 @@ class RecommendedActionServiceTests {
 
     private SystemSummary summary(boolean setupComplete, List<ProjectOsIssue> issues) {
         return new SystemSummary(
-                "Project OS",
+                "Autark-OS",
                 "instance-1",
                 "http://localhost:8082",
                 new SetupProgressSummary(setupComplete, setupComplete ? "complete" : "in_progress", setupComplete ? "done" : "host_check", setupComplete ? "Setup is complete." : "Setup is incomplete."),

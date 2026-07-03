@@ -306,7 +306,7 @@ export const ApplicationsPage = () => {
         ok: true,
         severity: 'info',
         title: 'App action started',
-        message: `${appActionLabel(action)} is running. Project OS will keep showing progress until the app reports its real state.`,
+        message: `${appActionLabel(action)} is running. Autark-OS will keep showing progress until the app reports its real state.`,
       });
     } catch (err) {
       showActionErrorNotification(err, 'App action failed');
@@ -326,7 +326,7 @@ export const ApplicationsPage = () => {
         ok: true,
         severity: 'info',
         title: 'Repair started',
-        message: 'Project OS is repairing this app and will keep showing progress until the app reports its real state.',
+        message: 'Autark-OS is repairing this app and will keep showing progress until the app reports its real state.',
       });
     } catch (err) {
       showActionErrorNotification(err, 'Repair could not start');
@@ -346,7 +346,7 @@ export const ApplicationsPage = () => {
         ok: true,
         severity: 'info',
         title: 'Backup started',
-        message: 'Project OS is creating a restore point for this app and will keep showing progress here.',
+        message: 'Autark-OS is creating a restore point for this app and will keep showing progress here.',
       });
       void invalidateBackupQueries(queryClient);
     } catch (err) {
@@ -390,7 +390,7 @@ export const ApplicationsPage = () => {
     try {
       const plan = await InstalledAppsAPIClient.settingsChangePlan(appId, nextSettings);
       if (plan.saveAllowed === false) {
-        throw new Error(plan.blockedReasons[0] || 'Project OS cannot safely apply these settings yet.');
+        throw new Error(plan.blockedReasons[0] || 'Autark-OS cannot safely apply these settings yet.');
       }
       const updatedApp = await InstalledAppsAPIClient.updateSettings(appId, nextSettings);
       syncCanonicalAppMutationResult(queryClient, { app: updatedApp });
@@ -444,7 +444,7 @@ export const ApplicationsPage = () => {
         ok: true,
         severity: 'info',
         title: 'Uninstall started',
-        message: 'Project OS is removing this app safely and keeping it visible until the job finishes.',
+        message: 'Autark-OS is removing this app safely and keeping it visible until the job finishes.',
       });
     } catch (err) {
       showActionErrorNotification(err, 'Uninstall could not start');
@@ -735,7 +735,7 @@ function emptyStateForFilter(filter: ApplicationFilter, query: string) {
   if (filter === 'managed') {
     return {
       title: 'No managed apps installed',
-      description: 'Install an app from Discover to have Project OS manage its runtime, access, and backups.',
+      description: 'Install an app from Discover to have Autark-OS manage its runtime, access, and backups.',
     };
   }
 
@@ -749,7 +749,7 @@ function emptyStateForFilter(filter: ApplicationFilter, query: string) {
   if (filter === 'found') {
     return {
       title: 'No unmanaged services found',
-      description: 'Project OS is not seeing any external services that need review on this server.',
+      description: 'Autark-OS is not seeing any external services that need review on this server.',
     };
   }
 
@@ -762,6 +762,6 @@ function emptyStateForFilter(filter: ApplicationFilter, query: string) {
 
   return {
     title: 'No apps or services yet',
-    description: 'Install an app from Discover or pin an existing service when Project OS finds one.',
+    description: 'Install an app from Discover or pin an existing service when Autark-OS finds one.',
   };
 }

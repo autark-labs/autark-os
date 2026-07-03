@@ -87,7 +87,7 @@ export function jobTypeLabel(type) {
     case 'uninstall_app':
       return 'Uninstall';
     default:
-      return 'Project OS task';
+      return 'Autark-OS task';
   }
 }
 

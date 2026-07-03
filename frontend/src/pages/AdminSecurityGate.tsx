@@ -19,10 +19,10 @@ function AdminSecurityGate({ status, onAuthenticated }: AdminSecurityGateProps) 
   const [error, setError] = useState('');
   const submitDisabled = busy || password.length < 12 || (!status.claimed && !setupCode.trim());
   const submitDisabledReason = busy
-    ? 'Project OS is already checking this admin login.'
+    ? 'Autark-OS is already checking this admin login.'
     : password.length < 12
       ? 'Enter an admin password with at least 12 characters.'
-      : 'Confirm the setup code before claiming Project OS.';
+      : 'Confirm the setup code before claiming Autark-OS.';
 
   async function submit() {
     setBusy(true);
@@ -32,13 +32,13 @@ function AdminSecurityGate({ status, onAuthenticated }: AdminSecurityGateProps) 
         ? await AdminSecurityAPIClient.login(password)
         : await AdminSecurityAPIClient.claim(setupCode, password);
       if (!session.authorized || !session.token) {
-        setError(session.message || 'Project OS could not verify this admin login.');
+        setError(session.message || 'Autark-OS could not verify this admin login.');
         return;
       }
       writeAdminToken(session.token);
       onAuthenticated();
     } catch (submitError) {
-      setError(apiErrorMessage(submitError, 'Project OS could not verify this admin login.'));
+      setError(apiErrorMessage(submitError, 'Autark-OS could not verify this admin login.'));
     } finally {
       setBusy(false);
     }
@@ -52,7 +52,7 @@ function AdminSecurityGate({ status, onAuthenticated }: AdminSecurityGateProps) 
             {status.claimed ? <Lock className="size-5" /> : <ShieldCheck className="size-5" />}
           </div>
           <div>
-            <p className="text-xs font-black uppercase tracking-normal text-cyan-200">{status.claimed ? 'Admin login' : 'Claim Project OS'}</p>
+            <p className="text-xs font-black uppercase tracking-normal text-cyan-200">{status.claimed ? 'Admin login' : 'Claim Autark-OS'}</p>
             <h1 className="mt-2 text-2xl font-black text-white">{status.claimed ? 'Unlock this dashboard' : 'Protect this dashboard'}</h1>
             <p className="mt-2 text-sm leading-6 text-slate-300">{status.message}</p>
           </div>

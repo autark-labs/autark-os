@@ -35,7 +35,7 @@ assert plan["paths"]["installDir"] == "/tmp/project-os-install"
 assert plan["paths"]["configDir"] == "/tmp/project-os-config"
 assert plan["paths"]["logDir"] == "/tmp/project-os-logs"
 assert plan["artifact"]["backendJar"] == fake_jar
-assert "install Project OS system service" in plan["actions"]
+assert "install Autark-OS system service" in plan["actions"]
 assert any(dep["name"] == "Java" for dep in plan["dependencies"])
 assert any(warning["id"] == "confirm-host-mutation" for warning in plan["warnings"])
 assert plan["blockers"] == []

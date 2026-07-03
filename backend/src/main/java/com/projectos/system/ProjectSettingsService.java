@@ -52,14 +52,14 @@ public class ProjectSettingsService {
         ProjectSettings current = current();
         ProjectSettings sanitized = sanitize(settings, current);
         repository.save(sanitized);
-        activityLogService.info("settings", "project_settings_updated", "Project OS settings updated", "Saved Project OS preferences.");
+        activityLogService.info("settings", "project_settings_updated", "Autark-OS settings updated", "Saved Autark-OS preferences.");
         return sanitized;
     }
 
     public ProjectSettingsAppDefaultsResult applyAppDefaults(ProjectSettings settings) {
         ProjectSettings sanitized = sanitize(settings, current());
         if (installedAppRepository == null) {
-            return new ProjectSettingsAppDefaultsResult(false, "error", "App defaults unavailable", "Project OS cannot update app defaults in this runtime.", 0, Instant.now());
+            return new ProjectSettingsAppDefaultsResult(false, "error", "App defaults unavailable", "Autark-OS cannot update app defaults in this runtime.", 0, Instant.now());
         }
         int updated = 0;
         BackupPolicy backup = new BackupPolicy(sanitized.automaticBackupsEnabled(), sanitized.backupFrequency(), sanitized.backupRetentionDays());

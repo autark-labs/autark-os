@@ -35,7 +35,7 @@ export function productionConflictSummary(setup) {
   }
   return {
     tone: 'warning',
-    title: 'Existing Project OS install found',
+    title: 'Existing Autark-OS install found',
     message: report.summary || 'Review found apps before creating another production instance.',
   };
 }

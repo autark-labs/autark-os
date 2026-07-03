@@ -90,7 +90,7 @@ public class InstallCustomizationResolver {
         }
         String normalized = value.trim();
         if (!normalized.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,63}")) {
-            throw new InstallationException("The " + label + " '" + value + "' is not a safe Project-OS folder name.");
+            throw new InstallationException("The " + label + " '" + value + "' is not a safe Autark-OS folder name.");
         }
         return normalized;
     }

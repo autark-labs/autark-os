@@ -1,6 +1,6 @@
-# Project OS Service User Installation
+# Autark-OS Service User Installation
 
-Project OS should run as a stable system service user on homelab hosts. The bootstrap script creates that user, prepares durable host directories, grants Docker/Tailscale access when available, and installs a systemd unit.
+Autark-OS should run as a stable system service user on homelab hosts. The bootstrap script creates that user, prepares durable host directories, grants Docker/Tailscale access when available, and installs a systemd unit.
 
 ## Script
 
@@ -11,7 +11,7 @@ sudo ./scripts/install-project-os-service.sh
 ```
 
 The script is idempotent and safe to rerun. It preserves `/var/lib/project-os`.
-After the first successful run, the setup script is also installed at `/opt/project-os/bin/install-project-os-service.sh`, so Project OS can show a stable repair command later:
+After the first successful run, the setup script is also installed at `/opt/project-os/bin/install-project-os-service.sh`, so Autark-OS can show a stable repair command later:
 
 ```bash
 sudo /opt/project-os/bin/install-project-os-service.sh
@@ -74,7 +74,7 @@ When Tailscale is installed, the script runs:
 tailscale set --operator=projectos
 ```
 
-That one-time grant lets Project OS create Tailscale Serve HTTPS links without running the whole backend as root.
+That one-time grant lets Autark-OS create Tailscale Serve HTTPS links without running the whole backend as root.
 
 If Tailscale is missing or not connected, the script prints a warning and continues. Install/connect Tailscale, then rerun the script.
 

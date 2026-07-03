@@ -131,7 +131,7 @@ export function starterAppNotes(app, context) {
     notes.push(isLightweightMarketplaceApp(app) ? 'Recommended as a lightweight first install while storage is tight.' : 'Storage is tight; review space before installing this larger app.');
   }
   if (!notes.length) {
-    notes.push('Ready to review as a first Project OS app.');
+    notes.push('Ready to review as a first Autark-OS app.');
   }
   return notes;
 }

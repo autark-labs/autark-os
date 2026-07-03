@@ -2,7 +2,7 @@
 
 > **Technology You Own.**
 >
-> Project OS and other software published by Autark Labs are built on a simple belief:
+> Autark-OS and other software published by Autark Labs are built on a simple belief:
 >
 > **People should be able to own, understand, and control the technology they rely on.**
 >

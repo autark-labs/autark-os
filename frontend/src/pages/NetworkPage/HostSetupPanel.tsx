@@ -50,7 +50,7 @@ export function HostSetupPanel({ setup }: { setup: SystemSetupStatus | null }) {
             Recommended setup
           </div>
           <code className="mt-2 block overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-sm text-cyan-100">{setup.installCommand}</code>
-          <p className="mt-2 text-xs leading-5 text-sky-100/50">Run once on the Project OS host. It creates the service user, prepares folders, and grants Tailscale Serve permission when Tailscale is available.</p>
+          <p className="mt-2 text-xs leading-5 text-sky-100/50">Run once on the Autark-OS host. It creates the service user, prepares folders, and grants Tailscale Serve permission when Tailscale is available.</p>
         </NetworkInset>
       </div>
     </NetworkPanel>

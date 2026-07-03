@@ -2,7 +2,7 @@
   "id": "no-action-needed",
   "severity": "success",
   "title": "No action needed",
-  "body": "Project OS does not see anything that needs your attention right now.",
+  "body": "Autark-OS does not see anything that needs your attention right now.",
   "primaryAction": null,
   "secondaryAction": null,
   "sourceIssueIds": [],

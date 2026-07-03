@@ -94,9 +94,9 @@ export function backupJobBannerTitle(job) {
  * @returns {string}
  */
 export function backupJobStartedMessage(job) {
-  if (job?.type === 'backup_verify') return 'Verification job started. Project OS will update the restore point when it finishes.';
-  if (job?.type === 'backup_restore') return 'Restore job started. Project OS will update app and backup state when it finishes.';
-  return 'Backup job started. Project OS will update restore points when it finishes.';
+  if (job?.type === 'backup_verify') return 'Verification job started. Autark-OS will update the restore point when it finishes.';
+  if (job?.type === 'backup_restore') return 'Restore job started. Autark-OS will update app and backup state when it finishes.';
+  return 'Backup job started. Autark-OS will update restore points when it finishes.';
 }
 
 /**
@@ -156,14 +156,14 @@ export function backupJobRunningId(job) {
 export function backupProtectionHero(report, latestRestore) {
   if (!report) {
     return {
-      summary: 'Project OS could not read backup status yet. Refresh the page or check Support if this continues.',
+      summary: 'Autark-OS could not read backup status yet. Refresh the page or check Support if this continues.',
       title: 'Protection status is unknown',
     };
   }
   if (report.status === 'protected') {
     if (!latestRestore) {
       return {
-        summary: 'Backups are configured, but Project OS has not created a completed restore point yet.',
+        summary: 'Backups are configured, but Autark-OS has not created a completed restore point yet.',
         title: 'Create the first restore point',
       };
     }
@@ -179,7 +179,7 @@ export function backupProtectionHero(report, latestRestore) {
     };
   }
   return {
-    summary: report.summary || 'Some apps still need a successful backup before Project OS can call them protected.',
+    summary: report.summary || 'Some apps still need a successful backup before Autark-OS can call them protected.',
     title: 'Finish backup protection',
   };
 }

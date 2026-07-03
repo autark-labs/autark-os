@@ -113,7 +113,7 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
         {!view.connected && (
           <div className="rounded-lg border border-orange-400/45 bg-orange-500/10 p-3 text-xs text-orange-100">
             <p className="m-0 font-semibold text-orange-200">Private access is optional.</p>
-            <p className="m-0 mt-1 text-orange-100/75">Project OS still works on your home network. Sign in when you want private links from trusted devices.</p>
+            <p className="m-0 mt-1 text-orange-100/75">Autark-OS still works on your home network. Sign in when you want private links from trusted devices.</p>
             <button className="mt-2 inline-flex items-center gap-1 text-left font-mono text-[0.72rem] text-orange-100 hover:text-white" onClick={copySetupCommand} type="button">
               <Terminal className="size-3.5" />
               {check?.actionCommand || 'sudo tailscale up'}

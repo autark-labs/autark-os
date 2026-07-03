@@ -56,11 +56,11 @@ export function ExpandedOperationStatus({ className, item }: { className?: strin
           <p className="text-sm font-semibold">{item.operationState.label}</p>
       {item.operationState.kind === 'failed' ? (
         <p className="mt-1 text-xs leading-5 opacity-80">
-          {item.operationState.message || 'Project OS could not finish this action. The app remains visible so you can review its state before trying again.'}
+          {item.operationState.message || 'Autark-OS could not finish this action. The app remains visible so you can review its state before trying again.'}
         </p>
       ) : (
             <p className="mt-1 text-xs leading-5 opacity-80">
-              {item.operationState.currentStep || 'Project OS is working on this app. Conflicting controls are paused until it finishes.'}
+              {item.operationState.currentStep || 'Autark-OS is working on this app. Conflicting controls are paused until it finishes.'}
             </p>
           )}
         </div>

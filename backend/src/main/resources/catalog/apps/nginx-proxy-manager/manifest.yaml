@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -99,7 +99,7 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open proxy manager
   headline: Configure advanced service routing
-  summary: Project OS starts the proxy manager. Use it when you intentionally want custom routing beyond Project OS private links.
+  summary: Autark-OS starts the proxy manager. Use it when you intentionally want custom routing beyond Autark-OS private links.
   setupSteps:
     - Open the admin UI.
     - Change the default login immediately.
@@ -110,7 +110,7 @@ usage:
       sensitive: false
       qr: false
   notes:
-    - Prefer Project OS private links for normal apps. Use this for advanced routing.
+    - Prefer Autark-OS private links for normal apps. Use this for advanced routing.
 health:
   type: http
   path: /
@@ -118,7 +118,7 @@ health:
   successLabel: Proxy manager is ready
   startingLabel: Starting proxy manager
   failureLabel: Proxy manager is not responding
-  description: Project OS checks that the admin UI answers before calling it ready.
+  description: Autark-OS checks that the admin UI answers before calling it ready.
 runtime:
   containerName: nginx-proxy-manager
   composeProject: project-os-nginx-proxy-manager

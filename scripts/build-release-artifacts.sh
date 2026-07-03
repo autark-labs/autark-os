@@ -17,7 +17,7 @@ usage() {
   cat <<USAGE
 Usage: $0 [options]
 
-Build GitHub-hostable Project OS release artifacts from the canonical release
+Build GitHub-hostable Autark-OS release artifacts from the canonical release
 bundle: .tar.gz, .deb, and self-extracting .run installer.
 
 Options:
@@ -34,7 +34,7 @@ Options:
 Artifacts:
   project-os-VERSION.tar.gz
   project-os_VERSION_ARCH.deb
-  Project-OS-Installer-VERSION-ARCH.run
+  Autark-OS-Installer-VERSION-ARCH.run
   project-os-artifacts.json
   SHA256SUMS
 USAGE
@@ -159,7 +159,7 @@ artifact_names() {
   BUNDLE_DIR="${OUTPUT_DIR}/${BUNDLE_NAME}"
   TARBALL="${OUTPUT_DIR}/${BUNDLE_NAME}.tar.gz"
   DEB="${OUTPUT_DIR}/project-os_${VERSION}_${ARCHITECTURE}.deb"
-  RUN_INSTALLER="${OUTPUT_DIR}/Project-OS-Installer-${VERSION}-${ARCHITECTURE}.run"
+  RUN_INSTALLER="${OUTPUT_DIR}/Autark-OS-Installer-${VERSION}-${ARCHITECTURE}.run"
   ARTIFACT_MANIFEST="${OUTPUT_DIR}/project-os-artifacts.json"
   CHECKSUMS="${OUTPUT_DIR}/SHA256SUMS"
 }
@@ -225,7 +225,7 @@ Depends: bash, sudo, systemd, curl, ca-certificates, openjdk-21-jre-headless | j
 Installed-Size: ${size_kb}
 Homepage: https://github.com/autark-labs/project-os
 Description: Calm local control center for self-hosted apps
- Project OS installs and manages supported self-hosted apps with Docker
+ Autark-OS installs and manages supported self-hosted apps with Docker
  Compose, private access, backups, restore, and guided recovery.
 CONTROL
 }
@@ -287,7 +287,7 @@ PAYLOAD_MARKER="__PROJECT_OS_PAYLOAD_BELOW__"
 
 usage() {
   cat <<USAGE
-Project OS Installer ${PROJECT_OS_INSTALLER_VERSION}
+Autark-OS Installer ${PROJECT_OS_INSTALLER_VERSION}
 
 Usage: $0 [options]
 
@@ -295,11 +295,11 @@ Options:
   --extract-only DIR  Extract the bundled release into DIR and exit.
   --dry-run           Preview install actions without changing this host.
   --yes               Confirm guided prompts where supported.
-  --runtime-dir DIR   Store Project OS runtime data in DIR.
-  --port PORT         Run Project OS on PORT.
+  --runtime-dir DIR   Store Autark-OS runtime data in DIR.
+  --port PORT         Run Autark-OS on PORT.
   -h, --help          Show this help.
 
-Run without options to start the guided Project OS installer. When launched
+Run without options to start the guided Autark-OS installer. When launched
 from a Linux desktop with zenity and a terminal available, this installer asks
 for confirmation graphically and opens a terminal for progress.
 USAGE
@@ -326,14 +326,14 @@ launch_terminal_for_desktop() {
   command_exists zenity || return 1
 
   if ! zenity --question \
-    --title="Project OS Installer" \
-    --text="Install Project OS on this device?\n\nA terminal will open to show progress and ask for administrator approval when needed."; then
+    --title="Autark-OS Installer" \
+    --text="Install Autark-OS on this device?\n\nA terminal will open to show progress and ask for administrator approval when needed."; then
     exit 0
   fi
 
   local self command
   self="$(readlink -f "$0" 2>/dev/null || printf '%s' "$0")"
-  command="PROJECT_OS_FORCE_TERMINAL=1 $(printf '%q' "${self}"); printf '\\nProject OS installer finished. Press Enter to close. '; read -r _"
+  command="PROJECT_OS_FORCE_TERMINAL=1 $(printf '%q' "${self}"); printf '\\nAutark-OS installer finished. Press Enter to close. '; read -r _"
 
   if command_exists x-terminal-emulator; then
     x-terminal-emulator -e bash -lc "${command}" &
@@ -348,7 +348,7 @@ launch_terminal_for_desktop() {
     exit 0
   fi
 
-  zenity --info --title="Project OS Installer" --text="No desktop terminal was found. The installer will continue in this shell."
+  zenity --info --title="Autark-OS Installer" --text="No desktop terminal was found. The installer will continue in this shell."
   return 1
 }
 
@@ -361,7 +361,7 @@ main() {
     case "$1" in
       --extract-only)
         shift
-        [[ $# -gt 0 ]] || { printf 'Project OS Installer error: --extract-only requires a directory.\n' >&2; exit 1; }
+        [[ $# -gt 0 ]] || { printf 'Autark-OS Installer error: --extract-only requires a directory.\n' >&2; exit 1; }
         extract_only="$1"
         ;;
       --extract-only=*)
@@ -380,7 +380,7 @@ main() {
 
   if [[ -n "${extract_only}" ]]; then
     extract_payload "${extract_only}"
-    printf 'Extracted Project OS installer payload to %s\n' "${extract_only}"
+    printf 'Extracted Autark-OS installer payload to %s\n' "${extract_only}"
     exit 0
   fi
 
@@ -389,8 +389,8 @@ main() {
   trap 'rm -rf "${temp_dir}"' EXIT
   extract_payload "${temp_dir}"
 
-  printf 'Project OS Installer %s\n' "${PROJECT_OS_INSTALLER_VERSION}"
-  printf 'This installer will check this device, install Project OS, and start the service.\n'
+  printf 'Autark-OS Installer %s\n' "${PROJECT_OS_INSTALLER_VERSION}"
+  printf 'This installer will check this device, install Autark-OS, and start the service.\n'
   "${temp_dir}/scripts/project-os" install --release-bundle "${temp_dir}" --guided "${install_args[@]}"
 }
 

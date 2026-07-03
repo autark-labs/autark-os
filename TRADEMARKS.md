@@ -12,12 +12,12 @@ The following names, logos, and identifiers are considered trademarks of Autark 
 
 * Autark
 * Autark Labs
-* Project OS
-* Project-OS
+* Autark-OS
+* Autark-OS
 * ProjectOS
 * Future Autark Labs product names
 * Autark Labs logos and visual marks
-* Project OS logos and visual marks
+* Autark-OS logos and visual marks
 
 ---
 
@@ -63,14 +63,14 @@ Examples:
 
 Permitted:
 
-* "My Custom Fork of Project OS"
-* "Project OS Community Mod"
+* "My Custom Fork of Autark-OS"
+* "Autark-OS Community Mod"
 
 Not Permitted:
 
-* "Project OS Enterprise"
+* "Autark-OS Enterprise"
 * "Autark Cloud"
-* "Official Project OS Pro"
+* "Official Autark-OS Pro"
 
 ---
 

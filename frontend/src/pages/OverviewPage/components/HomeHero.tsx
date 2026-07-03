@@ -27,7 +27,7 @@ export function HomeHero({
         <div className="relative z-10 flex min-h-[360px] flex-col justify-between gap-7 p-5 md:min-h-[430px] md:p-7">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
             <div className="max-w-2xl">
-              <p className="m-0 text-xs font-black uppercase tracking-normal text-cyan-600">Project OS</p>
+              <p className="m-0 text-xs font-black uppercase tracking-normal text-cyan-600">Autark-OS</p>
               <h1 className="m-0 mt-3 text-4xl font-black leading-none text-slate-100 md:text-5xl">
                 {timeGreeting()}, {shortName(deviceName)}.
               </h1>
@@ -56,9 +56,9 @@ export function HomeHero({
 }
 
 function homeHeroSubtitle(summary: SystemSummary | null, loading: boolean) {
-  if (loading && !summary) return 'Project OS is checking your home server.';
+  if (loading && !summary) return 'Autark-OS is checking your home server.';
   if (summary?.issues.length) return 'Your server needs a quick look.';
-  if (summary?.setup.complete === false) return summary.setup.summary || 'Finish setup to unlock the full Project OS experience.';
+  if (summary?.setup.complete === false) return summary.setup.summary || 'Finish setup to unlock the full Autark-OS experience.';
   return 'Your digital home is ready.';
 }
 

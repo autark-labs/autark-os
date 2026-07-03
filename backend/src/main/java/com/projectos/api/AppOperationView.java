@@ -16,6 +16,6 @@ public record AppOperationView(
     }
 
     public static AppOperationView failed(String label, String jobId, String message) {
-        return new AppOperationView("failed", label, jobId, "", message == null ? "Project OS could not finish this action." : message);
+        return new AppOperationView("failed", label, jobId, "", message == null ? "Autark-OS could not finish this action." : message);
     }
 }

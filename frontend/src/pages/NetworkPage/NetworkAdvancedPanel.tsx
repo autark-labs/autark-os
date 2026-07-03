@@ -31,7 +31,7 @@ export function NetworkAdvancedPanel({
           <InfoLine label="DNS name" value={tailscale?.dnsName || 'Not assigned'} />
           <InfoLine label="Tailnet IPs" value={tailscale?.tailnetIps?.join(', ') || 'None'} />
           <InfoLine label="Tailnet name" value={tailscale?.tailnetName || 'Unavailable'} />
-          <InfoLine label="Device" value={tailscale?.deviceName || 'Project OS'} />
+          <InfoLine label="Device" value={tailscale?.deviceName || 'Autark-OS'} />
         </div>
       </NetworkPanel>
 
@@ -47,7 +47,7 @@ export function NetworkAdvancedPanel({
           {connected ? (
             <div className="grid gap-3">
               <InfoLine label="Private DNS" value={tailscale?.dnsName || 'Using Tailscale IP'} />
-              <InfoLine label="Private apps" value="Managed by Project OS" />
+              <InfoLine label="Private apps" value="Managed by Autark-OS" />
             </div>
           ) : (
             <OnboardingGuide guide={guide} installed={Boolean(tailscale?.installed)} />
@@ -73,7 +73,7 @@ function OnboardingGuide({ guide, installed }: { guide: TailscaleConnectGuide | 
   return (
     <div className="grid gap-4">
       <div>
-        <h3 className="font-bold text-slate-50">{guide?.headline || 'Connect Project OS to Tailscale'}</h3>
+        <h3 className="font-bold text-slate-50">{guide?.headline || 'Connect Autark-OS to Tailscale'}</h3>
         <p className="mt-1 text-sm text-sky-100/70">{guide?.summary || 'Add this device to your tailnet to create private app links.'}</p>
       </div>
       <ol className="grid gap-2 text-sm text-sky-100/75">

@@ -38,7 +38,7 @@ public class ActivityLogRepository extends DatabaseBackedRepository {
             statement.setString(1, clean(level, "info"));
             statement.setString(2, clean(category, "system"));
             statement.setString(3, clean(action, "activity"));
-            statement.setString(4, clean(title, "Project OS activity"));
+            statement.setString(4, clean(title, "Autark-OS activity"));
             statement.setString(5, clean(message, ""));
             statement.setString(6, blankToNull(appId));
             statement.setString(7, clean(outcome, "recorded"));
@@ -46,7 +46,7 @@ public class ActivityLogRepository extends DatabaseBackedRepository {
             statement.setString(9, Instant.now().toString());
             statement.executeUpdate();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to record Project OS activity.", exception);
+            throw new InstallationException("Unable to record Autark-OS activity.", exception);
         }
     }
 
@@ -62,7 +62,7 @@ public class ActivityLogRepository extends DatabaseBackedRepository {
             }
             return logs;
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to read Project OS activity.", exception);
+            throw new InstallationException("Unable to read Autark-OS activity.", exception);
         }
     }
 
@@ -92,7 +92,7 @@ public class ActivityLogRepository extends DatabaseBackedRepository {
             }
             return logs;
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to read Project OS activity.", exception);
+            throw new InstallationException("Unable to read Autark-OS activity.", exception);
         }
     }
 

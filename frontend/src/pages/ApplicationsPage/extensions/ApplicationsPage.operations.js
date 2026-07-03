@@ -27,7 +27,7 @@ export function operationStateForItem(item, localAction, settingsAction, jobs = 
     return {
       kind: 'failed',
       label: 'Action failed',
-      message: terminalJob.error?.message || 'Project OS could not finish this action.',
+      message: terminalJob.error?.message || 'Autark-OS could not finish this action.',
       jobId: terminalJob.jobId,
     };
   }

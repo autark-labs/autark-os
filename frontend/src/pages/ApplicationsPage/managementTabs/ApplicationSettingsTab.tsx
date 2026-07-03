@@ -120,7 +120,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
     try {
       const plan = await actions.onSettingsPlanRequest(item.id, nextValues);
       if (!plan) {
-        setPlanError('Project OS could not build a settings plan for this app.');
+        setPlanError('Autark-OS could not build a settings plan for this app.');
         return;
       }
 
@@ -128,7 +128,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
       setPendingImpact(plan);
       setConfirmOpen(true);
     } catch {
-      setPlanError('Project OS could not build a settings plan for this app.');
+      setPlanError('Autark-OS could not build a settings plan for this app.');
     }
   });
 
@@ -144,7 +144,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
       setPendingValues(null);
       setConfirmOpen(false);
     } catch {
-      setPlanError('Project OS could not save these settings. Review the notification and try again.');
+      setPlanError('Autark-OS could not save these settings. Review the notification and try again.');
       setConfirmOpen(false);
     }
   };
@@ -157,7 +157,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <AlertTriangle />
             <AlertTitle>Read-only service</AlertTitle>
             <AlertDescription className="text-sky-100/70">
-              Project OS can show settings for found and pinned services, but it cannot change them until the service is managed here.
+              Autark-OS can show settings for found and pinned services, but it cannot change them until the service is managed here.
             </AlertDescription>
           </Alert>
         )}
@@ -187,14 +187,14 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <SwitchField
               control={control}
               disabled={!editable || busy}
-              explanation="When enabled, Project OS may retry safe container repairs, such as restart-style recovery, when this app drifts."
+              explanation="When enabled, Autark-OS may retry safe container repairs, such as restart-style recovery, when this app drifts."
               label="Safe automatic repair"
               name="autoRepairEnabled"
             />
             <NumberField
               control={control}
               disabled={!editable || busy}
-              explanation="Changing this port updates the app address. If the port mapping changes, Project OS may rewrite Compose and restart the app."
+              explanation="Changing this port updates the app address. If the port mapping changes, Autark-OS may rewrite Compose and restart the app."
               label="Local app port"
               min={1}
               name="localPort"
@@ -202,7 +202,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <SelectField
               control={control}
               disabled={!editable || busy}
-              explanation="This tells Project OS whether the local app endpoint should be checked as HTTP or HTTPS."
+              explanation="This tells Autark-OS whether the local app endpoint should be checked as HTTP or HTTPS."
               label="Local protocol"
               name="expectedProtocol"
               options={protocols}
@@ -216,7 +216,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
           <Field className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2" data-disabled={!editable || busy} orientation="horizontal">
             <FieldContent>
               <SettingLabel
-                explanation="When this is on, Project OS serves the app across your Tailscale private network with a stable HTTPS link. Turning it off removes that private network route and keeps local access unchanged."
+                explanation="When this is on, Autark-OS serves the app across your Tailscale private network with a stable HTTPS link. Turning it off removes that private network route and keeps local access unchanged."
                 inputId="private-network-access"
                 label="Private network"
               />
@@ -244,14 +244,14 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <SwitchField
               control={control}
               disabled={!editable || busy}
-              explanation="When enabled, this app is included in Project OS backup policy."
+              explanation="When enabled, this app is included in Autark-OS backup policy."
               label="Include in backups"
               name="backupEnabled"
             />
             <SelectField
               control={control}
               disabled={!editable || busy || !values.backupEnabled}
-              explanation="How often Project OS should create routine restore points for this app."
+              explanation="How often Autark-OS should create routine restore points for this app."
               label="Backup frequency"
               name="backupFrequency"
               options={backupFrequencies}
@@ -259,7 +259,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <NumberField
               control={control}
               disabled={!editable || busy || !values.backupEnabled}
-              explanation="How many restore points Project OS should keep before old ones can be cleaned up."
+              explanation="How many restore points Autark-OS should keep before old ones can be cleaned up."
               label="Backup retention"
               min={1}
               name="backupRetention"
@@ -272,10 +272,10 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
             <p className="text-sm font-medium text-white">{isDirty ? 'Unsaved changes' : 'Settings are current'}</p>
             <p className="mt-1 text-xs leading-5 text-sky-100/60">
               {operationBusy
-                ? 'Settings are paused while Project OS finishes the current app action.'
+                ? 'Settings are paused while Autark-OS finishes the current app action.'
                 : accessChanging
-                  ? 'Settings are paused while Project OS updates private network access.'
-                  : 'Save checks impact first. Project OS will warn before restarting containers.'}
+                  ? 'Settings are paused while Autark-OS updates private network access.'
+                  : 'Save checks impact first. Autark-OS will warn before restarting containers.'}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -311,7 +311,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
           <AlertDialogHeader>
             <AlertDialogTitle>{pendingImpact?.headline || 'Save app settings?'}</AlertDialogTitle>
             <AlertDialogDescription>
-              {pendingImpact?.summary || 'Project OS will apply the selected settings.'}
+              {pendingImpact?.summary || 'Autark-OS will apply the selected settings.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -533,7 +533,7 @@ function settingsFormValues(item: ApplicationSurfaceItem): ApplicationSettingsFo
 function privateNetworkStatus(item: ApplicationSurfaceItem, accessChanging: boolean) {
   if (accessChanging) {
     return {
-      description: 'Project OS is updating the private network route.',
+      description: 'Autark-OS is updating the private network route.',
       status: 'Updating',
     };
   }

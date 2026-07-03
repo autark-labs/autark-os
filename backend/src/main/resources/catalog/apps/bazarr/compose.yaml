@@ -1,2 +1,2 @@
-# Placeholder compose file for bazarr. Project OS renders the runtime compose file from manifest.yaml.
+# Placeholder compose file for bazarr. Autark-OS renders the runtime compose file from manifest.yaml.
 services: {}

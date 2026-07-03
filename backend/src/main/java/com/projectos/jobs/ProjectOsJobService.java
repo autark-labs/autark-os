@@ -109,15 +109,15 @@ public class ProjectOsJobService {
 
     private String interruptedMessage(ProjectOsJob job) {
         return switch (job.type()) {
-            case "install_app" -> "This app install was interrupted when Project OS stopped. Review My Apps, then retry the install if needed.";
-            case "backup" -> "This backup was interrupted when Project OS stopped. Rerun the backup to create a fresh restore point.";
-            default -> "This job was interrupted when Project OS stopped. Start it again if it is still needed.";
+            case "install_app" -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";
+            case "backup" -> "This backup was interrupted when Autark-OS stopped. Rerun the backup to create a fresh restore point.";
+            default -> "This job was interrupted when Autark-OS stopped. Start it again if it is still needed.";
         };
     }
 
     private String safeMessage(RuntimeException exception) {
         return exception.getMessage() == null || exception.getMessage().isBlank()
-                ? "Project OS could not finish this job."
+                ? "Autark-OS could not finish this job."
                 : exception.getMessage();
     }
 }

@@ -57,7 +57,7 @@ public class TailscaleService {
                 true,
                 true,
                 "connected",
-                "Project OS is connected to your tailnet.",
+                "Autark-OS is connected to your tailnet.",
                 text(self, "HostName"),
                 text(self, "DNSName"),
                 ips(self, "TailscaleIPs"),
@@ -76,13 +76,13 @@ public class TailscaleService {
     public TailscaleServeResult serveHttps(int localPort, int httpsPort) {
         TailscaleStatus status = status();
         if (!status.installed()) {
-            return new TailscaleServeResult(false, null, "Install Tailscale on this device before Project OS can create a private HTTPS link.", List.of());
+            return new TailscaleServeResult(false, null, "Install Tailscale on this device before Autark-OS can create a private HTTPS link.", List.of());
         }
         if (!status.connected()) {
-            return new TailscaleServeResult(false, null, "Sign in to Tailscale on this device before Project OS can create a private HTTPS link.", List.of());
+            return new TailscaleServeResult(false, null, "Sign in to Tailscale on this device before Autark-OS can create a private HTTPS link.", List.of());
         }
         if (status.dnsName() == null || status.dnsName().isBlank()) {
-            return new TailscaleServeResult(false, null, "Enable MagicDNS and HTTPS certificates in Tailscale before Project OS can create this private HTTPS link.", List.of());
+            return new TailscaleServeResult(false, null, "Enable MagicDNS and HTTPS certificates in Tailscale before Autark-OS can create this private HTTPS link.", List.of());
         }
         String target = "http://127.0.0.1:" + localPort;
         CommandResult result = commandRunner.run("tailscale", "serve", "--bg", "--https=" + httpsPort, target);
@@ -111,7 +111,7 @@ public class TailscaleService {
         }
         List<String> output = new ArrayList<>(configResult.output());
         output.addAll(statusResult.output());
-        return TailscaleServeConfig.unavailable("unavailable", "Project OS could not read Tailscale Serve configuration. " + conciseOutput(configResult), output);
+        return TailscaleServeConfig.unavailable("unavailable", "Autark-OS could not read Tailscale Serve configuration. " + conciseOutput(configResult), output);
     }
 
     private TailscaleServeResult serveHttpsWithOperatorSetup(int httpsPort, String target, String privateUrl, CommandResult originalResult) {
@@ -124,7 +124,7 @@ public class TailscaleService {
                 CommandResult retry = commandRunner.run("tailscale", "serve", "--bg", "--https=" + httpsPort, target);
                 output.addAll(retry.output());
                 if (retry.successful()) {
-                    return new TailscaleServeResult(true, privateUrl, "Project OS enabled Tailscale Serve permission for this user and created the private HTTPS link.", output);
+                    return new TailscaleServeResult(true, privateUrl, "Autark-OS enabled Tailscale Serve permission for this user and created the private HTTPS link.", output);
                 }
             }
         }
@@ -132,12 +132,12 @@ public class TailscaleService {
         CommandResult sudoServeResult = commandRunner.run("sudo", "-n", "tailscale", "serve", "--bg", "--https=" + httpsPort, target);
         output.addAll(sudoServeResult.output());
         if (sudoServeResult.successful()) {
-            return new TailscaleServeResult(true, privateUrl, "Project OS created the private HTTPS link with elevated Tailscale permissions.", output);
+            return new TailscaleServeResult(true, privateUrl, "Autark-OS created the private HTTPS link with elevated Tailscale permissions.", output);
         }
 
         String fix = username.isBlank() || "root".equals(username)
-                ? "Run Project OS with a user allowed to manage Tailscale Serve, then retry."
-                : "Run this once on the Project OS host, then retry: sudo tailscale set --operator=" + username;
+                ? "Run Autark-OS with a user allowed to manage Tailscale Serve, then retry."
+                : "Run this once on the Autark-OS host, then retry: sudo tailscale set --operator=" + username;
         return new TailscaleServeResult(false, privateUrl, "Tailscale is ready, but this user cannot manage Serve yet. " + fix, output);
     }
 
@@ -147,10 +147,10 @@ public class TailscaleService {
                 ? privateUrl(status, httpsPort)
                 : null;
         if (!status.installed()) {
-            return new TailscaleServeResult(false, privateUrl, "Install Tailscale on this device before Project OS can remove a private HTTPS link.", List.of());
+            return new TailscaleServeResult(false, privateUrl, "Install Tailscale on this device before Autark-OS can remove a private HTTPS link.", List.of());
         }
         if (!status.connected()) {
-            return new TailscaleServeResult(false, privateUrl, "Sign in to Tailscale on this device before Project OS can remove a private HTTPS link.", List.of());
+            return new TailscaleServeResult(false, privateUrl, "Sign in to Tailscale on this device before Autark-OS can remove a private HTTPS link.", List.of());
         }
         CommandResult result = commandRunner.run("tailscale", "serve", "--https=" + httpsPort, "off");
         if (result.successful()) {
@@ -163,7 +163,7 @@ public class TailscaleService {
             if (sudoResult.successful()) {
                 return new TailscaleServeResult(true, privateUrl, "Private HTTPS link was removed with elevated Tailscale permissions.", output);
             }
-            return new TailscaleServeResult(false, privateUrl, "Tailscale is ready, but this user cannot remove Serve links yet. Run the Project OS setup command, then retry.", output);
+            return new TailscaleServeResult(false, privateUrl, "Tailscale is ready, but this user cannot remove Serve links yet. Run the Autark-OS setup command, then retry.", output);
         }
         return new TailscaleServeResult(false, privateUrl, "Tailscale Serve could not remove the private HTTPS link. " + conciseOutput(result), result.output());
     }
@@ -195,7 +195,7 @@ public class TailscaleService {
             collectEndpointMappings(root.path("Endpoints"), null, mappings);
             return new TailscaleServeConfig(true, "available", "Read Tailscale Serve configuration from " + source + ".", mappings, result.output(), Instant.now());
         } catch (IOException exception) {
-            return TailscaleServeConfig.unavailable("parse_failed", "Project OS could not parse Tailscale Serve configuration.", result.output());
+            return TailscaleServeConfig.unavailable("parse_failed", "Autark-OS could not parse Tailscale Serve configuration.", result.output());
         }
     }
 

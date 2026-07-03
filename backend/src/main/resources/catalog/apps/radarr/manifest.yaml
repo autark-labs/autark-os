@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -94,13 +94,13 @@ access:
   requiresFirstRunSetup: true
   notes:
     - Dashboard access should stay private because it can control media workflows.
-    - Project OS should eventually autowire this with Prowlarr and qBittorrent.
+    - Autark-OS should eventually autowire this with Prowlarr and qBittorrent.
 usage:
   kind: companion-service
   primaryAction: open-dashboard
   openUrlLabel: Open Radarr
   headline: Set up movie library automation
-  summary: Project OS starts Radarr and prepares folders. You connect indexers, download clients, and library paths in Radarr.
+  summary: Autark-OS starts Radarr and prepares folders. You connect indexers, download clients, and library paths in Radarr.
   setupSteps:
     - Open Radarr.
     - Add your movie library path.
@@ -138,10 +138,10 @@ setup:
       plannedActions:
         - Confirm qBittorrent is installed and reachable.
         - Ask for approval before adding qBittorrent as a Radarr download client.
-        - Keep download paths inside Project OS managed folders.
+        - Keep download paths inside Autark-OS managed folders.
   userSteps:
     - Review media folders before enabling automated downloads.
-    - Approve each connection before Project OS changes Radarr.
+    - Approve each connection before Autark-OS changes Radarr.
   automationCapabilities:
     - Can detect whether Prowlarr and qBittorrent are installed.
     - Can propose indexer and download-client wiring.
@@ -153,7 +153,7 @@ health:
   successLabel: Movie manager is ready
   startingLabel: Starting movie manager
   failureLabel: Radarr is not responding
-  description: Project OS checks that the Radarr dashboard answers before calling it ready.
+  description: Autark-OS checks that the Radarr dashboard answers before calling it ready.
 runtime:
   containerName: radarr
   composeProject: project-os-radarr

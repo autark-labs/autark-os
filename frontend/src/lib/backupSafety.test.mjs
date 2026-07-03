@@ -37,6 +37,6 @@ test('adds verification warning for unverified restore points', () => {
 test('provides cleanup checklist for safety checkpoint copy', () => {
   const checklist = backupSafetyChecklist('storage-cleanup');
 
-  assert.ok(checklist.includes('Project OS will create a safety checkpoint before removing this folder.'));
+  assert.ok(checklist.includes('Autark-OS will create a safety checkpoint before removing this folder.'));
   assert.ok(checklist.some((item) => /direct child/i.test(item)));
 });

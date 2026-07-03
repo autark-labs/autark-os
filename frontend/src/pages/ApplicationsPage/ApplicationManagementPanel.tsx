@@ -201,7 +201,7 @@ function DangerZone({
 }) {
   const uninstallBlockedByOperation = operationBlocksManagement(item.operationState);
   const uninstallDisabledReason = !managed
-    ? 'Only managed apps can be uninstalled from Project OS.'
+    ? 'Only managed apps can be uninstalled from Autark-OS.'
     : uninstallBlockedByOperation
       ? 'Wait for the current app action to finish before uninstalling.'
       : null;
@@ -259,7 +259,7 @@ function EmptyActivity({ item }: { item: ApplicationSurfaceItem }) {
     <div className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2">
       <p className="text-sm font-medium text-sky-50">{item.lastEvent || 'No recent events reported'}</p>
       <p className="mt-1 text-xs text-sky-100/60">
-        {item.runtime.checkedAt ? `Last checked ${formatRuntimeTimestamp(item.runtime.checkedAt)}` : 'Project OS has not reported activity for this item.'}
+        {item.runtime.checkedAt ? `Last checked ${formatRuntimeTimestamp(item.runtime.checkedAt)}` : 'Autark-OS has not reported activity for this item.'}
       </p>
     </div>
   );

@@ -62,7 +62,7 @@ public class ActivityLogService {
             repository.record(level, category, action, title, message, appId, outcome, details);
             logToConsole(level, category, action, title, message, appId, outcome);
         } catch (RuntimeException exception) {
-            LOGGER.warn("Unable to write Project OS activity log: {}", exception.getMessage());
+            LOGGER.warn("Unable to write Autark-OS activity log: {}", exception.getMessage());
         }
     }
 

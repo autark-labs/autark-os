@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -63,7 +63,7 @@ user:
     - Per-folder permissions
   plainLanguage: Syncthing keeps selected folders matched across your devices so files stay available without sending them through a third-party cloud drive.
 technical:
-  summary: Deploys Syncthing with a persistent config folder, web dashboard, sync ports, discovery port, and Project-OS managed backup metadata.
+  summary: Deploys Syncthing with a persistent config folder, web dashboard, sync ports, discovery port, and Autark-OS managed backup metadata.
   requirements:
     - 1 CPU core
     - 512 MB RAM
@@ -100,7 +100,7 @@ usage:
   primaryAction: pair-devices
   openUrlLabel: Open Syncthing dashboard
   headline: Pair your devices with Syncthing
-  summary: Project OS starts the sync service. You choose which devices and folders are allowed to sync from the Syncthing dashboard.
+  summary: Autark-OS starts the sync service. You choose which devices and folders are allowed to sync from the Syncthing dashboard.
   setupSteps:
     - Open the Syncthing dashboard.
     - Add each trusted phone, laptop, or desktop by scanning or copying its device ID.
@@ -113,7 +113,7 @@ usage:
       qr: true
   notes:
     - Syncthing intentionally requires device approval so files are not shared by accident.
-    - Project OS can start the service, but you still choose which devices and folders are trusted.
+    - Autark-OS can start the service, but you still choose which devices and folders are trusted.
 health:
   type: http
   path: /
@@ -121,7 +121,7 @@ health:
   successLabel: Ready to pair devices
   startingLabel: Starting sync dashboard
   failureLabel: Sync dashboard is not responding
-  description: Project OS checks that the Syncthing dashboard answers before calling it ready.
+  description: Autark-OS checks that the Syncthing dashboard answers before calling it ready.
 runtime:
   containerName: syncthing
   composeProject: project-os-syncthing

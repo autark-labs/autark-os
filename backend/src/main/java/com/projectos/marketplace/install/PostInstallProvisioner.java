@@ -49,7 +49,7 @@ public class PostInstallProvisioner {
         List<InstallStep> steps = new ArrayList<>();
 
         if (password.isBlank()) {
-            String detail = "CouchDB credentials were not available, so Project OS could not finish Obsidian LiveSync setup.";
+            String detail = "CouchDB credentials were not available, so Autark-OS could not finish Obsidian LiveSync setup.";
             steps.add(InstallStep.failed("Preparing Obsidian sync", detail));
             return new PostInstallProvisioningResult(steps, logs, Map.of(
                     "username", username,

@@ -27,7 +27,7 @@ export function mapUninstallPlanToDestructiveActionPlan(plan: UninstallPlan): De
     steps: [
       ...plan.willStop.map((step) => `Stop ${step}`),
       ...plan.willKeep.map((step) => `Preserve ${step}`),
-      'Remove the Project OS app record',
+      'Remove the Autark-OS app record',
       'Refresh app state',
     ],
     warnings,

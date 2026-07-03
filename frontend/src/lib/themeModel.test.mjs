@@ -10,7 +10,7 @@ import {
   themeStorageKey,
 } from './themeModel.js';
 
-test('theme model exposes four stable Project OS themes', () => {
+test('theme model exposes four stable Autark-OS themes', () => {
   assert.equal(defaultThemeId, 'project-slate');
   assert.deepEqual(projectOsThemes.map((theme) => theme.id), ['project-slate', 'harbor', 'forest', 'ember']);
   assert.equal(new Set(projectOsThemes.map((theme) => theme.id)).size, 4);

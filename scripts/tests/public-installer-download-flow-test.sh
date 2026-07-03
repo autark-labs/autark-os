@@ -25,10 +25,10 @@ output="$("${repo_root}/scripts/install-project-os.sh" \
   --runtime-dir "${tmp_dir}/runtime" \
   --port 9191)"
 
-grep -q 'Project OS public installer' <<<"${output}"
+grep -q 'Autark-OS public installer' <<<"${output}"
 grep -q 'Release version: 2.0.0' <<<"${output}"
 grep -q 'Release channel: stable' <<<"${output}"
 grep -q 'Verifying release checksums' <<<"${output}"
-grep -q 'Project OS install plan' <<<"${output}"
+grep -q 'Autark-OS install plan' <<<"${output}"
 grep -q "Runtime data: ${tmp_dir}/runtime" <<<"${output}"
 grep -q 'Port: 9191' <<<"${output}"

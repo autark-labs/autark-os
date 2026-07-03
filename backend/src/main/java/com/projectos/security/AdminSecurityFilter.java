@@ -32,7 +32,7 @@ public class AdminSecurityFilter implements Filter {
         }
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.getWriter().write("{\"message\":\"Project OS admin login is required.\"}");
+        response.getWriter().write("{\"message\":\"Autark-OS admin login is required.\"}");
     }
 
     private boolean allowedWithoutToken(HttpServletRequest request) {

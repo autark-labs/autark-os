@@ -35,7 +35,7 @@ public class ProjectVersionService {
                 backendJar(),
                 settings.updateChannel(),
                 "unavailable",
-                "Signed release artifacts are not available yet, so Project OS can show version metadata but cannot check for or install updates.",
+                "Signed release artifacts are not available yet, so Autark-OS can show version metadata but cannot check for or install updates.",
                 Instant.now());
     }
 

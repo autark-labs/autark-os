@@ -29,7 +29,7 @@ export function DuplicateInstallWarningDialog({ appName, onInstallCopy, onOpenCh
           </div>
           <DialogTitle>Install a second copy?</DialogTitle>
           <DialogDescription className="leading-6 text-slate-400">
-            Project OS already sees {appName} on your system. Installing another copy can cause confusing behavior across your network, especially from phones, TVs, or other devices that discover services automatically. Pin or adopt the existing service when possible. Install a second copy only if you intentionally want two separate instances.
+            Autark-OS already sees {appName} on your system. Installing another copy can cause confusing behavior across your network, especially from phones, TVs, or other devices that discover services automatically. Pin or adopt the existing service when possible. Install a second copy only if you intentionally want two separate instances.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 border-sky-400/25 bg-slate-800">

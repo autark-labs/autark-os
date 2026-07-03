@@ -1,6 +1,6 @@
 # Marketplace And Runtime Architecture
 
-Project OS is not a Docker Compose launcher. It is a guided local runtime for discovering, installing, operating, backing up, and recovering self-hosted apps.
+Autark-OS is not a Docker Compose launcher. It is a guided local runtime for discovering, installing, operating, backing up, and recovering self-hosted apps.
 
 The user should not need to understand Docker, Compose projects, Tailscale Serve, storage mounts, Linux services, or container labels to use the main product flow. Those details remain available in advanced and diagnostics views.
 
@@ -21,7 +21,7 @@ Local runtime
     |-- runtime filesystem
     |-- SQLite database
     |-- Tailscale private links
-    |-- durable Project OS jobs
+    |-- durable Autark-OS jobs
 ```
 
 The frontend never talks to Docker or Tailscale directly. It renders backend-owned view models and submits user actions to backend endpoints.
@@ -69,7 +69,7 @@ It describes:
 - what the app is
 - who it is for
 - which ports, volumes, and backups it needs
-- how Project OS should check health
+- how Autark-OS should check health
 - whether private access is recommended
 - which settings are safe to expose
 - what the user should know before install
@@ -95,7 +95,7 @@ Future versions may support remote catalogs and signed manifests. The local cata
 
 ## Runtime Directory
 
-Managed app files live under the Project OS runtime directory:
+Managed app files live under the Autark-OS runtime directory:
 
 ```text
 /var/lib/project-os/
@@ -108,7 +108,7 @@ Managed app files live under the Project OS runtime directory:
 └── project-os.db
 ```
 
-Apps should not write arbitrary host paths. Project OS owns placement, labels, generated Compose files, and backup paths.
+Apps should not write arbitrary host paths. Autark-OS owns placement, labels, generated Compose files, and backup paths.
 
 ## Install Flow
 
@@ -143,11 +143,11 @@ Run health and access checks
 Record managed app state
 ```
 
-Install should be a guided operation. The user should see what Project OS will create, expose, preserve, and check before the runtime changes.
+Install should be a guided operation. The user should see what Autark-OS will create, expose, preserve, and check before the runtime changes.
 
 ## Jobs
 
-Long-running operations should be durable Project OS jobs:
+Long-running operations should be durable Autark-OS jobs:
 
 - install
 - repair
@@ -223,4 +223,4 @@ Canonical state tells every page what is true.
 Jobs track work that can outlive a request.
 ```
 
-This separation keeps Project OS maintainable as the catalog grows and as more recovery, backup, access, and update workflows move into the product.
+This separation keeps Autark-OS maintainable as the catalog grows and as more recovery, backup, access, and update workflows move into the product.

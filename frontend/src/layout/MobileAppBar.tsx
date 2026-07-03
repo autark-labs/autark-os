@@ -59,7 +59,7 @@ function MobileAppBar() {
   return (
     <div className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-sky-400/25 bg-slate-950 px-4 text-slate-50 shadow-xl shadow-slate-950/30 lg:hidden">
       <div className="min-w-0">
-        <p className="m-0 truncate text-xs font-semibold uppercase tracking-normal text-cyan-200">Project OS</p>
+        <p className="m-0 truncate text-xs font-semibold uppercase tracking-normal text-cyan-200">Autark-OS</p>
         <h1 className="m-0 truncate text-base font-black leading-none text-white">Appliance</h1>
       </div>
 
@@ -75,7 +75,7 @@ function MobileAppBar() {
           <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-sky-400/25 bg-slate-950 p-0 text-slate-50" side="right">
             <SheetHeader className="border-b border-sky-400/25 p-4">
               <SheetTitle className="text-white">System status</SheetTitle>
-              <SheetDescription>Project OS health and active work.</SheetDescription>
+              <SheetDescription>Autark-OS health and active work.</SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 p-4">
               <div className={cn(
@@ -87,7 +87,7 @@ function MobileAppBar() {
                 <p className="m-0 text-xs font-black uppercase tracking-normal text-slate-400">Current state</p>
                 <p className="m-0 mt-1 text-base font-black text-white">{statusLabel}</p>
                 <p className="m-0 mt-1 text-sm text-slate-300">
-                  {activeJob ? `${jobTypeLabel(activeJob.type)} is in progress.` : issueCount ? `${issueCount} setup check${issueCount === 1 ? '' : 's'} need attention.` : 'Project OS is ready for core app flows.'}
+                  {activeJob ? `${jobTypeLabel(activeJob.type)} is in progress.` : issueCount ? `${issueCount} setup check${issueCount === 1 ? '' : 's'} need attention.` : 'Autark-OS is ready for core app flows.'}
                 </p>
               </div>
 
@@ -136,7 +136,7 @@ function MobileAppBar() {
           </SheetTrigger>
           <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-sky-400/25 bg-slate-950 p-0 text-slate-50" side="left">
             <SheetHeader className="border-b border-sky-400/25 p-4">
-              <SheetTitle className="text-white">Project OS navigation</SheetTitle>
+              <SheetTitle className="text-white">Autark-OS navigation</SheetTitle>
               <SheetDescription>Move between core appliance flows and advanced tools.</SheetDescription>
             </SheetHeader>
             <nav aria-label="Mobile navigation" className="grid gap-5 p-4">

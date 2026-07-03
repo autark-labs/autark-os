@@ -30,13 +30,13 @@ public class InstallPlanService {
     public InstallPlan generatePlan(ApplicationManifest manifest, InstallOptionsRequest options) {
         ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
         FriendlyInstallPlan friendly = new FriendlyInstallPlan(
-                manifest.name() + " will be prepared with Project-OS managed storage, networking, access, and backups.",
+                manifest.name() + " will be prepared with Autark-OS managed storage, networking, access, and backups.",
                 manifest.installTime(),
                 manifest.bestFor(),
                 List.of("A protected runtime folder for " + manifest.name(), "Managed config and data directories"),
                 plannedContainers(manifest).stream().map(PlannedContainer::image).toList(),
                 runtimeConfiguration.ports().isEmpty() ? List.of("No public ports declared") : List.of(runtimeConfiguration.accessUrl(), "Local ports: " + String.join(", ", runtimeConfiguration.ports())),
-                List.of("Project-OS labels", runtimeConfiguration.tailscaleEnabled() ? "Tailscale access requested" : "Local browser access", "Health check metadata"),
+                List.of("Autark-OS labels", runtimeConfiguration.tailscaleEnabled() ? "Tailscale access requested" : "Local browser access", "Health check metadata"),
                 runtimeConfiguration.backup().enabled() ? List.of(runtimeConfiguration.backup().label()) : List.of("Backups disabled"));
 
         TechnicalInstallPlan technical = new TechnicalInstallPlan(
@@ -118,7 +118,7 @@ public class InstallPlanService {
             warnings.add("This app uses host networking so devices on your local network can discover it.");
         }
         if (runtimeConfiguration.tailscaleEnabled()) {
-            warnings.add("Project OS will attempt to create a private Tailscale HTTPS link during install.");
+            warnings.add("Autark-OS will attempt to create a private Tailscale HTTPS link during install.");
         }
         if (!runtimeConfiguration.backup().enabled()) {
             warnings.add("Backups are disabled for this install.");

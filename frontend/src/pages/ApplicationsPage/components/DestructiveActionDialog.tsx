@@ -83,7 +83,7 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
     try {
       setPlan(await loadPlan());
     } catch {
-      setPlanError('Project OS could not load the safety plan. Try again before making changes.');
+      setPlanError('Autark-OS could not load the safety plan. Try again before making changes.');
     } finally {
       setLoadingPlan(false);
     }
@@ -102,7 +102,7 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
       setOpen(false);
       setConfirmationText('');
     } catch {
-      setActionError('Project OS could not start this action. The app was not changed.');
+      setActionError('Autark-OS could not start this action. The app was not changed.');
     } finally {
       setRunning(false);
     }
@@ -120,7 +120,7 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
         <DialogHeader>
           <DialogTitle>{plan?.title ?? 'Review safety plan'}</DialogTitle>
           <DialogDescription>
-            {plan?.summary ?? 'Project OS will load a safety plan before making changes.'}
+            {plan?.summary ?? 'Autark-OS will load a safety plan before making changes.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -145,7 +145,7 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
               <AlertTitle>{plan.preservesDataByDefault ? 'Data preserved by default' : 'Data may be removed'}</AlertTitle>
               <AlertDescription>
                 {plan.preservesDataByDefault
-                  ? 'Project OS will keep app data unless the reviewed plan says otherwise.'
+                  ? 'Autark-OS will keep app data unless the reviewed plan says otherwise.'
                   : 'Read the plan carefully before continuing.'}
               </AlertDescription>
             </Alert>

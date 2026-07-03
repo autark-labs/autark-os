@@ -15,7 +15,7 @@ test('Storage page does not expose runtime migration planning without an apply j
   const systemClient = source('src/api/SystemAPIClient.ts');
   const systemTypes = source('src/types/system.ts');
 
-  assert.doesNotMatch(storagePage, /Move Project OS data|RuntimeMigrationPlanPreview|migrationGuidance|migrationTarget|migrationPlan/);
+  assert.doesNotMatch(storagePage, /Move Autark-OS data|RuntimeMigrationPlanPreview|migrationGuidance|migrationTarget|migrationPlan/);
   assert.doesNotMatch(storageRepository, /useRuntimeMigrationPlanMutation|RuntimeMigrationPlan|RuntimeMigrationPlanRequest|runtimeMigrationPlan/);
   assert.doesNotMatch(systemClient, /runtimeMigrationPlan|storage\/migration\/plan|RuntimeMigrationPlan|RuntimeMigrationPlanRequest/);
   assert.doesNotMatch(systemTypes, /RuntimeMigrationGuidance|RuntimeMigrationPlan|RuntimeMigrationPlanRequest|migrationGuidance/);

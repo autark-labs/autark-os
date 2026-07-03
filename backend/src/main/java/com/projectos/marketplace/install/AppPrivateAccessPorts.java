@@ -30,7 +30,7 @@ final class AppPrivateAccessPorts {
                 return candidate;
             }
         }
-        throw new InstallationException("Project OS could not find an available private HTTPS port for this app.");
+        throw new InstallationException("Autark-OS could not find an available private HTTPS port for this app.");
     }
 
     static Integer portFromUrl(String accessUrl) {

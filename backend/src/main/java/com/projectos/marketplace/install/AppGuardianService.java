@@ -64,7 +64,7 @@ public class AppGuardianService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Project OS is watching", app.appName() + " is ready. If it drifts, Project OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList());
     }
@@ -110,7 +110,7 @@ public class AppGuardianService {
             return;
         }
 
-        repository.recordEvent(app.appId(), "guardian_issue_detected", "Project OS noticed " + app.appName() + " needs attention: " + snapshot.message() + ".");
+        repository.recordEvent(app.appId(), "guardian_issue_detected", "Autark-OS noticed " + app.appName() + " needs attention: " + snapshot.message() + ".");
         if (activityLogService != null) {
             activityLogService.warning("stability", "guardian_issue_detected", app.appName() + " needs attention", snapshot.message(), app.appId());
         }
@@ -121,7 +121,7 @@ public class AppGuardianService {
         } catch (RuntimeException exception) {
             saveGuardianState(app, settings, blockedByOwnership(exception) ? "guardian_repair_blocked" : "guardian_repair_failed", attemptAt);
             if (!hasRecentGuardianFailure(app.appId())) {
-                repository.recordEvent(app.appId(), "guardian_repair_failed", "Project OS could not repair " + app.appName() + ". Reason: " + failureReason(exception));
+                repository.recordEvent(app.appId(), "guardian_repair_failed", "Autark-OS could not repair " + app.appName() + ". Reason: " + failureReason(exception));
                 if (activityLogService != null) {
                     activityLogService.error("stability", "guardian_repair_failed", "Automatic repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
                 }
@@ -144,7 +144,7 @@ public class AppGuardianService {
         if (!shouldRepair(snapshot) || recentlyAttempted(settings)) {
             return;
         }
-        repository.recordEvent(app.appId(), "guardian_issue_detected", "Project OS noticed " + app.appName() + " needs attention: " + snapshot.message() + ".");
+        repository.recordEvent(app.appId(), "guardian_issue_detected", "Autark-OS noticed " + app.appName() + " needs attention: " + snapshot.message() + ".");
         if (activityLogService != null) {
             activityLogService.warning("stability", "guardian_issue_detected", app.appName() + " needs attention", snapshot.message(), app.appId());
         }
@@ -155,7 +155,7 @@ public class AppGuardianService {
         } catch (RuntimeException exception) {
             saveGuardianState(app, settings, blockedByOwnership(exception) ? "guardian_repair_blocked" : "guardian_repair_failed", attemptAt);
             if (!hasRecentGuardianFailure(app.appId())) {
-                repository.recordEvent(app.appId(), "guardian_repair_failed", "Project OS could not repair " + app.appName() + ". Reason: " + failureReason(exception));
+                repository.recordEvent(app.appId(), "guardian_repair_failed", "Autark-OS could not repair " + app.appName() + ". Reason: " + failureReason(exception));
                 if (activityLogService != null) {
                     activityLogService.error("stability", "guardian_repair_failed", "Automatic repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
                 }
@@ -191,7 +191,7 @@ public class AppGuardianService {
 
     private boolean blockedByOwnership(RuntimeException exception) {
         String message = exception.getMessage();
-        return message != null && message.contains("not owned by this Project OS instance");
+        return message != null && message.contains("not owned by this Autark-OS instance");
     }
 
     private String failureReason(RuntimeException exception) {

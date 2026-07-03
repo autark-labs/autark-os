@@ -14,7 +14,7 @@ import type { MarketplaceApp } from '@/types/marketplace';
 type SetupAnswers = Record<string, unknown>;
 
 const GROUPS: Array<{ id: DiscoverSetupInput['tier']; label: string; description: string }> = [
-  { id: 'required', label: 'Required setup', description: 'Choices Project OS needs before it can install the app.' },
+  { id: 'required', label: 'Required setup', description: 'Choices Autark-OS needs before it can install the app.' },
   { id: 'recommended', label: 'Recommended setup', description: 'Good defaults for access, storage, and protection.' },
   { id: 'app_specific', label: 'App-specific setup', description: 'Choices that matter for this app.' },
   { id: 'advanced', label: 'Advanced options', description: 'Use only when you need a specific local port or approved advanced setting.' },
@@ -53,7 +53,7 @@ export function MarketplaceSetupPanel({
           </Badge>
           <h4 className="mt-3 font-bold text-slate-50">Choose how {app.name} should start</h4>
           <p className="mt-1 text-sm leading-6 text-slate-400">
-            These choices come from Project OS and are checked on the server before install.
+            These choices come from Autark-OS and are checked on the server before install.
           </p>
         </div>
         <Badge className={preview?.valid ?? true ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200'} variant="outline">
@@ -147,7 +147,7 @@ export function InstallPlanPreview({ preview }: { preview: DiscoverInstallPrevie
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="font-bold text-slate-50">Install preview</h4>
-          <p className="mt-1 text-sm leading-6 text-slate-400">Plain-language summary from the backend before Project OS changes this server.</p>
+          <p className="mt-1 text-sm leading-6 text-slate-400">Plain-language summary from the backend before Autark-OS changes this server.</p>
         </div>
         <Badge className={preview?.valid ?? true ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200'} variant="outline">
           {preview?.valid ?? true ? 'Ready' : 'Needs setup'}

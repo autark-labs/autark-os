@@ -138,9 +138,9 @@ class BackupControllerTests {
         RestoreResult result = new RestoreResult(
                 42L,
                 "warning",
-                "Data was restored for Vaultwarden, but Project OS could not restart it.",
+                "Data was restored for Vaultwarden, but Autark-OS could not restart it.",
                 List.of("vaultwarden"),
-                List.of("Restored managed files.", "Project OS could not start Vaultwarden: port 8080 is already in use."),
+                List.of("Restored managed files.", "Autark-OS could not start Vaultwarden: port 8080 is already in use."),
                 Instant.parse("2026-06-21T12:00:00Z"));
         when(backupService.restore(42L, "vaultwarden")).thenReturn(result);
 

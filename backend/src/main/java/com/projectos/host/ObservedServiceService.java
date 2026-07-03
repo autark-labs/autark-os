@@ -131,14 +131,14 @@ public class ObservedServiceService {
 
     public ActionResult pin(String id) {
         if (!repository.pin(id, Instant.now())) {
-            return new ActionResult(false, "warning", "Observed service not found", "Project OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
+            return new ActionResult(false, "warning", "Observed service not found", "Autark-OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
         }
-        return new ActionResult(true, "success", "Service pinned", "The service now appears in My Apps. Project OS will not manage its runtime.", id, "refresh_observed_services");
+        return new ActionResult(true, "success", "Service pinned", "The service now appears in My Apps. Autark-OS will not manage its runtime.", id, "refresh_observed_services");
     }
 
     public ActionResult unpin(String id) {
         if (!repository.unpin(id)) {
-            return new ActionResult(false, "warning", "Observed service not found", "Project OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
+            return new ActionResult(false, "warning", "Observed service not found", "Autark-OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
         }
         return new ActionResult(true, "success", "Service unpinned", "The service was removed from My Apps but remains listed as observed on this system.", id, "refresh_observed_services");
     }
@@ -146,7 +146,7 @@ public class ObservedServiceService {
     public ActionResult updateCatalogMatch(String id, String catalogAppId) {
         boolean updated = repository.updateCatalogMatch(id, catalogAppId, catalogAppId == null || catalogAppId.isBlank() ? "unknown" : "user");
         if (!updated) {
-            return new ActionResult(false, "warning", "Observed service not found", "Project OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
+            return new ActionResult(false, "warning", "Observed service not found", "Autark-OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
         }
         String message = catalogAppId == null || catalogAppId.isBlank()
                 ? "The service no longer has a catalog app match."
@@ -205,27 +205,27 @@ public class ObservedServiceService {
         }
         boolean adoptable = "legacy_project_os".equals(service.ownershipState()) || "foreign_project_os".equals(service.ownershipState());
         if (!adoptable) {
-            return unavailablePlan(id, displayName, service.catalogAppId(), "Project OS cannot safely adopt this service yet.", "This service does not expose recoverable Project OS ownership metadata.");
+            return unavailablePlan(id, displayName, service.catalogAppId(), "Autark-OS cannot safely adopt this service yet.", "This service does not expose recoverable Autark-OS ownership metadata.");
         }
         if (service.catalogAppId() == null || service.catalogAppId().isBlank()) {
-            return unavailablePlan(id, displayName, null, "Project OS cannot adopt this service until it is matched to a catalog app.", "Choose the matching app first.");
+            return unavailablePlan(id, displayName, null, "Autark-OS cannot adopt this service until it is matched to a catalog app.", "Choose the matching app first.");
         }
         return new ObservedServiceAdoptionPlan(
                 id,
                 true,
-                "Project OS will take control of " + displayName + " without deleting its data or recreating its container.",
+                "Autark-OS will take control of " + displayName + " without deleting its data or recreating its container.",
                 containers(service),
                 service.catalogAppId(),
-                List.of("Current Project OS ownership record", "Managed app access settings"),
+                List.of("Current Autark-OS ownership record", "Managed app access settings"),
                 false,
                 "Existing data paths and the running container are preserved.",
-                List.of("Project OS will treat this service as managed after adoption. Do not run another installer for the same app unless you intentionally want multiple copies."),
+                List.of("Autark-OS will treat this service as managed after adoption. Do not run another installer for the same app unless you intentionally want multiple copies."),
                 "",
                 confirmationText(displayName),
                 List.of(
                         "Add " + displayName + " to My Apps as a managed app.",
                         "Keep the existing Docker container and access URL.",
-                        "Record this Project OS installation as the owner for app recovery and marketplace state."),
+                        "Record this Autark-OS installation as the owner for app recovery and marketplace state."),
                 List.of());
     }
 
@@ -239,10 +239,10 @@ public class ObservedServiceService {
                 || !request.takeControlConfirmed()
                 || request.confirmation() == null
                 || !request.confirmation().equals(plan.confirmationText())) {
-            return new ActionResult(false, "warning", "Confirmation required", "Type the confirmation text exactly before Project OS takes control of this service.", id, "confirm_adoption");
+            return new ActionResult(false, "warning", "Confirmation required", "Type the confirmation text exactly before Autark-OS takes control of this service.", id, "confirm_adoption");
         }
         if (installedAppRepository == null || catalogService == null) {
-            return new ActionResult(false, "error", "Adoption unavailable", "Project OS cannot save managed app state in this runtime.", id, "review_adoption_plan");
+            return new ActionResult(false, "error", "Adoption unavailable", "Autark-OS cannot save managed app state in this runtime.", id, "review_adoption_plan");
         }
         ObservedService service = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
@@ -288,9 +288,9 @@ public class ObservedServiceService {
         installedAppRepository.saveSettings(appId, InstallSettings.defaults(accessUrl));
         repository.markManaged(id, identity.instanceId(), now);
         if (activityLogService != null) {
-            activityLogService.success("host", "adopt_observed_service", "Service adopted", "Project OS now manages " + displayName + ".", appId);
+            activityLogService.success("host", "adopt_observed_service", "Service adopted", "Autark-OS now manages " + displayName + ".", appId);
         }
-        return new ActionResult(true, "success", "Service adopted", displayName + " now appears as a managed app in Project OS.", id, "open_apps");
+        return new ActionResult(true, "success", "Service adopted", displayName + " now appears as a managed app in Autark-OS.", id, "open_apps");
     }
 
     private ObservedServiceAdoptionPlan unavailablePlan(String id, String displayName, String catalogAppId, String summary, String reason) {
@@ -458,12 +458,12 @@ public class ObservedServiceService {
 
     private static String userStatusDescription(ObservedService service, String status) {
         return switch (status) {
-            case ObservedServiceStatus.MANAGED -> "Managed by this Project OS installation.";
-            case ObservedServiceStatus.PINNED -> "Pinned to My Apps. Project OS can open it but does not manage its runtime.";
-            case ObservedServiceStatus.RECOVERABLE -> "Project OS found recoverable app metadata for this service.";
-            case ObservedServiceStatus.OWNED_ELSEWHERE -> "Owned by another Project OS installation.";
+            case ObservedServiceStatus.MANAGED -> "Managed by this Autark-OS installation.";
+            case ObservedServiceStatus.PINNED -> "Pinned to My Apps. Autark-OS can open it but does not manage its runtime.";
+            case ObservedServiceStatus.RECOVERABLE -> "Autark-OS found recoverable app metadata for this service.";
+            case ObservedServiceStatus.OWNED_ELSEWHERE -> "Owned by another Autark-OS installation.";
             case ObservedServiceStatus.CONFLICT -> "This service may block installing a managed copy.";
-            case ObservedServiceStatus.FAILED_INSTALL -> "Project OS started creating this app but did not finish. Review setup or click install again when ready.";
+            case ObservedServiceStatus.FAILED_INSTALL -> "Autark-OS started creating this app but did not finish. Review setup or click install again when ready.";
             default -> "Found on this server.";
         };
     }
@@ -505,7 +505,7 @@ public class ObservedServiceService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("runtimePath", blankDefault(runtimePath, ""));
         metadata.put("composeProject", blankDefault(composeProject, ""));
-        metadata.put("failureMessage", blankDefault(message, "Install failed after Project OS started creating runtime resources."));
+        metadata.put("failureMessage", blankDefault(message, "Install failed after Autark-OS started creating runtime resources."));
         metadata.put("logTail", logs == null ? List.of() : logs.stream().skip(Math.max(0, logs.size() - 20)).toList());
         try {
             return objectMapper.writeValueAsString(metadata);

@@ -63,7 +63,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
             statement.executeUpdate();
             return findById(jobId).orElseThrow();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to create Project OS job.", exception);
+            throw new InstallationException("Unable to create Autark-OS job.", exception);
         }
     }
 
@@ -82,7 +82,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
             ResultSet resultSet = statement.executeQuery();
             return resultSet.next() ? Optional.of(job(resultSet)) : Optional.empty();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to read active Project OS job.", exception);
+            throw new InstallationException("Unable to read active Autark-OS job.", exception);
         }
     }
 
@@ -93,7 +93,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
             ResultSet resultSet = statement.executeQuery();
             return resultSet.next() ? Optional.of(job(resultSet)) : Optional.empty();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to read Project OS job.", exception);
+            throw new InstallationException("Unable to read Autark-OS job.", exception);
         }
     }
 
@@ -109,7 +109,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
             }
             return jobs;
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to list Project OS jobs.", exception);
+            throw new InstallationException("Unable to list Autark-OS jobs.", exception);
         }
     }
 
@@ -127,7 +127,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
             }
             return jobs;
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to list active Project OS jobs.", exception);
+            throw new InstallationException("Unable to list active Autark-OS jobs.", exception);
         }
     }
 
@@ -190,7 +190,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
             statement.executeUpdate();
             return findById(jobId).orElseThrow();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to update Project OS job.", exception);
+            throw new InstallationException("Unable to update Autark-OS job.", exception);
         }
     }
 
@@ -257,7 +257,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
         try {
             return objectMapper.writeValueAsString(values);
         } catch (JsonProcessingException exception) {
-            throw new InstallationException("Unable to serialize Project OS job steps.", exception);
+            throw new InstallationException("Unable to serialize Autark-OS job steps.", exception);
         }
     }
 
@@ -274,7 +274,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
                             instant(value.get("finishedAt"))))
                     .toList();
         } catch (JsonProcessingException exception) {
-            throw new InstallationException("Unable to read Project OS job steps.", exception);
+            throw new InstallationException("Unable to read Autark-OS job steps.", exception);
         }
     }
 
@@ -282,7 +282,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
         try {
             return objectMapper.writeValueAsString(details == null ? Map.of() : details);
         } catch (JsonProcessingException exception) {
-            throw new InstallationException("Unable to serialize Project OS job error details.", exception);
+            throw new InstallationException("Unable to serialize Autark-OS job error details.", exception);
         }
     }
 
@@ -290,7 +290,7 @@ public class ProjectOsJobRepository extends DatabaseBackedRepository {
         try {
             return objectMapper.readValue(json == null || json.isBlank() ? "{}" : json, new TypeReference<>() {});
         } catch (JsonProcessingException exception) {
-            throw new InstallationException("Unable to read Project OS job error details.", exception);
+            throw new InstallationException("Unable to read Autark-OS job error details.", exception);
         }
     }
 

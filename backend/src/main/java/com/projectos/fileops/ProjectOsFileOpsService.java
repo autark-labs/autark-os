@@ -125,21 +125,21 @@ public class ProjectOsFileOpsService {
         Path root = runtimeLayout.appRoot(appId).toAbsolutePath().normalize();
         Path appsRoot = appsRoot();
         if (!root.startsWith(appsRoot)) {
-            throw new IllegalArgumentException("App runtime path must stay under Project OS apps.");
+            throw new IllegalArgumentException("App runtime path must stay under Autark-OS apps.");
         }
         return root;
     }
 
     private void requireSafeAppId(String appId) {
         if (appId == null || !APP_ID_PATTERN.matcher(appId).matches()) {
-            throw new IllegalArgumentException("Invalid app id for Project OS file operation.");
+            throw new IllegalArgumentException("Invalid app id for Autark-OS file operation.");
         }
     }
 
     private Path requireBackupPath(Path path) {
         Path normalized = path.toAbsolutePath().normalize();
         if (!normalized.startsWith(backupRoot())) {
-            throw new IllegalArgumentException("File operation paths must stay under Project OS backups.");
+            throw new IllegalArgumentException("File operation paths must stay under Autark-OS backups.");
         }
         return normalized;
     }
@@ -165,7 +165,7 @@ public class ProjectOsFileOpsService {
         command.addAll(List.of(args));
         CommandResult result = commandRunner.run(command.toArray(String[]::new));
         if (!result.successful()) {
-            throw new IOException("Project OS could not complete privileged file operation " + operation + ". " + conciseOutput(result));
+            throw new IOException("Autark-OS could not complete privileged file operation " + operation + ". " + conciseOutput(result));
         }
     }
 
@@ -190,7 +190,7 @@ public class ProjectOsFileOpsService {
 
     private String conciseOutput(CommandResult result) {
         if (result.missingCommand()) {
-            return "Install the project-os-fileops helper and rerun Project OS setup.";
+            return "Install the project-os-fileops helper and rerun Autark-OS setup.";
         }
         return result.output().isEmpty() ? "No details were returned." : result.output().get(0);
     }

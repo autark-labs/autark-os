@@ -146,7 +146,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
                     "critical",
                     "docker_unavailable",
                     "Docker is not ready",
-                    "Project OS needs Docker before it can install or repair apps.",
+                    "Autark-OS needs Docker before it can install or repair apps.",
                     ProjectOsAction.route("open-diagnostics", "View diagnostics", "/diagnostics")));
         }
         apps.stream().flatMap(app -> app.issues().stream()).forEach(issues::add);

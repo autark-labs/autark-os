@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -99,7 +99,7 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open Grafana
   headline: Build monitoring dashboards
-  summary: Project OS starts Grafana. Add Prometheus, Netdata, or another data source to begin building dashboards.
+  summary: Autark-OS starts Grafana. Add Prometheus, Netdata, or another data source to begin building dashboards.
   setupSteps:
     - Open Grafana.
     - Change the default admin password if prompted.
@@ -123,7 +123,7 @@ setup:
     - id: grafana-prometheus
       name: Connect Prometheus metrics
       targetAppId: prometheus
-      description: Add Prometheus as a Grafana data source so dashboards can show Project OS and device metrics.
+      description: Add Prometheus as a Grafana data source so dashboards can show Autark-OS and device metrics.
       requiresApproval: true
       plannedActions:
         - Confirm Prometheus is installed and reachable from Grafana.
@@ -132,7 +132,7 @@ setup:
   userSteps:
     - Open Grafana and finish the first login.
     - Change the default admin password when prompted.
-    - Approve data-source wiring when Project OS offers it in a future release.
+    - Approve data-source wiring when Autark-OS offers it in a future release.
   automationCapabilities:
     - Detects whether Prometheus is installed.
     - Can propose a safe data-source connection before changing Grafana.
@@ -144,7 +144,7 @@ health:
   successLabel: Dashboard service is ready
   startingLabel: Starting dashboards
   failureLabel: Grafana is not responding
-  description: Project OS checks that the Grafana login page answers before calling it ready.
+  description: Autark-OS checks that the Grafana login page answers before calling it ready.
 runtime:
   containerName: grafana
   composeProject: project-os-grafana

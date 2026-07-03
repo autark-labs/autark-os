@@ -66,7 +66,7 @@ export function PrivateAccessManager({
         title="Private app links"
       >
           {privateAppAccess.length === 0 ? (
-            <EmptyState icon={Lock} title="No private apps yet" text="Choose which apps should be available away from home. Project OS will create private links after Tailscale is connected." />
+            <EmptyState icon={Lock} title="No private apps yet" text="Choose which apps should be available away from home. Autark-OS will create private links after Tailscale is connected." />
           ) : (
             <PrivateLinksTable
               copiedAppId={copiedAppId}
@@ -106,7 +106,7 @@ export function PrivateAccessManager({
             ))
           )}
           {localApps.length > 5 && <p className="text-xs text-sky-100/50">{localApps.length - 5} more app(s) can be managed from My Apps.</p>}
-          {!tailscale?.connected && <p className="text-xs text-orange-200">Connect Project OS to Tailscale before enabling private app links.</p>}
+          {!tailscale?.connected && <p className="text-xs text-orange-200">Connect Autark-OS to Tailscale before enabling private app links.</p>}
       </NetworkPanel>
 
       {reconciliation?.staleMappings?.length ? (
@@ -129,7 +129,7 @@ export function PrivateAccessManager({
                   </div>
                 </div>
                 <AlertDialog>
-                  <DisabledAction disabled={!mapping.servePort || loadingAppId === `stale-${mapping.servePort}`} reason={!mapping.servePort ? 'Project OS needs the stale Tailscale port before it can review cleanup.' : 'Project OS is already reviewing this stale private link.'}>
+                  <DisabledAction disabled={!mapping.servePort || loadingAppId === `stale-${mapping.servePort}`} reason={!mapping.servePort ? 'Autark-OS needs the stale Tailscale port before it can review cleanup.' : 'Autark-OS is already reviewing this stale private link.'}>
                     <AlertDialogTrigger asChild>
                       <ProjectWarningButton disabled={!mapping.servePort || loadingAppId === `stale-${mapping.servePort}`} type="button">
                         <Trash2 className={cn('size-4', loadingAppId === `stale-${mapping.servePort}` && 'animate-pulse')} />
@@ -141,7 +141,7 @@ export function PrivateAccessManager({
                     <AlertDialogHeader>
                       <AlertDialogTitle>Remove this stale private link?</AlertDialogTitle>
                       <AlertDialogDescription className="text-slate-400">
-                        Project OS will remove the Tailscale Serve entry for HTTPS port {mapping.servePort ?? 'unknown'}. This should only affect the stale endpoint shown here:
+                        Autark-OS will remove the Tailscale Serve entry for HTTPS port {mapping.servePort ?? 'unknown'}. This should only affect the stale endpoint shown here:
                         {mapping.endpoint ? ` ${mapping.endpoint}` : ' unknown endpoint'}.
                       </AlertDialogDescription>
                     </AlertDialogHeader>

@@ -8,7 +8,7 @@ Use this checklist before adding or updating a catalog app manifest.
 - `metadata.name` is the friendly app name users will recognize.
 - `metadata.category`, `description`, `shortValue`, and `tags` are written for non-technical users.
 - `user.plainLanguage` explains what the app does without container or networking jargon.
-- `technical.summary` explains what Project OS will deploy for advanced users.
+- `technical.summary` explains what Autark-OS will deploy for advanced users.
 
 ## Runtime Contract
 

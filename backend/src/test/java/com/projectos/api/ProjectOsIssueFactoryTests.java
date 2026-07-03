@@ -16,7 +16,7 @@ class ProjectOsIssueFactoryTests {
                 "critical",
                 "app_missing_container",
                 "Vaultwarden is missing",
-                "Project OS cannot find the container for this app.",
+                "Autark-OS cannot find the container for this app.",
                 action);
 
         assertThat(issue.id()).isEqualTo("app-missing-vaultwarden");

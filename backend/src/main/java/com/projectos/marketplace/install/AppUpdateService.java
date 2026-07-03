@@ -49,7 +49,7 @@ public class AppUpdateService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Project OS is watching", app.appName() + " is ready. If it drifts, Project OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList());
     }
@@ -116,10 +116,10 @@ public class AppUpdateService {
         Path appRoot = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         Path compose = appRoot.resolve("compose.yaml");
         Path previousCompose = appRoot.resolve("compose.previous.yaml");
-        repository.recordEvent(appId, "update_planned", "Project OS planned an update to trusted catalog version " + plan.targetImage() + ".");
+        repository.recordEvent(appId, "update_planned", "Autark-OS planned an update to trusted catalog version " + plan.targetImage() + ".");
         activityLogService.info("applications", "update_planned", "Update planned for " + app.appName(), "Trusted target: " + plan.targetImage(), appId);
         repository.recordEvent(appId, "update_backup_started", "Creating a backup checkpoint before update.");
-        activityLogService.info("applications", "update_backup_started", "Backup checkpoint started for " + app.appName(), "Project OS creates a restore point before updating.", appId);
+        activityLogService.info("applications", "update_backup_started", "Backup checkpoint started for " + app.appName(), "Autark-OS creates a restore point before updating.", appId);
         BackupRunResult checkpoint = backupService.run(appId);
         logs.add("Backup checkpoint: " + checkpoint.message());
         if ("completed".equals(checkpoint.status())) {
@@ -128,8 +128,8 @@ public class AppUpdateService {
         } else {
             repository.recordEvent(appId, "update_backup_failed", "Backup checkpoint failed before update: " + checkpoint.message());
             activityLogService.warning("applications", "update_backup_failed", "Backup checkpoint failed for " + app.appName(), checkpoint.message(), appId);
-            logs.add("Update stopped because Project OS could not create a backup checkpoint.");
-            return new AppUpdateResult(app.appId(), app.appName(), "failed", "Update was not started because Project OS could not create a backup checkpoint.", logs, appLifecycleService.getApp(appId), Instant.now());
+            logs.add("Update stopped because Autark-OS could not create a backup checkpoint.");
+            return new AppUpdateResult(app.appId(), app.appName(), "failed", "Update was not started because Autark-OS could not create a backup checkpoint.", logs, appLifecycleService.getApp(appId), Instant.now());
         }
         try {
             Files.copy(compose, previousCompose, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -150,14 +150,14 @@ public class AppUpdateService {
                 throw new InstallationException("Health check failed after update: " + health.message());
             }
             repository.recordEvent(appId, "update_completed", "Updated " + app.appName() + " to the trusted catalog version.");
-            activityLogService.success("applications", "update_completed", "Updated " + app.appName(), "Project OS updated the app and health checks passed.", appId);
+            activityLogService.success("applications", "update_completed", "Updated " + app.appName(), "Autark-OS updated the app and health checks passed.", appId);
             return new AppUpdateResult(app.appId(), app.appName(), "completed", "Update completed and health checks passed.", logs, appLifecycleService.getApp(appId), Instant.now());
         } catch (RuntimeException | IOException exception) {
             logs.add("Update failed: " + userMessage(exception));
             rollback(app, checkpoint, previousCompose, compose, logs);
-            repository.recordEvent(appId, "update_rolled_back", "Update failed and Project OS restored the previous version. Reason: " + userMessage(exception));
+            repository.recordEvent(appId, "update_rolled_back", "Update failed and Autark-OS restored the previous version. Reason: " + userMessage(exception));
             activityLogService.warning("applications", "update_rolled_back", "Rolled back " + app.appName(), userMessage(exception), appId);
-            return new AppUpdateResult(app.appId(), app.appName(), "rolled_back", "Update failed, so Project OS restored the previous version.", logs, appLifecycleService.getApp(appId), Instant.now());
+            return new AppUpdateResult(app.appId(), app.appName(), "rolled_back", "Update failed, so Autark-OS restored the previous version.", logs, appLifecycleService.getApp(appId), Instant.now());
         }
     }
 
@@ -171,7 +171,7 @@ public class AppUpdateService {
 
     private void rollback(InstalledApp app, BackupRunResult checkpoint, Path previousCompose, Path compose, List<String> logs) {
         try {
-            repository.recordEvent(app.appId(), "rollback_started", "Project OS started rollback for " + app.appName() + ".");
+            repository.recordEvent(app.appId(), "rollback_started", "Autark-OS started rollback for " + app.appName() + ".");
             if (Files.isRegularFile(previousCompose)) {
                 Files.copy(previousCompose, compose, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 logs.add("Restored previous Compose file.");
@@ -208,13 +208,13 @@ public class AppUpdateService {
                 projectSettingsService.current().updateChannel(),
                 releaseNotesUrl(manifest),
                 manifest.sourceUrl(),
-                "Registry checks are advisory in this build. Project OS only installs trusted catalog versions.",
+                "Registry checks are advisory in this build. Autark-OS only installs trusted catalog versions.",
                 "trusted-catalog-only",
                 manifest.runtime().multiService() ? "medium" : "low",
                 true,
                 "verified-backup-before-update",
                 rollbackAvailable,
-                rollbackAvailable ? "Previous Compose file is available for rollback." : "Rollback becomes available after Project OS saves a previous Compose file.",
+                rollbackAvailable ? "Previous Compose file is available for rollback." : "Rollback becomes available after Autark-OS saves a previous Compose file.",
                 Instant.now());
     }
 
@@ -252,9 +252,9 @@ public class AppUpdateService {
 
     private InstalledApp installedApp(String appId) {
         if (!managedAppIds().contains(appId)) {
-            throw new InstallationException("Project OS is not managing an app with id " + appId + ".");
+            throw new InstallationException("Autark-OS is not managing an app with id " + appId + ".");
         }
-        return repository.findById(appId).orElseThrow(() -> new InstallationException("Project OS is not managing an app with id " + appId + "."));
+        return repository.findById(appId).orElseThrow(() -> new InstallationException("Autark-OS is not managing an app with id " + appId + "."));
     }
 
     private List<InstalledApp> managedInstalledApps() {

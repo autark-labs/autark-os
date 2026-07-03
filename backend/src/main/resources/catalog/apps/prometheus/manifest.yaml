@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -93,13 +93,13 @@ access:
   requiresFirstRunSetup: true
   notes:
     - Dashboard access should stay private because metrics may reveal internal services.
-    - Project OS should eventually autowire scrape targets for managed apps.
+    - Autark-OS should eventually autowire scrape targets for managed apps.
 usage:
   kind: infrastructure
   primaryAction: open-dashboard
   openUrlLabel: Open Prometheus
   headline: Collect service metrics
-  summary: Project OS starts Prometheus. Add scrape targets or pair it with Grafana for dashboards.
+  summary: Autark-OS starts Prometheus. Add scrape targets or pair it with Grafana for dashboards.
   setupSteps:
     - Open Prometheus.
     - Review the default targets.
@@ -119,7 +119,7 @@ health:
   successLabel: Metrics collector is ready
   startingLabel: Starting metrics collector
   failureLabel: Prometheus is not responding
-  description: Project OS checks the Prometheus readiness endpoint before calling it ready.
+  description: Autark-OS checks the Prometheus readiness endpoint before calling it ready.
 runtime:
   containerName: prometheus
   composeProject: project-os-prometheus

@@ -26,7 +26,7 @@ export function buildNetworkPosture({
     return {
       status: 'setup-needed',
       headline: 'Set up private access',
-      summary: 'Install Tailscale on this device so Project OS can create private links for your apps.',
+      summary: 'Install Tailscale on this device so Autark-OS can create private links for your apps.',
       primaryAction: {
         detail: 'This is the first step before phones, laptops, or private app links can appear here.',
         label: 'Install Tailscale',
@@ -39,10 +39,10 @@ export function buildNetworkPosture({
   if (!connected) {
     return {
       status: 'setup-needed',
-      headline: 'Connect Project OS to your private network',
+      headline: 'Connect Autark-OS to your private network',
       summary: tailscale?.message || 'Sign in to Tailscale from this device to enable private app links.',
       primaryAction: {
-        detail: 'Once connected, Project OS can show your devices and prepare private app links.',
+        detail: 'Once connected, Autark-OS can show your devices and prepare private app links.',
         label: 'Connect this device',
         tone: 'warning',
       },
@@ -68,7 +68,7 @@ export function buildNetworkPosture({
     return {
       status: 'ready',
       headline: 'Private access is ready',
-      summary: 'Project OS is connected. Choose which apps should be available from your private devices.',
+      summary: 'Autark-OS is connected. Choose which apps should be available from your private devices.',
       primaryAction: {
         detail: 'Turn on private access for apps you use away from home.',
         label: 'Make apps private',
@@ -204,7 +204,7 @@ export function buildDeviceViews(tailscale: TailscaleStatus | null, tailnetDevic
       icon: connected ? ShieldCheck : MonitorSmartphone,
       ipAddress: tailscale?.tailnetIps?.[0] || '',
       lastSeen: '',
-      label: tailscale?.deviceName || 'Project OS',
+      label: tailscale?.deviceName || 'Autark-OS',
       operatingSystem: '',
       status: connected ? 'neutral' : 'warning',
       statusLabel: connected ? 'Syncing' : 'Waiting',
@@ -214,7 +214,7 @@ export function buildDeviceViews(tailscale: TailscaleStatus | null, tailnetDevic
     const status: NetworkNodeStatus = device.online ? 'connected' : 'neutral';
     return {
       connectionType: friendlyConnectionType(device),
-      detail: device.self ? 'This Project OS device' : formatLastSeen(device.lastSeen, device.online),
+      detail: device.self ? 'This Autark-OS device' : formatLastSeen(device.lastSeen, device.online),
       dnsName: device.dnsName,
       icon: device.self ? ShieldCheck : MonitorSmartphone,
       ipAddress: device.tailnetIps[0] || '',

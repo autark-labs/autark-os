@@ -42,7 +42,7 @@ class SystemSupportServiceTests {
                 "critical",
                 "app_missing_container",
                 "Vaultwarden is missing",
-                "Project OS cannot find the container for this app.",
+                "Autark-OS cannot find the container for this app.",
                 ProjectOsAction.route("open-apps", "Open apps", "/applications"));
         SystemSummary summary = new SystemSummary(
                 "project-os-test",

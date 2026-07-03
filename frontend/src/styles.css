@@ -15,7 +15,7 @@
   line-height: 1.5;
   text-rendering: optimizeLegibility;
 
-  /* Project OS product tokens. These are the source of truth for app-level styling. */
+  /* Autark-OS product tokens. These are the source of truth for app-level styling. */
   --app-page: var(--color-slate-800);
   --app-surface: var(--color-slate-950);
   --app-panel: var(--color-slate-900);

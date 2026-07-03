@@ -18,7 +18,7 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
       <section className="rounded-xl border border-sky-400/20 bg-slate-800 p-3">
         <p className="text-sm font-semibold text-white">No guide available</p>
         <p className="mt-1 text-sm leading-6 text-sky-100/70">
-          Project OS does not have app-specific setup details for this service yet.
+          Autark-OS does not have app-specific setup details for this service yet.
         </p>
       </section>
     );

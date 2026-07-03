@@ -19,15 +19,15 @@ usage() {
   cat <<USAGE
 Usage: $0 --release-url URL [options]
 
-Download or consume a Project OS release bundle and run the shared installer.
+Download or consume an Autark-OS release bundle and run the shared installer.
 
 Options:
   --release-url URL  Release bundle URL. file:///path/to/bundle is supported.
   --channel VALUE    Release channel to request. Default: ${CHANNEL}.
   --version VALUE    Release version to request. Default: ${VERSION}.
-  --runtime-dir DIR  Store Project OS runtime data in DIR.
-  --port PORT        Run Project OS on PORT.
-  --no-start         Install files but do not start Project OS.
+  --runtime-dir DIR  Store Autark-OS runtime data in DIR.
+  --port PORT        Run Autark-OS on PORT.
+  --no-start         Install files but do not start Autark-OS.
   --yes              Confirm host changes without prompting.
   --dry-run          Verify and preview without changing the host.
   --json             Print the shared install plan as JSON.
@@ -161,7 +161,7 @@ run_guided_setup() {
     START_AFTER_INSTALL=1
   else
     [[ -n "${RUNTIME_DIR}" ]] || RUNTIME_DIR="$(read_default "Runtime data directory" "/var/lib/project-os")"
-    [[ -n "${PORT}" ]] || PORT="$(read_default "Project OS port" "8082")"
+    [[ -n "${PORT}" ]] || PORT="$(read_default "Autark-OS port" "8082")"
     require_absolute_path "Runtime data directory" "${RUNTIME_DIR}"
     require_port "${PORT}"
     if read_yes_no "Install missing supported dependencies" "Y"; then
@@ -174,7 +174,7 @@ run_guided_setup() {
     else
       PRIVATE_ACCESS_CHOICE="configure later"
     fi
-    if read_yes_no "Start Project OS after install" "Y"; then
+    if read_yes_no "Start Autark-OS after install" "Y"; then
       START_AFTER_INSTALL=1
     else
       START_AFTER_INSTALL=0
@@ -216,7 +216,7 @@ verify_release() {
 confirm_install() {
   [[ "${YES}" -eq 1 || "${DRY_RUN}" -eq 1 ]] && return 0
   local response
-  printf 'Install Project OS on this host? [y/N]: '
+  printf 'Install Autark-OS on this host? [y/N]: '
   read -r response
   case "${response,,}" in
     y|yes) return 0 ;;
@@ -292,7 +292,7 @@ main() {
   release_version="$(metadata_value PROJECT_OS_VERSION "${release_env}")"
   release_channel="$(metadata_value PROJECT_OS_UPDATE_CHANNEL "${release_env}")"
 
-  log "Project OS public installer"
+  log "Autark-OS public installer"
   log "Requested channel: ${CHANNEL}"
   log "Requested version: ${VERSION}"
   log "Release source: ${RELEASE_URL}"

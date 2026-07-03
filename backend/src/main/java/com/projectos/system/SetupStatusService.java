@@ -34,7 +34,7 @@ public class SetupStatusService {
                 .filter(service -> !"ignored".equals(service.userVisibility()))
                 .anyMatch(service -> !"owned_managed".equals(service.ownershipState()));
         if (hasFoundResources) {
-            return new SetupStatus(false, "existing_apps", "Project OS found existing apps on this server.");
+            return new SetupStatus(false, "existing_apps", "Autark-OS found existing apps on this server.");
         }
         return new SetupStatus(false, mapStep(progress.lastRecommendedStep()), message(progress.lastRecommendedStep()));
     }
@@ -52,7 +52,7 @@ public class SetupStatusService {
 
     private String message(String progressStep) {
         return switch (mapStep(progressStep)) {
-            case "tailscale" -> "Choose how Project OS should handle private access.";
+            case "tailscale" -> "Choose how Autark-OS should handle private access.";
             case "starter_apps" -> "Choose starter apps to install.";
             case "first_backup" -> "Create or skip the first restore point.";
             case "done" -> "Setup is ready to complete.";

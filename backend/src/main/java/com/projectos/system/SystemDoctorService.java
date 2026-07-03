@@ -72,13 +72,13 @@ public class SystemDoctorService {
         String defaultDestination = runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize().toString();
         String destination = settingsRepository.backupDestination(runtimeLayout.runtimeRoot().resolve("backups")).toString();
         boolean external = !destination.equals(defaultDestination);
-        String message = external ? "Routine backups use your selected backup folder." : "Routine backups use the Project OS runtime drive.";
+        String message = external ? "Routine backups use your selected backup folder." : "Routine backups use the Autark-OS runtime drive.";
         String detail = external ? destination : "Same-device backups help with app mistakes, but they do not protect against drive failure.";
         return new SystemSetupCheck(SystemCapabilityCatalog.BACKUP_DESTINATION, "Backup destination", SystemCapabilityCatalog.NEUTRAL, message, detail, "Open Backups", "/backups");
     }
 
     private SystemReadinessStatus readiness(List<SystemSetupCheck> checks) {
-        SystemReadinessGroup core = group("core", "Project OS", "Project OS can open and save settings.", checks, SystemCapabilityCatalog.CORE_CHECKS);
+        SystemReadinessGroup core = group("core", "Autark-OS", "Autark-OS can open and save settings.", checks, SystemCapabilityCatalog.CORE_CHECKS);
         SystemReadinessGroup appInstalls = group("app-installs", "App installs", "Docker is ready for Marketplace apps.", checks, SystemCapabilityCatalog.APP_INSTALL_CHECKS);
         SystemReadinessGroup privateAccess = group("private-access", "Private access", "Tailscale is ready for private app links.", checks, SystemCapabilityCatalog.PRIVATE_ACCESS_CHECKS);
         SystemReadinessGroup storage = group("storage", "Storage", "Storage and backup locations are ready.", checks, SystemCapabilityCatalog.STORAGE_CHECKS);
@@ -89,7 +89,7 @@ public class SystemDoctorService {
             return new SystemReadinessStatus(
                     "storage_needs_review",
                     "Storage needs review",
-                    "Project OS needs writable storage before setup can be completed.",
+                    "Autark-OS needs writable storage before setup can be completed.",
                     false,
                     false,
                     groups);
@@ -107,7 +107,7 @@ public class SystemDoctorService {
             return new SystemReadinessStatus(
                     "apps_need_docker",
                     "Apps need Docker setup",
-                    "Project OS can finish setup, but Marketplace app installs need Docker access first.",
+                    "Autark-OS can finish setup, but Marketplace app installs need Docker access first.",
                     true,
                     true,
                     groups);
@@ -133,7 +133,7 @@ public class SystemDoctorService {
         return new SystemReadinessStatus(
                 "ready",
                 "Ready",
-                "Project OS can manage apps, backups, and private access.",
+                "Autark-OS can manage apps, backups, and private access.",
                 true,
                 false,
                 groups);

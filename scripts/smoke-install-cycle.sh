@@ -16,7 +16,7 @@ usage() {
   cat <<USAGE
 Usage: $0 [options]
 
-Run a repeatable Project OS installation smoke cycle with isolated service
+Run a repeatable Autark-OS installation smoke cycle with isolated service
 names, paths, user/group, port, and CLI link. The default mode is a dry run.
 
 Options:
@@ -149,7 +149,7 @@ cleanup_smoke_install() {
   PROJECT_OS_CLI_LINK="/usr/local/bin/${SMOKE_NAME}" \
     "${REPO_ROOT}/scripts/project-os" uninstall \
       --remove-data \
-      --confirm-delete-data DELETE-PROJECT-OS-DATA \
+      --confirm-delete-data DELETE-AUTARK-OS-DATA \
       --yes || true
   if id "$(smoke_user)" >/dev/null 2>&1; then
     sudo userdel "$(smoke_user)" >/dev/null 2>&1 || true
@@ -230,7 +230,7 @@ main() {
   log "Support bundle: ${support_file}"
   if [[ "${KEEP_INSTALL}" -eq 1 ]]; then
     log "Keeping smoke install for inspection."
-    log "Cleanup command: PROJECT_OS_SERVICE_NAME=${SMOKE_NAME} PROJECT_OS_CONFIG_FILE=${config_file} ${REPO_ROOT}/scripts/project-os uninstall --remove-data --confirm-delete-data DELETE-PROJECT-OS-DATA --yes"
+    log "Cleanup command: PROJECT_OS_SERVICE_NAME=${SMOKE_NAME} PROJECT_OS_CONFIG_FILE=${config_file} ${REPO_ROOT}/scripts/project-os uninstall --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA --yes"
     return 0
   fi
   cleanup_smoke_install "${config_file}"

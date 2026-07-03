@@ -32,7 +32,7 @@ test('maps warning action results to sticky warning notifications', () => {
     ok: false,
     severity: 'warning',
     title: 'Confirmation required',
-    message: 'Type the confirmation text exactly before Project OS takes control.',
+    message: 'Type the confirmation text exactly before Autark-OS takes control.',
   }, 'Service action finished');
 
   assert.equal(notification.severity, 'warning');

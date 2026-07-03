@@ -132,7 +132,7 @@ public class MarketplaceInstallService {
         }
         InstalledApp existingApp = installedAppRepository.findById(manifest.id()).orElse(null);
         if (existingApp != null && (options == null || !options.reinstallRequested())) {
-            recordStep(steps, sink, InstallStep.completed("Already installed", manifest.name() + " is already managed by Project OS."));
+            recordStep(steps, sink, InstallStep.completed("Already installed", manifest.name() + " is already managed by Autark-OS."));
             return new InstallResult(
                     manifest.id(),
                     manifest.name(),
@@ -150,7 +150,7 @@ public class MarketplaceInstallService {
         try {
             String appInstanceId = newAppInstanceId();
             composeProject = composeProject(manifest);
-            activityInfo("install_started", "Installing " + manifest.name(), "Project OS is preparing storage, networking, and containers for " + manifest.name() + ".", manifest.id());
+            activityInfo("install_started", "Installing " + manifest.name(), "Autark-OS is preparing storage, networking, and containers for " + manifest.name() + ".", manifest.id());
             recordStep(steps, sink, InstallStep.completed("Preparing app", "Validated manifest and generated install plan."));
             appRoot = directoryManager.prepare(manifest);
             recordStep(steps, sink, InstallStep.completed("Creating safe storage", appRoot.toString()));
@@ -158,7 +158,7 @@ public class MarketplaceInstallService {
             packageCopier.copyManifest(manifest, appRoot);
             Path composeFile = composeRenderer.render(manifest, appRoot, runtimeConfiguration, appInstanceId, composeProject);
             AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
-            recordStep(steps, sink, InstallStep.completed("Configuring private access", "Rendered Compose file with Project-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
+            recordStep(steps, sink, InstallStep.completed("Configuring private access", "Rendered Compose file with Autark-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
 
             DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, composeProject);
             logs.addAll(composeResult.output());
@@ -196,7 +196,7 @@ public class MarketplaceInstallService {
 
             recordStep(steps, sink, InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl())));
             if (!ownershipReconcilesToManaged(manifest.id())) {
-                String message = "Project OS could not confirm that this app is managed by this installation. The install was stopped so we do not show a service as installed when it is not under Project OS control.";
+                String message = "Autark-OS could not confirm that this app is managed by this installation. The install was stopped so we do not show a service as installed when it is not under Autark-OS control.";
                 recordStep(steps, sink, InstallStep.failed("Confirming ownership", message));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", message);
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, message, logs);
@@ -216,9 +216,9 @@ public class MarketplaceInstallService {
             installedAppRepository.saveSettings(manifest.id(), installSettings(manifest, runtimeConfiguration, privateAccess));
             installedAppRepository.recordEvent(manifest.id(), "installed", manifest.name() + " installed successfully.");
             clearFailedPartialInstall(manifest.id());
-            activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Project OS.", manifest.id());
+            activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Autark-OS.", manifest.id());
 
-            return new InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Project-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
+            return new InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Autark-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
         } catch (RuntimeException exception) {
             recordStep(steps, sink, InstallStep.failed("Install failed", exception.getMessage()));
             try {
@@ -256,11 +256,11 @@ public class MarketplaceInstallService {
     }
 
     private String recoverableDuplicateMessage(ApplicationManifest manifest) {
-        return "Project OS found an existing " + manifest.name() + " service with Project OS runtime metadata. To avoid weird behavior across your network, recover the existing " + manifest.name() + " service from My Apps instead of installing another copy on top of it.";
+        return "Autark-OS found an existing " + manifest.name() + " service with Autark-OS runtime metadata. To avoid weird behavior across your network, recover the existing " + manifest.name() + " service from My Apps instead of installing another copy on top of it.";
     }
 
     private String duplicateWarningMessage(ApplicationManifest manifest) {
-        return "Project OS already sees " + manifest.name() + " on your system. Installing another copy can cause confusing behavior across your network. Pin or adopt the existing service when possible, or acknowledge that you intentionally want a separate copy.";
+        return "Autark-OS already sees " + manifest.name() + " on your system. Installing another copy can cause confusing behavior across your network. Pin or adopt the existing service when possible, or acknowledge that you intentionally want a separate copy.";
     }
 
     private boolean ownershipReconcilesToManaged(String appId) {
@@ -452,7 +452,7 @@ public class MarketplaceInstallService {
             sleep();
         }
         if (lastContainers.stream().anyMatch(this::running) && lastContainers.stream().noneMatch(this::failed)) {
-            return StartupCheck.warmingUp("The service is running and still finishing startup checks. Project OS will keep watching it from Applications.", lastStatus);
+            return StartupCheck.warmingUp("The service is running and still finishing startup checks. Autark-OS will keep watching it from Applications.", lastStatus);
         }
         String detail = "The app did not report ready within 20 seconds. Last container state: " + String.join("; ", lastStatus);
         return StartupCheck.failed(detail, lastStatus);
@@ -488,9 +488,9 @@ public class MarketplaceInstallService {
             return health.description();
         }
         if ("tcp".equals(health.type())) {
-            return "The service container is running. Project OS will keep checking the service port from Applications.";
+            return "The service container is running. Autark-OS will keep checking the service port from Applications.";
         }
-        return "The app container is running. Project OS will keep checking the app link from Applications.";
+        return "The app container is running. Autark-OS will keep checking the app link from Applications.";
     }
 
     private String readyDetail(ApplicationManifest manifest, String accessUrl, String privateAccessUrl) {

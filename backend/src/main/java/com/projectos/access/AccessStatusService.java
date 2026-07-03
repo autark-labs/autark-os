@@ -99,7 +99,7 @@ public class AccessStatusService {
                     "info",
                     "tailscale_mock_dev",
                     "Private access is mocked in development",
-                    "Project OS is using a development Tailscale mock. This confirms UI behavior, not production private access.",
+                    "Autark-OS is using a development Tailscale mock. This confirms UI behavior, not production private access.",
                     ProjectOsAction.route("open-diagnostics", "View diagnostics", "/diagnostics")));
             return issues;
         }
@@ -113,7 +113,7 @@ public class AccessStatusService {
                     "warning",
                     "tailscale_not_installed",
                     "Tailscale is not installed",
-                    "Private links need Tailscale installed and signed in on the Project OS host.",
+                    "Private links need Tailscale installed and signed in on the Autark-OS host.",
                     ProjectOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access")));
         } else if (!status.connected()) {
             issues.add(ProjectOsIssueFactory.accessIssue(

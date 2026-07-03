@@ -105,7 +105,7 @@ public class SystemMetricsService {
         try {
             return InetAddress.getLocalHost().getHostName();
         } catch (UnknownHostException exception) {
-            return "Project OS device";
+            return "Autark-OS device";
         }
     }
 

@@ -120,7 +120,7 @@ class AppLifecycleServiceTests {
 
         assertThatThrownBy(() -> service.start("vaultwarden"))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("not owned by this Project OS instance");
+                .hasMessageContaining("not owned by this Autark-OS instance");
         assertThat(composeExecutor.upCalled).isFalse();
     }
 
@@ -460,7 +460,7 @@ class AppLifecycleServiceTests {
         AppRuntimeView app = service.getApp("vaultwarden");
 
         assertThat(app.remediation().state()).isEqualTo("auto_repairing");
-        assertThat(app.remediation().label()).isEqualTo("Project OS is repairing");
+        assertThat(app.remediation().label()).isEqualTo("Autark-OS is repairing");
         assertThat(app.remediation().nextActionLabel()).isEqualTo("Wait for repair");
     }
 

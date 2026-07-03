@@ -251,7 +251,7 @@ public class ManifestValidator {
         String hostPath = parts[0];
         String containerPath = parts[1];
         if (!hostPath.startsWith(manifest.runtime().runtimeRoot())) {
-            errors.add("runtime.volumes host path is outside the Project-OS runtime root: " + volume);
+            errors.add("runtime.volumes host path is outside the Autark-OS runtime root: " + volume);
         }
         if (!SAFE_RUNTIME_PATH.matcher(hostPath).matches()) {
             errors.add("runtime.volumes host path must stay under the managed app folder and use safe path characters: " + volume);

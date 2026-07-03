@@ -112,7 +112,7 @@ function NetworkPage() {
     setActionError(null);
     try {
       await removeStalePrivateAccess.mutateAsync(port);
-      showActionNotification({ ok: true, severity: 'success', title: 'Stale private link removed', message: 'Project OS removed the stale Tailscale Serve entry.' }, 'Stale private link removed');
+      showActionNotification({ ok: true, severity: 'success', title: 'Stale private link removed', message: 'Autark-OS removed the stale Tailscale Serve entry.' }, 'Stale private link removed');
       await refreshAll();
     } catch (err) {
       const message = apiErrorMessage(err, 'Unable to remove this stale private link.');
@@ -214,7 +214,7 @@ function AccessZoneDiagram({ zones }: { zones: ReturnType<typeof buildAccessZone
     <Surface className="grid gap-3 p-5 shadow-slate-950/20" tone="panel">
       <div>
         <h3 className="text-lg font-black text-slate-50">Where apps are reachable</h3>
-        <p className="mt-1 text-sm text-sky-100/70">Project OS keeps public exposure empty by default and favors LAN or private Tailscale links.</p>
+        <p className="mt-1 text-sm text-sky-100/70">Autark-OS keeps public exposure empty by default and favors LAN or private Tailscale links.</p>
       </div>
       <div className="grid gap-3 lg:grid-cols-4">
         {zones.map((zone) => (
@@ -255,7 +255,7 @@ function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconcil
           <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Private access setup path</p>
           <h3 className="mt-2 text-xl font-black text-slate-50">{statusLabel}</h3>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">
-            Local access works without Tailscale. Private app links need this device connected to Tailscale, MagicDNS/HTTPS enabled, and Tailscale Serve permission granted to Project OS.
+            Local access works without Tailscale. Private app links need this device connected to Tailscale, MagicDNS/HTTPS enabled, and Tailscale Serve permission granted to Autark-OS.
           </p>
         </div>
         <Badge className={connected ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/45 bg-orange-500/10 text-orange-200'} variant="outline">

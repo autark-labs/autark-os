@@ -1,2 +1,2 @@
-# Placeholder compose file for pi-hole. Project OS renders the runtime compose file from manifest.yaml.
+# Placeholder compose file for pi-hole. Autark-OS renders the runtime compose file from manifest.yaml.
 services: {}

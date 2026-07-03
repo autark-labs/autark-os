@@ -27,7 +27,7 @@ usage() {
   cat <<USAGE
 Usage: $0 [options]
 
-Build and install Project OS from this checkout, or install a packaged release.
+Build and install Autark-OS from this checkout, or install a packaged release.
 
 Options:
   --skip-tests       Skip backend tests before packaging.
@@ -40,15 +40,15 @@ Options:
   --auto-install-deps Install supported host dependencies on Debian/Ubuntu/RPi OS.
   --release-bundle DIR Install from a packaged release bundle instead of building this checkout.
   --release-jar FILE   Install this packaged backend jar instead of building this checkout.
-  --runtime-dir DIR  Store Project OS runtime data, database, apps, and backups in DIR.
-  --install-dir DIR  Install Project OS binaries into DIR. Default: /opt/project-os.
-  --config-dir DIR   Store Project OS host config in DIR. Default: /etc/project-os.
-  --log-dir DIR      Store Project OS logs in DIR. Default: /var/log/project-os.
+  --runtime-dir DIR  Store Autark-OS runtime data, database, apps, and backups in DIR.
+  --install-dir DIR  Install Autark-OS binaries into DIR. Default: /opt/project-os.
+  --config-dir DIR   Store Autark-OS host config in DIR. Default: /etc/project-os.
+  --log-dir DIR      Store Autark-OS logs in DIR. Default: /var/log/project-os.
   --state-dir DIR    Store resumable installer state in DIR.
   --port PORT        Run the production backend on PORT. Default: 8082.
   -h, --help         Show this help.
 
-Repo mode builds Project OS from this checkout. Release mode installs a
+Repo mode builds Autark-OS from this checkout. Release mode installs a
 prebuilt backend jar and does not require Node.js or Yarn on the target host.
 USAGE
 }
@@ -445,9 +445,9 @@ plan_dependencies() {
   compose_status="$(dependency_status 'docker compose version')"
   tailscale_status="$(dependency_status 'tailscale version')"
   sudo_status="$(dependency_status 'sudo --version')"
-  json_dependency "Java" "${java_status}" true "Required to run the Project OS backend."
+  json_dependency "Java" "${java_status}" true "Required to run the Autark-OS backend."
   printf ','
-  json_dependency "sudo" "${sudo_status}" true "Required to install Project OS as a system service."
+  json_dependency "sudo" "${sudo_status}" true "Required to install Autark-OS as a system service."
   printf ','
   json_dependency "Docker" "${docker_status}" true "Required for Marketplace app installs."
   printf ','
@@ -458,9 +458,9 @@ plan_dependencies() {
     node_status="$(dependency_status 'node --version')"
     yarn_status="$(dependency_status 'yarn --version')"
     printf ','
-    json_dependency "Node.js" "${node_status}" true "Required only when building Project OS from source."
+    json_dependency "Node.js" "${node_status}" true "Required only when building Autark-OS from source."
     printf ','
-    json_dependency "Yarn" "${yarn_status}" true "Required only when building Project OS from source."
+    json_dependency "Yarn" "${yarn_status}" true "Required only when building Autark-OS from source."
   fi
 }
 
@@ -896,9 +896,9 @@ print_doctor_json() {
   json_string "${status}"
   printf ',"recommendedNextAction":'
   case "${status}" in
-    ready) json_string "This host is ready for Project OS installation." ;;
+    ready) json_string "This host is ready for Autark-OS installation." ;;
     ready_with_notes) json_string "Review warnings, then continue or install missing optional dependencies." ;;
-    *) json_string "Resolve blockers before installing Project OS." ;;
+    *) json_string "Resolve blockers before installing Autark-OS." ;;
   esac
   printf ',"host":{"os":'
   json_string "$(os_field PRETTY_NAME || true)"
@@ -921,7 +921,7 @@ print_doctor_text() {
   local status
   status="$(doctor_status)"
   cat <<DOCTOR
-Project OS pre-install doctor
+Autark-OS pre-install doctor
 
 Status: ${status}
 Host: $(os_field PRETTY_NAME || true) ($(uname -m))
@@ -931,9 +931,9 @@ Service port: $(server_port)
 
 Next action: $(
     case "${status}" in
-      ready) printf 'This host is ready for Project OS installation.' ;;
+      ready) printf 'This host is ready for Autark-OS installation.' ;;
       ready_with_notes) printf 'Review warnings, then continue or install missing optional dependencies.' ;;
-      *) printf 'Resolve blockers before installing Project OS.' ;;
+      *) printf 'Resolve blockers before installing Autark-OS.' ;;
     esac
   )
 DOCTOR
@@ -988,7 +988,7 @@ plan_warnings_json() {
   printf '['
   for warning in \
     "confirm-host-mutation|Review and confirm the install plan before changing this host." \
-    "docker-required-for-apps|Project OS can start without Docker, but Marketplace app installs need Docker." \
+    "docker-required-for-apps|Autark-OS can start without Docker, but Marketplace app installs need Docker." \
     "tailscale-optional|Tailscale can be skipped for local-only use and configured later."; do
     if [[ "${first}" -eq 0 ]]; then
       printf ','
@@ -1053,7 +1053,7 @@ print_plan_json() {
   plan_dependencies "${include_node}"
   printf ']'
   printf ',"actions":'
-  json_string_array "prepare Project OS runtime, config, log, and install directories" "install Project OS system service" "install project-os helper command" "configure Docker access when available" "configure Tailscale operator when connected" "start project-os service unless disabled"
+  json_string_array "prepare Autark-OS runtime, config, log, and install directories" "install Autark-OS system service" "install project-os helper command" "configure Docker access when available" "configure Tailscale operator when connected" "start project-os service unless disabled"
   printf ',"warnings":'
   plan_warnings_json
   printf ',"blockers":[]'
@@ -1070,7 +1070,7 @@ print_plan_text() {
   log_dir="$(log_dir)"
   port="$(server_port)"
   cat <<PLAN
-Project OS install plan
+Autark-OS install plan
 
 Mode: ${mode}
 Audience: ${audience}
@@ -1093,8 +1093,8 @@ Service:
   Start after install: $([[ "${NO_START}" -eq 1 ]] && printf no || printf yes)
 
 Actions:
-  - prepare Project OS runtime, config, log, and install directories
-  - install Project OS system service
+  - prepare Autark-OS runtime, config, log, and install directories
+  - install Autark-OS system service
   - install project-os helper command
   - configure Docker access when available
   - configure Tailscale operator when connected
@@ -1102,7 +1102,7 @@ Actions:
 
 Warnings:
   - Review and confirm the install plan before changing this host.
-  - Project OS can start without Docker, but Marketplace app installs need Docker.
+  - Autark-OS can start without Docker, but Marketplace app installs need Docker.
   - Tailscale can be skipped for local-only use and configured later.
 PLAN
 }
@@ -1227,7 +1227,7 @@ guide_tailscale_connection() {
 
 Private access setup with Tailscale
 
-Project OS can use Tailscale so you can reach apps from your trusted phones,
+Autark-OS can use Tailscale so you can reach apps from your trusted phones,
 laptops, and tablets without opening public internet ports.
 
 Choose one:
@@ -1246,7 +1246,7 @@ TAILSCALE_SETUP
           if tailscale_connected; then
             log "Tailscale sign-in detected."
           else
-            log "Tailscale sign-in was started, but Project OS does not see an active connection yet."
+            log "Tailscale sign-in was started, but Autark-OS does not see an active connection yet."
             log "Finish later with: sudo tailscale up"
           fi
         else
@@ -1296,12 +1296,12 @@ preflight() {
     yarn_version="$(yarn --version 2>/dev/null || true)"
     [[ "${yarn_version}" == 1.* ]] || log "Yarn 1.x is expected for this repo. Detected: ${yarn_version:-unknown}."
   fi
-  has_command sudo || die "sudo is required to install Project OS as a system service."
+  has_command sudo || die "sudo is required to install Autark-OS as a system service."
   if has_command docker; then
     local docker_output=""
     if ! docker_output="$(docker version 2>&1 >/dev/null)"; then
       if grep -qiE 'permission denied|denied while trying to connect|Got permission denied' <<<"${docker_output}"; then
-        log "Docker is installed, but this shell cannot access the Docker socket yet. Project OS will use service-user docker-group access after install."
+        log "Docker is installed, but this shell cannot access the Docker socket yet. Autark-OS will use service-user docker-group access after install."
       else
         log "Docker is installed, but the daemon is not reachable yet. Marketplace installs need Docker running."
       fi
@@ -1397,11 +1397,11 @@ install_service() {
     if [[ "${AUTO_INSTALL_DEPS}" -eq 1 && "$(package_manager_status)" == "apt-supported" ]]; then
       env_args+=("PROJECT_OS_ASSUME_DEPENDENCIES_INSTALLED=1")
     fi
-    log "Previewing Project OS system service installation."
+    log "Previewing Autark-OS system service installation."
     env "${env_args[@]}" "${INSTALL_SCRIPT}" "${args[@]}"
     return 0
   fi
-  log "Installing Project OS system service."
+  log "Installing Autark-OS system service."
   sudo env "${env_args[@]}" "${INSTALL_SCRIPT}" "${args[@]}"
 }
 
@@ -1420,7 +1420,7 @@ print_next_steps() {
     fi
     cat <<NEXT
 
-Project OS installation preview completed.
+Autark-OS installation preview completed.
 
 Run without --dry-run to install:
   ${install_command}
@@ -1440,7 +1440,7 @@ NEXT
 
   cat <<NEXT
 
-Project OS installation completed.
+Autark-OS installation completed.
 
 Open:
   http://localhost:${port}

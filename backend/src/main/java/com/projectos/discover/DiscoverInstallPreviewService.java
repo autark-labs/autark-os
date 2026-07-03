@@ -30,7 +30,7 @@ public class DiscoverInstallPreviewService {
         List<DiscoverInstallIssue> blockingIssues = issues.stream().filter(issue -> "error".equals(issue.severity())).toList();
         List<DiscoverInstallIssue> warnings = new ArrayList<>(issues.stream().filter(issue -> !"error".equals(issue.severity())).toList());
         if ("disabled".equals(answers.stringValue("backupPolicy"))) {
-            warnings.add(new DiscoverInstallIssue("backupPolicy", "warning", manifest.name() + " will not be included in Project OS backups until you enable it."));
+            warnings.add(new DiscoverInstallIssue("backupPolicy", "warning", manifest.name() + " will not be included in Autark-OS backups until you enable it."));
         }
         InstallOptionsRequest options = installOptions(manifest, answers);
         InstallPlan technicalPlan = installPlanService.generatePlan(manifest, blockingIssues.isEmpty() ? options : InstallOptionsRequest.defaults());
@@ -73,7 +73,7 @@ public class DiscoverInstallPreviewService {
             } else {
                 Path mediaPath = Path.of(path);
                 if (!Files.isDirectory(mediaPath) || !Files.isReadable(mediaPath)) {
-                    issues.add(error("jellyfinExistingMediaPath", "Choose a media folder that exists and can be read by Project OS."));
+                    issues.add(error("jellyfinExistingMediaPath", "Choose a media folder that exists and can be read by Autark-OS."));
                 }
             }
         }
@@ -81,7 +81,7 @@ public class DiscoverInstallPreviewService {
             issues.add(error("piholeCustomDns", "Enter one or more DNS server IP addresses, separated by commas."));
         }
         if ("existing_folder".equals(answers.stringValue("storageMode")) && !"jellyfin".equals(manifest.id())) {
-            issues.add(new DiscoverInstallIssue("storageMode", "warning", "Existing folders need a review before Project OS treats them as protected app data."));
+            issues.add(new DiscoverInstallIssue("storageMode", "warning", "Existing folders need a review before Autark-OS treats them as protected app data."));
         }
         return issues;
     }
@@ -97,8 +97,8 @@ public class DiscoverInstallPreviewService {
 
     private List<DiscoverInstallPreviewItem> createItems(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
         List<DiscoverInstallPreviewItem> items = new ArrayList<>();
-        items.add(item("Create " + answers.stringValue("displayName") + " as a managed Project OS app.", null, "default"));
-        items.add(item("Create managed folders for app data.", "Project OS uses predictable app folders for recovery and cleanup.", "default"));
+        items.add(item("Create " + answers.stringValue("displayName") + " as a managed Autark-OS app.", null, "default"));
+        items.add(item("Create managed folders for app data.", "Autark-OS uses predictable app folders for recovery and cleanup.", "default"));
         if ("jellyfin".equals(manifest.id())) {
             if ("existing_folder".equals(answers.stringValue("jellyfinMediaFolder"))) {
                 items.add(item("Connect the existing media folder after validating it.", answers.stringValue("jellyfinExistingMediaPath"), "default"));
@@ -119,10 +119,10 @@ public class DiscoverInstallPreviewService {
 
     private List<DiscoverInstallPreviewItem> protectItems(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
         if ("disabled".equals(answers.stringValue("backupPolicy"))) {
-            return List.of(item("Do not include " + manifest.name() + " in Project OS backups yet.", "You can enable backups later.", "warning"));
+            return List.of(item("Do not include " + manifest.name() + " in Autark-OS backups yet.", "You can enable backups later.", "warning"));
         }
         if ("enabled_no_checkpoint".equals(answers.stringValue("backupPolicy"))) {
-            return List.of(item("Include " + manifest.name() + " in routine Project OS backups.", null, "success"));
+            return List.of(item("Include " + manifest.name() + " in routine Autark-OS backups.", null, "success"));
         }
         return List.of(item("Include " + manifest.name() + " in backups and recommend a first restore point.", null, "success"));
     }

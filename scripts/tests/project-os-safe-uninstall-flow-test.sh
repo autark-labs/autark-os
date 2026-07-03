@@ -60,7 +60,7 @@ if PROJECT_OS_CONFIG_FILE="${config_file}" PROJECT_OS_SERVICE_FILE="${service_fi
   exit 1
 fi
 
-destructive_plan="$(PROJECT_OS_CONFIG_FILE="${config_file}" PROJECT_OS_SERVICE_FILE="${service_file}" PROJECT_OS_CLI_LINK="${cli_link}" "${repo_root}/scripts/project-os" uninstall --plan --json --remove-data --confirm-delete-data DELETE-PROJECT-OS-DATA)"
+destructive_plan="$(PROJECT_OS_CONFIG_FILE="${config_file}" PROJECT_OS_SERVICE_FILE="${service_file}" PROJECT_OS_CLI_LINK="${cli_link}" "${repo_root}/scripts/project-os" uninstall --plan --json --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA)"
 PROJECT_OS_UNINSTALL_JSON="${destructive_plan}" RUNTIME_DIR="${runtime_dir}" python3 - <<'PY'
 import json
 import os
@@ -68,7 +68,7 @@ import os
 plan = json.loads(os.environ["PROJECT_OS_UNINSTALL_JSON"])
 assert plan["mode"] == "remove-all-data"
 assert plan["requiresTypedConfirmation"] is True
-assert plan["typedConfirmation"] == "DELETE-PROJECT-OS-DATA"
+assert plan["typedConfirmation"] == "DELETE-AUTARK-OS-DATA"
 assert os.environ["RUNTIME_DIR"] in plan["removePaths"]
 assert os.environ["RUNTIME_DIR"] not in plan["preservePaths"]
 PY

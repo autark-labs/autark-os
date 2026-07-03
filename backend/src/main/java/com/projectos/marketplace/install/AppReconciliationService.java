@@ -53,21 +53,21 @@ public class AppReconciliationService {
     private AppReconciliationItem reconcileInstalled(InstalledApp app, List<ManagedContainer> containers) {
         InstalledAppOwnershipMetadata metadata = repository.ownershipFor(app.appId()).orElse(null);
         if (metadata != null && !isOwnedMetadata(metadata)) {
-            return item(app.appId(), app.appName(), "Managed elsewhere", ownershipFrom(metadata), false, "Stored app metadata is not owned by this Project OS instance.");
+            return item(app.appId(), app.appName(), "Managed elsewhere", ownershipFrom(metadata), false, "Stored app metadata is not owned by this Autark-OS instance.");
         }
         if (containers.isEmpty()) {
             return item(app.appId(), app.appName(), "Missing", DockerResourceOwnership.OWNED, false, "No owned containers were found for this app.");
         }
         DockerResourceOwnership ownership = strongestOwnership(containers);
         if (ownership == DockerResourceOwnership.FOREIGN) {
-            return item(app.appId(), app.appName(), "Managed elsewhere", ownership, false, "Docker reports containers owned by another Project OS instance.");
+            return item(app.appId(), app.appName(), "Managed elsewhere", ownership, false, "Docker reports containers owned by another Autark-OS instance.");
         }
         if (ownership == DockerResourceOwnership.LEGACY_UNSCOPED) {
             if (isExplicitlyAdopted(metadata)) {
                 String status = statusFromContainers(containers);
-                return item(app.appId(), app.appName(), status, DockerResourceOwnership.OWNED, lifecycleEligible(status, DockerResourceOwnership.OWNED), "Project OS explicitly adopted this legacy container.");
+                return item(app.appId(), app.appName(), status, DockerResourceOwnership.OWNED, lifecycleEligible(status, DockerResourceOwnership.OWNED), "Autark-OS explicitly adopted this legacy container.");
             }
-            return item(app.appId(), app.appName(), "Needs attention", ownership, false, "Docker reports legacy Project OS containers without instance ownership labels.");
+            return item(app.appId(), app.appName(), "Needs attention", ownership, false, "Docker reports legacy Autark-OS containers without instance ownership labels.");
         }
         String status = statusFromContainers(containers);
         return item(app.appId(), app.appName(), status, ownership, lifecycleEligible(status, ownership), "Reconciled from owned Docker containers.");

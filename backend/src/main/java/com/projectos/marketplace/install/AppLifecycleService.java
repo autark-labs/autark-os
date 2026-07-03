@@ -208,7 +208,7 @@ public class AppLifecycleService {
         String status = displayHealthStatus(app);
         boolean privateMissing = privateLinkMissing(app);
         String message = privateMissing ? "Private link is missing" : health == null ? "Waiting for health check" : health.message();
-        String detail = privateMissing ? "Project OS expects a private link for this app, but Tailscale Serve does not currently have one configured." : health == null ? "Project OS has not recorded a health check for this app yet." : health.detail();
+        String detail = privateMissing ? "Autark-OS expects a private link for this app, but Tailscale Serve does not currently have one configured." : health == null ? "Autark-OS has not recorded a health check for this app yet." : health.detail();
         String action = privateMissing ? "Repair private link" : "Try to fix";
         return new AppReliabilityIssue(
                 app.appId(),
@@ -285,13 +285,13 @@ public class AppLifecycleService {
     private String reliabilitySummaryText(String posture, int issueCount, int successfulRepairs, int failedRepairs) {
         if ("healthy".equals(posture)) {
             return successfulRepairs > 0
-                    ? "Project OS recently fixed issues and no apps currently need attention."
+                    ? "Autark-OS recently fixed issues and no apps currently need attention."
                     : "No app stability issues are currently reported.";
         }
         if (failedRepairs > 0) {
-            return "Project OS found " + issueCount + " issue(s), and at least one repair needs your review.";
+            return "Autark-OS found " + issueCount + " issue(s), and at least one repair needs your review.";
         }
-        return "Project OS found " + issueCount + " issue(s) and will try safe fixes when automatic repair is enabled.";
+        return "Autark-OS found " + issueCount + " issue(s) and will try safe fixes when automatic repair is enabled.";
     }
 
     public AppActionResult start(String appId) {
@@ -335,7 +335,7 @@ public class AppLifecycleService {
         }
 
         saveRepairState(app, automatic ? "guardian_repair_running" : "manual_repair_running");
-        repository.recordEvent(app.appId(), eventPrefix + "repair_started", "Project OS noticed: " + before.message() + ". " + repairPlanLabel(before));
+        repository.recordEvent(app.appId(), eventPrefix + "repair_started", "Autark-OS noticed: " + before.message() + ". " + repairPlanLabel(before));
         activityWarning(eventPrefix + "repair_started", "Repair started for " + app.appName(), before.message() + ". " + repairPlanLabel(before), app.appId());
         boolean repairingPrivateAccess = shouldRepairPrivateAccess(before);
         if (repairingPrivateAccess) {
@@ -355,7 +355,7 @@ public class AppLifecycleService {
                 saveRepairState(app, automatic ? "guardian_repair_failed" : "manual_repair_failed");
                 repository.recordEvent(app.appId(), eventPrefix + "repair_failed", failureReason(result.output()));
                 activityWarning(eventPrefix + "repair_failed", "Repair failed for " + app.appName(), failureReason(result.output()), app.appId());
-                throw new InstallationException("Project OS could not start " + app.appName() + ". Check recent activity for details.");
+                throw new InstallationException("Autark-OS could not start " + app.appName() + ". Check recent activity for details.");
             }
             repository.recordEvent(app.appId(), eventPrefix + "repair_step_completed", "Started " + app.appName() + " as part of repair.");
         } else {
@@ -365,7 +365,7 @@ public class AppLifecycleService {
                 saveRepairState(app, automatic ? "guardian_repair_failed" : "manual_repair_failed");
                 repository.recordEvent(app.appId(), eventPrefix + "repair_failed", failureReason(result.output()));
                 activityWarning(eventPrefix + "repair_failed", "Repair failed for " + app.appName(), failureReason(result.output()), app.appId());
-                throw new InstallationException("Project OS could not restart " + app.appName() + ". Check recent activity for details.");
+                throw new InstallationException("Autark-OS could not restart " + app.appName() + ". Check recent activity for details.");
             }
             repository.recordEvent(app.appId(), eventPrefix + "repair_step_completed", "Restarted " + app.appName() + " as part of repair.");
         }
@@ -419,7 +419,7 @@ public class AppLifecycleService {
                     disableResult.configured() ? "private_access_disabled" : "private_access_disable_failed",
                     sanitized.autoRepairEnabled());
             repository.recordEvent(app.appId(), "private_access_disabled", "Removed private HTTPS link for " + app.appName() + ".");
-            activitySuccess("private_access_disabled", "Private link removed for " + app.appName(), "Project OS turned off private access for this app.", app.appId());
+            activitySuccess("private_access_disabled", "Private link removed for " + app.appName(), "Autark-OS turned off private access for this app.", app.appId());
         } else if (!sanitized.tailscaleEnabled() && sanitized.privateAccessUrl() != null) {
             sanitized = new InstallSettings(
                     sanitized.accessUrl(),
@@ -476,7 +476,7 @@ public class AppLifecycleService {
             changes.add("Local app address will change to " + requested.accessUrl() + ".");
             if (!same(currentPort, requestedPort)) {
                 redeployRequired = true;
-                warnings.add("Project OS will update the Compose file and restart the app containers so the new port is active.");
+                warnings.add("Autark-OS will update the Compose file and restart the app containers so the new port is active.");
             }
         }
         if (!same(current.expectedProtocol(), requested.expectedProtocol())) {
@@ -485,7 +485,7 @@ public class AppLifecycleService {
         }
         if (current.tailscaleEnabled() != requested.tailscaleEnabled()) {
             changes.add(requested.tailscaleEnabled() ? "Private access preference will be enabled." : "Private access preference will be disabled.");
-            warnings.add("Private access is safest to manage from Network, where Project OS can repair and verify Tailscale links.");
+            warnings.add("Private access is safest to manage from Network, where Autark-OS can repair and verify Tailscale links.");
         }
         if (!same(current.backup(), requested.backup())) {
             changes.add("Backup preference will be saved for this app.");
@@ -496,7 +496,7 @@ public class AppLifecycleService {
         if (!same(current.storageSubfolders(), requested.storageSubfolders())) {
             dataMigrationRequired = true;
             changes.add("Storage folder names were changed.");
-            blocked.add("Storage folder changes need a guarded data migration. Project OS will not move app data from this modal yet.");
+            blocked.add("Storage folder changes need a guarded data migration. Autark-OS will not move app data from this modal yet.");
         }
 
         if (changes.isEmpty()) {
@@ -522,11 +522,11 @@ public class AppLifecycleService {
             default -> "Safe to save";
         };
         String summary = switch (impact) {
-            case "manual" -> "Project OS cannot safely apply one or more settings yet.";
-            case "data_migration_required" -> "Project OS needs a migration step before changing storage folders.";
-            case "redeploy_required" -> "Project OS will rewrite the Compose file and start the app with the new settings.";
-            case "restart_required" -> "Project OS will save the setting and may need a restart before it is reflected.";
-            default -> "Project OS will save these settings without restarting containers.";
+            case "manual" -> "Autark-OS cannot safely apply one or more settings yet.";
+            case "data_migration_required" -> "Autark-OS needs a migration step before changing storage folders.";
+            case "redeploy_required" -> "Autark-OS will rewrite the Compose file and start the app with the new settings.";
+            case "restart_required" -> "Autark-OS will save the setting and may need a restart before it is reflected.";
+            default -> "Autark-OS will save these settings without restarting containers.";
         };
         return new AppSettingsChangePlan(
                 app.appId(),
@@ -545,7 +545,7 @@ public class AppLifecycleService {
 
     private void safeRedeployForSettings(InstalledApp app, InstallSettings settings) {
         ApplicationManifest manifest = catalogService.findById(app.appId())
-                .orElseThrow(() -> new InstallationException("Project OS could not find the catalog template for " + app.appName() + "."));
+                .orElseThrow(() -> new InstallationException("Autark-OS could not find the catalog template for " + app.appName() + "."));
         Path appRoot = Path.of(app.runtimePath());
         Path composePath = appRoot.resolve("compose.yaml");
         String previousCompose = readCompose(composePath);
@@ -564,10 +564,10 @@ public class AppLifecycleService {
                 restored = true;
                 repository.recordEvent(app.appId(), "settings_redeploy_failed", failureReason(result.output()));
                 activityWarning("settings_redeploy_failed", "Settings redeploy failed for " + app.appName(), failureReason(result.output()), app.appId());
-                throw new InstallationException("Project OS could not restart " + app.appName() + " with the new settings. The previous Compose file was restored.");
+                throw new InstallationException("Autark-OS could not restart " + app.appName() + " with the new settings. The previous Compose file was restored.");
             }
             repository.recordEvent(app.appId(), "settings_redeploy_completed", "Updated Compose and restarted " + app.appName() + ".");
-            activitySuccess("settings_redeploy_completed", "Settings redeploy completed for " + app.appName(), "Project OS updated Compose and restarted the app.", app.appId());
+            activitySuccess("settings_redeploy_completed", "Settings redeploy completed for " + app.appName(), "Autark-OS updated Compose and restarted the app.", app.appId());
         } catch (RuntimeException exception) {
             if (!restored) {
                 restoreCompose(composePath, previousCompose);
@@ -580,7 +580,7 @@ public class AppLifecycleService {
         try {
             return Files.exists(composePath) ? Files.readString(composePath) : null;
         } catch (IOException exception) {
-            throw new InstallationException("Project OS could not read the existing Compose file before applying settings.", exception);
+            throw new InstallationException("Autark-OS could not read the existing Compose file before applying settings.", exception);
         }
     }
 
@@ -591,7 +591,7 @@ public class AppLifecycleService {
         try {
             Files.writeString(composePath, previousCompose);
         } catch (IOException exception) {
-            throw new InstallationException("Project OS could not restore the previous Compose file after a failed settings change.", exception);
+            throw new InstallationException("Autark-OS could not restore the previous Compose file after a failed settings change.", exception);
         }
     }
 
@@ -606,7 +606,7 @@ public class AppLifecycleService {
         String accessUrl = firstPresent(view.accessUrl(), view.settings() == null ? null : view.settings().accessUrl(), app.accessUrl());
         Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
         if (localPort == null) {
-            throw new InstallationException("Project OS could not find a local browser port for " + app.appName() + ".");
+            throw new InstallationException("Autark-OS could not find a local browser port for " + app.appName() + ".");
         }
 
         int privateHttpsPort = AppPrivateAccessPorts.selectHttpsPort(app.appId(), localPort, repository);
@@ -661,7 +661,7 @@ public class AppLifecycleService {
                 current.autoRepairEnabled());
         repository.saveSettings(app.appId(), updated);
         repository.recordEvent(app.appId(), "private_access_disabled", "Removed private HTTPS link for " + app.appName() + ".");
-        activitySuccess("private_access_disabled", "Private link removed for " + app.appName(), "Project OS turned off private access for this app.", app.appId());
+        activitySuccess("private_access_disabled", "Private link removed for " + app.appName(), "Autark-OS turned off private access for this app.", app.appId());
         return new AppActionResult(app.appId(), "private-access-disable", "completed", app.appName() + " is no longer available through a private Tailscale link.", refresh(app), disableResult.output(), Instant.now());
     }
 
@@ -690,18 +690,18 @@ public class AppLifecycleService {
 
     private String repairMessage(InstalledApp app, AppHealthSnapshot before, AppHealthSnapshot after, boolean privateAccessRepaired) {
         if (privateAccessRepaired) {
-            return "Project OS repaired the private network link for " + app.appName() + ".";
+            return "Autark-OS repaired the private network link for " + app.appName() + ".";
         }
         if ("Ready".equals(after.status())) {
-            return "Project OS repaired " + app.appName() + ". It is ready now.";
+            return "Autark-OS repaired " + app.appName() + ". It is ready now.";
         }
         if ("Starting".equals(after.status())) {
-            return "Project OS repaired " + app.appName() + " and it is starting now.";
+            return "Autark-OS repaired " + app.appName() + " and it is starting now.";
         }
         if (before.status().equals(after.status())) {
-            return "Project OS tried to repair " + app.appName() + ", but it still needs attention.";
+            return "Autark-OS tried to repair " + app.appName() + ", but it still needs attention.";
         }
-        return "Project OS moved " + app.appName() + " from " + before.status() + " to " + after.status() + ".";
+        return "Autark-OS moved " + app.appName() + " from " + before.status() + " to " + after.status() + ".";
     }
 
     private String repairPlanLabel(AppHealthSnapshot snapshot) {
@@ -715,7 +715,7 @@ public class AppLifecycleService {
     }
 
     private String failureReason(RuntimeException exception) {
-        return firstPresent(exception.getMessage(), "Repair failed before Project OS could read a reason.");
+        return firstPresent(exception.getMessage(), "Repair failed before Autark-OS could read a reason.");
     }
 
     private String failureReason(List<String> output) {
@@ -746,12 +746,12 @@ public class AppLifecycleService {
         InstalledApp app = installedApp(appId);
         boolean checkpointPlanned = hasCheckpointableData(app);
         String checkpointMessage = checkpointPlanned
-                ? "Project OS will save a safety checkpoint before removing containers. Your app data is still kept on disk."
-                : "Project OS did not find app data to checkpoint. The remove step will still keep the app folder if it exists.";
+                ? "Autark-OS will save a safety checkpoint before removing containers. Your app data is still kept on disk."
+                : "Autark-OS did not find app data to checkpoint. The remove step will still keep the app folder if it exists.";
         return new UninstallPlan(
                 app.appId(),
                 app.appName(),
-                "Project-OS can remove the running app while keeping your data on disk.",
+                "Autark-OS can remove the running app while keeping your data on disk.",
                 checkpointPlanned,
                 checkpointMessage,
                 List.of("Create a safety checkpoint when app data is present", "Stop the app containers", "Remove the Compose project", "Hide the app from the managed Applications list"),
@@ -776,7 +776,7 @@ public class AppLifecycleService {
             repository.recordEvent(app.appId(), "uninstalled", "Removed containers for " + app.appName() + "; data was kept on disk.");
             activitySuccess("uninstalled", "Uninstalled " + app.appName(), "Removed containers and kept app data on disk.", app.appId());
             repository.delete(app.appId());
-            return new AppActionResult(app.appId(), "uninstall", "removed", app.appName() + " was removed from Project-OS. Data was kept on disk.", null, logs, Instant.now());
+            return new AppActionResult(app.appId(), "uninstall", "removed", app.appName() + " was removed from Autark-OS. Data was kept on disk.", null, logs, Instant.now());
         }
         repository.recordEvent(app.appId(), "uninstall_failed", String.join("\n", result.output()));
         activityWarning("uninstall_failed", "Uninstall failed for " + app.appName(), failureReason(result.output()), app.appId());
@@ -795,13 +795,13 @@ public class AppLifecycleService {
             long size = zipDirectory(source, destination);
             backupRepository.record(app.appId(), app.appName(), "app", "pre_uninstall", app.appId(), destination.toString(), "completed", size, "Safety checkpoint created before uninstall.");
             repository.recordEvent(app.appId(), "safety_checkpoint_created", "Saved a safety checkpoint before removing " + app.appName() + ".");
-            activitySuccess("safety_checkpoint_created", "Saved safety checkpoint", "Project OS saved a checkpoint before removing " + app.appName() + ".", app.appId());
+            activitySuccess("safety_checkpoint_created", "Saved safety checkpoint", "Autark-OS saved a checkpoint before removing " + app.appName() + ".", app.appId());
             return new SafetyCheckpointResult(true, List.of("Created safety checkpoint " + destination));
         } catch (IOException | RuntimeException exception) {
             String reason = exception.getMessage() == null || exception.getMessage().isBlank()
                     ? "No detailed reason was returned."
                     : exception.getMessage();
-            String message = "Project OS could not create a safety checkpoint before uninstall: " + reason;
+            String message = "Autark-OS could not create a safety checkpoint before uninstall: " + reason;
             repository.recordEvent(app.appId(), "safety_checkpoint_failed", message);
             activityWarning("safety_checkpoint_failed", "Safety checkpoint failed", message, app.appId());
             return new SafetyCheckpointResult(false, List.of(message));
@@ -840,7 +840,7 @@ public class AppLifecycleService {
         repository.updateStatus(app.appId(), status.friendlyStatus());
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
         String category = manifest == null ? "Installed" : manifest.category();
-        String description = manifest == null ? "Managed by Project-OS." : manifest.description();
+        String description = manifest == null ? "Managed by Autark-OS." : manifest.description();
         String version = manifest == null ? "Unknown" : manifest.version();
         String image = manifest == null ? null : manifest.image();
         List<com.projectos.marketplace.model.ConfigurationItem> appConfiguration = manifest == null || manifest.configuration() == null ? List.of() : manifest.configuration();
@@ -1009,7 +1009,7 @@ public class AppLifecycleService {
         } else if ("Starting".equals(runtime.friendlyStatus()) && startupGrace) {
             status = "Starting";
             message = health.startingLabel();
-            detail = "Project OS is giving this app up to " + health.startupGraceSeconds() + " seconds to finish startup before marking it as unhealthy.";
+            detail = "Autark-OS is giving this app up to " + health.startupGraceSeconds() + " seconds to finish startup before marking it as unhealthy.";
         } else if ("Stopped".equals(runtime.friendlyStatus())) {
             status = "Paused";
             message = "Paused";
@@ -1017,7 +1017,7 @@ public class AppLifecycleService {
         } else if ("Stopped".equals(runtime.friendlyStatus()) || "not running".equals(runtime.healthCheck())) {
             status = "Unavailable";
             message = "Unavailable";
-            detail = "Project OS could not find running managed containers for this app.";
+            detail = "Autark-OS could not find running managed containers for this app.";
         } else if (localBroken) {
             status = "Needs attention";
             message = health.failureLabel();
@@ -1452,7 +1452,7 @@ public class AppLifecycleService {
 
     private InstalledApp installedApp(String appId) {
         return repository.findById(appId)
-                .orElseThrow(() -> new InstallationException("Project-OS is not managing an app with id " + appId + "."));
+                .orElseThrow(() -> new InstallationException("Autark-OS is not managing an app with id " + appId + "."));
     }
 
     private List<InstalledApp> managedInstalledApps() {
@@ -1471,13 +1471,13 @@ public class AppLifecycleService {
 
     private void assertLifecycleEligible(InstalledApp app, String action) {
         InstalledAppOwnershipMetadata metadata = repository.ownershipFor(app.appId())
-                .orElseThrow(() -> new InstallationException(app.appName() + " is not owned by this Project OS instance, so Project OS will not " + action + " it automatically."));
+                .orElseThrow(() -> new InstallationException(app.appName() + " is not owned by this Autark-OS instance, so Autark-OS will not " + action + " it automatically."));
         if (!"owned".equalsIgnoreCase(metadata.ownershipStatus())) {
-            throw new InstallationException(app.appName() + " is not owned by this Project OS instance, so Project OS will not " + action + " it automatically.");
+            throw new InstallationException(app.appName() + " is not owned by this Autark-OS instance, so Autark-OS will not " + action + " it automatically.");
         }
         if (metadata.appInstanceId() == null || metadata.appInstanceId().isBlank()
                 || metadata.projectOsInstanceId() == null || metadata.projectOsInstanceId().isBlank()) {
-            throw new InstallationException(app.appName() + " has incomplete Project OS ownership metadata, so Project OS will not " + action + " it automatically.");
+            throw new InstallationException(app.appName() + " has incomplete Autark-OS ownership metadata, so Autark-OS will not " + action + " it automatically.");
         }
     }
 

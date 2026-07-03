@@ -251,7 +251,7 @@ function backendOperationState(value: AppRuntimeView['operationState']): AppOper
     return {
       kind: 'failed',
       label: value.label || 'Action failed',
-      message: value.message || 'Project OS could not finish this action.',
+      message: value.message || 'Autark-OS could not finish this action.',
       jobId: value.jobId || undefined,
     };
   }
@@ -337,7 +337,7 @@ function observedNextAction(service: ObservedServiceView): ApplicationNextAction
 
   if (service.userStatus === 'recoverable') {
     return {
-      description: service.userStatusDescription || 'Review this service before recovering it into Project OS.',
+      description: service.userStatusDescription || 'Review this service before recovering it into Autark-OS.',
       id: 'review_found_service',
       label: 'Review recovery',
     };
@@ -345,7 +345,7 @@ function observedNextAction(service: ObservedServiceView): ApplicationNextAction
 
   if (service.userStatus === 'managed_elsewhere') {
     return {
-      description: service.userStatusDescription || 'This service appears to be owned outside this Project OS instance.',
+      description: service.userStatusDescription || 'This service appears to be owned outside this Autark-OS instance.',
       id: 'review_found_service',
       label: 'Review owner',
     };
@@ -463,7 +463,7 @@ function observedSettings(service: ObservedServiceView): ApplicationSurfaceItem[
     backupFrequency: 'daily',
     backupRetention: 7,
     canEdit: false,
-    containerDetail: service.userStatusDescription || 'Project OS observes this service but does not manage its container.',
+    containerDetail: service.userStatusDescription || 'Autark-OS observes this service but does not manage its container.',
     containerStatus: service.runtimeState || service.userStatusLabel || 'Observed',
     desiredAccessMode: service.accessScope || 'external',
     expectedLocalPort: portFromUrl(service.url || undefined),

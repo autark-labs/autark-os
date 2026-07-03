@@ -34,7 +34,7 @@ class AdminSecurityFilterTests {
         filter.doFilter(request, response, new MockFilterChain());
 
         assertThat(response.getStatus()).isEqualTo(401);
-        assertThat(response.getContentAsString(StandardCharsets.UTF_8)).contains("Project OS admin login is required.");
+        assertThat(response.getContentAsString(StandardCharsets.UTF_8)).contains("Autark-OS admin login is required.");
     }
 
     @Test

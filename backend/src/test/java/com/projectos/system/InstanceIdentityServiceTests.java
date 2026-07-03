@@ -64,7 +64,7 @@ class InstanceIdentityServiceTests {
 
         ProjectOsIdentity identity = new InstanceIdentityService(
                 runtimeLayout,
-                () -> "Project OS",
+                () -> "Autark-OS",
                 () -> "pos_created",
                 () -> Instant.parse("2026-06-20T12:00:00Z")).current();
 
@@ -80,13 +80,13 @@ class InstanceIdentityServiceTests {
 
         InstanceIdentityService service = new InstanceIdentityService(
                 runtimeLayout,
-                () -> "Project OS",
+                () -> "Autark-OS",
                 () -> "pos_replacement",
                 () -> Instant.parse("2026-06-20T12:00:00Z"));
 
         assertThatThrownBy(service::current)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Project OS identity");
+                .hasMessageContaining("Autark-OS identity");
         assertThat(Files.readString(runtimeLayout.identityPath())).isEqualTo("{not-json");
     }
 

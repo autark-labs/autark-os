@@ -27,7 +27,7 @@ export const routeAliases = {
 
 export function navigationGroups(viewMode = 'basic') {
   const groups = [
-    { label: 'Project OS', items: primaryNavigation },
+    { label: 'Autark-OS', items: primaryNavigation },
   ];
   if (viewMode === 'advanced') {
     groups.push({ label: 'Advanced', items: advancedNavigation });

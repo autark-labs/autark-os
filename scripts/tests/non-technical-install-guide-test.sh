@@ -18,13 +18,13 @@ readme = Path(sys.argv[2]).read_text()
 docs_index = Path(sys.argv[3]).read_text()
 
 required_headings = [
-    "# Install Project OS",
+    "# Install Autark-OS",
     "## Choose Your Install Option",
     "## Prepare The Device",
     "## Run The Installer",
     "## Choose Storage",
     "## Choose Private Access",
-    "## Open Project OS",
+    "## Open Autark-OS",
     "## Install Your First App",
     "## If Setup Needs Attention",
     "## Advanced Install Docs",

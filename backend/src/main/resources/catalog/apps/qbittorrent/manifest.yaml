@@ -29,7 +29,7 @@ testing:
   smokeTests:
     - label: Install plan generated
       status: Passed
-      detail: Manifest loads and produces a Project OS install plan.
+      detail: Manifest loads and produces an Autark-OS install plan.
     - label: x86_64 image pull
       status: Needs end-to-end test
       detail: Image source is documented; pull still needs verification on a clean x86_64 host.
@@ -47,7 +47,7 @@ testing:
       detail: Needs private-link validation on a tailnet.
     - label: Backup path exists
       status: Passed
-      detail: Manifest declares managed backup paths under the Project OS app folder.
+      detail: Manifest declares managed backup paths under the Autark-OS app folder.
     - label: Uninstall safety checkpoint
       status: Needs end-to-end test
       detail: Needs install, backup checkpoint, and uninstall validation on a real host.
@@ -100,7 +100,7 @@ usage:
   primaryAction: open-dashboard
   openUrlLabel: Open qBittorrent
   headline: Manage downloads privately
-  summary: Project OS starts qBittorrent and prepares folders. Configure credentials and download behavior in the dashboard.
+  summary: Autark-OS starts qBittorrent and prepares folders. Configure credentials and download behavior in the dashboard.
   setupSteps:
     - Open the qBittorrent web UI.
     - Change default credentials if prompted.
@@ -112,7 +112,7 @@ usage:
       sensitive: false
       qr: false
   notes:
-    - Project OS should eventually warn clearly before enabling any public transfer ports.
+    - Autark-OS should eventually warn clearly before enabling any public transfer ports.
 setup:
   kind: media-stack
   automation: planned
@@ -139,7 +139,7 @@ setup:
         - Ask before adding qBittorrent as a Radarr download client.
   userSteps:
     - Review download folders and credentials in qBittorrent.
-    - Approve media-app connections before Project OS changes anything.
+    - Approve media-app connections before Autark-OS changes anything.
   automationCapabilities:
     - Can detect Sonarr and Radarr.
     - Can propose download-client wiring.
@@ -151,7 +151,7 @@ health:
   successLabel: Download dashboard is ready
   startingLabel: Starting download client
   failureLabel: qBittorrent is not responding
-  description: Project OS checks that the qBittorrent web UI answers before calling it ready.
+  description: Autark-OS checks that the qBittorrent web UI answers before calling it ready.
 runtime:
   containerName: qbittorrent
   composeProject: project-os-qbittorrent

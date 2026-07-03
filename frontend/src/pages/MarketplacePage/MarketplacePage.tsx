@@ -449,7 +449,7 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
     return (
       <div className="mb-5 rounded-lg border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-200">
         <p className="font-semibold text-current">Install failed for {appNameForJob(installJob, apps)}</p>
-        <p className="mt-1">{installJob.error?.message || 'Project OS could not finish the install.'}</p>
+        <p className="mt-1">{installJob.error?.message || 'Autark-OS could not finish the install.'}</p>
       </div>
     );
   }
@@ -501,13 +501,13 @@ function DiscoverGuidedHeader({
             </DialogTrigger>
             <DialogContent className="border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>How Project OS installs apps</DialogTitle>
+                <DialogTitle>How Autark-OS installs apps</DialogTitle>
                 <DialogDescription className="text-muted-foreground">
-                  Project OS shows a plan before anything changes, then prepares the app with managed storage, local access, health checks, and backup defaults.
+                  Autark-OS shows a plan before anything changes, then prepares the app with managed storage, local access, health checks, and backup defaults.
                 </DialogDescription>
               </DialogHeader>
               <ol className="grid gap-3 text-sm text-slate-300">
-                {['Pick an app that fits what you want to do.', 'Review setup choices and any host readiness notes.', 'Confirm the install plan before Project OS changes this server.', 'Open the app from My Apps and create a first restore point.'].map((step, index) => (
+                {['Pick an app that fits what you want to do.', 'Review setup choices and any host readiness notes.', 'Confirm the install plan before Autark-OS changes this server.', 'Open the app from My Apps and create a first restore point.'].map((step, index) => (
                   <li className="grid grid-cols-[28px_1fr] gap-3" key={step}>
                     <span className="grid size-7 place-items-center rounded-full border border-cyan-300/35 bg-cyan-400/10 text-xs font-bold text-cyan-200">{index + 1}</span>
                     <span className="leading-6">{step}</span>
@@ -558,7 +558,7 @@ function DiscoverGuidedHeader({
       <div className="mt-5 rounded-xl border border-cyan-300/35 bg-cyan-400/10 p-4">
         <p className="text-xs font-semibold uppercase tracking-normal text-cyan-200">Recommended path</p>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          Pick an app, review the setup, and Project OS will prepare storage, networking, health checks, and backups.
+          Pick an app, review the setup, and Autark-OS will prepare storage, networking, health checks, and backups.
         </p>
       </div>
     </header>

@@ -744,7 +744,7 @@ class MarketplaceInstallServiceTests {
         public TailscaleServeResult serveHttps(int localPort, int httpsPort) {
             lastLocalPort = localPort;
             lastHttpsPort = httpsPort;
-            return new TailscaleServeResult(false, null, "Sign in to Tailscale before Project OS can create the private HTTPS link.", List.of("tailscale serve failed"));
+            return new TailscaleServeResult(false, null, "Sign in to Tailscale before Autark-OS can create the private HTTPS link.", List.of("tailscale serve failed"));
         }
     }
 }

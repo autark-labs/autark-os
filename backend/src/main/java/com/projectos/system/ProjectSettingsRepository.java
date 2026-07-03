@@ -42,7 +42,7 @@ public class ProjectSettingsRepository extends DatabaseBackedRepository {
             }
             return settings;
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to read Project OS settings.", exception);
+            throw new InstallationException("Unable to read Autark-OS settings.", exception);
         }
     }
 
@@ -61,7 +61,7 @@ public class ProjectSettingsRepository extends DatabaseBackedRepository {
             ResultSet resultSet = statement.executeQuery();
             return resultSet.next();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to read Project OS settings.", exception);
+            throw new InstallationException("Unable to read Autark-OS settings.", exception);
         }
     }
 
@@ -100,7 +100,7 @@ public class ProjectSettingsRepository extends DatabaseBackedRepository {
             }
             statement.executeBatch();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to save Project OS settings.", exception);
+            throw new InstallationException("Unable to save Autark-OS settings.", exception);
         }
     }
 
@@ -121,7 +121,7 @@ public class ProjectSettingsRepository extends DatabaseBackedRepository {
             }
             statement.executeBatch();
         } catch (SQLException exception) {
-            throw new InstallationException("Unable to save Project OS settings.", exception);
+            throw new InstallationException("Unable to save Autark-OS settings.", exception);
         }
     }
 

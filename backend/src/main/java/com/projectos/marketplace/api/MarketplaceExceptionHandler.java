@@ -49,7 +49,7 @@ public class MarketplaceExceptionHandler {
                 "duplicate_install_acknowledgement_required",
                 exception.getMessage(),
                 List.of(
-                        "Review the service Project OS already found before installing another copy.",
+                        "Review the service Autark-OS already found before installing another copy.",
                         "To continue intentionally, retry the install with duplicateAcknowledged set to true."),
                 Instant.now()));
     }

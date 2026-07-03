@@ -60,7 +60,7 @@ test('shows Serve ready only for live verified private-link reconciliation', () 
     installed: true,
     connected: true,
     state: 'connected',
-    message: 'Project OS is connected.',
+    message: 'Autark-OS is connected.',
     dnsName: 'project-os.tailnet.ts.net',
   };
   const desiredOnly = tailscaleControlView(status, { status: 'ok' }, {

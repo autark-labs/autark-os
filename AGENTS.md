@@ -2,13 +2,13 @@
 
 Guidance for AI coding agents working in this repository.
 
-Project OS should feel like a calm, powerful appliance: install an app, open it, access it safely, and recover it when something goes wrong. Code should protect that product promise. Favor readable implementation, clear user states, and small validated slices over broad rewrites.
+Autark-OS should feel like a calm, powerful appliance: install an app, open it, access it safely, and recover it when something goes wrong. Code should protect that product promise. Favor readable implementation, clear user states, and small validated slices over broad rewrites.
 
 ---
 
 ## 1. Core Product Principles
 
-### Treat Project OS as a guided runtime, not a generic dashboard
+### Treat Autark-OS as a guided runtime, not a generic dashboard
 
 The app should help users answer:
 
@@ -21,14 +21,14 @@ Avoid surfacing raw infrastructure details unless the user is in an advanced or 
 
 ### Do not blur ownership states
 
-Project OS must distinguish between:
+Autark-OS must distinguish between:
 
-- **Managed apps**: owned by the current Project OS instance.
+- **Managed apps**: owned by the current Autark-OS instance.
 - **Found apps**: detected on the host but not owned by this instance.
 - **Linked services**: user-added shortcuts or externally managed services.
 - **Conflicts**: resources that block install or recovery.
 
-Never show a foreign or legacy app as simply “Installed” for the current instance. Use language such as “Found on this server,” “Owned by another Project OS instance,” “Recoverable,” or “Linked service.”
+Never show a foreign or legacy app as simply “Installed” for the current instance. Use language such as “Found on this server,” “Owned by another Autark-OS instance,” “Recoverable,” or “Linked service.”
 
 ### One clear next action
 
@@ -175,7 +175,7 @@ Create custom components by composing shadcn primitives, not by bypassing them.
 
 ### Build project-level components for repeated patterns
 
-Use reusable Project OS components for repeated product concepts:
+Use reusable Autark-OS components for repeated product concepts:
 
 - `PageHeader`
 - `AppCard`
@@ -375,7 +375,7 @@ Safe flow:
 
 ### Separate recovery from cleanup
 
-Recovery means bringing an existing app under current Project OS management while preserving data.
+Recovery means bringing an existing app under current Autark-OS management while preserving data.
 
 Cleanup means removing old resources. Cleanup should default to preserving data. Permanent data deletion requires explicit confirmation.
 
@@ -474,7 +474,7 @@ Each app card should clearly show one of:
 - Recoverable
 - Blocked by conflict
 
-The install plan should explain what Project OS will do in user language, with technical details behind disclosure.
+The install plan should explain what Autark-OS will do in user language, with technical details behind disclosure.
 
 ### Access
 
@@ -581,8 +581,8 @@ Before considering a slice done, verify:
 Use fixtures that represent real server states:
 
 - clean install
-- existing legacy Project OS apps
-- foreign Project OS instance apps
+- existing legacy Autark-OS apps
+- foreign Autark-OS instance apps
 - external Docker containers
 - Tailscale signed out
 - Tailscale connected
@@ -599,7 +599,7 @@ Use fixtures that represent real server states:
 Good:
 
 ```txt
-Project OS found apps from another installation.
+Autark-OS found apps from another installation.
 ```
 
 Avoid:
@@ -614,7 +614,7 @@ Use technical detail only when it helps the user decide what to do.
 
 Do not say an app is protected unless a successful restore point exists.
 
-Do not say Project OS manages an app unless the current instance owns it.
+Do not say Autark-OS manages an app unless the current instance owns it.
 
 Do not imply Tailscale is ready in production when the app is using a development mock.
 
@@ -639,9 +639,9 @@ Avoid vague labels:
 
 ## 13. Security And Safety
 
-### Treat Project OS as privileged software
+### Treat Autark-OS as privileged software
 
-Project OS can control apps, containers, network access, and backups. Be conservative.
+Autark-OS can control apps, containers, network access, and backups. Be conservative.
 
 Minimum expectations:
 

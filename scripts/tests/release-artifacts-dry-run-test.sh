@@ -19,7 +19,7 @@ grep -q 'Would build release artifacts' <<<"${output}"
 grep -q 'build-release-bundle.sh' <<<"${output}"
 grep -q 'project-os-9.8.7.tar.gz' <<<"${output}"
 grep -q 'project-os_9.8.7_amd64.deb' <<<"${output}"
-grep -q 'Project-OS-Installer-9.8.7-amd64.run' <<<"${output}"
+grep -q 'Autark-OS-Installer-9.8.7-amd64.run' <<<"${output}"
 grep -q 'SHA256SUMS' <<<"${output}"
 
 [[ ! -e "${artifacts_dir}" ]]

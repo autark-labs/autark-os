@@ -26,7 +26,7 @@ export function tailscaleControlView(status, check, reconciliation) {
     const summary = serveReady
       ? 'Verified private links are available for trusted devices on your tailnet.'
       : magicDnsReady
-        ? 'Tailscale is connected. Private links will show as ready after Project OS verifies live Serve mappings.'
+        ? 'Tailscale is connected. Private links will show as ready after Autark-OS verifies live Serve mappings.'
         : 'Tailscale is connected, but private HTTPS links need MagicDNS and HTTPS readiness before they are available.';
     return {
       connected,

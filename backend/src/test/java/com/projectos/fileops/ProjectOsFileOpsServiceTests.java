@@ -86,7 +86,7 @@ class ProjectOsFileOpsServiceTests {
 
         assertThatThrownBy(() -> service.restoreAppData(outsideArchive, "full", "home-assistant"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Project OS backups");
+                .hasMessageContaining("Autark-OS backups");
     }
 
     @Test

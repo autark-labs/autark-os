@@ -69,7 +69,7 @@ public class DevTailscaleService extends TailscaleService {
     @Override
     public List<TailscaleDevice> devices() {
         return List.of(
-                new TailscaleDevice("self", "Project OS Dev", DEV_DNS, List.of("100.64.0.10"), "linux", true, null, "direct", null, "127.0.0.1", false, true, "dev"),
+                new TailscaleDevice("self", "Autark-OS Dev", DEV_DNS, List.of("100.64.0.10"), "linux", true, null, "direct", null, "127.0.0.1", false, true, "dev"),
                 new TailscaleDevice("phone", "Dev Phone", "phone." + DEV_DNS, List.of("100.64.0.11"), "ios", true, null, "direct", null, "100.64.0.11", false, false, "dev"));
     }
 }

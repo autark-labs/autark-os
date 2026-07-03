@@ -57,7 +57,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
         <SheetContent className="border-slate-700 bg-slate-950 text-slate-100 sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>Service not found</SheetTitle>
-            <SheetDescription>Project OS could not find that observed service in the current inventory.</SheetDescription>
+            <SheetDescription>Autark-OS could not find that observed service in the current inventory.</SheetDescription>
           </SheetHeader>
         </SheetContent>
       </Sheet>
@@ -117,7 +117,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
           <div className="flex flex-wrap items-start justify-between gap-3 pr-10">
             <div className="min-w-0">
               <SheetTitle className="truncate text-xl font-black text-white">{service.displayName}</SheetTitle>
-              <SheetDescription className="mt-2 leading-6 text-slate-400">{service.userStatusDescription || 'Project OS observes this service but does not manage it.'}</SheetDescription>
+              <SheetDescription className="mt-2 leading-6 text-slate-400">{service.userStatusDescription || 'Autark-OS observes this service but does not manage it.'}</SheetDescription>
             </div>
             <Badge className={stateBadgeClass(service)} variant="outline">{service.userStatusLabel || (service.pinned ? 'Pinned' : 'Found')}</Badge>
           </div>
@@ -204,7 +204,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
             <section className="grid gap-3 rounded-lg border border-amber-300/20 bg-amber-500/8 p-4">
               <div>
                 <h3 className="font-bold text-white">Adoption plan</h3>
-                <p className="mt-1 text-sm leading-6 text-amber-100/75">{adoptionAction.disabled ? adoptionAction.reason || 'This service cannot be adopted safely yet.' : 'Review the plan before Project OS takes control of this service.'}</p>
+                <p className="mt-1 text-sm leading-6 text-amber-100/75">{adoptionAction.disabled ? adoptionAction.reason || 'This service cannot be adopted safely yet.' : 'Review the plan before Autark-OS takes control of this service.'}</p>
               </div>
               {canAdopt && !plan && (
                 <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before loading an adoption plan.">
@@ -216,7 +216,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
               )}
               {plan && (
                 <div className="grid gap-3 text-sm">
-                  <p className="leading-6 text-amber-50/85">{typeof plan.summary === 'string' ? plan.summary : 'Project OS prepared an adoption plan for this service.'}</p>
+                  <p className="leading-6 text-amber-50/85">{typeof plan.summary === 'string' ? plan.summary : 'Autark-OS prepared an adoption plan for this service.'}</p>
                   <PlanList title="Containers" items={planList(plan.containers)} />
                   <PlanList title="Steps" items={planList(plan.steps)} />
                   <PlanList title="Warnings" items={planList(plan.warnings)} />

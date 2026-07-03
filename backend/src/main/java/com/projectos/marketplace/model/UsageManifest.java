@@ -21,7 +21,7 @@ public record UsageManifest(
                 "Ready to use",
                 "Open the app in your browser after installation.",
                 false,
-                List.of("Open the app from Project OS."),
+                List.of("Open the app from Autark-OS."),
                 List.of(),
                 List.of());
     }

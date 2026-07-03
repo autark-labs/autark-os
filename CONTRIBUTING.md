@@ -1,8 +1,8 @@
-# Contributing to Project OS
+# Contributing to Autark-OS
 
-Thanks for taking the time to contribute. Project OS is still early, and community help is welcome. The main way to propose changes right now is through GitHub pull requests.
+Thanks for taking the time to contribute. Autark-OS is still early, and community help is welcome. The main way to propose changes right now is through GitHub pull requests.
 
-Project OS is tied closely to the Autark Labs brand and product direction, so maintainers keep final say over what ships. That does not mean contributions need to be perfect before you open them. It means changes should be easy to review, easy to test, and aligned with the product promise: a calm, guided runtime for self-hosted apps.
+Autark-OS is tied closely to the Autark Labs brand and product direction, so maintainers keep final say over what ships. That does not mean contributions need to be perfect before you open them. It means changes should be easy to review, easy to test, and aligned with the product promise: a calm, guided runtime for self-hosted apps.
 
 ## How To Contribute
 
@@ -53,7 +53,7 @@ Helpful PRs make maintainer review easier by clearly answering:
 
 ## Product Principles
 
-Project OS should feel like a calm appliance, not a generic infrastructure dashboard.
+Autark-OS should feel like a calm appliance, not a generic infrastructure dashboard.
 
 Please keep these principles in mind:
 
@@ -62,7 +62,7 @@ Please keep these principles in mind:
 - Do not expose raw Docker, Tailscale, filesystem, or network detail unless the user is in an advanced or diagnostics flow.
 - Preserve data by default.
 - Use plan-then-apply for destructive or complex actions.
-- Never show found, foreign, or legacy resources as simply installed by the current Project OS instance.
+- Never show found, foreign, or legacy resources as simply installed by the current Autark-OS instance.
 - Avoid no-op buttons, placeholder controls, or UI that implies functionality that is not implemented.
 
 ## Development Setup
@@ -150,7 +150,7 @@ Before requesting review, check that your PR:
 ### Frontend And UI
 
 - Use shadcn/Radix primitives where practical.
-- Reuse Project OS primitives and page components instead of copying card, badge, panel, and empty-state styling.
+- Reuse Autark-OS primitives and page components instead of copying card, badge, panel, and empty-state styling.
 - Keep pages calm and action-oriented.
 - Put technical detail behind advanced sections, diagnostics, disclosures, or tooltips.
 - Make disabled actions explain why they are unavailable.
@@ -158,7 +158,7 @@ Before requesting review, check that your PR:
 
 ### Styling
 
-- Prefer semantic shadcn tokens, Project OS primitives, and readable Tailwind classes.
+- Prefer semantic shadcn tokens, Autark-OS primitives, and readable Tailwind classes.
 - Avoid arbitrary hex colors and one-off visual systems.
 - Do not introduce broad global styling rewrites in feature PRs.
 - Keep `className` usage readable and grouped by layout, spacing, typography, color, border, and interaction.
@@ -181,7 +181,7 @@ Use the [manifest authoring checklist](docs/manifest-authoring-checklist.md).
 
 ## Security And Safety
 
-Project OS controls containers, app data, backups, private access, and privileged host operations. Treat changes accordingly.
+Autark-OS controls containers, app data, backups, private access, and privileged host operations. Treat changes accordingly.
 
 Do not include real secrets, tokens, private hostnames, credentials, support bundles, or user data in issues or PRs.
 
@@ -218,4 +218,4 @@ Release process changes should be proposed in an issue before implementation.
 
 Be direct, respectful, and practical. Technical disagreement is fine. Keep discussion focused on user outcomes, safety, maintainability, and the product direction.
 
-Project OS is trying to make self-hosting less fragile for normal people. Contributions that protect that goal are the ones most likely to land.
+Autark-OS is trying to make self-hosting less fragile for normal people. Contributions that protect that goal are the ones most likely to land.

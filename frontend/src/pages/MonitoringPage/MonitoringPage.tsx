@@ -114,7 +114,7 @@ function MonitoringPage() {
               <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Monitoring</p>
               <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">System Activity</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-                See what Project OS is checking, fixing, and waiting on in the background.
+                See what Autark-OS is checking, fixing, and waiting on in the background.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -138,7 +138,7 @@ function MonitoringPage() {
             icon={postureIcon(reliability?.posture)}
             label="System posture"
             value={reliability?.headline || (monitoring.isLoading ? 'Checking' : 'No apps yet')}
-            detail={reliability?.summary || 'Project OS will summarize app stability here.'}
+            detail={reliability?.summary || 'Autark-OS will summarize app stability here.'}
             tone={postureTone(reliability?.posture)}
           />
           <SignalCard
@@ -189,7 +189,7 @@ function MonitoringPage() {
                 <Activity className="size-5 text-cyan-200" />
                 <h2 className="text-xl font-black text-white">Recent activity</h2>
               </div>
-              <p className="mt-1 text-sm text-slate-400">{showAdvancedMetrics ? 'Install progress, health checks, repairs, private access changes, and backend warnings.' : 'The latest visible work Project OS has done for apps, backups, access, and repairs.'}</p>
+              <p className="mt-1 text-sm text-slate-400">{showAdvancedMetrics ? 'Install progress, health checks, repairs, private access changes, and backend warnings.' : 'The latest visible work Autark-OS has done for apps, backups, access, and repairs.'}</p>
             </div>
             <Badge className="border-slate-700 bg-slate-900 text-slate-300">{monitoring.activity.length} events</Badge>
           </div>
@@ -205,7 +205,7 @@ function MonitoringPage() {
 
           <div className="mt-5 flex max-h-[680px] flex-col gap-3 overflow-y-auto pr-2 [scrollbar-color:rgba(103,232,249,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
             {monitoring.isLoading ? (
-              <EmptyState title="Loading activity" message="Project OS is checking recent events." />
+              <EmptyState title="Loading activity" message="Autark-OS is checking recent events." />
             ) : monitoring.activity.length ? (
               monitoring.activity.map((event) => (
                 <ActivityRow
@@ -227,7 +227,7 @@ function MonitoringPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-black text-white">Needs attention</h2>
-                <p className="mt-1 text-sm text-slate-400">Apps Project OS cannot fully fix on its own.</p>
+                <p className="mt-1 text-sm text-slate-400">Apps Autark-OS cannot fully fix on its own.</p>
               </div>
               <Badge className={cn('border', (reliability?.issues.length ?? 0) > 0 ? 'border-orange-400/45 bg-orange-500/10 text-orange-200' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
                 {reliability?.issues.length ?? 0}
@@ -235,7 +235,7 @@ function MonitoringPage() {
             </div>
             <div className="mt-4 grid gap-3">
               {reliability?.issues.length ? reliability.issues.map((issue) => <IssueCard issue={issue} key={`${issue.appId}-${issue.status}`} />) : (
-                <EmptyState title="No active issues" message="Project OS has not found any app stability issues." compact />
+                <EmptyState title="No active issues" message="Autark-OS has not found any app stability issues." compact />
               )}
             </div>
           </MonitoringPanel>
@@ -244,7 +244,7 @@ function MonitoringPage() {
             <h2 className="text-lg font-black text-white">What gets logged</h2>
             <div className="mt-4 grid gap-3 text-sm text-slate-300">
               <GuideRow icon={CheckCircle2} title="Successful work" text="Installs, repairs, access updates, and app checks that completed." />
-              <GuideRow icon={AlertTriangle} title="Needs attention" text="Problems Project OS detected or could not safely repair." />
+              <GuideRow icon={AlertTriangle} title="Needs attention" text="Problems Autark-OS detected or could not safely repair." />
               <GuideRow icon={ShieldCheck} title="Background repair" text="Safe restart and private-link repair attempts performed by the guardian." />
               <GuideRow icon={Clock3} title="Timing" text="This page refreshes automatically every few seconds while it is open." />
             </div>
@@ -263,7 +263,7 @@ function SystemActivitySummary({ highlightedIssue, recentEvents, recentFixes, re
           <div>
             <div className="flex items-center gap-2">
               <Activity className="size-5 text-cyan-200" />
-              <h2 className="text-xl font-black text-white">What Project OS is doing</h2>
+              <h2 className="text-xl font-black text-white">What Autark-OS is doing</h2>
             </div>
             <p className="mt-1 text-sm text-slate-400">Recent checks, background repairs, and app activity in plain language.</p>
           </div>
@@ -271,7 +271,7 @@ function SystemActivitySummary({ highlightedIssue, recentEvents, recentFixes, re
         </div>
         <div className="mt-5 grid gap-3">
           {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} />) : (
-            <EmptyState compact title="No recent activity" message="Project OS has not logged visible work for the current filters yet." />
+            <EmptyState compact title="No recent activity" message="Autark-OS has not logged visible work for the current filters yet." />
           )}
         </div>
       </MonitoringPanel>
@@ -301,12 +301,12 @@ function SystemActivitySummary({ highlightedIssue, recentEvents, recentFixes, re
             </span>
             <div>
               <h2 className="text-lg font-black text-white">Automatic fixes</h2>
-              <p className="mt-1 text-sm text-slate-400">{recentFixes.length ? 'Recent safe repairs Project OS completed.' : 'No automatic repairs were needed recently.'}</p>
+              <p className="mt-1 text-sm text-slate-400">{recentFixes.length ? 'Recent safe repairs Autark-OS completed.' : 'No automatic repairs were needed recently.'}</p>
             </div>
           </div>
           <div className="mt-4 grid gap-2">
             {recentFixes.slice(0, 3).map((event) => <CompactActivityItem event={event} key={event.id} />)}
-            {!recentFixes.length && <EmptyState compact title="Quiet is good" message="Project OS will list safe repair work here when it happens." />}
+            {!recentFixes.length && <EmptyState compact title="Quiet is good" message="Autark-OS will list safe repair work here when it happens." />}
           </div>
         </MonitoringPanel>
 
@@ -340,7 +340,7 @@ function HighlightedIssueCard({ issue }: { issue: AppReliabilityIssue | null }) 
           <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
           <div>
             <h2 className="font-black text-white">No highlighted issue</h2>
-            <p className="mt-1 text-sm text-emerald-100/80">Project OS has not found an app issue that needs action right now.</p>
+            <p className="mt-1 text-sm text-emerald-100/80">Autark-OS has not found an app issue that needs action right now.</p>
           </div>
         </div>
       </section>
@@ -391,7 +391,7 @@ function ProjectOsMetricsPanel({ appTrendData, categoryData, history, levelData,
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="size-5 text-cyan-200" />
-            <h2 className="text-xl font-black text-white">Project OS metrics</h2>
+            <h2 className="text-xl font-black text-white">Autark-OS metrics</h2>
           </div>
           <p className="mt-1 text-sm text-slate-400">A quick read on system activity, app health, and managed app resource usage.</p>
         </div>
@@ -546,7 +546,7 @@ function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { histo
             <Server className="size-5 text-cyan-300" />
             <h2 className="text-xl font-black text-white">Device instrumentation</h2>
           </div>
-          <p className="mt-1 text-sm text-slate-400">Current host readings for the device running Project OS. Memory uses Linux available memory so cache does not look like active app usage.</p>
+          <p className="mt-1 text-sm text-slate-400">Current host readings for the device running Autark-OS. Memory uses Linux available memory so cache does not look like active app usage.</p>
         </div>
         <Badge className="border-cyan-300/20 bg-cyan-500/10 text-cyan-100">{metrics ? formatDate(metrics.checkedAt) : 'Waiting'}</Badge>
       </div>
@@ -554,11 +554,11 @@ function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { histo
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <MetricRing icon={Cpu} label="Device CPU" value={metrics?.systemCpuPercent ?? -1} detail={metrics ? `${metrics.availableProcessors} cores available` : 'No sample yet'} tone="cyan" />
         <MetricRing icon={MemoryStick} label="Memory" value={metrics?.usedMemoryPercent ?? -1} detail={metrics ? `${formatBytes(memoryUsedBytes)} used of ${formatBytes(metrics.totalMemoryBytes)}` : 'No sample yet'} tone="cyan" />
-        <MetricRing icon={HardDrive} label="Project OS disk" value={metrics?.runtimeUsedPercent ?? -1} detail={metrics ? `${formatBytes(runtimeUsedBytes)} used of ${formatBytes(metrics.runtimeTotalBytes)}` : 'No sample yet'} tone="orange" />
+        <MetricRing icon={HardDrive} label="Autark-OS disk" value={metrics?.runtimeUsedPercent ?? -1} detail={metrics ? `${formatBytes(runtimeUsedBytes)} used of ${formatBytes(metrics.runtimeTotalBytes)}` : 'No sample yet'} tone="orange" />
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
-        <MetricDetail icon={Server} label="Device" value={metrics?.deviceName || 'Project OS device'} />
+        <MetricDetail icon={Server} label="Device" value={metrics?.deviceName || 'Autark-OS device'} />
         <MetricDetail icon={Cpu} label="OS" value={metrics ? `${metrics.osName} ${metrics.osVersion}` : 'Not reported'} />
         <MetricDetail icon={MemoryStick} label="Available memory" value={metrics ? `${formatBytes(metrics.freeMemoryBytes)} available` : 'Not reported'} />
         <MetricDetail icon={Activity} label="System load" value={metrics ? loadLabel(metrics.systemLoadAverage, metrics.availableProcessors) : 'Not reported'} />
@@ -601,7 +601,7 @@ function DeviceInstrumentationPanel({ history, hostTrendData, metrics }: { histo
             </AreaChart>
           </ChartContainer>
         ) : (
-          <EmptyState title="Trend is still warming up" message="Project OS needs at least two retained host samples before drawing this trend." compact />
+          <EmptyState title="Trend is still warming up" message="Autark-OS needs at least two retained host samples before drawing this trend." compact />
         )}
       </MonitoringInset>
     </MonitoringPanel>

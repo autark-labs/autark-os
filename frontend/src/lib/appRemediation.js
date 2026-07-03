@@ -31,7 +31,7 @@ export function buildAppRemediation({ access, app, health, reconciliation, telem
   if (privateAccessIssue) {
     return privateAccessRemediation({
       appId: app?.appId,
-      summary: reconciliation.detail || reconciliation.message || 'Project OS could not verify this private Tailscale link.',
+      summary: reconciliation.detail || reconciliation.message || 'Autark-OS could not verify this private Tailscale link.',
     });
   }
 
@@ -49,8 +49,8 @@ export function buildAppRemediation({ access, app, health, reconciliation, telem
       severity: 'warning',
       tone: 'amber',
       title: 'The app is running, but its link is not responding',
-      summary: access.message || 'Project OS could not reach the configured app URL.',
-      nextStep: 'Restart the app. If the URL was changed outside Project OS, update the app address in Settings.',
+      summary: access.message || 'Autark-OS could not reach the configured app URL.',
+      nextStep: 'Restart the app. If the URL was changed outside Autark-OS, update the app address in Settings.',
       safeAction: { kind: 'app-action', action: 'restart', label: 'Restart app' },
       checklist: ['Confirm the local address is still correct.', 'Restart before changing app data.', 'Use Settings to update the app URL if needed.'],
       dangerousActions: [],
@@ -86,7 +86,7 @@ export function buildAppRemediationFromIssue(issue) {
   if (text.includes('private') || text.includes('tailscale')) {
     return privateAccessRemediation({
       appId: issue.appId,
-      summary: issue.detail || issue.message || 'Project OS could not verify this private Tailscale link.',
+      summary: issue.detail || issue.message || 'Autark-OS could not verify this private Tailscale link.',
     });
   }
   return appHealthRemediation({

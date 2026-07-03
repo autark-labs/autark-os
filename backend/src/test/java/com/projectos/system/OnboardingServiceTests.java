@@ -93,8 +93,8 @@ class OnboardingServiceTests {
             return new SystemDoctorStatus(
                     "ready",
                     "This device is ready",
-                    "Project OS can manage apps, backups, and private access.",
-                    new SystemReadinessStatus("ready", "Ready", "Project OS is ready.", true, false, List.of()),
+                    "Autark-OS can manage apps, backups, and private access.",
+                    new SystemReadinessStatus("ready", "Ready", "Autark-OS is ready.", true, false, List.of()),
                     List.of(),
                     List.of(),
                     "Linux",

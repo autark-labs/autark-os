@@ -84,9 +84,9 @@ test('backup job copy distinguishes backup, verification, and restore jobs', () 
   assert.equal(backupJobBannerTitle({ type: 'backup_verify' }), 'Verification in progress');
   assert.equal(backupJobBannerTitle({ type: 'backup_restore' }), 'Restore in progress');
 
-  assert.equal(backupJobStartedMessage({ type: 'backup' }), 'Backup job started. Project OS will update restore points when it finishes.');
-  assert.equal(backupJobStartedMessage({ type: 'backup_verify' }), 'Verification job started. Project OS will update the restore point when it finishes.');
-  assert.equal(backupJobStartedMessage({ type: 'backup_restore' }), 'Restore job started. Project OS will update app and backup state when it finishes.');
+  assert.equal(backupJobStartedMessage({ type: 'backup' }), 'Backup job started. Autark-OS will update restore points when it finishes.');
+  assert.equal(backupJobStartedMessage({ type: 'backup_verify' }), 'Verification job started. Autark-OS will update the restore point when it finishes.');
+  assert.equal(backupJobStartedMessage({ type: 'backup_restore' }), 'Restore job started. Autark-OS will update app and backup state when it finishes.');
 
   assert.equal(backupJobCompletedMessage({ type: 'backup' }), 'Backup job completed.');
   assert.equal(backupJobCompletedMessage({ type: 'backup_verify' }), 'Verification job completed.');
