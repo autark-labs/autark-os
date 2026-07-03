@@ -243,7 +243,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                     </div>
                   )}
                   {planAvailable && (
-                    <DisabledAction disabled={adoptDisabled} reason={busyAction !== null ? 'Wait for the current service action to finish before adopting.' : blockedReasons.length > 0 ? 'Resolve the blocked adoption items before adopting this service.' : confirmationText ? 'Type the confirmation text exactly before adopting this service.' : 'This adoption plan is not available yet.'}>
+                    <DisabledAction disabled={adoptDisabled} reason={busyAction !== null ? 'Wait for the current service action to finish before adopting.' : blockedReasons.length > 0 ? 'Resolve the blocked adoption items before adopting this service.' : confirmationText ? 'Type the confirmation text exactly before adopting this service.' : 'Review the loaded adoption plan before adopting this service.'}>
                       <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={adoptDisabled} onClick={() => runMutation('adopt', () => ObservedServicesAPIClient.adopt(service.id, confirmation), { refresh: false })} type="button">
                         {busyAction === 'adopt' ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
                         Adopt service

@@ -306,5 +306,5 @@ function adoptDisabledReason(busyAction: ObservedServiceAction | null, blockedRe
   if (confirmationText) {
     return 'Type the confirmation text exactly before adopting this service.';
   }
-  return 'This recovery plan is not available yet.';
+  return 'Reload the recovery plan before adopting this service.';
 }

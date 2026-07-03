@@ -2,7 +2,6 @@ import type { ComponentType, ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Info, MoreVertical, Sparkles, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
 import {
   ProjectDarkControlButton,
   ProjectOpenButton,
@@ -254,13 +253,7 @@ export function HomeQuickAccessTile({
     <ProjectOpenButton asChild className="h-9 rounded-lg px-4 text-sm font-semibold" size="sm">
       <Link to={to}>{actionLabel}</Link>
     </ProjectOpenButton>
-  ) : (
-    <DisabledAction disabled reason="This action is not available yet.">
-      <ProjectOpenButton className="h-9 rounded-lg px-4 text-sm font-semibold" disabled size="sm" type="button">
-        {actionLabel}
-      </ProjectOpenButton>
-    </DisabledAction>
-  );
+  ) : null;
   const secondaryAction = secondaryActionLabel && secondaryTo ? (
     <ProjectDarkControlButton asChild className="h-9 rounded-lg px-4 text-sm font-semibold" size="sm">
       <Link to={secondaryTo}>{secondaryActionLabel}</Link>
@@ -294,10 +287,12 @@ export function HomeQuickAccessTile({
           {description && <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-sky-100/65">{description}</p>}
         </div>
       </div>
-      <div className={cn('grid gap-2 pt-4', secondaryAction && '2xl:grid-cols-2')}>
-        {action}
-        {secondaryAction}
-      </div>
+      {(action || secondaryAction) && (
+        <div className={cn('grid gap-2 pt-4', action && secondaryAction && '2xl:grid-cols-2')}>
+          {action}
+          {secondaryAction}
+        </div>
+      )}
     </HomeSoftCard>
   );
 }
@@ -382,13 +377,7 @@ export function HomeActionButton({
       </ButtonComponent>
     );
   }
-  return (
-    <DisabledAction disabled reason="This action is not available yet.">
-      <ProjectPrimaryButton className={className} disabled size="sm" type="button">
-        {label}
-      </ProjectPrimaryButton>
-    </DisabledAction>
-  );
+  return null;
 }
 
 function HomeGlowBadge({

@@ -1,7 +1,6 @@
 import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
 import { useRecommendedActionQuery } from '@/repositories/recommendedActionRepository';
@@ -90,13 +89,7 @@ function RecommendedActionButton({ action, severity }: { action?: ProjectOsActio
     );
   }
 
-  return (
-    <DisabledAction disabled reason="This action is not available yet.">
-      <ButtonComponent className="w-full sm:w-auto" disabled size="sm" type="button">
-        {label}
-      </ButtonComponent>
-    </DisabledAction>
-  );
+  return null;
 }
 
 function severityIcon(severity?: string): LucideIcon {

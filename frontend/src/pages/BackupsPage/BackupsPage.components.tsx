@@ -84,7 +84,7 @@ export function RoutineHealthPanel({ report, showAdvancedMetrics }: { report: Ba
   );
 }
 
-export function ActionCard({ busy, description, disabled = false, disabledReason = 'This action is not available yet.', icon: Icon, label, onClick, title, tone }: { busy: boolean; description: string; disabled?: boolean; disabledReason?: string; icon: LucideIcon; label: string; onClick: () => void; title: string; tone: 'cyan' | 'sky' | 'emerald' }) {
+export function ActionCard({ busy, description, disabled = false, disabledReason = 'This action is unavailable for the current backup state.', icon: Icon, label, onClick, title, tone }: { busy: boolean; description: string; disabled?: boolean; disabledReason?: string; icon: LucideIcon; label: string; onClick: () => void; title: string; tone: 'cyan' | 'sky' | 'emerald' }) {
   const tones = {
     cyan: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
     sky: 'border-sky-400/30 bg-sky-500/10 text-sky-100',

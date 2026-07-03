@@ -134,14 +134,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
                     Review existing service
                   </Link>
                 </ProjectWarningButton>
-              ) : (
-                <DisabledAction disabled reason="Project OS cannot open the existing service review yet. Refresh existing apps and try again.">
-                  <ProjectWarningButton disabled type="button">
-                    <TriangleAlert className="size-4" />
-                    Review existing service
-                  </ProjectWarningButton>
-                </DisabledAction>
-              )}
+              ) : null}
               <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
                 <ProjectDarkControlButton disabled={installDisabled} onClick={openDuplicateWarning} type="button">
                   Install second copy
@@ -216,6 +209,10 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
 }
 
 function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
+  if (!app.sourceUrl && !app.documentationUrl) {
+    return null;
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -227,7 +224,7 @@ function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
       <DropdownMenuContent align="start" className="w-64 border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
         <DropdownMenuLabel>{app.name}</DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-sky-400/20" />
-        {app.sourceUrl ? (
+        {app.sourceUrl && (
           <DropdownMenuItem asChild className="focus:bg-slate-700 focus:text-white">
             <a href={app.sourceUrl} rel="noreferrer" target="_blank">
               <ExternalLink className="mr-2 size-4" />
@@ -235,15 +232,8 @@ function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
               <span className="ml-auto text-xs text-slate-400">{app.source}</span>
             </a>
           </DropdownMenuItem>
-        ) : (
-          <DisabledAction className="w-full" disabled reason="This catalog app does not publish a source URL yet.">
-            <DropdownMenuItem className="focus:bg-slate-700 focus:text-white" disabled>
-              View source
-              <span className="ml-auto text-xs text-slate-400">Unavailable</span>
-            </DropdownMenuItem>
-          </DisabledAction>
         )}
-        {app.documentationUrl ? (
+        {app.documentationUrl && (
           <DropdownMenuItem asChild className="focus:bg-slate-700 focus:text-white">
             <a href={app.documentationUrl} rel="noreferrer" target="_blank">
               <BookOpen className="mr-2 size-4" />
@@ -251,13 +241,6 @@ function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
               <span className="ml-auto text-xs text-slate-400">External</span>
             </a>
           </DropdownMenuItem>
-        ) : (
-          <DisabledAction className="w-full" disabled reason="This catalog app does not publish documentation yet.">
-            <DropdownMenuItem className="focus:bg-slate-700 focus:text-white" disabled>
-              Read docs
-              <span className="ml-auto text-xs text-slate-400">Unavailable</span>
-            </DropdownMenuItem>
-          </DisabledAction>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

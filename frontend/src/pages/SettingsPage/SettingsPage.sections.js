@@ -20,8 +20,8 @@ export const settingsGroups = [
   {
     id: 'advanced',
     label: 'Advanced',
-    description: 'Update channel and low-level host details',
-    sections: ['updates', 'advanced'],
+    description: 'Low-level host details and support checks',
+    sections: ['advanced'],
   },
 ];
 

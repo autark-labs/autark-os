@@ -80,3 +80,11 @@ test('marketplace first-backup prompt uses canonical installed backup protection
   assert.match(detail, /protectedByBackups/);
   assert.doesNotMatch(detail, /function shouldOfferFirstBackup\([^)]*\) \{\s*return true;\s*\}/s);
 });
+
+test('marketplace hides dead link controls when an app lacks URLs or review targets', () => {
+  const detail = source('MarketplaceAppDetail.tsx');
+  const duplicateWarning = source('DuplicateInstallWarningDialog.tsx');
+
+  assert.doesNotMatch(detail, /cannot open the existing service review yet|does not publish a source URL yet|does not publish documentation yet/);
+  assert.doesNotMatch(duplicateWarning, /cannot open the existing service review yet|Review existing service[\s\S]*disabled/);
+});

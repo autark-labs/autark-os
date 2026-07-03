@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { TriangleAlert } from 'lucide-react';
-import { DisabledAction } from '@/components/project-os/DisabledAction';
 import { Button } from '@/components/ui/button';
 import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import {
@@ -34,16 +33,10 @@ export function DuplicateInstallWarningDialog({ appName, onInstallCopy, onOpenCh
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2 border-sky-400/25 bg-slate-800">
-          {reviewHref ? (
+          {reviewHref && (
             <ProjectWarningButton asChild>
               <Link to={reviewHref}>Review existing service</Link>
             </ProjectWarningButton>
-          ) : (
-            <DisabledAction disabled reason="Project OS cannot open the existing service review yet. Refresh existing apps and try again.">
-              <Button className="bg-slate-950 text-slate-300" disabled type="button">
-                Review existing service
-              </Button>
-            </DisabledAction>
           )}
           <Button
             className="border-sky-400/25 bg-slate-900 text-slate-300 hover:bg-slate-700 hover:text-slate-50"

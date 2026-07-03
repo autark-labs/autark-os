@@ -60,7 +60,7 @@ type SettingsState = {
   version: ProjectVersionInfo | null;
 };
 
-type SettingsSection = 'general' | 'system' | 'network' | 'storage' | 'backups' | 'applications' | 'security' | 'updates' | 'remote-access' | 'advanced';
+type SettingsSection = 'general' | 'system' | 'network' | 'storage' | 'backups' | 'applications' | 'security' | 'remote-access' | 'advanced';
 type SettingsGroupId = 'general' | 'backups' | 'network' | 'advanced';
 
 type SettingHelp = {
@@ -120,20 +120,6 @@ const settingHelp: Record<string, SettingHelp> = {
     body: 'Stores the preferred access posture for new installs. Manifests can still require stricter behavior for safety.',
     usedFor: ['Marketplace defaults', 'Private access recommendations', 'Future install wizard defaults'],
     tip: 'Manifest default is safest while the catalog is still growing.',
-  },
-  updateChannel: {
-    id: 'updateChannel',
-    title: 'Update channel',
-    body: 'Controls whether this install should prefer stable releases or preview functionality once update delivery is wired in.',
-    usedFor: ['Future update checks', 'Release messaging', 'Support context'],
-    tip: 'Use stable unless you are intentionally testing new Project OS features.',
-  },
-  advancedMetrics: {
-    id: 'advancedMetrics',
-    title: 'Show advanced metrics',
-    body: 'Stores whether advanced resource and host details should be shown by default.',
-    usedFor: ['Monitoring defaults', 'Support context', 'Power-user views'],
-    tip: 'Keep this off if the interface feels too noisy.',
   },
 };
 
@@ -278,7 +264,7 @@ function SettingsPage() {
           <div>
             <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Settings</p>
             <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Project OS controls</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, services, app defaults, backups, updates, and advanced host details.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, services, app defaults, backups, and advanced host details.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={cn('border', dirty ? 'border-orange-300/35 bg-orange-500/10 text-orange-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
@@ -435,9 +421,6 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
       <ReadOnlyRow label="Data root" note="Location for app data and persistent storage." value={metrics?.runtimeRoot || 'Unknown'} />
       <ReadOnlyRow label="Runtime disk used" note="Project OS data usage on the runtime disk." value={percentLabel(metrics?.runtimeUsedPercent)} />
       <ReadOnlyRow label="Runtime disk free" note="Available space for app data and backups." value={formatBytes(metrics?.runtimeUsableBytes ?? 0)} />
-      <SettingRow helpId="advancedMetrics" label="Show advanced disk info" note="Show detailed disk usage and filesystem information.">
-        <Badge className="border-sky-400/25 bg-slate-950 text-slate-300">Coming soon</Badge>
-      </SettingRow>
     </SettingsGroup>
   );
 }
@@ -477,27 +460,11 @@ function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRu
   );
 }
 
-function SecurityPanel({ draft, onUpdate, setup }: PanelProps & { setup: SystemSetupStatus | null }) {
+function SecurityPanel({ setup }: { setup: SystemSetupStatus | null }) {
   return (
     <SettingsGroup description="Configure security and access options." title="Security">
       <ReadOnlyRow label="Service user" note="Recommended production user for backend operations." value={setup?.expectedUser || 'projectos'} />
-      <SettingRow helpId="advancedMetrics" label="Audit logging" note="Record important system and user actions.">
-        <Switch checked={draft.showAdvancedMetrics} onCheckedChange={(checked) => onUpdate({ showAdvancedMetrics: checked })} />
-      </SettingRow>
       <ReadOnlyRow label="Docker socket access" note="Required for Project OS to manage containers." value={setup?.dockerVersion ? 'Available' : 'Not detected'} />
-    </SettingsGroup>
-  );
-}
-
-function UpdatesPanel({ draft, onUpdate, version }: PanelProps & { version: ProjectVersionInfo | null }) {
-  return (
-    <SettingsGroup description="Choose how Project OS should handle future updates." title="Updates">
-      <ReadOnlyRow label="Installed version" note={version?.buildDate ? `Built ${version.buildDate}` : 'Current Project OS build.'} value={version?.version || 'Unknown'} />
-      <ReadOnlyRow label="Build" note="Used when sharing support details." value={version?.buildSha || 'Unknown'} />
-      <SettingRow helpId="updateChannel" label="Update channel" note="Choose stable releases or preview functionality.">
-        <SettingsSelect value={draft.updateChannel} onChange={(value) => onUpdate({ updateChannel: value })} options={[['stable', 'Stable'], ['preview', 'Preview']]} />
-      </SettingRow>
-      <ReadOnlyRow label="Update checks" note={version?.updateMessage || 'Update delivery is not implemented yet.'} value={version?.updateStatus === 'unavailable' ? 'Unavailable until signed releases exist' : humanize(version?.updateStatus || 'unknown')} />
     </SettingsGroup>
   );
 }
@@ -515,15 +482,14 @@ function RemoteAccessPanel({ apps, draft, onUpdate, setup }: PanelProps & { apps
   );
 }
 
-function AdvancedPanel({ checks, copied, metrics, onCopy, onUpdate, settings, setup, version }: SystemPanelProps) {
+function AdvancedPanel({ checks, copied, metrics, onCopy, setup, version }: SystemPanelProps) {
   return (
     <SettingsGroup description="Low-level Project OS values for power users." title="Advanced">
       <div className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-4 text-sm leading-6 text-cyan-100">
-        Advanced settings expose host details, raw paths, and instrumentation defaults. Keep these available for troubleshooting, but change them intentionally.
+        Advanced details expose host checks, raw paths, and runtime facts for troubleshooting.
       </div>
-      <SettingRow helpId="advancedMetrics" label="Show advanced metrics" note="Default advanced instrumentation visibility.">
-        <Switch checked={settings.showAdvancedMetrics} onCheckedChange={(checked) => onUpdate({ showAdvancedMetrics: checked })} />
-      </SettingRow>
+      <ReadOnlyRow label="Installed version" note={version?.buildDate ? `Built ${version.buildDate}` : 'Current Project OS build.'} value={version?.version || 'Unknown'} />
+      <ReadOnlyRow label="Build" note="Used when sharing support details." value={version?.buildSha || 'Unknown'} />
       <ReadOnlyRow label="Backend port" note="Local API port." value={setup?.backendPort || '8082'} />
       <ReadOnlyRow label="Install path" note="Where Project OS binaries are installed." value={version?.installPath || 'Unknown'} />
       <ReadOnlyRow label="Backend jar" note="Active backend artifact path." value={version?.backendJar || 'Unknown'} />
@@ -603,9 +569,7 @@ function SettingsPanelBySection({ advancedChecks, apps, backupRoot, copied, doct
     case 'remote-access':
       return <RemoteAccessPanel apps={apps} draft={draft} onUpdate={onUpdate} setup={setup} />;
     case 'security':
-      return <SecurityPanel draft={draft} onUpdate={onUpdate} setup={setup} />;
-    case 'updates':
-      return <UpdatesPanel draft={draft} onUpdate={onUpdate} version={version} />;
+      return <SecurityPanel setup={setup} />;
     case 'advanced':
       return <AdvancedPanel checks={advancedChecks} copied={copied} doctor={doctor} draft={draft} metrics={metrics} onCopy={onCopy} onUpdate={onUpdate} settings={draft} setup={setup} version={version} />;
     default:
@@ -751,10 +715,6 @@ function shortSha(value: string) {
     return value || 'unknown';
   }
   return value.length > 12 ? value.slice(0, 12) : value;
-}
-
-function humanize(value: string) {
-  return value.replaceAll('-', ' ').replaceAll('_', ' ');
 }
 
 function formatBytes(value: number) {

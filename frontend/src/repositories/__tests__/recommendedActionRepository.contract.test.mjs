@@ -34,3 +34,10 @@ test('primary pages render canonical recommended action through shared component
   assert.match(component, /PrimaryActionCard/);
   assert.match(component, /no-action-needed/);
 });
+
+test('recommended actions never render a generic unavailable button', () => {
+  const component = source('src/components/project-os/CanonicalRecommendedAction.tsx');
+
+  assert.doesNotMatch(component, /This action is not available yet/);
+  assert.doesNotMatch(component, /DisabledAction/);
+});
