@@ -34,3 +34,66 @@ test('offers sign-in and setup-later controls when Tailscale is disconnected', (
   assert.deepEqual(actions.map((action) => action.id), ['signin', 'access', 'refresh']);
   assert.equal(actions[0].href, 'https://login.tailscale.com/start');
 });
+
+test('does not treat successful setup checks as live Tailscale connection or Serve readiness', () => {
+  const view = tailscaleControlView(null, { status: 'ok' }, {
+    status: 'warning',
+    apps: [
+      {
+        appId: 'vaultwarden',
+        status: 'waiting',
+        expectedPrivateUrl: 'https://project-os.tailnet.ts.net:8443',
+        actualPrivateUrl: null,
+      },
+    ],
+  });
+
+  assert.equal(view.connected, false);
+  assert.equal(view.httpsReady, false);
+  assert.equal(view.serveReady, false);
+  assert.equal(view.privateLinksReady, 0);
+  assert.equal(view.label, 'Not signed in');
+});
+
+test('shows Serve ready only for live verified private-link reconciliation', () => {
+  const status = {
+    installed: true,
+    connected: true,
+    state: 'connected',
+    message: 'Project OS is connected.',
+    dnsName: 'project-os.tailnet.ts.net',
+  };
+  const desiredOnly = tailscaleControlView(status, { status: 'ok' }, {
+    status: 'warning',
+    apps: [
+      {
+        appId: 'vaultwarden',
+        status: 'waiting',
+        expectedPrivateUrl: 'https://project-os.tailnet.ts.net:8443',
+        actualPrivateUrl: 'https://project-os.tailnet.ts.net:8443',
+      },
+    ],
+  });
+
+  assert.equal(desiredOnly.connected, true);
+  assert.equal(desiredOnly.httpsReady, true);
+  assert.equal(desiredOnly.serveReady, false);
+  assert.equal(desiredOnly.privateLinksReady, 0);
+
+  const verified = tailscaleControlView(status, { status: 'ok' }, {
+    status: 'healthy',
+    apps: [
+      {
+        appId: 'vaultwarden',
+        status: 'healthy',
+        expectedPrivateUrl: 'https://project-os.tailnet.ts.net:8443',
+        actualPrivateUrl: 'https://project-os.tailnet.ts.net:8443',
+      },
+    ],
+  });
+
+  assert.equal(verified.connected, true);
+  assert.equal(verified.httpsReady, true);
+  assert.equal(verified.serveReady, true);
+  assert.equal(verified.privateLinksReady, 1);
+});

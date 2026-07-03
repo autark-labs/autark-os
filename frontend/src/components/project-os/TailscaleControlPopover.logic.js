@@ -1,11 +1,11 @@
 export function tailscaleControlView(status, check, reconciliation) {
   const mock = status?.state === 'dev' || status?.state === 'mocked_dev' || status?.message?.toLowerCase().includes('mock') || false;
-  const connected = Boolean(status?.connected || check?.status === 'ok' || mock);
+  const connected = Boolean(status?.connected || mock);
   const installed = status?.installed ?? check?.status !== 'warning';
   const magicDnsReady = connected && Boolean(status?.dnsName || mock);
-  const privateLinksReady = (reconciliation?.apps || []).filter((app) => app.status === 'healthy' || app.expectedPrivateUrl || app.actualPrivateUrl).length;
-  const httpsReady = connected && (privateLinksReady > 0 || mock || check?.status === 'ok');
-  const serveReady = connected && (reconciliation?.status === 'healthy' || privateLinksReady > 0 || mock || check?.status === 'ok');
+  const privateLinksReady = (reconciliation?.apps || []).filter((app) => app.status === 'healthy').length;
+  const httpsReady = connected && Boolean(status?.dnsName || privateLinksReady > 0 || mock);
+  const serveReady = connected && Boolean(privateLinksReady > 0 || mock);
 
   if (mock) {
     return {
@@ -23,6 +23,11 @@ export function tailscaleControlView(status, check, reconciliation) {
   }
 
   if (connected) {
+    const summary = serveReady
+      ? 'Verified private links are available for trusted devices on your tailnet.'
+      : magicDnsReady
+        ? 'Tailscale is connected. Private links will show as ready after Project OS verifies live Serve mappings.'
+        : 'Tailscale is connected, but private HTTPS links need MagicDNS and HTTPS readiness before they are available.';
     return {
       connected,
       httpsReady,
@@ -31,7 +36,7 @@ export function tailscaleControlView(status, check, reconciliation) {
       mock,
       privateLinksReady,
       serveReady,
-      summary: 'Private links are available for trusted devices on your tailnet.',
+      summary,
       title: 'Tailscale connected',
       tone: 'green',
     };
