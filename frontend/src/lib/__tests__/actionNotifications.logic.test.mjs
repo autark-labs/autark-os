@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic.js';
+import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from '../actionNotifications.logic.js';
 
 test('maps completed app action results to concise success notifications', () => {
   const notification = actionNotificationFromResult({

@@ -10,7 +10,7 @@ import {
   shouldShowStartHereSection,
   starterCatalogForDiscover,
   starterAppsForMarketplace,
-} from './MarketplacePage.logic.js';
+} from '../MarketplacePage.logic.js';
 
 function app(overrides = {}) {
   return {

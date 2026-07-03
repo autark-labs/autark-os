@@ -6,7 +6,7 @@ import {
   buildHostTrendData,
   buildLevelData,
   buildResourceData,
-} from './MonitoringPage.viewModels.js';
+} from '../MonitoringPage.viewModels.js';
 
 test('Monitoring view models group activity by visible category and level', () => {
   const events = [

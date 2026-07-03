@@ -8,7 +8,7 @@ import {
   resolveThemeId,
   storeTheme,
   themeStorageKey,
-} from './themeModel.js';
+} from '../themeModel.js';
 
 test('theme model exposes four stable Autark-OS themes', () => {
   assert.equal(defaultThemeId, 'project-slate');

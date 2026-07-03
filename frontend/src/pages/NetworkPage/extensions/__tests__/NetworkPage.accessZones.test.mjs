@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildAccessZones } from './NetworkPage.accessZones.js';
+import { buildAccessZones } from '../NetworkPage.accessZones.js';
 
 test('Access zones place public, private, LAN, pinned external, and server-only resources in readable zones', () => {
   const zones = buildAccessZones({

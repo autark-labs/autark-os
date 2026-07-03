@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildAppRemediation, buildAppRemediationFromIssue } from './appRemediation.js';
+import { buildAppRemediation, buildAppRemediationFromIssue } from '../appRemediation.js';
 
 const app = {
   appId: 'vaultwarden',

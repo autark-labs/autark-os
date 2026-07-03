@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { privateAccessUrlForApp } from './NetworkPage.privateAccess.js';
+import { privateAccessUrlForApp } from '../NetworkPage.privateAccess.js';
 
 test('private access URLs only come from canonical or observed backend state', () => {
   const privateUrl = privateAccessUrlForApp({

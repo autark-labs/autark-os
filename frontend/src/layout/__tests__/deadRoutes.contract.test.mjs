@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { primaryNavigation, routeAliases } from './navigationModel.js';
+import { primaryNavigation, routeAliases } from '../navigationModel.js';
 
 const root = process.cwd();
 

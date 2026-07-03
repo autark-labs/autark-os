@@ -4,7 +4,7 @@ import {
   backupSafetyChecklist,
   backupSafetyWarning,
   backupSafetyWarnings,
-} from './backupSafety.js';
+} from '../backupSafety.js';
 
 test('describes reinstall as preserving data folders while requiring a backup', () => {
   const warning = backupSafetyWarning('reinstall');
