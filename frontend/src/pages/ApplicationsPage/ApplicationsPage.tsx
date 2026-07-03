@@ -155,6 +155,7 @@ export const ApplicationsPage = () => {
 
   const clearApplicationFocus = useCallback(() => {
     appliedDeepLinkKeyRef.current = '';
+    setSelectedId('');
     setManagementOpen(false);
     navigate('/apps', { replace: true });
   }, [navigate]);
@@ -199,16 +200,14 @@ export const ApplicationsPage = () => {
     }
 
     if (!items.length) {
-      appliedDeepLinkKeyRef.current = '';
-      setSelectedId('');
+      clearApplicationFocus();
       return;
     }
 
     if (!items.some((item) => item.id === selectedId)) {
-      appliedDeepLinkKeyRef.current = '';
-      setSelectedId('');
+      clearApplicationFocus();
     }
-  }, [items, selectedId]);
+  }, [clearApplicationFocus, items, selectedId]);
 
   useEffect(() => {
     if (!managementOpen) {
@@ -248,16 +247,19 @@ export const ApplicationsPage = () => {
       if (target instanceof Node && railRef.current?.contains(target)) {
         return;
       }
+      if (target instanceof HTMLElement && target.closest('[data-slot="dialog-content"], [data-slot="dialog-overlay"]')) {
+        return;
+      }
 
       if (canCloseManagement()) {
         clearApplicationFocus();
       }
     };
 
-    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('pointerdown', handlePointerDown, true);
     return () => {
       scrollTimers.forEach((timer) => window.clearTimeout(timer));
-      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
     };
   }, [canCloseManagement, clearApplicationFocus, managementOpen]);
 

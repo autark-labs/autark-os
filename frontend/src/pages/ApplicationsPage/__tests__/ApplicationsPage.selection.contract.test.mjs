@@ -31,6 +31,19 @@ test('deep-link selection can reapply after selected item temporarily disappears
   assert.match(page, /appliedDeepLinkKeyRef\.current = '';\s+setSelectedId\(''\);/);
 });
 
+test('stale selected apps collapse management instead of leaving an empty expanded rail', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+
+  assert.match(page, /if \(!items\.some\(\(item\) => item\.id === selectedId\)\) \{\s+clearApplicationFocus\(\);\s+\}/);
+});
+
+test('management outside click listener runs in capture phase before child stopPropagation', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+
+  assert.match(page, /document\.addEventListener\('pointerdown', handlePointerDown, true\)/);
+  assert.match(page, /document\.removeEventListener\('pointerdown', handlePointerDown, true\)/);
+});
+
 test('empty selection is not cleared after a deep-link effect schedules a real selection', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
