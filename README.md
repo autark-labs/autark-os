@@ -181,6 +181,7 @@ docs/          User guides, runtime architecture, development plans
 ## Documentation
 
 - [Docs index](docs/README.md)
+- [Contributing](CONTRIBUTING.md)
 - [Non-technical install guide](docs/non-technical-install-guide.md)
 - [Beta testing repository](https://github.com/autark-labs/project-os/)
 - [Local development](docs/local-development.md)
