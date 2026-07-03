@@ -30,9 +30,10 @@ test('Access page private access mutations consume action results without local 
 
   assert.match(networkPage, /InstalledAppsAPIClient\.enablePrivateAccess\(app\.appId\)/);
   assert.match(networkPage, /InstalledAppsAPIClient\.disablePrivateAccess\(app\.appId\)/);
-  assert.match(networkPage, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);
-  assert.match(networkPage, /invalidateApplicationState\(queryClient\)/);
+  assert.match(networkPage, /syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.match(networkPage, /invalidateNetworkQueries\(queryClient\)/);
+  assert.doesNotMatch(networkPage, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);
+  assert.doesNotMatch(networkPage, /invalidateApplicationState\(queryClient\)/);
   assert.doesNotMatch(networkPage, /appWithOptimisticPrivateAccess/);
   assert.doesNotMatch(networkPage, /repairPrivateAccess\(app\.appId\)/);
   assert.doesNotMatch(networkPage, /queryClient\.setQueryData<ApplicationState/);

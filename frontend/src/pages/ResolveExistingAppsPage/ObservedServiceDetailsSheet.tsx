@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Loader2, Pin, PinOff, RotateCcw, Search, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
@@ -23,8 +22,6 @@ import {
 import { cn } from '@/lib/utils';
 import {
   catalogAppIsManaged,
-  setApplicationStateFromActionResultCache,
-  setObservedServicePinnedInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan, ObservedServiceView } from '@/types/observedService';
@@ -38,7 +35,6 @@ type ObservedServiceDetailsSheetProps = {
 };
 
 export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, onRefresh, open, service }: ObservedServiceDetailsSheetProps) {
-  const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [matchValue, setMatchValue] = useState('');
@@ -89,15 +85,8 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
     setLocalError(null);
     try {
       const result = await mutation();
-      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
-      if (!stateUpdated && actionId === 'pin') {
-        setObservedServicePinnedInApplicationStateCache(queryClient, currentService.id, true);
-      }
-      if (!stateUpdated && actionId === 'unpin') {
-        setObservedServicePinnedInApplicationStateCache(queryClient, currentService.id, false);
-      }
       onActionComplete(result);
-      if (!stateUpdated && (options.refresh !== false || actionId === 'pin' || actionId === 'unpin')) {
+      if (options.refresh !== false) {
         await onRefresh();
       }
     } catch (error) {

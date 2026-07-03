@@ -16,9 +16,7 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
 
   assert.match(page, /InstalledAppsAPIClient\.runAction\(appId, action\)/);
-  assert.match(page, /setProjectOsJobCache\(queryClient, data\)/);
-  assert.match(page, /setProjectOsJobInApplicationStateCache\(queryClient, data\)/);
-  assert.match(page, /invalidateApplicationState\(queryClient\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, data\)/);
   assert.match(page, /actionLoadingByAppId/);
   assert.match(page, /useProjectOsJobsQuery\(\)/);
   assert.match(page, /operationStateForItem\(/);
@@ -53,10 +51,9 @@ test('applications page pins and unpins observed services through canonical appl
   assert.match(page, /ObservedServicesAPIClient/);
   assert.match(page, /ObservedServicesAPIClient\.pin\(serviceId\)/);
   assert.match(page, /ObservedServicesAPIClient\.unpin\(serviceId\)/);
-  assert.match(page, /setApplicationStateFromActionResultCache\(queryClient, result\)/);
-  assert.match(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId, true\)/);
-  assert.match(page, /setObservedServicePinnedInApplicationStateCache\(queryClient, serviceId, false\)/);
-  assert.match(page, /appState\.refresh\(\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
+  assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache\(queryClient/);
+  assert.doesNotMatch(page, /appState\.refresh\(\)/);
   assert.match(page, /showActionNotification\(result/);
   assert.match(page, /showActionErrorNotification\(err, 'Service could not be pinned'\)/);
   assert.match(page, /showActionErrorNotification\(err, 'Service could not be unpinned'\)/);
@@ -146,8 +143,7 @@ test('applications page runs repair only from canonical available actions', () =
   assert.match(types, /onRepair: \(id: string\) => void/);
   assert.ok(api.includes('post<ProjectOsJob>(`/api/apps/${appId}/repair`)'));
   assert.match(page, /InstalledAppsAPIClient\.repair\(appId\)/);
-  assert.match(page, /setProjectOsJobCache\(queryClient, job\)/);
-  assert.match(page, /setProjectOsJobInApplicationStateCache\(queryClient, job\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /title: 'Repair started'/);
 
   assert.match(rail, /const repairAction = item\.availableActions\.find\(\(action\) => action\.id === 'repair'\)/);
@@ -171,8 +167,7 @@ test('applications page starts app backup jobs from real backup actions', () => 
   assert.match(page, /BackupAPIClient/);
   assert.match(page, /BackupAPIClient\.run\(appId\)/);
   assert.match(page, /setAppActionLoading\(appId, 'backup'\)/);
-  assert.match(page, /setProjectOsJobCache\(queryClient, job\)/);
-  assert.match(page, /setProjectOsJobInApplicationStateCache\(queryClient, job\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /invalidateBackupQueries\(queryClient\)/);
   assert.match(page, /title: 'Backup started'/);
   assert.doesNotMatch(page, /const handleCreateBackup = \(id: string\) => \{[\s\S]*setManagementOpen\(true\);[\s\S]*invalidateApplicationState\(queryClient\);[\s\S]*\};/);
@@ -238,7 +233,7 @@ test('applications page changes private network access as a standalone settings 
   assert.match(page, /setSettingsLoading\(appId, 'private_access'\)/);
   assert.match(page, /InstalledAppsAPIClient\.enablePrivateAccess\(appId\)/);
   assert.match(page, /InstalledAppsAPIClient\.disablePrivateAccess\(appId\)/);
-  assert.match(page, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.match(page, /invalidateNetworkQueries\(queryClient\)/);
   assert.doesNotMatch(page, /repairPrivateAccess\(appId\)/);
 

@@ -274,6 +274,7 @@ export type AppActionResult = {
   status?: string;
   message: string;
   app?: AppRuntimeView | null;
+  applicationState?: import('./applicationState').ApplicationState | null;
   output?: string[];
   completedAt?: string;
   ok?: boolean;

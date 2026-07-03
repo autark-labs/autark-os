@@ -4,14 +4,10 @@ import { BackupAPIClient } from '@/api/BackupAPIClient';
 import type { BackupReport, RestorePlan } from '@/types/backup';
 import type { ProjectOsJob } from '@/types/jobs';
 import {
-  setProjectOsJobCache,
   useProjectOsJobQuery as useSharedProjectOsJobQuery,
   useProjectOsJobsQuery,
 } from './jobRepository';
-import {
-  invalidateApplicationState,
-  setProjectOsJobInApplicationStateCache,
-} from './applicationStateRepository';
+import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
 
 export const backupQueryKeys = {
   all: ['backups'] as const,
@@ -62,7 +58,7 @@ export function useRunAppBackupMutation() {
   return useMutation<ProjectOsJob, unknown, string>({
     mutationFn: (appId) => BackupAPIClient.run(appId),
     onSuccess: (job) => {
-      setProjectOsJobCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
     },
   });
@@ -73,7 +69,7 @@ export function useRunFullBackupMutation() {
   return useMutation<ProjectOsJob>({
     mutationFn: () => BackupAPIClient.runFull(),
     onSuccess: (job) => {
-      setProjectOsJobCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
     },
   });
@@ -84,7 +80,7 @@ export function useRunRoutineBackupMutation() {
   return useMutation<ProjectOsJob>({
     mutationFn: () => BackupAPIClient.runRoutine(),
     onSuccess: (job) => {
-      setProjectOsJobCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
     },
   });
@@ -101,10 +97,8 @@ export function useRestoreBackupMutation() {
   return useMutation<ProjectOsJob, unknown, { restorePointId: number; appId?: string | null }>({
     mutationFn: ({ restorePointId, appId }) => BackupAPIClient.restore(restorePointId, appId),
     onSuccess: (job) => {
-      setProjectOsJobCache(queryClient, job);
-      setProjectOsJobInApplicationStateCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
-      void invalidateApplicationState(queryClient);
     },
   });
 }
@@ -114,7 +108,7 @@ export function useVerifyRestorePointMutation() {
   return useMutation<ProjectOsJob, unknown, number>({
     mutationFn: (restorePointId) => BackupAPIClient.verify(restorePointId),
     onSuccess: (job) => {
-      setProjectOsJobCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
     },
   });

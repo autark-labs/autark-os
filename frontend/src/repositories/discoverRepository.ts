@@ -7,12 +7,11 @@ import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView, DiscoverInstallPreview, DiscoverInstallRequestOptions } from '@/types/discover';
 import type { ProjectOsJob } from '@/types/jobs';
 import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
-import { invalidateApplicationState, setProjectOsJobInApplicationStateCache } from './applicationStateRepository';
+import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
 import { invalidateBackupQueries } from './backupRepository';
 import {
   JOB_FAMILIES,
   latestActiveJob,
-  setProjectOsJobCache,
   useProjectOsJobQuery,
   useProjectOsJobsQuery,
 } from './jobRepository';
@@ -113,10 +112,8 @@ export function useDiscoverInstallMutation() {
   return useMutation<ProjectOsJob, unknown, DiscoverInstallMutationInput>({
     mutationFn: ({ appId, answers, options = {} }) => DiscoverAPIClient.install(appId, answers, options),
     onSuccess: (job) => {
-      setProjectOsJobCache(queryClient, job);
-      setProjectOsJobInApplicationStateCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       void invalidateDiscoverQueries(queryClient);
-      void invalidateApplicationState(queryClient);
     },
   });
 }
@@ -126,11 +123,9 @@ export function useDiscoverBackupMutation() {
   return useMutation<ProjectOsJob, unknown, string>({
     mutationFn: (appId) => BackupAPIClient.run(appId),
     onSuccess: (job) => {
-      setProjectOsJobCache(queryClient, job);
-      setProjectOsJobInApplicationStateCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       void invalidateDiscoverQueries(queryClient);
       void invalidateBackupQueries(queryClient);
-      void invalidateApplicationState(queryClient);
     },
   });
 }

@@ -12,11 +12,8 @@ import { StatusPill } from '@/components/primitives/StatusPill';
 import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
-import {
-  setApplicationStateFromActionResultCache,
-  setObservedServicePinnedInApplicationStateCache,
-  useApplicationStateRepository,
-} from '@/repositories/applicationStateRepository';
+import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
 import {
@@ -77,14 +74,8 @@ function ResolveExistingAppsPage() {
     setBusyId(service.id);
     try {
       const result = await ObservedServicesAPIClient.pin(service.id);
-      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
-      if (!stateUpdated) {
-        setObservedServicePinnedInApplicationStateCache(queryClient, service.id, true);
-      }
+      syncCanonicalAppMutationResult(queryClient, result);
       showActionNotification(result, result.title || `${service.displayName} pinned`);
-      if (!stateUpdated) {
-        void appState.refresh();
-      }
     } catch (pinError) {
       showActionErrorNotification(pinError, 'Service could not be pinned');
     } finally {
@@ -93,11 +84,8 @@ function ResolveExistingAppsPage() {
   }
 
   function handleObservedServiceResult(result: ObservedServiceActionResult) {
-    const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+    syncCanonicalAppMutationResult(queryClient, result);
     showActionNotification(result, result.title || 'Service action finished');
-    if (!stateUpdated) {
-      void appState.refresh();
-    }
   }
 
   return (

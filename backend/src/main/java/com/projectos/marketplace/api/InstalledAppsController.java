@@ -268,9 +268,19 @@ public class InstalledAppsController {
         return result;
     }
 
+    private AppActionResult refreshAfter(AppActionResult result) {
+        applicationStateService.invalidate();
+        return result.withApplicationState(applicationStateService.snapshot());
+    }
+
     private <T> T invalidateAfter(T result) {
         applicationStateService.invalidate();
         return result;
+    }
+
+    private AppActionResult invalidateAfter(AppActionResult result) {
+        applicationStateService.invalidate();
+        return result.withApplicationState(applicationStateService.snapshot());
     }
 
     private ProjectOsJob startLifecycleJob(String action, String jobType, String id) {

@@ -15,13 +15,11 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import {
   applicationStateQueryKey,
   invalidateApplicationState,
-  setApplicationStateFromActionResultCache,
-  setObservedServicePinnedInApplicationStateCache,
-  setProjectOsJobInApplicationStateCache,
   setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
-import { invalidateProjectOsJobs, setProjectOsJobCache, terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
+import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
+import { terminalJob, useProjectOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
 import { invalidateBackupQueries } from '@/repositories/backupRepository';
 import type { AppRuntimeView, AppSettingsChangePlan, InstallSettings } from '@/types/app';
@@ -302,8 +300,7 @@ export const ApplicationsPage = () => {
 
     try {
       const data = await InstalledAppsAPIClient.runAction(appId, action);
-      setProjectOsJobCache(queryClient, data);
-      setProjectOsJobInApplicationStateCache(queryClient, data);
+      syncCanonicalAppMutationResult(queryClient, data);
       setTrackedAppJobIds((current) => current.includes(data.jobId) ? current : [...current, data.jobId]);
       showActionNotification({
         ok: true,
@@ -311,8 +308,6 @@ export const ApplicationsPage = () => {
         title: 'App action started',
         message: `${appActionLabel(action)} is running. Project OS will keep showing progress until the app reports its real state.`,
       });
-      void invalidateProjectOsJobs(queryClient);
-      void invalidateApplicationState(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'App action failed');
     } finally {
@@ -325,8 +320,7 @@ export const ApplicationsPage = () => {
 
     try {
       const job = await InstalledAppsAPIClient.repair(appId);
-      setProjectOsJobCache(queryClient, job);
-      setProjectOsJobInApplicationStateCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
         ok: true,
@@ -334,8 +328,6 @@ export const ApplicationsPage = () => {
         title: 'Repair started',
         message: 'Project OS is repairing this app and will keep showing progress until the app reports its real state.',
       });
-      void invalidateProjectOsJobs(queryClient);
-      void invalidateApplicationState(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'Repair could not start');
     } finally {
@@ -348,8 +340,7 @@ export const ApplicationsPage = () => {
 
     try {
       const job = await BackupAPIClient.run(appId);
-      setProjectOsJobCache(queryClient, job);
-      setProjectOsJobInApplicationStateCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
         ok: true,
@@ -357,9 +348,7 @@ export const ApplicationsPage = () => {
         title: 'Backup started',
         message: 'Project OS is creating a restore point for this app and will keep showing progress here.',
       });
-      void invalidateProjectOsJobs(queryClient);
       void invalidateBackupQueries(queryClient);
-      void invalidateApplicationState(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'Backup could not start');
     } finally {
@@ -404,7 +393,7 @@ export const ApplicationsPage = () => {
         throw new Error(plan.blockedReasons[0] || 'Project OS cannot safely apply these settings yet.');
       }
       const updatedApp = await InstalledAppsAPIClient.updateSettings(appId, nextSettings);
-      setRuntimeAppInApplicationStateCache(queryClient, updatedApp);
+      syncCanonicalAppMutationResult(queryClient, { app: updatedApp });
 
       showActionNotification({
         ok: true,
@@ -413,7 +402,6 @@ export const ApplicationsPage = () => {
         message: plan.summary,
       });
       setSettingsDirtyByAppId((current) => ({ ...current, [appId]: false }));
-      void invalidateApplicationState(queryClient);
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       restoreApplicationState(previousState);
@@ -431,11 +419,8 @@ export const ApplicationsPage = () => {
       const result = enabled
         ? await InstalledAppsAPIClient.enablePrivateAccess(appId)
         : await InstalledAppsAPIClient.disablePrivateAccess(appId);
-      if (result.app) {
-        setRuntimeAppInApplicationStateCache(queryClient, result.app);
-      }
+      syncCanonicalAppMutationResult(queryClient, result);
       showActionNotification(result, enabled ? 'Private network ready' : 'Private network turned off');
-      void invalidateApplicationState(queryClient);
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       showActionErrorNotification(err, enabled ? 'Private network could not be enabled' : 'Private network could not be turned off');
@@ -453,8 +438,7 @@ export const ApplicationsPage = () => {
   async function runUninstall(appId: string) {
     try {
       const job = await InstalledAppsAPIClient.uninstall(appId);
-      setProjectOsJobCache(queryClient, job);
-      setProjectOsJobInApplicationStateCache(queryClient, job);
+      syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
         ok: true,
@@ -462,8 +446,6 @@ export const ApplicationsPage = () => {
         title: 'Uninstall started',
         message: 'Project OS is removing this app safely and keeping it visible until the job finishes.',
       });
-      void invalidateProjectOsJobs(queryClient);
-      void invalidateApplicationState(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'Uninstall could not start');
       throw err;
@@ -473,14 +455,8 @@ export const ApplicationsPage = () => {
   async function pinObservedService(serviceId: string) {
     try {
       const result = await ObservedServicesAPIClient.pin(serviceId);
-      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
-      if (!stateUpdated) {
-        setObservedServicePinnedInApplicationStateCache(queryClient, serviceId, true);
-      }
+      syncCanonicalAppMutationResult(queryClient, result);
       showActionNotification(result, result.title || 'Service pinned');
-      if (!stateUpdated) {
-        void appState.refresh();
-      }
     } catch (err) {
       showActionErrorNotification(err, 'Service could not be pinned');
       throw err;
@@ -490,14 +466,8 @@ export const ApplicationsPage = () => {
   async function unpinObservedService(serviceId: string) {
     try {
       const result = await ObservedServicesAPIClient.unpin(serviceId);
-      const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
-      if (!stateUpdated) {
-        setObservedServicePinnedInApplicationStateCache(queryClient, serviceId, false);
-      }
+      syncCanonicalAppMutationResult(queryClient, result);
       showActionNotification(result, result.title || 'Service unpinned');
-      if (!stateUpdated) {
-        void appState.refresh();
-      }
     } catch (err) {
       showActionErrorNotification(err, 'Service could not be unpinned');
       throw err;
@@ -529,11 +499,8 @@ export const ApplicationsPage = () => {
   }
 
   function handleObservedServiceActionResult(result: ObservedServiceActionResult, fallbackTitle: string) {
-    const stateUpdated = setApplicationStateFromActionResultCache(queryClient, result);
+    syncCanonicalAppMutationResult(queryClient, result);
     showActionNotification(result, fallbackTitle);
-    if (!stateUpdated) {
-      void invalidateApplicationState(queryClient);
-    }
   }
 
   const handleStart = (id: string) => void runManagedAction(id, 'start');

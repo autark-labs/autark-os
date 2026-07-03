@@ -13,10 +13,9 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import {
-  invalidateApplicationState,
-  setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
+import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import {
   invalidateNetworkQueries,
   useAccessNetworkRepository,
@@ -96,11 +95,8 @@ function NetworkPage() {
       const result = enabled
         ? await InstalledAppsAPIClient.enablePrivateAccess(app.appId)
         : await InstalledAppsAPIClient.disablePrivateAccess(app.appId);
-      if (result.app) {
-        setRuntimeAppInApplicationStateCache(queryClient, result.app);
-      }
+      syncCanonicalAppMutationResult(queryClient, result);
       showActionNotification(result, enabled ? 'Private network ready' : 'Private network turned off');
-      void invalidateApplicationState(queryClient);
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       const message = apiErrorMessage(err, 'Unable to update private access for this app.');

@@ -3,6 +3,8 @@ package com.projectos.marketplace.install;
 import java.time.Instant;
 import java.util.List;
 
+import com.projectos.apps.ApplicationState;
+
 public record AppActionResult(
         String appId,
         String action,
@@ -15,7 +17,24 @@ public record AppActionResult(
         String severity,
         String title,
         String nextAction,
-        String jobId) {
+        String jobId,
+        ApplicationState applicationState) {
+
+    public AppActionResult(
+            String appId,
+            String action,
+            String status,
+            String message,
+            AppRuntimeView app,
+            List<String> logs,
+            Instant completedAt,
+            boolean ok,
+            String severity,
+            String title,
+            String nextAction,
+            String jobId) {
+        this(appId, action, status, message, app, logs, completedAt, ok, severity, title, nextAction, jobId, null);
+    }
 
     public AppActionResult(
             String appId,
@@ -37,7 +56,12 @@ public record AppActionResult(
                 severityForStatus(status),
                 titleFor(action, status),
                 nextActionFor(action),
+                null,
                 null);
+    }
+
+    public AppActionResult withApplicationState(ApplicationState state) {
+        return new AppActionResult(appId, action, status, message, app, logs, completedAt, ok, severity, title, nextAction, jobId, state);
     }
 
     private static boolean okForStatus(String status) {

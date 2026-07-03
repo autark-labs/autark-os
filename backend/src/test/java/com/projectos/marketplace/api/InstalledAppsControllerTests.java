@@ -213,6 +213,7 @@ class InstalledAppsControllerTests {
                 applicationStateService,
                 jobService());
         AppRuntimeView app = appRuntimeView("vaultwarden");
+        var refreshedState = applicationStateWith(app);
         AppActionResult result = new AppActionResult(
                 "vaultwarden",
                 "private-access",
@@ -222,11 +223,13 @@ class InstalledAppsControllerTests {
                 List.of(),
                 Instant.parse("2026-06-21T12:00:00Z"));
         when(lifecycleService.enablePrivateAccess("vaultwarden")).thenReturn(result);
+        when(applicationStateService.snapshot()).thenReturn(refreshedState);
 
         AppActionResult returned = controller.enablePrivateAccess("vaultwarden");
 
-        assertThat(returned).isEqualTo(result);
+        assertThat(returned.applicationState()).isEqualTo(refreshedState);
         verify(applicationStateService).invalidate();
+        verify(applicationStateService).snapshot();
         verify(applicationStateService, never()).refreshInBackground();
     }
 
