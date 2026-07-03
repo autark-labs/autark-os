@@ -2,6 +2,7 @@ import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House,
 import type { LucideIcon } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
+import { ThemeSelectorPopover } from '@/components/project-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -63,6 +64,7 @@ function MobileAppBar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <ThemeSelectorPopover className="px-2" />
         <Sheet>
           <SheetTrigger asChild>
             <Button aria-label="Open system status" className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white" size="sm" type="button" variant="outline">

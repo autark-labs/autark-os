@@ -79,6 +79,184 @@
   --sidebar-ring: oklch(0.68 0.13 210);
 }
 
+:root[data-theme="project-slate"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="harbor"] {
+  color-scheme: dark;
+
+  --color-slate-950: #06111f;
+  --color-slate-900: #0a1b2d;
+  --color-slate-800: #102b44;
+  --color-slate-700: #17405f;
+  --color-slate-600: #245a7f;
+  --color-slate-500: #6a8ba3;
+  --color-slate-400: #9db5c7;
+  --color-slate-300: #c5d6e3;
+  --color-slate-50: #f3f9ff;
+  --color-sky-400: #38bdf8;
+  --color-cyan-300: #67e8f9;
+  --color-cyan-200: #a5f3fc;
+
+  --app-page: #102b44;
+  --app-surface: #06111f;
+  --app-panel: #0a1b2d;
+  --app-panel-muted: #102b44;
+  --app-panel-hover: #17405f;
+  --app-border: #38bdf8;
+  --app-border-muted: rgb(56 189 248 / 0.26);
+  --app-border-strong: rgb(56 189 248 / 0.46);
+  --app-accent: #67e8f9;
+  --app-accent-strong: #a5f3fc;
+  --app-brand-gradient: linear-gradient(135deg, #67e8f9 0%, #0ea5e9 58%, #bae6fd 100%);
+  --app-hero-default:
+    radial-gradient(circle at top left, rgb(103 232 249 / 0.18), transparent 30%),
+    radial-gradient(circle at top right, rgb(14 165 233 / 0.14), transparent 28%),
+    linear-gradient(135deg, rgb(6 17 31 / 0.98), rgb(16 43 68 / 0.94));
+
+  --background: oklch(0.62 0.055 225);
+  --foreground: oklch(0.96 0.015 220);
+  --card: oklch(0.22 0.04 235);
+  --card-foreground: oklch(0.96 0.015 220);
+  --popover: oklch(0.17 0.04 240);
+  --popover-foreground: oklch(0.96 0.015 220);
+  --primary: oklch(0.72 0.13 215);
+  --primary-foreground: oklch(0.16 0.035 245);
+  --secondary: oklch(0.26 0.045 235);
+  --secondary-foreground: oklch(0.94 0.018 220);
+  --muted: oklch(0.27 0.035 235);
+  --muted-foreground: oklch(0.72 0.035 225);
+  --accent: oklch(0.34 0.08 220);
+  --accent-foreground: oklch(0.96 0.015 220);
+  --border: oklch(0.52 0.1 220);
+  --ring: oklch(0.72 0.13 215);
+  --sidebar: oklch(0.17 0.04 240);
+  --sidebar-foreground: oklch(0.94 0.018 220);
+  --sidebar-primary: oklch(0.72 0.13 215);
+  --sidebar-primary-foreground: oklch(0.16 0.035 245);
+  --sidebar-accent: oklch(0.26 0.045 235);
+  --sidebar-accent-foreground: oklch(0.94 0.018 220);
+  --sidebar-border: oklch(0.42 0.075 225);
+  --sidebar-ring: oklch(0.72 0.13 215);
+}
+
+:root[data-theme="forest"] {
+  color-scheme: dark;
+
+  --color-slate-950: #061611;
+  --color-slate-900: #0a2119;
+  --color-slate-800: #123429;
+  --color-slate-700: #1b4b3b;
+  --color-slate-600: #2c6b56;
+  --color-slate-500: #6c9786;
+  --color-slate-400: #a1bfb3;
+  --color-slate-300: #cce0d8;
+  --color-slate-50: #f3fbf7;
+  --color-sky-400: #34d399;
+  --color-cyan-300: #5eead4;
+  --color-cyan-200: #99f6e4;
+
+  --app-page: #123429;
+  --app-surface: #061611;
+  --app-panel: #0a2119;
+  --app-panel-muted: #123429;
+  --app-panel-hover: #1b4b3b;
+  --app-border: #34d399;
+  --app-border-muted: rgb(52 211 153 / 0.26);
+  --app-border-strong: rgb(52 211 153 / 0.46);
+  --app-accent: #5eead4;
+  --app-accent-strong: #99f6e4;
+  --app-brand-gradient: linear-gradient(135deg, #5eead4 0%, #10b981 58%, #bbf7d0 100%);
+  --app-hero-default:
+    radial-gradient(circle at top left, rgb(94 234 212 / 0.16), transparent 30%),
+    radial-gradient(circle at top right, rgb(52 211 153 / 0.14), transparent 28%),
+    linear-gradient(135deg, rgb(6 22 17 / 0.98), rgb(18 52 41 / 0.94));
+
+  --background: oklch(0.58 0.055 165);
+  --foreground: oklch(0.96 0.015 160);
+  --card: oklch(0.22 0.04 160);
+  --card-foreground: oklch(0.96 0.015 160);
+  --popover: oklch(0.16 0.04 160);
+  --popover-foreground: oklch(0.96 0.015 160);
+  --primary: oklch(0.76 0.12 170);
+  --primary-foreground: oklch(0.14 0.035 160);
+  --secondary: oklch(0.27 0.045 160);
+  --secondary-foreground: oklch(0.94 0.018 160);
+  --muted: oklch(0.27 0.035 160);
+  --muted-foreground: oklch(0.72 0.035 165);
+  --accent: oklch(0.34 0.08 165);
+  --accent-foreground: oklch(0.96 0.015 160);
+  --border: oklch(0.52 0.1 165);
+  --ring: oklch(0.76 0.12 170);
+  --sidebar: oklch(0.16 0.04 160);
+  --sidebar-foreground: oklch(0.94 0.018 160);
+  --sidebar-primary: oklch(0.76 0.12 170);
+  --sidebar-primary-foreground: oklch(0.14 0.035 160);
+  --sidebar-accent: oklch(0.27 0.045 160);
+  --sidebar-accent-foreground: oklch(0.94 0.018 160);
+  --sidebar-border: oklch(0.42 0.075 165);
+  --sidebar-ring: oklch(0.76 0.12 170);
+}
+
+:root[data-theme="ember"] {
+  color-scheme: dark;
+
+  --color-slate-950: #170c08;
+  --color-slate-900: #24110a;
+  --color-slate-800: #392015;
+  --color-slate-700: #57301f;
+  --color-slate-600: #7a442b;
+  --color-slate-500: #a47862;
+  --color-slate-400: #c9a895;
+  --color-slate-300: #ead1c2;
+  --color-slate-50: #fff7ed;
+  --color-sky-400: #fb923c;
+  --color-cyan-300: #fdba74;
+  --color-cyan-200: #fed7aa;
+
+  --app-page: #392015;
+  --app-surface: #170c08;
+  --app-panel: #24110a;
+  --app-panel-muted: #392015;
+  --app-panel-hover: #57301f;
+  --app-border: #fb923c;
+  --app-border-muted: rgb(251 146 60 / 0.26);
+  --app-border-strong: rgb(251 146 60 / 0.46);
+  --app-accent: #fdba74;
+  --app-accent-strong: #fed7aa;
+  --app-brand-gradient: linear-gradient(135deg, #fdba74 0%, #f97316 58%, #fed7aa 100%);
+  --app-hero-default:
+    radial-gradient(circle at top left, rgb(253 186 116 / 0.17), transparent 30%),
+    radial-gradient(circle at top right, rgb(251 146 60 / 0.14), transparent 28%),
+    linear-gradient(135deg, rgb(23 12 8 / 0.98), rgb(57 32 21 / 0.94));
+
+  --background: oklch(0.57 0.055 45);
+  --foreground: oklch(0.96 0.015 55);
+  --card: oklch(0.22 0.04 45);
+  --card-foreground: oklch(0.96 0.015 55);
+  --popover: oklch(0.16 0.04 45);
+  --popover-foreground: oklch(0.96 0.015 55);
+  --primary: oklch(0.76 0.14 58);
+  --primary-foreground: oklch(0.14 0.035 45);
+  --secondary: oklch(0.27 0.045 45);
+  --secondary-foreground: oklch(0.94 0.018 55);
+  --muted: oklch(0.27 0.035 45);
+  --muted-foreground: oklch(0.72 0.035 55);
+  --accent: oklch(0.34 0.08 50);
+  --accent-foreground: oklch(0.96 0.015 55);
+  --border: oklch(0.54 0.12 55);
+  --ring: oklch(0.76 0.14 58);
+  --sidebar: oklch(0.16 0.04 45);
+  --sidebar-foreground: oklch(0.94 0.018 55);
+  --sidebar-primary: oklch(0.76 0.14 58);
+  --sidebar-primary-foreground: oklch(0.14 0.035 45);
+  --sidebar-accent: oklch(0.27 0.045 45);
+  --sidebar-accent-foreground: oklch(0.94 0.018 55);
+  --sidebar-border: oklch(0.44 0.09 50);
+  --sidebar-ring: oklch(0.76 0.14 58);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

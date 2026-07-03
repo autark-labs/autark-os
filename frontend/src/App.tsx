@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { AdminSecurityAPIClient, type AdminSecurityStatus } from './api/AdminSecurityAPIClient';
 import { SystemAPIClient } from './api/SystemAPIClient';
 import { ProjectSettingsProvider } from './contexts/ProjectSettingsContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import AppShell from './layout/AppShell';
 import { routeAliases } from './layout/navigationModel';
 import { readAdminToken } from './lib/adminSecuritySession';
@@ -31,10 +32,12 @@ function PageFallback() {
 
 function App() {
   return (
-    <ProjectSettingsProvider>
-      <AppContent />
-      <Toaster closeButton position="top-right" richColors />
-    </ProjectSettingsProvider>
+    <ThemeProvider>
+      <ProjectSettingsProvider>
+        <AppContent />
+        <Toaster closeButton position="top-right" richColors />
+      </ProjectSettingsProvider>
+    </ThemeProvider>
   );
 }
 

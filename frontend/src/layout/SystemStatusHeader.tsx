@@ -3,6 +3,7 @@ import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-
 import { Link } from 'react-router-dom';
 import { JobProgress } from '@/components/project-os/JobProgress';
 import { TailscaleControlPopover } from '@/components/project-os/TailscaleControlPopover';
+import { ThemeSelectorPopover } from '@/components/project-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -67,14 +68,12 @@ function SystemStatusHeader() {
     <header className="sticky top-0 z-20 border-b border-sky-400/25 bg-slate-950 px-4 py-2 text-slate-50 shadow-lg shadow-slate-950/20 md:px-6" aria-label="System status">
       <div className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="m-0 truncate text-sm font-semibold text-white">Project OS</p>
-          <p className="m-0 hidden truncate text-xs text-slate-400 sm:block">
-            {doctor?.lanUrl ? `LAN ${doctor.lanUrl}` : checkedAt}
-          </p>
+          <p className="m-0 hidden truncate text-xs text-slate-400 sm:block">{doctor?.lanUrl ? `Reachable at: ${doctor.lanUrl}` : checkedAt}</p>
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
           {activeJob && <GlobalJobPopover job={activeJob} />}
+          <ThemeSelectorPopover />
           <StatusPopover loading={loading} service={dockerService} />
           <TailscaleControlPopover check={tailscaleCheck} loading={loading} />
           <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-slate-400 sm:inline-flex">
