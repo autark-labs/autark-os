@@ -478,8 +478,8 @@ function JobStepList({ job }: { job: ProjectOsJob }) {
   );
 }
 
-function shouldOfferFirstBackup(_app: DiscoverInstalledAppSummary) {
-  return true;
+function shouldOfferFirstBackup(app: DiscoverInstalledAppSummary) {
+  return app.firstBackupRecommended && !app.protectedByBackups;
 }
 
 function CatalogConfidenceCard({ app }: { app: MarketplaceApp }) {

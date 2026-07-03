@@ -69,3 +69,14 @@ test('marketplace detail deep-links found services and installed apps into My Ap
   assert.doesNotMatch(detail, /<Link to="\/apps">View in My Apps<\/Link>/);
   assert.doesNotMatch(detail, /<Link to="\/apps">Manage in My Apps<\/Link>/);
 });
+
+test('marketplace first-backup prompt uses canonical installed backup protection', () => {
+  const detail = source('MarketplaceAppDetail.tsx');
+  const discoverTypes = projectSource('types/discover.ts');
+
+  assert.match(discoverTypes, /protectedByBackups: boolean/);
+  assert.match(discoverTypes, /firstBackupRecommended: boolean/);
+  assert.match(detail, /firstBackupRecommended/);
+  assert.match(detail, /protectedByBackups/);
+  assert.doesNotMatch(detail, /function shouldOfferFirstBackup\([^)]*\) \{\s*return true;\s*\}/s);
+});

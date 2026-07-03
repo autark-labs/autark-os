@@ -33,6 +33,9 @@ export type DiscoverInstalledAppSummary = {
   appName: string;
   status: string;
   accessUrl: string;
+  backupState: string;
+  protectedByBackups: boolean;
+  firstBackupRecommended: boolean;
 };
 
 export type DiscoverAppView = {

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.projectos.discover.DiscoverInstalledAppSummary;
+import com.projectos.backups.BackupRepository;
 import com.projectos.host.ObservedService;
 import com.projectos.host.ObservedServiceRepository;
 import com.projectos.host.ObservedServiceScanner;
@@ -212,6 +213,52 @@ class AppOwnershipServiceTests {
     }
 
     @Test
+    void installedSummaryReportsCanonicalBackupProtectionFromCompletedRestorePoints() {
+        InstalledAppRepository repository = installedRepository();
+        InstalledApp vaultwarden = new InstalledApp(
+                "vaultwarden",
+                "Family Passwords",
+                "Ready",
+                runtimeRoot.resolve("apps/vaultwarden").toString(),
+                "project-os-vaultwarden",
+                "http://localhost:8090",
+                Instant.parse("2026-06-21T12:00:00Z"));
+        repository.save(vaultwarden);
+        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+                "vaultwarden",
+                "appinst_vaultwarden",
+                "vaultwarden",
+                "current-instance",
+                runtimeRoot.resolve("apps/vaultwarden").toString(),
+                "installed",
+                "owned",
+                Instant.parse("2026-06-21T12:00:00Z"),
+                Instant.parse("2026-06-21T12:00:00Z")));
+        BackupRepository backupRepository = new BackupRepository(runtimeLayout());
+        backupRepository.record("vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden-failed.zip", "failed", 0, "Backup failed.");
+
+        DiscoverInstalledAppSummary unprotected = service(repository, observedRepository(), backupRepository)
+                .app("vaultwarden")
+                .orElseThrow()
+                .installedApp();
+
+        assertThat(unprotected.backupState()).isEqualTo("backup_enabled_no_restore_point");
+        assertThat(unprotected.protectedByBackups()).isFalse();
+        assertThat(unprotected.firstBackupRecommended()).isTrue();
+
+        backupRepository.record("vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 1024, "Backup completed.");
+
+        DiscoverInstalledAppSummary protectedApp = service(repository, observedRepository(), backupRepository)
+                .app("vaultwarden")
+                .orElseThrow()
+                .installedApp();
+
+        assertThat(protectedApp.backupState()).isEqualTo("protected_by_restore_point");
+        assertThat(protectedApp.protectedByBackups()).isTrue();
+        assertThat(protectedApp.firstBackupRecommended()).isFalse();
+    }
+
+    @Test
     void ownershipProjectionReadsCachedObservedServicesWithoutScanningHost() {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("manual:vaultwarden", "vaultwarden", "external", "pinned"));
@@ -220,7 +267,8 @@ class AppOwnershipServiceTests {
                 catalogService(),
                 installedRepository(),
                 observedServiceService,
-                dockerOwnershipService());
+                dockerOwnershipService(),
+                new BackupRepository(runtimeLayout()));
 
         AppOwnershipView view = service.app("vaultwarden").orElseThrow();
         List<AppOwnershipView> views = service.apps();
@@ -263,11 +311,16 @@ class AppOwnershipServiceTests {
     }
 
     private AppOwnershipService service(InstalledAppRepository installedRepository, ObservedServiceRepository observedRepository) {
+        return service(installedRepository, observedRepository, new BackupRepository(runtimeLayout()));
+    }
+
+    private AppOwnershipService service(InstalledAppRepository installedRepository, ObservedServiceRepository observedRepository, BackupRepository backupRepository) {
         return new AppOwnershipService(
                 catalogService(),
                 installedRepository,
                 observedService(observedRepository),
-                dockerOwnershipService());
+                dockerOwnershipService(),
+                backupRepository);
     }
 
     private MarketplaceCatalogService catalogService() {

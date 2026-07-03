@@ -6,12 +6,15 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.projectos.backups.BackupRepository;
+import com.projectos.backups.RestorePoint;
 import com.projectos.discover.DiscoverInstalledAppSummary;
 import com.projectos.host.ObservedService;
 import com.projectos.host.ObservedServiceService;
 import com.projectos.host.ObservedServiceView;
 import com.projectos.marketplace.catalog.MarketplaceCatalogService;
 import com.projectos.marketplace.install.DockerOwnershipService;
+import com.projectos.marketplace.install.InstallSettings;
 import com.projectos.marketplace.install.InstalledApp;
 import com.projectos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.projectos.marketplace.install.InstalledAppRepository;
@@ -24,16 +27,19 @@ public class AppOwnershipService {
     private final InstalledAppRepository installedAppRepository;
     private final ObservedServiceService observedServiceService;
     private final DockerOwnershipService dockerOwnershipService;
+    private final BackupRepository backupRepository;
 
     public AppOwnershipService(
             MarketplaceCatalogService catalogService,
             InstalledAppRepository installedAppRepository,
             ObservedServiceService observedServiceService,
-            DockerOwnershipService dockerOwnershipService) {
+            DockerOwnershipService dockerOwnershipService,
+            BackupRepository backupRepository) {
         this.catalogService = catalogService;
         this.installedAppRepository = installedAppRepository;
         this.observedServiceService = observedServiceService;
         this.dockerOwnershipService = dockerOwnershipService;
+        this.backupRepository = backupRepository;
     }
 
     public List<AppOwnershipView> apps() {
@@ -102,8 +108,35 @@ public class AppOwnershipService {
                 reviewExistingHref,
                 primaryAction,
                 availableActions(manifest.id(), state, installed, observedService, reviewExistingHref),
-                installed == null ? null : new DiscoverInstalledAppSummary(installed.appId(), installed.appName(), installed.status(), installed.accessUrl()),
+                installed == null ? null : installedSummary(installed),
                 observedView);
+    }
+
+    private DiscoverInstalledAppSummary installedSummary(InstalledApp app) {
+        String backupState = backupState(app);
+        boolean protectedByBackups = "protected_by_restore_point".equals(backupState);
+        return new DiscoverInstalledAppSummary(
+                app.appId(),
+                app.appName(),
+                app.status(),
+                app.accessUrl(),
+                backupState,
+                protectedByBackups,
+                "backup_enabled_no_restore_point".equals(backupState));
+    }
+
+    private String backupState(InstalledApp app) {
+        InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
+        if (settings.backup() == null || !settings.backup().enabled()) {
+            return "backup_disabled";
+        }
+        boolean hasCompletedRestorePoint = backupRepository.forApp(app.appId(), 10).stream()
+                .anyMatch(this::completedRestorePoint);
+        return hasCompletedRestorePoint ? "protected_by_restore_point" : "backup_enabled_no_restore_point";
+    }
+
+    private boolean completedRestorePoint(RestorePoint restorePoint) {
+        return "completed".equalsIgnoreCase(restorePoint.status());
     }
 
     private boolean ownershipCompatible(String appId) {

@@ -17,6 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.projectos.apps.AppOwnershipState;
 import com.projectos.apps.ApplicationState;
 import com.projectos.apps.ApplicationStateService;
+import com.projectos.backups.BackupRepository;
 import com.projectos.host.ObservedService;
 import com.projectos.host.ObservedServiceRepository;
 import com.projectos.host.ObservedServiceScanner;
@@ -297,7 +298,8 @@ class DiscoverServiceTests {
                 new com.projectos.marketplace.install.DockerOwnershipService(
                         () -> new com.projectos.system.ProjectOsIdentity("current-instance", "project-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                         () -> "0.2.0",
-                        false));
+                        false),
+                new BackupRepository(runtimeLayout()));
     }
 
     private MarketplaceCatalogService catalogService() {
