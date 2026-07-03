@@ -1,5 +1,5 @@
 import { Clock3 } from 'lucide-react';
-import overviewBackground from '@/assets/overviewBackground.png';
+import overviewBackground from '@/assets/overviewBackground.webp';
 import { StatusPill } from '@/components/primitives/StatusPill';
 import type { SystemSummary } from '@/types/system';
 
