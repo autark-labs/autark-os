@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { tailscaleControlActions, tailscaleControlView } from '../TailscaleControlPopover.logic.js';
+import { tailscaleControlActions, tailscaleControlView } from '../TailscaleControlPopover.logic';
 
 test('treats dev-mode Tailscale state as an informational mock even if copy changes', () => {
   const view = tailscaleControlView({ installed: true, connected: true, state: 'dev', message: '', dnsName: 'autark-os-dev.tailnet.local' }, null, null);

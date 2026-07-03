@@ -17,7 +17,7 @@ test('frontend recovery flows do not use legacy ownership or host inventory clie
 
   const appOwnershipTypes = source('src/types/appOwnership.ts');
   const discoverTypes = source('src/types/discover.ts');
-  const applicationStateLogic = source('src/repositories/applicationStateRepository.logic.js');
+  const applicationStateLogic = source('src/repositories/applicationStateRepository.logic.ts');
 
   assert.doesNotMatch(appOwnershipTypes, /foundResource|HostInventoryResource/);
   assert.doesNotMatch(discoverTypes, /foundResource|HostInventoryResource/);

@@ -1,16 +1,21 @@
-/**
- * @typedef {{ label: string, href?: string, command?: string | null }} TailscaleTaskAction
- * @typedef {{
- *   id: string,
- *   status: 'ok' | 'warning' | 'neutral',
- *   title: string,
- *   detail: string,
- *   primaryAction: TailscaleTaskAction,
- *   secondaryAction?: TailscaleTaskAction,
- * }} TailscaleSetupTask
- */
+import type { PrivateAccessReconciliationReport, SystemSetupCheck, SystemSetupStatus, TailscaleStatus } from '@/types/network';
 
-export function tailscaleSetupGuidance(tailscale) {
+type TailscaleTaskAction = {
+  command?: string | null;
+  href?: string;
+  label: string;
+};
+
+export type TailscaleSetupTask = {
+  detail: string;
+  id: string;
+  primaryAction: TailscaleTaskAction;
+  secondaryAction?: TailscaleTaskAction;
+  status: 'ok' | 'warning' | 'neutral';
+  title: string;
+};
+
+export function tailscaleSetupGuidance(tailscale: TailscaleStatus | null | undefined) {
   if (!tailscale?.installed) {
     return {
       tone: 'red',
@@ -38,7 +43,7 @@ export function tailscaleSetupGuidance(tailscale) {
   };
 }
 
-export function tailscaleAccessDisplay(tailscale) {
+export function tailscaleAccessDisplay(tailscale: TailscaleStatus | null | undefined) {
   const message = tailscale?.message || '';
   const isDevelopmentMock = tailscale?.state === 'mocked_dev' || /dev(elopment)? mock/i.test(message);
 
@@ -72,9 +77,17 @@ export function tailscaleAccessDisplay(tailscale) {
  * @param {{ tailscale?: any, setup?: any, reconciliation?: any }} input
  * @returns {TailscaleSetupTask[]}
  */
-export function tailscaleSetupTasks({ tailscale, setup = null, reconciliation = null } = {}) {
-  const tasks = [];
-  const operatorCheck = setup?.checks?.find((check) => check.id === 'tailscale-operator') ?? null;
+export function tailscaleSetupTasks({
+  tailscale,
+  setup = null,
+  reconciliation = null,
+}: {
+  reconciliation?: PrivateAccessReconciliationReport | null;
+  setup?: SystemSetupStatus | null;
+  tailscale?: TailscaleStatus | null;
+} = {}) {
+  const tasks: TailscaleSetupTask[] = [];
+  const operatorCheck = setup?.checks?.find((check: SystemSetupCheck) => check.id === 'tailscale-operator') ?? null;
 
   if (!tailscale?.installed) {
     tasks.push({
@@ -145,7 +158,7 @@ export function tailscaleSetupTasks({ tailscale, setup = null, reconciliation = 
  * @param {any} check
  * @returns {{ dot: 'green' | 'amber' | 'red', label: string, summary: string, tone: 'green' | 'amber' | 'red' }}
  */
-export function tailscaleHeaderStatus(check) {
+export function tailscaleHeaderStatus(check: SystemSetupCheck | null | undefined) {
   if (check?.status === 'ok') {
     return {
       dot: 'green',

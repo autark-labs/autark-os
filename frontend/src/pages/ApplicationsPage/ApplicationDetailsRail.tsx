@@ -15,7 +15,7 @@ import { ExpandedOperationStatus } from './components/AppOperationStatus';
 import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { ApplicationManagementPanel } from './ApplicationManagementPanel';
-import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations.js';
+import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations';
 import type { ApplicationActionHandlers, ApplicationNextAction, ApplicationRuntimeAction, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationDetailsRailProps = {

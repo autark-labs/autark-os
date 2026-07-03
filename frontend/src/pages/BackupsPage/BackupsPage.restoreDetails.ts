@@ -1,11 +1,12 @@
-import { backupSafetyWarnings } from '../../lib/backupSafety.js';
+import { backupSafetyWarnings } from '../../lib/backupSafety';
+import type { AppBackupStatus, RestorePlan, RestorePoint } from '@/types/backup';
 
 /**
  * @param {import('@/types/backup').RestorePoint} point
  * @param {Array<{ appId: string; appName: string }>} apps
  * @param {import('@/types/backup').RestorePlan | null} plan
  */
-export function restorePointDetails(point, apps = [], plan = null) {
+export function restorePointDetails(point: RestorePoint, apps: AppBackupStatus[] = [], plan: RestorePlan | null = null) {
   const includedIds = point.includedAppIds.split(',').map((id) => id.trim()).filter(Boolean);
   const includedApps = point.scope === 'full'
     ? apps.filter((app) => includedIds.includes(app.appId)).map((app) => app.appName)
@@ -27,6 +28,6 @@ export function restorePointDetails(point, apps = [], plan = null) {
   };
 }
 
-function defaultWarnings(point) {
+function defaultWarnings(point: RestorePoint) {
   return backupSafetyWarnings('restore', { verified: point.verificationStatus === 'verified' });
 }

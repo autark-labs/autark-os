@@ -1,6 +1,19 @@
+import type { AutarkOsJob } from '@/types/jobs';
+import type {
+  ApplicationRuntimeAction,
+  ApplicationSettingsAction,
+  ApplicationSurfaceItem,
+  AppOperationState,
+} from './ApplicationsPage.types';
+
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'canceled']);
 
-export function operationStateForItem(item, localAction, settingsAction, jobs = []) {
+export function operationStateForItem(
+  item: Pick<ApplicationSurfaceItem, 'attentionState' | 'id' | 'operationState' | 'readinessState' | 'sourceId'>,
+  localAction: ApplicationRuntimeAction | null,
+  settingsAction: ApplicationSettingsAction | null,
+  jobs: AutarkOsJob[] = [],
+): AppOperationState {
   const matchingJobs = jobsForItem(item, jobs);
   const activeJob = matchingJobs.find((job) => !TERMINAL_JOB_STATUSES.has(job.status));
   if (activeJob) {
@@ -35,7 +48,7 @@ export function operationStateForItem(item, localAction, settingsAction, jobs = 
   return { kind: 'idle' };
 }
 
-export function runtimeControlsDisabled(operationState, loadingAction) {
+export function runtimeControlsDisabled(operationState: AppOperationState, loadingAction: ApplicationRuntimeAction | null) {
   if (loadingAction) {
     return true;
   }
@@ -43,12 +56,12 @@ export function runtimeControlsDisabled(operationState, loadingAction) {
   return kind !== 'idle' && kind !== 'failed';
 }
 
-export function operationBlocksManagement(operationState) {
+export function operationBlocksManagement(operationState: AppOperationState) {
   const kind = operationState?.kind ?? 'idle';
   return kind !== 'idle' && kind !== 'failed';
 }
 
-function operationStateFromLocalAction(action) {
+function operationStateFromLocalAction(action: ApplicationRuntimeAction): AppOperationState {
   if (action === 'start') {
     return {
       kind: 'starting',
@@ -82,7 +95,7 @@ function operationStateFromLocalAction(action) {
   return { kind: 'idle' };
 }
 
-function operationStateFromJob(job) {
+function operationStateFromJob(job: AutarkOsJob): AppOperationState {
   if (job.type === 'start_app') {
     return {
       kind: 'starting',
@@ -142,16 +155,16 @@ function operationStateFromJob(job) {
   return { kind: 'idle' };
 }
 
-function jobsForItem(item, jobs) {
-  const itemIds = new Set([item?.id, item?.sourceId].filter(Boolean));
+function jobsForItem(item: Pick<ApplicationSurfaceItem, 'id' | 'sourceId'>, jobs: AutarkOsJob[]) {
+  const itemIds = new Set([item?.id, item?.sourceId].filter((id): id is string => Boolean(id)));
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => jobTargetsItem(job, itemIds))
     .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app'].includes(job.type))
-    .toSorted((left, right) => jobTime(right) - jobTime(left));
+    .sort((left, right) => jobTime(right) - jobTime(left));
 }
 
-function jobTargetsItem(job, itemIds) {
-  if (itemIds.has(job.subjectId)) {
+function jobTargetsItem(job: AutarkOsJob, itemIds: Set<string>) {
+  if (job.subjectId && itemIds.has(job.subjectId)) {
     return true;
   }
   if (job.type !== 'backup_restore') {
@@ -161,7 +174,7 @@ function jobTargetsItem(job, itemIds) {
   return target === 'all' || itemIds.has(target);
 }
 
-function restoreTarget(subjectId) {
+function restoreTarget(subjectId?: string | null) {
   if (!subjectId) {
     return '';
   }
@@ -169,7 +182,10 @@ function restoreTarget(subjectId) {
   return separator < 0 ? subjectId : subjectId.slice(separator + 1);
 }
 
-function failedJobStillRelevant(item, job) {
+function failedJobStillRelevant(
+  item: Pick<ApplicationSurfaceItem, 'attentionState' | 'readinessState'>,
+  job: AutarkOsJob,
+) {
   if (isFailedFullRestore(job)) {
     return false;
   }
@@ -185,18 +201,18 @@ function failedJobStillRelevant(item, job) {
   return item?.attentionState !== 'none' || ['stopped', 'unreachable', 'unknown'].includes(item?.readinessState);
 }
 
-function isFailedFullRestore(job) {
+function isFailedFullRestore(job: AutarkOsJob) {
   return job?.type === 'backup_restore' && job.status === 'failed' && restoreTarget(job.subjectId) === 'all';
 }
 
-function currentJobStepText(job) {
+function currentJobStepText(job: AutarkOsJob) {
   const step = job?.steps?.find((candidate) => candidate.id === job.currentStep)
     ?? job?.steps?.find((candidate) => candidate.status === 'running')
     ?? job?.steps?.find((candidate) => candidate.status === 'pending');
   return step?.message || step?.label || '';
 }
 
-function jobTime(job) {
+function jobTime(job: AutarkOsJob) {
   const parsed = Date.parse(job?.updatedAt || job?.createdAt || '');
   return Number.isFinite(parsed) ? parsed : 0;
 }

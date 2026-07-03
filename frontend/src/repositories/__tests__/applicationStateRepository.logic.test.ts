@@ -17,7 +17,7 @@ import {
   ownershipViews,
   setObservedServicePinnedInState,
   telemetryByAppId,
-} from '../applicationStateRepository.logic.js';
+} from '../applicationStateRepository.logic';
 
 const updatedAt = '2026-06-21T12:00:00Z';
 

@@ -1,4 +1,36 @@
-import { backupSafetyWarning } from './backupSafety.js';
+import { backupSafetyWarning } from './backupSafety';
+import type { AppAccessCheck, AppHealthSnapshot, AppReliabilityIssue, AppRuntimeView, AppTelemetry } from '@/types/app';
+
+type PrivateAccessReconciliation = {
+  detail?: string | null;
+  message?: string | null;
+  status?: string | null;
+};
+
+type AppActionRemediation = { kind: 'app-action'; action: 'restart'; label: string };
+type LinkRemediation = { kind: 'link'; to: string; label: string };
+type NoopRemediation = { kind: 'none'; label: string };
+type DangerousRemediationAction = { label: string; warning: string; target: string };
+
+export type AppRemediation = {
+  cause: 'private-access' | 'app-health' | 'local-link' | 'resource';
+  severity: 'warning' | 'critical';
+  tone: 'amber' | 'red';
+  title: string;
+  summary: string;
+  nextStep: string;
+  safeAction: AppActionRemediation | LinkRemediation | NoopRemediation;
+  checklist: string[];
+  dangerousActions: DangerousRemediationAction[];
+};
+
+type BuildAppRemediationInput = {
+  access?: AppAccessCheck | null;
+  app?: AppRuntimeView | null;
+  health?: AppHealthSnapshot | null;
+  reconciliation?: PrivateAccessReconciliation | null;
+  telemetry?: AppTelemetry | null;
+};
 
 /**
  * @typedef {{ kind: 'app-action', action: 'restart', label: string }} AppActionRemediation
@@ -22,9 +54,9 @@ import { backupSafetyWarning } from './backupSafety.js';
  * @param {{ access?: any, app?: any, health?: any, reconciliation?: any, telemetry?: any }} input
  * @returns {AppRemediation | null}
  */
-export function buildAppRemediation({ access, app, health, reconciliation, telemetry }) {
+export function buildAppRemediation({ access, app, health, reconciliation, telemetry }: BuildAppRemediationInput): AppRemediation | null {
   const status = health?.status || app?.friendlyStatus;
-  const privateAccessIssue = reconciliation && !['healthy', 'waiting'].includes(reconciliation.status);
+  const privateAccessIssue = reconciliation && !['healthy', 'waiting'].includes(reconciliation.status ?? '');
   const linkIssue = access?.status === 'unreachable';
   const resourceIssue = resourceWarning(telemetry);
 
@@ -78,7 +110,7 @@ export function buildAppRemediation({ access, app, health, reconciliation, telem
  * @param {any} issue
  * @returns {AppRemediation | null}
  */
-export function buildAppRemediationFromIssue(issue) {
+export function buildAppRemediationFromIssue(issue: AppReliabilityIssue | null | undefined): AppRemediation | null {
   if (!issue) {
     return null;
   }
@@ -100,7 +132,7 @@ export function buildAppRemediationFromIssue(issue) {
  * @param {{ summary: string }} input
  * @returns {AppRemediation}
  */
-function privateAccessRemediation({ summary }) {
+function privateAccessRemediation({ summary }: { appId?: string; summary: string }): AppRemediation {
   return {
     cause: 'private-access',
     severity: 'warning',
@@ -118,7 +150,7 @@ function privateAccessRemediation({ summary }) {
  * @param {{ appId?: string, appName: string, summary: string }} input
  * @returns {AppRemediation}
  */
-function appHealthRemediation({ appId, appName, summary }) {
+function appHealthRemediation({ appId, appName, summary }: { appId?: string; appName: string; summary: string }): AppRemediation {
   return {
     cause: 'app-health',
     severity: 'critical',
@@ -132,7 +164,7 @@ function appHealthRemediation({ appId, appName, summary }) {
   };
 }
 
-function recoveryActions(appId) {
+function recoveryActions(appId?: string) {
   if (!appId) {
     return [];
   }
@@ -150,7 +182,7 @@ function recoveryActions(appId) {
   ];
 }
 
-function resourceWarning(telemetry) {
+function resourceWarning(telemetry?: AppTelemetry | null) {
   const cpu = percent(telemetry?.cpuPercent);
   const memory = percent(telemetry?.memoryPercent);
   if (typeof cpu === 'number' && cpu >= 85) {
@@ -162,7 +194,7 @@ function resourceWarning(telemetry) {
   return null;
 }
 
-function percent(value) {
+function percent(value: string | null | undefined) {
   if (!value || value === 'Unavailable') {
     return null;
   }

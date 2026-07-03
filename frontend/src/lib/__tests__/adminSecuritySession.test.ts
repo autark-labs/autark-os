@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { applyAdminAuthHeader, clearAdminToken, readAdminToken, writeAdminToken } from '../adminSecuritySession.js';
+import { applyAdminAuthHeader, clearAdminToken, readAdminToken, writeAdminToken } from '../adminSecuritySession';
 
 function memoryStorage() {
   const values = new Map();

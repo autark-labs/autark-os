@@ -1,10 +1,12 @@
-import { activeJobs } from '../../repositories/jobRepository.logic.js';
+import { activeJobs } from '../../repositories/jobRepository.logic';
+import type { AppBackupStatus, BackupReport, RestorePoint } from '@/types/backup';
+import type { AutarkOsJob } from '@/types/jobs';
 
 /**
  * @param {string | null | undefined} value
  * @returns {string}
  */
-export function formatBackupDate(value) {
+export function formatBackupDate(value: string | null | undefined) {
   if (!value) return 'None';
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value));
 }
@@ -13,7 +15,7 @@ export function formatBackupDate(value) {
  * @param {number} value
  * @returns {string}
  */
-export function formatBackupBytes(value) {
+export function formatBackupBytes(value: number) {
   if (!Number.isFinite(value) || value <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let size = value;
@@ -29,7 +31,7 @@ export function formatBackupBytes(value) {
  * @param {string} value
  * @returns {string}
  */
-export function capitalizeBackupLabel(value) {
+export function capitalizeBackupLabel(value: string) {
   return value ? value.slice(0, 1).toUpperCase() + value.slice(1) : value;
 }
 
@@ -37,7 +39,7 @@ export function capitalizeBackupLabel(value) {
  * @param {string} status
  * @returns {string}
  */
-export function backupStatusLabel(status) {
+export function backupStatusLabel(status: string) {
   if (status === 'manual_only') return 'Manual run required';
   if (status === 'needs_backup_review') return 'Needs backup review';
   if (status === 'not_backed_up') return 'No restore point yet';
@@ -50,7 +52,7 @@ export function backupStatusLabel(status) {
  * @param {string} status
  * @returns {string}
  */
-export function backupSchedulerLabel(status) {
+export function backupSchedulerLabel(status: string) {
   if (status === 'off') return 'Off';
   if (status === 'manual_only') return 'Run-now mode';
   if (status === 'warning') return 'Needs attention';
@@ -62,7 +64,7 @@ export function backupSchedulerLabel(status) {
  * @param {string} status
  * @returns {string}
  */
-export function backupSchedulerTone(status) {
+export function backupSchedulerTone(status: string) {
   if (status === 'healthy') return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
   if (status === 'warning') return 'border-red-400/40 bg-red-500/10 text-red-200';
   if (status === 'off') return 'border-slate-700 bg-slate-900 text-slate-300';
@@ -73,7 +75,7 @@ export function backupSchedulerTone(status) {
  * @param {string} status
  * @returns {string}
  */
-export function backupAppBadgeTone(status) {
+export function backupAppBadgeTone(status: string) {
   if (status === 'protected') return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
   if (status === 'failed') return 'border-red-400/40 bg-red-500/10 text-red-200';
   return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
@@ -83,7 +85,7 @@ export function backupAppBadgeTone(status) {
  * @param {{ type?: string } | null | undefined} job
  * @returns {string}
  */
-export function backupJobBannerTitle(job) {
+export function backupJobBannerTitle(job?: Pick<AutarkOsJob, 'type'> | null) {
   if (job?.type === 'backup_verify') return 'Verification in progress';
   if (job?.type === 'backup_restore') return 'Restore in progress';
   return 'Backup in progress';
@@ -93,7 +95,7 @@ export function backupJobBannerTitle(job) {
  * @param {{ type?: string } | null | undefined} job
  * @returns {string}
  */
-export function backupJobStartedMessage(job) {
+export function backupJobStartedMessage(job?: Pick<AutarkOsJob, 'type'> | null) {
   if (job?.type === 'backup_verify') return 'Verification job started. Autark-OS will update the restore point when it finishes.';
   if (job?.type === 'backup_restore') return 'Restore job started. Autark-OS will update app and backup state when it finishes.';
   return 'Backup job started. Autark-OS will update restore points when it finishes.';
@@ -103,7 +105,7 @@ export function backupJobStartedMessage(job) {
  * @param {{ type?: string } | null | undefined} job
  * @returns {string}
  */
-export function backupJobCompletedMessage(job) {
+export function backupJobCompletedMessage(job?: Pick<AutarkOsJob, 'type'> | null) {
   if (job?.type === 'backup_verify') return 'Verification job completed.';
   if (job?.type === 'backup_restore') return 'Restore job completed.';
   return 'Backup job completed.';
@@ -115,7 +117,7 @@ const BACKUP_JOB_TYPES = ['backup', 'backup_verify', 'backup_restore'];
  * @param {Array<{ type?: string, status?: string, updatedAt?: string, createdAt?: string }>} jobs
  * @returns {Array<unknown>}
  */
-export function activeBackupJobs(jobs) {
+export function activeBackupJobs(jobs: AutarkOsJob[] | null | undefined) {
   return activeJobs(jobs, BACKUP_JOB_TYPES);
 }
 
@@ -123,7 +125,7 @@ export function activeBackupJobs(jobs) {
  * @param {Array<{ type?: string, status?: string, updatedAt?: string, createdAt?: string }>} jobs
  * @returns {unknown | null}
  */
-export function selectActiveBackupJob(jobs) {
+export function selectActiveBackupJob(jobs: AutarkOsJob[] | null | undefined) {
   return activeBackupJobs(jobs)[0] ?? null;
 }
 
@@ -131,7 +133,7 @@ export function selectActiveBackupJob(jobs) {
  * @param {{ type?: string, subjectId?: string | null } | null | undefined} job
  * @returns {string}
  */
-export function backupJobRunningId(job) {
+export function backupJobRunningId(job?: Pick<AutarkOsJob, 'subjectId' | 'type'> | null) {
   const subjectId = job?.subjectId || '';
   if (job?.type === 'backup_restore') {
     return `restore-${subjectId.split(':')[0] || subjectId}`;
@@ -153,7 +155,7 @@ export function backupJobRunningId(job) {
  * @param {unknown} latestRestore
  * @returns {{ summary: string; title: string }}
  */
-export function backupProtectionHero(report, latestRestore) {
+export function backupProtectionHero(report: BackupReport | null | undefined, latestRestore: RestorePoint | null | undefined) {
   if (!report) {
     return {
       summary: 'Autark-OS could not read backup status yet. Refresh the page or check Support if this continues.',
@@ -187,14 +189,14 @@ export function backupProtectionHero(report, latestRestore) {
 /**
  * @param {unknown | null} report
  */
-export function backupPageViewModel(report) {
-  const restorePoints = report?.recentRestorePoints ?? [];
+export function backupPageViewModel(report: BackupReport | null | undefined) {
+  const restorePoints: RestorePoint[] = report?.recentRestorePoints ?? [];
   const latestRestore = restorePoints.find((point) => point.status === 'completed') ?? null;
   return {
     appRestorePoints: restorePoints.filter((point) => point.scope !== 'full' && point.status === 'completed'),
     fullRestorePoints: restorePoints.filter((point) => point.scope === 'full' && point.status === 'completed'),
     latestRestore,
-    needsAttention: report?.apps.filter((app) => app.status !== 'protected') ?? [],
+    needsAttention: report?.apps.filter((app: AppBackupStatus) => app.status !== 'protected') ?? [],
     protectionHero: backupProtectionHero(report, latestRestore),
     routineRestorePoints: restorePoints.filter((point) => point.scope === 'full' && point.source === 'automatic' && point.status === 'completed'),
   };

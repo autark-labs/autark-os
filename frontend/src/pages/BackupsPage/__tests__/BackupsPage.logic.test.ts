@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { activeBackupJobs, backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, backupStatusLabel, selectActiveBackupJob } from '../BackupsPage.logic.js';
+import { activeBackupJobs, backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, backupStatusLabel, selectActiveBackupJob } from '../BackupsPage.logic';
 
 const baseReport = {
   apps: [

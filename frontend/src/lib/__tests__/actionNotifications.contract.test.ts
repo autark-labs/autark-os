@@ -39,7 +39,7 @@ test('story 9 removes duplicate local success banners for settings and cleanup m
 
 test('story 9 exposes reusable error notification handling', () => {
   const helper = source('src/lib/actionNotifications.ts');
-  const logic = source('src/lib/actionNotifications.logic.js');
+  const logic = source('src/lib/actionNotifications.logic.ts');
 
   assert.match(helper, /showActionErrorNotification/);
   assert.match(logic, /actionNotificationFromError/);

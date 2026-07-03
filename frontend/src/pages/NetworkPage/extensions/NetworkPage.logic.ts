@@ -2,7 +2,7 @@ import { MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import type { AppRuntimeView } from '@/types/app';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationItem, PrivateAccessReconciliationReport, TailscaleDevice, TailscaleStatus } from '@/types/network';
 import type { AppExposureGroup, AppExposureLevel, NetworkDeviceView, NetworkIssueView, NetworkNodeStatus, NetworkPosture, PrivateAppAccess } from './NetworkPage.types';
-import { privateAccessUrlForApp } from './NetworkPage.privateAccess.js';
+import { privateAccessUrlForApp } from './NetworkPage.privateAccess';
 
 export function buildNetworkPosture({
   devices,

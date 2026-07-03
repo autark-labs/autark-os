@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { homeMajorActivity, isMajorHomeActivity } from '../OverviewPage.activity.js';
+import { homeMajorActivity, isMajorHomeActivity } from '../OverviewPage.activity';
 
 function event(overrides = {}) {
   return {

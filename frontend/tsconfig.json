@@ -3,8 +3,7 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "allowJs": true,
-    "checkJs": false,
+    "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -22,6 +21,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/main.tsx", "src/**/*.d.ts", "vite.config.js"],
+  "include": ["src/main.tsx", "src/**/*.d.ts"],
   "references": []
 }

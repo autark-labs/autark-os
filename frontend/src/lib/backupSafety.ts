@@ -8,7 +8,9 @@ const warnings = {
   storageCleanupScope: 'This only removes a direct child of the Autark-OS apps folder that does not match an installed app.',
 };
 
-export function backupSafetyWarning(action) {
+type BackupSafetyAction = 'reinstall' | 'reset' | 'restore' | 'storage-cleanup' | string;
+
+export function backupSafetyWarning(action: BackupSafetyAction) {
   if (action === 'reset') {
     return warnings.reset;
   }
@@ -21,7 +23,7 @@ export function backupSafetyWarning(action) {
   return warnings.reinstall;
 }
 
-export function backupSafetyWarnings(action, options = {}) {
+export function backupSafetyWarnings(action: BackupSafetyAction, options: { verified?: boolean } = {}) {
   if (action === 'restore') {
     const restoreWarnings = [warnings.restoreReplacement, warnings.restoreSafetyBackup];
     if (options.verified === false) {
@@ -32,7 +34,7 @@ export function backupSafetyWarnings(action, options = {}) {
   return [backupSafetyWarning(action)];
 }
 
-export function backupSafetyChecklist(action) {
+export function backupSafetyChecklist(action: BackupSafetyAction) {
   if (action === 'storage-cleanup') {
     return [warnings.storageCleanupCheckpoint, warnings.storageCleanupScope];
   }

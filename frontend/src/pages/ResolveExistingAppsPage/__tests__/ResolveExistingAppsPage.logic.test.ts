@@ -3,7 +3,7 @@ import { test } from 'vitest';
 import {
   resolveExistingServiceActions,
   visibleResolveExistingServices,
-} from '../ResolveExistingAppsPage.logic.js';
+} from '../ResolveExistingAppsPage.logic';
 
 function service(overrides = {}) {
   return {

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import {
   managedAppIconUrl,
   observedServiceIconUrl,
-} from '../OverviewPage.appTiles.js';
+} from '../OverviewPage.appTiles';
 
 test('managed app tile uses its canonical app icon', () => {
   assert.equal(managedAppIconUrl({ icon: '/app-images/pi-hole.svg' }), '/app-images/pi-hole.svg');

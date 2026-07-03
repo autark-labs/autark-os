@@ -10,11 +10,11 @@ function source(relativePath) {
 }
 
 test('Monitoring page delegates chart and resource view models to tested helpers', () => {
-  assert.equal(existsSync(resolve(root, 'src/pages/MonitoringPage/extensions/MonitoringPage.viewModels.js')), true);
+  assert.equal(existsSync(resolve(root, 'src/pages/MonitoringPage/extensions/MonitoringPage.viewModels.ts')), true);
   assert.equal(existsSync(resolve(root, 'src/pages/MonitoringPage/extensions/__tests__/MonitoringPage.viewModels.test.ts')), true);
 
   const page = source('src/pages/MonitoringPage/MonitoringPage.tsx');
-  const viewModels = source('src/pages/MonitoringPage/extensions/MonitoringPage.viewModels.js');
+  const viewModels = source('src/pages/MonitoringPage/extensions/MonitoringPage.viewModels.ts');
 
   assert.match(page, /from '.\/extensions\/MonitoringPage\.viewModels'/);
   assert.doesNotMatch(page, /function buildCategoryData|function buildLevelData|function buildResourceData|function buildHostTrendData|function buildAppTrendData/);

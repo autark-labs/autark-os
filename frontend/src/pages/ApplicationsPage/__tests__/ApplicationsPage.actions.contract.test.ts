@@ -11,7 +11,7 @@ function source(relativePath) {
 
 test('applications page starts lifecycle jobs and re-pulls canonical app state', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const operations = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.operations.js');
+  const operations = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.operations.ts');
   const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
   const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
 

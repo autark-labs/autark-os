@@ -14,7 +14,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { tailscaleControlActions, tailscaleControlView } from './TailscaleControlPopover.logic.js';
+import { tailscaleControlActions, tailscaleControlView } from './TailscaleControlPopover.logic';
 import type { PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';
 import type { SystemSetupCheck } from '@/types/system';
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from '../SupportPage.diagnosticsModel.js';
+import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from '../SupportPage.diagnosticsModel';
 
 test('Diagnostics headline prefers plain Ready and Needs attention states', () => {
   assert.equal(diagnosticsHeadline({ status: 'ready', findings: [] }, { status: 'ready' }), 'Ready');

@@ -8,7 +8,7 @@ import {
   filterForApplicationDeepLinkTarget,
   findApplicationDeepLinkTarget,
   parseApplicationsDeepLink,
-} from '../extensions/ApplicationsPage.deepLinks.js';
+} from '../extensions/ApplicationsPage.deepLinks';
 
 test('builds durable My Apps links for managed apps and observed services', () => {
   assert.equal(

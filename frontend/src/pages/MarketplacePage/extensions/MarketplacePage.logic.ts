@@ -1,10 +1,36 @@
 export const START_HERE_DISMISSAL_KEY = 'autark-os:discover:start-here-dismissed:v1';
 
-import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks.js';
+import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
+import type { DiscoverAppView, DiscoverInstalledAppSummary } from '@/types/discover';
+import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
+import type { StorageReport, SystemDoctorStatus } from '@/types/system';
 
 /**
  * @param {{ apps?: unknown[]; hideInstalled?: boolean; installedAppIds?: Set<string>; searchQuery?: string; selectedCategory?: string; sortBy?: string }} params
  */
+type MarketplaceVisibleAppsParams = {
+  apps?: MarketplaceApp[];
+  hideInstalled?: boolean;
+  installedAppIds?: Set<string>;
+  searchQuery?: string;
+  selectedCategory?: string;
+  sortBy?: string;
+};
+
+type MarketplaceVisibleAppViewsParams = {
+  views?: DiscoverAppView[];
+  hideInstalled?: boolean;
+  searchQuery?: string;
+  selectedCategory?: string;
+  sortBy?: string;
+};
+
+type StarterAppContext = {
+  appInstallsBlocked: boolean;
+  limitedStorage: boolean;
+  privateAccessBlocked: boolean;
+};
+
 export function marketplaceVisibleApps({
   apps = [],
   hideInstalled = false,
@@ -12,7 +38,7 @@ export function marketplaceVisibleApps({
   searchQuery = '',
   selectedCategory = 'All',
   sortBy = 'Recommended',
-} = {}) {
+}: MarketplaceVisibleAppsParams = {}) {
   return sortMarketplaceApps(
     apps.filter((app) => (selectedCategory === 'All' || app.category === selectedCategory) && (!hideInstalled || !installedAppIds.has(app.id)) && marketplaceAppMatchesSearch(app, searchQuery)),
     sortBy,
@@ -28,7 +54,7 @@ export function marketplaceVisibleAppViews({
   searchQuery = '',
   selectedCategory = 'All',
   sortBy = 'Recommended',
-} = {}) {
+}: MarketplaceVisibleAppViewsParams = {}) {
   const appOrder = new Map(marketplaceVisibleApps({
     apps: views.map((view) => view.app),
     hideInstalled: false,
@@ -43,8 +69,8 @@ export function marketplaceVisibleAppViews({
     .sort((left, right) => (appOrder.get(left.app.id) ?? 0) - (appOrder.get(right.app.id) ?? 0));
 }
 
-export function marketplacePrimaryRoute(view = {}) {
-  const action = view.primaryAction;
+export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'primaryAction'> | null | undefined = null) {
+  const action = view?.primaryAction;
   if (!action || action.disabled || action.kind !== 'route' || !action.href) {
     return null;
   }
@@ -61,14 +87,20 @@ export function marketplacePrimaryRoute(view = {}) {
  * @param {unknown | null} doctor
  * @param {unknown | null} storage
  */
-export function starterAppsForMarketplace(apps, recommendedApps, installedById, doctor, storage) {
+export function starterAppsForMarketplace(
+  apps: MarketplaceApp[],
+  recommendedApps: string[],
+  installedById: Map<string, DiscoverInstalledAppSummary | null>,
+  doctor: SystemDoctorStatus | null | undefined,
+  storage: StorageReport | null | undefined,
+) {
   const selectedIds = (recommendedApps.length ? recommendedApps : ['vaultwarden', 'jellyfin', 'homepage', 'freshrss', 'syncthing']).slice(0, 5);
   const appInstallsBlocked = doctor?.readiness.groups.find((group) => group.id === 'app-installs')?.status === 'warning';
   const privateAccessBlocked = doctor?.readiness.groups.find((group) => group.id === 'private-access')?.status === 'warning';
   const limitedStorage = storage?.status === 'warning' || storage?.status === 'critical' || (storage?.runtimeDisk.usedPercent ?? 0) >= 75;
   return selectedIds
     .map((appId, index) => ({ app: apps.find((candidate) => candidate.id === appId), index }))
-    .filter((item) => Boolean(item.app))
+    .filter((item): item is { app: MarketplaceApp; index: number } => Boolean(item.app))
     .map(({ app, index }) => {
       const notes = starterAppNotes(app, { appInstallsBlocked, privateAccessBlocked, limitedStorage });
       const readiness = appInstallsBlocked ? 'blocked' : limitedStorage && !isLightweightMarketplaceApp(app) ? 'review' : 'ready';
@@ -89,19 +121,22 @@ export function starterAppsForMarketplace(apps, recommendedApps, installedById, 
     }));
 }
 
-export function shouldShowStartHereSection(recommendations, dismissed) {
+export function shouldShowStartHereSection(
+  recommendations: Array<{ installed?: boolean }>,
+  dismissed: boolean,
+) {
   if (dismissed || !recommendations.length) {
     return false;
   }
   return recommendations.some((recommendation) => !recommendation.installed);
 }
 
-export function starterCatalogForDiscover(apps) {
+export function starterCatalogForDiscover(apps: MarketplaceApp[]) {
   const starterIds = ['vaultwarden', 'jellyfin', 'homepage', 'immich', 'adguard-home', 'home-assistant', 'nextcloud'];
   const byId = new Map(apps.map((app) => [app.id, app]));
-  const starterApps = starterIds.map((appId) => byId.get(appId)).filter(Boolean);
+  const starterApps = starterIds.map((appId) => byId.get(appId)).filter((app): app is MarketplaceApp => Boolean(app));
   const readyApps = apps.filter((app) => app.supportLevel === 'Ready' || app.badge === 'Official' || marketplaceDifficultyRank(app.difficulty) === 0);
-  const catalog = [];
+  const catalog: MarketplaceApp[] = [];
   for (const app of [...starterApps, ...readyApps]) {
     if (!catalog.some((candidate) => candidate.id === app.id) && app.supportLevel !== 'Advanced' && app.supportLevel !== 'Experimental') {
       catalog.push(app);
@@ -113,12 +148,12 @@ export function starterCatalogForDiscover(apps) {
   return catalog;
 }
 
-export function safeBasicCatalogForDiscover(apps) {
+export function safeBasicCatalogForDiscover(apps: MarketplaceApp[]) {
   return apps.filter((app) => app.supportLevel === 'Ready');
 }
 
-export function starterAppNotes(app, context) {
-  const notes = [];
+export function starterAppNotes(app: MarketplaceApp, context: StarterAppContext) {
+  const notes: string[] = [];
   if (context.appInstallsBlocked) {
     notes.push('Docker setup is needed first. Review host readiness before installing apps.');
   } else {
@@ -136,7 +171,7 @@ export function starterAppNotes(app, context) {
   return notes;
 }
 
-export function marketplaceAppMatchesSearch(app, searchQuery) {
+export function marketplaceAppMatchesSearch(app: MarketplaceApp, searchQuery: string) {
   const query = searchQuery.trim().toLowerCase();
   if (!query) {
     return true;
@@ -154,7 +189,7 @@ export function marketplaceAppMatchesSearch(app, searchQuery) {
   ].some((value) => value.toLowerCase().includes(query));
 }
 
-export function sortMarketplaceApps(apps, sortBy) {
+export function sortMarketplaceApps(apps: MarketplaceApp[], sortBy: string) {
   const sorted = [...apps];
   switch (sortBy) {
     case 'Easiest to install':
@@ -166,18 +201,18 @@ export function sortMarketplaceApps(apps, sortBy) {
   }
 }
 
-export function marketplaceDifficultyRank(difficulty) {
+export function marketplaceDifficultyRank(difficulty: string) {
   const normalized = difficulty.toLowerCase();
   if (normalized.includes('easy')) return 0;
   if (normalized.includes('moderate')) return 1;
   return 2;
 }
 
-export function isLightweightMarketplaceApp(app) {
+export function isLightweightMarketplaceApp(app: MarketplaceApp) {
   return marketplaceDifficultyRank(app.difficulty) === 0 || app.installTime.toLowerCase().includes('2-3');
 }
 
-export function marketplaceUpdateRank(lastUpdated) {
+export function marketplaceUpdateRank(lastUpdated: string) {
   const value = lastUpdated.toLowerCase();
   if (value.includes('today') || value.includes('recent')) return 0;
   if (value.includes('day')) return 1;
@@ -186,8 +221,8 @@ export function marketplaceUpdateRank(lastUpdated) {
   return 4;
 }
 
-export function marketplaceCardToneClass(view = {}) {
-  const tone = view.cardTone || cardToneForState(view.state);
+export function marketplaceCardToneClass(view: Pick<DiscoverAppView, 'cardTone' | 'state'> | null | undefined = null) {
+  const tone = view?.cardTone || cardToneForState(view?.state);
   const tones = {
     success: 'border-emerald-300/35 bg-emerald-500/10 hover:bg-emerald-500/15',
     info: 'border-cyan-300/35 bg-cyan-400/10 hover:bg-cyan-400/15',
@@ -197,10 +232,10 @@ export function marketplaceCardToneClass(view = {}) {
     neutral: 'border-sky-400/25 bg-slate-900 hover:bg-slate-700',
     muted: 'border-sky-400/25 bg-slate-800 hover:bg-slate-700',
   };
-  return tones[tone] || tones.neutral;
+  return tones[tone as keyof typeof tones] || tones.neutral;
 }
 
-function cardToneForState(state) {
+function cardToneForState(state: string | null | undefined) {
   if (state === 'installed_managed') return 'success';
   if (state === 'pinned_external') return 'info';
   if (state === 'found_on_server') return 'observed';
@@ -211,7 +246,7 @@ function cardToneForState(state) {
   return 'neutral';
 }
 
-export function marketplaceActivityTone(level) {
+export function marketplaceActivityTone(level: string) {
   switch (level) {
     case 'success':
       return 'text-emerald-200';
@@ -224,7 +259,7 @@ export function marketplaceActivityTone(level) {
   }
 }
 
-export function formatMarketplaceActivityTime(value) {
+export function formatMarketplaceActivityTime(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
     return 'recently';
@@ -232,7 +267,16 @@ export function formatMarketplaceActivityTime(value) {
   return parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export function optionsFromInstalledSettings(settings, fallback) {
+export function optionsFromInstalledSettings(
+  settings: {
+    accessUrl?: string | null;
+    backup?: { enabled?: boolean; frequency?: string; retention?: number } | null;
+    expectedLocalPort?: number | null;
+    storageSubfolders?: Record<string, string> | null;
+    tailscaleEnabled?: boolean;
+  } | null | undefined,
+  fallback: InstallOptions,
+) {
   if (!settings) {
     return fallback;
   }
@@ -249,7 +293,7 @@ export function optionsFromInstalledSettings(settings, fallback) {
   };
 }
 
-export function portFromUrl(value) {
+export function portFromUrl(value: string | null | undefined) {
   if (!value) {
     return null;
   }

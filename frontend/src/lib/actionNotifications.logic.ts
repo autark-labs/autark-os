@@ -1,7 +1,41 @@
 const TERMINAL_ERROR_STATUSES = new Set(['failed', 'error']);
 const INFO_STATUSES = new Set(['skipped', 'cancelled', 'canceled']);
 
-export function actionNotificationFromResult(result = {}, fallbackTitle = 'Action finished') {
+type ActionNotificationSeverity = 'success' | 'info' | 'warning' | 'error' | 'critical' | string;
+
+type ActionNotificationResult = {
+  message?: string | null;
+  nextAction?: unknown;
+  ok?: boolean;
+  severity?: ActionNotificationSeverity | null;
+  status?: string | null;
+  summary?: string | null;
+  title?: string | null;
+};
+
+type ActionNotificationJobStep = {
+  id?: string | null;
+  label?: string | null;
+  message?: string | null;
+  status?: string | null;
+};
+
+type ActionNotificationJob = {
+  currentStep?: string | null;
+  error?: { message?: string | null } | null;
+  steps?: ActionNotificationJobStep[];
+  status?: string | null;
+  subjectId?: string | null;
+  type?: string | null;
+};
+
+type ErrorLike = {
+  detail?: unknown;
+  message?: unknown;
+  title?: unknown;
+};
+
+export function actionNotificationFromResult(result: ActionNotificationResult = {}, fallbackTitle = 'Action finished') {
   const severity = normalizeSeverity(result);
   const title = result.title || fallbackTitle;
   const message = result.message || result.summary || '';
@@ -14,7 +48,7 @@ export function actionNotificationFromResult(result = {}, fallbackTitle = 'Actio
   };
 }
 
-export function actionNotificationFromError(error, fallbackTitle = 'Action failed') {
+export function actionNotificationFromError(error: unknown, fallbackTitle = 'Action failed') {
   const message = errorMessage(error);
   return {
     severity: 'error',
@@ -25,7 +59,7 @@ export function actionNotificationFromError(error, fallbackTitle = 'Action faile
   };
 }
 
-export function actionNotificationFromJob(job = {}) {
+export function actionNotificationFromJob(job: ActionNotificationJob = {}) {
   const type = job.type || '';
   const status = String(job.status || '').toLowerCase();
   const failed = status === 'failed';
@@ -45,7 +79,7 @@ export function actionNotificationFromJob(job = {}) {
   };
 }
 
-function errorMessage(error) {
+function errorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
@@ -53,7 +87,8 @@ function errorMessage(error) {
     return error;
   }
   if (error && typeof error === 'object') {
-    const maybeMessage = error.message || error.title || error.detail;
+    const errorLike = error as ErrorLike;
+    const maybeMessage = errorLike.message || errorLike.title || errorLike.detail;
     if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
       return maybeMessage;
     }
@@ -61,14 +96,14 @@ function errorMessage(error) {
   return 'Autark-OS could not complete this action. Review diagnostics for details.';
 }
 
-export function notificationToastMethod(severity) {
+export function notificationToastMethod(severity: ActionNotificationSeverity) {
   if (severity === 'success') return 'success';
   if (severity === 'info') return 'info';
   if (severity === 'warning') return 'warning';
   return 'error';
 }
 
-function jobOperationLabel(type) {
+function jobOperationLabel(type: string | null | undefined) {
   switch (type) {
     case 'backup':
       return 'Backup';
@@ -88,20 +123,20 @@ function jobOperationLabel(type) {
   }
 }
 
-function currentStep(job) {
+function currentStep(job: ActionNotificationJob) {
   return job?.steps?.find((step) => step.id === job.currentStep)
     || job?.steps?.find((step) => step.status === 'running')
     || null;
 }
 
-function jobSubjectMessage(job) {
+function jobSubjectMessage(job: ActionNotificationJob) {
   if (job?.subjectId && job.subjectId !== '__full__' && job.subjectId !== '__routine__') {
     return `${jobOperationLabel(job.type)} is running for ${job.subjectId}.`;
   }
   return `${jobOperationLabel(job.type)} is running.`;
 }
 
-function normalizeSeverity(result) {
+function normalizeSeverity(result: ActionNotificationResult) {
   if (typeof result.severity === 'string' && result.severity) {
     return result.severity === 'critical' ? 'error' : result.severity;
   }

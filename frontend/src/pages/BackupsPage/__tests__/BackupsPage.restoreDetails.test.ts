@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { restorePointDetails } from '../BackupsPage.restoreDetails.js';
+import { restorePointDetails } from '../BackupsPage.restoreDetails';
 
 test('summarizes full restore points with included app names and checksum', () => {
   const details = restorePointDetails({

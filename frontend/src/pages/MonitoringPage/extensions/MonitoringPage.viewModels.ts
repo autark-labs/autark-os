@@ -1,4 +1,32 @@
-export function buildCategoryData(events) {
+import type { ActivityLog } from '@/types/activity';
+import type { AppTelemetry } from '@/types/app';
+import type { AppMetricSample, HostMetricSample } from '@/types/monitoring';
+
+type CountPoint = {
+  count: number;
+  label: string;
+};
+
+type ResourcePoint = {
+  cpu: number;
+  label: string;
+  memory: number;
+};
+
+type HostTrendPoint = {
+  cpu: number;
+  disk: number;
+  label: string;
+  memory: number;
+};
+
+type AppTrendPoint = {
+  cpu: number;
+  label: string;
+  memory: number;
+};
+
+export function buildCategoryData(events: ActivityLog[]): CountPoint[] {
   const categories = ['install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
   return categories.map((category) => ({
     label: humanize(category),
@@ -6,14 +34,14 @@ export function buildCategoryData(events) {
   })).filter((point) => point.count > 0).slice(0, 7);
 }
 
-export function buildLevelData(events) {
+export function buildLevelData(events: ActivityLog[]): CountPoint[] {
   return ['error', 'warning', 'success', 'info'].map((level) => ({
     label: humanize(level),
     count: events.filter((event) => event.level === level).length,
   }));
 }
 
-export function buildResourceData(telemetryByAppId) {
+export function buildResourceData(telemetryByAppId: Record<string, AppTelemetry>): ResourcePoint[] {
   return Object.entries(telemetryByAppId)
     .map(([appId, telemetry]) => ({
       label: shortAppLabel(appId),
@@ -25,7 +53,7 @@ export function buildResourceData(telemetryByAppId) {
     .slice(0, 6);
 }
 
-export function buildHostTrendData(samples) {
+export function buildHostTrendData(samples: HostMetricSample[]): HostTrendPoint[] {
   return bucketSamples(samples, (bucket) => ({
     label: formatTime(bucket[0].sampledAt),
     cpu: average(bucket.map((sample) => sample.systemCpuPercent)),
@@ -34,7 +62,7 @@ export function buildHostTrendData(samples) {
   }));
 }
 
-export function buildAppTrendData(samples) {
+export function buildAppTrendData(samples: AppMetricSample[]): AppTrendPoint[] {
   return bucketSamples(samples, (bucket) => ({
     label: formatTime(bucket[0].sampledAt),
     cpu: average(bucket.map((sample) => sample.cpuPercent)),
@@ -42,16 +70,16 @@ export function buildAppTrendData(samples) {
   }));
 }
 
-export function humanize(value) {
+export function humanize(value: string) {
   return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function bucketSamples(samples, mapper) {
+function bucketSamples<TSample, TResult>(samples: TSample[], mapper: (bucket: TSample[]) => TResult): TResult[] {
   if (!samples.length) {
     return [];
   }
   const bucketSize = Math.max(1, Math.ceil(samples.length / 18));
-  const buckets = [];
+  const buckets: TSample[][] = [];
   samples.forEach((sample, index) => {
     const bucketIndex = Math.floor(index / bucketSize);
     buckets[bucketIndex] = buckets[bucketIndex] || [];
@@ -60,7 +88,7 @@ function bucketSamples(samples, mapper) {
   return buckets.filter(Boolean).map(mapper);
 }
 
-function average(values) {
+function average(values: number[]) {
   const valid = values.filter((value) => Number.isFinite(value));
   if (!valid.length) {
     return 0;
@@ -68,7 +96,7 @@ function average(values) {
   return Math.round((valid.reduce((total, value) => total + value, 0) / valid.length) * 10) / 10;
 }
 
-function shortAppLabel(appId) {
+function shortAppLabel(appId: string) {
   return appId
     .split('-')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -76,7 +104,7 @@ function shortAppLabel(appId) {
     .slice(0, 14);
 }
 
-function formatTime(value) {
+function formatTime(value?: string | null) {
   if (!value) {
     return '';
   }
@@ -86,11 +114,11 @@ function formatTime(value) {
   }).format(new Date(value));
 }
 
-function parsePercent(value) {
+function parsePercent(value: string) {
   const parsed = Number.parseFloat(String(value).replace('%', '').trim());
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function clamp(value) {
+function clamp(value: number) {
   return Math.max(0, Math.min(100, value));
 }

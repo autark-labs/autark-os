@@ -1,3 +1,5 @@
+import type { AutarkOsJob, AutarkOsJobStep } from '@/types/jobs';
+
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
 export const JOB_FAMILIES = {
@@ -7,23 +9,23 @@ export const JOB_FAMILIES = {
   install: ['install_app'],
 };
 
-export function terminalJob(job) {
-  return TERMINAL_JOB_STATUSES.has(job?.status);
+export function terminalJob(job?: Pick<AutarkOsJob, 'status'> | null) {
+  return TERMINAL_JOB_STATUSES.has(job?.status ?? '');
 }
 
-export function activeJobs(jobs, types = []) {
+export function activeJobs(jobs: AutarkOsJob[] | null | undefined, types: string[] = []) {
   const allowedTypes = new Set(types);
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => job && !terminalJob(job))
     .filter((job) => allowedTypes.size === 0 || allowedTypes.has(job.type))
-    .toSorted((left, right) => jobTime(right) - jobTime(left));
+    .sort((left, right) => jobTime(right) - jobTime(left));
 }
 
-export function latestActiveJob(jobs, types = []) {
+export function latestActiveJob(jobs: AutarkOsJob[] | null | undefined, types: string[] = []) {
   return activeJobs(jobs, types)[0] ?? null;
 }
 
-export function activeJobsByFamily(jobs) {
+export function activeJobsByFamily(jobs: AutarkOsJob[] | null | undefined) {
   return {
     appLifecycle: activeJobs(jobs, JOB_FAMILIES.appLifecycle),
     backup: activeJobs(jobs, JOB_FAMILIES.backup),
@@ -32,7 +34,7 @@ export function activeJobsByFamily(jobs) {
   };
 }
 
-export function currentJobStep(job) {
+export function currentJobStep(job?: AutarkOsJob | null) {
   const step = job?.steps?.find((candidate) => candidate.id === job.currentStep)
     ?? job?.steps?.find((candidate) => candidate.status === 'running')
     ?? job?.steps?.find((candidate) => candidate.status === 'pending');
@@ -42,28 +44,28 @@ export function currentJobStep(job) {
   return step;
 }
 
-export function currentJobStepText(job, fallback = '') {
+export function currentJobStepText(job?: AutarkOsJob | null, fallback = '') {
   const step = currentJobStep(job);
   return step?.message || step?.label || fallback;
 }
 
-export function jobProgressPercent(job) {
+export function jobProgressPercent(job?: AutarkOsJob | null) {
   const steps = Array.isArray(job?.steps) ? job.steps : [];
   if (!steps.length) {
     return terminalJob(job) ? 100 : 8;
   }
-  if (job.status === 'succeeded') {
+  if (job?.status === 'succeeded') {
     return 100;
   }
-  if (job.status === 'failed' || job.status === 'cancelled') {
+  if (job?.status === 'failed' || job?.status === 'cancelled') {
     return Math.max(8, Math.round((completedSteps(steps) / steps.length) * 100));
   }
-  const runningStepIndex = steps.findIndex((step) => step.status === 'running' || step.id === job.currentStep);
+  const runningStepIndex = steps.findIndex((step) => step.status === 'running' || step.id === job?.currentStep);
   const progressStepCount = runningStepIndex >= 0 ? Math.max(completedSteps(steps), runningStepIndex) + 0.5 : completedSteps(steps);
   return Math.min(100, Math.max(8, Math.round((progressStepCount / steps.length) * 100)));
 }
 
-export function jobTypeLabel(type) {
+export function jobTypeLabel(type?: string | null) {
   switch (type) {
     case 'install_app':
       return 'Install';
@@ -91,11 +93,11 @@ export function jobTypeLabel(type) {
   }
 }
 
-function completedSteps(steps) {
+function completedSteps(steps: AutarkOsJobStep[]) {
   return steps.filter((step) => ['succeeded', 'skipped'].includes(step.status)).length;
 }
 
-function jobTime(job) {
+function jobTime(job: Pick<AutarkOsJob, 'createdAt' | 'updatedAt'>) {
   const value = job?.updatedAt || job?.createdAt || '';
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;

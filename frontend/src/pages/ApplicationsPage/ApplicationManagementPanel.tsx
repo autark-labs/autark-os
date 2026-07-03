@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { ApplicationDarkControlButton } from './components/ApplicationButtons';
 import { DestructiveActionDialog } from './components/DestructiveActionDialog';
 import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
-import { operationBlocksManagement } from './extensions/ApplicationsPage.operations.js';
+import { operationBlocksManagement } from './extensions/ApplicationsPage.operations';
 import { ApplicationGuideTab } from './managementTabs/ApplicationGuideTab';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
 import { ApplicationRecoveryTab } from './managementTabs/ApplicationRecoveryTab';

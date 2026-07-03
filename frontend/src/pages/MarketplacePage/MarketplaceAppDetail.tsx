@@ -66,7 +66,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
   const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId, { panel: 'manage' }) : '/apps';
   const reviewExistingHref = appView.observedService
     ? applicationDeepLinkForObservedService(appView.observedService, { panel: 'manage' })
-    : applicationRouteWithManagementPanel(appView.reviewExistingHref);
+    : applicationRouteWithManagementPanel(appView.reviewExistingHref) ?? null;
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`

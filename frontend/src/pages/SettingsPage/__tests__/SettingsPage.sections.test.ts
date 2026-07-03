@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { test } from 'vitest';
 import { fileURLToPath } from 'node:url';
-import { settingsGroups, sectionsForGroup, defaultSettingsGroup, visibleSettingsGroups } from '../SettingsPage.sections.js';
+import { settingsGroups, sectionsForGroup, defaultSettingsGroup, visibleSettingsGroups } from '../SettingsPage.sections';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -33,7 +33,7 @@ test('can hide advanced group for simplified views', () => {
 
 test('does not expose unfinished MVP settings controls', () => {
   const page = readFileSync(resolve(here, '../SettingsPage.tsx'), 'utf8');
-  const sections = readFileSync(resolve(here, '../SettingsPage.sections.js'), 'utf8');
+  const sections = readFileSync(resolve(here, '../SettingsPage.sections.ts'), 'utf8');
 
   assert.doesNotMatch(page, /Show advanced disk info|Coming soon|Audit logging|Update channel|Update checks|UpdatesPanel/);
   assert.doesNotMatch(sections, /updates|Update channel/);

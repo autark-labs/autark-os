@@ -21,7 +21,7 @@ import { CompactOperationStatus } from './components/AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
 import { ApplicationLightControlButton, ApplicationOpenButton } from './components/ApplicationButtons';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
-import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations.js';
+import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations';
 import type { ApplicationActionHandlers, ApplicationEmptyState, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type AdvancedApplicationsViewProps = {

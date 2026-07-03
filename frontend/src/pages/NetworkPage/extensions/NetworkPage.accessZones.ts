@@ -1,4 +1,13 @@
-export function buildAccessZones(exposureGroups, pinnedExternalServices = []) {
+import type { AppRuntimeView } from '@/types/app';
+import type { ObservedServiceView } from '@/types/observedService';
+import type { AppExposureGroup } from './NetworkPage.types';
+
+type ZoneAppSource = AppRuntimeView | ObservedServiceView;
+
+export function buildAccessZones(
+  exposureGroups: Record<string, AppExposureGroup>,
+  pinnedExternalServices: ObservedServiceView[] = [],
+) {
   return [
     zone('public', 'Public Internet', exposureGroups?.public?.apps || [], 'Public access is off', 'Off'),
     zone('tailnet', 'Private / Tailscale', exposureGroups?.tailnet?.apps || [], 'No private links yet'),
@@ -7,14 +16,14 @@ export function buildAccessZones(exposureGroups, pinnedExternalServices = []) {
   ];
 }
 
-export function zoneAppChip(item) {
-  if (item.userStatus === 'pinned_external' || item.pinned) {
+export function zoneAppChip(item: ZoneAppSource) {
+  if ('displayName' in item) {
     return {
       id: item.id,
-      label: item.displayName || item.name,
-      url: item.url,
+      label: item.displayName,
+      url: item.url || '',
       external: true,
-      status: 'Pinned external',
+      status: item.userStatus === 'pinned_external' || item.pinned ? 'Pinned external' : item.userStatusLabel,
     };
   }
   return {
@@ -26,7 +35,7 @@ export function zoneAppChip(item) {
   };
 }
 
-function zone(id, label, apps, emptyText, emptyStatusLabel = '0') {
+function zone(id: string, label: string, apps: ZoneAppSource[], emptyText: string, emptyStatusLabel = '0') {
   return {
     id,
     label,

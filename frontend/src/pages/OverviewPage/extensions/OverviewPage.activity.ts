@@ -17,13 +17,15 @@ const MAJOR_ACTIVITY_ACTIONS = new Set([
 const MAJOR_ACTIVITY_CATEGORIES = new Set(['install', 'marketplace', 'backup', 'restore', 'update', 'access', 'setup']);
 const NOISY_ACTION_PARTS = ['refresh', 'poll', 'sync', 'diagnostic', 'health_check', 'status_check', 'auto_repair_check'];
 
-export function homeMajorActivity(items, limit = 5) {
+import type { ActivityLog } from '@/types/activity';
+
+export function homeMajorActivity(items: ActivityLog[] | null | undefined, limit = 5) {
   return (items || [])
     .filter((item) => isMajorHomeActivity(item))
     .slice(0, limit);
 }
 
-export function isMajorHomeActivity(item) {
+export function isMajorHomeActivity(item: ActivityLog | null | undefined) {
   const action = clean(item?.action);
   const category = clean(item?.category);
   const title = clean(item?.title);
@@ -42,6 +44,6 @@ export function isMajorHomeActivity(item) {
   return MAJOR_ACTIVITY_CATEGORIES.has(category) && item?.outcome !== 'failed_background';
 }
 
-function clean(value) {
+function clean(value: unknown) {
   return String(value || '').trim().toLowerCase().replaceAll(' ', '_');
 }

@@ -25,28 +25,30 @@ export const autarkOsThemes = [
   },
 ];
 
-const themeIds = new Set(autarkOsThemes.map((theme) => theme.id));
+export type AutarkOsThemeId = (typeof autarkOsThemes)[number]['id'];
 
-export function resolveThemeId(value) {
-  return themeIds.has(value) ? value : defaultThemeId;
+const themeIds = new Set<string>(autarkOsThemes.map((theme) => theme.id));
+
+export function resolveThemeId(value: string | null | undefined) {
+  return typeof value === 'string' && themeIds.has(value) ? value : defaultThemeId;
 }
 
-export function readStoredTheme(storage = globalThis.localStorage) {
+export function readStoredTheme(storage: Pick<Storage, 'getItem'> | undefined = globalThis.localStorage) {
   try {
     const stored = storage?.getItem(themeStorageKey);
-    return themeIds.has(stored) ? stored : null;
+    return typeof stored === 'string' && themeIds.has(stored) ? stored : null;
   } catch {
     return null;
   }
 }
 
-export function storeTheme(themeId, storage = globalThis.localStorage) {
+export function storeTheme(themeId: string, storage: Pick<Storage, 'setItem'> | undefined = globalThis.localStorage) {
   const nextTheme = resolveThemeId(themeId);
   storage?.setItem(themeStorageKey, nextTheme);
   return nextTheme;
 }
 
-export function applyThemeToDocument(documentRef = globalThis.document, themeId = defaultThemeId) {
+export function applyThemeToDocument(documentRef: Document | undefined = globalThis.document, themeId = defaultThemeId) {
   const nextTheme = resolveThemeId(themeId);
   if (documentRef?.documentElement?.dataset) {
     documentRef.documentElement.dataset.theme = nextTheme;

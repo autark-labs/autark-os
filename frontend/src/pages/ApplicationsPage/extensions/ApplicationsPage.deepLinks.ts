@@ -1,12 +1,30 @@
+import type { ObservedServiceView } from '@/types/observedService';
+import type { ApplicationSurfaceItem } from './ApplicationsPage.types';
+
 const APPLICATIONS_PATH = '/apps';
 const FOCUS_KINDS = new Set(['managed', 'app', 'service', 'observed', 'catalog']);
 const MANAGEMENT_PANEL = 'manage';
 
-export function applicationDeepLinkForManagedApp(appId, options = {}) {
+type ApplicationDeepLinkKind = 'managed' | 'service' | 'catalog';
+type ApplicationDeepLinkPanel = typeof MANAGEMENT_PANEL;
+type ApplicationDeepLinkOptions = {
+  panel?: ApplicationDeepLinkPanel | null;
+  tab?: string | null;
+};
+
+export type ApplicationDeepLinkTarget = {
+  id: string | null;
+  key: string;
+  kind: ApplicationDeepLinkKind | null;
+  panel: ApplicationDeepLinkPanel | null;
+  tab: string | null;
+};
+
+export function applicationDeepLinkForManagedApp(appId: string, options: ApplicationDeepLinkOptions = {}) {
   return applicationDeepLink('managed', appId, options);
 }
 
-export function applicationDeepLinkForObservedService(service, options = {}) {
+export function applicationDeepLinkForObservedService(service: Pick<ObservedServiceView, 'catalogAppId' | 'id'> | null | undefined, options: ApplicationDeepLinkOptions = {}) {
   if (service?.id) {
     return applicationDeepLink('service', service.id, options);
   }
@@ -16,7 +34,7 @@ export function applicationDeepLinkForObservedService(service, options = {}) {
   return APPLICATIONS_PATH;
 }
 
-export function applicationDeepLinkForSurfaceItem(item, options = {}) {
+export function applicationDeepLinkForSurfaceItem(item: ApplicationSurfaceItem | null | undefined, options: ApplicationDeepLinkOptions = {}) {
   if (!item) {
     return APPLICATIONS_PATH;
   }
@@ -34,7 +52,7 @@ export function applicationDeepLinkForSurfaceItem(item, options = {}) {
   return APPLICATIONS_PATH;
 }
 
-export function applicationRouteWithManagementPanel(href) {
+export function applicationRouteWithManagementPanel(href: string | null | undefined) {
   if (!href) {
     return href;
   }
@@ -48,7 +66,7 @@ export function applicationRouteWithManagementPanel(href) {
   return `${parsed.pathname}?${parsed.searchParams.toString()}`;
 }
 
-export function parseApplicationsDeepLink(search = '') {
+export function parseApplicationsDeepLink(search = ''): ApplicationDeepLinkTarget {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const rawFocus = params.get('focus') || legacyFocusParam(params);
   const separatorIndex = rawFocus.indexOf(':');
@@ -77,7 +95,7 @@ export function parseApplicationsDeepLink(search = '') {
   };
 }
 
-function legacyFocusParam(params) {
+function legacyFocusParam(params: URLSearchParams) {
   const serviceId = params.get('service');
   if (serviceId) {
     return `service:${serviceId}`;
@@ -89,7 +107,7 @@ function legacyFocusParam(params) {
   return '';
 }
 
-export function findApplicationDeepLinkTarget(items, target) {
+export function findApplicationDeepLinkTarget(items: ApplicationSurfaceItem[], target: ApplicationDeepLinkTarget | null | undefined) {
   if (!target?.kind || !target.id) {
     return null;
   }
@@ -97,7 +115,7 @@ export function findApplicationDeepLinkTarget(items, target) {
   return items.find((item) => matchesApplicationDeepLinkTarget(item, target)) ?? null;
 }
 
-export function filterForApplicationDeepLinkTarget(item) {
+export function filterForApplicationDeepLinkTarget(item: ApplicationSurfaceItem | null | undefined) {
   if (item?.managementState === 'managed') {
     return 'managed';
   }
@@ -110,7 +128,7 @@ export function filterForApplicationDeepLinkTarget(item) {
   return 'all';
 }
 
-function applicationDeepLink(kind, id, options = {}) {
+function applicationDeepLink(kind: ApplicationDeepLinkKind, id: string | null | undefined, options: ApplicationDeepLinkOptions = {}) {
   if (!id) {
     return APPLICATIONS_PATH;
   }
@@ -126,7 +144,7 @@ function applicationDeepLink(kind, id, options = {}) {
   return `${APPLICATIONS_PATH}?${params.toString()}`;
 }
 
-function parseAppRelativeUrl(href) {
+function parseAppRelativeUrl(href: string) {
   try {
     return new URL(href, 'http://autark-os.local');
   } catch {
@@ -134,7 +152,7 @@ function parseAppRelativeUrl(href) {
   }
 }
 
-function normalizeKind(kind) {
+function normalizeKind(kind: string): ApplicationDeepLinkKind | null {
   if (!FOCUS_KINDS.has(kind)) {
     return null;
   }
@@ -144,19 +162,19 @@ function normalizeKind(kind) {
   if (kind === 'observed') {
     return 'service';
   }
-  return kind;
+  return kind as ApplicationDeepLinkKind;
 }
 
-function matchesApplicationDeepLinkTarget(item, target) {
-  const itemIds = new Set([item.id, item.sourceId].filter(Boolean));
+function matchesApplicationDeepLinkTarget(item: ApplicationSurfaceItem, target: ApplicationDeepLinkTarget) {
+  const itemIds = new Set([item.id, item.sourceId].filter((id): id is string => Boolean(id)));
   if (target.kind === 'managed') {
-    return item.managementState === 'managed' && itemIds.has(target.id);
+    return target.id !== null && item.managementState === 'managed' && itemIds.has(target.id);
   }
   if (target.kind === 'service') {
-    return item.managementState !== 'managed' && itemIds.has(target.id);
+    return target.id !== null && item.managementState !== 'managed' && itemIds.has(target.id);
   }
   if (target.kind === 'catalog') {
-    return item.catalogAppId === target.id || itemIds.has(target.id);
+    return target.id !== null && (item.catalogAppId === target.id || itemIds.has(target.id));
   }
   return false;
 }

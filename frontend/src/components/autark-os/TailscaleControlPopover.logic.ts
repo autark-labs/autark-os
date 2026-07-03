@@ -1,4 +1,26 @@
-export function tailscaleControlView(status, check, reconciliation) {
+type TailscaleStatus = {
+  connected?: boolean;
+  deviceName?: string | null;
+  dnsName?: string | null;
+  installed?: boolean;
+  message?: string | null;
+  mock?: boolean;
+  state?: string | null;
+};
+
+type TailscaleCheck = {
+  status?: string | null;
+};
+
+type PrivateLinkReconciliation = {
+  apps?: Array<{ status?: string | null }>;
+};
+
+export function tailscaleControlView(
+  status: TailscaleStatus | null | undefined,
+  check: TailscaleCheck | null | undefined,
+  reconciliation: PrivateLinkReconciliation | null | undefined,
+) {
   const mock = status?.state === 'dev' || status?.state === 'mocked_dev' || status?.message?.toLowerCase().includes('mock') || false;
   const connected = Boolean(status?.connected || mock);
   const installed = status?.installed ?? check?.status !== 'warning';
@@ -56,7 +78,7 @@ export function tailscaleControlView(status, check, reconciliation) {
   };
 }
 
-export function tailscaleControlActions(status) {
+export function tailscaleControlActions(status: TailscaleStatus | null | undefined) {
   if (status?.connected || status?.mock) {
     return [
       { id: 'admin', label: 'Manage Tailscale', href: 'https://login.tailscale.com/admin/machines', external: true, enabled: true },

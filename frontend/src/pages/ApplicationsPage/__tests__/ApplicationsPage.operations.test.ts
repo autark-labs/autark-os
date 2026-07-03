@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { operationStateForItem, runtimeControlsDisabled, operationBlocksManagement } from '../extensions/ApplicationsPage.operations.js';
+import { operationStateForItem, runtimeControlsDisabled, operationBlocksManagement } from '../extensions/ApplicationsPage.operations';
 
 test('operationStateForItem maps local runtime actions before idle state', () => {
   assert.deepEqual(operationStateForItem(item('vaultwarden'), 'start', null, []), {

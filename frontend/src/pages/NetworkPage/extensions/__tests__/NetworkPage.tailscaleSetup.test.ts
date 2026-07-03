@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { tailscaleAccessDisplay, tailscaleHeaderStatus, tailscaleSetupGuidance, tailscaleSetupTasks } from '../NetworkPage.tailscaleSetup.js';
+import { tailscaleAccessDisplay, tailscaleHeaderStatus, tailscaleSetupGuidance, tailscaleSetupTasks } from '../NetworkPage.tailscaleSetup';
 
 test('asks users to sign in when Tailscale is installed but disconnected', () => {
   const guidance = tailscaleSetupGuidance({ installed: true, connected: false, message: 'Needs login' });

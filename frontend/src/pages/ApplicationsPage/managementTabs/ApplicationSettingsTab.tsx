@@ -40,7 +40,7 @@ import type {
   ApplicationSettingsImpact,
   ApplicationSurfaceItem,
 } from '../extensions/ApplicationsPage.types';
-import { operationBlocksManagement } from '../extensions/ApplicationsPage.operations.js';
+import { operationBlocksManagement } from '../extensions/ApplicationsPage.operations';
 
 type ApplicationSettingsTabProps = {
   actions: Pick<ApplicationActionHandlers, 'onDirtyChange' | 'onSaveSettings' | 'onSettingsPlanRequest' | 'onSetPrivateNetworkAccess'>;
