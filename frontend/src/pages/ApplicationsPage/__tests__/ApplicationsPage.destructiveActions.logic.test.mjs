@@ -20,7 +20,7 @@ function loadDestructiveActionsModule() {
   return module.exports;
 }
 
-test('maps backend-shaped uninstall plans without legacy confirmation field', () => {
+test('maps backend-shaped uninstall plans without turning normal confirmations into blockers', () => {
   const { mapUninstallPlanToDestructiveActionPlan } = loadDestructiveActionsModule();
 
   const plan = mapUninstallPlanToDestructiveActionPlan({
@@ -39,7 +39,6 @@ test('maps backend-shaped uninstall plans without legacy confirmation field', ()
     'Confirm you understand that containers will be removed',
     'Project OS will save a safety checkpoint.',
   ]);
-  assert.deepEqual(Array.from(plan.blockedReasons), [
-    'Confirm you understand that containers will be removed',
-  ]);
+  assert.deepEqual(Array.from(plan.blockedReasons), []);
+  assert.equal(plan.requiresTextConfirmation, 'UNINSTALL');
 });

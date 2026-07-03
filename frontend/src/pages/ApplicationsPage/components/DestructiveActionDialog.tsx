@@ -1,16 +1,15 @@
 import { useState, type MouseEvent } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,20 +109,20 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
   }
 
   return (
-    <AlertDialog onOpenChange={handleOpenChange} open={open}>
-      <AlertDialogTrigger asChild>
+    <Dialog onOpenChange={handleOpenChange} open={open}>
+      <DialogTrigger asChild>
         <Button className={className} size="sm" type="button" variant="outline">
           <AlertTriangle data-icon="inline-start" />
           {triggerLabel}
         </Button>
-      </AlertDialogTrigger>
-      <AlertDialogContent className="max-h-[85vh] overflow-y-auto bg-slate-950 text-slate-50 sm:max-w-2xl">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{plan?.title ?? 'Review safety plan'}</AlertDialogTitle>
-          <AlertDialogDescription>
+      </DialogTrigger>
+      <DialogContent className="max-h-[85vh] overflow-y-auto bg-slate-950 text-slate-50 sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{plan?.title ?? 'Review safety plan'}</DialogTitle>
+          <DialogDescription>
             {plan?.summary ?? 'Project OS will load a safety plan before making changes.'}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         {loadingPlan && <PlanSkeleton />}
 
@@ -185,15 +184,17 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
           </Alert>
         )}
 
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={running}>Cancel</AlertDialogCancel>
-          <AlertDialogAction className="bg-red-600 text-white hover:bg-red-500" disabled={!canRun} onClick={confirmAction}>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button disabled={running} type="button" variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button className="bg-red-600 text-white hover:bg-red-500" disabled={!canRun} onClick={confirmAction} type="button">
             {running && <Loader2 className="animate-spin" data-icon="inline-start" />}
             {running ? 'Starting' : plan?.runLabel ?? 'Continue'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -24,7 +24,7 @@ test('applications page destructive actions use a shared plan-confirm-run dialog
   assert.match(destructiveActions, /needsConfirmation/);
 
   assert.match(dialog, /export function DestructiveActionDialog/);
-  assert.match(dialog, /AlertDialog/);
+  assert.match(dialog, /Dialog/);
   assert.match(dialog, /loadPlan/);
   assert.match(dialog, /runAction/);
   assert.match(dialog, /disabledReason/);
@@ -35,10 +35,12 @@ test('applications page destructive actions use a shared plan-confirm-run dialog
   assert.match(dialog, /confirmationText/);
   assert.match(dialog, /setActionError/);
   assert.match(dialog, /canRun/);
+  assert.match(dialog, /<DialogClose asChild>/);
 
   assert.match(panel, /DestructiveActionDialog/);
   assert.match(panel, /disabledReason/);
   assert.doesNotMatch(panel, /<AlertDialog/);
+  assert.doesNotMatch(dialog, /AlertDialog/);
   assert.doesNotMatch(panel, /This wireframe keeps data by default/);
   assert.doesNotMatch(panel, /Keep data and uninstall/);
 

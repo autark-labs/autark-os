@@ -31,7 +31,8 @@ export function mapUninstallPlanToDestructiveActionPlan(plan: UninstallPlan): De
       'Refresh app state',
     ],
     warnings,
-    blockedReasons: confirmationItems,
+    blockedReasons: [],
+    requiresTextConfirmation: confirmationItems.length > 0 ? 'UNINSTALL' : undefined,
     runLabel: 'Keep data and uninstall',
   };
 }
