@@ -63,3 +63,24 @@ export type AppExposureGroup = {
   label: string;
   status: NetworkNodeStatus;
 };
+
+export type ReachabilityZoneId = 'local' | 'lan' | 'tailnet' | 'public';
+
+export type ReachabilityTypeFilter = 'managed' | 'external' | 'attention';
+
+export type ReachabilityService = {
+  id: string;
+  type: 'managed-app' | 'external-service';
+  app: AppRuntimeView | null;
+  label: string;
+  detail: string;
+  zone: ReachabilityZoneId;
+  openUrl: string | null;
+  status: NetworkNodeStatus;
+  statusLabel: string;
+  draggable: boolean;
+  issue: string | null;
+  privateUrl: string | null;
+  localUrl: string | null;
+  iconUrl: string | null;
+};

@@ -1,17 +1,34 @@
-import { useCallback, useMemo, useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
-import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
-import { StatusPill } from '@/components/primitives/StatusPill';
+import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
+import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { Surface } from '@/components/primitives/Surface';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { cn } from '@/lib/utils';
 import {
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
@@ -21,34 +38,54 @@ import {
   useAccessNetworkRepository,
   useRemoveStalePrivateAccessMutation,
 } from '@/repositories/networkRepository';
-import type { AppRuntimeView } from '@/types/app';
+import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleStatus } from '@/types/network';
 import { HostSetupPanel } from './HostSetupPanel';
 import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';
 import { NetworkIssuesPanel } from './NetworkIssuesPanel';
-import { PrivateAccessManager } from './PrivateAccessManager';
-import { AccessPageErrorState, AccessPageLoadingState, NetworkInset } from './NetworkPage.shared';
+import { ReachabilityMatrix } from './ReachabilityMatrix';
+import { AccessLine, AccessPageErrorState, AccessPageLoadingState, NetworkInset, NetworkPanel } from './NetworkPage.shared';
 import {
   buildDeviceViews,
-  buildAppExposureGroups,
   buildNetworkIssues,
-  buildNetworkPosture,
-  buildPrivateAppAccess,
+  buildReachabilityServices,
 } from './extensions/NetworkPage.logic';
-import { buildAccessZones } from './extensions/NetworkPage.accessZones';
-import { tailscaleAccessDisplay, tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
+import {
+  accessDeepLinkForService,
+  accessDeepLinkForTab,
+  findAccessDeepLinkTarget,
+  parseAccessDeepLink,
+  type AccessDeepLinkTab,
+} from './extensions/NetworkPage.deepLinks';
+import { tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
+import type { ReachabilityService, ReachabilityTypeFilter, ReachabilityZoneId } from './extensions/NetworkPage.types';
+
+type PendingReachability = {
+  token: number;
+  zone: ReachabilityZoneId;
+};
 
 function NetworkPage() {
   const { showAdvancedMetrics } = useProjectSettings();
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   const appState = useApplicationStateRepository();
   const network = useAccessNetworkRepository();
   const removeStalePrivateAccess = useRemoveStalePrivateAccessMutation();
   const [actionError, setActionError] = useState<string | null>(null);
-  const [copiedAppId, setCopiedAppId] = useState<string | null>(null);
-  const [appActionLoading, setAppActionLoading] = useState<string | null>(null);
+  const [copiedLinkKey, setCopiedLinkKey] = useState<string | null>(null);
+  const [processingServiceIds, setProcessingServiceIds] = useState<Record<string, boolean>>({});
+  const [pendingReachabilityByServiceId, setPendingReachabilityByServiceId] = useState<Record<string, PendingReachability>>({});
+  const [staleActionLoadingId, setStaleActionLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [focusedServiceId, setFocusedServiceId] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [typeFilters, setTypeFilters] = useState<ReachabilityTypeFilter[]>([]);
+  const appliedDeepLinkKeyRef = useRef('');
+  const pendingReachabilityTokenRef = useRef(0);
+  const deepLinkTarget = useMemo(() => parseAccessDeepLink(location.search), [location.search]);
 
   const apps = appState.apps;
   const observedServices = appState.observedServices;
@@ -63,52 +100,98 @@ function NetworkPage() {
     ]);
   }, [appState, network]);
 
-  const privateApps = useMemo(() => apps.filter((app) => app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private' || app.settings?.tailscaleEnabled), [apps]);
   const devices = useMemo(() => buildDeviceViews(network.tailscale, network.tailnetDevices), [network.tailnetDevices, network.tailscale]);
-  const exposureGroups = useMemo(() => buildAppExposureGroups(apps, network.tailscale, network.reconciliation), [apps, network.reconciliation, network.tailscale]);
   const pinnedExternalServices = useMemo(() => observedServices.filter((service) => service.userStatus === 'pinned_external'), [observedServices]);
-  const accessZones = useMemo(() => buildAccessZones(exposureGroups, pinnedExternalServices), [exposureGroups, pinnedExternalServices]);
-  const posture = useMemo(() => buildNetworkPosture({
-    devices,
-    diagnostics: network.diagnostics,
-    privateApps,
+  const issues = useMemo(() => buildNetworkIssues(network.diagnostics, network.reconciliation), [network.diagnostics, network.reconciliation]);
+  const reachabilityServices = useMemo(() => buildReachabilityServices({
+    apps,
+    pinnedExternalServices,
     reconciliation: network.reconciliation,
     tailscale: network.tailscale,
-  }), [devices, network.diagnostics, network.reconciliation, network.tailscale, privateApps]);
-  const issues = useMemo(() => buildNetworkIssues(network.diagnostics, network.reconciliation), [network.diagnostics, network.reconciliation]);
-  const privateAppAccess = useMemo(() => buildPrivateAppAccess(privateApps, network.tailscale, network.reconciliation), [network.reconciliation, network.tailscale, privateApps]);
-  const defaultTab = posture.counts.issues > 0 ? 'issues' : 'private-apps';
-  const selectedTab = !showAdvancedMetrics && activeTab && !['private-apps', 'issues'].includes(activeTab) ? defaultTab : activeTab ?? defaultTab;
+  }), [apps, network.reconciliation, network.tailscale, pinnedExternalServices]);
+  const displayedReachabilityServices = useMemo(
+    () => applyPendingReachability(reachabilityServices, pendingReachabilityByServiceId),
+    [pendingReachabilityByServiceId, reachabilityServices],
+  );
+  const filteredReachabilityServices = useMemo(
+    () => filterReachabilityServices(displayedReachabilityServices, query, typeFilters),
+    [displayedReachabilityServices, query, typeFilters],
+  );
+  const selectedTab = !showAdvancedMetrics && activeTab && !['matrix', 'issues'].includes(activeTab) ? 'matrix' : activeTab ?? deepLinkTarget.tab ?? 'matrix';
+  const focusedService = useMemo(() => displayedReachabilityServices.find((service) => service.id === focusedServiceId) ?? null, [displayedReachabilityServices, focusedServiceId]);
 
-  const copyPrivateLink = useCallback(async (appId: string, url: string | null) => {
+  const copyAccessLink = useCallback(async (appId: string, linkKind: string, url: string | null) => {
     if (!url) return;
     await navigator.clipboard.writeText(url);
     showActionNotification({ ok: true, severity: 'success', title: 'Link copied', message: url }, 'Link copied');
-    setCopiedAppId(appId);
-    window.setTimeout(() => setCopiedAppId((current) => current === appId ? null : current), 1600);
+    const copiedKey = `${appId}:${linkKind}`;
+    setCopiedLinkKey(copiedKey);
+    window.setTimeout(() => setCopiedLinkKey((current) => current === copiedKey ? null : current), 1600);
   }, []);
 
-  const updatePrivateAccess = useCallback(async (app: AppRuntimeView, enabled: boolean) => {
-    setAppActionLoading(app.appId);
+  const moveReachabilityService = useCallback(async (service: ReachabilityService, targetZone: ReachabilityZoneId) => {
+    const app = service.app;
+    if (!app || service.zone === targetZone || targetZone === 'public') {
+      return;
+    }
+    let succeeded = false;
+    const pendingToken = pendingReachabilityTokenRef.current + 1;
+    pendingReachabilityTokenRef.current = pendingToken;
+    setServiceProcessing(service.id, true, setProcessingServiceIds);
+    setPendingReachabilityByServiceId((current) => ({ ...current, [service.id]: { token: pendingToken, zone: targetZone } }));
+    setFocusedServiceId(service.id);
     setActionError(null);
+    window.setTimeout(() => {
+      setServiceProcessing(service.id, false, setProcessingServiceIds);
+      setPendingReachabilityByServiceId((current) => removePendingReachabilityForToken(current, service.id, pendingToken));
+    }, 20000);
     try {
-      const result = enabled
-        ? await InstalledAppsAPIClient.enablePrivateAccess(app.appId)
-        : await InstalledAppsAPIClient.disablePrivateAccess(app.appId);
-      syncCanonicalAppMutationResult(queryClient, result);
-      showActionNotification(result, enabled ? 'Private network ready' : 'Private network turned off');
+      if (targetZone === 'tailnet') {
+        const result = await InstalledAppsAPIClient.enablePrivateAccess(app.appId);
+        syncCanonicalAppMutationResult(queryClient, result);
+        showActionNotification(result, 'Private Tailnet enabled');
+        succeeded = true;
+      } else {
+        const currentlyPrivate = isPrivateAccessApp(app);
+        let appForSettings = app;
+        if (currentlyPrivate) {
+          const disabled = await InstalledAppsAPIClient.disablePrivateAccess(app.appId);
+          syncCanonicalAppMutationResult(queryClient, disabled);
+          appForSettings = disabled.app ?? appForSettings;
+          if (targetZone === 'local') {
+            showActionNotification(disabled, 'Private access turned off');
+            void invalidateNetworkQueries(queryClient);
+            succeeded = true;
+            return;
+          }
+        }
+        const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(appForSettings, targetZone));
+        syncCanonicalAppMutationResult(queryClient, { app: updated });
+        showActionNotification({
+          ok: true,
+          severity: 'success',
+          title: `${app.appName} access updated`,
+          message: targetZone === 'lan'
+            ? 'Autark-OS saved this service for home-network reachability.'
+            : 'Autark-OS saved this service for server-only reachability.',
+        }, 'Access updated');
+        succeeded = true;
+      }
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
-      const message = apiErrorMessage(err, 'Unable to update private access for this app.');
+      const message = apiErrorMessage(err, 'Unable to update reachability for this service.');
       setActionError(message);
-      showActionErrorNotification(err, 'Private access update failed');
+      showActionErrorNotification(err, 'Reachability update failed');
     } finally {
-      setAppActionLoading(null);
+      if (!succeeded) {
+        setServiceProcessing(service.id, false, setProcessingServiceIds);
+        setPendingReachabilityByServiceId((current) => removePendingReachability(current, service.id));
+      }
     }
   }, [queryClient]);
 
   const removeStaleMapping = useCallback(async (port: number) => {
-    setAppActionLoading(`stale-${port}`);
+    setStaleActionLoadingId(`stale-${port}`);
     setActionError(null);
     try {
       await removeStalePrivateAccess.mutateAsync(port);
@@ -119,9 +202,55 @@ function NetworkPage() {
       setActionError(message);
       showActionErrorNotification(err, 'Stale private link removal failed');
     } finally {
-      setAppActionLoading(null);
+      setStaleActionLoadingId(null);
     }
   }, [refreshAll, removeStalePrivateAccess]);
+
+  const handleTabChange = useCallback((tab: string) => {
+    const nextTab = tab as AccessDeepLinkTab;
+    setActiveTab(nextTab);
+    navigate(accessDeepLinkForTab(nextTab, focusedService), { replace: true });
+  }, [focusedService, navigate]);
+
+  const focusReachabilityService = useCallback((service: ReachabilityService) => {
+    setFocusedServiceId(service.id);
+    setActiveTab('matrix');
+    navigate(accessDeepLinkForService(service, { tab: 'matrix' }), { replace: true });
+  }, [navigate]);
+
+  useEffect(() => {
+    if (appliedDeepLinkKeyRef.current === deepLinkTarget.key) {
+      return;
+    }
+    setActiveTab(deepLinkTarget.tab);
+    if (!deepLinkTarget.kind || !deepLinkTarget.id) {
+      setFocusedServiceId(null);
+      appliedDeepLinkKeyRef.current = deepLinkTarget.key;
+      return;
+    }
+    if (!displayedReachabilityServices.length) {
+      return;
+    }
+    const targetService = findAccessDeepLinkTarget(displayedReachabilityServices, deepLinkTarget);
+    if (!targetService) {
+      return;
+    }
+    setQuery('');
+    setTypeFilters([]);
+    setFocusedServiceId(targetService.id);
+    appliedDeepLinkKeyRef.current = deepLinkTarget.key;
+  }, [deepLinkTarget, displayedReachabilityServices]);
+
+  useEffect(() => {
+    const settledServiceIds = Object.entries(pendingReachabilityByServiceId)
+    .filter(([serviceId, pending]) => reachabilityServices.find((service) => service.id === serviceId)?.zone === pending.zone)
+    .map(([serviceId]) => serviceId);
+    if (!settledServiceIds.length) {
+      return;
+    }
+    setProcessingServiceIds((current) => removeServiceProcessingIds(current, settledServiceIds));
+    setPendingReachabilityByServiceId((current) => removePendingReachabilityIds(current, settledServiceIds));
+  }, [pendingReachabilityByServiceId, reachabilityServices]);
 
   return (
     <PageShell>
@@ -141,35 +270,42 @@ function NetworkPage() {
         <AccessPageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : (
         <>
-          <AccessZoneDiagram zones={accessZones} />
-          <TailscaleAccessCard posture={posture} setup={network.setupStatus} tailscale={network.tailscale} />
           {(showAdvancedMetrics || !network.tailscale?.connected) && (
             <PrivateAccessSetupPath reconciliation={network.reconciliation} setup={network.setupStatus} tailscale={network.tailscale} />
           )}
-          <Tabs className="gap-5" onValueChange={setActiveTab} value={selectedTab}>
-            <TabsList className="sticky top-0 z-10 w-full justify-start overflow-x-auto border-b border-sky-400/20 bg-slate-900/95 p-0 py-2 backdrop-blur" variant="line">
-              <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="private-apps">Private app links</TabsTrigger>
+          <SearchFilterBar
+            actions={<ServiceTypeFilterDropdown filters={typeFilters} onChange={setTypeFilters} />}
+            filterAriaLabel="Filter reachability services"
+            onSearchChange={setQuery}
+            searchAriaLabel="Search services"
+            searchPlaceholder="Search services"
+            searchValue={query}
+          />
+          <Tabs className="gap-5" onValueChange={handleTabChange} value={selectedTab}>
+            <TabsList className="w-full justify-start overflow-x-auto border-b border-sky-400/20 bg-slate-900/95 p-0 py-2 backdrop-blur" variant="line">
+              <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="matrix">Matrix</TabsTrigger>
               <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="issues">Issues</TabsTrigger>
               {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="devices">Trusted devices</TabsTrigger>}
               {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="advanced">Map and diagnostics</TabsTrigger>}
             </TabsList>
-            <TabsContent className="min-h-[560px]" value="private-apps">
-              <PrivateAccessManager
-                copiedAppId={copiedAppId}
-                installedApps={apps}
-                loadingAppId={appActionLoading}
-                onCopyPrivateLink={copyPrivateLink}
-                onEnablePrivateAccess={(app) => updatePrivateAccess(app, true)}
+            <TabsContent className="min-h-[560px]" value="matrix">
+              <ReachabilityMatrix
+                copiedLinkKey={copiedLinkKey}
+                focusedServiceId={focusedServiceId}
+                items={filteredReachabilityServices}
+                loadingServiceIds={processingServiceIds}
+                onCopyLink={copyAccessLink}
+                onFocusService={focusReachabilityService}
+                onMoveService={moveReachabilityService}
+              />
+              <StalePrivateLinksPanel
+                loadingId={staleActionLoadingId}
                 onRemoveStaleMapping={removeStaleMapping}
-                onRepairPrivateAccess={(app) => updatePrivateAccess(app, true)}
-                onTurnOffPrivateAccess={(app) => updatePrivateAccess(app, false)}
-                privateAppAccess={privateAppAccess}
                 reconciliation={network.reconciliation}
-                tailscale={network.tailscale}
               />
             </TabsContent>
             <TabsContent className="min-h-[560px]" value="issues">
-              <NetworkIssuesPanel issues={issues} />
+              <NetworkIssuesPanel issues={issues} onReviewPrivateLinks={() => handleTabChange('matrix')} />
             </TabsContent>
             {showAdvancedMetrics && <TabsContent className="min-h-[560px]" value="devices">
               <NetworkDevicesPanel devices={devices} />
@@ -184,61 +320,6 @@ function NetworkPage() {
         </>
       )}
     </PageShell>
-  );
-}
-
-function TailscaleAccessCard({ posture, setup, tailscale }: { posture: ReturnType<typeof buildNetworkPosture>; setup: SystemSetupStatus | null; tailscale: TailscaleStatus | null }) {
-  const display = tailscaleAccessDisplay(tailscale) as { badge: string; heading: string; summary: string; tone: 'success' | 'warning' };
-  const check = setup?.checks?.find((item) => item.id === 'tailscale') || null;
-  return (
-    <Surface className="overflow-hidden p-5 shadow-slate-950/20" tone="panel">
-      <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-        <div>
-          <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Private access</p>
-          <h3 className="mt-2 text-2xl font-black text-slate-50">{display.heading}</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">
-            {display.tone === 'success' ? posture.summary : display.summary}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill tone={display.tone}>{display.badge}</StatusPill>
-          <TailscaleControlPopover align="end" check={check} triggerLabel="full" />
-        </div>
-      </div>
-    </Surface>
-  );
-}
-
-function AccessZoneDiagram({ zones }: { zones: ReturnType<typeof buildAccessZones> }) {
-  return (
-    <Surface className="grid gap-3 p-5 shadow-slate-950/20" tone="panel">
-      <div>
-        <h3 className="text-lg font-black text-slate-50">Where apps are reachable</h3>
-        <p className="mt-1 text-sm text-sky-100/70">Autark-OS keeps public exposure empty by default and favors LAN or private Tailscale links.</p>
-      </div>
-      <div className="grid gap-3 lg:grid-cols-4">
-        {zones.map((zone) => (
-          <NetworkInset className="rounded-xl p-4" key={zone.id}>
-            <div className="flex items-center justify-between gap-2">
-              <h4 className="font-bold text-slate-50">{zone.label}</h4>
-              <Badge className={zone.id === 'public' && zone.apps.length > 0 ? 'border-red-400/40 bg-red-500/10 text-red-200' : zone.id === 'public' ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : 'border-sky-400/25 bg-slate-900 text-sky-100/80'} variant="outline">
-                {zone.statusLabel}
-              </Badge>
-            </div>
-            <div className="mt-3 grid gap-2">
-              {zone.apps.length ? zone.apps.map((app: { id: string; label: string; external: boolean; status: string; url: string }) => (
-                <a className="rounded-lg border border-sky-400/20 bg-slate-900 px-3 py-2 text-sm text-sky-100/85 transition hover:border-cyan-300/45 hover:bg-slate-700 hover:text-white" href={app.url || undefined} key={app.id} rel="noreferrer" target={app.url ? '_blank' : undefined}>
-                  <span className="block truncate font-semibold">{app.label}</span>
-                  <span className="text-xs text-sky-100/50">{app.external ? 'Pinned external service' : app.status}</span>
-                </a>
-              )) : (
-                <p className="m-0 rounded-lg border border-dashed border-sky-400/20 px-3 py-2 text-sm text-sky-100/50">{zone.emptyText}</p>
-              )}
-            </div>
-          </NetworkInset>
-        ))}
-      </div>
-    </Surface>
   );
 }
 
@@ -277,6 +358,67 @@ function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconcil
   );
 }
 
+function StalePrivateLinksPanel({
+  loadingId,
+  onRemoveStaleMapping,
+  reconciliation,
+}: {
+  loadingId: string | null;
+  onRemoveStaleMapping: (port: number) => void;
+  reconciliation: PrivateAccessReconciliationReport | null;
+}) {
+  if (!reconciliation?.staleMappings?.length) {
+    return null;
+  }
+  return (
+    <NetworkPanel
+      className="mt-5 border-orange-400/45"
+      description="These private links do not match a service that currently wants Private Tailnet access."
+      title="Advanced cleanup"
+    >
+      {reconciliation.staleMappings.map((mapping) => (
+        <NetworkInset className="grid gap-3 rounded-lg border-orange-400/30 p-4 md:grid-cols-[minmax(0,1fr)_auto]" key={mapping.id}>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold text-slate-50">HTTPS port {mapping.servePort ?? 'unknown'}</h3>
+              <Badge className="border-orange-400/45 bg-orange-500/10 text-orange-200" variant="outline">Stale private link</Badge>
+            </div>
+            <p className="mt-2 text-sm text-orange-100/80">{mapping.detail}</p>
+            <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+              <AccessLine label="Endpoint" value={mapping.endpoint || 'Unknown endpoint'} />
+              <AccessLine label="Routes to" value={mapping.target || 'Unknown target'} />
+            </div>
+          </div>
+          <AlertDialog>
+            <DisabledAction disabled={!mapping.servePort || loadingId === `stale-${mapping.servePort}`} reason={!mapping.servePort ? 'Autark-OS needs the stale Tailscale port before cleanup.' : 'Autark-OS is already reviewing this stale private link.'}>
+              <AlertDialogTrigger asChild>
+                <ProjectWarningButton disabled={!mapping.servePort || loadingId === `stale-${mapping.servePort}`} type="button">
+                  <Trash2 className={cn('size-4', loadingId === `stale-${mapping.servePort}` && 'animate-pulse')} />
+                  Remove stale link
+                </ProjectWarningButton>
+              </AlertDialogTrigger>
+            </DisabledAction>
+            <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove this stale private link?</AlertDialogTitle>
+                <AlertDialogDescription className="text-slate-400">
+                  Autark-OS will remove the Tailscale Serve entry for HTTPS port {mapping.servePort ?? 'unknown'}. Active service links should be changed from the matrix.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800">Keep link</AlertDialogCancel>
+                <AlertDialogAction className="bg-orange-500 text-white hover:bg-orange-400" onClick={() => mapping.servePort && onRemoveStaleMapping(mapping.servePort)}>
+                  Remove stale link
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </NetworkInset>
+      ))}
+    </NetworkPanel>
+  );
+}
+
 function SetupStep({ action, detail, label, status }: { action: string; detail: string; label: string; status: string }) {
   return (
     <NetworkInset className="p-4">
@@ -290,6 +432,154 @@ function SetupStep({ action, detail, label, status }: { action: string; detail: 
       <p className="mt-3 text-xs font-semibold text-cyan-200">{action}</p>
     </NetworkInset>
   );
+}
+
+function ServiceTypeFilterDropdown({
+  filters,
+  onChange,
+}: {
+  filters: ReachabilityTypeFilter[];
+  onChange: (filters: ReachabilityTypeFilter[]) => void;
+}) {
+  const options: Array<{ label: string; value: ReachabilityTypeFilter }> = [
+    { label: 'Managed apps', value: 'managed' },
+    { label: 'Pinned services', value: 'external' },
+    { label: 'Needs attention', value: 'attention' },
+  ];
+
+  return (
+    <MultiSelect
+      onValueChange={(value) => onChange(value as ReachabilityTypeFilter[])}
+      options={options}
+      placeholder="All service types"
+      searchPlaceholder="Filter service types"
+      value={filters}
+    />
+  );
+}
+
+function filterReachabilityServices(services: ReachabilityService[], query: string, filters: ReachabilityTypeFilter[]) {
+  const normalizedQuery = query.trim().toLowerCase();
+  return services.filter((service) => {
+    if (normalizedQuery) {
+      const searchable = `${service.label} ${service.detail} ${service.statusLabel}`.toLowerCase();
+      if (!searchable.includes(normalizedQuery)) {
+        return false;
+      }
+    }
+    if (filters.length === 0) {
+      return true;
+    }
+    return filters.some((filter) => {
+      if (filter === 'attention') {
+        return Boolean(service.issue);
+      }
+      if (filter === 'managed') {
+        return service.type === 'managed-app';
+      }
+      return service.type === 'external-service';
+    });
+  });
+}
+
+function applyPendingReachability(services: ReachabilityService[], pendingByServiceId: Record<string, PendingReachability>) {
+  return services.map((service) => {
+    const pendingZone = pendingByServiceId[service.id]?.zone;
+    if (!pendingZone || pendingZone === service.zone) {
+      return service;
+    }
+    return {
+      ...service,
+      detail: processingReachabilityDetail(pendingZone),
+      statusLabel: 'Processing',
+      zone: pendingZone,
+    };
+  });
+}
+
+function processingReachabilityDetail(zone: ReachabilityZoneId) {
+  if (zone === 'tailnet') {
+    return 'Autark-OS is turning on private Tailnet access.';
+  }
+  if (zone === 'lan') {
+    return 'Autark-OS is saving home-network reachability.';
+  }
+  if (zone === 'local') {
+    return 'Autark-OS is moving this service back to this server.';
+  }
+  return 'Autark-OS is updating this service.';
+}
+
+function setServiceProcessing(
+  serviceId: string,
+  processing: boolean,
+  setProcessingServiceIds: Dispatch<SetStateAction<Record<string, boolean>>>,
+) {
+  setProcessingServiceIds((current) => {
+    if (processing) {
+      return { ...current, [serviceId]: true };
+    }
+    const next = { ...current };
+    delete next[serviceId];
+    return next;
+  });
+}
+
+function removePendingReachability(current: Record<string, PendingReachability>, serviceId: string) {
+  const next = { ...current };
+  delete next[serviceId];
+  return next;
+}
+
+function removePendingReachabilityForToken(current: Record<string, PendingReachability>, serviceId: string, token: number) {
+  if (current[serviceId]?.token !== token) {
+    return current;
+  }
+  return removePendingReachability(current, serviceId);
+}
+
+function removePendingReachabilityIds(current: Record<string, PendingReachability>, serviceIds: string[]) {
+  const next = { ...current };
+  for (const serviceId of serviceIds) {
+    delete next[serviceId];
+  }
+  return next;
+}
+
+function removeServiceProcessingIds(current: Record<string, boolean>, serviceIds: string[]) {
+  const next = { ...current };
+  for (const serviceId of serviceIds) {
+    delete next[serviceId];
+  }
+  return next;
+}
+
+function isPrivateAccessApp(app: AppRuntimeView) {
+  return Boolean(app.settings?.tailscaleEnabled || app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private');
+}
+
+function settingsForReachabilityZone(app: AppRuntimeView, zone: Exclude<ReachabilityZoneId, 'tailnet' | 'public'>): InstallSettings {
+  const desiredAccessMode = zone === 'lan' ? 'network' : 'local';
+  return {
+    accessUrl: app.settings?.accessUrl ?? app.accessUrl ?? app.observedAccess?.localUrl ?? null,
+    autoRepairEnabled: app.settings?.autoRepairEnabled ?? true,
+    backup: {
+      enabled: app.settings?.backup?.enabled ?? true,
+      frequency: app.settings?.backup?.frequency || 'daily',
+      retention: app.settings?.backup?.retention ?? 7,
+    },
+    desiredAccessMode,
+    expectedLocalPort: app.settings?.expectedLocalPort ?? app.desiredAccess?.expectedLocalPort ?? app.observedAccess?.localPort ?? null,
+    expectedProtocol: app.settings?.expectedProtocol ?? app.desiredAccess?.expectedProtocol ?? app.observedAccess?.protocol ?? null,
+    lastAccessCheckAt: app.settings?.lastAccessCheckAt ?? app.observedAccess?.lastAccessCheckAt ?? null,
+    lastRepairAttemptAt: app.settings?.lastRepairAttemptAt ?? app.observedAccess?.lastRepairAttemptAt ?? null,
+    lastRepairStatus: app.settings?.lastRepairStatus ?? app.observedAccess?.lastRepairStatus ?? null,
+    lastSuccessfulAccessAt: app.settings?.lastSuccessfulAccessAt ?? app.observedAccess?.lastSuccessfulAccessAt ?? null,
+    privateAccessRequirement: 'disabled',
+    privateAccessUrl: null,
+    storageSubfolders: app.settings?.storageSubfolders ?? {},
+    tailscaleEnabled: false,
+  };
 }
 
 export default NetworkPage;

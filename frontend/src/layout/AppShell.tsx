@@ -33,7 +33,7 @@ function AppShell() {
         <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
       </div>
       <main className="min-w-0 bg-slate-800">
-        <div className="hidden lg:block">
+        <div className="sticky top-0 z-40 hidden lg:block">
           <SystemStatusHeader />
         </div>
         <div className="px-3 pb-4 pt-3 sm:px-4 md:p-6">

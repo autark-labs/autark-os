@@ -1,9 +1,12 @@
 import { Copy, ExternalLink, KeyRound, Link2, Server } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { accessDeepLinkForManagedApp, accessDeepLinkForObservedService } from '@/pages/NetworkPage/extensions/NetworkPage.deepLinks';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) {
+  const accessHref = accessRouteForApplicationItem(item);
+
   return (
     <div className="grid gap-4">
       <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
@@ -15,7 +18,7 @@ export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) 
 
       <section className="grid gap-2 sm:grid-cols-2">
         <Button asChild className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" variant="outline">
-          <Link to="/access">
+          <Link to={accessHref}>
             <KeyRound data-icon="inline-start" />
             Access
           </Link>
@@ -29,6 +32,17 @@ export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) 
       </section>
     </div>
   );
+}
+
+function accessRouteForApplicationItem(item: ApplicationSurfaceItem) {
+  const itemId = item.sourceId || item.id;
+  if (item.managementState === 'managed' && itemId) {
+    return accessDeepLinkForManagedApp(itemId);
+  }
+  if ((item.managementState === 'found' || item.managementState === 'linked') && item.sourceId) {
+    return accessDeepLinkForObservedService(item.sourceId);
+  }
+  return '/access';
 }
 
 function LiveLinkRow({ icon: Icon, label, value }: { icon: typeof ExternalLink; label: string; value?: string }) {

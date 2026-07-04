@@ -1,11 +1,13 @@
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { statusTone } from './extensions/NetworkPage.theme';
 import type { NetworkIssueView } from './extensions/NetworkPage.types';
 import { EmptyState, NetworkInset, NetworkPanel } from './NetworkPage.shared';
 
-export function NetworkIssuesPanel({ issues }: { issues: NetworkIssueView[] }) {
+export function NetworkIssuesPanel({ issues, onReviewPrivateLinks }: { issues: NetworkIssueView[]; onReviewPrivateLinks: () => void }) {
   return (
     <NetworkPanel
       description="Only items that need attention appear here."
@@ -19,15 +21,26 @@ export function NetworkIssuesPanel({ issues }: { issues: NetworkIssueView[] }) {
               <span className={cn('mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border', statusTone(issue.status, 'soft'))}>
                 <AlertTriangle className="size-4" />
               </span>
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-center gap-2">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-slate-50">{issue.label}</span>
                   <Badge className="border-sky-400/25 bg-slate-900 text-sky-100/80" variant="outline">{issue.source === 'app' ? 'App link' : 'Network'}</Badge>
-                  {issue.actionLabel && <span className="text-xs text-cyan-200">{issue.actionLabel}</span>}
-                </span>
+                </div>
                 <span className="mt-1 block text-sm text-sky-100/75">{issue.message}</span>
                 {issue.detail && <span className="mt-1 block text-xs text-sky-100/50">{issue.detail}</span>}
-              </span>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {issue.source === 'app' || issue.id.startsWith('stale-') ? (
+                    <ProjectPrimaryButton onClick={onReviewPrivateLinks} size="sm" type="button">
+                      Review services
+                    </ProjectPrimaryButton>
+                  ) : (
+                    <ProjectDarkControlButton asChild size="sm">
+                      <Link to="/diagnostics">Open diagnostics</Link>
+                    </ProjectDarkControlButton>
+                  )}
+                  {issue.actionLabel && <span className="text-xs text-sky-100/55">{issue.actionLabel}</span>}
+                </div>
+              </div>
             </NetworkInset>
           ))
         )}

@@ -1,7 +1,8 @@
 import { MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import type { AppRuntimeView } from '@/types/app';
+import type { ObservedServiceView } from '@/types/observedService';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationItem, PrivateAccessReconciliationReport, TailscaleDevice, TailscaleStatus } from '@/types/network';
-import type { AppExposureGroup, AppExposureLevel, NetworkDeviceView, NetworkIssueView, NetworkNodeStatus, NetworkPosture, PrivateAppAccess } from './NetworkPage.types';
+import type { AppExposureGroup, AppExposureLevel, NetworkDeviceView, NetworkIssueView, NetworkNodeStatus, NetworkPosture, PrivateAppAccess, ReachabilityService, ReachabilityZoneId } from './NetworkPage.types';
 import { privateAccessUrlForApp } from './NetworkPage.privateAccess';
 
 export function buildNetworkPosture({
@@ -149,6 +150,134 @@ export function buildPrivateAppAccess(privateApps: AppRuntimeView[], tailscale: 
   });
 }
 
+export function buildReachabilityServices({
+  apps,
+  pinnedExternalServices = [],
+  reconciliation,
+  tailscale,
+}: {
+  apps: AppRuntimeView[];
+  pinnedExternalServices?: ObservedServiceView[];
+  reconciliation: PrivateAccessReconciliationReport | null;
+  tailscale: TailscaleStatus | null;
+}): ReachabilityService[] {
+  const reconciliationByAppId = new Map((reconciliation?.apps || []).map((item) => [item.appId, item]));
+  const managed = apps.map((app) => {
+    const reconciliationItem = reconciliationByAppId.get(app.appId) || null;
+    const privateUrl = privateAccessUrlForApp(app, reconciliationItem);
+    const localUrl = app.observedAccess?.localUrl || app.accessRoute?.localUrl || app.accessUrl || app.settings?.accessUrl || null;
+    const zone = classifyAppExposure(app, tailscale);
+    const issue = reachabilityIssue(app, reconciliationItem);
+    const status: NetworkNodeStatus = issue ? 'warning' : zone === 'tailnet' ? 'connected' : 'neutral';
+    return {
+      app,
+      detail: reachabilityDetail(zone, app),
+      draggable: true,
+      iconUrl: managedAppIconUrl(app),
+      id: app.appId,
+      issue,
+      label: app.appName,
+      localUrl,
+      openUrl: app.accessRoute?.primaryOpenUrl || privateUrl || localUrl,
+      privateUrl,
+      status,
+      statusLabel: issue ? 'Needs attention' : reachabilityStatusLabel(zone),
+      type: 'managed-app' as const,
+      zone,
+    };
+  });
+
+  const external = pinnedExternalServices.map((service) => ({
+    app: null,
+    detail: service.url || 'Pinned external service',
+    draggable: false,
+    iconUrl: observedServiceIconUrl(service),
+    id: service.id,
+    issue: null,
+    label: service.displayName,
+    localUrl: service.url || null,
+    openUrl: service.url || null,
+    privateUrl: null,
+    status: 'neutral' as const,
+    statusLabel: service.userStatus === 'pinned_external' || service.pinned ? 'Pinned external' : service.userStatusLabel,
+    type: 'external-service' as const,
+    zone: 'lan' as const,
+  }));
+
+  return [...managed, ...external].sort((left, right) => {
+    if (left.type !== right.type) {
+      return left.type === 'managed-app' ? -1 : 1;
+    }
+    return left.label.localeCompare(right.label);
+  });
+}
+
+function managedAppIconUrl(app: AppRuntimeView) {
+  return nonBlank(app.image);
+}
+
+function observedServiceIconUrl(service: ObservedServiceView) {
+  return nonBlank(service.metadata?.iconUrl)
+    || nonBlank(service.metadata?.icon)
+    || nonBlank(service.metadata?.appIcon)
+    || nonBlank(service.metadata?.imageUrl)
+    || nonBlank(service.metadata?.catalogImage)
+    || catalogIconUrl(service.catalogAppId);
+}
+
+function catalogIconUrl(catalogAppId: string | null | undefined) {
+  const appId = nonBlank(catalogAppId);
+  if (!appId || !/^[a-z0-9][a-z0-9-]*$/.test(appId)) {
+    return null;
+  }
+  return `/app-images/${appId}.svg`;
+}
+
+function nonBlank(value: unknown) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function reachabilityIssue(app: AppRuntimeView, reconciliationItem: PrivateAccessReconciliationItem | null) {
+  if (app.attentionState && app.attentionState !== 'none') {
+    return app.remediation?.summary || app.healthSnapshot?.message || 'This app needs review.';
+  }
+  if (reconciliationItem && !['healthy', 'waiting'].includes(reconciliationItem.status)) {
+    return reconciliationItem.message || 'Private link needs review.';
+  }
+  if (app.accessRoute?.privateLinkStatus === 'port_conflict') {
+    return 'Private link has a port conflict.';
+  }
+  return null;
+}
+
+function reachabilityDetail(zone: ReachabilityZoneId, app: AppRuntimeView) {
+  if (zone === 'tailnet') {
+    return 'Available to trusted Tailscale devices.';
+  }
+  if (zone === 'lan') {
+    return 'Available from this home network.';
+  }
+  if (zone === 'public') {
+    return 'Review public exposure carefully.';
+  }
+  return app.accessRoute?.localUrl || app.observedAccess?.localUrl || app.accessUrl
+    ? 'Available from this server.'
+    : 'No open link configured yet.';
+}
+
+function reachabilityStatusLabel(zone: ReachabilityZoneId) {
+  if (zone === 'tailnet') {
+    return 'Private';
+  }
+  if (zone === 'lan') {
+    return 'Home';
+  }
+  if (zone === 'public') {
+    return 'Public';
+  }
+  return 'Server';
+}
+
 export function buildAppExposureGroups(apps: AppRuntimeView[], tailscale: TailscaleStatus | null, reconciliation?: PrivateAccessReconciliationReport | null): Record<AppExposureLevel, AppExposureGroup> {
   const groups: Record<AppExposureLevel, AppRuntimeView[]> = {
     lan: [],
@@ -228,14 +357,18 @@ export function buildDeviceViews(tailscale: TailscaleStatus | null, tailnetDevic
 }
 
 function classifyAppExposure(app: AppRuntimeView, tailscale: TailscaleStatus | null): AppExposureLevel {
-  if (app.desiredAccess?.mode === 'public') {
+  const desiredMode = app.settings?.desiredAccessMode || app.desiredAccess?.mode;
+  if (desiredMode === 'public') {
     return 'public';
   }
-  if (app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private' || app.settings?.tailscaleEnabled) {
+  if (desiredMode === 'private' || desiredMode === 'local-and-private' || app.settings?.tailscaleEnabled) {
     return 'tailnet';
   }
-  if (app.desiredAccess?.mode === 'network') {
+  if (desiredMode === 'network') {
     return 'lan';
+  }
+  if (desiredMode === 'local' || desiredMode === 'none') {
+    return 'local';
   }
 
   const accessUrl = app.accessUrl || app.settings?.accessUrl;

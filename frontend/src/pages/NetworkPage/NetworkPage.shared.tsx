@@ -1,6 +1,6 @@
 import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { ProjectEmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
@@ -41,13 +41,14 @@ export function NetworkInset({
   children,
   className,
   interactive = false,
+  ...props
 }: {
   children: ReactNode;
   className?: string;
   interactive?: boolean;
-}) {
+} & HTMLAttributes<HTMLElement>) {
   return (
-    <ProjectInset className={className} interactive={interactive}>
+    <ProjectInset className={className} interactive={interactive} {...props}>
       {children}
     </ProjectInset>
   );

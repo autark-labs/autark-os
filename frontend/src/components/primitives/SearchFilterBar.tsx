@@ -14,9 +14,9 @@ type SearchFilterBarProps = {
   actions?: ReactNode;
   className?: string;
   filterAriaLabel: string;
-  filterValue: string;
-  filters: SearchFilterOption[];
-  onFilterChange: (value: string) => void;
+  filterValue?: string;
+  filters?: SearchFilterOption[];
+  onFilterChange?: (value: string) => void;
   onSearchChange: (value: string) => void;
   searchAriaLabel: string;
   searchPlaceholder: string;
@@ -51,25 +51,27 @@ export function SearchFilterBar({
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between xl:justify-end">
-          <ToggleGroup
-            aria-label={filterAriaLabel}
-            className="flex-wrap"
-            onValueChange={onFilterChange}
-            size="sm"
-            type="single"
-            value={filterValue}
-            variant="outline"
-          >
-            {filters.map((filter) => (
-              <ToggleGroupItem
-                className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950"
-                key={filter.value}
-                value={filter.value}
-              >
-                {filter.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          {filters && filters.length > 0 && onFilterChange && (
+            <ToggleGroup
+              aria-label={filterAriaLabel}
+              className="flex-wrap"
+              onValueChange={onFilterChange}
+              size="sm"
+              type="single"
+              value={filterValue}
+              variant="outline"
+            >
+              {filters.map((filter) => (
+                <ToggleGroupItem
+                  className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950"
+                  key={filter.value}
+                  value={filter.value}
+                >
+                  {filter.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          )}
 
           {actions}
         </div>

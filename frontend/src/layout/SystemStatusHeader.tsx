@@ -65,7 +65,7 @@ function SystemStatusHeader() {
     };
 
   return (
-    <header className="sticky top-0 z-20 border-b border-sky-400/25 bg-slate-950 px-4 py-2 text-slate-50 shadow-lg shadow-slate-950/20 md:px-6" aria-label="System status">
+    <header className="border-b border-sky-400/25 bg-slate-950 px-4 py-2 text-slate-50 shadow-lg shadow-slate-950/20 md:px-6" aria-label="System status">
       <div className="flex min-h-10 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="m-0 hidden truncate text-xs text-slate-400 sm:block">{doctor?.lanUrl ? `Reachable at: ${doctor.lanUrl}` : checkedAt}</p>
