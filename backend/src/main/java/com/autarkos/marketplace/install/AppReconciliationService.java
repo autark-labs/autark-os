@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Service

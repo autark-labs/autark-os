@@ -3,7 +3,7 @@ package com.autarkos.network.devices;
 import java.time.Instant;
 import java.util.List;
 
-import com.autarkos.marketplace.install.AccessModels;
+import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
 public record DeviceAccessReport(

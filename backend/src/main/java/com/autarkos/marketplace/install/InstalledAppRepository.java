@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.autarkos.marketplace.install.InstalledApps.AppEventRow;
 import com.autarkos.marketplace.install.InstalledApps.AppHealthRow;
 import com.autarkos.marketplace.install.InstalledApps.InstallSettingsRow;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 
 @Repository
 public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity, String> {

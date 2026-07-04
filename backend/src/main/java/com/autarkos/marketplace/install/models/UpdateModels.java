@@ -1,7 +1,9 @@
-package com.autarkos.marketplace.install;
+package com.autarkos.marketplace.install.models;
 
 import java.time.Instant;
 import java.util.List;
+
+import com.autarkos.marketplace.install.AppRuntimeView;
 
 public final class UpdateModels {
 

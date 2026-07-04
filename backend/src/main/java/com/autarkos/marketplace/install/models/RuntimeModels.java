@@ -1,8 +1,10 @@
-package com.autarkos.marketplace.install;
+package com.autarkos.marketplace.install.models;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+
+import com.autarkos.marketplace.install.DockerResourceOwnership;
 
 public final class RuntimeModels {
 

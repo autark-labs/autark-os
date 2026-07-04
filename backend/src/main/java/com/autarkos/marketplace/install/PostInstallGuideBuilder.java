@@ -7,6 +7,7 @@ import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
+import com.autarkos.marketplace.install.models.GuideModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.SetupField;
 import com.autarkos.marketplace.model.SetupManifest;

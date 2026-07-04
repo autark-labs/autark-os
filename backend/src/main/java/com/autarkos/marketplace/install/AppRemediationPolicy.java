@@ -1,6 +1,7 @@
 package com.autarkos.marketplace.install;
 
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
 
 public final class AppRemediationPolicy {
 

@@ -24,7 +24,7 @@ import com.autarkos.marketplace.install.AppActionResult;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.AppUpdateService;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.monitoring.MonitoringMetricsService;

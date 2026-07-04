@@ -9,10 +9,10 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.apps.ApplicationStateService;
-import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
+import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.network.tailscale.TailscaleDevice;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;

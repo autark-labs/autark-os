@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.autarkos.jobs.AutarkOsJob;
-import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.models.InstallModels;
 
 @RestController
 @RequestMapping("/api/discover/apps")

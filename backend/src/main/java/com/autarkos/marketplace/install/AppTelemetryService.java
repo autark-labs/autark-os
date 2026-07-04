@@ -7,6 +7,8 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.autarkos.marketplace.install.models.RuntimeModels;
+
 @Service
 public class AppTelemetryService {
 

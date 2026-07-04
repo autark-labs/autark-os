@@ -4,6 +4,9 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
+
 final class InstalledApps {
 
     private InstalledApps() {

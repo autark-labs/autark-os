@@ -17,6 +17,8 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.automation.AutomationService;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
 
 @Service
 public class AppGuardianService {

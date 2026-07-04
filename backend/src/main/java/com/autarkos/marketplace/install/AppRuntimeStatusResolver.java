@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.List;
 
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 class AppRuntimeStatusResolver {

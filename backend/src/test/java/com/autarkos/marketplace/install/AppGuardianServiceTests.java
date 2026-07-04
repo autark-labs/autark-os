@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test;
 
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
-import com.autarkos.marketplace.install.InstallModels;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 
 class AppGuardianServiceTests {
 

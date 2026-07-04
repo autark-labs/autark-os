@@ -21,16 +21,16 @@ import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
-import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.AppActionResult;
 import com.autarkos.marketplace.install.AppHealthSnapshot;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.AppUpdateService;
-import com.autarkos.marketplace.install.InstallModels;
-import com.autarkos.marketplace.install.ReliabilityModels;
-import com.autarkos.marketplace.install.RuntimeModels;
-import com.autarkos.marketplace.install.UpdateModels;
+import com.autarkos.marketplace.install.models.AccessModels;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.marketplace.install.models.UpdateModels;
 import com.autarkos.monitoring.MonitoringMetricsService;
 
 @RestController

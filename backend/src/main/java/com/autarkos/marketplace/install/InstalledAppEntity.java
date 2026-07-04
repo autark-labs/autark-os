@@ -1,5 +1,7 @@
 package com.autarkos.marketplace.install;
 
+import com.autarkos.marketplace.install.models.RuntimeModels;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;

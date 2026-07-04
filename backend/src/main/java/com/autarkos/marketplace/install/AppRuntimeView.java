@@ -7,6 +7,11 @@ import com.autarkos.api.AppOperationView;
 import com.autarkos.api.ApplicationBehaviorStates;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.marketplace.install.models.AccessModels;
+import com.autarkos.marketplace.install.models.GuideModels;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ConfigurationItem;
 
 public record AppRuntimeView(

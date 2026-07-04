@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import com.autarkos.marketplace.install.AppTelemetryService;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 
 class AppTelemetryServiceTests {
 

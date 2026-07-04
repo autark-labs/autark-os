@@ -11,6 +11,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
 import com.autarkos.marketplace.runtime.RuntimeLayout;

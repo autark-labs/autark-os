@@ -7,6 +7,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import com.autarkos.marketplace.install.models.AccessModels;
+import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 

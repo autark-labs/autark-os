@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.autarkos.discover.DiscoverInstallModels;
 import com.autarkos.host.ObservedServiceView;
-import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.models.InstallModels;
 
 public record AppOwnershipView(
         String catalogAppId,

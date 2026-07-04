@@ -8,7 +8,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.system.SystemMetrics;
 
 @Service

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;

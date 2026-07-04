@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.install.PortAllocator;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.CatalogSmokeTest;

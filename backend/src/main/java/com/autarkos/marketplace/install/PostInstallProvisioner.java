@@ -15,6 +15,8 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.autarkos.marketplace.install.models.GuideModels;
+import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Component

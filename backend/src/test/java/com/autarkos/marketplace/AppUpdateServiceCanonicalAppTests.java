@@ -20,7 +20,7 @@ import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppUpdateService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.UpdateModels;
+import com.autarkos.marketplace.install.models.UpdateModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettingsRepository;

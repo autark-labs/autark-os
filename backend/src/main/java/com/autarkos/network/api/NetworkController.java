@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
+import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.network.api.DeviceTrustUpdateRequest;
 import com.autarkos.network.devices.DeviceAccessReport;
 import com.autarkos.network.devices.DeviceTrustMetadata;

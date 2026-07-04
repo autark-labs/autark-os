@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.system.InstanceIdentityService;
 

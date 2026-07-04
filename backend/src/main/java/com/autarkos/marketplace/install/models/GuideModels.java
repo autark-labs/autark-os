@@ -1,4 +1,4 @@
-package com.autarkos.marketplace.install;
+package com.autarkos.marketplace.install.models;
 
 import java.util.List;
 import java.util.Map;

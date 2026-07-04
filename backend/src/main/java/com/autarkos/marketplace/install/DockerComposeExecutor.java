@@ -3,6 +3,8 @@ package com.autarkos.marketplace.install;
 import java.nio.file.Path;
 import java.util.List;
 
+import com.autarkos.marketplace.install.models.RuntimeModels;
+
 public interface DockerComposeExecutor {
     RuntimeModels.DockerComposeResult up(Path composeFile, String projectName);
 

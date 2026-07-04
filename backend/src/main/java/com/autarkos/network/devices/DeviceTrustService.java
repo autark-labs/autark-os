@@ -7,8 +7,8 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
+import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.network.api.DeviceTrustUpdateRequest;
 import com.autarkos.network.tailscale.TailscaleDevice;
 import com.autarkos.network.tailscale.TailscaleService;

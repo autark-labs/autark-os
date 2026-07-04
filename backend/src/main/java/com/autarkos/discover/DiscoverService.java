@@ -19,8 +19,8 @@ import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.MarketplaceInstallService;
+import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Service

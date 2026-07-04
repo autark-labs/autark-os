@@ -2,7 +2,7 @@ package com.autarkos.marketplace.plan;
 
 import java.util.Map;
 
-import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.models.InstallModels;
 
 public record InstallCustomizationSummary(
         String accessUrl,

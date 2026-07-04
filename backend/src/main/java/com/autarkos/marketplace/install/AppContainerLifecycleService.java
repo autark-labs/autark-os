@@ -8,6 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 
 class AppContainerLifecycleService {
 

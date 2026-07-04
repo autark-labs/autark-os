@@ -17,10 +17,10 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.backups.BackupModels;
 import com.autarkos.backups.BackupService;
-import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
-import com.autarkos.marketplace.install.ReliabilityModels;
+import com.autarkos.marketplace.install.models.AccessModels;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
 
 @Service
 public class SystemSupportService {

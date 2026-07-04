@@ -6,6 +6,7 @@ import java.util.List;
 import com.autarkos.api.ApplicationBehaviorStates;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
 
 public record AppInstanceView(
         String appInstanceId,

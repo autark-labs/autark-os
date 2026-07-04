@@ -8,12 +8,12 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.autarkos.marketplace.install.AccessModels;
-import com.autarkos.marketplace.install.GuideModels;
-import com.autarkos.marketplace.install.InstallModels;
-import com.autarkos.marketplace.install.ReliabilityModels;
-import com.autarkos.marketplace.install.RuntimeModels;
-import com.autarkos.marketplace.install.UpdateModels;
+import com.autarkos.marketplace.install.models.AccessModels;
+import com.autarkos.marketplace.install.models.GuideModels;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.marketplace.install.models.UpdateModels;
 
 class BackendModelGroupingArchitectureTests {
 

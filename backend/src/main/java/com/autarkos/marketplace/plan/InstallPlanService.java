@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.install.InstallCustomizationResolver;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
 import com.autarkos.marketplace.runtime.RuntimeLayout;

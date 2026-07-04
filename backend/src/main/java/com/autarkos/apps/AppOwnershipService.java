@@ -16,10 +16,10 @@ import com.autarkos.host.ObservedServiceService;
 import com.autarkos.host.ObservedServiceView;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.DockerOwnershipService;
-import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Service

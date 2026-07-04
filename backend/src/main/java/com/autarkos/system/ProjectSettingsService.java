@@ -9,9 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.models.InstallModels;
 
 @Service
 public class ProjectSettingsService {

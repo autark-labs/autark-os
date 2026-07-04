@@ -4,6 +4,8 @@ import java.net.URI;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.autarkos.marketplace.install.models.InstallModels;
+
 final class AppPrivateAccessPorts {
 
     private static final int FIRST_PRIVATE_PORT = 12000;

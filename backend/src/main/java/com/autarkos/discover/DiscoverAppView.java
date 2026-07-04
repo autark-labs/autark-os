@@ -5,7 +5,7 @@ import java.util.List;
 import com.autarkos.apps.AppOwnershipAction;
 import com.autarkos.apps.AppOwnershipState;
 import com.autarkos.host.ObservedServiceView;
-import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 public record DiscoverAppView(

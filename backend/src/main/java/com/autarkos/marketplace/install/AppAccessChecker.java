@@ -10,6 +10,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Set;
 
+import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.HealthManifest;

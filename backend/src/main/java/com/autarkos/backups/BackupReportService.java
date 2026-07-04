@@ -14,9 +14,9 @@ import java.util.function.Supplier;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.system.ProjectSettings;
 import com.autarkos.system.ProjectSettingsService;

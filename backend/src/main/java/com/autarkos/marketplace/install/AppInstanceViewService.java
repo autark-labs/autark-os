@@ -14,6 +14,9 @@ import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Service

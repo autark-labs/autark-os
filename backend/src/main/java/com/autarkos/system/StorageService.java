@@ -21,10 +21,10 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
-import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.ReliabilityModels;
+import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 
 @Service

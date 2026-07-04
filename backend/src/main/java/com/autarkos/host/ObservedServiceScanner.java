@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.DockerResourceOwnership;
-import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.system.AutarkOsIdentity;
 
 @Service
