@@ -2,7 +2,7 @@ import { AppWindow, Archive, CalendarClock, CheckCircle2, Clock3, Info, Loader2,
 import type { LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
-import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
+import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import {
@@ -109,7 +109,7 @@ export function ActionCard({ busy, description, disabled = false, disabledReason
 
 export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRestore, onVerify, points, running }: { apps: AppBackupStatus[]; latestRestore: RestorePoint | null; nextRun: string | null; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; points: RestorePoint[]; running: string | null }) {
   if (!points.length) {
-    return <EmptyState title="No restore points yet" message="Run a routine backup after installing an app to create the first restore point." />;
+    return <EmptyState title="No restore points yet" description="Run a routine backup after installing an app to create the first restore point." />;
   }
   return (
     <BackupInset className="overflow-hidden p-4">
@@ -129,7 +129,7 @@ export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRes
 export function RestoreList({ apps, appRestorePoints, fullRestorePoints, onDetails, onRestore, onVerify, running }: { apps: AppBackupStatus[]; appRestorePoints: RestorePoint[]; fullRestorePoints: RestorePoint[]; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; running: string | null }) {
   const allPoints = [...fullRestorePoints, ...appRestorePoints].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   if (!allPoints.length) {
-    return <EmptyState title="No restore points yet" message="Run a routine or manual backup to create the first restore point." />;
+    return <EmptyState title="No restore points yet" description="Run a routine or manual backup to create the first restore point." />;
   }
   return (
     <div className="grid gap-3">
@@ -298,10 +298,6 @@ export function SectionHeader({ compact = false, description, icon: Icon, title 
       </div>
     </div>
   );
-}
-
-export function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 export function AttentionCard({ app }: { app: AppBackupStatus }) {

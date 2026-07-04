@@ -1,7 +1,7 @@
 import { Activity, BarChart3, Cpu, Database, HardDrive, MemoryStick, Server } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
+import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { Badge } from '@/components/ui/badge';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -187,7 +187,7 @@ function AutarkOsMetricsPanel({
                 </BarChart>
               </ChartContainer>
             ) : (
-              <EmptyState title="No app resource samples" message="App CPU and memory charts appear after telemetry is collected." compact />
+              <EmptyState title="No app resource samples" description="App CPU and memory charts appear after telemetry is collected." compact />
             )}
           </MonitoringInset>
 
@@ -224,7 +224,7 @@ function AutarkOsMetricsPanel({
                 </AreaChart>
               </ChartContainer>
             ) : (
-              <EmptyState title="Trend is still warming up" message="Keep Monitoring open briefly to collect enough app samples for a trend." compact />
+              <EmptyState title="Trend is still warming up" description="Keep Monitoring open briefly to collect enough app samples for a trend." compact />
             )}
           </MonitoringInset>
         </div>
@@ -310,7 +310,7 @@ function DeviceInstrumentationPanel({
             </AreaChart>
           </ChartContainer>
         ) : (
-          <EmptyState title="Trend is still warming up" message="Autark-OS needs at least two retained host samples before drawing this trend." compact />
+          <EmptyState title="Trend is still warming up" description="Autark-OS needs at least two retained host samples before drawing this trend." compact />
         )}
       </MonitoringInset>
     </MonitoringPanel>
@@ -364,10 +364,6 @@ function LegendDot({ color, label }: { color: string; label: string }) {
       {label}
     </span>
   );
-}
-
-function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 function formatDate(value?: string | null) {

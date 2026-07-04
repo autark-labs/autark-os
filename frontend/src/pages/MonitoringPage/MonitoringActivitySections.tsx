@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3, Filter, HeartPulse, ShieldCheck, Wrench } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
+import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +54,7 @@ export function SystemActivitySummary({
         </div>
         <div className="mt-5 grid gap-3">
           {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} />) : (
-            <EmptyState compact title="No recent activity" message="Autark-OS has not logged visible work for the current filters yet." />
+            <EmptyState compact title="No recent activity" description="Autark-OS has not logged visible work for the current filters yet." />
           )}
         </div>
       </MonitoringPanel>
@@ -89,7 +89,7 @@ export function SystemActivitySummary({
           </div>
           <div className="mt-4 grid gap-2">
             {recentFixes.slice(0, 3).map((event) => <CompactActivityItem event={event} key={event.id} />)}
-            {!recentFixes.length && <EmptyState compact title="Quiet is good" message="Autark-OS will list safe repair work here when it happens." />}
+            {!recentFixes.length && <EmptyState compact title="Quiet is good" description="Autark-OS will list safe repair work here when it happens." />}
           </div>
         </MonitoringPanel>
 
@@ -140,7 +140,7 @@ export function MonitoringActivityFeed({
 
         <div className="mt-5 flex max-h-[680px] flex-col gap-3 overflow-y-auto pr-2 [scrollbar-color:rgba(103,232,249,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
           {isLoading ? (
-            <EmptyState title="Loading activity" message="Autark-OS is checking recent events." />
+            <EmptyState title="Loading activity" description="Autark-OS is checking recent events." />
           ) : activity.length ? (
             activity.map((event) => (
               <ActivityRow
@@ -152,7 +152,7 @@ export function MonitoringActivityFeed({
               />
             ))
           ) : (
-            <EmptyState title="No activity found" message="Try another filter, or install an app to start recording activity." />
+            <EmptyState title="No activity found" description="Try another filter, or install an app to start recording activity." />
           )}
         </div>
       </MonitoringPanel>
@@ -170,7 +170,7 @@ export function MonitoringActivityFeed({
           </div>
           <div className="mt-4 grid gap-3">
             {reliability?.issues.length ? reliability.issues.map((issue) => <IssueCard issue={issue} key={`${issue.appId}-${issue.status}`} />) : (
-              <EmptyState title="No active issues" message="Autark-OS has not found any app stability issues." compact />
+              <EmptyState title="No active issues" description="Autark-OS has not found any app stability issues." compact />
             )}
           </div>
         </MonitoringPanel>
@@ -347,10 +347,6 @@ function Detail({ label, value }: { label: string; value: string }) {
       <p className="mt-1 break-words text-slate-200">{value || 'None'}</p>
     </MonitoringInset>
   );
-}
-
-function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 function eventIcon(event: ActivityLog) {

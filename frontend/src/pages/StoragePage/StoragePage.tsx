@@ -5,7 +5,7 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
-import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
+import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -138,7 +138,7 @@ function StoragePage() {
                 <SectionHeader icon={PackageOpen} title="Largest apps" description="Start here if app data is the reason storage is growing." />
                 <div className="mt-5 grid gap-3">
                   {largestApps.length ? largestApps.map((app) => <AppStorageRow app={app} copied={copied} key={app.appId} onCopy={copy} showAdvancedMetrics={showAdvancedMetrics} />) : (
-                    <EmptyState title="No app data found" message="Installed app storage will appear here after apps are installed." />
+                    <EmptyState title="No app data found" description="Installed app storage will appear here after apps are installed." />
                   )}
                 </div>
               </StoragePanel>
@@ -149,7 +149,7 @@ function StoragePage() {
                 <SectionHeader compact icon={Info} title="Needs attention" />
                 <div className="mt-4 grid gap-3">
                   {report.recommendations.length ? report.recommendations.map((recommendation) => <RecommendationCard key={recommendation.id} recommendation={recommendation} />) : (
-                    <EmptyState compact title="No storage issues" message="Autark-OS did not find anything that needs storage cleanup right now." />
+                    <EmptyState compact title="No storage issues" description="Autark-OS did not find anything that needs storage cleanup right now." />
                   )}
                 </div>
               </StoragePanel>
@@ -167,7 +167,7 @@ function StoragePage() {
                 <SectionHeader compact icon={FolderSearch} title="Unused data" />
                 <div className="mt-4 grid gap-3">
                   {cleanupCandidates.length ? cleanupCandidates.map((orphan) => <OrphanedRow key={orphan.path} onCleanup={setCleanupTarget} orphan={orphan} showAdvancedMetrics={showAdvancedMetrics} />) : (
-                    <EmptyState compact title="No unused folders" message="Autark-OS did not find orphaned app data." />
+                    <EmptyState compact title="No unused folders" description="Autark-OS did not find orphaned app data." />
                   )}
                 </div>
               </StoragePanel>
@@ -435,10 +435,6 @@ function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string
       <p className="mt-1 line-clamp-2 text-xs text-current/75">{detail}</p>
     </div>
   );
-}
-
-function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 function StorageLoadingState() {

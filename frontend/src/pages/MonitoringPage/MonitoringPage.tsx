@@ -5,7 +5,7 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageShell } from '@/components/layout/PageShell';
-import { ProjectInlineEmptyState } from '@/components/primitives/EmptyState';
+import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -168,10 +168,10 @@ function MonitoringChartsFallback() {
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
       <MonitoringPanel className="min-h-[420px]">
-        <EmptyState title="Loading metrics" message="Autark-OS is preparing advanced charts." />
+        <EmptyState title="Loading metrics" description="Autark-OS is preparing advanced charts." />
       </MonitoringPanel>
       <MonitoringPanel className="min-h-[420px]">
-        <EmptyState title="Loading instrumentation" message="Autark-OS is preparing device readings." />
+        <EmptyState title="Loading instrumentation" description="Autark-OS is preparing device readings." />
       </MonitoringPanel>
     </div>
   );
@@ -195,10 +195,6 @@ function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string
       <p className="mt-1 line-clamp-2 text-xs text-current/75">{detail}</p>
     </div>
   );
-}
-
-function EmptyState({ compact = false, message, title }: { compact?: boolean; message: string; title: string }) {
-  return <ProjectInlineEmptyState compact={compact} description={message} title={title} />;
 }
 
 function MonitoringErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {

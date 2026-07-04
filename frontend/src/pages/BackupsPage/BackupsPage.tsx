@@ -8,6 +8,7 @@ import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalReco
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageShell } from '@/components/layout/PageShell';
+import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -36,7 +37,6 @@ import {
   AppBackupCard,
   BackupPanel,
   AttentionCard,
-  EmptyState,
   FactRow,
   ProtectionPanel,
   RestoreDialog,
@@ -350,7 +350,7 @@ function BackupsPage() {
                 {report.apps.length ? report.apps.map((app) => (
                   <AppBackupCard app={app} key={app.appId} onRun={runManualAppBackup} running={running === `app-${app.appId}`} showAdvancedMetrics={showAdvancedMetrics} />
                 )) : (
-                  <EmptyState title="No apps installed" message="Install apps to begin backup protection." />
+                  <EmptyState title="No apps installed" description="Install apps to begin backup protection." />
                 )}
               </div>
             </BackupPanel>
@@ -373,7 +373,7 @@ function BackupsPage() {
             <BackupPanel>
               <SectionHeader compact icon={AlertTriangle} title="Needs attention" />
               <div className="mt-4 grid gap-3">
-                {needsAttention.length ? needsAttention.map((app) => <AttentionCard app={app} key={app.appId} />) : <EmptyState compact title={report.totalApps ? 'All apps have restore points' : 'No apps installed'} message={report.totalApps ? 'Installed apps are protected by completed restore points.' : 'Install an app before backup protection can begin.'} />}
+                {needsAttention.length ? needsAttention.map((app) => <AttentionCard app={app} key={app.appId} />) : <EmptyState compact title={report.totalApps ? 'All apps have restore points' : 'No apps installed'} description={report.totalApps ? 'Installed apps are protected by completed restore points.' : 'Install an app before backup protection can begin.'} />}
               </div>
             </BackupPanel>
           </aside>
