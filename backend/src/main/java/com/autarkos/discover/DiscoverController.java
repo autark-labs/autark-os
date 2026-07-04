@@ -35,17 +35,17 @@ public class DiscoverController {
     }
 
     @GetMapping("/{appId}/setup-schema")
-    public DiscoverSetupSchema setupSchema(@PathVariable String appId) {
+    public DiscoverSetupModels.DiscoverSetupSchema setupSchema(@PathVariable String appId) {
         return discoverService.setupSchema(appId);
     }
 
     @PostMapping("/{appId}/install-preview")
-    public DiscoverInstallPreview installPreview(@PathVariable String appId, @RequestBody(required = false) DiscoverSetupAnswersRequest request) {
+    public DiscoverInstallModels.DiscoverInstallPreview installPreview(@PathVariable String appId, @RequestBody(required = false) DiscoverSetupModels.DiscoverSetupAnswersRequest request) {
         return discoverService.installPreview(appId, request);
     }
 
     @PostMapping("/{appId}/install")
-    public AutarkOsJob install(@PathVariable String appId, @RequestBody(required = false) DiscoverInstallRequest request) {
+    public AutarkOsJob install(@PathVariable String appId, @RequestBody(required = false) DiscoverInstallModels.DiscoverInstallRequest request) {
         return discoverService.install(appId, request);
     }
 }

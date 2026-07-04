@@ -80,7 +80,7 @@ public class StorageService {
         this.fileOperations = fileOperations;
     }
 
-    public StorageReport report() {
+    public StorageModels.StorageReport report() {
         Path runtimeRoot = runtimeLayout.runtimeRoot();
         Path appsRoot = runtimeRoot.resolve("apps").normalize();
         Path backupsRoot = runtimeRoot.resolve("backups").normalize();
@@ -88,21 +88,21 @@ public class StorageService {
 
         List<InstalledApp> installedApps = managedInstalledApps();
         Set<String> installedIds = installedApps.stream().map(InstalledApp::appId).collect(HashSet::new, Set::add, Set::addAll);
-        StorageUsage hostDisk = diskUsage("Host disk", runtimeRoot);
-        StorageUsage runtimeDisk = directoryUsage("Autark-OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
-        StorageUsage backupStorage = directoryUsage("Backups", backupsRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
-        List<AppStorageUsage> apps = installedApps.stream()
+        StorageModels.StorageUsage hostDisk = diskUsage("Host disk", runtimeRoot);
+        StorageModels.StorageUsage runtimeDisk = directoryUsage("Autark-OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
+        StorageModels.StorageUsage backupStorage = directoryUsage("Backups", backupsRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
+        List<StorageModels.AppStorageUsage> apps = installedApps.stream()
                 .map(this::appStorage)
-                .sorted(Comparator.comparingLong(AppStorageUsage::usedBytes).reversed())
+                .sorted(Comparator.comparingLong(StorageModels.AppStorageUsage::usedBytes).reversed())
                 .toList();
         recordStorageSamples(apps);
-        List<OrphanedStorage> orphaned = orphanedStorage(appsRoot, installedIds);
+        List<StorageModels.OrphanedStorage> orphaned = orphanedStorage(appsRoot, installedIds);
         InstallStorageSafety installSafety = installSafety(hostDisk.usableBytes());
         String status = status(hostDisk.usedPercent(), orphaned.size());
-        List<StorageRecommendation> recommendations = recommendations(status, hostDisk, backupStorage, orphaned, apps);
+        List<StorageModels.StorageRecommendation> recommendations = recommendations(status, hostDisk, backupStorage, orphaned, apps);
         maybeLogWarning(status, hostDisk, orphaned.size());
 
-        return new StorageReport(
+        return new StorageModels.StorageReport(
                 status,
                 headline(status),
                 summary(status, hostDisk, runtimeDisk, orphaned.size()),
@@ -116,7 +116,7 @@ public class StorageService {
                 Instant.now());
     }
 
-    public StorageCleanupResult cleanupOrphan(String name) {
+    public StorageModels.StorageCleanupResult cleanupOrphan(String name) {
         String safeName = safeOrphanName(name);
         Path appsRoot = runtimeLayout.runtimeRoot().resolve("apps").toAbsolutePath().normalize();
         Path orphanPath = appsRoot.resolve(safeName).normalize();
@@ -144,7 +144,7 @@ public class StorageService {
                     "Removed unused app data",
                     "Removed " + safeName + " after creating a safety checkpoint.",
                     null);
-            return new StorageCleanupResult(
+            return new StorageModels.StorageCleanupResult(
                     "completed",
                     "Removed unused app data after creating a safety checkpoint.",
                     safeName,
@@ -158,15 +158,15 @@ public class StorageService {
         }
     }
 
-    private AppStorageUsage appStorage(InstalledApp app) {
+    private StorageModels.AppStorageUsage appStorage(InstalledApp app) {
         Path path = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElse(null);
         long usedBytes = fileOperations.directorySize(path);
-        List<StorageTrendPoint> trend = storageSampleRepository.forAppSince(app.appId(), Instant.now().minus(STORAGE_SAMPLE_RETENTION).toString()).stream()
-                .map(sample -> new StorageTrendPoint(sample.usedBytes(), Instant.parse(sample.sampledAt())))
+        List<StorageModels.StorageTrendPoint> trend = storageSampleRepository.forAppSince(app.appId(), Instant.now().minus(STORAGE_SAMPLE_RETENTION).toString()).stream()
+                .map(sample -> new StorageModels.StorageTrendPoint(sample.usedBytes(), Instant.parse(sample.sampledAt())))
                 .toList();
         long growth = trend.isEmpty() ? 0 : usedBytes - trend.getFirst().usedBytes();
-        return new AppStorageUsage(
+        return new StorageModels.AppStorageUsage(
                 app.appId(),
                 app.appName(),
                 app.status(),
@@ -179,15 +179,15 @@ public class StorageService {
                 "Not recorded");
     }
 
-    private void recordStorageSamples(List<AppStorageUsage> apps) {
+    private void recordStorageSamples(List<StorageModels.AppStorageUsage> apps) {
         Instant sampledAt = Instant.now();
-        for (AppStorageUsage app : apps) {
+        for (StorageModels.AppStorageUsage app : apps) {
             storageSampleRepository.save(new StorageSampleEntity(app.appId(), app.usedBytes(), sampledAt.toString()));
         }
         storageSampleRepository.deleteBefore(sampledAt.minus(STORAGE_SAMPLE_RETENTION).toString());
     }
 
-    private List<OrphanedStorage> orphanedStorage(Path appsRoot, Set<String> installedIds) {
+    private List<StorageModels.OrphanedStorage> orphanedStorage(Path appsRoot, Set<String> installedIds) {
         if (!Files.isDirectory(appsRoot)) {
             return List.of();
         }
@@ -195,8 +195,8 @@ public class StorageService {
             return stream
                     .filter(Files::isDirectory)
                     .filter(path -> !installedIds.contains(path.getFileName().toString()))
-                    .map(path -> new OrphanedStorage(path.getFileName().toString(), path.toAbsolutePath().normalize().toString(), fileOperations.directorySize(path)))
-                    .sorted(Comparator.comparingLong(OrphanedStorage::usedBytes).reversed())
+                    .map(path -> new StorageModels.OrphanedStorage(path.getFileName().toString(), path.toAbsolutePath().normalize().toString(), fileOperations.directorySize(path)))
+                    .sorted(Comparator.comparingLong(StorageModels.OrphanedStorage::usedBytes).reversed())
                     .toList();
         } catch (IOException exception) {
             return List.of();
@@ -213,22 +213,22 @@ public class StorageService {
                 .toList();
     }
 
-    private StorageUsage diskUsage(String label, Path path) {
+    private StorageModels.StorageUsage diskUsage(String label, Path path) {
         try {
             ensure(path);
             FileStore store = Files.getFileStore(path);
             long total = store.getTotalSpace();
             long usable = store.getUsableSpace();
             long used = Math.max(0, total - usable);
-            return new StorageUsage(label, path.toAbsolutePath().normalize().toString(), total, usable, used, ratioPercent(used, total));
+            return new StorageModels.StorageUsage(label, path.toAbsolutePath().normalize().toString(), total, usable, used, ratioPercent(used, total));
         } catch (IOException exception) {
-            return new StorageUsage(label, path.toAbsolutePath().normalize().toString(), 0, 0, 0, -1);
+            return new StorageModels.StorageUsage(label, path.toAbsolutePath().normalize().toString(), 0, 0, 0, -1);
         }
     }
 
-    private StorageUsage directoryUsage(String label, Path path, long totalBytes, long usableBytes) {
+    private StorageModels.StorageUsage directoryUsage(String label, Path path, long totalBytes, long usableBytes) {
         long used = fileOperations.directorySize(path);
-        return new StorageUsage(label, path.toAbsolutePath().normalize().toString(), totalBytes, usableBytes, used, ratioPercent(used, totalBytes));
+        return new StorageModels.StorageUsage(label, path.toAbsolutePath().normalize().toString(), totalBytes, usableBytes, used, ratioPercent(used, totalBytes));
     }
 
     private InstallStorageSafety installSafety(long currentFreeBytes) {
@@ -248,23 +248,23 @@ public class StorageService {
                 true);
     }
 
-    private List<StorageRecommendation> recommendations(String status, StorageUsage hostDisk, StorageUsage backupStorage, List<OrphanedStorage> orphaned, List<AppStorageUsage> apps) {
-        java.util.ArrayList<StorageRecommendation> recommendations = new java.util.ArrayList<>();
+    private List<StorageModels.StorageRecommendation> recommendations(String status, StorageModels.StorageUsage hostDisk, StorageModels.StorageUsage backupStorage, List<StorageModels.OrphanedStorage> orphaned, List<StorageModels.AppStorageUsage> apps) {
+        java.util.ArrayList<StorageModels.StorageRecommendation> recommendations = new java.util.ArrayList<>();
         if ("critical".equals(status)) {
-            recommendations.add(new StorageRecommendation("disk-critical", "danger", "Free up space soon", "The host disk is critically full. Installs, backups, and app updates may fail.", "Review largest apps"));
+            recommendations.add(new StorageModels.StorageRecommendation("disk-critical", "danger", "Free up space soon", "The host disk is critically full. Installs, backups, and app updates may fail.", "Review largest apps"));
         } else if (hostDisk.usedPercent() >= 75) {
-            recommendations.add(new StorageRecommendation("disk-warning", "warning", "Storage is getting tight", "Autark-OS can still run, but new installs and backups may become unreliable.", "Review storage"));
+            recommendations.add(new StorageModels.StorageRecommendation("disk-warning", "warning", "Storage is getting tight", "Autark-OS can still run, but new installs and backups may become unreliable.", "Review storage"));
         } else {
-            recommendations.add(new StorageRecommendation("disk-healthy", "success", "Storage looks healthy", "Autark-OS has enough free space for normal operation.", null));
+            recommendations.add(new StorageModels.StorageRecommendation("disk-healthy", "success", "Storage looks healthy", "Autark-OS has enough free space for normal operation.", null));
         }
         if (!orphaned.isEmpty()) {
-            recommendations.add(new StorageRecommendation("orphaned-data", "warning", "Unused app data found", "Autark-OS found folders that do not match an installed app. Review them before cleanup.", "Review unused data"));
+            recommendations.add(new StorageModels.StorageRecommendation("orphaned-data", "warning", "Unused app data found", "Autark-OS found folders that do not match an installed app. Review them before cleanup.", "Review unused data"));
         }
         if (backupStorage.usedBytes() == 0) {
-            recommendations.add(new StorageRecommendation("backups-empty", "neutral", "No backup files found", "Backup storage is empty. Run a routine or manual backup to create the first restore point.", "Open backups"));
+            recommendations.add(new StorageModels.StorageRecommendation("backups-empty", "neutral", "No backup files found", "Backup storage is empty. Run a routine or manual backup to create the first restore point.", "Open backups"));
         }
         apps.stream().filter(app -> !app.backupEnabled()).findFirst().ifPresent(app ->
-                recommendations.add(new StorageRecommendation("backup-disabled", "warning", "Some apps are not protected", "At least one installed app is excluded from routine backup protection.", "Open backups")));
+                recommendations.add(new StorageModels.StorageRecommendation("backup-disabled", "warning", "Some apps are not protected", "At least one installed app is excluded from routine backup protection.", "Open backups")));
         return recommendations;
     }
 
@@ -286,7 +286,7 @@ public class StorageService {
         };
     }
 
-    private String summary(String status, StorageUsage hostDisk, StorageUsage runtimeDisk, int orphanedCount) {
+    private String summary(String status, StorageModels.StorageUsage hostDisk, StorageModels.StorageUsage runtimeDisk, int orphanedCount) {
         String base = "Autark-OS is using " + readableBytes(runtimeDisk.usedBytes()) + " on a host with " + readableBytes(hostDisk.usableBytes()) + " free.";
         if ("critical".equals(status)) {
             return base + " Free space is low enough that installs or backups may fail.";
@@ -297,7 +297,7 @@ public class StorageService {
         return base;
     }
 
-    private void maybeLogWarning(String status, StorageUsage hostDisk, int orphanedCount) {
+    private void maybeLogWarning(String status, StorageModels.StorageUsage hostDisk, int orphanedCount) {
         if ("healthy".equals(status)) {
             return;
         }

@@ -48,7 +48,7 @@ public class ObservedServiceScanner {
                 .toList();
     }
 
-    private ObservedService observed(HostDockerContainer container, AutarkOsIdentity identity, Instant now) {
+    private ObservedService observed(HostModels.HostDockerContainer container, AutarkOsIdentity identity, Instant now) {
         DockerResourceClassification classification = ownershipService == null
                 ? null
                 : ownershipService.classify(container.name(), container.labels());
@@ -61,7 +61,7 @@ public class ObservedServiceScanner {
         String url = accessUrl(container.ports());
         return new ObservedService(
                 "docker:" + clean(container.name()),
-                ObservedServiceSource.DOCKER,
+                HostModels.ObservedServiceSource.DOCKER,
                 clean(container.name()),
                 displayName(appId, container.name()),
                 url,
@@ -81,7 +81,7 @@ public class ObservedServiceScanner {
                 metadata(container, identity));
     }
 
-    private String metadata(HostDockerContainer container, AutarkOsIdentity identity) {
+    private String metadata(HostModels.HostDockerContainer container, AutarkOsIdentity identity) {
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put("containerName", clean(container.name()));
         metadata.put("image", clean(container.image()));

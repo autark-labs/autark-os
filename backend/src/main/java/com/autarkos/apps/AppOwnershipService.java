@@ -10,7 +10,7 @@ import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
-import com.autarkos.discover.DiscoverInstalledAppSummary;
+import com.autarkos.discover.DiscoverInstallModels;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
 import com.autarkos.host.ObservedServiceView;
@@ -114,10 +114,10 @@ public class AppOwnershipService {
                 observedView);
     }
 
-    private DiscoverInstalledAppSummary installedSummary(InstalledApp app) {
+    private DiscoverInstallModels.DiscoverInstalledAppSummary installedSummary(InstalledApp app) {
         String backupState = backupState(app);
         boolean protectedByBackups = AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(backupState);
-        return new DiscoverInstalledAppSummary(
+        return new DiscoverInstallModels.DiscoverInstalledAppSummary(
                 app.appId(),
                 app.appName(),
                 app.status(),

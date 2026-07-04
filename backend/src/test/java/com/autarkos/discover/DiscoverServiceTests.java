@@ -115,9 +115,9 @@ class DiscoverServiceTests {
     void buildsCommonAndAppSpecificSetupSchemaFromBackend() {
         DiscoverService service = discoverService(observedRepository());
 
-        DiscoverSetupSchema schema = service.setupSchema("jellyfin");
+        DiscoverSetupModels.DiscoverSetupSchema schema = service.setupSchema("jellyfin");
 
-        assertThat(schema.inputs()).extracting(DiscoverSetupInput::id)
+        assertThat(schema.inputs()).extracting(DiscoverSetupModels.DiscoverSetupInput::id)
                 .contains("displayName", "accessMode", "storageMode", "backupPolicy", "localBrowserPort", "jellyfinMediaFolder", "jellyfinExistingMediaPath");
         assertThat(schema.inputs()).filteredOn(input -> input.id().equals("accessMode"))
                 .singleElement()
@@ -133,7 +133,7 @@ class DiscoverServiceTests {
         DiscoverService service = discoverService(observedRepository());
         Path media = Files.createDirectory(runtimeRoot.resolve("media"));
 
-        DiscoverInstallPreview invalid = service.installPreview("jellyfin", new DiscoverSetupAnswersRequest(Map.of(
+        DiscoverInstallModels.DiscoverInstallPreview invalid = service.installPreview("jellyfin", new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of(
                 "displayName", "Family Movies",
                 "accessMode", "lan_only",
                 "storageMode", "autark_os_default",
@@ -143,10 +143,10 @@ class DiscoverServiceTests {
                 "jellyfinExistingMediaPath", runtimeRoot.resolve("missing").toString())));
 
         assertThat(invalid.valid()).isFalse();
-        assertThat(invalid.blockingIssues()).extracting(DiscoverInstallIssue::fieldId)
+        assertThat(invalid.blockingIssues()).extracting(DiscoverInstallModels.DiscoverInstallIssue::fieldId)
                 .containsExactly("jellyfinExistingMediaPath");
 
-        DiscoverInstallPreview valid = service.installPreview("jellyfin", new DiscoverSetupAnswersRequest(Map.of(
+        DiscoverInstallModels.DiscoverInstallPreview valid = service.installPreview("jellyfin", new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of(
                 "displayName", "Family Movies",
                 "accessMode", "lan_only",
                 "storageMode", "autark_os_default",
@@ -158,14 +158,14 @@ class DiscoverServiceTests {
         assertThat(valid.valid()).isTrue();
         assertThat(valid.sections()).filteredOn(section -> section.id().equals("connect"))
                 .singleElement()
-                .extracting(DiscoverInstallPreviewSection::items)
+                .extracting(DiscoverInstallModels.DiscoverInstallPreviewSection::items)
                 .asList()
-                .anySatisfy(item -> assertThat(((DiscoverInstallPreviewItem) item).label()).contains("home network"));
+                .anySatisfy(item -> assertThat(((DiscoverInstallModels.DiscoverInstallPreviewItem) item).label()).contains("home network"));
         assertThat(valid.sections()).filteredOn(section -> section.id().equals("protect"))
                 .singleElement()
-                .extracting(DiscoverInstallPreviewSection::items)
+                .extracting(DiscoverInstallModels.DiscoverInstallPreviewSection::items)
                 .asList()
-                .anySatisfy(item -> assertThat(((DiscoverInstallPreviewItem) item).tone()).isEqualTo("warning"));
+                .anySatisfy(item -> assertThat(((DiscoverInstallModels.DiscoverInstallPreviewItem) item).tone()).isEqualTo("warning"));
         assertThat(valid.installOptions().ports().hostPort()).isEqualTo(19096);
         assertThat(valid.installOptions().backup().enabled()).isFalse();
         assertThat(valid.technicalDetails().technical().volumes())
@@ -175,7 +175,7 @@ class DiscoverServiceTests {
     @Test
     void setupAnswersArePersistedWithInstallIntent() {
         DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(runtimeLayout());
-        DiscoverSetupAnswers answers = new DiscoverSetupAnswers(Map.of(
+        DiscoverSetupModels.DiscoverSetupAnswers answers = new DiscoverSetupModels.DiscoverSetupAnswers(Map.of(
                 "displayName", "Family Passwords",
                 "accessMode", "private_lan",
                 "storageMode", "autark_os_default",
@@ -198,7 +198,7 @@ class DiscoverServiceTests {
         AutarkOsJobService jobService = jobService();
         DiscoverService service = discoverService(observedRepository(), installService, jobService);
 
-        service.install("vaultwarden", new DiscoverInstallRequest(Map.of(), false, true));
+        service.install("vaultwarden", new DiscoverInstallModels.DiscoverInstallRequest(Map.of(), false, true));
         jobService.runQueuedJobsNow();
 
         assertThat(installService.lastOptions).isNotNull();
@@ -219,7 +219,7 @@ class DiscoverServiceTests {
                 new RecordingMarketplaceInstallService(),
                 jobService());
 
-        service.install("vaultwarden", new DiscoverInstallRequest(Map.of(
+        service.install("vaultwarden", new DiscoverInstallModels.DiscoverInstallRequest(Map.of(
                 "displayName", "Family Passwords",
                 "accessMode", "private_lan",
                 "storageMode", "autark_os_default",
@@ -256,7 +256,7 @@ class DiscoverServiceTests {
                 new RecordingMarketplaceInstallService(),
                 jobService());
 
-        service.install("vaultwarden", new DiscoverInstallRequest(Map.of(), false, true));
+        service.install("vaultwarden", new DiscoverInstallModels.DiscoverInstallRequest(Map.of(), false, true));
 
         verify(applicationStateService).invalidate();
     }

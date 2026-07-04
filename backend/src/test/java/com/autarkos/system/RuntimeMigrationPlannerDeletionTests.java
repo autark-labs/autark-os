@@ -20,7 +20,7 @@ class RuntimeMigrationPlannerDeletionTests {
     void storageServiceAndReportDoNotExposeMigrationPlanning() {
         assertThat(Arrays.stream(StorageService.class.getDeclaredMethods()).map(method -> method.getName()))
                 .doesNotContain("migrationPlan");
-        assertThat(Arrays.stream(StorageReport.class.getRecordComponents()).map(component -> component.getName()))
+        assertThat(Arrays.stream(StorageModels.StorageReport.class.getRecordComponents()).map(component -> component.getName()))
                 .doesNotContain("migrationGuidance");
     }
 

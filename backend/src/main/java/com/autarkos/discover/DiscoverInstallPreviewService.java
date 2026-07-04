@@ -24,17 +24,17 @@ public class DiscoverInstallPreviewService {
         this.setupService = setupService;
     }
 
-    public DiscoverInstallPreview preview(ApplicationManifest manifest, DiscoverSetupAnswersRequest request) {
-        DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, request);
-        List<DiscoverInstallIssue> issues = validate(manifest, answers);
-        List<DiscoverInstallIssue> blockingIssues = issues.stream().filter(issue -> "error".equals(issue.severity())).toList();
-        List<DiscoverInstallIssue> warnings = new ArrayList<>(issues.stream().filter(issue -> !"error".equals(issue.severity())).toList());
+    public DiscoverInstallModels.DiscoverInstallPreview preview(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswersRequest request) {
+        DiscoverSetupModels.DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, request);
+        List<DiscoverInstallModels.DiscoverInstallIssue> issues = validate(manifest, answers);
+        List<DiscoverInstallModels.DiscoverInstallIssue> blockingIssues = issues.stream().filter(issue -> "error".equals(issue.severity())).toList();
+        List<DiscoverInstallModels.DiscoverInstallIssue> warnings = new ArrayList<>(issues.stream().filter(issue -> !"error".equals(issue.severity())).toList());
         if ("disabled".equals(answers.stringValue("backupPolicy"))) {
-            warnings.add(new DiscoverInstallIssue("backupPolicy", "warning", manifest.name() + " will not be included in Autark-OS backups until you enable it."));
+            warnings.add(new DiscoverInstallModels.DiscoverInstallIssue("backupPolicy", "warning", manifest.name() + " will not be included in Autark-OS backups until you enable it."));
         }
         InstallOptionsRequest options = installOptions(manifest, answers);
         InstallPlan technicalPlan = installPlanService.generatePlan(manifest, blockingIssues.isEmpty() ? options : InstallOptionsRequest.defaults());
-        return new DiscoverInstallPreview(
+        return new DiscoverInstallModels.DiscoverInstallPreview(
                 blockingIssues.isEmpty(),
                 blockingIssues,
                 warnings,
@@ -43,7 +43,7 @@ public class DiscoverInstallPreviewService {
                 options);
     }
 
-    public InstallOptionsRequest installOptions(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
+    public InstallOptionsRequest installOptions(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         Integer hostPort = hostPort(answers.value("localBrowserPort"));
         boolean tailscale = "private_lan".equals(answers.stringValue("accessMode"));
         boolean backupEnabled = !"disabled".equals(answers.stringValue("backupPolicy"));
@@ -54,8 +54,8 @@ public class DiscoverInstallPreviewService {
                 new InstallOptionsRequest.BackupOptions(backupEnabled, "daily", 7));
     }
 
-    public List<DiscoverInstallIssue> validate(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
-        List<DiscoverInstallIssue> issues = new ArrayList<>();
+    public List<DiscoverInstallModels.DiscoverInstallIssue> validate(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
+        List<DiscoverInstallModels.DiscoverInstallIssue> issues = new ArrayList<>();
         if (answers.stringValue("displayName").isBlank()) {
             issues.add(error("displayName", "Give this app a name before installing it."));
         }
@@ -81,22 +81,22 @@ public class DiscoverInstallPreviewService {
             issues.add(error("piholeCustomDns", "Enter one or more DNS server IP addresses, separated by commas."));
         }
         if ("existing_folder".equals(answers.stringValue("storageMode")) && !"jellyfin".equals(manifest.id())) {
-            issues.add(new DiscoverInstallIssue("storageMode", "warning", "Existing folders need a review before Autark-OS treats them as protected app data."));
+            issues.add(new DiscoverInstallModels.DiscoverInstallIssue("storageMode", "warning", "Existing folders need a review before Autark-OS treats them as protected app data."));
         }
         return issues;
     }
 
-    private List<DiscoverInstallPreviewSection> sections(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
+    private List<DiscoverInstallModels.DiscoverInstallPreviewSection> sections(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         return List.of(
-                new DiscoverInstallPreviewSection("create", "Create", createItems(manifest, answers)),
-                new DiscoverInstallPreviewSection("connect", "Connect", connectItems(answers)),
-                new DiscoverInstallPreviewSection("protect", "Protect", protectItems(manifest, answers)),
-                new DiscoverInstallPreviewSection("check", "Check", checkItems(manifest, answers)),
-                new DiscoverInstallPreviewSection("afterInstall", "After install", afterInstallItems(manifest, answers)));
+                new DiscoverInstallModels.DiscoverInstallPreviewSection("create", "Create", createItems(manifest, answers)),
+                new DiscoverInstallModels.DiscoverInstallPreviewSection("connect", "Connect", connectItems(answers)),
+                new DiscoverInstallModels.DiscoverInstallPreviewSection("protect", "Protect", protectItems(manifest, answers)),
+                new DiscoverInstallModels.DiscoverInstallPreviewSection("check", "Check", checkItems(manifest, answers)),
+                new DiscoverInstallModels.DiscoverInstallPreviewSection("afterInstall", "After install", afterInstallItems(manifest, answers)));
     }
 
-    private List<DiscoverInstallPreviewItem> createItems(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
-        List<DiscoverInstallPreviewItem> items = new ArrayList<>();
+    private List<DiscoverInstallModels.DiscoverInstallPreviewItem> createItems(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
+        List<DiscoverInstallModels.DiscoverInstallPreviewItem> items = new ArrayList<>();
         items.add(item("Create " + answers.stringValue("displayName") + " as a managed Autark-OS app.", null, "default"));
         items.add(item("Create managed folders for app data.", "Autark-OS uses predictable app folders for recovery and cleanup.", "default"));
         if ("jellyfin".equals(manifest.id())) {
@@ -109,7 +109,7 @@ public class DiscoverInstallPreviewService {
         return items;
     }
 
-    private List<DiscoverInstallPreviewItem> connectItems(DiscoverSetupAnswers answers) {
+    private List<DiscoverInstallModels.DiscoverInstallPreviewItem> connectItems(DiscoverSetupModels.DiscoverSetupAnswers answers) {
         return switch (answers.stringValue("accessMode")) {
             case "private_lan" -> List.of(item("Create a home network link and request private Tailscale access.", null, "default"));
             case "local_only" -> List.of(item("Keep access limited to this server until you change it later.", null, "warning"));
@@ -117,7 +117,7 @@ public class DiscoverInstallPreviewService {
         };
     }
 
-    private List<DiscoverInstallPreviewItem> protectItems(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
+    private List<DiscoverInstallModels.DiscoverInstallPreviewItem> protectItems(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         if ("disabled".equals(answers.stringValue("backupPolicy"))) {
             return List.of(item("Do not include " + manifest.name() + " in Autark-OS backups yet.", "You can enable backups later.", "warning"));
         }
@@ -127,8 +127,8 @@ public class DiscoverInstallPreviewService {
         return List.of(item("Include " + manifest.name() + " in backups and recommend a first restore point.", null, "success"));
     }
 
-    private List<DiscoverInstallPreviewItem> checkItems(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
-        List<DiscoverInstallPreviewItem> items = new ArrayList<>();
+    private List<DiscoverInstallModels.DiscoverInstallPreviewItem> checkItems(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
+        List<DiscoverInstallModels.DiscoverInstallPreviewItem> items = new ArrayList<>();
         items.add(item("Start the app and wait for: " + manifest.health().successLabel(), manifest.health().description(), "default"));
         Integer port = hostPort(answers.value("localBrowserPort"));
         if (port != null) {
@@ -143,8 +143,8 @@ public class DiscoverInstallPreviewService {
         return items;
     }
 
-    private List<DiscoverInstallPreviewItem> afterInstallItems(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
-        List<DiscoverInstallPreviewItem> items = new ArrayList<>();
+    private List<DiscoverInstallModels.DiscoverInstallPreviewItem> afterInstallItems(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
+        List<DiscoverInstallModels.DiscoverInstallPreviewItem> items = new ArrayList<>();
         items.add(item("Open " + manifest.name() + " from My Apps.", null, "default"));
         if ("enabled_first_checkpoint".equals(answers.stringValue("backupPolicy"))) {
             items.add(item("Create a first restore point before making major changes.", null, "success"));
@@ -155,7 +155,7 @@ public class DiscoverInstallPreviewService {
         return items;
     }
 
-    private Map<String, String> storageSubfolders(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
+    private Map<String, String> storageSubfolders(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         java.util.LinkedHashMap<String, String> subfolders = new java.util.LinkedHashMap<>();
         if ("jellyfin".equals(manifest.id()) && "create_new".equals(answers.stringValue("jellyfinMediaFolder"))) {
             subfolders.put("media", "media");
@@ -163,19 +163,19 @@ public class DiscoverInstallPreviewService {
         return subfolders;
     }
 
-    private Map<String, String> storageHostPaths(ApplicationManifest manifest, DiscoverSetupAnswers answers) {
+    private Map<String, String> storageHostPaths(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         if ("jellyfin".equals(manifest.id()) && "existing_folder".equals(answers.stringValue("jellyfinMediaFolder"))) {
             return Map.of("media", answers.stringValue("jellyfinExistingMediaPath"));
         }
         return Map.of();
     }
 
-    private DiscoverInstallPreviewItem item(String label, String description, String tone) {
-        return new DiscoverInstallPreviewItem(label, description, tone);
+    private DiscoverInstallModels.DiscoverInstallPreviewItem item(String label, String description, String tone) {
+        return new DiscoverInstallModels.DiscoverInstallPreviewItem(label, description, tone);
     }
 
-    private DiscoverInstallIssue error(String fieldId, String message) {
-        return new DiscoverInstallIssue(fieldId, "error", message);
+    private DiscoverInstallModels.DiscoverInstallIssue error(String fieldId, String message) {
+        return new DiscoverInstallModels.DiscoverInstallIssue(fieldId, "error", message);
     }
 
     private Integer hostPort(Object value) {
@@ -216,7 +216,7 @@ public class DiscoverInstallPreviewService {
         return true;
     }
 
-    private String dnsProviderLabel(DiscoverSetupAnswers answers) {
+    private String dnsProviderLabel(DiscoverSetupModels.DiscoverSetupAnswers answers) {
         return switch (answers.stringValue("piholeDnsProvider")) {
             case "quad9" -> "Quad9";
             case "google" -> "Google";

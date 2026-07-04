@@ -35,7 +35,7 @@ public class BackupSchedulerService {
             return;
         }
         try {
-            Optional<BackupRunResult> result = backupService.runAutomaticIfDue();
+            Optional<BackupModels.BackupRunResult> result = backupService.runAutomaticIfDue();
             result.ifPresent(run -> {
                 if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(run.status())) {
                     activityLogService.success("backup", "scheduled_backup_completed", "Routine backup completed", run.message(), null);

@@ -29,7 +29,7 @@ public record DiscoverAppView(
         String reviewExistingHref,
         AppOwnershipAction primaryAction,
         List<AppOwnershipAction> availableActions,
-        DiscoverInstalledAppSummary installedApp,
+        DiscoverInstallModels.DiscoverInstalledAppSummary installedApp,
         ObservedServiceView observedService,
-        DiscoverSetupSchema setupSchema) {
+        DiscoverSetupModels.DiscoverSetupSchema setupSchema) {
 }

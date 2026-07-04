@@ -1,6 +1,6 @@
 package com.autarkos.api;
 
-import com.autarkos.host.ObservedServiceStatus;
+import com.autarkos.host.HostModels;
 
 public final class ApplicationBehaviorStates {
 
@@ -12,10 +12,10 @@ public final class ApplicationBehaviorStates {
     }
 
     public static String observedManagementState(String userStatus, boolean pinned, boolean managedByThisAutarkOs) {
-        if (managedByThisAutarkOs || ObservedServiceStatus.MANAGED.equals(userStatus)) {
+        if (managedByThisAutarkOs || HostModels.ObservedServiceStatus.MANAGED.equals(userStatus)) {
             return AutarkOsStates.ManagementState.MANAGED;
         }
-        if (pinned || ObservedServiceStatus.PINNED.equals(userStatus)) {
+        if (pinned || HostModels.ObservedServiceStatus.PINNED.equals(userStatus)) {
             return AutarkOsStates.ManagementState.LINKED;
         }
         return AutarkOsStates.ManagementState.FOUND;
@@ -59,9 +59,9 @@ public final class ApplicationBehaviorStates {
 
     public static String observedAttentionState(String userStatus) {
         return switch (userStatus) {
-            case ObservedServiceStatus.CONFLICT -> AutarkOsStates.AttentionState.BLOCKED;
-            case ObservedServiceStatus.OWNED_ELSEWHERE -> AutarkOsStates.AttentionState.CONFLICT;
-            case ObservedServiceStatus.RECOVERABLE, ObservedServiceStatus.FOUND, ObservedServiceStatus.FAILED_INSTALL -> AutarkOsStates.AttentionState.NEEDS_REVIEW;
+            case HostModels.ObservedServiceStatus.CONFLICT -> AutarkOsStates.AttentionState.BLOCKED;
+            case HostModels.ObservedServiceStatus.OWNED_ELSEWHERE -> AutarkOsStates.AttentionState.CONFLICT;
+            case HostModels.ObservedServiceStatus.RECOVERABLE, HostModels.ObservedServiceStatus.FOUND, HostModels.ObservedServiceStatus.FAILED_INSTALL -> AutarkOsStates.AttentionState.NEEDS_REVIEW;
             default -> AutarkOsStates.AttentionState.NONE;
         };
     }

@@ -50,17 +50,17 @@ class BackupReportService {
         this.backupRoot = backupRoot;
     }
 
-    BackupReport report(List<InstalledApp> installedApps) {
+    BackupModels.BackupReport report(List<InstalledApp> installedApps) {
         Map<String, ApplicationManifest> manifestsById = catalogService.findAll().stream()
                 .collect(java.util.stream.Collectors.toMap(ApplicationManifest::id, manifest -> manifest));
-        List<AppBackupStatus> apps = installedApps.stream()
+        List<BackupModels.AppBackupStatus> apps = installedApps.stream()
                 .map(app -> appStatus(app, manifestsById))
-                .sorted(Comparator.comparing(AppBackupStatus::appName))
+                .sorted(Comparator.comparing(BackupModels.AppBackupStatus::appName))
                 .toList();
         List<RestorePoint> recent = backupRepository.recent(20).stream()
                 .map(RestorePoints::toDomain)
                 .toList();
-        int protectedApps = (int) apps.stream().filter(AppBackupStatus::protectedByBackups).count();
+        int protectedApps = (int) apps.stream().filter(BackupModels.AppBackupStatus::protectedByBackups).count();
         int failedBackups = (int) recent.stream().filter(point -> AutarkOsStates.RestorePointStatus.FAILED.equals(point.status())).count();
         long backupStorage = fileOperations.directorySize(backupRoot.get());
         String status = status(apps, failedBackups);
@@ -78,11 +78,11 @@ class BackupReportService {
                 .findFirst()
                 .orElse(null);
 
-        return new BackupReport(
+        return new BackupModels.BackupReport(
                 status,
                 headline(status),
                 summary(installedApps.size(), protectedApps, failedBackups),
-                new BackupSettingsSummary(
+                new BackupModels.BackupSettingsSummary(
                         settings.automaticBackupsEnabled(),
                         settings.backupFrequency(),
                         settings.backupRetentionDays(),
@@ -131,7 +131,7 @@ class BackupReportService {
         return candidate.toInstant(ZoneOffset.UTC).toString();
     }
 
-    private AppBackupStatus appStatus(InstalledApp app, Map<String, ApplicationManifest> manifestsById) {
+    private BackupModels.AppBackupStatus appStatus(InstalledApp app, Map<String, ApplicationManifest> manifestsById) {
         Optional<InstallSettings> settings = installedAppRepository.settingsFor(app.appId());
         BackupPolicy policy = settings.map(InstallSettings::backup).orElse(BackupPolicy.defaults());
         List<RestorePoint> restorePoints = backupRepository.forApp(app.appId(), 5).stream()
@@ -139,9 +139,9 @@ class BackupReportService {
                 .toList();
         RestorePoint latest = restorePoints.stream().findFirst().orElse(null);
         long dataSize = fileOperations.directorySize(Path.of(app.runtimePath()));
-        BackupContract contract = backupContractService.backupContract(app, manifestsById.get(app.appId()));
+        BackupModels.BackupContract contract = backupContractService.backupContract(app, manifestsById.get(app.appId()));
         String status = appBackupStatus(policy, latest, contract);
-        return new AppBackupStatus(
+        return new BackupModels.AppBackupStatus(
                 app.appId(),
                 app.appName(),
                 status,
@@ -158,7 +158,7 @@ class BackupReportService {
                 Instant.now());
     }
 
-    private String appBackupStatus(BackupPolicy policy, RestorePoint latest, BackupContract contract) {
+    private String appBackupStatus(BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
         if (!policy.enabled()) {
             return "unprotected";
         }
@@ -177,7 +177,7 @@ class BackupReportService {
         return "not_backed_up";
     }
 
-    private String statusMessage(BackupPolicy policy, RestorePoint latest, BackupContract contract) {
+    private String statusMessage(BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
         if (!policy.enabled()) {
             return "Backups are off.";
         }
@@ -242,7 +242,7 @@ class BackupReportService {
         return "Next " + policy.frequency() + " window";
     }
 
-    private String status(List<AppBackupStatus> apps, int failedBackups) {
+    private String status(List<BackupModels.AppBackupStatus> apps, int failedBackups) {
         if (failedBackups > 0) {
             return "warning";
         }

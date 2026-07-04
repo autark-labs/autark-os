@@ -11,8 +11,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.autarkos.discover.DiscoverInstalledAppSummary;
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.discover.DiscoverInstallModels;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
@@ -95,7 +95,7 @@ class AppOwnershipServiceTests {
                     assertThat(view.ownedByCurrentInstance()).isTrue();
                     assertThat(view.installCopyWarningRequired()).isFalse();
                     assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("manage", "Manage", "route", "/apps?focus=managed%3Avaultwarden&panel=manage", null, false, ""));
-                    assertThat(view.installedApp()).isEqualTo(new DiscoverInstalledAppSummary("vaultwarden", "Family Passwords", "Ready", "http://localhost:8090"));
+                    assertThat(view.installedApp()).isEqualTo(new DiscoverInstallModels.DiscoverInstalledAppSummary("vaultwarden", "Family Passwords", "Ready", "http://localhost:8090"));
                     assertThat(view.observedService()).isNull();
                 });
         assertThat(views).filteredOn(view -> view.catalogAppId().equals("jellyfin"))
@@ -239,7 +239,7 @@ class AppOwnershipServiceTests {
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout());
         RestorePointTestRecords.record(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden-failed.zip", "failed", 0, "Backup failed.");
 
-        DiscoverInstalledAppSummary unprotected = service(repository, observedRepository(), backupRepository)
+        DiscoverInstallModels.DiscoverInstalledAppSummary unprotected = service(repository, observedRepository(), backupRepository)
                 .app("vaultwarden")
                 .orElseThrow()
                 .installedApp();
@@ -250,7 +250,7 @@ class AppOwnershipServiceTests {
 
         RestorePointTestRecords.record(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 1024, "Backup completed.");
 
-        DiscoverInstalledAppSummary protectedApp = service(repository, observedRepository(), backupRepository)
+        DiscoverInstallModels.DiscoverInstalledAppSummary protectedApp = service(repository, observedRepository(), backupRepository)
                 .app("vaultwarden")
                 .orElseThrow()
                 .installedApp();

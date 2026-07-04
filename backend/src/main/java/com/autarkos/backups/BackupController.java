@@ -1,6 +1,5 @@
 package com.autarkos.backups;
 
-import com.autarkos.backups.api.RestoreRequest;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,14 +31,14 @@ public class BackupController {
     }
 
     @GetMapping
-    public BackupReport report() {
+    public BackupModels.BackupReport report() {
         return backupService.report();
     }
 
     @PostMapping("/apps/{appId}/run")
     public AutarkOsJob run(@PathVariable String appId) {
         AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP, appId, backupSteps(), () -> {
-            BackupRunResult result = backupService.run(appId);
+            BackupModels.BackupRunResult result = backupService.run(appId);
             invalidateApplicationState();
             return backupOutcome(result);
         });
@@ -58,7 +57,7 @@ public class BackupController {
     }
 
     @GetMapping("/restore-points/{id}/plan")
-    public RestorePlan restorePlan(@PathVariable long id, @RequestParam(required = false) String appId) {
+    public RestoreModels.RestorePlan restorePlan(@PathVariable long id, @RequestParam(required = false) String appId) {
         return backupService.restorePlan(id, appId);
     }
 
@@ -68,10 +67,10 @@ public class BackupController {
     }
 
     @PostMapping("/restore-points/{id}/restore")
-    public AutarkOsJob restore(@PathVariable long id, @RequestBody(required = false) RestoreRequest request) {
+    public AutarkOsJob restore(@PathVariable long id, @RequestBody(required = false) RestoreModels.RestoreRequest request) {
         String appId = request == null ? null : request.appId();
         AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP_RESTORE, restoreSubject(id, appId), restoreSteps(), () -> {
-            RestoreResult result = backupService.restore(id, appId);
+            RestoreModels.RestoreResult result = backupService.restore(id, appId);
             invalidateApplicationState();
             return restoreOutcome(result);
         });
@@ -87,7 +86,7 @@ public class BackupController {
                 AutarkOsJobStep.pending("finish", "Finishing backup"));
     }
 
-    private AutarkOsJobOutcome backupOutcome(BackupRunResult result) {
+    private AutarkOsJobOutcome backupOutcome(BackupModels.BackupRunResult result) {
         if (AutarkOsStates.JobStatus.FAILED.equals(result.status())) {
             java.util.List<AutarkOsJobStep> steps = java.util.List.of(
                     AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
@@ -112,7 +111,7 @@ public class BackupController {
                 AutarkOsJobStep.pending("finish", "Finishing verification"));
     }
 
-    private AutarkOsJobOutcome verificationOutcome(BackupVerificationResult result) {
+    private AutarkOsJobOutcome verificationOutcome(BackupModels.BackupVerificationResult result) {
         java.util.List<AutarkOsJobStep> steps = java.util.List.of(
                 AutarkOsJobStep.succeeded("load_restore_point", "Loading restore point", "Restore point loaded."),
                 AutarkOsStates.JobStatus.FAILED.equals(result.status())
@@ -136,7 +135,7 @@ public class BackupController {
                 AutarkOsJobStep.pending("finish", "Finishing restore"));
     }
 
-    private AutarkOsJobOutcome restoreOutcome(RestoreResult result) {
+    private AutarkOsJobOutcome restoreOutcome(RestoreModels.RestoreResult result) {
         boolean failed = AutarkOsStates.JobStatus.FAILED.equals(result.status());
         boolean warning = AutarkOsStates.Tone.WARNING.equals(result.status());
         java.util.List<AutarkOsJobStep> steps = java.util.List.of(

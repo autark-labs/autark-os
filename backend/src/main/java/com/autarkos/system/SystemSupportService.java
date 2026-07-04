@@ -15,20 +15,12 @@ import org.springframework.stereotype.Service;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.activity.ActivityLog;
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.backups.BackupReport;
+import com.autarkos.backups.BackupModels;
 import com.autarkos.backups.BackupService;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppReliabilitySummary;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationReport;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
-import com.autarkos.system.api.SupportBundle;
-import com.autarkos.system.api.SupportCommand;
-import com.autarkos.system.api.SupportDomainSummary;
-import com.autarkos.system.api.SupportFinding;
-import com.autarkos.system.api.SupportLogLine;
-import com.autarkos.system.api.SupportRedactionRule;
-import com.autarkos.system.api.SupportSummary;
-import com.autarkos.system.api.SystemSetupStatus;
 
 @Service
 public class SystemSupportService {
@@ -97,9 +89,9 @@ public class SystemSupportService {
         this.commandRunner = commandRunner;
     }
 
-    public SupportSummary summary() {
+    public SupportModels.SupportSummary summary() {
         SupportContext context = supportContext(30);
-        return new SupportSummary(
+        return new SupportModels.SupportSummary(
                 context.setup().status(),
                 supportHeadline(context.setup(), context.failures().size(), context.findings().size()),
                 supportSummary(context.setup(), context.failures().size(), context.findings().size()),
@@ -128,7 +120,7 @@ public class SystemSupportService {
         }
     }
 
-    public List<SupportLogLine> logs(int limit) {
+    public List<SupportModels.SupportLogLine> logs(int limit) {
         int safeLimit = Math.max(25, Math.min(limit <= 0 ? DEFAULT_LOG_LIMIT : limit, MAX_LOG_LIMIT));
         CommandResult journal = commandRunner.apply(List.of("journalctl", "-u", "autark-os.service", "-n", String.valueOf(safeLimit), "--no-pager"));
         if (journal.successful() && !journal.output().isBlank()) {
@@ -141,16 +133,16 @@ public class SystemSupportService {
                 .toList();
     }
 
-    public SupportBundle bundle() {
+    public SupportModels.SupportBundle bundle() {
         SupportContext context = supportContext(30);
         SystemMetrics metrics = metricsService.metrics();
         List<ActivityLog> recentActivity = redactedActivity(activityLogService.recent(80));
         List<ActivityLog> recentFailures = redactedActivity(context.failures());
-        List<SupportLogLine> logs = logs(120);
+        List<SupportModels.SupportLogLine> logs = logs(120);
         String headline = supportHeadline(context.setup(), context.failures().size(), context.findings().size());
         String summary = supportSummary(context.setup(), context.failures().size(), context.findings().size());
         String bundleText = bundleText(context, headline, summary, metrics, recentActivity, recentFailures, logs);
-        return new SupportBundle(
+        return new SupportModels.SupportBundle(
                 context.setup().status(),
                 headline,
                 summary,
@@ -175,13 +167,13 @@ public class SystemSupportService {
     }
 
     private SupportContext supportContext(int failureLimit) {
-        SystemSetupStatus setup = setupService.status();
+        SystemSetupModels.SystemSetupStatus setup = setupService.status();
         ProjectVersionInfo version = versionInfo();
         List<ActivityLog> failures = recentFailures(failureLimit);
-        List<SupportDomainSummary> domainSummaries = domainSummaries();
-        List<SupportFinding> findings = findings(setup, failures, domainSummaries);
-        List<SupportRedactionRule> redactionRules = redactionRules();
-        List<SupportCommand> commands = safeCommands(setup);
+        List<SupportModels.SupportDomainSummary> domainSummaries = domainSummaries();
+        List<SupportModels.SupportFinding> findings = findings(setup, failures, domainSummaries);
+        List<SupportModels.SupportRedactionRule> redactionRules = redactionRules();
+        List<SupportModels.SupportCommand> commands = safeCommands(setup);
         return new SupportContext(
                 setup,
                 version,
@@ -197,8 +189,8 @@ public class SystemSupportService {
                 Instant.now());
     }
 
-    private List<SupportDomainSummary> domainSummaries() {
-        List<SupportDomainSummary> summaries = new ArrayList<>();
+    private List<SupportModels.SupportDomainSummary> domainSummaries() {
+        List<SupportModels.SupportDomainSummary> summaries = new ArrayList<>();
         summaries.add(applicationsSummary());
         summaries.add(privateAccessSummary());
         summaries.add(storageSummary());
@@ -206,13 +198,13 @@ public class SystemSupportService {
         return summaries;
     }
 
-    private SupportDomainSummary applicationsSummary() {
+    private SupportModels.SupportDomainSummary applicationsSummary() {
         if (appLifecycleService == null) {
             return unavailableSummary("applications", "Applications");
         }
         try {
             AppReliabilitySummary reliability = appLifecycleService.reliabilitySummary();
-            return new SupportDomainSummary(
+            return new SupportModels.SupportDomainSummary(
                     "applications",
                     "Applications",
                     reliability.posture(),
@@ -224,13 +216,13 @@ public class SystemSupportService {
         }
     }
 
-    private SupportDomainSummary privateAccessSummary() {
+    private SupportModels.SupportDomainSummary privateAccessSummary() {
         if (privateAccessReconciliationService == null) {
             return unavailableSummary("private-access", "Private access");
         }
         try {
             PrivateAccessReconciliationReport report = privateAccessReconciliationService.report();
-            return new SupportDomainSummary(
+            return new SupportModels.SupportDomainSummary(
                     "private-access",
                     "Private access",
                     report.status(),
@@ -241,13 +233,13 @@ public class SystemSupportService {
         }
     }
 
-    private SupportDomainSummary storageSummary() {
+    private SupportModels.SupportDomainSummary storageSummary() {
         if (storageService == null) {
             return unavailableSummary("storage", "Storage");
         }
         try {
-            StorageReport report = storageService.report();
-            return new SupportDomainSummary(
+            StorageModels.StorageReport report = storageService.report();
+            return new SupportModels.SupportDomainSummary(
                     "storage",
                     "Storage",
                     report.status(),
@@ -258,13 +250,13 @@ public class SystemSupportService {
         }
     }
 
-    private SupportDomainSummary backupSummary() {
+    private SupportModels.SupportDomainSummary backupSummary() {
         if (backupService == null) {
             return unavailableSummary("backups", "Backups");
         }
         try {
-            BackupReport report = backupService.report();
-            return new SupportDomainSummary(
+            BackupModels.BackupReport report = backupService.report();
+            return new SupportModels.SupportDomainSummary(
                     "backups",
                     "Backups",
                     report.status(),
@@ -276,11 +268,11 @@ public class SystemSupportService {
         }
     }
 
-    private List<SupportFinding> findings(SystemSetupStatus setup, List<ActivityLog> failures, List<SupportDomainSummary> domainSummaries) {
-        List<SupportFinding> findings = new ArrayList<>();
+    private List<SupportModels.SupportFinding> findings(SystemSetupModels.SystemSetupStatus setup, List<ActivityLog> failures, List<SupportModels.SupportDomainSummary> domainSummaries) {
+        List<SupportModels.SupportFinding> findings = new ArrayList<>();
         setup.checks().stream()
                 .filter(check -> !"ok".equalsIgnoreCase(check.status()) && !"neutral".equalsIgnoreCase(check.status()))
-                .forEach(check -> findings.add(new SupportFinding(
+                .forEach(check -> findings.add(new SupportModels.SupportFinding(
                         "setup-" + check.id(),
                         "Settings",
                         severity(check.status()),
@@ -289,11 +281,11 @@ public class SystemSupportService {
                         check.actionLabel() == null || check.actionLabel().isBlank() ? "Open Settings" : redact(check.actionLabel()),
                         routeForSetupCheck(check.id()))));
 
-        for (SupportDomainSummary summary : domainSummaries) {
+        for (SupportModels.SupportDomainSummary summary : domainSummaries) {
             if (healthyStatus(summary.status())) {
                 continue;
             }
-            findings.add(new SupportFinding(
+            findings.add(new SupportModels.SupportFinding(
                     "domain-" + summary.id(),
                     summary.label(),
                     severity(summary.status()),
@@ -304,7 +296,7 @@ public class SystemSupportService {
         }
 
         if (!failures.isEmpty()) {
-            findings.add(new SupportFinding(
+            findings.add(new SupportModels.SupportFinding(
                     "recent-failures",
                     "Monitoring",
                     "warning",
@@ -316,11 +308,11 @@ public class SystemSupportService {
         return findings;
     }
 
-    private List<SupportRedactionRule> redactionRules() {
+    private List<SupportModels.SupportRedactionRule> redactionRules() {
         return List.of(
-                new SupportRedactionRule("secrets", "Secrets and credentials", "Masks passwords, tokens, API keys, auth values, and credential fields in plain text or JSON-like logs."),
-                new SupportRedactionRule("tailnet-dns", "Tailnet hostnames", "Masks private ts.net hostnames and private URLs before support data is displayed or copied."),
-                new SupportRedactionRule("tailnet-ip", "Tailnet IP addresses", "Masks Tailscale 100.64.0.0/10 addresses that identify private devices."));
+                new SupportModels.SupportRedactionRule("secrets", "Secrets and credentials", "Masks passwords, tokens, API keys, auth values, and credential fields in plain text or JSON-like logs."),
+                new SupportModels.SupportRedactionRule("tailnet-dns", "Tailnet hostnames", "Masks private ts.net hostnames and private URLs before support data is displayed or copied."),
+                new SupportModels.SupportRedactionRule("tailnet-ip", "Tailnet IP addresses", "Masks Tailscale 100.64.0.0/10 addresses that identify private devices."));
     }
 
     private boolean healthyStatus(String status) {
@@ -361,12 +353,12 @@ public class SystemSupportService {
         };
     }
 
-    private SupportDomainSummary unavailableSummary(String id, String label) {
-        return new SupportDomainSummary(id, label, "unknown", label + " summary unavailable", "This support context was not available.");
+    private SupportModels.SupportDomainSummary unavailableSummary(String id, String label) {
+        return new SupportModels.SupportDomainSummary(id, label, "unknown", label + " summary unavailable", "This support context was not available.");
     }
 
-    private SupportDomainSummary failedSummary(String id, String label, RuntimeException exception) {
-        return new SupportDomainSummary(id, label, "unknown", label + " summary failed", redact(userMessage(exception)));
+    private SupportModels.SupportDomainSummary failedSummary(String id, String label, RuntimeException exception) {
+        return new SupportModels.SupportDomainSummary(id, label, "unknown", label + " summary failed", redact(userMessage(exception)));
     }
 
     private String userMessage(RuntimeException exception) {
@@ -376,33 +368,33 @@ public class SystemSupportService {
         return exception.getMessage();
     }
 
-    private List<SupportCommand> safeCommands(SystemSetupStatus setup) {
-        List<SupportCommand> commands = new ArrayList<>();
-        commands.add(new SupportCommand(
+    private List<SupportModels.SupportCommand> safeCommands(SystemSetupModels.SystemSetupStatus setup) {
+        List<SupportModels.SupportCommand> commands = new ArrayList<>();
+        commands.add(new SupportModels.SupportCommand(
                 "service-status",
                 "Check service status",
                 "Shows whether the production service is running.",
                 "sudo systemctl status autark-os.service --no-pager",
                 "local-terminal"));
-        commands.add(new SupportCommand(
+        commands.add(new SupportModels.SupportCommand(
                 "service-logs",
                 "View service logs",
                 "Shows recent Autark-OS backend logs.",
                 "sudo journalctl -u autark-os.service -n 120 --no-pager",
                 "local-terminal"));
-        commands.add(new SupportCommand(
+        commands.add(new SupportModels.SupportCommand(
                 "setup-check",
                 "Re-run setup check",
                 "Checks the host setup without changing app data.",
                 setup.installCommand() + " --check",
                 "local-terminal"));
-        commands.add(new SupportCommand(
+        commands.add(new SupportModels.SupportCommand(
                 "project-version",
                 "Show Autark-OS version",
                 "Prints version, build, install path, and runtime path.",
                 "autark-os version",
                 "local-terminal"));
-        commands.add(new SupportCommand(
+        commands.add(new SupportModels.SupportCommand(
                 "restart-service",
                 "Restart Autark-OS service",
                 "Restarts the production backend service.",
@@ -433,9 +425,9 @@ public class SystemSupportService {
                 .toList();
     }
 
-    private SupportLogLine logLine(String line) {
+    private SupportModels.SupportLogLine logLine(String line) {
         String redacted = redact(line);
-        return new SupportLogLine(redacted, logLevel(redacted), !redacted.equals(line));
+        return new SupportModels.SupportLogLine(redacted, logLevel(redacted), !redacted.equals(line));
     }
 
     private String logLevel(String line) {
@@ -461,7 +453,7 @@ public class SystemSupportService {
         return redacted;
     }
 
-    private String checkStatus(SystemSetupStatus setup, String id) {
+    private String checkStatus(SystemSetupModels.SystemSetupStatus setup, String id) {
         return setup.checks().stream()
                 .filter(check -> id.equals(check.id()))
                 .findFirst()
@@ -469,7 +461,7 @@ public class SystemSupportService {
                 .orElse("unknown");
     }
 
-    private String supportHeadline(SystemSetupStatus setup, int failures, int findings) {
+    private String supportHeadline(SystemSetupModels.SystemSetupStatus setup, int failures, int findings) {
         if (findings > 0) {
             return "Support data found items to review";
         }
@@ -482,7 +474,7 @@ public class SystemSupportService {
         return "Support data has setup items to review";
     }
 
-    private String supportSummary(SystemSetupStatus setup, int failures, int findings) {
+    private String supportSummary(SystemSetupModels.SystemSetupStatus setup, int failures, int findings) {
         if (findings > 0) {
             return findings + " support finding" + (findings == 1 ? "" : "s") + " can be opened from this page.";
         }
@@ -499,7 +491,7 @@ public class SystemSupportService {
         return new ProjectVersionInfo("unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unavailable", "Version service is unavailable in this context.", Instant.now());
     }
 
-    private String bundleText(SupportContext context, String headline, String summary, SystemMetrics metrics, List<ActivityLog> recentActivity, List<ActivityLog> recentFailures, List<SupportLogLine> logs) {
+    private String bundleText(SupportContext context, String headline, String summary, SystemMetrics metrics, List<ActivityLog> recentActivity, List<ActivityLog> recentFailures, List<SupportModels.SupportLogLine> logs) {
         return """
                 Autark-OS Support Bundle
                 Generated: %s
@@ -576,10 +568,10 @@ public class SystemSupportService {
                 redactionRuleText(context.redactionRules()),
                 activityText(recentFailures),
                 activityText(recentActivity),
-                logs.stream().map(SupportLogLine::line).collect(Collectors.joining("\n")));
+                logs.stream().map(SupportModels.SupportLogLine::line).collect(Collectors.joining("\n")));
     }
 
-    private String domainSummaryText(List<SupportDomainSummary> summaries) {
+    private String domainSummaryText(List<SupportModels.SupportDomainSummary> summaries) {
         if (summaries.isEmpty()) {
             return "- none";
         }
@@ -597,7 +589,7 @@ public class SystemSupportService {
                 .collect(Collectors.joining("\n"));
     }
 
-    private String findingText(List<SupportFinding> findings) {
+    private String findingText(List<SupportModels.SupportFinding> findings) {
         if (findings.isEmpty()) {
             return "- none";
         }
@@ -606,7 +598,7 @@ public class SystemSupportService {
                 .collect(Collectors.joining("\n"));
     }
 
-    private String redactionRuleText(List<SupportRedactionRule> rules) {
+    private String redactionRuleText(List<SupportModels.SupportRedactionRule> rules) {
         return rules.stream()
                 .map(rule -> "- " + rule.label() + ": " + rule.description())
                 .collect(Collectors.joining("\n"));
@@ -628,13 +620,13 @@ public class SystemSupportService {
     }
 
     private record SupportContext(
-            SystemSetupStatus setup,
+            SystemSetupModels.SystemSetupStatus setup,
             ProjectVersionInfo version,
             List<ActivityLog> failures,
-            List<SupportDomainSummary> domainSummaries,
-            List<SupportFinding> findings,
-            List<SupportRedactionRule> redactionRules,
-            List<SupportCommand> commands,
+            List<SupportModels.SupportDomainSummary> domainSummaries,
+            List<SupportModels.SupportFinding> findings,
+            List<SupportModels.SupportRedactionRule> redactionRules,
+            List<SupportModels.SupportCommand> commands,
             String backendHealth,
             String dockerStatus,
             String tailscaleStatus,

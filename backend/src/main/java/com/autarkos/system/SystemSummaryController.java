@@ -13,7 +13,7 @@ public class SystemSummaryController {
     }
 
     @GetMapping("/api/system-summary")
-    public SystemSummary summary() {
+    public SystemSummaryModels.SystemSummary summary() {
         return systemSummaryProvider.summary();
     }
 }

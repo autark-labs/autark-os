@@ -2,7 +2,7 @@ package com.autarkos.apps;
 
 import java.util.List;
 
-import com.autarkos.discover.DiscoverInstalledAppSummary;
+import com.autarkos.discover.DiscoverInstallModels;
 import com.autarkos.host.ObservedServiceView;
 
 public record AppOwnershipView(
@@ -23,6 +23,6 @@ public record AppOwnershipView(
         String reviewExistingHref,
         AppOwnershipAction primaryAction,
         List<AppOwnershipAction> availableActions,
-        DiscoverInstalledAppSummary installedApp,
+        DiscoverInstallModels.DiscoverInstalledAppSummary installedApp,
         ObservedServiceView observedService) {
 }

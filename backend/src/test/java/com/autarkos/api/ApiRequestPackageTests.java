@@ -4,52 +4,41 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-import com.autarkos.backups.api.RestoreRequest;
+import com.autarkos.backups.RestoreModels;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.network.api.DeviceTrustUpdateRequest;
-import com.autarkos.system.api.OnboardingUpdateRequest;
-import com.autarkos.system.api.OnboardingState;
-import com.autarkos.system.api.SupportBundle;
-import com.autarkos.system.api.SupportCommand;
-import com.autarkos.system.api.SupportDomainSummary;
-import com.autarkos.system.api.SupportFinding;
-import com.autarkos.system.api.SupportLogLine;
-import com.autarkos.system.api.SupportRedactionRule;
-import com.autarkos.system.api.SupportSummary;
-import com.autarkos.system.api.SystemDoctorStatus;
-import com.autarkos.system.api.SystemReadinessGroup;
-import com.autarkos.system.api.SystemReadinessStatus;
-import com.autarkos.system.api.SystemSetupCheck;
-import com.autarkos.system.api.SystemSetupStatus;
+import com.autarkos.system.OnboardingModels;
+import com.autarkos.system.SupportModels;
+import com.autarkos.system.SystemSetupModels;
 
 class ApiRequestPackageTests {
 
     @Test
     void controllerRequestsLiveAtTheApiBoundary() {
-        assertThat(RestoreRequest.class.getPackageName()).isEqualTo("com.autarkos.backups.api");
+        assertThat(RestoreModels.RestoreRequest.class.getPackageName()).isEqualTo("com.autarkos.backups");
         assertThat(InstallOptionsRequest.class.getPackageName()).isEqualTo("com.autarkos.marketplace.api");
         assertThat(DeviceTrustUpdateRequest.class.getPackageName()).isEqualTo("com.autarkos.network.api");
-        assertThat(OnboardingUpdateRequest.class.getPackageName()).isEqualTo("com.autarkos.system.api");
+        assertThat(OnboardingModels.OnboardingUpdateRequest.class.getPackageName()).isEqualTo("com.autarkos.system");
     }
 
     @Test
     void systemSetupAndOnboardingResponsesLiveAtTheApiBoundary() {
-        assertThat(OnboardingState.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SystemDoctorStatus.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SystemReadinessGroup.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SystemReadinessStatus.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SystemSetupCheck.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SystemSetupStatus.class.getPackageName()).isEqualTo("com.autarkos.system.api");
+        assertThat(OnboardingModels.OnboardingState.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SystemSetupModels.SystemDoctorStatus.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SystemSetupModels.SystemReadinessGroup.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SystemSetupModels.SystemReadinessStatus.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SystemSetupModels.SystemSetupCheck.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SystemSetupModels.SystemSetupStatus.class.getPackageName()).isEqualTo("com.autarkos.system");
     }
 
     @Test
     void supportResponsesLiveAtTheApiBoundary() {
-        assertThat(SupportBundle.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SupportCommand.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SupportDomainSummary.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SupportFinding.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SupportLogLine.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SupportRedactionRule.class.getPackageName()).isEqualTo("com.autarkos.system.api");
-        assertThat(SupportSummary.class.getPackageName()).isEqualTo("com.autarkos.system.api");
+        assertThat(SupportModels.SupportBundle.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SupportModels.SupportCommand.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SupportModels.SupportDomainSummary.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SupportModels.SupportFinding.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SupportModels.SupportLogLine.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SupportModels.SupportRedactionRule.class.getPackageName()).isEqualTo("com.autarkos.system");
+        assertThat(SupportModels.SupportSummary.class.getPackageName()).isEqualTo("com.autarkos.system");
     }
 }

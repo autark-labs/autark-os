@@ -29,16 +29,16 @@ class RestoreSimulationService {
         this.backupRoot = backupRoot;
     }
 
-    RestoreSimulationResult simulateRestore(RestorePoint point, List<InstalledApp> affected) {
+    RestoreModels.RestoreSimulationResult simulateRestore(RestorePoint point, List<InstalledApp> affected) {
         if (!AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())) {
-            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Only completed restore points can be simulated.", List.of("Backup status is " + point.status() + "."), Instant.now());
+            return new RestoreModels.RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Only completed restore points can be simulated.", List.of("Backup status is " + point.status() + "."), Instant.now());
         }
         if (affected.isEmpty()) {
-            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "No installed app matches this restore point.", List.of("Autark-OS could not find a current app for this restore point."), Instant.now());
+            return new RestoreModels.RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "No installed app matches this restore point.", List.of("Autark-OS could not find a current app for this restore point."), Instant.now());
         }
         Path zipPath = Path.of(point.path()).toAbsolutePath().normalize();
         if (!Files.isRegularFile(zipPath)) {
-            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Backup file is missing, so Autark-OS cannot simulate restore.", List.of(zipPath.toString()), Instant.now());
+            return new RestoreModels.RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Backup file is missing, so Autark-OS cannot simulate restore.", List.of(zipPath.toString()), Instant.now());
         }
 
         List<String> details = new java.util.ArrayList<>();
@@ -48,7 +48,7 @@ class RestoreSimulationService {
         try {
             Files.createDirectories(simulationRoot);
             for (InstalledApp app : affected) {
-                BackupContract contract = backupContractService.backupContract(app);
+                BackupModels.BackupContract contract = backupContractService.backupContract(app);
                 if (contract.reviewRequired()) {
                     reviewRequired = true;
                     details.add(app.appName() + ": simulation skipped for " + contract.label().toLowerCase() + ". " + contract.summary());
@@ -75,12 +75,12 @@ class RestoreSimulationService {
         }
 
         if (failed) {
-            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Autark-OS could not prove this restore point can be safely extracted.", details, Instant.now());
+            return new RestoreModels.RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Autark-OS could not prove this restore point can be safely extracted.", details, Instant.now());
         }
         if (reviewRequired) {
-            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.WARNING, "File restore simulation passed where supported, but at least one app needs a stronger backup contract.", details, Instant.now());
+            return new RestoreModels.RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.WARNING, "File restore simulation passed where supported, but at least one app needs a stronger backup contract.", details, Instant.now());
         }
-        return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.PASSED, "Autark-OS simulated this restore into a temporary folder and found restorable files.", details, Instant.now());
+        return new RestoreModels.RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.PASSED, "Autark-OS simulated this restore into a temporary folder and found restorable files.", details, Instant.now());
     }
 
     private SimulationStats extractAppForSimulation(RestorePoint point, InstalledApp app, Path destination) throws IOException {

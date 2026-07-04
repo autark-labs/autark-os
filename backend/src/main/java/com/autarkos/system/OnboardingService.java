@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.network.tailscale.TailscaleService;
-import com.autarkos.system.api.OnboardingState;
-import com.autarkos.system.api.OnboardingUpdateRequest;
 
 @Service
 public class OnboardingService {
@@ -36,12 +34,12 @@ public class OnboardingService {
         this.doctorService = doctorService;
     }
 
-    public OnboardingState state() {
+    public OnboardingModels.OnboardingState state() {
         boolean existingSettings = settingsRepository.hasAnySettings();
         Map<String, String> values = settingsRepository.readAll();
         ProjectSettings settings = settingsService.current();
         String defaultStatus = existingSettings ? "complete" : "not_started";
-        return new OnboardingState(
+        return new OnboardingModels.OnboardingState(
                 value(values, "onboardingStatus", defaultStatus),
                 intValue(values, "onboardingCurrentStep", 0),
                 settings.deviceName(),
@@ -56,7 +54,7 @@ public class OnboardingService {
                 instantValue(values, "onboardingUpdatedAt"));
     }
 
-    public OnboardingState update(OnboardingUpdateRequest request) {
+    public OnboardingModels.OnboardingState update(OnboardingModels.OnboardingUpdateRequest request) {
         Map<String, String> updates = new LinkedHashMap<>();
         if (request.status() != null && !request.status().isBlank()) {
             updates.put("onboardingStatus", cleanStatus(request.status()));
@@ -104,8 +102,8 @@ public class OnboardingService {
         return state();
     }
 
-    public OnboardingState complete() {
-        return update(new OnboardingUpdateRequest("complete", 6, null, null, null, null, null, List.of("device", "doctor", "tailscale", "storage", "backups", "apps")));
+    public OnboardingModels.OnboardingState complete() {
+        return update(new OnboardingModels.OnboardingUpdateRequest("complete", 6, null, null, null, null, null, List.of("device", "doctor", "tailscale", "storage", "backups", "apps")));
     }
 
     private String cleanStatus(String value) {

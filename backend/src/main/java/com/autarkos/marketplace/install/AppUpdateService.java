@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
-import com.autarkos.backups.BackupRunResult;
+import com.autarkos.backups.BackupModels;
 import com.autarkos.backups.BackupService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.model.ApplicationManifest;
@@ -121,7 +121,7 @@ public class AppUpdateService {
         activityLogService.info("applications", "update_planned", "Update planned for " + app.appName(), "Trusted target: " + plan.targetImage(), appId);
         repository.recordEvent(appId, "update_backup_started", "Creating a backup checkpoint before update.");
         activityLogService.info("applications", "update_backup_started", "Backup checkpoint started for " + app.appName(), "Autark-OS creates a restore point before updating.", appId);
-        BackupRunResult checkpoint = backupService.run(appId);
+        BackupModels.BackupRunResult checkpoint = backupService.run(appId);
         logs.add("Backup checkpoint: " + checkpoint.message());
         if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(checkpoint.status())) {
             repository.recordEvent(appId, "update_backup_completed", "Backup checkpoint completed before update.");
@@ -170,7 +170,7 @@ public class AppUpdateService {
         return new AppUpdateResult(app.appId(), app.appName(), "rolled_back", "Rollback command completed.", logs, appLifecycleService.getApp(appId), Instant.now());
     }
 
-    private void rollback(InstalledApp app, BackupRunResult checkpoint, Path previousCompose, Path compose, List<String> logs) {
+    private void rollback(InstalledApp app, BackupModels.BackupRunResult checkpoint, Path previousCompose, Path compose, List<String> logs) {
         try {
             repository.recordEvent(app.appId(), "rollback_started", "Autark-OS started rollback for " + app.appName() + ".");
             if (Files.isRegularFile(previousCompose)) {

@@ -97,27 +97,27 @@ public class DiscoverService {
                 .map(manifest -> appView(manifest, ownershipOrAvailable(manifest, ownershipByAppId.get(manifest.id()))));
     }
 
-    public DiscoverSetupSchema setupSchema(String appId) {
+    public DiscoverSetupModels.DiscoverSetupSchema setupSchema(String appId) {
         ApplicationManifest manifest = catalogService.findById(appId).orElseThrow(() -> new IllegalArgumentException("Unknown app: " + appId));
         return setupService.schema(manifest);
     }
 
-    public DiscoverInstallPreview installPreview(String appId, DiscoverSetupAnswersRequest request) {
+    public DiscoverInstallModels.DiscoverInstallPreview installPreview(String appId, DiscoverSetupModels.DiscoverSetupAnswersRequest request) {
         ApplicationManifest manifest = catalogService.findById(appId).orElseThrow(() -> new IllegalArgumentException("Unknown app: " + appId));
         return previewService.preview(manifest, request);
     }
 
-    public AutarkOsJob install(String appId, DiscoverInstallRequest request) {
+    public AutarkOsJob install(String appId, DiscoverInstallModels.DiscoverInstallRequest request) {
         if (marketplaceInstallService == null || jobService == null) {
             throw new IllegalStateException("Discover install jobs are not configured.");
         }
         ApplicationManifest manifest = catalogService.findById(appId).orElseThrow(() -> new IllegalArgumentException("Unknown app: " + appId));
-        DiscoverSetupAnswersRequest answersRequest = request == null ? new DiscoverSetupAnswersRequest(Map.of()) : request.answersRequest();
-        DiscoverInstallPreview preview = previewService.preview(manifest, answersRequest);
+        DiscoverSetupModels.DiscoverSetupAnswersRequest answersRequest = request == null ? new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of()) : request.answersRequest();
+        DiscoverInstallModels.DiscoverInstallPreview preview = previewService.preview(manifest, answersRequest);
         if (!preview.valid()) {
             throw new IllegalArgumentException(preview.blockingIssues().getFirst().message());
         }
-        DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, answersRequest);
+        DiscoverSetupModels.DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, answersRequest);
         setupService.persist(appId, manifest.id(), answers);
         AutarkOsJob job = jobService.startWithJob("install_app", appId, installJobSteps(manifest.name()), activeJob -> {
             List<AutarkOsJobStep> liveSteps = new ArrayList<>();
@@ -133,7 +133,7 @@ public class DiscoverService {
         return job;
     }
 
-    private InstallOptionsRequest installOptions(InstallOptionsRequest options, DiscoverInstallRequest request) {
+    private InstallOptionsRequest installOptions(InstallOptionsRequest options, DiscoverInstallModels.DiscoverInstallRequest request) {
         return new InstallOptionsRequest(
                 options.ports(),
                 options.access(),

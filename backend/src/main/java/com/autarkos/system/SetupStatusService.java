@@ -25,18 +25,18 @@ public class SetupStatusService {
         this.observedServices = observedServices;
     }
 
-    public SetupStatus status() {
-        SetupProgress progress = progressService.status();
+    public SetupProgressModels.SetupStatus status() {
+        SetupProgressModels.SetupProgress progress = progressService.status();
         if (progress.setupComplete()) {
-            return new SetupStatus(true, "done", "Setup is complete.");
+            return new SetupProgressModels.SetupStatus(true, "done", "Setup is complete.");
         }
         boolean hasFoundResources = observedServices.get().stream()
                 .filter(service -> !"ignored".equals(service.userVisibility()))
                 .anyMatch(service -> !"owned_managed".equals(service.ownershipState()));
         if (hasFoundResources) {
-            return new SetupStatus(false, "existing_apps", "Autark-OS found existing apps on this server.");
+            return new SetupProgressModels.SetupStatus(false, "existing_apps", "Autark-OS found existing apps on this server.");
         }
-        return new SetupStatus(false, mapStep(progress.lastRecommendedStep()), message(progress.lastRecommendedStep()));
+        return new SetupProgressModels.SetupStatus(false, mapStep(progress.lastRecommendedStep()), message(progress.lastRecommendedStep()));
     }
 
     private String mapStep(String progressStep) {

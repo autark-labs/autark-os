@@ -18,7 +18,7 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
     }
 
     @Override
-    public List<HostDockerContainer> findContainers() {
+    public List<HostModels.HostDockerContainer> findContainers() {
         SystemCommandRunner.CommandExecutionResult result = commandRunner.run(
                 "docker",
                 "ps",
@@ -34,9 +34,9 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
                 .toList();
     }
 
-    private HostDockerContainer container(String line) {
+    private HostModels.HostDockerContainer container(String line) {
         String[] fields = line.split("\t", -1);
-        return new HostDockerContainer(
+        return new HostModels.HostDockerContainer(
                 field(fields, 0),
                 field(fields, 1),
                 field(fields, 2),

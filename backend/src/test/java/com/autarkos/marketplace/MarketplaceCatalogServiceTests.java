@@ -7,8 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import com.autarkos.discover.DiscoverController;
-import com.autarkos.discover.DiscoverInstallPreview;
-import com.autarkos.discover.DiscoverSetupAnswersRequest;
+import com.autarkos.discover.DiscoverInstallModels;
+import com.autarkos.discover.DiscoverSetupModels;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.plan.InstallPlan;
@@ -62,7 +62,7 @@ class MarketplaceCatalogServiceTests {
     @Test
     void exposesCatalogAndInstallPreviewThroughDiscoverController() {
         assertThat(discoverController.apps()).hasSize(26);
-        DiscoverInstallPreview preview = discoverController.installPreview("vaultwarden", new DiscoverSetupAnswersRequest(java.util.Map.of()));
+        DiscoverInstallModels.DiscoverInstallPreview preview = discoverController.installPreview("vaultwarden", new DiscoverSetupModels.DiscoverSetupAnswersRequest(java.util.Map.of()));
 
         assertThat(preview.technicalDetails())
                 .extracting(InstallPlan::appId)

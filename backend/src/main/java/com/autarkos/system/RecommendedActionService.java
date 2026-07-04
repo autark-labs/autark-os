@@ -15,22 +15,22 @@ import com.autarkos.api.AutarkOsIssue;
 @Service
 public class RecommendedActionService implements RecommendedActionProvider {
 
-    private final Supplier<SystemSummary> systemSummary;
+    private final Supplier<SystemSummaryModels.SystemSummary> systemSummary;
     private final RecommendedActionDismissals dismissals;
 
     @Autowired
     public RecommendedActionService(SystemSummaryProvider systemSummaryProvider, RecommendedActionDismissals dismissals) {
-        this((Supplier<SystemSummary>) systemSummaryProvider::summary, dismissals);
+        this((Supplier<SystemSummaryModels.SystemSummary>) systemSummaryProvider::summary, dismissals);
     }
 
-    public RecommendedActionService(Supplier<SystemSummary> systemSummary, RecommendedActionDismissals dismissals) {
+    public RecommendedActionService(Supplier<SystemSummaryModels.SystemSummary> systemSummary, RecommendedActionDismissals dismissals) {
         this.systemSummary = systemSummary;
         this.dismissals = dismissals;
     }
 
     @Override
     public RecommendedAction current() {
-        SystemSummary summary = systemSummary.get();
+        SystemSummaryModels.SystemSummary summary = systemSummary.get();
         if (!summary.setup().complete()) {
             return new RecommendedAction(
                     "complete-setup",

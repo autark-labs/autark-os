@@ -4,10 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-import com.autarkos.system.api.OnboardingUpdateRequest;
-import com.autarkos.system.api.OnboardingState;
-import com.autarkos.system.api.SystemDoctorStatus;
-import com.autarkos.system.api.SystemReadinessStatus;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,7 +35,7 @@ class OnboardingServiceTests {
         OnboardingService service = service();
         Path destination = externalRoot.resolve("autark-os-backups");
 
-        OnboardingState state = service.update(new OnboardingUpdateRequest("in_progress", 3, null, destination.toString(), true, null, null, null));
+        OnboardingModels.OnboardingState state = service.update(new OnboardingModels.OnboardingUpdateRequest("in_progress", 3, null, destination.toString(), true, null, null, null));
 
         assertThat(state.backupDestination()).isEqualTo(destination.toAbsolutePath().normalize().toString());
         assertThat(Files.isDirectory(destination)).isTrue();
@@ -51,7 +47,7 @@ class OnboardingServiceTests {
         OnboardingService service = service();
         Path destination = externalRoot.resolve("missing-parent/autark-os-backups");
 
-        assertThatThrownBy(() -> service.update(new OnboardingUpdateRequest("in_progress", 3, null, destination.toString(), true, null, null, null)))
+        assertThatThrownBy(() -> service.update(new OnboardingModels.OnboardingUpdateRequest("in_progress", 3, null, destination.toString(), true, null, null, null)))
                 .isInstanceOf(InstallationException.class)
                 .hasMessageContaining("parent folder");
     }
@@ -60,7 +56,7 @@ class OnboardingServiceTests {
     void storesPrivateAccessChoiceForFirstBootSetup() {
         OnboardingService service = service();
 
-        OnboardingState state = service.update(new OnboardingUpdateRequest("in_progress", 2, null, null, null, "local-only", null, null));
+        OnboardingModels.OnboardingState state = service.update(new OnboardingModels.OnboardingUpdateRequest("in_progress", 2, null, null, null, "local-only", null, null));
 
         assertThat(state.privateAccessChoice()).isEqualTo("local-only");
     }
@@ -91,12 +87,12 @@ class OnboardingServiceTests {
         }
 
         @Override
-        public SystemDoctorStatus status() {
-            return new SystemDoctorStatus(
+        public SystemSetupModels.SystemDoctorStatus status() {
+            return new SystemSetupModels.SystemDoctorStatus(
                     "ready",
                     "This device is ready",
                     "Autark-OS can manage apps, backups, and private access.",
-                    new SystemReadinessStatus("ready", "Ready", "Autark-OS is ready.", true, false, List.of()),
+                    new SystemSetupModels.SystemReadinessStatus("ready", "Ready", "Autark-OS is ready.", true, false, List.of()),
                     List.of(),
                     List.of(),
                     "Linux",

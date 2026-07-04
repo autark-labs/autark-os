@@ -45,12 +45,12 @@ public class SetupProgressService {
         this.clock = clock;
     }
 
-    public SetupProgress status() {
+    public SetupProgressModels.SetupProgress status() {
         Map<String, String> values = repository.readAll();
         List<String> completed = listValue(values.get(COMPLETED_KEY));
         List<String> skipped = listValue(values.get(SKIPPED_KEY));
         boolean setupComplete = completed.contains("done");
-        return new SetupProgress(
+        return new SetupProgressModels.SetupProgress(
                 SETUP_VERSION,
                 completed,
                 skipped,
@@ -59,18 +59,18 @@ public class SetupProgressService {
                 instantValue(values.get(UPDATED_KEY)));
     }
 
-    public SetupProgress completeStep(String step) {
+    public SetupProgressModels.SetupProgress completeStep(String step) {
         String normalized = cleanStep(step);
-        SetupProgress current = status();
+        SetupProgressModels.SetupProgress current = status();
         List<String> completed = append(current.completedSteps(), normalized);
         List<String> skipped = without(current.skippedSteps(), normalized);
         save(completed, skipped);
         return status();
     }
 
-    public SetupProgress skipStep(String step) {
+    public SetupProgressModels.SetupProgress skipStep(String step) {
         String normalized = cleanStep(step);
-        SetupProgress current = status();
+        SetupProgressModels.SetupProgress current = status();
         List<String> skipped = append(current.skippedSteps(), normalized);
         List<String> completed = without(current.completedSteps(), normalized);
         save(completed, skipped);

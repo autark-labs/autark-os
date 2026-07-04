@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DiscoverSetupRepository extends JpaRepository<DiscoverSetupEntity, String> {
 
-    default void save(String appId, String catalogAppId, DiscoverSetupAnswers answers) {
+    default void save(String appId, String catalogAppId, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         Instant now = Instant.now();
         Instant createdAt = findById(appId)
                 .map(DiscoverSetupEntity::createdAt)
@@ -16,7 +16,7 @@ public interface DiscoverSetupRepository extends JpaRepository<DiscoverSetupEnti
         save(DiscoverSetupRecords.entity(appId, catalogAppId, answers, createdAt, now));
     }
 
-    default Optional<DiscoverSetupRecord> recordByAppId(String appId) {
+    default Optional<DiscoverSetupModels.DiscoverSetupRecord> recordByAppId(String appId) {
         return findById(appId).map(DiscoverSetupRecords::record);
     }
 }

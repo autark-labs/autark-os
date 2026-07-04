@@ -11,11 +11,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.runtime.RuntimeLayout;
-import com.autarkos.system.api.SystemDoctorStatus;
-import com.autarkos.system.api.SystemReadinessGroup;
-import com.autarkos.system.api.SystemReadinessStatus;
-import com.autarkos.system.api.SystemSetupCheck;
-import com.autarkos.system.api.SystemSetupStatus;
 
 @Service
 public class SystemDoctorService {
@@ -30,18 +25,18 @@ public class SystemDoctorService {
         this.runtimeLayout = runtimeLayout;
     }
 
-    public SystemDoctorStatus status() {
-        SystemSetupStatus setup = setupService.status();
-        List<SystemSetupCheck> checks = new ArrayList<>(setup.checks());
+    public SystemSetupModels.SystemDoctorStatus status() {
+        SystemSetupModels.SystemSetupStatus setup = setupService.status();
+        List<SystemSetupModels.SystemSetupCheck> checks = new ArrayList<>(setup.checks());
         checks.add(internetCheck());
         checks.add(backupDestinationCheck());
-        List<SystemSetupCheck> repairable = checks.stream()
+        List<SystemSetupModels.SystemSetupCheck> repairable = checks.stream()
                 .filter(check -> check.actionCommand() != null && !check.actionCommand().isBlank())
                 .toList();
         boolean supported = automatedDependencyInstallSupported();
-        SystemReadinessStatus readiness = readiness(checks);
+        SystemSetupModels.SystemReadinessStatus readiness = readiness(checks);
         String status = readiness.canCompleteOnboarding() && !readiness.finishAnywayRequiresAdvanced() ? "ready" : "needs_attention";
-        return new SystemDoctorStatus(
+        return new SystemSetupModels.SystemDoctorStatus(
                 status,
                 readiness.headline(),
                 readiness.summary(),
@@ -55,38 +50,38 @@ public class SystemDoctorService {
                 Instant.now());
     }
 
-    public SystemDoctorStatus repairSupported() {
+    public SystemSetupModels.SystemDoctorStatus repairSupported() {
         return status();
     }
 
-    private SystemSetupCheck internetCheck() {
+    private SystemSetupModels.SystemSetupCheck internetCheck() {
         try (Socket socket = new Socket()) {
             socket.connect(new InetSocketAddress("tailscale.com", 443), 1800);
-            return new SystemSetupCheck(SystemCapabilityCatalog.INTERNET, "Internet", SystemCapabilityCatalog.OK, "This device can reach the internet.", "DNS and outbound HTTPS checks passed.", null, null);
+            return new SystemSetupModels.SystemSetupCheck(SystemCapabilityCatalog.INTERNET, "Internet", SystemCapabilityCatalog.OK, "This device can reach the internet.", "DNS and outbound HTTPS checks passed.", null, null);
         } catch (Exception exception) {
-            return new SystemSetupCheck(SystemCapabilityCatalog.INTERNET, "Internet", SystemCapabilityCatalog.WARNING, "Internet access could not be confirmed.", exception.getMessage(), "Check network", null);
+            return new SystemSetupModels.SystemSetupCheck(SystemCapabilityCatalog.INTERNET, "Internet", SystemCapabilityCatalog.WARNING, "Internet access could not be confirmed.", exception.getMessage(), "Check network", null);
         }
     }
 
-    private SystemSetupCheck backupDestinationCheck() {
+    private SystemSetupModels.SystemSetupCheck backupDestinationCheck() {
         String defaultDestination = runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize().toString();
         String destination = settingsRepository.backupDestination(runtimeLayout.runtimeRoot().resolve("backups")).toString();
         boolean external = !destination.equals(defaultDestination);
         String message = external ? "Routine backups use your selected backup folder." : "Routine backups use the Autark-OS runtime drive.";
         String detail = external ? destination : "Same-device backups help with app mistakes, but they do not protect against drive failure.";
-        return new SystemSetupCheck(SystemCapabilityCatalog.BACKUP_DESTINATION, "Backup destination", SystemCapabilityCatalog.NEUTRAL, message, detail, "Open Backups", "/backups");
+        return new SystemSetupModels.SystemSetupCheck(SystemCapabilityCatalog.BACKUP_DESTINATION, "Backup destination", SystemCapabilityCatalog.NEUTRAL, message, detail, "Open Backups", "/backups");
     }
 
-    private SystemReadinessStatus readiness(List<SystemSetupCheck> checks) {
-        SystemReadinessGroup core = group("core", "Autark-OS", "Autark-OS can open and save settings.", checks, SystemCapabilityCatalog.CORE_CHECKS);
-        SystemReadinessGroup appInstalls = group("app-installs", "App installs", "Docker is ready for Marketplace apps.", checks, SystemCapabilityCatalog.APP_INSTALL_CHECKS);
-        SystemReadinessGroup privateAccess = group("private-access", "Private access", "Tailscale is ready for private app links.", checks, SystemCapabilityCatalog.PRIVATE_ACCESS_CHECKS);
-        SystemReadinessGroup storage = group("storage", "Storage", "Storage and backup locations are ready.", checks, SystemCapabilityCatalog.STORAGE_CHECKS);
-        SystemReadinessGroup warnings = group("warnings", "Other checks", "Network and service notes are ready.", checks, SystemCapabilityCatalog.WARNING_CHECKS);
-        List<SystemReadinessGroup> groups = List.of(core, appInstalls, privateAccess, storage, warnings);
+    private SystemSetupModels.SystemReadinessStatus readiness(List<SystemSetupModels.SystemSetupCheck> checks) {
+        SystemSetupModels.SystemReadinessGroup core = group("core", "Autark-OS", "Autark-OS can open and save settings.", checks, SystemCapabilityCatalog.CORE_CHECKS);
+        SystemSetupModels.SystemReadinessGroup appInstalls = group("app-installs", "App installs", "Docker is ready for Marketplace apps.", checks, SystemCapabilityCatalog.APP_INSTALL_CHECKS);
+        SystemSetupModels.SystemReadinessGroup privateAccess = group("private-access", "Private access", "Tailscale is ready for private app links.", checks, SystemCapabilityCatalog.PRIVATE_ACCESS_CHECKS);
+        SystemSetupModels.SystemReadinessGroup storage = group("storage", "Storage", "Storage and backup locations are ready.", checks, SystemCapabilityCatalog.STORAGE_CHECKS);
+        SystemSetupModels.SystemReadinessGroup warnings = group("warnings", "Other checks", "Network and service notes are ready.", checks, SystemCapabilityCatalog.WARNING_CHECKS);
+        List<SystemSetupModels.SystemReadinessGroup> groups = List.of(core, appInstalls, privateAccess, storage, warnings);
 
         if (SystemCapabilityCatalog.WARNING.equals(core.status())) {
-            return new SystemReadinessStatus(
+            return new SystemSetupModels.SystemReadinessStatus(
                     "storage_needs_review",
                     "Storage needs review",
                     "Autark-OS needs writable storage before setup can be completed.",
@@ -95,7 +90,7 @@ public class SystemDoctorService {
                     groups);
         }
         if (SystemCapabilityCatalog.WARNING.equals(storage.status())) {
-            return new SystemReadinessStatus(
+            return new SystemSetupModels.SystemReadinessStatus(
                     "storage_needs_review",
                     "Storage needs review",
                     "Review storage and backup warnings before relying on this device.",
@@ -104,7 +99,7 @@ public class SystemDoctorService {
                     groups);
         }
         if (SystemCapabilityCatalog.WARNING.equals(appInstalls.status())) {
-            return new SystemReadinessStatus(
+            return new SystemSetupModels.SystemReadinessStatus(
                     "apps_need_docker",
                     "Apps need Docker setup",
                     "Autark-OS can finish setup, but Marketplace app installs need Docker access first.",
@@ -113,7 +108,7 @@ public class SystemDoctorService {
                     groups);
         }
         if (SystemCapabilityCatalog.WARNING.equals(privateAccess.status())) {
-            return new SystemReadinessStatus(
+            return new SystemSetupModels.SystemReadinessStatus(
                     "private_access_needs_tailscale",
                     "Private access needs Tailscale setup",
                     "Local access can work now. Set up Tailscale when you want private app links.",
@@ -122,7 +117,7 @@ public class SystemDoctorService {
                     groups);
         }
         if (SystemCapabilityCatalog.WARNING.equals(warnings.status())) {
-            return new SystemReadinessStatus(
+            return new SystemSetupModels.SystemReadinessStatus(
                     "warnings_only",
                     "Ready with notes",
                     "Core setup is ready, with a few items to review later.",
@@ -130,7 +125,7 @@ public class SystemDoctorService {
                     true,
                     groups);
         }
-        return new SystemReadinessStatus(
+        return new SystemSetupModels.SystemReadinessStatus(
                 "ready",
                 "Ready",
                 "Autark-OS can manage apps, backups, and private access.",
@@ -139,8 +134,8 @@ public class SystemDoctorService {
                 groups);
     }
 
-    private SystemReadinessGroup group(String id, String label, String readyMessage, List<SystemSetupCheck> checks, List<String> checkIds) {
-        List<SystemSetupCheck> groupChecks = checks.stream()
+    private SystemSetupModels.SystemReadinessGroup group(String id, String label, String readyMessage, List<SystemSetupModels.SystemSetupCheck> checks, List<String> checkIds) {
+        List<SystemSetupModels.SystemSetupCheck> groupChecks = checks.stream()
                 .filter(check -> checkIds.contains(check.id()))
                 .toList();
         String status = groupChecks.stream().anyMatch(SystemCapabilityCatalog::warning)
@@ -149,9 +144,9 @@ public class SystemDoctorService {
         String message = groupChecks.stream()
                 .filter(SystemCapabilityCatalog::warning)
                 .findFirst()
-                .map(SystemSetupCheck::message)
+                .map(SystemSetupModels.SystemSetupCheck::message)
                 .orElse(readyMessage);
-        return new SystemReadinessGroup(id, label, status, message, groupChecks);
+        return new SystemSetupModels.SystemReadinessGroup(id, label, status, message, groupChecks);
     }
 
     private boolean automatedDependencyInstallSupported() {

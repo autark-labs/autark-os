@@ -11,7 +11,6 @@ import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
 import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.system.api.SystemSetupStatus;
 
 class SystemSummaryServiceTests {
 
@@ -35,7 +34,7 @@ class SystemSummaryServiceTests {
                 () -> "http://192.168.122.50:8082",
                 () -> Instant.parse("2026-06-20T13:00:00Z"));
 
-        SystemSummary summary = service.summary();
+        SystemSummaryModels.SystemSummary summary = service.summary();
 
         assertThat(summary.deviceName()).isEqualTo("autark-os-test");
         assertThat(summary.instanceId()).isEqualTo("pos_test");
@@ -63,7 +62,7 @@ class SystemSummaryServiceTests {
                 () -> "http://localhost:8082",
                 Instant::now);
 
-        SystemSummary summary = service.summary();
+        SystemSummaryModels.SystemSummary summary = service.summary();
 
         assertThat(summary.docker().ready()).isFalse();
         assertThat(summary.issues()).anySatisfy(issue -> {
@@ -79,11 +78,11 @@ class SystemSummaryServiceTests {
                 () -> ProjectSettings.defaults("autark-os-test"),
                 () -> new AutarkOsIdentity("pos_test", "autark-os-test", "/runtime", "sha256:test", Instant.parse("2026-06-20T12:00:00Z"), 1),
                 () -> setupStatus("ready", "Docker 29.6.0"),
-                () -> new SetupProgress(1, List.of("welcome"), List.of("tailscale_connect"), "host_check", false, Instant.parse("2026-06-20T12:00:00Z")),
+                () -> new SetupProgressModels.SetupProgress(1, List.of("welcome"), List.of("tailscale_connect"), "host_check", false, Instant.parse("2026-06-20T12:00:00Z")),
                 () -> "http://localhost:8082",
                 Instant::now);
 
-        SystemSummary summary = service.summary();
+        SystemSummaryModels.SystemSummary summary = service.summary();
 
         assertThat(summary.setup().complete()).isFalse();
         assertThat(summary.setup().status()).isEqualTo("in_progress");
@@ -110,8 +109,8 @@ class SystemSummaryServiceTests {
                 Instant.parse("2026-06-20T12:30:00Z"));
     }
 
-    private SystemSetupStatus setupStatus(String status, String dockerVersion) {
-        return new SystemSetupStatus(
+    private SystemSetupModels.SystemSetupStatus setupStatus(String status, String dockerVersion) {
+        return new SystemSetupModels.SystemSetupStatus(
                 status,
                 "Setup",
                 "Setup summary",
@@ -125,7 +124,7 @@ class SystemSummaryServiceTests {
                 "not installed",
                 "current-instance",
                 "homelab-box",
-                new com.autarkos.system.api.SystemSetupExistingInstallReport(false, true, "ok", "No existing Autark-OS install found", "No existing Autark-OS install found.", List.of(), List.of()),
+                new SystemSetupModels.SystemSetupExistingInstallReport(false, true, "ok", "No existing Autark-OS install found", "No existing Autark-OS install found.", List.of(), List.of()),
                 "install",
                 List.of(),
                 Instant.parse("2026-06-20T12:00:00Z"));

@@ -19,22 +19,22 @@ public class SetupProgressController {
     }
 
     @GetMapping("/progress")
-    public SetupProgress progress() {
+    public SetupProgressModels.SetupProgress progress() {
         return service.status();
     }
 
     @GetMapping("/status")
-    public SetupStatus status() {
+    public SetupProgressModels.SetupStatus status() {
         return statusService.status();
     }
 
     @PostMapping("/progress/complete")
-    public SetupProgress complete(@RequestBody SetupProgressUpdateRequest request) {
+    public SetupProgressModels.SetupProgress complete(@RequestBody SetupProgressModels.SetupProgressUpdateRequest request) {
         return service.completeStep(request.step());
     }
 
     @PostMapping("/progress/skip")
-    public SetupProgress skip(@RequestBody SetupProgressUpdateRequest request) {
+    public SetupProgressModels.SetupProgress skip(@RequestBody SetupProgressModels.SetupProgressUpdateRequest request) {
         return service.skipStep(request.step());
     }
 }

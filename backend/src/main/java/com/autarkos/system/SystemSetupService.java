@@ -21,11 +21,6 @@ import com.autarkos.host.ObservedServiceService;
 import com.autarkos.host.ObservedServiceView;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
-import com.autarkos.system.api.SystemSetupAction;
-import com.autarkos.system.api.SystemSetupCheck;
-import com.autarkos.system.api.SystemSetupExistingInstallReport;
-import com.autarkos.system.api.SystemSetupExistingInstallResource;
-import com.autarkos.system.api.SystemSetupStatus;
 
 @Service
 public class SystemSetupService {
@@ -76,11 +71,11 @@ public class SystemSetupService {
         this.observedServices = observedServices;
     }
 
-    public SystemSetupStatus status() {
-        List<SystemSetupCheck> checks = new ArrayList<>();
+    public SystemSetupModels.SystemSetupStatus status() {
+        List<SystemSetupModels.SystemSetupCheck> checks = new ArrayList<>();
         String runAsUser = System.getProperty("user.name", "unknown");
         AutarkOsIdentity identity = identitySupplier.get();
-        SystemSetupExistingInstallReport existingInstall = existingInstallReport(identity);
+        SystemSetupModels.SystemSetupExistingInstallReport existingInstall = existingInstallReport(identity);
         if (existingInstall.conflict()) {
             checks.add(warn("existing-install", "Existing Autark-OS install", existingInstall.headline(), existingInstall.summary(), "Recover existing apps", "/resolve-existing-apps"));
         } else if (!existingInstall.resources().isEmpty()) {
@@ -95,7 +90,7 @@ public class SystemSetupService {
         checks.add(systemdCheck());
 
         String overall = overall(checks);
-        return new SystemSetupStatus(
+        return new SystemSetupModels.SystemSetupStatus(
                 overall,
                 headline(overall),
                 summary(overall),
@@ -115,7 +110,7 @@ public class SystemSetupService {
                 Instant.now());
     }
 
-    private SystemSetupCheck serviceUserCheck(String runAsUser) {
+    private SystemSetupModels.SystemSetupCheck serviceUserCheck(String runAsUser) {
         if (devMode) {
             return neutral(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Dev mode is running as your local user.", "Current user: " + runAsUser, null, null);
         }
@@ -125,7 +120,7 @@ public class SystemSetupService {
         return warn(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Autark-OS is not running as the autarkos service user.", "Current user: " + runAsUser, "Run service setup", installCommand());
     }
 
-    private SystemSetupCheck runtimeCheck() {
+    private SystemSetupModels.SystemSetupCheck runtimeCheck() {
         Path runtimeRoot = runtimeLayout.runtimeRoot();
         try {
             Files.createDirectories(runtimeRoot);
@@ -138,7 +133,7 @@ public class SystemSetupService {
         }
     }
 
-    private SystemSetupCheck dockerCheck() {
+    private SystemSetupModels.SystemSetupCheck dockerCheck() {
         CommandResult docker = run("docker", "version", "--format", "{{.Server.Version}}");
         if (docker.exitCode() == 127) {
             return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is not installed.", "Marketplace app installs need Docker.", "Install Docker", null);
@@ -149,7 +144,7 @@ public class SystemSetupService {
         return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is installed but Autark-OS cannot access it.", firstLine(docker), "Run service setup", installCommand());
     }
 
-    private SystemSetupCheck fileOpsCheck() {
+    private SystemSetupModels.SystemSetupCheck fileOpsCheck() {
         String helper = fileOpsHelperCommand();
         CommandResult result = run("sudo", "-n", helper, "--help");
         if (result.successful()) {
@@ -164,7 +159,7 @@ public class SystemSetupService {
         return warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Autark-OS cannot run bounded file operations yet.", firstLine(result), "Run service setup", installCommand());
     }
 
-    private SystemSetupCheck tailscaleCheck() {
+    private SystemSetupModels.SystemSetupCheck tailscaleCheck() {
         TailscaleStatus status = tailscaleService.status();
         if (!status.installed()) {
             return warn(SystemCapabilityCatalog.TAILSCALE, "Tailscale", "Tailscale is not installed.", "Private HTTPS app links need Tailscale.", "Install Tailscale", "https://tailscale.com/download");
@@ -178,7 +173,7 @@ public class SystemSetupService {
         return ok(SystemCapabilityCatalog.TAILSCALE, "Tailscale", "Tailscale is connected.", status.dnsName(), null, null);
     }
 
-    private SystemSetupCheck tailscaleOperatorCheck(String runAsUser) {
+    private SystemSetupModels.SystemSetupCheck tailscaleOperatorCheck(String runAsUser) {
         if (devMode) {
             return ok(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Dev mode is using mock Tailscale Serve access.", "No real Tailscale Serve command will be run.", null, null);
         }
@@ -197,7 +192,7 @@ public class SystemSetupService {
         return warn(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Autark-OS cannot manage Tailscale Serve yet.", detail, "Grant Serve permission", command);
     }
 
-    private SystemSetupCheck systemdCheck() {
+    private SystemSetupModels.SystemSetupCheck systemdCheck() {
         if (devMode) {
             return neutral(SystemCapabilityCatalog.SYSTEMD, "System service", "Dev mode is using a local backend process.", "Production should still run through autark-os.service.", null, null);
         }
@@ -211,7 +206,7 @@ public class SystemSetupService {
         return warn(SystemCapabilityCatalog.SYSTEMD, "System service", "Autark-OS is not running as a system service.", firstLine(systemctl), "Run service setup", installCommand());
     }
 
-    private String overall(List<SystemSetupCheck> checks) {
+    private String overall(List<SystemSetupModels.SystemSetupCheck> checks) {
         if (checks.stream().anyMatch(SystemCapabilityCatalog::warning)) {
             return "needs_admin_setup";
         }
@@ -237,16 +232,16 @@ public class SystemSetupService {
         };
     }
 
-    private SystemSetupCheck ok(String id, String label, String message, String detail, String actionLabel, String actionCommand) {
-        return new SystemSetupCheck(id, label, SystemCapabilityCatalog.OK, message, detail, actionLabel, actionCommand);
+    private SystemSetupModels.SystemSetupCheck ok(String id, String label, String message, String detail, String actionLabel, String actionCommand) {
+        return new SystemSetupModels.SystemSetupCheck(id, label, SystemCapabilityCatalog.OK, message, detail, actionLabel, actionCommand);
     }
 
-    private SystemSetupCheck warn(String id, String label, String message, String detail, String actionLabel, String actionCommand) {
-        return new SystemSetupCheck(id, label, SystemCapabilityCatalog.WARNING, message, detail, actionLabel, actionCommand);
+    private SystemSetupModels.SystemSetupCheck warn(String id, String label, String message, String detail, String actionLabel, String actionCommand) {
+        return new SystemSetupModels.SystemSetupCheck(id, label, SystemCapabilityCatalog.WARNING, message, detail, actionLabel, actionCommand);
     }
 
-    private SystemSetupCheck neutral(String id, String label, String message, String detail, String actionLabel, String actionCommand) {
-        return new SystemSetupCheck(id, label, SystemCapabilityCatalog.NEUTRAL, message, detail, actionLabel, actionCommand);
+    private SystemSetupModels.SystemSetupCheck neutral(String id, String label, String message, String detail, String actionLabel, String actionCommand) {
+        return new SystemSetupModels.SystemSetupCheck(id, label, SystemCapabilityCatalog.NEUTRAL, message, detail, actionLabel, actionCommand);
     }
 
     private String installCommand() {
@@ -306,14 +301,14 @@ public class SystemSetupService {
         return helper == null || helper.isBlank() ? DEFAULT_FILEOPS_HELPER : helper;
     }
 
-    private SystemSetupExistingInstallReport existingInstallReport(AutarkOsIdentity identity) {
-        List<SystemSetupExistingInstallResource> resources = observedServices.get().stream()
+    private SystemSetupModels.SystemSetupExistingInstallReport existingInstallReport(AutarkOsIdentity identity) {
+        List<SystemSetupModels.SystemSetupExistingInstallResource> resources = observedServices.get().stream()
                 .filter(service -> !"ignored".equals(service.userVisibility()))
                 .filter(this::isExistingAutarkOsResource)
                 .map(service -> existingResource(service, identity))
                 .toList();
         if (resources.isEmpty()) {
-            return new SystemSetupExistingInstallReport(
+            return new SystemSetupModels.SystemSetupExistingInstallReport(
                     false,
                     devMode,
                     "ok",
@@ -323,16 +318,16 @@ public class SystemSetupService {
                     List.of());
         }
         if (devMode) {
-            return new SystemSetupExistingInstallReport(
+            return new SystemSetupModels.SystemSetupExistingInstallReport(
                     false,
                     true,
                     "info",
                     "Development instance detected",
                     "Autark-OS found other Autark-OS resources, but this development instance is isolated as " + identity.instanceSlug() + ".",
                     resources,
-                    List.of(new SystemSetupAction("review_existing_apps", "Review found apps", "/resolve-existing-apps", "secondary")));
+                    List.of(new SystemSetupModels.SystemSetupAction("review_existing_apps", "Review found apps", "/resolve-existing-apps", "secondary")));
         }
-        return new SystemSetupExistingInstallReport(
+        return new SystemSetupModels.SystemSetupExistingInstallReport(
                 true,
                 false,
                 "warning",
@@ -340,8 +335,8 @@ public class SystemSetupService {
                 "Review apps found on this server before creating another production Autark-OS instance.",
                 resources,
                 List.of(
-                        new SystemSetupAction("recover_existing_apps", "Recover existing apps", "/resolve-existing-apps", "primary"),
-                        new SystemSetupAction("abort", "Abort setup", "/", "secondary")));
+                        new SystemSetupModels.SystemSetupAction("recover_existing_apps", "Recover existing apps", "/resolve-existing-apps", "primary"),
+                        new SystemSetupModels.SystemSetupAction("abort", "Abort setup", "/", "secondary")));
     }
 
     private boolean isExistingAutarkOsResource(ObservedService service) {
@@ -350,14 +345,14 @@ public class SystemSetupService {
                 || "unknown_conflict".equals(service.ownershipState());
     }
 
-    private SystemSetupExistingInstallResource existingResource(ObservedService service, AutarkOsIdentity identity) {
+    private SystemSetupModels.SystemSetupExistingInstallResource existingResource(ObservedService service, AutarkOsIdentity identity) {
         ObservedServiceView view = ObservedServiceService.toView(service);
         String kind = "legacy_autark_os".equals(service.ownershipState()) ? "recoverable_app" : "autark_os_resource";
         String owner = service.autarkOsInstanceId();
         if (owner == null || owner.isBlank()) {
             owner = identity.instanceId();
         }
-        return new SystemSetupExistingInstallResource(
+        return new SystemSetupModels.SystemSetupExistingInstallResource(
                 view.id(),
                 view.displayName(),
                 kind,

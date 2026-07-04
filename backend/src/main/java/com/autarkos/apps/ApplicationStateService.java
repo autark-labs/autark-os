@@ -21,9 +21,9 @@ import org.springframework.stereotype.Service;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.api.AppOperationView;
 import com.autarkos.api.AutarkOsAction;
+import com.autarkos.host.HostModels;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
-import com.autarkos.host.ObservedServiceStatus;
 import com.autarkos.host.ObservedServiceView;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobService;
@@ -203,10 +203,10 @@ public class ApplicationStateService {
                 .map(ObservedServiceService::toView)
                 .toList();
         List<ObservedServiceView> pinned = observedViews.stream()
-                .filter(service -> ObservedServiceStatus.PINNED.equals(service.userStatus()))
+                .filter(service -> HostModels.ObservedServiceStatus.PINNED.equals(service.userStatus()))
                 .toList();
         List<ObservedServiceView> found = observedViews.stream()
-                .filter(service -> !service.managedByThisAutarkOs() && !ObservedServiceStatus.PINNED.equals(service.userStatus()))
+                .filter(service -> !service.managedByThisAutarkOs() && !HostModels.ObservedServiceStatus.PINNED.equals(service.userStatus()))
                 .toList();
         List<AppOwnershipView> ownership = appOwnershipService == null ? List.of() : appOwnershipService.apps(observed);
         Instant completedAt = clock.get();

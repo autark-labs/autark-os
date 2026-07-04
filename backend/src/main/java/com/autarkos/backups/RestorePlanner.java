@@ -33,7 +33,7 @@ class RestorePlanner {
         this.managedInstalledApps = managedInstalledApps;
     }
 
-    RestorePlan restorePlan(long restorePointId, String targetAppId) {
+    RestoreModels.RestorePlan restorePlan(long restorePointId, String targetAppId) {
         RestorePoint point = backupRepository.findById(restorePointId)
                 .map(RestorePoints::toDomain)
                 .orElseThrow(() -> new InstallationException("Restore point was not found."));
@@ -48,7 +48,7 @@ class RestorePlanner {
         }
         warnings.add("Current app data will be replaced. Autark-OS creates a safety backup before restoring.");
         for (InstalledApp app : affected) {
-            BackupContract contract = backupContractService.backupContract(app);
+            BackupModels.BackupContract contract = backupContractService.backupContract(app);
             dryRunDetails.add(app.appName() + ": " + contract.label() + ". " + contract.summary());
             if (contract.reviewRequired()) {
                 warnings.add(app.appName() + " uses " + contract.label().toLowerCase() + ". Autark-OS will restore managed files, but database/application consistency should be reviewed after restore.");
@@ -59,7 +59,7 @@ class RestorePlanner {
         } else if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
             warnings.add("This restore point has not been verified yet.");
         }
-        RestoreSimulationResult simulation = restoreSimulationService.simulateRestore(point, affected);
+        RestoreModels.RestoreSimulationResult simulation = restoreSimulationService.simulateRestore(point, affected);
         if (AutarkOsStates.RestoreSimulationStatus.FAILED.equals(simulation.status())) {
             warnings.add(simulation.message());
         } else if (AutarkOsStates.RestoreSimulationStatus.WARNING.equals(simulation.status())) {
@@ -72,7 +72,7 @@ class RestorePlanner {
                 "Start affected app services again",
                 "Record restore activity");
         String scope = "full".equals(point.scope()) && targetAppId == null ? "full" : "app";
-        return new RestorePlan(
+        return new RestoreModels.RestorePlan(
                 point.id(),
                 scope,
                 point.source(),

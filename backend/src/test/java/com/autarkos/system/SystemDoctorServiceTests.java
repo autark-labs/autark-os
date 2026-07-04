@@ -11,9 +11,6 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
-import com.autarkos.system.api.SystemDoctorStatus;
-import com.autarkos.system.api.SystemSetupCheck;
-import com.autarkos.system.api.SystemSetupStatus;
 
 class SystemDoctorServiceTests {
 
@@ -30,7 +27,7 @@ class SystemDoctorServiceTests {
                 neutral("tailscale-operator"),
                 ok("systemd")));
 
-        SystemDoctorStatus status = service.status();
+        SystemSetupModels.SystemDoctorStatus status = service.status();
 
         assertThat(status.readiness().status()).isEqualTo("apps_need_docker");
         assertThat(status.readiness().canCompleteOnboarding()).isTrue();
@@ -56,14 +53,14 @@ class SystemDoctorServiceTests {
                 ok("tailscale-operator"),
                 ok("systemd")));
 
-        SystemDoctorStatus status = service.status();
+        SystemSetupModels.SystemDoctorStatus status = service.status();
 
         assertThat(status.readiness().status()).isEqualTo("storage_needs_review");
         assertThat(status.readiness().canCompleteOnboarding()).isFalse();
         assertThat(status.readiness().finishAnywayRequiresAdvanced()).isFalse();
     }
 
-    private SystemDoctorService service(List<SystemSetupCheck> setupChecks) {
+    private SystemDoctorService service(List<SystemSetupModels.SystemSetupCheck> setupChecks) {
         RuntimeLayout runtimeLayout = runtimeLayout();
         ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);
         return new SystemDoctorService(new FakeSystemSetupService(setupChecks), repository, runtimeLayout);
@@ -75,16 +72,16 @@ class SystemDoctorServiceTests {
         return new RuntimeLayout(properties);
     }
 
-    private static SystemSetupCheck ok(String id) {
-        return new SystemSetupCheck(id, label(id), "ok", label(id) + " is ready.", "", null, null);
+    private static SystemSetupModels.SystemSetupCheck ok(String id) {
+        return new SystemSetupModels.SystemSetupCheck(id, label(id), "ok", label(id) + " is ready.", "", null, null);
     }
 
-    private static SystemSetupCheck warn(String id, String label, String message, String actionCommand) {
-        return new SystemSetupCheck(id, label, "warning", message, "", "Fix " + label, actionCommand);
+    private static SystemSetupModels.SystemSetupCheck warn(String id, String label, String message, String actionCommand) {
+        return new SystemSetupModels.SystemSetupCheck(id, label, "warning", message, "", "Fix " + label, actionCommand);
     }
 
-    private static SystemSetupCheck neutral(String id) {
-        return new SystemSetupCheck(id, label(id), "neutral", label(id) + " is waiting.", "", null, null);
+    private static SystemSetupModels.SystemSetupCheck neutral(String id) {
+        return new SystemSetupModels.SystemSetupCheck(id, label(id), "neutral", label(id) + " is waiting.", "", null, null);
     }
 
     private static String label(String id) {
@@ -96,16 +93,16 @@ class SystemDoctorServiceTests {
     }
 
     private static class FakeSystemSetupService extends SystemSetupService {
-        private final List<SystemSetupCheck> checks;
+        private final List<SystemSetupModels.SystemSetupCheck> checks;
 
-        private FakeSystemSetupService(List<SystemSetupCheck> checks) {
+        private FakeSystemSetupService(List<SystemSetupModels.SystemSetupCheck> checks) {
             super(null, null, command -> new CommandResult(0, ""));
             this.checks = checks;
         }
 
         @Override
-        public SystemSetupStatus status() {
-            return new SystemSetupStatus(
+        public SystemSetupModels.SystemSetupStatus status() {
+            return new SystemSetupModels.SystemSetupStatus(
                     "needs_admin_setup",
                     "Autark-OS needs host setup",
                     "Review setup.",
@@ -119,7 +116,7 @@ class SystemDoctorServiceTests {
                     "not installed",
                     "current-instance",
                     "homelab-box",
-                    new com.autarkos.system.api.SystemSetupExistingInstallReport(false, false, "ok", "No existing Autark-OS install found", "No existing Autark-OS install found.", java.util.List.of(), java.util.List.of()),
+                    new SystemSetupModels.SystemSetupExistingInstallReport(false, false, "ok", "No existing Autark-OS install found", "No existing Autark-OS install found.", java.util.List.of(), java.util.List.of()),
                     "sudo install-autark-os-service.sh",
                     checks,
                     java.time.Instant.now());

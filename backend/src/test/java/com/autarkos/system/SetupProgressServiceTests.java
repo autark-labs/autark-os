@@ -21,7 +21,7 @@ class SetupProgressServiceTests {
     void freshRuntimeStartsIncompleteAtWelcome() {
         SetupProgressService service = service();
 
-        SetupProgress progress = service.status();
+        SetupProgressModels.SetupProgress progress = service.status();
 
         assertThat(progress.setupVersion()).isEqualTo(1);
         assertThat(progress.completedSteps()).isEmpty();
@@ -50,7 +50,7 @@ class SetupProgressServiceTests {
         service.completeStep("docker_check");
         service.completeStep("access_choice");
 
-        SetupProgress progress = service.skipStep("tailscale_connect");
+        SetupProgressModels.SetupProgress progress = service.skipStep("tailscale_connect");
 
         assertThat(progress.skippedSteps()).contains("tailscale_connect");
         assertThat(progress.lastRecommendedStep()).isEqualTo("starter_apps");
@@ -61,7 +61,7 @@ class SetupProgressServiceTests {
     void completingDoneMarksSetupComplete() {
         SetupProgressService service = service();
 
-        SetupProgress progress = service.completeStep("done");
+        SetupProgressModels.SetupProgress progress = service.completeStep("done");
 
         assertThat(progress.completedSteps()).contains("done");
         assertThat(progress.lastRecommendedStep()).isEqualTo("done");

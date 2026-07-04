@@ -51,8 +51,8 @@ class RestoreExecutor {
         this.backupRoot = backupRoot;
     }
 
-    RestoreResult restore(long restorePointId, String targetAppId) {
-        RestorePlan plan = restorePlanner.restorePlan(restorePointId, targetAppId);
+    RestoreModels.RestoreResult restore(long restorePointId, String targetAppId) {
+        RestoreModels.RestorePlan plan = restorePlanner.restorePlan(restorePointId, targetAppId);
         if (!plan.executable()) {
             throw new InstallationException("This restore point cannot be restored. Review the restore plan for details.");
         }
@@ -71,13 +71,13 @@ class RestoreExecutor {
         if (!restartFailures.isEmpty()) {
             String message = restoreRestartWarningMessage(apps, restartFailures);
             activityLogService.warning("backup", "restore_restart_failed", "Restore needs attention", message, null);
-            return new RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.WARNING, message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
+            return new RestoreModels.RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.WARNING, message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
         }
         String message = plan.scope().equals("full")
                 ? "Full restore completed for " + apps.size() + " app(s)."
                 : "Restore completed for " + apps.getFirst().appName() + ".";
         activityLogService.success("backup", "restore_completed", message, String.join(", ", apps.stream().map(InstalledApp::appName).toList()), null);
-        return new RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.COMPLETED, message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
+        return new RestoreModels.RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.COMPLETED, message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
     }
 
     private RestoreAppResult restoreApp(RestorePoint point, InstalledApp app, List<String> logs) {

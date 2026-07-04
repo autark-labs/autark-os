@@ -78,21 +78,21 @@ class RecommendedActionServiceTests {
         assertThat(criticalService.current().id()).isEqualTo("critical-docker");
     }
 
-    private RecommendedActionService service(SystemSummary summary, RecommendedActionDismissals dismissals) {
-        return new RecommendedActionService((Supplier<SystemSummary>) () -> summary, dismissals);
+    private RecommendedActionService service(SystemSummaryModels.SystemSummary summary, RecommendedActionDismissals dismissals) {
+        return new RecommendedActionService((Supplier<SystemSummaryModels.SystemSummary>) () -> summary, dismissals);
     }
 
-    private SystemSummary summary(boolean setupComplete, List<AutarkOsIssue> issues) {
-        return new SystemSummary(
+    private SystemSummaryModels.SystemSummary summary(boolean setupComplete, List<AutarkOsIssue> issues) {
+        return new SystemSummaryModels.SystemSummary(
                 "Autark-OS",
                 "instance-1",
                 "http://localhost:8082",
-                new SetupProgressSummary(setupComplete, setupComplete ? "complete" : "in_progress", setupComplete ? "done" : "host_check", setupComplete ? "Setup is complete." : "Setup is incomplete."),
-                new DockerSummary(true, "Docker is ready."),
-                new AccessSummary("local_only", "Local access is ready."),
-                new AppsSummary(1, 1, 0, List.of()),
-                new BackupSummary("needs_restore_point", "A restore point is needed."),
-                new StorageSummary("ok", "Storage is available."),
+                new SetupProgressModels.SetupProgressSummary(setupComplete, setupComplete ? "complete" : "in_progress", setupComplete ? "done" : "host_check", setupComplete ? "Setup is complete." : "Setup is incomplete."),
+                new SystemSummaryModels.DockerSummary(true, "Docker is ready."),
+                new SystemSummaryModels.AccessSummary("local_only", "Local access is ready."),
+                new SystemSummaryModels.AppsSummary(1, 1, 0, List.of()),
+                new SystemSummaryModels.BackupSummary("needs_restore_point", "A restore point is needed."),
+                new SystemSummaryModels.StorageSummary("ok", "Storage is available."),
                 issues,
                 Instant.parse("2026-06-21T12:00:00Z"));
     }

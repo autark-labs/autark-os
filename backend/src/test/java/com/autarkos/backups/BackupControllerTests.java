@@ -14,7 +14,6 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.autarkos.backups.api.RestoreRequest;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobRepository;
@@ -35,7 +34,7 @@ class BackupControllerTests {
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         BackupController controller = new BackupController(backupService, jobService, applicationStateService);
-        BackupRunResult result = new BackupRunResult(
+        BackupModels.BackupRunResult result = new BackupModels.BackupRunResult(
                 "vaultwarden",
                 "Vaultwarden",
                 "completed",
@@ -68,7 +67,7 @@ class BackupControllerTests {
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         BackupController controller = new BackupController(backupService, jobService, applicationStateService);
-        BackupVerificationResult result = new BackupVerificationResult(
+        BackupModels.BackupVerificationResult result = new BackupModels.BackupVerificationResult(
                 42L,
                 "verified",
                 "Archive checksum matched.",
@@ -101,7 +100,7 @@ class BackupControllerTests {
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         BackupController controller = new BackupController(backupService, jobService, applicationStateService);
-        RestoreResult result = new RestoreResult(
+        RestoreModels.RestoreResult result = new RestoreModels.RestoreResult(
                 42L,
                 "completed",
                 "Restore completed for Vaultwarden.",
@@ -110,7 +109,7 @@ class BackupControllerTests {
                 Instant.parse("2026-06-21T12:00:00Z"));
         when(backupService.restore(42L, "vaultwarden")).thenReturn(result);
 
-        AutarkOsJob job = controller.restore(42L, new RestoreRequest("vaultwarden"));
+        AutarkOsJob job = controller.restore(42L, new RestoreModels.RestoreRequest("vaultwarden"));
 
         assertThat(job.type()).isEqualTo("backup_restore");
         assertThat(job.subjectId()).isEqualTo("42:vaultwarden");
@@ -136,7 +135,7 @@ class BackupControllerTests {
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         BackupController controller = new BackupController(backupService, jobService, applicationStateService);
-        RestoreResult result = new RestoreResult(
+        RestoreModels.RestoreResult result = new RestoreModels.RestoreResult(
                 42L,
                 "warning",
                 "Data was restored for Vaultwarden, but Autark-OS could not restart it.",
@@ -145,7 +144,7 @@ class BackupControllerTests {
                 Instant.parse("2026-06-21T12:00:00Z"));
         when(backupService.restore(42L, "vaultwarden")).thenReturn(result);
 
-        AutarkOsJob job = controller.restore(42L, new RestoreRequest("vaultwarden"));
+        AutarkOsJob job = controller.restore(42L, new RestoreModels.RestoreRequest("vaultwarden"));
 
         jobService.runQueuedJobsNow();
 

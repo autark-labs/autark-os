@@ -1,12 +1,5 @@
 package com.autarkos.system;
 
-import com.autarkos.system.api.OnboardingState;
-import com.autarkos.system.api.OnboardingUpdateRequest;
-import com.autarkos.system.api.SystemDoctorStatus;
-import com.autarkos.system.api.SystemSetupStatus;
-import com.autarkos.system.api.SupportBundle;
-import com.autarkos.system.api.SupportLogLine;
-import com.autarkos.system.api.SupportSummary;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,32 +42,32 @@ public class SystemController {
     }
 
     @GetMapping("/setup-status")
-    public SystemSetupStatus setupStatus() {
+    public SystemSetupModels.SystemSetupStatus setupStatus() {
         return setupService.status();
     }
 
     @GetMapping("/doctor")
-    public SystemDoctorStatus doctor() {
+    public SystemSetupModels.SystemDoctorStatus doctor() {
         return doctorService.status();
     }
 
     @PostMapping("/doctor/repair-supported")
-    public SystemDoctorStatus repairSupported() {
+    public SystemSetupModels.SystemDoctorStatus repairSupported() {
         return doctorService.repairSupported();
     }
 
     @GetMapping("/onboarding")
-    public OnboardingState onboarding() {
+    public OnboardingModels.OnboardingState onboarding() {
         return onboardingService.state();
     }
 
     @PutMapping("/onboarding")
-    public OnboardingState updateOnboarding(@RequestBody OnboardingUpdateRequest request) {
+    public OnboardingModels.OnboardingState updateOnboarding(@RequestBody OnboardingModels.OnboardingUpdateRequest request) {
         return onboardingService.update(request);
     }
 
     @PostMapping("/onboarding/complete")
-    public OnboardingState completeOnboarding() {
+    public OnboardingModels.OnboardingState completeOnboarding() {
         return onboardingService.complete();
     }
 
@@ -86,12 +79,12 @@ public class SystemController {
     }
 
     @GetMapping("/storage")
-    public StorageReport storage() {
+    public StorageModels.StorageReport storage() {
         return storageService.report();
     }
 
     @PostMapping("/storage/orphans/{name}/cleanup")
-    public StorageCleanupResult cleanupOrphan(@PathVariable String name) {
+    public StorageModels.StorageCleanupResult cleanupOrphan(@PathVariable String name) {
         return storageService.cleanupOrphan(name);
     }
 
@@ -118,17 +111,17 @@ public class SystemController {
     }
 
     @GetMapping("/support/summary")
-    public SupportSummary supportSummary() {
+    public SupportModels.SupportSummary supportSummary() {
         return supportService.summary();
     }
 
     @GetMapping("/support/logs")
-    public java.util.List<SupportLogLine> supportLogs(@RequestParam(required = false) Integer limit) {
+    public java.util.List<SupportModels.SupportLogLine> supportLogs(@RequestParam(required = false) Integer limit) {
         return supportService.logs(limit == null ? 120 : limit);
     }
 
     @GetMapping("/support/bundle")
-    public SupportBundle supportBundle() {
+    public SupportModels.SupportBundle supportBundle() {
         return supportService.bundle();
     }
 }

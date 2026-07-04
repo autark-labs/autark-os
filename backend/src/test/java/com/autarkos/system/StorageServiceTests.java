@@ -41,10 +41,10 @@ class StorageServiceTests {
                 () -> List.of(appInstance("homepage")),
                 new RuntimeFileOperations());
 
-        StorageReport report = service.report();
+        StorageModels.StorageReport report = service.report();
 
-        assertThat(report.apps()).extracting(AppStorageUsage::appId).containsExactly("homepage");
-        assertThat(report.orphanedData()).extracting(OrphanedStorage::name).contains("vaultwarden");
+        assertThat(report.apps()).extracting(StorageModels.AppStorageUsage::appId).containsExactly("homepage");
+        assertThat(report.orphanedData()).extracting(StorageModels.OrphanedStorage::name).contains("vaultwarden");
     }
 
     private StorageService storageService(RuntimeLayout layout) {

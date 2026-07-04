@@ -2,7 +2,6 @@ package com.autarkos.system;
 
 import java.util.List;
 
-import com.autarkos.system.api.SystemSetupCheck;
 
 public final class SystemCapabilityCatalog {
 
@@ -38,11 +37,11 @@ public final class SystemCapabilityCatalog {
         };
     }
 
-    public static boolean warning(SystemSetupCheck check) {
+    public static boolean warning(SystemSetupModels.SystemSetupCheck check) {
         return WARNING.equals(check.status());
     }
 
-    public static boolean neutral(SystemSetupCheck check) {
+    public static boolean neutral(SystemSetupModels.SystemSetupCheck check) {
         return NEUTRAL.equals(check.status());
     }
 }

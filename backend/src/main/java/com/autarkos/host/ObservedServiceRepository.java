@@ -78,14 +78,14 @@ public interface ObservedServiceRepository extends JpaRepository<ObservedService
     }
 
     default void deleteFailedInstall(String catalogAppId) {
-        deleteAll(findByCatalogAppIdAndSourceAndOwnershipState(catalogAppId, ObservedServiceSource.AUTARK_OS_INSTALL, "failed_install"));
+        deleteAll(findByCatalogAppIdAndSourceAndOwnershipState(catalogAppId, HostModels.ObservedServiceSource.AUTARK_OS_INSTALL, "failed_install"));
     }
 
     default void deleteUnpinnedDockerServicesNotIn(Collection<String> fingerprints) {
         if (fingerprints == null || fingerprints.isEmpty()) {
             return;
         }
-        List<ObservedServiceEntity> stale = findBySource(ObservedServiceSource.DOCKER).stream()
+        List<ObservedServiceEntity> stale = findBySource(HostModels.ObservedServiceSource.DOCKER).stream()
                 .filter(entity -> !"pinned".equals(entity.userVisibility()))
                 .filter(entity -> !fingerprints.contains(entity.fingerprint()))
                 .toList();

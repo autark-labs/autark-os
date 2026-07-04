@@ -9,13 +9,12 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.autarkos.host.HostModels;
 import com.autarkos.host.ObservedService;
-import com.autarkos.host.ObservedServiceSource;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
-import com.autarkos.system.api.SystemSetupStatus;
 
 class SystemSetupServiceTests {
 
@@ -38,7 +37,7 @@ class SystemSetupServiceTests {
                     return new SystemSetupService.CommandResult(0, "{}");
                 });
 
-        SystemSetupStatus status = service.status();
+        SystemSetupModels.SystemSetupStatus status = service.status();
 
         assertThat(status.status()).isEqualTo("needs_admin_setup");
         assertThat(status.checks())
@@ -71,7 +70,7 @@ class SystemSetupServiceTests {
                     return new SystemSetupService.CommandResult(0, "{}");
                 });
 
-        SystemSetupStatus status = service.status();
+        SystemSetupModels.SystemSetupStatus status = service.status();
 
         assertThat(status.checks())
                 .filteredOn(check -> check.id().equals("tailscale-operator"))
@@ -101,7 +100,7 @@ class SystemSetupServiceTests {
                     return new SystemSetupService.CommandResult(0, "{}");
                 });
 
-        SystemSetupStatus status = service.status();
+        SystemSetupModels.SystemSetupStatus status = service.status();
 
         assertThat(status.checks())
                 .filteredOn(check -> check.id().equals("fileops"))
@@ -122,7 +121,7 @@ class SystemSetupServiceTests {
                 command -> new SystemSetupService.CommandResult(1, "not available"),
                 true);
 
-        SystemSetupStatus status = service.status();
+        SystemSetupModels.SystemSetupStatus status = service.status();
 
         assertThat(status.checks())
                 .anySatisfy(check -> {
@@ -158,7 +157,7 @@ class SystemSetupServiceTests {
                 () -> new AutarkOsIdentity("current-instance", "homelab-box", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                 () -> List.of(observedService("legacy_autark_os", ""), observedService("foreign_autark_os", "other-instance")));
 
-        SystemSetupStatus status = service.status();
+        SystemSetupModels.SystemSetupStatus status = service.status();
 
         assertThat(status.existingInstall().conflict()).isTrue();
         assertThat(status.existingInstall().severity()).isEqualTo("warning");
@@ -183,7 +182,7 @@ class SystemSetupServiceTests {
                 () -> new AutarkOsIdentity("current-instance", "dev-box", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                 () -> List.of(observedService("foreign_autark_os", "other-instance")));
 
-        SystemSetupStatus status = service.status();
+        SystemSetupModels.SystemSetupStatus status = service.status();
 
         assertThat(status.instanceSlug()).isEqualTo("dev-box");
         assertThat(status.existingInstall().conflict()).isFalse();
@@ -201,7 +200,7 @@ class SystemSetupServiceTests {
     private ObservedService observedService(String ownershipState, String ownerInstanceId) {
         return new ObservedService(
                 "docker:" + ownershipState,
-                ObservedServiceSource.DOCKER,
+                HostModels.ObservedServiceSource.DOCKER,
                 "autark-os-" + ownershipState,
                 ownershipState,
                 "http://localhost:8080",

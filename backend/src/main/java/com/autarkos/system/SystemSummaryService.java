@@ -13,7 +13,6 @@ import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
 import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.system.api.SystemSetupStatus;
 
 @Service
 public class SystemSummaryService implements SystemSummaryProvider {
@@ -21,8 +20,8 @@ public class SystemSummaryService implements SystemSummaryProvider {
     private final Supplier<List<AppInstanceView>> appViews;
     private final Supplier<ProjectSettings> settings;
     private final Supplier<AutarkOsIdentity> identity;
-    private final Supplier<SystemSetupStatus> setupStatus;
-    private final Supplier<SetupProgress> setupProgress;
+    private final Supplier<SystemSetupModels.SystemSetupStatus> setupStatus;
+    private final Supplier<SetupProgressModels.SetupProgress> setupProgress;
     private final Supplier<String> lanUrl;
     private final Supplier<Instant> clock;
 
@@ -40,7 +39,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
             Supplier<List<AppInstanceView>> appViews,
             Supplier<ProjectSettings> settings,
             Supplier<AutarkOsIdentity> identity,
-            Supplier<SystemSetupStatus> setupStatus,
+            Supplier<SystemSetupModels.SystemSetupStatus> setupStatus,
             Supplier<String> lanUrl,
             Supplier<Instant> clock) {
         this(appViews, settings, identity, setupStatus, () -> null, lanUrl, clock);
@@ -50,8 +49,8 @@ public class SystemSummaryService implements SystemSummaryProvider {
             Supplier<List<AppInstanceView>> appViews,
             Supplier<ProjectSettings> settings,
             Supplier<AutarkOsIdentity> identity,
-            Supplier<SystemSetupStatus> setupStatus,
-            Supplier<SetupProgress> setupProgress,
+            Supplier<SystemSetupModels.SystemSetupStatus> setupStatus,
+            Supplier<SetupProgressModels.SetupProgress> setupProgress,
             Supplier<String> lanUrl,
             Supplier<Instant> clock) {
         this.appViews = appViews;
@@ -63,13 +62,13 @@ public class SystemSummaryService implements SystemSummaryProvider {
         this.clock = clock;
     }
 
-    public SystemSummary summary() {
+    public SystemSummaryModels.SystemSummary summary() {
         List<AppInstanceView> apps = appViews.get();
-        SystemSetupStatus setup = setupStatus.get();
+        SystemSetupModels.SystemSetupStatus setup = setupStatus.get();
         ProjectSettings currentSettings = settings.get();
         AutarkOsIdentity currentIdentity = identity.get();
         List<AutarkOsIssue> issues = issues(apps, setup);
-        return new SystemSummary(
+        return new SystemSummaryModels.SystemSummary(
                 currentSettings.deviceName(),
                 currentIdentity.instanceId(),
                 lanUrl.get(),
@@ -83,63 +82,63 @@ public class SystemSummaryService implements SystemSummaryProvider {
                 clock.get());
     }
 
-    private SetupProgressSummary setup(SystemSetupStatus setup, SetupProgress progress) {
+    private SetupProgressModels.SetupProgressSummary setup(SystemSetupModels.SystemSetupStatus setup, SetupProgressModels.SetupProgress progress) {
         if (progress != null) {
-            return new SetupProgressSummary(
+            return new SetupProgressModels.SetupProgressSummary(
                     progress.setupComplete(),
                     progress.setupComplete() ? "complete" : "in_progress",
                     progress.lastRecommendedStep(),
                     progress.setupComplete() ? "Setup is complete." : "Setup is in progress.");
         }
         boolean complete = "ready".equals(setup.status());
-        return new SetupProgressSummary(complete, setup.status(), complete ? "done" : "host_check", setup.summary());
+        return new SetupProgressModels.SetupProgressSummary(complete, setup.status(), complete ? "done" : "host_check", setup.summary());
     }
 
-    private DockerSummary docker(SystemSetupStatus setup) {
+    private SystemSummaryModels.DockerSummary docker(SystemSetupModels.SystemSetupStatus setup) {
         boolean ready = setup.dockerVersion() != null
                 && !setup.dockerVersion().isBlank()
                 && !"not installed".equalsIgnoreCase(setup.dockerVersion())
                 && !setup.dockerVersion().contains("not reachable");
-        return new DockerSummary(ready, ready ? "Docker is ready." : "Docker is not ready for app installs.");
+        return new SystemSummaryModels.DockerSummary(ready, ready ? "Docker is ready." : "Docker is not ready for app installs.");
     }
 
-    private AccessSummary access(List<AppInstanceView> apps) {
+    private SystemSummaryModels.AccessSummary access(List<AppInstanceView> apps) {
         boolean privateReady = apps.stream().anyMatch(app -> "private_ready".equals(app.accessState()));
         boolean localReady = apps.stream().anyMatch(app -> "local_ready".equals(app.accessState()));
         if (privateReady) {
-            return new AccessSummary("private_ready", "Private access is ready for at least one app.");
+            return new SystemSummaryModels.AccessSummary("private_ready", "Private access is ready for at least one app.");
         }
         if (localReady) {
-            return new AccessSummary("local_only", "Local access is ready.");
+            return new SystemSummaryModels.AccessSummary("local_only", "Local access is ready.");
         }
-        return new AccessSummary("not_ready", "No app access is ready yet.");
+        return new SystemSummaryModels.AccessSummary("not_ready", "No app access is ready yet.");
     }
 
-    private AppsSummary apps(List<AppInstanceView> apps) {
-        List<ReadyAppSummary> readyToOpen = apps.stream()
+    private SystemSummaryModels.AppsSummary apps(List<AppInstanceView> apps) {
+        List<SystemSummaryModels.ReadyAppSummary> readyToOpen = apps.stream()
                 .filter(app -> "Ready".equals(app.userStatus()))
                 .filter(app -> app.localUrl() != null && !app.localUrl().isBlank())
-                .map(app -> new ReadyAppSummary(app.appInstanceId(), app.name(), app.localUrl()))
+                .map(app -> new SystemSummaryModels.ReadyAppSummary(app.appInstanceId(), app.name(), app.localUrl()))
                 .toList();
-        return new AppsSummary(
+        return new SystemSummaryModels.AppsSummary(
                 apps.size(),
                 (int) apps.stream().filter(app -> AutarkOsStates.AppStatus.READY.equals(app.userStatus())).count(),
                 (int) apps.stream().filter(app -> List.of(AutarkOsStates.AppStatus.MISSING, AutarkOsStates.AppStatus.NEEDS_ATTENTION, "Managed elsewhere").contains(app.userStatus())).count(),
                 readyToOpen);
     }
 
-    private BackupSummary backups(List<AppInstanceView> apps) {
+    private SystemSummaryModels.BackupSummary backups(List<AppInstanceView> apps) {
         boolean needsFirstRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(app.backupState()));
         return needsFirstRestorePoint
-                ? new BackupSummary("needs_restore_point", "At least one app has backups enabled but no restore point yet.")
-                : new BackupSummary("not_configured", "No restore point is required yet.");
+                ? new SystemSummaryModels.BackupSummary("needs_restore_point", "At least one app has backups enabled but no restore point yet.")
+                : new SystemSummaryModels.BackupSummary("not_configured", "No restore point is required yet.");
     }
 
-    private StorageSummary storage() {
-        return new StorageSummary("unknown", "Storage details are available from the Storage page.");
+    private SystemSummaryModels.StorageSummary storage() {
+        return new SystemSummaryModels.StorageSummary("unknown", "Storage details are available from the Storage page.");
     }
 
-    private List<AutarkOsIssue> issues(List<AppInstanceView> apps, SystemSetupStatus setup) {
+    private List<AutarkOsIssue> issues(List<AppInstanceView> apps, SystemSetupModels.SystemSetupStatus setup) {
         java.util.ArrayList<AutarkOsIssue> issues = new java.util.ArrayList<>();
         if (!docker(setup).ready()) {
             issues.add(AutarkOsIssueFactory.systemIssue(

@@ -49,31 +49,31 @@ public class ObservedServiceController {
     }
 
     @PostMapping("/{id}/pin")
-    public ActionResult pin(@PathVariable String id) {
+    public HostModels.ActionResult pin(@PathVariable String id) {
         return refreshAfter(service.pin(id));
     }
 
     @PostMapping("/{id}/unpin")
-    public ActionResult unpin(@PathVariable String id) {
+    public HostModels.ActionResult unpin(@PathVariable String id) {
         return refreshAfter(service.unpin(id));
     }
 
     @PostMapping("/{id}/match")
-    public ActionResult match(@PathVariable String id, @RequestBody ObservedServiceMatchRequest request) {
+    public HostModels.ActionResult match(@PathVariable String id, @RequestBody HostModels.ObservedServiceMatchRequest request) {
         return refreshAfter(service.updateCatalogMatch(id, request == null ? null : request.catalogAppId()));
     }
 
     @PostMapping("/{id}/adoption-plan")
-    public ObservedServiceAdoptionPlan adoptionPlan(@PathVariable String id) {
+    public HostModels.ObservedServiceAdoptionPlan adoptionPlan(@PathVariable String id) {
         return service.adoptionPlan(id);
     }
 
     @PostMapping("/{id}/adopt")
-    public ActionResult adopt(@PathVariable String id, @RequestBody ObservedServiceAdoptionRequest request) {
+    public HostModels.ActionResult adopt(@PathVariable String id, @RequestBody HostModels.ObservedServiceAdoptionRequest request) {
         return refreshAfter(service.adopt(id, request));
     }
 
-    private ActionResult refreshAfter(ActionResult result) {
+    private HostModels.ActionResult refreshAfter(HostModels.ActionResult result) {
         if (applicationStateService != null && result.ok()) {
             return result.withApplicationState(applicationStateService.refreshNow());
         }

@@ -29,7 +29,7 @@ class ObservedServiceServiceTests {
         ObservedServiceService service = service(repository, List.of());
         repository.upsert(observed("obs_vaultwarden", "manual_url", "http://vault.local", "Vaultwarden", "vaultwarden", "external", "pinned"));
 
-        ActionResult result = service.unpin("obs_vaultwarden");
+        HostModels.ActionResult result = service.unpin("obs_vaultwarden");
 
         assertThat(result.ok()).isTrue();
         assertThat(repository.findServiceById("obs_vaultwarden")).hasValueSatisfying(observed -> {
@@ -45,7 +45,7 @@ class ObservedServiceServiceTests {
         ObservedServiceRepository repository = repository();
         Instant pinnedAt = Instant.parse("2026-06-21T12:00:00Z");
         repository.upsert(observed("docker:autark-os-vault", "docker", "autark-os-vault", "Vault", "vaultwarden", "external_docker", "pinned", pinnedAt));
-        ObservedServiceService service = service(repository, List.of(new HostDockerContainer(
+        ObservedServiceService service = service(repository, List.of(new HostModels.HostDockerContainer(
                 "autark-os-vault",
                 "vaultwarden/server:latest",
                 "Up 2 minutes",
@@ -69,8 +69,8 @@ class ObservedServiceServiceTests {
         ObservedServiceRepository repository = repository();
         repository.upsert(observed("docker:ignored-postgres", "docker", "ignored-postgres", "Postgres", null, "external_docker", "ignored"));
         ObservedServiceService service = service(repository, List.of(
-                new HostDockerContainer("unmatched-worker", "worker:latest", "Up 5 seconds", Map.of(), ""),
-                new HostDockerContainer("ignored-postgres", "postgres:16", "Up 1 hour", Map.of(), "")));
+                new HostModels.HostDockerContainer("unmatched-worker", "worker:latest", "Up 5 seconds", Map.of(), ""),
+                new HostModels.HostDockerContainer("ignored-postgres", "postgres:16", "Up 1 hour", Map.of(), "")));
 
         List<ObservedServiceView> observed = service.refresh();
 
@@ -81,7 +81,7 @@ class ObservedServiceServiceTests {
                 .satisfies(view -> {
                     assertThat(view.catalogAppId()).isNull();
                     assertThat(view.userStatus()).isEqualTo("found_on_server");
-                    assertThat(view.availableActions()).extracting(ObservedServiceAction::id).contains("pin", "change_match");
+                    assertThat(view.availableActions()).extracting(HostModels.ObservedServiceAction::id).contains("pin", "change_match");
                 });
         assertThat(observed).filteredOn(view -> view.id().equals("docker:ignored-postgres"))
                 .singleElement()
@@ -94,7 +94,7 @@ class ObservedServiceServiceTests {
         repository.upsert(observed("docker:old-autark-os-vault", "docker", "old-autark-os-vault", "Old Vault", "vaultwarden", "legacy_autark_os", "observed"));
         repository.upsert(observed("docker:pinned-lab-link", "docker", "pinned-lab-link", "Pinned Lab", null, "external_docker", "pinned", Instant.parse("2026-06-21T12:00:00Z")));
         repository.upsert(observed("manual:gitlab", "manual_url", "http://gitlab.local", "GitLab", "gitlab", "external", "pinned"));
-        ObservedServiceService service = service(repository, List.of(new HostDockerContainer(
+        ObservedServiceService service = service(repository, List.of(new HostModels.HostDockerContainer(
                 "current-worker",
                 "worker:latest",
                 "Up 5 seconds",
@@ -153,8 +153,8 @@ class ObservedServiceServiceTests {
                 currentIdentity(),
                 null);
 
-        ObservedServiceAdoptionPlan plan = service.adoptionPlan("docker:autark-os-syncthing");
-        ActionResult result = service.adopt("docker:autark-os-syncthing", new ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
+        HostModels.ObservedServiceAdoptionPlan plan = service.adoptionPlan("docker:autark-os-syncthing");
+        HostModels.ActionResult result = service.adopt("docker:autark-os-syncthing", new HostModels.ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
 
         assertThat(result.ok()).isTrue();
         assertThat(installedRepository.findAppById("syncthing")).hasValueSatisfying(app -> {
@@ -248,8 +248,8 @@ class ObservedServiceServiceTests {
                 currentIdentity(),
                 null);
 
-        ObservedServiceAdoptionPlan plan = service.adoptionPlan("docker:autark-os-vaultwarden");
-        ActionResult result = service.adopt("docker:autark-os-vaultwarden", new ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
+        HostModels.ObservedServiceAdoptionPlan plan = service.adoptionPlan("docker:autark-os-vaultwarden");
+        HostModels.ActionResult result = service.adopt("docker:autark-os-vaultwarden", new HostModels.ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
 
         assertThat(plan.available()).isTrue();
         assertThat(result.ok()).isTrue();
@@ -271,7 +271,7 @@ class ObservedServiceServiceTests {
         });
     }
 
-    private ObservedServiceService service(ObservedServiceRepository repository, List<HostDockerContainer> containers) {
+    private ObservedServiceService service(ObservedServiceRepository repository, List<HostModels.HostDockerContainer> containers) {
         ObservedServiceScanner scanner = new ObservedServiceScanner(() -> containers, currentIdentity());
         return new ObservedServiceService(repository, scanner);
     }

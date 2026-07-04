@@ -24,6 +24,6 @@ public record ObservedServiceView(
         boolean managedByThisAutarkOs,
         boolean adoptable,
         boolean duplicateInstallWarningRequired,
-        List<ObservedServiceAction> availableActions,
+        List<HostModels.ObservedServiceAction> availableActions,
         Map<String, String> metadata) {
 }

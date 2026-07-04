@@ -22,8 +22,8 @@ class SetupProgressControllerTests {
         SetupProgressService service = service();
         SetupProgressController controller = new SetupProgressController(service, new SetupStatusService(service, java.util.List::of));
 
-        SetupProgress completed = controller.complete(new SetupProgressUpdateRequest("welcome"));
-        SetupProgress skipped = controller.skip(new SetupProgressUpdateRequest("tailscale_connect"));
+        SetupProgressModels.SetupProgress completed = controller.complete(new SetupProgressModels.SetupProgressUpdateRequest("welcome"));
+        SetupProgressModels.SetupProgress skipped = controller.skip(new SetupProgressModels.SetupProgressUpdateRequest("tailscale_connect"));
 
         assertThat(controller.progress().completedSteps()).containsExactly("welcome");
         assertThat(completed.lastRecommendedStep()).isEqualTo("host_check");

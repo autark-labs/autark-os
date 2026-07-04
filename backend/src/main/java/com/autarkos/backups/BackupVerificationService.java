@@ -69,8 +69,8 @@ class BackupVerificationService {
         }
     }
 
-    BackupVerificationResult result(RestorePoint point) {
-        return new BackupVerificationResult(point.id(), point.verificationStatus(), point.verificationMessage(), point.checksumSha256(), point.restoreConfidence(), point.verifiedAt());
+    BackupModels.BackupVerificationResult result(RestorePoint point) {
+        return new BackupModels.BackupVerificationResult(point.id(), point.verificationStatus(), point.verificationMessage(), point.checksumSha256(), point.restoreConfidence(), point.verifiedAt());
     }
 
     String restoreConfidence(RestorePoint point, List<InstalledApp> affected) {
@@ -80,7 +80,7 @@ class BackupVerificationService {
         if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
             return "Unknown";
         }
-        boolean reviewRequired = affected.stream().map(backupContractService::backupContract).anyMatch(BackupContract::reviewRequired);
+        boolean reviewRequired = affected.stream().map(backupContractService::backupContract).anyMatch(BackupModels.BackupContract::reviewRequired);
         return reviewRequired ? "Medium" : "High";
     }
 
@@ -92,12 +92,12 @@ class BackupVerificationService {
                     .map(installedAppRepository::findAppById)
                     .flatMap(Optional::stream)
                     .map(backupContractService::backupContract)
-                    .anyMatch(BackupContract::reviewRequired);
+                    .anyMatch(BackupModels.BackupContract::reviewRequired);
             return reviewRequired ? "medium" : "high";
         }
         return installedAppRepository.findAppById(point.appId())
                 .map(backupContractService::backupContract)
-                .filter(BackupContract::reviewRequired)
+                .filter(BackupModels.BackupContract::reviewRequired)
                 .isPresent() ? "medium" : "high";
     }
 
@@ -158,6 +158,6 @@ class BackupVerificationService {
     private record ZipSummary(long entries, long bytes) {
     }
 
-    record VerificationUpdate(RestorePoint restorePoint, BackupVerificationResult result) {
+    record VerificationUpdate(RestorePoint restorePoint, BackupModels.BackupVerificationResult result) {
     }
 }

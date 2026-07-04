@@ -9,8 +9,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.autarkos.host.HostModels;
 import com.autarkos.host.ObservedService;
-import com.autarkos.host.ObservedServiceSource;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
@@ -24,7 +24,7 @@ class SetupStatusServiceTests {
     void recommendsExistingAppsWhenFoundResourcesExistAndSetupIsIncomplete() {
         SetupStatusService service = new SetupStatusService(progressService(), () -> List.of(observedService("legacy_autark_os", "observed")));
 
-        SetupStatus status = service.status();
+        SetupProgressModels.SetupStatus status = service.status();
 
         assertThat(status.setupComplete()).isFalse();
         assertThat(status.currentStep()).isEqualTo("existing_apps");
@@ -66,7 +66,7 @@ class SetupStatusServiceTests {
     private ObservedService observedService(String ownershipState, String userVisibility) {
         return new ObservedService(
                 "docker:legacy",
-                ObservedServiceSource.DOCKER,
+                HostModels.ObservedServiceSource.DOCKER,
                 "autark-os-legacy",
                 "legacy_autark_os",
                 "http://localhost:8080",

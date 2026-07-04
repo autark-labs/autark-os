@@ -15,7 +15,7 @@ final class DiscoverSetupRecords {
     private DiscoverSetupRecords() {
     }
 
-    static DiscoverSetupEntity entity(String appId, String catalogAppId, DiscoverSetupAnswers answers, Instant createdAt, Instant updatedAt) {
+    static DiscoverSetupEntity entity(String appId, String catalogAppId, DiscoverSetupModels.DiscoverSetupAnswers answers, Instant createdAt, Instant updatedAt) {
         return new DiscoverSetupEntity(
                 appId,
                 catalogAppId,
@@ -29,8 +29,8 @@ final class DiscoverSetupRecords {
                 updatedAt.toString());
     }
 
-    static DiscoverSetupRecord record(DiscoverSetupEntity entity) {
-        return new DiscoverSetupRecord(
+    static DiscoverSetupModels.DiscoverSetupRecord record(DiscoverSetupEntity entity) {
+        return new DiscoverSetupModels.DiscoverSetupRecord(
                 entity.appId(),
                 entity.catalogAppId(),
                 entity.displayName(),
@@ -38,12 +38,12 @@ final class DiscoverSetupRecords {
                 entity.storageMode(),
                 entity.backupPolicy(),
                 entity.localBrowserPort(),
-                new DiscoverSetupAnswers(answersMap(entity.answersJson())),
+                new DiscoverSetupModels.DiscoverSetupAnswers(answersMap(entity.answersJson())),
                 Instant.parse(entity.createdAt()),
                 Instant.parse(entity.updatedAt()));
     }
 
-    private static String answersJson(DiscoverSetupAnswers answers) {
+    private static String answersJson(DiscoverSetupModels.DiscoverSetupAnswers answers) {
         try {
             return OBJECT_MAPPER.writeValueAsString(answers.values() == null ? Map.of() : answers.values());
         } catch (JsonProcessingException exception) {

@@ -71,10 +71,10 @@ class BackupServiceCanonicalAppTests {
                 () -> List.of(appInstance("homepage", "Homepage")),
                 new RuntimeFileOperations());
 
-        BackupReport report = service.report();
+        BackupModels.BackupReport report = service.report();
 
         assertThat(report.totalApps()).isEqualTo(1);
-        assertThat(report.apps()).extracting(AppBackupStatus::appId).containsExactly("homepage");
+        assertThat(report.apps()).extracting(BackupModels.AppBackupStatus::appId).containsExactly("homepage");
     }
 
     @Test
@@ -87,7 +87,7 @@ class BackupServiceCanonicalAppTests {
         installedRepository.save(homepage);
         installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
 
-        BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
+        BackupModels.BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
 
         assertThat(report.protectedApps()).isZero();
         assertThat(report.status()).isEqualTo("attention");
@@ -110,7 +110,7 @@ class BackupServiceCanonicalAppTests {
         installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
         RestorePointTestRecords.record(backupRepository, "homepage", "Homepage", "app", "manual", "homepage", "/backups/homepage.tar", "completed", 1024, "Backup completed.");
 
-        BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
+        BackupModels.BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
 
         assertThat(report.protectedApps()).isEqualTo(1);
         assertThat(report.status()).isEqualTo("protected");
@@ -139,7 +139,7 @@ class BackupServiceCanonicalAppTests {
         RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
         BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService);
 
-        RestoreResult result = service.restore(point.id(), "homepage");
+        RestoreModels.RestoreResult result = service.restore(point.id(), "homepage");
 
         assertThat(result.status()).as(String.join("\n", result.logs())).isEqualTo("completed");
         assertThat(fileOpsService.restoreCalls).containsExactly("homepage|full|" + archive.toAbsolutePath().normalize());
@@ -168,7 +168,7 @@ class BackupServiceCanonicalAppTests {
                 fileOpsService,
                 new FailingStartDockerComposeExecutor());
 
-        RestoreResult result = service.restore(point.id(), "homepage");
+        RestoreModels.RestoreResult result = service.restore(point.id(), "homepage");
 
         assertThat(result.status()).isEqualTo("warning");
         assertThat(result.message()).contains("could not restart");

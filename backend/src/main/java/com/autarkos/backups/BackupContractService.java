@@ -14,13 +14,13 @@ class BackupContractService {
         this.catalogService = catalogService;
     }
 
-    BackupContract backupContract(InstalledApp app) {
+    BackupModels.BackupContract backupContract(InstalledApp app) {
         return backupContract(app, catalogService.findById(app.appId()).orElse(null));
     }
 
-    BackupContract backupContract(InstalledApp app, ApplicationManifest appManifest) {
+    BackupModels.BackupContract backupContract(InstalledApp app, ApplicationManifest appManifest) {
         if (appManifest == null) {
-            return new BackupContract(
+            return new BackupModels.BackupContract(
                     "unknown",
                     "Unknown backup contract",
                     "needs_review",
@@ -34,7 +34,7 @@ class BackupContractService {
         boolean hasSqlite = appManifest.includes().stream().anyMatch(item -> item.toLowerCase().contains("sqlite"))
                 || backupPaths.stream().anyMatch(path -> path.toLowerCase().contains("sqlite") || path.equalsIgnoreCase("data"));
         if (backupPaths.isEmpty()) {
-            return new BackupContract(
+            return new BackupModels.BackupContract(
                     "none",
                     "No declared backup paths",
                     "weak",
@@ -43,7 +43,7 @@ class BackupContractService {
                     List.of("Autark-OS cannot prove what data should be included."));
         }
         if (hasPostgres) {
-            return new BackupContract(
+            return new BackupModels.BackupContract(
                     "postgres",
                     "Database-aware review",
                     "needs_review",
@@ -52,7 +52,7 @@ class BackupContractService {
                     List.of("Declared paths: " + String.join(", ", backupPaths), "Restore will replace managed folders but does not yet run a database dump/import."));
         }
         if (multiService) {
-            return new BackupContract(
+            return new BackupModels.BackupContract(
                     "multi-service",
                     "Multi-service review",
                     "needs_review",
@@ -61,7 +61,7 @@ class BackupContractService {
                     List.of("Declared paths: " + String.join(", ", backupPaths), "Services: " + appManifest.runtime().services().size()));
         }
         if (hasSqlite) {
-            return new BackupContract(
+            return new BackupModels.BackupContract(
                     "sqlite",
                     "SQLite/file backup",
                     "standard",
@@ -69,7 +69,7 @@ class BackupContractService {
                     "Autark-OS backs up the declared managed data folder. This is suitable for simple apps using local files or SQLite.",
                     List.of("Declared paths: " + String.join(", ", backupPaths)));
         }
-        return new BackupContract(
+        return new BackupModels.BackupContract(
                 "file-only",
                 "File backup",
                 "standard",
