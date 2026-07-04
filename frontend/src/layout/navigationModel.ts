@@ -4,6 +4,7 @@ export const primaryNavigation = [
   { id: 'discover', label: 'Discover', to: '/discover', icon: 'discover', activePaths: ['/discover', '/marketplace'] },
   { id: 'access', label: 'Access', to: '/access', icon: 'access', activePaths: ['/access', '/network'] },
   { id: 'backups', label: 'Backups', to: '/backups', icon: 'backups', activePaths: ['/backups'] },
+  { id: 'pro', label: 'Autark Pro', to: '/pro', icon: 'pro', activePaths: ['/pro'] },
 ];
 
 export const advancedNavigation = [

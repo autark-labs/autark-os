@@ -17,6 +17,7 @@ const MarketplacePage = lazy(() => import('./pages/MarketplacePage/MarketplacePa
 const MonitoringPage = lazy(() => import('./pages/MonitoringPage/MonitoringPage'));
 const NetworkPage = lazy(() => import('./pages/NetworkPage/NetworkPage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage/OverviewPage'));
+const ProPage = lazy(() => import('./pages/ProPage/ProPage'));
 const ResolveExistingAppsPage = lazy(() => import('./pages/ResolveExistingAppsPage/ResolveExistingAppsPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage/SettingsPage'));
 const StoragePage = lazy(() => import('./pages/StoragePage/StoragePage'));
@@ -85,6 +86,7 @@ function AppContent() {
         <Route path="/access" element={<Suspense fallback={<PageFallback />}><NetworkPage /></Suspense>} />
         <Route path="/storage" element={<Suspense fallback={<PageFallback />}><StoragePage /></Suspense>} />
         <Route path="/backups" element={<Suspense fallback={<PageFallback />}><BackupsPage /></Suspense>} />
+        <Route path="/pro" element={<Suspense fallback={<PageFallback />}><ProPage /></Suspense>} />
         <Route path="/activity" element={<Suspense fallback={<PageFallback />}><MonitoringPage /></Suspense>} />
         <Route path="/settings" element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} />
         <Route path="/diagnostics" element={<Suspense fallback={<PageFallback />}><SupportPage /></Suspense>} />

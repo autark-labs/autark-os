@@ -9,6 +9,7 @@ import {
   House,
   LayoutGrid,
   Settings,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -40,6 +41,7 @@ const navIcons: Record<string, LucideIcon> = {
   diagnostics: Activity,
   discover: Compass,
   home: House,
+  pro: ShieldCheck,
   settings: Settings,
   storage: Database,
 };

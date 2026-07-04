@@ -1,4 +1,4 @@
-import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House, LayoutGrid, Loader2, Menu, Settings, Users } from 'lucide-react';
+import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House, LayoutGrid, Loader2, Menu, Settings, ShieldCheck, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
@@ -39,6 +39,7 @@ const navIcons: Record<string, LucideIcon> = {
   diagnostics: Activity,
   discover: Compass,
   home: House,
+  pro: ShieldCheck,
   settings: Settings,
   storage: Database,
 };

@@ -13,7 +13,7 @@ function source(relativePath) {
 test('basic navigation focuses on the five core appliance routes', () => {
   const items = navigationGroups('basic').flatMap((group) => group.items);
 
-  assert.deepEqual(items.map((item) => item.label), ['Home', 'My Apps', 'Discover', 'Access', 'Backups']);
+  assert.deepEqual(items.map((item) => item.label), ['Home', 'My Apps', 'Discover', 'Access', 'Backups', 'Autark Pro']);
   assert.equal(items.some((item) => ['Storage', 'Settings', 'Diagnostics', 'Activity Log'].includes(item.label)), false);
 });
 
@@ -21,7 +21,7 @@ test('advanced navigation keeps operational pages reachable outside basic mode',
   const groups = navigationGroups('advanced');
 
   assert.equal(groups.length, 2);
-  assert.deepEqual(groups[0].items.map((item) => item.label), ['Home', 'My Apps', 'Discover', 'Access', 'Backups']);
+  assert.deepEqual(groups[0].items.map((item) => item.label), ['Home', 'My Apps', 'Discover', 'Access', 'Backups', 'Autark Pro']);
   assert.deepEqual(groups[1].items.map((item) => item.label), ['Storage', 'Settings', 'Diagnostics', 'Activity Log']);
   assert.deepEqual(advancedNavigation.map((item) => item.to), ['/storage', '/settings', '/diagnostics', '/activity']);
 });
@@ -35,8 +35,9 @@ test('old active concepts have intentional aliases to MVP routes', () => {
 });
 
 test('primary navigation remains within MVP scope', () => {
-  assert.equal(primaryNavigation.length, 5);
+  assert.equal(primaryNavigation.length, 6);
   assert.equal(primaryNavigation.find((item) => item.id === 'access')?.to, '/access');
+  assert.equal(primaryNavigation.find((item) => item.id === 'pro')?.to, '/pro');
 });
 
 test('operational pages removed from basic nav remain reachable through contextual links', () => {
