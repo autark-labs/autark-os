@@ -440,6 +440,174 @@ class ProServiceTests {
         });
     }
 
+    @Test
+    void syncProFeedRequiresRegistration() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T14:00:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        assertThatThrownBy(service::syncProFeed)
+                .isInstanceOf(ProRemoteException.class)
+                .hasMessageContaining("Register this Autark-OS install before syncing the Pro feed.");
+
+        assertThat(remoteClient.feedCalls.get()).isZero();
+    }
+
+    @Test
+    void syncProFeedStoresTimestampAndCounts() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "accountless",
+                "ins_registered",
+                "tok_registered",
+                false,
+                null,
+                "autark_pro_test",
+                "active",
+                Instant.parse("2027-07-04T00:00:00Z"),
+                true,
+                true,
+                true,
+                false,
+                null,
+                null,
+                null,
+                Instant.parse("2026-07-04T12:00:00Z"),
+                1,
+                1,
+                1,
+                createdAt,
+                createdAt));
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T14:00:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        ProModels.ProStatus status = service.syncProFeed();
+
+        assertThat(status.lastFeedSyncAt()).isEqualTo(Instant.parse("2026-07-04T14:00:30Z"));
+        assertThat(status.feedAdvisoryCount()).isEqualTo(2);
+        assertThat(status.feedDeviceProfileCount()).isEqualTo(3);
+        assertThat(status.feedBlueprintCount()).isEqualTo(4);
+        assertThat(remoteClient.feedCalls.get()).isEqualTo(1);
+        assertThat(remoteClient.lastFeedSince).isEqualTo(Instant.parse("2026-07-04T12:00:00Z"));
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.installTokenProtected()).isEqualTo("tok_registered");
+            assertThat(settings.lastFeedSyncAt()).isEqualTo(Instant.parse("2026-07-04T14:00:30Z"));
+            assertThat(settings.feedAdvisoryCount()).isEqualTo(2);
+            assertThat(settings.feedDeviceProfileCount()).isEqualTo(3);
+            assertThat(settings.feedBlueprintCount()).isEqualTo(4);
+        });
+    }
+
+    @Test
+    void syncProFeedFailureUsesProSpecificCopyAndPreservesLastCounts() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "accountless",
+                "ins_registered",
+                "tok_registered",
+                false,
+                null,
+                "autark_pro_test",
+                "active",
+                Instant.parse("2027-07-04T00:00:00Z"),
+                true,
+                true,
+                true,
+                false,
+                null,
+                null,
+                null,
+                Instant.parse("2026-07-04T12:00:00Z"),
+                1,
+                1,
+                1,
+                createdAt,
+                createdAt));
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        remoteClient.failFeed = true;
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T14:00:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        assertThatThrownBy(service::syncProFeed)
+                .isInstanceOf(ProRemoteException.class)
+                .hasMessageContaining("Autark Pro feed sync failed");
+
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.lastFeedSyncAt()).isEqualTo(Instant.parse("2026-07-04T12:00:00Z"));
+            assertThat(settings.feedAdvisoryCount()).isEqualTo(1);
+            assertThat(settings.feedDeviceProfileCount()).isEqualTo(1);
+            assertThat(settings.feedBlueprintCount()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void disableProLocallyKeepsRegistrationAndEntitlementMetadata() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "accountless",
+                "ins_registered",
+                "tok_registered",
+                false,
+                null,
+                "autark_pro_test",
+                "active",
+                Instant.parse("2027-07-04T00:00:00Z"),
+                true,
+                true,
+                true,
+                false,
+                Instant.parse("2026-07-04T13:00:30Z"),
+                "accepted",
+                Instant.parse("2026-07-04T12:30:00Z"),
+                Instant.parse("2026-07-04T14:00:30Z"),
+                2,
+                3,
+                4,
+                createdAt,
+                createdAt));
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T15:00:00Z"),
+                false,
+                new RecordingRemoteClient(),
+                () -> "1.2.3");
+
+        ProModels.ProStatus status = service.disableLocally();
+
+        assertThat(status.enabled()).isFalse();
+        assertThat(status.mode()).isEqualTo("free");
+        assertThat(status.registered()).isTrue();
+        assertThat(status.installId()).isEqualTo("ins_registered");
+        assertThat(status.plan()).isEqualTo("autark_pro_test");
+        assertThat(status.entitlementStatus()).isEqualTo("active");
+        assertThat(status.feedAdvisoryCount()).isEqualTo(2);
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.installTokenProtected()).isEqualTo("tok_registered");
+            assertThat(settings.entitlementExpiresAt()).isEqualTo(Instant.parse("2027-07-04T00:00:00Z"));
+            assertThat(settings.updatedAt()).isEqualTo(Instant.parse("2026-07-04T15:00:00Z"));
+        });
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -460,10 +628,13 @@ class ProServiceTests {
         private final AtomicInteger registerCalls = new AtomicInteger();
         private final AtomicInteger redeemCalls = new AtomicInteger();
         private final AtomicInteger heartbeatCalls = new AtomicInteger();
+        private final AtomicInteger feedCalls = new AtomicInteger();
         private ProRemoteModels.RegisterInstallRequest lastRegisterRequest;
         private ProRemoteModels.RedeemLicenseRequest lastRedeemRequest;
         private ProRemoteModels.HeartbeatRequest lastHeartbeatRequest;
+        private Instant lastFeedSince;
         private boolean failHeartbeat;
+        private boolean failFeed;
 
         @Override
         public ProRemoteModels.RegisterInstallResponse registerInstall(ProRemoteModels.RegisterInstallRequest request) {
@@ -508,7 +679,19 @@ class ProServiceTests {
 
         @Override
         public ProRemoteModels.ProFeedResponse proFeed(Instant since) {
-            throw new UnsupportedOperationException();
+            feedCalls.incrementAndGet();
+            lastFeedSince = since;
+            if (failFeed) {
+                throw new ProRemoteException("Autark Pro feed sync failed. Local Autark-OS features are still available.");
+            }
+            return new ProRemoteModels.ProFeedResponse(
+                    Instant.parse("2026-07-04T14:00:30Z"),
+                    java.util.List.of(
+                            new ProRemoteModels.ProFeedItem("advisory-1", "Check backups", "Backups need review.", "info", Instant.parse("2026-07-04T14:00:00Z")),
+                            new ProRemoteModels.ProFeedItem("advisory-2", "Check updates", "Updates are available.", "info", Instant.parse("2026-07-04T14:00:00Z"))),
+                    2,
+                    3,
+                    4);
         }
     }
 }

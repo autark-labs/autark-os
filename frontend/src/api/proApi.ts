@@ -26,4 +26,14 @@ export const ProAPIClient = {
     const response = await httpClient.post<ProStatus>('/api/pro/heartbeat/send-now');
     return response.data;
   },
+
+  async syncProFeed() {
+    const response = await httpClient.post<ProStatus>('/api/pro/feed/sync');
+    return response.data;
+  },
+
+  async disableLocally() {
+    const response = await httpClient.post<ProStatus>('/api/pro/disable');
+    return response.data;
+  },
 };

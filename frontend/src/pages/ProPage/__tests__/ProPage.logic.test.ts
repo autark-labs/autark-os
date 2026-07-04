@@ -12,6 +12,9 @@ function status(overrides: Partial<ProStatus> = {}): ProStatus {
     enabled: false,
     entitlementExpiresAt: null,
     entitlementStatus: 'none',
+    feedAdvisoryCount: 0,
+    feedBlueprintCount: 0,
+    feedDeviceProfileCount: 0,
     healthReportingEnabled: true,
     installId: null,
     lastEntitlementCheckAt: null,
@@ -42,6 +45,7 @@ describe('proStatusViewModel', () => {
     assert.equal(proStatusViewModel(status({ registered: true, installId: 'install_local_123' })).badge, 'Registered');
     assert.equal(proStatusViewModel(status({ enabled: true, registered: true, mode: 'accountless', entitlementStatus: 'active', plan: 'Pro' })).badge, 'Active');
     assert.equal(proStatusViewModel(status({ enabled: false, registered: true, mode: 'accountless', entitlementStatus: 'active' })).badge, 'Disabled');
+    assert.equal(proStatusViewModel(status({ enabled: false, registered: true, mode: 'free', entitlementStatus: 'active' })).badge, 'Disabled');
   });
 });
 

@@ -10,7 +10,7 @@ export type ProStatusViewModel = {
 };
 
 export function proStatusViewModel(status: ProStatus): ProStatusViewModel {
-  if (status.registered && !status.enabled && status.mode !== 'free') {
+  if (status.registered && !status.enabled && (status.mode !== 'free' || status.entitlementStatus === 'active')) {
     return {
       badge: 'Disabled',
       heading: 'Autark Pro is disabled locally',

@@ -70,6 +70,15 @@ class ProSettingsEntity {
     @Column(name = "last_feed_sync_at")
     private String lastFeedSyncAt;
 
+    @Column(name = "feed_advisory_count", nullable = false)
+    private int feedAdvisoryCount;
+
+    @Column(name = "feed_device_profile_count", nullable = false)
+    private int feedDeviceProfileCount;
+
+    @Column(name = "feed_blueprint_count", nullable = false)
+    private int feedBlueprintCount;
+
     @Column(name = "created_at", nullable = false)
     private String createdAt;
 
@@ -102,6 +111,9 @@ class ProSettingsEntity {
         this.lastHeartbeatResult = settings.lastHeartbeatResult();
         this.lastEntitlementCheckAt = encode(settings.lastEntitlementCheckAt());
         this.lastFeedSyncAt = encode(settings.lastFeedSyncAt());
+        this.feedAdvisoryCount = settings.feedAdvisoryCount();
+        this.feedDeviceProfileCount = settings.feedDeviceProfileCount();
+        this.feedBlueprintCount = settings.feedBlueprintCount();
         this.createdAt = encode(settings.createdAt());
         this.updatedAt = encode(settings.updatedAt());
     }
@@ -125,6 +137,9 @@ class ProSettingsEntity {
                 lastHeartbeatResult,
                 decode(lastEntitlementCheckAt),
                 decode(lastFeedSyncAt),
+                feedAdvisoryCount,
+                feedDeviceProfileCount,
+                feedBlueprintCount,
                 decode(createdAt),
                 decode(updatedAt));
     }

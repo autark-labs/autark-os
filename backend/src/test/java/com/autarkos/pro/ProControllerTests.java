@@ -98,6 +98,42 @@ class ProControllerTests {
         assertThat(status.lastHeartbeatResult()).isEqualTo("accepted");
     }
 
+    @Test
+    void syncsProFeed() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        ProController controller = new ProController(new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T10:00:00Z"),
+                false,
+                new ControllerRemoteClient(),
+                () -> "1.2.3"));
+        controller.register();
+
+        var status = controller.syncProFeed();
+
+        assertThat(status.lastFeedSyncAt()).isEqualTo(Instant.parse("2026-07-04T10:02:00Z"));
+        assertThat(status.feedAdvisoryCount()).isEqualTo(1);
+    }
+
+    @Test
+    void disablesProLocally() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        ProController controller = new ProController(new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T10:00:00Z"),
+                false,
+                new ControllerRemoteClient(),
+                () -> "1.2.3"));
+        controller.redeemLicense(new ProController.RedeemLicenseRequest("AUTARK-PRO-CONTROLLER"));
+
+        var status = controller.disableLocally();
+
+        assertThat(status.enabled()).isFalse();
+        assertThat(status.mode()).isEqualTo("free");
+        assertThat(status.registered()).isTrue();
+        assertThat(status.entitlementStatus()).isEqualTo("active");
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -129,7 +165,17 @@ class ProControllerTests {
 
         @Override
         public ProRemoteModels.ProFeedResponse proFeed(Instant since) {
-            throw new UnsupportedOperationException();
+            return new ProRemoteModels.ProFeedResponse(
+                    Instant.parse("2026-07-04T10:02:00Z"),
+                    java.util.List.of(new ProRemoteModels.ProFeedItem(
+                            "controller-feed-item",
+                            "Controller feed item",
+                            "Feed sync works.",
+                            "info",
+                            Instant.parse("2026-07-04T10:02:00Z"))),
+                    1,
+                    2,
+                    3);
         }
     }
 }

@@ -28,6 +28,8 @@ test('Pro page has a local route, navigation entry, typed API client, and no hos
   assert.match(api, /post<ProStatus>\('\/api\/pro\/register'\)/);
   assert.match(api, /post<ProStatus>\('\/api\/pro\/redeem-license'/);
   assert.match(api, /post<ProStatus>\('\/api\/pro\/heartbeat\/send-now'\)/);
+  assert.match(api, /post<ProStatus>\('\/api\/pro\/feed\/sync'\)/);
+  assert.match(api, /post<ProStatus>\('\/api\/pro\/disable'\)/);
   assert.match(api, /get<ProPrivacyPayloadPreview>\('\/api\/pro\/privacy\/payload-preview'\)/);
   assert.doesNotMatch(api, /supabase/i);
 
@@ -103,4 +105,33 @@ test('Pro manual heartbeat action requires registration and updates status', () 
   assert.match(page, /Send test heartbeat/);
   assert.match(page, /Register this install before sending a heartbeat\./);
   assert.match(page, /disabled=\{sendingHeartbeat \|\| !status\.registered\}/);
+});
+
+test('Pro feed sync and local disable actions update status without cloud-side deletion controls', () => {
+  const page = source('src/pages/ProPage/ProPage.tsx');
+  const types = source('src/types/pro.ts');
+
+  assert.match(types, /feedAdvisoryCount: number/);
+  assert.match(types, /feedDeviceProfileCount: number/);
+  assert.match(types, /feedBlueprintCount: number/);
+
+  assert.match(page, /const \[syncingFeed, setSyncingFeed\]/);
+  assert.match(page, /const \[disablingPro, setDisablingPro\]/);
+  assert.match(page, /async function syncProFeed/);
+  assert.match(page, /await ProAPIClient\.syncProFeed\(\)/);
+  assert.match(page, /setStatus\(feedStatus\)/);
+  assert.match(page, /showActionNotification\(\{[\s\S]*title: 'Pro feed synced'/);
+  assert.match(page, /showActionErrorNotification\(feedError, 'Autark Pro feed sync failed'\)/);
+  assert.match(page, /Sync Pro feed/);
+  assert.match(page, /Advisories/);
+  assert.match(page, /Device profiles/);
+  assert.match(page, /Blueprints/);
+
+  assert.match(page, /async function disableProLocally/);
+  assert.match(page, /await ProAPIClient\.disableLocally\(\)/);
+  assert.match(page, /setStatus\(disabledStatus\)/);
+  assert.match(page, /showActionNotification\(\{[\s\S]*title: 'Autark Pro disabled locally'/);
+  assert.match(page, /Disable Pro locally/);
+  assert.doesNotMatch(page, /delete cloud/i);
+  assert.doesNotMatch(page, /delete hosted/i);
 });

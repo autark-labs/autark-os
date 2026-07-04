@@ -21,6 +21,8 @@ function ProPage() {
   const [registering, setRegistering] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
   const [sendingHeartbeat, setSendingHeartbeat] = useState(false);
+  const [syncingFeed, setSyncingFeed] = useState(false);
+  const [disablingPro, setDisablingPro] = useState(false);
   const [licenseCode, setLicenseCode] = useState('');
   const [licenseError, setLicenseError] = useState<string | null>(null);
   const [privacyPreview, setPrivacyPreview] = useState<ProPrivacyPayloadPreview | null>(null);
@@ -133,6 +135,51 @@ function ProPage() {
     }
   }
 
+  async function syncProFeed() {
+    if (!status?.registered) {
+      setError('Register this install before syncing the Pro feed.');
+      return;
+    }
+
+    setSyncingFeed(true);
+    setError(null);
+    try {
+      const feedStatus = await ProAPIClient.syncProFeed();
+      setStatus(feedStatus);
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: 'Pro feed synced',
+        message: 'Autark Pro feed counts were refreshed for this install.',
+      }, 'Pro feed synced');
+    } catch (feedError) {
+      setError(apiErrorMessage(feedError, 'Autark Pro feed sync failed.'));
+      showActionErrorNotification(feedError, 'Autark Pro feed sync failed');
+    } finally {
+      setSyncingFeed(false);
+    }
+  }
+
+  async function disableProLocally() {
+    setDisablingPro(true);
+    setError(null);
+    try {
+      const disabledStatus = await ProAPIClient.disableLocally();
+      setStatus(disabledStatus);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'Autark Pro disabled locally',
+        message: 'Registration and entitlement metadata were kept on this install.',
+      }, 'Autark Pro disabled locally');
+    } catch (disableError) {
+      setError(apiErrorMessage(disableError, 'Autark Pro could not be disabled locally.'));
+      showActionErrorNotification(disableError, 'Autark Pro disable failed');
+    } finally {
+      setDisablingPro(false);
+    }
+  }
+
   const statusView = useMemo(() => status ? proStatusViewModel(status) : null, [status]);
 
   if (loading) {
@@ -235,7 +282,11 @@ function ProPage() {
                 sendingHeartbeat={sendingHeartbeat}
                 status={status}
               />
-              <FeedPanel status={status} />
+              <FeedPanel
+                onSyncFeed={syncProFeed}
+                status={status}
+                syncingFeed={syncingFeed}
+              />
             </div>
           </div>
 
@@ -251,7 +302,11 @@ function ProPage() {
                 </div>
               </div>
             </ProjectPanel>
-            <LocalDisablePanel status={status} />
+            <LocalDisablePanel
+              disablingPro={disablingPro}
+              onDisablePro={disableProLocally}
+              status={status}
+            />
           </aside>
         </div>
       )}
@@ -426,7 +481,15 @@ function HeartbeatPanel({
   );
 }
 
-function FeedPanel({ status }: { status: ProStatus }) {
+function FeedPanel({
+  onSyncFeed,
+  status,
+  syncingFeed,
+}: {
+  onSyncFeed: () => void;
+  status: ProStatus;
+  syncingFeed: boolean;
+}) {
   return (
     <ProjectPanel>
       <SectionHeading icon={Bell} title="Pro feed" />
@@ -434,19 +497,48 @@ function FeedPanel({ status }: { status: ProStatus }) {
         <BooleanRow enabled={status.proFeedEnabled} label="Feed enabled" />
         <BooleanRow enabled={status.alertsEnabled} label="Alerts enabled" />
         <StatusFact label="Last feed sync" value={formatProTimestamp(status.lastFeedSyncAt)} />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatusFact label="Advisories" value={String(status.feedAdvisoryCount)} />
+          <StatusFact label="Device profiles" value={String(status.feedDeviceProfileCount)} />
+          <StatusFact label="Blueprints" value={String(status.feedBlueprintCount)} />
+        </div>
+        {!status.registered && (
+          <p className="rounded-lg border border-orange-300/25 bg-orange-500/10 px-3 py-2 text-sm font-semibold text-orange-100">
+            Register this install before syncing the Pro feed.
+          </p>
+        )}
+        <ProjectPrimaryButton disabled={syncingFeed || !status.registered} onClick={onSyncFeed} type="button">
+          {syncingFeed && <Loader2 className="size-4 animate-spin" />}
+          Sync Pro feed
+        </ProjectPrimaryButton>
       </div>
     </ProjectPanel>
   );
 }
 
-function LocalDisablePanel({ status }: { status: ProStatus }) {
+function LocalDisablePanel({
+  disablingPro,
+  onDisablePro,
+  status,
+}: {
+  disablingPro: boolean;
+  onDisablePro: () => void;
+  status: ProStatus;
+}) {
   return (
     <ProjectPanel>
       <SectionHeading icon={Power} title="Disable locally" />
       <p className="mt-3 text-sm leading-6 text-slate-400">Turning Pro off later will keep local app management available and pause Pro-only reporting from this install.</p>
-      <ProjectInset className="mt-4">
-        <p className="text-sm font-semibold text-white">{status.enabled ? 'Local disable controls are coming later.' : 'Pro is already disabled locally.'}</p>
-      </ProjectInset>
+      <div className="mt-4 grid gap-3">
+        <ProjectInset>
+          <p className="text-sm font-semibold text-white">{status.enabled ? 'Registration and entitlement metadata stay on this device.' : 'Pro is already disabled locally.'}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-400">This does not delete future recovery data or remove this install&apos;s local registration.</p>
+        </ProjectInset>
+        <ProjectDarkControlButton disabled={disablingPro || !status.enabled} onClick={onDisablePro} type="button">
+          {disablingPro && <Loader2 className="size-4 animate-spin" />}
+          Disable Pro locally
+        </ProjectDarkControlButton>
+      </div>
     </ProjectPanel>
   );
 }

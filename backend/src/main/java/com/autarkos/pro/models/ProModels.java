@@ -41,8 +41,56 @@ public final class ProModels {
             String lastHeartbeatResult,
             Instant lastEntitlementCheckAt,
             Instant lastFeedSyncAt,
+            int feedAdvisoryCount,
+            int feedDeviceProfileCount,
+            int feedBlueprintCount,
             Instant createdAt,
             Instant updatedAt) {
+
+        public ProSettings(
+                boolean enabled,
+                String mode,
+                String installId,
+                String installTokenProtected,
+                boolean accountLinked,
+                String accountEmail,
+                String plan,
+                String entitlementStatus,
+                Instant entitlementExpiresAt,
+                boolean healthReportingEnabled,
+                boolean alertsEnabled,
+                boolean proFeedEnabled,
+                boolean configSnapshotEnabled,
+                Instant lastHeartbeatAt,
+                String lastHeartbeatResult,
+                Instant lastEntitlementCheckAt,
+                Instant lastFeedSyncAt,
+                Instant createdAt,
+                Instant updatedAt) {
+            this(
+                    enabled,
+                    mode,
+                    installId,
+                    installTokenProtected,
+                    accountLinked,
+                    accountEmail,
+                    plan,
+                    entitlementStatus,
+                    entitlementExpiresAt,
+                    healthReportingEnabled,
+                    alertsEnabled,
+                    proFeedEnabled,
+                    configSnapshotEnabled,
+                    lastHeartbeatAt,
+                    lastHeartbeatResult,
+                    lastEntitlementCheckAt,
+                    lastFeedSyncAt,
+                    0,
+                    0,
+                    0,
+                    createdAt,
+                    updatedAt);
+        }
 
         public static ProSettings defaults(Instant now) {
             return new ProSettings(
@@ -63,6 +111,9 @@ public final class ProModels {
                     null,
                     null,
                     null,
+                    0,
+                    0,
+                    0,
                     now,
                     now);
         }
@@ -86,6 +137,9 @@ public final class ProModels {
             String lastHeartbeatResult,
             Instant lastEntitlementCheckAt,
             Instant lastFeedSyncAt,
+            int feedAdvisoryCount,
+            int feedDeviceProfileCount,
+            int feedBlueprintCount,
             boolean remoteApiConfigured,
             Boolean remoteApiHealthy) {
 
@@ -108,6 +162,9 @@ public final class ProModels {
                     settings.lastHeartbeatResult(),
                     settings.lastEntitlementCheckAt(),
                     settings.lastFeedSyncAt(),
+                    settings.feedAdvisoryCount(),
+                    settings.feedDeviceProfileCount(),
+                    settings.feedBlueprintCount(),
                     remoteApiConfigured,
                     remoteApiHealthy);
         }

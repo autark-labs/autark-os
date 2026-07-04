@@ -49,7 +49,14 @@ public final class ProRemoteModels {
 
     public record ProFeedResponse(
             Instant syncedAt,
-            List<ProFeedItem> items) {
+            List<ProFeedItem> items,
+            int advisoryCount,
+            int deviceProfileCount,
+            int blueprintCount) {
+
+        public ProFeedResponse(Instant syncedAt, List<ProFeedItem> items) {
+            this(syncedAt, items, items == null ? 0 : items.size(), 0, 0);
+        }
     }
 
     public record ProFeedItem(

@@ -43,6 +43,16 @@ public class ProController {
         return proService.sendHeartbeatNow();
     }
 
+    @PostMapping("/feed/sync")
+    public ProModels.ProStatus syncProFeed() {
+        return proService.syncProFeed();
+    }
+
+    @PostMapping("/disable")
+    public ProModels.ProStatus disableLocally() {
+        return proService.disableLocally();
+    }
+
     public record RedeemLicenseRequest(String licenseCode) {
     }
 }

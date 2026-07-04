@@ -20,6 +20,9 @@ export type ProStatus = {
   lastHeartbeatResult: string | null;
   lastEntitlementCheckAt: string | null;
   lastFeedSyncAt: string | null;
+  feedAdvisoryCount: number;
+  feedDeviceProfileCount: number;
+  feedBlueprintCount: number;
   remoteApiConfigured: boolean;
   remoteApiHealthy: boolean | null;
 };

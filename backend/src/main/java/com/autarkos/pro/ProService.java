@@ -147,6 +147,9 @@ public class ProService {
                 current.lastHeartbeatResult(),
                 now,
                 current.lastFeedSyncAt(),
+                current.feedAdvisoryCount(),
+                current.feedDeviceProfileCount(),
+                current.feedBlueprintCount(),
                 current.createdAt() == null ? now : current.createdAt(),
                 now);
         repository.saveSettings(activated);
@@ -191,6 +194,63 @@ public class ProService {
         }
     }
 
+    public ProModels.ProStatus syncProFeed() {
+        ProModels.ProSettings current = repository.settings()
+                .orElseGet(() -> ProModels.ProSettings.defaults(clock.get()));
+        if (!hasText(current.installId())) {
+            throw new ProRemoteException("Register this Autark-OS install before syncing the Pro feed.");
+        }
+
+        try {
+            ProRemoteModels.ProFeedResponse response = remoteClient.proFeed(current.lastFeedSyncAt());
+            Instant now = clock.get();
+            ProModels.ProSettings updated = withFeedSync(
+                    current,
+                    response.syncedAt() == null ? now : response.syncedAt(),
+                    Math.max(0, response.advisoryCount()),
+                    Math.max(0, response.deviceProfileCount()),
+                    Math.max(0, response.blueprintCount()),
+                    now);
+            repository.saveSettings(updated);
+            return ProModels.ProStatus.from(updated, remoteApiConfigured, null);
+        } catch (ProRemoteException exception) {
+            throw new ProRemoteException(
+                    "Autark Pro feed sync failed. " + firstPresent(exception.getMessage(), "Try again later."),
+                    exception);
+        }
+    }
+
+    public ProModels.ProStatus disableLocally() {
+        Instant now = clock.get();
+        ProModels.ProSettings current = repository.settings()
+                .orElseGet(() -> ProModels.ProSettings.defaults(now));
+        ProModels.ProSettings disabled = new ProModels.ProSettings(
+                false,
+                ProModels.Mode.FREE,
+                current.installId(),
+                current.installTokenProtected(),
+                current.accountLinked(),
+                current.accountEmail(),
+                current.plan(),
+                current.entitlementStatus(),
+                current.entitlementExpiresAt(),
+                current.healthReportingEnabled(),
+                current.alertsEnabled(),
+                current.proFeedEnabled(),
+                current.configSnapshotEnabled(),
+                current.lastHeartbeatAt(),
+                current.lastHeartbeatResult(),
+                current.lastEntitlementCheckAt(),
+                current.lastFeedSyncAt(),
+                current.feedAdvisoryCount(),
+                current.feedDeviceProfileCount(),
+                current.feedBlueprintCount(),
+                current.createdAt() == null ? now : current.createdAt(),
+                now);
+        repository.saveSettings(disabled);
+        return ProModels.ProStatus.from(disabled, remoteApiConfigured, null);
+    }
+
     private static ProModels.ProSettings withHeartbeatResult(
             ProModels.ProSettings current,
             Instant lastHeartbeatAt,
@@ -214,6 +274,41 @@ public class ProService {
                 lastHeartbeatResult,
                 current.lastEntitlementCheckAt(),
                 current.lastFeedSyncAt(),
+                current.feedAdvisoryCount(),
+                current.feedDeviceProfileCount(),
+                current.feedBlueprintCount(),
+                current.createdAt() == null ? updatedAt : current.createdAt(),
+                updatedAt);
+    }
+
+    private static ProModels.ProSettings withFeedSync(
+            ProModels.ProSettings current,
+            Instant lastFeedSyncAt,
+            int advisoryCount,
+            int deviceProfileCount,
+            int blueprintCount,
+            Instant updatedAt) {
+        return new ProModels.ProSettings(
+                current.enabled(),
+                current.mode(),
+                current.installId(),
+                current.installTokenProtected(),
+                current.accountLinked(),
+                current.accountEmail(),
+                current.plan(),
+                current.entitlementStatus(),
+                current.entitlementExpiresAt(),
+                current.healthReportingEnabled(),
+                current.alertsEnabled(),
+                current.proFeedEnabled(),
+                current.configSnapshotEnabled(),
+                current.lastHeartbeatAt(),
+                current.lastHeartbeatResult(),
+                current.lastEntitlementCheckAt(),
+                lastFeedSyncAt,
+                advisoryCount,
+                deviceProfileCount,
+                blueprintCount,
                 current.createdAt() == null ? updatedAt : current.createdAt(),
                 updatedAt);
     }
