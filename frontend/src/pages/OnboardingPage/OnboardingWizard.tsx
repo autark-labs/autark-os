@@ -122,7 +122,6 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   }
 
   const checks = state.doctor.checks;
-  const warnings = checks.filter((check) => check.status === 'warning');
   const defaultBackupDestination = `${state.runtimePath}/backups`;
   const readiness = state.doctor.readiness;
   const privateAccessGroup = readiness.groups.find((group) => group.id === 'private-access');

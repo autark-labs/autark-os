@@ -29,7 +29,7 @@ import {
   invalidateApplicationState,
   setAutarkOsJobInApplicationStateCache,
 } from '@/repositories/applicationStateRepository';
-import type { AppBackupStatus, BackupReport, RestorePlan, RestorePoint } from '@/types/backup';
+import type { AppBackupStatus, RestorePlan, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
 import {
   ActionCard,

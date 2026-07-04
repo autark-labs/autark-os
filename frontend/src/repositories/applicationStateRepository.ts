@@ -21,7 +21,7 @@ import {
   telemetryByAppId,
   updatesByAppId,
 } from './applicationStateRepository.logic';
-import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry, AppUpdateStatus } from '@/types/app';
+import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
 import type { AppOwnershipView } from '@/types/appOwnership';
 import type { ObservedServiceView } from '@/types/observedService';
 import type { AutarkOsJob } from '@/types/jobs';

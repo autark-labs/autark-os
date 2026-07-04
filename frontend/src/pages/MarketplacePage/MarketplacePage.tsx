@@ -42,7 +42,7 @@ import { terminalJob } from '@/repositories/jobRepository';
 import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
-import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
+import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
 import { categories } from './extensions/MarketplacePage.constants';
 import {
   START_HERE_DISMISSAL_KEY,

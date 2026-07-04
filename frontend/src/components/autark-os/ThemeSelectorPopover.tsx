@@ -3,9 +3,6 @@ import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons
 import {
   Popover,
   PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTheme, type AutarkOsThemeId } from '@/contexts/ThemeContext';

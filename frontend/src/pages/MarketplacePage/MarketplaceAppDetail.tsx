@@ -465,53 +465,6 @@ function shouldOfferFirstBackup(app: DiscoverInstalledAppSummary) {
   return app.firstBackupRecommended && !app.protectedByBackups;
 }
 
-function CatalogConfidenceCard({ app }: { app: MarketplaceApp }) {
-  return (
-    <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h4 className="font-bold text-slate-50">Catalog confidence</h4>
-          <p className="mt-1 text-sm leading-6 text-slate-400">{app.supportSummary}</p>
-        </div>
-        <SupportBadge level={app.supportLevel} />
-      </div>
-      <div className="mt-4 grid gap-2">
-        {app.smokeTests.map((test) => (
-          <div className="grid gap-2 rounded-lg border border-sky-400/25 bg-slate-900 p-3 sm:grid-cols-[minmax(160px,0.7fr)_minmax(140px,0.6fr)_1fr]" key={test.label}>
-            <span className="font-semibold text-slate-300">{test.label}</span>
-            <span className={cn('text-sm font-semibold', smokeStatusTone(test.status))}>{test.status}</span>
-            <span className="text-sm leading-5 text-slate-400">{test.detail}</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function smokeStatusTone(status: string) {
-  switch (status) {
-    case 'Passed':
-      return 'text-emerald-200';
-    case 'Blocked':
-      return 'text-red-200';
-    case 'Not applicable':
-      return 'text-slate-400';
-    default:
-      return 'text-orange-200';
-  }
-}
-
 function requiresInstallCaution(app: MarketplaceApp) {
   return ['Advanced', 'Needs testing', 'Experimental'].includes(app.supportLevel);
-}
-
-function serviceKindLabel(kind: string) {
-  const labels: Record<string, string> = {
-    'web-app': 'App you open',
-    'companion-service': 'Service you connect to',
-    'admin-service': 'Setup tool',
-    'background-service': 'Background service',
-    infrastructure: 'Infrastructure',
-  };
-  return labels[kind] || kind.replaceAll('-', ' ');
 }
