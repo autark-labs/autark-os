@@ -46,6 +46,7 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(matrix, /service\.iconUrl/);
   assert.match(matrix, /bg-cyan-950\/80/);
   assert.match(matrix, /xl:max-h-\[calc\(100vh-17rem\)\]/);
+  assert.match(matrix, /xl:\[contain:layout_paint\]/);
   assert.match(matrix, /label\.toLowerCase\(\)/);
   assert.match(matrix, /copiedLinkKey/);
   assert.match(matrix, /onCopyLink\(service\.id, 'local', service\.localUrl\)/);

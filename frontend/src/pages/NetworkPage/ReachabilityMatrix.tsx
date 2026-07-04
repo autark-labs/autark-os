@@ -164,7 +164,7 @@ export function ReachabilityMatrix({
               aria-label={zone.title}
               className={cn(
                 'grid min-h-[22rem] content-start gap-2 rounded-xl border p-3 transition-colors',
-                'xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto',
+                'xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:overscroll-contain xl:[contain:layout_paint]',
                 zone.warning ? 'border-orange-400/30 bg-orange-500/10' : 'border-sky-400/25 bg-slate-800',
                 activeDropZone === zone.id && zone.droppable && 'border-cyan-300/60 bg-slate-700/80',
               )}
