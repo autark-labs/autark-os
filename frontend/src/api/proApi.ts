@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { ProStatus } from '@/types/pro';
+import type { ProPrivacyPayloadPreview, ProStatus } from '@/types/pro';
 
 export const ProAPIClient = {
   async status() {
@@ -14,6 +14,11 @@ export const ProAPIClient = {
 
   async redeemLicense(licenseCode: string) {
     const response = await httpClient.post<ProStatus>('/api/pro/redeem-license', { licenseCode });
+    return response.data;
+  },
+
+  async privacyPayloadPreview() {
+    const response = await httpClient.get<ProPrivacyPayloadPreview>('/api/pro/privacy/payload-preview');
     return response.data;
   },
 };

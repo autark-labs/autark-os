@@ -1,6 +1,8 @@
 package com.autarkos.pro.models;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 public final class ProModels {
 
@@ -113,5 +115,12 @@ public final class ProModels {
         private static boolean hasText(String value) {
             return value != null && !value.isBlank();
         }
+    }
+
+    public record ProPrivacyPayloadPreview(
+            Instant generatedAt,
+            Map<String, Object> payload,
+            List<String> maySend,
+            List<String> neverSends) {
     }
 }

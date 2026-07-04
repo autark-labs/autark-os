@@ -18,14 +18,16 @@ public class ProService {
     private final boolean remoteApiConfigured;
     private final ProRemoteClient remoteClient;
     private final Supplier<String> versionSupplier;
+    private final ProHeartbeatPayloadBuilder heartbeatPayloadBuilder;
 
     @Autowired
     public ProService(
             ProSettingsRepository repository,
             ProProperties properties,
             ProRemoteClient remoteClient,
-            ProjectVersionService versionService) {
-        this(repository, Instant::now, properties.remoteApiConfigured(), remoteClient, () -> versionService.info().version());
+            ProjectVersionService versionService,
+            ProHeartbeatPayloadBuilder heartbeatPayloadBuilder) {
+        this(repository, Instant::now, properties.remoteApiConfigured(), remoteClient, () -> versionService.info().version(), heartbeatPayloadBuilder);
     }
 
     ProService(ProSettingsRepository repository, Supplier<Instant> clock, boolean remoteApiConfigured) {
@@ -38,11 +40,22 @@ public class ProService {
             boolean remoteApiConfigured,
             ProRemoteClient remoteClient,
             Supplier<String> versionSupplier) {
+        this(repository, clock, remoteApiConfigured, remoteClient, versionSupplier, ProHeartbeatPayloadBuilder.minimal(repository, clock, versionSupplier));
+    }
+
+    ProService(
+            ProSettingsRepository repository,
+            Supplier<Instant> clock,
+            boolean remoteApiConfigured,
+            ProRemoteClient remoteClient,
+            Supplier<String> versionSupplier,
+            ProHeartbeatPayloadBuilder heartbeatPayloadBuilder) {
         this.repository = repository;
         this.clock = clock;
         this.remoteApiConfigured = remoteApiConfigured;
         this.remoteClient = remoteClient;
         this.versionSupplier = versionSupplier;
+        this.heartbeatPayloadBuilder = heartbeatPayloadBuilder;
     }
 
     public ProModels.ProStatus status() {
@@ -138,6 +151,10 @@ public class ProService {
                 now);
         repository.saveSettings(activated);
         return ProModels.ProStatus.from(activated, remoteApiConfigured, null);
+    }
+
+    public ProModels.ProPrivacyPayloadPreview privacyPayloadPreview() {
+        return heartbeatPayloadBuilder.preview();
     }
 
     private static String platform() {

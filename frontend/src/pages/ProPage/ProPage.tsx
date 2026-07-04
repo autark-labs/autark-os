@@ -11,7 +11,7 @@ import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/pri
 import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
-import type { ProStatus } from '@/types/pro';
+import type { ProPrivacyPayloadPreview, ProStatus } from '@/types/pro';
 import { formatProTimestamp, normalizeLicenseCode, proStatusViewModel } from './ProPage.logic';
 
 function ProPage() {
@@ -22,6 +22,9 @@ function ProPage() {
   const [redeeming, setRedeeming] = useState(false);
   const [licenseCode, setLicenseCode] = useState('');
   const [licenseError, setLicenseError] = useState<string | null>(null);
+  const [privacyPreview, setPrivacyPreview] = useState<ProPrivacyPayloadPreview | null>(null);
+  const [privacyLoading, setPrivacyLoading] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load(background = false) {
@@ -31,6 +34,8 @@ function ProPage() {
       setLoading(true);
     }
     setError(null);
+    setPrivacyError(null);
+    setPrivacyLoading(true);
     try {
       setStatus(await ProAPIClient.status());
     } catch (statusError) {
@@ -38,6 +43,15 @@ function ProPage() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+
+    try {
+      const preview = await ProAPIClient.privacyPayloadPreview();
+      setPrivacyPreview(preview);
+    } catch (previewError) {
+      setPrivacyError(apiErrorMessage(previewError, 'Payload preview could not load.'));
+    } finally {
+      setPrivacyLoading(false);
     }
   }
 
@@ -184,7 +198,12 @@ function ProPage() {
                 registering={registering}
                 status={status}
               />
-              <PrivacyPanel status={status} />
+              <PrivacyPanel
+                privacyError={privacyError}
+                privacyLoading={privacyLoading}
+                privacyPreview={privacyPreview}
+                status={status}
+              />
               <HeartbeatPanel status={status} />
               <FeedPanel status={status} />
             </div>
@@ -280,16 +299,70 @@ function ActivationPanel({
   );
 }
 
-function PrivacyPanel({ status }: { status: ProStatus }) {
+function PrivacyPanel({
+  privacyError,
+  privacyLoading,
+  privacyPreview,
+  status,
+}: {
+  privacyError: string | null;
+  privacyLoading: boolean;
+  privacyPreview: ProPrivacyPayloadPreview | null;
+  status: ProStatus;
+}) {
   return (
     <ProjectPanel>
       <SectionHeading icon={ShieldCheck} title="Privacy" />
       <div className="mt-4 grid gap-3">
         <BooleanRow enabled={status.healthReportingEnabled} label="Health reporting" />
         <BooleanRow enabled={status.configSnapshotEnabled} label="Config snapshot" />
-        <p className="text-sm leading-6 text-slate-400">Heartbeat previews and exact payload controls come before any scheduled Pro reporting.</p>
+        <div className="grid gap-3 md:grid-cols-2">
+          <PrivacyList title="May send" items={privacyPreview?.maySend ?? []} loading={privacyLoading} />
+          <PrivacyList title="Never sends" items={privacyPreview?.neverSends ?? []} loading={privacyLoading} />
+        </div>
+        <ProjectInset>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-black text-white">Heartbeat payload preview</p>
+            {privacyLoading && (
+              <span className="inline-flex items-center gap-2 text-xs font-bold text-cyan-100">
+                <Loader2 className="size-3.5 animate-spin" />
+                Loading payload preview
+              </span>
+            )}
+          </div>
+          {privacyError && (
+            <p className="mt-3 rounded-lg border border-orange-300/25 bg-orange-500/10 px-3 py-2 text-sm font-semibold text-orange-100">
+              Payload preview could not load: {privacyError}
+            </p>
+          )}
+          {privacyPreview && (
+            <pre className="mt-3 max-h-80 overflow-auto rounded-xl border border-sky-400/15 bg-slate-950 p-3 text-xs leading-5 text-sky-100">
+              {JSON.stringify(privacyPreview.payload, null, 2)}
+            </pre>
+          )}
+        </ProjectInset>
       </div>
     </ProjectPanel>
+  );
+}
+
+function PrivacyList({ items, loading, title }: { items: string[]; loading: boolean; title: string }) {
+  return (
+    <ProjectInset>
+      <p className="text-sm font-black text-white">{title}</p>
+      {loading && items.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-400">Loading payload preview...</p>
+      ) : (
+        <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-slate-300">
+          {items.map((item) => (
+            <li className="flex gap-2" key={item}>
+              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-cyan-300" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </ProjectInset>
   );
 }
 

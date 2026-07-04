@@ -23,3 +23,10 @@ export type ProStatus = {
   remoteApiConfigured: boolean;
   remoteApiHealthy: boolean | null;
 };
+
+export type ProPrivacyPayloadPreview = {
+  generatedAt: string;
+  payload: Record<string, unknown>;
+  maySend: string[];
+  neverSends: string[];
+};

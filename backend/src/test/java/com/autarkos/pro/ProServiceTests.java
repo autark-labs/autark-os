@@ -271,6 +271,63 @@ class ProServiceTests {
         });
     }
 
+    @Test
+    void privacyPayloadPreviewWorksBeforeRegistrationAndExcludesForbiddenFields() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        ProService service = new ProService(repository, () -> Instant.parse("2026-07-04T12:30:00Z"), false);
+
+        ProModels.ProPrivacyPayloadPreview preview = service.privacyPayloadPreview();
+
+        assertThat(preview.payload()).containsEntry("installId", null);
+        assertThat(preview.payload()).containsEntry("generatedAt", Instant.parse("2026-07-04T12:30:00Z"));
+        assertThat(preview.payload()).containsEntry("autarkVersion", "0.0.1-SNAPSHOT");
+        assertThat(preview.payload()).containsEntry("agentVersion", "0.0.1-SNAPSHOT");
+        assertThat(preview.payload()).containsKeys("coarseSystemHealth", "diskUsagePercent", "memoryUsagePercent", "appHealthCounts", "backupStatusSummary", "updateStatusSummary");
+        assertThat(preview.payload()).containsEntry("updateStatusSummary", null);
+        assertThat(preview.maySend()).contains("install ID", "coarse system health", "app health counts", "backup status summary");
+        assertThat(preview.neverSends()).contains("user files", "raw logs", "secrets", "private keys", "full network map");
+        assertThat(serialized(preview.payload()))
+                .doesNotContainIgnoringCase("token")
+                .doesNotContainIgnoringCase("secret")
+                .doesNotContainIgnoringCase("privateKey")
+                .doesNotContainIgnoringCase("rawLog")
+                .doesNotContainIgnoringCase("fileName")
+                .doesNotContainIgnoringCase("dnsHistory")
+                .doesNotContainIgnoringCase("networkMap");
+    }
+
+    @Test
+    void privacyPayloadPreviewUsesRegisteredInstallIdWithoutExposingToken() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "free",
+                "ins_registered",
+                "tok_registered",
+                false,
+                null,
+                null,
+                "none",
+                null,
+                true,
+                true,
+                true,
+                false,
+                null,
+                null,
+                null,
+                null,
+                createdAt,
+                createdAt));
+        ProService service = new ProService(repository, () -> Instant.parse("2026-07-04T12:30:00Z"), false);
+
+        ProModels.ProPrivacyPayloadPreview preview = service.privacyPayloadPreview();
+
+        assertThat(preview.payload()).containsEntry("installId", "ins_registered");
+        assertThat(serialized(preview.payload())).doesNotContain("tok_registered");
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -281,6 +338,10 @@ class ProServiceTests {
         return Arrays.stream(ProModels.ProStatus.class.getRecordComponents())
                 .map(RecordComponent::getName)
                 .toList();
+    }
+
+    private static String serialized(Object value) {
+        return String.valueOf(value);
     }
 
     private static class RecordingRemoteClient implements ProRemoteClient {

@@ -33,6 +33,11 @@ public class ProController {
         return proService.redeemLicense(request == null ? null : request.licenseCode());
     }
 
+    @GetMapping("/privacy/payload-preview")
+    public ProModels.ProPrivacyPayloadPreview privacyPayloadPreview() {
+        return proService.privacyPayloadPreview();
+    }
+
     public record RedeemLicenseRequest(String licenseCode) {
     }
 }

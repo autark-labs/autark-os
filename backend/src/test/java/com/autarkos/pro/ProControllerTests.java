@@ -64,6 +64,23 @@ class ProControllerTests {
         assertThat(status.installId()).isEqualTo("ins_controller");
     }
 
+    @Test
+    void returnsPrivacyPayloadPreview() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        ProController controller = new ProController(new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T10:00:00Z"),
+                false,
+                new ControllerRemoteClient(),
+                () -> "1.2.3"));
+
+        var preview = controller.privacyPayloadPreview();
+
+        assertThat(preview.payload()).containsEntry("generatedAt", Instant.parse("2026-07-04T10:00:00Z"));
+        assertThat(preview.payload()).containsKey("appHealthCounts");
+        assertThat(preview.neverSends()).contains("secrets", "raw logs");
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

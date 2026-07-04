@@ -27,6 +27,7 @@ test('Pro page has a local route, navigation entry, typed API client, and no hos
   assert.match(api, /get<ProStatus>\('\/api\/pro\/status'\)/);
   assert.match(api, /post<ProStatus>\('\/api\/pro\/register'\)/);
   assert.match(api, /post<ProStatus>\('\/api\/pro\/redeem-license'/);
+  assert.match(api, /get<ProPrivacyPayloadPreview>\('\/api\/pro\/privacy\/payload-preview'\)/);
   assert.doesNotMatch(api, /supabase/i);
 
   const page = source('src/pages/ProPage/ProPage.tsx');
@@ -66,4 +67,25 @@ test('Pro license redemption trims input, avoids empty network calls, and refres
   assert.match(page, /showActionErrorNotification\(redeemError, 'Autark Pro activation failed'\)/);
   assert.match(page, /placeholder="AUTARK-PRO-XXXX-XXXX"/);
   assert.match(page, /Activate accountless Pro/);
+});
+
+test('Pro privacy panel loads a readable payload preview and handles preview errors', () => {
+  const page = source('src/pages/ProPage/ProPage.tsx');
+  const types = source('src/types/pro.ts');
+
+  assert.match(types, /export type ProPrivacyPayloadPreview/);
+  assert.match(types, /payload: Record<string, unknown>/);
+  assert.match(types, /maySend: string\[\]/);
+  assert.match(types, /neverSends: string\[\]/);
+
+  assert.match(page, /const \[privacyPreview, setPrivacyPreview\]/);
+  assert.match(page, /const \[privacyLoading, setPrivacyLoading\]/);
+  assert.match(page, /const \[privacyError, setPrivacyError\]/);
+  assert.match(page, /await ProAPIClient\.privacyPayloadPreview\(\)/);
+  assert.match(page, /setPrivacyPreview\(preview\)/);
+  assert.match(page, /Loading payload preview/);
+  assert.match(page, /Payload preview could not load/);
+  assert.match(page, /JSON\.stringify\(privacyPreview\.payload, null, 2\)/);
+  assert.match(page, /May send/);
+  assert.match(page, /Never sends/);
 });
