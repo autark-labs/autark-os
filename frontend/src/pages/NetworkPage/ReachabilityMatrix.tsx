@@ -163,8 +163,8 @@ export function ReachabilityMatrix({
             <section
               aria-label={zone.title}
               className={cn(
-                'grid min-h-[22rem] content-start gap-2 rounded-xl border p-3 transition-colors',
-                'xl:max-h-[calc(100vh-24rem)] xl:overflow-y-auto xl:overscroll-contain xl:[contain:layout_paint]',
+                'flex min-h-[22rem] flex-col gap-2 rounded-xl border p-3 transition-colors',
+                'xl:max-h-[calc(100vh-24rem)] xl:overflow-hidden xl:overscroll-contain xl:[contain:layout_paint]',
                 zone.warning ? 'border-orange-400/30 bg-orange-500/10' : 'border-sky-400/25 bg-slate-800',
                 activeDropZone === zone.id && zone.droppable && 'border-cyan-300/60 bg-slate-700/80',
               )}
@@ -189,7 +189,7 @@ export function ReachabilityMatrix({
                 </Badge>
               </div>
 
-              <div className="grid gap-2">
+              <div className="grid gap-2 xl:min-h-0 xl:flex-1 xl:auto-rows-max xl:content-start xl:items-start xl:overflow-y-auto xl:overscroll-contain xl:pr-1 xl:[contain:layout_paint]">
                 {showGhost && draggedService && <GhostReachabilityCard service={draggedService} />}
                 {zoneItems.length === 0 && !showGhost ? (
                   <div className="rounded-lg border border-dashed border-sky-400/20 px-3 py-4 text-center text-sm text-sky-100/45">
