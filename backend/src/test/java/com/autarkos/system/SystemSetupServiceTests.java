@@ -92,7 +92,7 @@ class SystemSetupServiceTests {
                     if (joined.startsWith("docker ")) {
                         return new SystemSetupService.CommandResult(0, "27.0.0");
                     }
-                    if (joined.equals("sudo -n autark-os-fileops --help")) {
+                    if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops --help")) {
                         return new SystemSetupService.CommandResult(1, "sudo: a password is required");
                     }
                     if (joined.equals("systemctl is-active autark-os")) {
@@ -115,7 +115,7 @@ class SystemSetupServiceTests {
 
 
     @Test
-    void devModeReportsLocalProcessNotesInsteadOfProductionWarnings() {
+    void devModeReportsLocalProcessNotesAndPrivilegedFileOpsWarning() {
         SystemSetupService service = new SystemSetupService(
                 runtimeLayout(),
                 new FakeTailscaleService(new TailscaleStatus(true, true, "dev", "Dev mode", "autark-os-dev", "autark-os-dev.tailnet.local", List.of("100.64.0.1"), "tail.ts.net", "owner@example.com")),
@@ -134,6 +134,11 @@ class SystemSetupServiceTests {
                     assertThat(check.id()).isEqualTo("tailscale-operator");
                     assertThat(check.status()).isEqualTo("ok");
                     assertThat(check.message()).contains("mock Tailscale");
+                })
+                .anySatisfy(check -> {
+                    assertThat(check.id()).isEqualTo("fileops");
+                    assertThat(check.status()).isEqualTo("warning");
+                    assertThat(check.message()).contains("privileged file operations");
                 })
                 .anySatisfy(check -> {
                     assertThat(check.id()).isEqualTo("systemd");

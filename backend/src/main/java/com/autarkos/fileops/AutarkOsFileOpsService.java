@@ -22,6 +22,7 @@ import com.autarkos.system.SystemCommandRunner;
 public class AutarkOsFileOpsService {
 
     private static final Duration COMMAND_TIMEOUT = Duration.ofMinutes(10);
+    private static final String DEFAULT_HELPER_COMMAND = "/opt/autark-os/bin/autark-os-fileops";
     private static final Pattern APP_ID_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
     private final RuntimeLayout runtimeLayout;
@@ -42,7 +43,7 @@ public class AutarkOsFileOpsService {
         this.runtimeLayout = runtimeLayout;
         this.localOperations = localOperations;
         this.commandRunner = commandRunner;
-        this.helperCommand = helperCommand == null || helperCommand.isBlank() ? "autark-os-fileops" : helperCommand;
+        this.helperCommand = helperCommand == null || helperCommand.isBlank() ? DEFAULT_HELPER_COMMAND : helperCommand;
     }
 
     public void clearAppRuntime(String appId) throws IOException {
@@ -169,7 +170,7 @@ public class AutarkOsFileOpsService {
 
     private static String defaultHelperCommand() {
         String configured = System.getenv("AUTARK_OS_FILEOPS_HELPER");
-        return configured == null || configured.isBlank() ? "autark-os-fileops" : configured;
+        return configured == null || configured.isBlank() ? DEFAULT_HELPER_COMMAND : configured;
     }
 
     private boolean isPermissionFailure(IOException exception) {
@@ -190,7 +191,12 @@ public class AutarkOsFileOpsService {
         if (result.missingCommand()) {
             return "Install the autark-os-fileops helper and rerun Autark-OS setup.";
         }
-        return result.output().isEmpty() ? "No details were returned." : result.output().get(0);
+        String firstLine = result.output().isEmpty() ? "" : result.output().get(0);
+        String normalized = firstLine.toLowerCase();
+        if (normalized.contains("sudo") && normalized.contains("password")) {
+            return "The current backend user cannot run the bounded fileops helper without a password. Run Autark-OS through the autarkos service user or rerun install-autark-os-service.sh to repair helper sudo access.";
+        }
+        return firstLine.isBlank() ? "No details were returned." : firstLine;
     }
 
     interface CommandRunner {

@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${AUTARK_OS_BACKEND_PORT:-8082}"
 SERVICE_NAME="${AUTARK_OS_SERVICE_NAME:-autark-os}"
+FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-/opt/autark-os/bin/autark-os-fileops}"
 AUTO_PORT=0
 STOP_SERVICE=0
 STATUS_ONLY=0
@@ -22,6 +23,7 @@ Options:
 Environment:
   AUTARK_OS_BACKEND_PORT      Default backend port for dev mode. Defaults to 8082.
   AUTARK_OS_SERVICE_NAME      Production systemd service name. Defaults to autark-os.
+  AUTARK_OS_FILEOPS_HELPER    Bounded privileged file helper. Defaults to /opt/autark-os/bin/autark-os-fileops.
 
 Examples:
   ./scripts/dev-backend.sh
@@ -107,6 +109,11 @@ show_status() {
   else
     log "systemd: unavailable"
   fi
+  if sudo -n "${FILEOPS_HELPER}" --help >/dev/null 2>&1; then
+    log "Privileged file operations: available via ${FILEOPS_HELPER}"
+  else
+    log "Privileged file operations: unavailable for $(id -un); root-owned app backups/restores may fail in dev mode"
+  fi
 }
 
 stop_service_if_requested() {
@@ -143,6 +150,11 @@ if [[ "${STATUS_ONLY}" -eq 1 ]]; then
 fi
 
 stop_service_if_requested
+
+if ! sudo -n "${FILEOPS_HELPER}" --help >/dev/null 2>&1; then
+  log "Warning: $(id -un) cannot run ${FILEOPS_HELPER} without a sudo prompt."
+  log "Backups/restores for root-owned app data require the installed ${SERVICE_NAME}.service or repaired fileops sudo setup."
+fi
 
 if port_busy "${PORT}"; then
   if [[ "${AUTO_PORT}" -eq 1 ]]; then

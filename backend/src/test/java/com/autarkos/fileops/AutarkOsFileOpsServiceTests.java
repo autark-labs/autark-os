@@ -63,7 +63,7 @@ class AutarkOsFileOpsServiceTests {
             assertThat(command).containsExactly(
                     "sudo",
                     "-n",
-                    "autark-os-fileops",
+                    "/opt/autark-os/bin/autark-os-fileops",
                     "clear-runtime",
                     "--runtime-root",
                     layout.runtimeRoot().toString(),
@@ -111,7 +111,7 @@ class AutarkOsFileOpsServiceTests {
             assertThat(command).containsExactly(
                     "sudo",
                     "-n",
-                    "autark-os-fileops",
+                    "/opt/autark-os/bin/autark-os-fileops",
                     "restore-app-data",
                     "--runtime-root",
                     layout.runtimeRoot().toString(),
@@ -147,7 +147,7 @@ class AutarkOsFileOpsServiceTests {
             assertThat(command).containsExactly(
                     "sudo",
                     "-n",
-                    "autark-os-fileops",
+                    "/opt/autark-os/bin/autark-os-fileops",
                     "create-full-archive",
                     "--runtime-root",
                     layout.runtimeRoot().toString(),
@@ -176,6 +176,24 @@ class AutarkOsFileOpsServiceTests {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid app id");
         assertThat(commands).isEmpty();
+    }
+
+    @Test
+    void privilegedFailureExplainsWhenCurrentUserCannotUsePasswordlessHelper() throws Exception {
+        RuntimeLayout layout = layout();
+        Path backupRoot = layout.runtimeRoot().resolve("backups").resolve("full");
+        Files.createDirectories(backupRoot);
+        Path archive = backupRoot.resolve("full.zip");
+        AutarkOsFileOpsService service = new AutarkOsFileOpsService(
+                layout,
+                new DeniedAutarkOsFileOperations(),
+                command -> new AutarkOsFileOpsService.CommandResult(1, List.of("sudo: a password is required"), false));
+
+        assertThatThrownBy(() -> service.createFullArchive(List.of("grafana"), archive))
+                .isInstanceOf(java.io.IOException.class)
+                .hasMessageContaining("current backend user")
+                .hasMessageContaining("autarkos service user")
+                .hasMessageContaining("install-autark-os-service.sh");
     }
 
     private RuntimeLayout layout() {

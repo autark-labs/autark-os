@@ -31,6 +31,7 @@ import com.autarkos.system.api.SystemSetupStatus;
 public class SystemSetupService {
 
     private static final String EXPECTED_USER = "autarkos";
+    private static final String DEFAULT_FILEOPS_HELPER = "/opt/autark-os/bin/autark-os-fileops";
     private static final String INSTALL_COMMAND_OVERRIDE = "AUTARK_OS_SETUP_COMMAND";
 
     private final RuntimeLayout runtimeLayout;
@@ -149,13 +150,16 @@ public class SystemSetupService {
     }
 
     private SystemSetupCheck fileOpsCheck() {
-        if (devMode) {
-            return neutral(SystemCapabilityCatalog.FILEOPS, "File operations", "Dev mode uses local file operations first.", "Production setup installs a bounded helper for root-owned app data.", null, null);
-        }
         String helper = fileOpsHelperCommand();
         CommandResult result = run("sudo", "-n", helper, "--help");
         if (result.successful()) {
-            return ok(SystemCapabilityCatalog.FILEOPS, "File operations", "Autark-OS can repair root-owned app data.", "Backups, restores, and app cleanup can use the bounded helper.", null, null);
+            String message = devMode
+                    ? "Dev mode can use bounded privileged file operations."
+                    : "Autark-OS can repair root-owned app data.";
+            return ok(SystemCapabilityCatalog.FILEOPS, "File operations", message, "Backups, restores, and app cleanup can use the bounded helper.", null, null);
+        }
+        if (devMode) {
+            return warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Dev mode cannot use privileged file operations.", "Local operations may work, but backups, restores, and cleanup for root-owned app data can fail: " + firstLine(result), "Run service setup", installCommand());
         }
         return warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Autark-OS cannot run bounded file operations yet.", firstLine(result), "Run service setup", installCommand());
     }
@@ -299,7 +303,7 @@ public class SystemSetupService {
 
     private String fileOpsHelperCommand() {
         String helper = System.getenv("AUTARK_OS_FILEOPS_HELPER");
-        return helper == null || helper.isBlank() ? "autark-os-fileops" : helper;
+        return helper == null || helper.isBlank() ? DEFAULT_FILEOPS_HELPER : helper;
     }
 
     private SystemSetupExistingInstallReport existingInstallReport(AutarkOsIdentity identity) {
