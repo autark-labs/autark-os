@@ -24,6 +24,7 @@ repositories {
 
 dependencies {
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-database-nc-sqlite:12.4.0'
 	implementation 'org.yaml:snakeyaml:2.5'

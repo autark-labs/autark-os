@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.pro.models.ProModels;
@@ -19,8 +18,8 @@ public class ProService {
     @Autowired
     public ProService(
             ProSettingsRepository repository,
-            @Value("${autark-os.pro.api-base-url:}") String apiBaseUrl) {
-        this(repository, Instant::now, apiBaseUrl != null && !apiBaseUrl.isBlank());
+            ProProperties properties) {
+        this(repository, Instant::now, properties.remoteApiConfigured());
     }
 
     ProService(ProSettingsRepository repository, Supplier<Instant> clock, boolean remoteApiConfigured) {
