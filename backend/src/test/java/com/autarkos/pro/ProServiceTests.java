@@ -328,6 +328,118 @@ class ProServiceTests {
         assertThat(serialized(preview.payload())).doesNotContain("tok_registered");
     }
 
+    @Test
+    void sendHeartbeatRequiresRegistration() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T13:00:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        assertThatThrownBy(service::sendHeartbeatNow)
+                .isInstanceOf(ProRemoteException.class)
+                .hasMessageContaining("Register this Autark-OS install before sending a Pro heartbeat.");
+
+        assertThat(remoteClient.heartbeatCalls.get()).isZero();
+        assertThat(repository.settings()).isEmpty();
+    }
+
+    @Test
+    void sendHeartbeatStoresAcceptedResult() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "free",
+                "ins_registered",
+                "tok_registered",
+                false,
+                null,
+                null,
+                "none",
+                null,
+                true,
+                true,
+                true,
+                false,
+                null,
+                null,
+                null,
+                null,
+                createdAt,
+                createdAt));
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T13:00:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        ProModels.ProStatus status = service.sendHeartbeatNow();
+
+        assertThat(status.lastHeartbeatAt()).isEqualTo(Instant.parse("2026-07-04T13:00:30Z"));
+        assertThat(status.lastHeartbeatResult()).isEqualTo("accepted");
+        assertThat(remoteClient.heartbeatCalls.get()).isEqualTo(1);
+        assertThat(remoteClient.lastHeartbeatRequest.installId()).isEqualTo("ins_registered");
+        assertThat(remoteClient.lastHeartbeatRequest.generatedAt()).isEqualTo(Instant.parse("2026-07-04T13:00:00Z"));
+        assertThat(remoteClient.lastHeartbeatRequest.payload()).containsEntry("installId", "ins_registered");
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.installTokenProtected()).isEqualTo("tok_registered");
+            assertThat(settings.lastHeartbeatAt()).isEqualTo(Instant.parse("2026-07-04T13:00:30Z"));
+            assertThat(settings.lastHeartbeatResult()).isEqualTo("accepted");
+            assertThat(settings.updatedAt()).isEqualTo(Instant.parse("2026-07-04T13:00:00Z"));
+        });
+    }
+
+    @Test
+    void sendHeartbeatStoresReadableFailureResult() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "free",
+                "ins_registered",
+                "tok_registered",
+                false,
+                null,
+                null,
+                "none",
+                null,
+                true,
+                true,
+                true,
+                false,
+                null,
+                null,
+                null,
+                null,
+                createdAt,
+                createdAt));
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        remoteClient.failHeartbeat = true;
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T13:00:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        assertThatThrownBy(service::sendHeartbeatNow)
+                .isInstanceOf(ProRemoteException.class)
+                .hasMessageContaining("Autark Pro could not reach the remote service");
+
+        assertThat(remoteClient.heartbeatCalls.get()).isEqualTo(1);
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.lastHeartbeatAt()).isEqualTo(Instant.parse("2026-07-04T13:00:00Z"));
+            assertThat(settings.lastHeartbeatResult()).contains("failed");
+            assertThat(settings.lastHeartbeatResult()).contains("Autark Pro could not reach the remote service");
+        });
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -347,8 +459,11 @@ class ProServiceTests {
     private static class RecordingRemoteClient implements ProRemoteClient {
         private final AtomicInteger registerCalls = new AtomicInteger();
         private final AtomicInteger redeemCalls = new AtomicInteger();
+        private final AtomicInteger heartbeatCalls = new AtomicInteger();
         private ProRemoteModels.RegisterInstallRequest lastRegisterRequest;
         private ProRemoteModels.RedeemLicenseRequest lastRedeemRequest;
+        private ProRemoteModels.HeartbeatRequest lastHeartbeatRequest;
+        private boolean failHeartbeat;
 
         @Override
         public ProRemoteModels.RegisterInstallResponse registerInstall(ProRemoteModels.RegisterInstallRequest request) {
@@ -380,7 +495,15 @@ class ProServiceTests {
 
         @Override
         public ProRemoteModels.HeartbeatResponse submitHeartbeat(ProRemoteModels.HeartbeatRequest request) {
-            throw new UnsupportedOperationException();
+            heartbeatCalls.incrementAndGet();
+            lastHeartbeatRequest = request;
+            if (failHeartbeat) {
+                throw new ProRemoteException("Autark Pro could not reach the remote service. Local Autark-OS features are still available.");
+            }
+            return new ProRemoteModels.HeartbeatResponse(
+                    "accepted",
+                    Instant.parse("2026-07-04T13:00:30Z"),
+                    "Heartbeat accepted.");
         }
 
         @Override

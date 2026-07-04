@@ -20,6 +20,7 @@ function ProPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
+  const [sendingHeartbeat, setSendingHeartbeat] = useState(false);
   const [licenseCode, setLicenseCode] = useState('');
   const [licenseError, setLicenseError] = useState<string | null>(null);
   const [privacyPreview, setPrivacyPreview] = useState<ProPrivacyPayloadPreview | null>(null);
@@ -104,6 +105,31 @@ function ProPage() {
       showActionErrorNotification(redeemError, 'Autark Pro activation failed');
     } finally {
       setRedeeming(false);
+    }
+  }
+
+  async function sendHeartbeatNow() {
+    if (!status?.registered) {
+      setError('Register this install before sending a heartbeat.');
+      return;
+    }
+
+    setSendingHeartbeat(true);
+    setError(null);
+    try {
+      const heartbeatStatus = await ProAPIClient.sendHeartbeatNow();
+      setStatus(heartbeatStatus);
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: 'Test heartbeat sent',
+        message: 'Autark Pro accepted the current operational summary.',
+      }, 'Test heartbeat sent');
+    } catch (heartbeatError) {
+      setError(apiErrorMessage(heartbeatError, 'Autark Pro heartbeat failed.'));
+      showActionErrorNotification(heartbeatError, 'Autark Pro heartbeat failed');
+    } finally {
+      setSendingHeartbeat(false);
     }
   }
 
@@ -204,7 +230,11 @@ function ProPage() {
                 privacyPreview={privacyPreview}
                 status={status}
               />
-              <HeartbeatPanel status={status} />
+              <HeartbeatPanel
+                onSendHeartbeat={sendHeartbeatNow}
+                sendingHeartbeat={sendingHeartbeat}
+                status={status}
+              />
               <FeedPanel status={status} />
             </div>
           </div>
@@ -366,14 +396,31 @@ function PrivacyList({ items, loading, title }: { items: string[]; loading: bool
   );
 }
 
-function HeartbeatPanel({ status }: { status: ProStatus }) {
+function HeartbeatPanel({
+  onSendHeartbeat,
+  sendingHeartbeat,
+  status,
+}: {
+  onSendHeartbeat: () => void;
+  sendingHeartbeat: boolean;
+  status: ProStatus;
+}) {
   return (
     <ProjectPanel>
       <SectionHeading icon={HeartPulse} title="Heartbeat" />
       <div className="mt-4 grid gap-3">
         <StatusFact label="Last heartbeat" value={formatProTimestamp(status.lastHeartbeatAt)} />
         <StatusFact label="Result" value={status.lastHeartbeatResult ?? 'Not sent'} />
-        <p className="text-sm leading-6 text-slate-400">Payload preview is coming before any scheduled heartbeat reporting is enabled.</p>
+        {!status.registered && (
+          <p className="rounded-lg border border-orange-300/25 bg-orange-500/10 px-3 py-2 text-sm font-semibold text-orange-100">
+            Register this install before sending a heartbeat.
+          </p>
+        )}
+        <ProjectPrimaryButton disabled={sendingHeartbeat || !status.registered} onClick={onSendHeartbeat} type="button">
+          {sendingHeartbeat && <Loader2 className="size-4 animate-spin" />}
+          Send test heartbeat
+        </ProjectPrimaryButton>
+        <p className="text-sm leading-6 text-slate-400">Manual heartbeat sends the exact operational summary shown in the privacy preview. Scheduled heartbeat reporting is not enabled yet.</p>
       </div>
     </ProjectPanel>
   );

@@ -27,6 +27,7 @@ test('Pro page has a local route, navigation entry, typed API client, and no hos
   assert.match(api, /get<ProStatus>\('\/api\/pro\/status'\)/);
   assert.match(api, /post<ProStatus>\('\/api\/pro\/register'\)/);
   assert.match(api, /post<ProStatus>\('\/api\/pro\/redeem-license'/);
+  assert.match(api, /post<ProStatus>\('\/api\/pro\/heartbeat\/send-now'\)/);
   assert.match(api, /get<ProPrivacyPayloadPreview>\('\/api\/pro\/privacy\/payload-preview'\)/);
   assert.doesNotMatch(api, /supabase/i);
 
@@ -88,4 +89,18 @@ test('Pro privacy panel loads a readable payload preview and handles preview err
   assert.match(page, /JSON\.stringify\(privacyPreview\.payload, null, 2\)/);
   assert.match(page, /May send/);
   assert.match(page, /Never sends/);
+});
+
+test('Pro manual heartbeat action requires registration and updates status', () => {
+  const page = source('src/pages/ProPage/ProPage.tsx');
+
+  assert.match(page, /const \[sendingHeartbeat, setSendingHeartbeat\]/);
+  assert.match(page, /async function sendHeartbeatNow/);
+  assert.match(page, /await ProAPIClient\.sendHeartbeatNow\(\)/);
+  assert.match(page, /setStatus\(heartbeatStatus\)/);
+  assert.match(page, /showActionNotification\(\{[\s\S]*title: 'Test heartbeat sent'/);
+  assert.match(page, /showActionErrorNotification\(heartbeatError, 'Autark Pro heartbeat failed'\)/);
+  assert.match(page, /Send test heartbeat/);
+  assert.match(page, /Register this install before sending a heartbeat\./);
+  assert.match(page, /disabled=\{sendingHeartbeat \|\| !status\.registered\}/);
 });

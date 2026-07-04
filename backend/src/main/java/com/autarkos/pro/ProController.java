@@ -38,6 +38,11 @@ public class ProController {
         return proService.privacyPayloadPreview();
     }
 
+    @PostMapping("/heartbeat/send-now")
+    public ProModels.ProStatus sendHeartbeatNow() {
+        return proService.sendHeartbeatNow();
+    }
+
     public record RedeemLicenseRequest(String licenseCode) {
     }
 }

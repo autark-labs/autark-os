@@ -81,6 +81,23 @@ class ProControllerTests {
         assertThat(preview.neverSends()).contains("secrets", "raw logs");
     }
 
+    @Test
+    void sendsManualHeartbeat() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        ProController controller = new ProController(new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T10:00:00Z"),
+                false,
+                new ControllerRemoteClient(),
+                () -> "1.2.3"));
+        controller.register();
+
+        var status = controller.sendHeartbeatNow();
+
+        assertThat(status.lastHeartbeatAt()).isEqualTo(Instant.parse("2026-07-04T10:01:00Z"));
+        assertThat(status.lastHeartbeatResult()).isEqualTo("accepted");
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -104,7 +121,10 @@ class ProControllerTests {
 
         @Override
         public ProRemoteModels.HeartbeatResponse submitHeartbeat(ProRemoteModels.HeartbeatRequest request) {
-            throw new UnsupportedOperationException();
+            return new ProRemoteModels.HeartbeatResponse(
+                    "accepted",
+                    Instant.parse("2026-07-04T10:01:00Z"),
+                    "Heartbeat accepted.");
         }
 
         @Override

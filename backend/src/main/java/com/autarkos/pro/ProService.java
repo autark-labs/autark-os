@@ -157,6 +157,67 @@ public class ProService {
         return heartbeatPayloadBuilder.preview();
     }
 
+    public ProModels.ProStatus sendHeartbeatNow() {
+        ProModels.ProSettings current = repository.settings()
+                .orElseGet(() -> ProModels.ProSettings.defaults(clock.get()));
+        if (!hasText(current.installId())) {
+            throw new ProRemoteException("Register this Autark-OS install before sending a Pro heartbeat.");
+        }
+
+        ProModels.ProPrivacyPayloadPreview preview = heartbeatPayloadBuilder.preview();
+        try {
+            ProRemoteModels.HeartbeatResponse response = remoteClient.submitHeartbeat(new ProRemoteModels.HeartbeatRequest(
+                    current.installId(),
+                    preview.generatedAt(),
+                    preview.payload()));
+            Instant now = clock.get();
+            Instant heartbeatAt = response.receivedAt() == null ? now : response.receivedAt();
+            ProModels.ProSettings updated = withHeartbeatResult(
+                    current,
+                    heartbeatAt,
+                    firstPresent(response.result(), response.userMessage(), "accepted"),
+                    now);
+            repository.saveSettings(updated);
+            return ProModels.ProStatus.from(updated, remoteApiConfigured, null);
+        } catch (ProRemoteException exception) {
+            Instant now = clock.get();
+            ProModels.ProSettings failed = withHeartbeatResult(
+                    current,
+                    now,
+                    "failed: " + firstPresent(exception.getMessage(), "Autark Pro heartbeat failed."),
+                    now);
+            repository.saveSettings(failed);
+            throw exception;
+        }
+    }
+
+    private static ProModels.ProSettings withHeartbeatResult(
+            ProModels.ProSettings current,
+            Instant lastHeartbeatAt,
+            String lastHeartbeatResult,
+            Instant updatedAt) {
+        return new ProModels.ProSettings(
+                current.enabled(),
+                current.mode(),
+                current.installId(),
+                current.installTokenProtected(),
+                current.accountLinked(),
+                current.accountEmail(),
+                current.plan(),
+                current.entitlementStatus(),
+                current.entitlementExpiresAt(),
+                current.healthReportingEnabled(),
+                current.alertsEnabled(),
+                current.proFeedEnabled(),
+                current.configSnapshotEnabled(),
+                lastHeartbeatAt,
+                lastHeartbeatResult,
+                current.lastEntitlementCheckAt(),
+                current.lastFeedSyncAt(),
+                current.createdAt() == null ? updatedAt : current.createdAt(),
+                updatedAt);
+    }
+
     private static String platform() {
         return firstPresent(System.getProperty("os.name"), "unknown")
                 + "-"

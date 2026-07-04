@@ -21,4 +21,9 @@ export const ProAPIClient = {
     const response = await httpClient.get<ProPrivacyPayloadPreview>('/api/pro/privacy/payload-preview');
     return response.data;
   },
+
+  async sendHeartbeatNow() {
+    const response = await httpClient.post<ProStatus>('/api/pro/heartbeat/send-now');
+    return response.data;
+  },
 };
