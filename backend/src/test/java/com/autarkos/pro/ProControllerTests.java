@@ -2,14 +2,17 @@ package com.autarkos.pro;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.RecordComponent;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Arrays;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.pro.models.ProModels;
 import com.autarkos.pro.models.ProRemoteModels;
 import com.autarkos.testsupport.JpaTestRepositories;
 
@@ -134,10 +137,77 @@ class ProControllerTests {
         assertThat(status.entitlementStatus()).isEqualTo("active");
     }
 
+    @Test
+    void completesLocalProLeanSliceFlowAndReloadsWithoutExposingToken() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        ProController controller = new ProController(new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T10:00:00Z"),
+                false,
+                new ControllerRemoteClient(),
+                () -> "1.2.3"));
+
+        assertThat(controller.status().registered()).isFalse();
+
+        var registered = controller.register();
+        assertThat(registered.registered()).isTrue();
+        assertThat(registered.installId()).isEqualTo("ins_controller");
+
+        var activated = controller.redeemLicense(new ProController.RedeemLicenseRequest("AUTARK-PRO-CONTROLLER"));
+        assertThat(activated.enabled()).isTrue();
+        assertThat(activated.mode()).isEqualTo("accountless");
+        assertThat(activated.entitlementStatus()).isEqualTo("active");
+
+        var preview = controller.privacyPayloadPreview();
+        assertThat(preview.payload()).containsEntry("installId", "ins_controller");
+        assertThat(String.valueOf(preview.payload())).doesNotContain("tok_controller");
+
+        var heartbeat = controller.sendHeartbeatNow();
+        assertThat(heartbeat.lastHeartbeatResult()).isEqualTo("accepted");
+
+        var feed = controller.syncProFeed();
+        assertThat(feed.lastFeedSyncAt()).isEqualTo(Instant.parse("2026-07-04T10:02:00Z"));
+        assertThat(feed.feedAdvisoryCount()).isEqualTo(1);
+        assertThat(feed.feedDeviceProfileCount()).isEqualTo(2);
+        assertThat(feed.feedBlueprintCount()).isEqualTo(3);
+
+        var disabled = controller.disableLocally();
+        assertThat(disabled.enabled()).isFalse();
+        assertThat(disabled.mode()).isEqualTo("free");
+        assertThat(disabled.registered()).isTrue();
+        assertThat(disabled.entitlementStatus()).isEqualTo("active");
+        assertThat(publicStatusFields()).doesNotContain("installToken", "installTokenProtected");
+
+        ProController reloadedController = new ProController(new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T11:00:00Z"),
+                false,
+                new ControllerRemoteClient(),
+                () -> "1.2.3"));
+        var reloaded = reloadedController.status();
+
+        assertThat(reloaded.enabled()).isFalse();
+        assertThat(reloaded.mode()).isEqualTo("free");
+        assertThat(reloaded.registered()).isTrue();
+        assertThat(reloaded.installId()).isEqualTo("ins_controller");
+        assertThat(reloaded.entitlementStatus()).isEqualTo("active");
+        assertThat(reloaded.lastHeartbeatResult()).isEqualTo("accepted");
+        assertThat(reloaded.feedAdvisoryCount()).isEqualTo(1);
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.installTokenProtected()).isEqualTo("tok_controller");
+        });
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
         return new RuntimeLayout(properties);
+    }
+
+    private static java.util.List<String> publicStatusFields() {
+        return Arrays.stream(ProModels.ProStatus.class.getRecordComponents())
+                .map(RecordComponent::getName)
+                .toList();
     }
 
     private static class ControllerRemoteClient implements ProRemoteClient {
