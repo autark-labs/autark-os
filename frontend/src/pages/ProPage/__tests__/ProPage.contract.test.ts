@@ -25,6 +25,7 @@ test('Pro page has a local route, navigation entry, typed API client, and no hos
 
   const api = source('src/api/proApi.ts');
   assert.match(api, /get<ProStatus>\('\/api\/pro\/status'\)/);
+  assert.match(api, /post<ProStatus>\('\/api\/pro\/register'\)/);
   assert.doesNotMatch(api, /supabase/i);
 
   const page = source('src/pages/ProPage/ProPage.tsx');
@@ -36,4 +37,17 @@ test('Pro page has a local route, navigation entry, typed API client, and no hos
   assert.match(page, /Loading Autark Pro/);
   assert.match(page, /Autark Pro could not load/);
   assert.match(page, /Account linking is coming later\./);
+});
+
+test('Pro registration action updates status and uses action notifications', () => {
+  const page = source('src/pages/ProPage/ProPage.tsx');
+
+  assert.match(page, /async function registerInstall/);
+  assert.match(page, /setRegistering\(true\)/);
+  assert.match(page, /await ProAPIClient\.register\(\)/);
+  assert.match(page, /setStatus\(registeredStatus\)/);
+  assert.match(page, /showActionNotification\(\{[\s\S]*title: 'Autark Pro registered'/);
+  assert.match(page, /showActionErrorNotification\(registerError, 'Autark Pro registration failed'\)/);
+  assert.match(page, /Register this Autark install/);
+  assert.match(page, /disabled=\{registering \|\| status\.registered\}/);
 });

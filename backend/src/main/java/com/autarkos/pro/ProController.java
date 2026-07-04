@@ -1,6 +1,7 @@
 package com.autarkos.pro;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,5 +20,10 @@ public class ProController {
     @GetMapping("/status")
     public ProModels.ProStatus status() {
         return proService.status();
+    }
+
+    @PostMapping("/register")
+    public ProModels.ProStatus register() {
+        return proService.registerInstall();
     }
 }

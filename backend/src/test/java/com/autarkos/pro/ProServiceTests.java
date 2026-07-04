@@ -6,6 +6,7 @@ import java.lang.reflect.RecordComponent;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.pro.models.ProModels;
+import com.autarkos.pro.models.ProRemoteModels;
 import com.autarkos.testsupport.JpaTestRepositories;
 
 class ProServiceTests {
@@ -95,6 +97,83 @@ class ProServiceTests {
         assertThat(publicStatusFields()).doesNotContain("installToken", "installTokenProtected");
     }
 
+    @Test
+    void registerInstallStoresRemoteIdentityAndReturnsPublicStatus() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T12:00:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        ProModels.ProStatus status = service.registerInstall();
+
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.mode()).isEqualTo("free");
+        assertThat(status.registered()).isTrue();
+        assertThat(status.installId()).isEqualTo("ins_story_4");
+        assertThat(status.entitlementStatus()).isEqualTo("none");
+        assertThat(status.remoteApiConfigured()).isFalse();
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.installId()).isEqualTo("ins_story_4");
+            assertThat(settings.installTokenProtected()).isEqualTo("tok_story_4");
+            assertThat(settings.updatedAt()).isEqualTo(Instant.parse("2026-07-04T12:00:00Z"));
+        });
+        assertThat(remoteClient.registerCalls.get()).isEqualTo(1);
+        assertThat(remoteClient.lastRegisterRequest.clientName()).isEqualTo("Autark-OS");
+        assertThat(remoteClient.lastRegisterRequest.autarkVersion()).isEqualTo("1.2.3");
+        assertThat(remoteClient.lastRegisterRequest.agentVersion()).isEqualTo("1.2.3");
+        assertThat(remoteClient.lastRegisterRequest.platform()).isNotBlank();
+        assertThat(publicStatusFields()).doesNotContain("installToken", "installTokenProtected");
+    }
+
+    @Test
+    void registerInstallIsIdempotentWhenAlreadyRegistered() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "free",
+                "ins_existing",
+                "tok_existing",
+                false,
+                null,
+                null,
+                "none",
+                null,
+                true,
+                true,
+                true,
+                false,
+                null,
+                null,
+                null,
+                null,
+                createdAt,
+                createdAt));
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T12:00:00Z"),
+                true,
+                remoteClient,
+                () -> "1.2.3");
+
+        ProModels.ProStatus status = service.registerInstall();
+
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.registered()).isTrue();
+        assertThat(status.installId()).isEqualTo("ins_existing");
+        assertThat(status.remoteApiConfigured()).isTrue();
+        assertThat(remoteClient.registerCalls.get()).isZero();
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.installTokenProtected()).isEqualTo("tok_existing");
+            assertThat(settings.updatedAt()).isEqualTo(createdAt);
+        });
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -105,5 +184,35 @@ class ProServiceTests {
         return Arrays.stream(ProModels.ProStatus.class.getRecordComponents())
                 .map(RecordComponent::getName)
                 .toList();
+    }
+
+    private static class RecordingRemoteClient implements ProRemoteClient {
+        private final AtomicInteger registerCalls = new AtomicInteger();
+        private ProRemoteModels.RegisterInstallRequest lastRegisterRequest;
+
+        @Override
+        public ProRemoteModels.RegisterInstallResponse registerInstall(ProRemoteModels.RegisterInstallRequest request) {
+            registerCalls.incrementAndGet();
+            lastRegisterRequest = request;
+            return new ProRemoteModels.RegisterInstallResponse(
+                    "ins_story_4",
+                    "tok_story_4",
+                    Instant.parse("2026-07-04T12:00:00Z"));
+        }
+
+        @Override
+        public ProRemoteModels.RedeemLicenseResponse redeemLicense(ProRemoteModels.RedeemLicenseRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ProRemoteModels.HeartbeatResponse submitHeartbeat(ProRemoteModels.HeartbeatRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public ProRemoteModels.ProFeedResponse proFeed(Instant since) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

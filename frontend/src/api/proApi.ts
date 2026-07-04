@@ -6,4 +6,9 @@ export const ProAPIClient = {
     const response = await httpClient.get<ProStatus>('/api/pro/status');
     return response.data;
   },
+
+  async register() {
+    const response = await httpClient.post<ProStatus>('/api/pro/register');
+    return response.data;
+  },
 };

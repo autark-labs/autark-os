@@ -7,6 +7,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Badge } from '@/components/ui/badge';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import type { ProStatus } from '@/types/pro';
 import { formatProTimestamp, proStatusViewModel } from './ProPage.logic';
@@ -15,6 +16,7 @@ function ProPage() {
   const [status, setStatus] = useState<ProStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [registering, setRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load(background = false) {
@@ -37,6 +39,26 @@ function ProPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function registerInstall() {
+    setRegistering(true);
+    setError(null);
+    try {
+      const registeredStatus = await ProAPIClient.register();
+      setStatus(registeredStatus);
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: 'Autark Pro registered',
+        message: 'This Autark-OS install now has a local Pro identity.',
+      }, 'Autark Pro registered');
+    } catch (registerError) {
+      setError(apiErrorMessage(registerError, 'Autark Pro registration failed.'));
+      showActionErrorNotification(registerError, 'Autark Pro registration failed');
+    } finally {
+      setRegistering(false);
+    }
+  }
 
   const statusView = useMemo(() => status ? proStatusViewModel(status) : null, [status]);
 
@@ -118,7 +140,7 @@ function ProPage() {
             </ProjectPanel>
 
             <div className="grid gap-5 lg:grid-cols-2">
-              <ActivationPanel status={status} />
+              <ActivationPanel onRegister={registerInstall} registering={registering} status={status} />
               <PrivacyPanel status={status} />
               <HeartbeatPanel status={status} />
               <FeedPanel status={status} />
@@ -154,7 +176,15 @@ function StatusFact({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActivationPanel({ status }: { status: ProStatus }) {
+function ActivationPanel({
+  onRegister,
+  registering,
+  status,
+}: {
+  onRegister: () => void;
+  registering: boolean;
+  status: ProStatus;
+}) {
   return (
     <ProjectPanel>
       <SectionHeading icon={Sparkles} title="Activation" />
@@ -163,9 +193,10 @@ function ActivationPanel({ status }: { status: ProStatus }) {
           <p className="text-sm font-bold text-white">{status.registered ? 'This install is registered.' : 'Register this install to enable Pro actions later.'}</p>
           <p className="mt-1 text-sm leading-6 text-slate-400">Account linking is coming later.</p>
         </ProjectInset>
-        <ProjectInset className="border-cyan-300/25 bg-cyan-400/10">
-          <p className="text-sm font-semibold text-cyan-100">Registration actions arrive in the next Pro slice.</p>
-        </ProjectInset>
+        <ProjectPrimaryButton disabled={registering || status.registered} onClick={onRegister} type="button">
+          {registering && <Loader2 className="size-4 animate-spin" />}
+          {status.registered ? 'Install registered' : 'Register this Autark install'}
+        </ProjectPrimaryButton>
       </div>
     </ProjectPanel>
   );
