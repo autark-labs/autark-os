@@ -44,11 +44,11 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     private boolean userFacingManagedApp(AppReconciliationItem item) {
         return item.ownership() == DockerResourceOwnership.OWNED
-                && repository.findById(item.appId()).isPresent();
+                && repository.findAppById(item.appId()).isPresent();
     }
 
     private AppInstanceView view(AppReconciliationItem item) {
-        InstalledApp app = repository.findById(item.appId()).orElse(null);
+        InstalledApp app = repository.findAppById(item.appId()).orElse(null);
         InstalledAppOwnershipMetadata ownership = repository.ownershipFor(item.appId()).orElse(null);
         InstallSettings settings = repository.settingsFor(item.appId()).orElse(null);
         ApplicationManifest manifest = catalogService.findById(item.appId()).orElse(null);

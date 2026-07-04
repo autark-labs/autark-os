@@ -48,7 +48,7 @@ public class StorageService {
     }
 
     public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, RuntimeFileOperations fileOperations) {
-        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, () -> installedAppRepository.findAll().stream()
+        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, () -> installedAppRepository.findAllApps().stream()
                 .map(app -> new AppInstanceView(
                         app.appId(),
                         app.appId(),
@@ -208,7 +208,7 @@ public class StorageService {
                 .map(AppInstanceView::catalogAppId)
                 .filter(id -> id != null && !id.isBlank())
                 .collect(HashSet::new, Set::add, Set::addAll);
-        return installedAppRepository.findAll().stream()
+        return installedAppRepository.findAllApps().stream()
                 .filter(app -> managedIds.contains(app.appId()))
                 .toList();
     }

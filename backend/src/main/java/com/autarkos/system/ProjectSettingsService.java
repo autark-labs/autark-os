@@ -63,7 +63,7 @@ public class ProjectSettingsService {
         }
         int updated = 0;
         BackupPolicy backup = new BackupPolicy(sanitized.automaticBackupsEnabled(), sanitized.backupFrequency(), sanitized.backupRetentionDays());
-        for (InstalledApp app : installedAppRepository.findAll()) {
+        for (InstalledApp app : installedAppRepository.findAllApps()) {
             InstallSettings current = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
             installedAppRepository.saveSettings(app.appId(), new InstallSettings(
                     current.accessUrl(),

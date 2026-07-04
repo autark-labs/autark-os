@@ -1,7 +1,7 @@
 package com.autarkos.testsupport;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import javax.sql.DataSource;
 
@@ -25,6 +25,7 @@ import com.autarkos.database.AutarkOsDatabase;
 import com.autarkos.discover.DiscoverSetupRepository;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.jobs.AutarkOsJobRepository;
+import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.devices.DeviceTrustRepository;
@@ -32,7 +33,8 @@ import com.autarkos.system.ProjectSettingsRepository;
 
 public final class JpaTestRepositories {
 
-    private static final Map<String, ConfigurableApplicationContext> CONTEXTS = new ConcurrentHashMap<>();
+    private static final int MAX_CONTEXTS = 8;
+    private static final Map<String, ConfigurableApplicationContext> CONTEXTS = new LinkedHashMap<>(16, 0.75f, true);
 
     private JpaTestRepositories() {
     }
@@ -61,11 +63,35 @@ public final class JpaTestRepositories {
         return context(layout).getBean(ObservedServiceRepository.class);
     }
 
-    private static ConfigurableApplicationContext context(RuntimeLayout layout) {
+    public static InstalledAppRepository installedAppRepository(RuntimeLayout layout) {
+        return context(layout).getBean(InstalledAppRepository.class);
+    }
+
+    private static synchronized ConfigurableApplicationContext context(RuntimeLayout layout) {
         String runtimeRoot = layout.runtimeRoot().toString();
-        return CONTEXTS.computeIfAbsent(runtimeRoot, root -> new SpringApplicationBuilder(JpaRepositoryTestConfiguration.class)
+        ConfigurableApplicationContext existing = CONTEXTS.get(runtimeRoot);
+        if (existing != null) {
+            return existing;
+        }
+
+        ConfigurableApplicationContext created = new SpringApplicationBuilder(JpaRepositoryTestConfiguration.class)
                 .web(WebApplicationType.NONE)
-                .run("--autark-os.runtime-root=" + root));
+                .run("--autark-os.runtime-root=" + runtimeRoot);
+        CONTEXTS.put(runtimeRoot, created);
+        evictOldestContextIfNeeded();
+        return created;
+    }
+
+    private static void evictOldestContextIfNeeded() {
+        if (CONTEXTS.size() <= MAX_CONTEXTS) {
+            return;
+        }
+
+        String oldestKey = CONTEXTS.keySet().iterator().next();
+        ConfigurableApplicationContext oldest = CONTEXTS.remove(oldestKey);
+        if (oldest != null) {
+            oldest.close();
+        }
     }
 
     @TestConfiguration
@@ -75,7 +101,8 @@ public final class JpaTestRepositories {
             ProjectSettingsRepository.class,
             DeviceTrustRepository.class,
             DiscoverSetupRepository.class,
-            ObservedServiceRepository.class
+            ObservedServiceRepository.class,
+            InstalledAppRepository.class
     })
     @Import(AutarkOsDataSourceConfiguration.class)
     static class JpaRepositoryTestConfiguration {
@@ -102,7 +129,8 @@ public final class JpaTestRepositories {
                     "com.autarkos.system",
                     "com.autarkos.network.devices",
                     "com.autarkos.discover",
-                    "com.autarkos.host");
+                    "com.autarkos.host",
+                    "com.autarkos.marketplace.install");
             factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
             factory.setJpaPropertyMap(Map.of(
                     "hibernate.hbm2ddl.auto", "none",

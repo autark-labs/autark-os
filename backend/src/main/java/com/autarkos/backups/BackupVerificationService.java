@@ -89,13 +89,13 @@ class BackupVerificationService {
             boolean reviewRequired = java.util.Arrays.stream(point.includedAppIds().split(","))
                     .map(String::trim)
                     .filter(value -> !value.isBlank())
-                    .map(installedAppRepository::findById)
+                    .map(installedAppRepository::findAppById)
                     .flatMap(Optional::stream)
                     .map(backupContractService::backupContract)
                     .anyMatch(BackupContract::reviewRequired);
             return reviewRequired ? "medium" : "high";
         }
-        return installedAppRepository.findById(point.appId())
+        return installedAppRepository.findAppById(point.appId())
                 .map(backupContractService::backupContract)
                 .filter(BackupContract::reviewRequired)
                 .isPresent() ? "medium" : "high";

@@ -235,7 +235,7 @@ class AppInstanceViewServiceTests {
     private InstalledAppRepository repository() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return new InstalledAppRepository(new RuntimeLayout(properties));
+        return JpaTestRepositories.installedAppRepository(new RuntimeLayout(properties));
     }
 
     private BackupRepository backupRepository() {

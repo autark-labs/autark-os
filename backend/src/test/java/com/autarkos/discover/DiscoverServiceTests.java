@@ -306,7 +306,7 @@ class DiscoverServiceTests {
     }
 
     private InstalledAppRepository repository() {
-        return new InstalledAppRepository(runtimeLayout());
+        return JpaTestRepositories.installedAppRepository(runtimeLayout());
     }
 
     private ObservedServiceRepository observedRepository() {

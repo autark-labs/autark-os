@@ -56,7 +56,7 @@ final class AppPrivateAccessPorts {
 
     private static Set<Integer> usedPorts(String appId, InstalledAppRepository repository) {
         Set<Integer> ports = new HashSet<>();
-        for (InstalledApp app : repository.findAll()) {
+        for (InstalledApp app : repository.findAllApps()) {
             add(ports, portFromUrl(app.accessUrl()));
             repository.settingsFor(app.appId()).ifPresent(settings -> {
                 add(ports, portFromUrl(settings.accessUrl()));

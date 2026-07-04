@@ -35,7 +35,7 @@ class AppUpdateServiceCanonicalAppTests {
     @Test
     void statusesOnlyIncludeCanonicalManagedApps() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
+        InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         repository.save(installed(runtimeLayout, "homepage", "Homepage"));
         repository.save(installed(runtimeLayout, "vaultwarden", "Vaultwarden"));
         ActivityLogService activityLogService = new ActivityLogService(mock(ActivityLogRepository.class));

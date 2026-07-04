@@ -330,7 +330,7 @@ class AppOwnershipServiceTests {
     }
 
     private InstalledAppRepository installedRepository() {
-        return new InstalledAppRepository(runtimeLayout());
+        return JpaTestRepositories.installedAppRepository(runtimeLayout());
     }
 
     private ObservedServiceRepository observedRepository() {

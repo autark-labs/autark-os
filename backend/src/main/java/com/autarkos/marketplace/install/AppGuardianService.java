@@ -48,7 +48,7 @@ public class AppGuardianService {
     }
 
     public AppGuardianService(InstalledAppRepository repository, AppLifecycleService appLifecycleService, @Value("${autark-os.guardian.enabled:true}") boolean enabled) {
-        this(repository, appLifecycleService, enabled, null, null, () -> repository.findAll().stream()
+        this(repository, appLifecycleService, enabled, null, null, () -> repository.findAllApps().stream()
                 .map(app -> new AppInstanceView(
                         app.appId(),
                         app.appId(),
@@ -211,13 +211,13 @@ public class AppGuardianService {
                 .map(AppInstanceView::catalogAppId)
                 .filter(id -> id != null && !id.isBlank())
                 .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
-        return repository.findAll().stream()
+        return repository.findAllApps().stream()
                 .filter(app -> managedIds.contains(app.appId()))
                 .toList();
     }
 
     private List<InstalledApp> managedInstalledAppsFromSnapshot(Set<String> managedIds) {
-        return repository.findAll().stream()
+        return repository.findAllApps().stream()
                 .filter(app -> managedIds.contains(app.appId()))
                 .toList();
     }

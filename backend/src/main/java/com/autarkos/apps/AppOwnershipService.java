@@ -69,7 +69,7 @@ public class AppOwnershipService {
     }
 
     private AppOwnershipView appView(ApplicationManifest manifest, List<ObservedService> observedServices) {
-        InstalledApp installed = installedAppRepository.findById(manifest.id())
+        InstalledApp installed = installedAppRepository.findAppById(manifest.id())
                 .filter(app -> ownershipCompatible(manifest.id()))
                 .orElse(null);
         ObservedService recoverable = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);

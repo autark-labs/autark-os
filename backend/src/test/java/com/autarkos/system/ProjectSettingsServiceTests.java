@@ -28,7 +28,7 @@ class ProjectSettingsServiceTests {
     @Test
     void appliesBackupAndRepairDefaultsToInstalledAppsWithoutReplacingAppSpecificSettings() {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        InstalledAppRepository installedApps = new InstalledAppRepository(runtimeLayout);
+        InstalledAppRepository installedApps = JpaTestRepositories.installedAppRepository(runtimeLayout);
         ProjectSettingsService service = new ProjectSettingsService(
                 JpaTestRepositories.projectSettingsRepository(runtimeLayout),
                 new ActivityLogService(mock(ActivityLogRepository.class)),

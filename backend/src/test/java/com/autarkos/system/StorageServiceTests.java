@@ -16,6 +16,7 @@ import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,7 +30,7 @@ class StorageServiceTests {
         RuntimeLayout layout = runtimeLayout(tempDir.resolve("runtime"));
         Files.createDirectories(layout.appRoot("homepage"));
         Files.createDirectories(layout.appRoot("vaultwarden"));
-        InstalledAppRepository repository = new InstalledAppRepository(layout);
+        InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(layout);
         repository.save(installed(layout, "homepage", "Homepage"));
         repository.save(installed(layout, "vaultwarden", "Vaultwarden"));
         StorageService service = new StorageService(
@@ -49,7 +50,7 @@ class StorageServiceTests {
     private StorageService storageService(RuntimeLayout layout) {
         return new StorageService(
                 layout,
-                new InstalledAppRepository(layout),
+                JpaTestRepositories.installedAppRepository(layout),
                 new ActivityLogService(mock(ActivityLogRepository.class)),
                 mock(StorageSampleRepository.class),
                 new RuntimeFileOperations());

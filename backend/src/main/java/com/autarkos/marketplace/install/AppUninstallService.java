@@ -80,7 +80,7 @@ class AppUninstallService {
         if (result.successful()) {
             repository.recordEvent(app.appId(), "uninstalled", "Removed containers for " + app.appName() + "; data was kept on disk.");
             activitySuccess("uninstalled", "Uninstalled " + app.appName(), "Removed containers and kept app data on disk.", app.appId());
-            repository.delete(app.appId());
+            repository.deleteApp(app.appId());
             return new AppActionResult(app.appId(), "uninstall", "removed", app.appName() + " was removed from Autark-OS. Data was kept on disk.", null, logs, Instant.now());
         }
         repository.recordEvent(app.appId(), "uninstall_failed", String.join("\n", result.output()));

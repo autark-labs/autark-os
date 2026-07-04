@@ -14,6 +14,7 @@ import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class AppReconciliationServiceTests {
 
@@ -87,7 +88,7 @@ class AppReconciliationServiceTests {
                     assertThat(item.status()).isEqualTo("Needs setup");
                     assertThat(item.lifecycleEligible()).isFalse();
                 });
-        assertThat(repository.findById("vaultwarden")).isEmpty();
+        assertThat(repository.findAppById("vaultwarden")).isEmpty();
     }
 
     private AppReconciliationService service(InstalledAppRepository repository, List<ManagedContainer> containers) {
@@ -100,7 +101,7 @@ class AppReconciliationServiceTests {
     private InstalledAppRepository repository() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return new InstalledAppRepository(new RuntimeLayout(properties));
+        return JpaTestRepositories.installedAppRepository(new RuntimeLayout(properties));
     }
 
     private InstalledApp installed(String appId, String status) {

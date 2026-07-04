@@ -50,7 +50,7 @@ class PrivateAccessReconciliationServiceTests {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
         RuntimeLayout runtimeLayout = new RuntimeLayout(properties);
-        repository = new InstalledAppRepository(runtimeLayout);
+        repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         composeExecutor = new FakeDockerComposeExecutor();
         tailscaleService = new FakeTailscaleService();
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());

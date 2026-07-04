@@ -31,7 +31,7 @@ public class AppReconciliationService {
     }
 
     public List<AppReconciliationItem> reconcile() {
-        List<InstalledApp> installedApps = repository.findAll();
+        List<InstalledApp> installedApps = repository.findAllApps();
         List<ManagedContainer> containers = managedContainerDiscovery.findManagedContainers();
         Map<String, List<ManagedContainer>> containersByApp = containers.stream()
                 .filter(container -> container.appId() != null && !container.appId().isBlank())

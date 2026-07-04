@@ -17,6 +17,7 @@ import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class InstalledAppRepositoryTests {
 
@@ -25,7 +26,7 @@ class InstalledAppRepositoryTests {
 
     @Test
     void savesAppsSettingsEventsAndHealthSnapshots() {
-        InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout());
+        InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout());
         Instant installedAt = Instant.parse("2026-06-19T00:00:00Z");
         Instant checkedAt = Instant.parse("2026-06-19T01:00:00Z");
 
@@ -48,8 +49,8 @@ class InstalledAppRepositoryTests {
         repository.recordEvent("vaultwarden", "installed", "Vaultwarden installed.");
         repository.saveHealthSnapshot(new AppHealthSnapshot("vaultwarden", "Ready", "Ready", "Healthy", "Running", "reachable", "reachable", false, checkedAt));
 
-        assertThat(repository.findById("vaultwarden")).contains(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", "/apps/vaultwarden", "autark-os-vaultwarden", "http://localhost:8090", installedAt));
-        assertThat(repository.findAll()).extracting(InstalledApp::appId).containsExactly("vaultwarden");
+        assertThat(repository.findAppById("vaultwarden")).contains(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", "/apps/vaultwarden", "autark-os-vaultwarden", "http://localhost:8090", installedAt));
+        assertThat(repository.findAllApps()).extracting(InstalledApp::appId).containsExactly("vaultwarden");
         assertThat(repository.settingsFor("vaultwarden"))
                 .hasValueSatisfying(settings -> {
                     assertThat(settings.tailscaleEnabled()).isTrue();
@@ -64,7 +65,7 @@ class InstalledAppRepositoryTests {
 
     @Test
     void savesAndReadsOwnershipMetadataWithoutChangingInstalledAppApi() {
-        InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout());
+        InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout());
         Instant installedAt = Instant.parse("2026-06-19T00:00:00Z");
         Instant updatedAt = Instant.parse("2026-06-19T01:00:00Z");
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", "/apps/vaultwarden", "autarkos_homelab-box_vaultwarden", "http://localhost:8090", installedAt));

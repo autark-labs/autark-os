@@ -61,7 +61,7 @@ class AppLifecycleServiceTests {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
         runtimeLayout = new RuntimeLayout(properties);
-        repository = new InstalledAppRepository(runtimeLayout);
+        repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         composeExecutor = new FakeLifecycleDockerComposeExecutor();
         tailscaleService = new FakeTailscaleService();
@@ -252,7 +252,7 @@ class AppLifecycleServiceTests {
 
         assertThat(app.friendlyStatus()).isEqualTo("Ready");
         assertThat(app.readinessState()).isEqualTo("ready");
-        assertThat(repository.findById("vaultwarden")).hasValueSatisfying(saved ->
+        assertThat(repository.findAppById("vaultwarden")).hasValueSatisfying(saved ->
                 assertThat(saved.composeProject()).isEqualTo("autarkos_dev_postest_vaultwarden"));
         assertThat(repository.ownershipFor("vaultwarden")).hasValueSatisfying(ownership ->
                 assertThat(ownership.appInstanceId()).isEqualTo("appinst_vaultwarden_runtime"));
@@ -327,7 +327,7 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         AppGuardianService guardian = new AppGuardianService(repository, service, true);
 
-        guardian.inspectApp(repository.findById("vaultwarden").orElseThrow());
+        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
 
         assertThat(composeExecutor.restartCalled).isTrue();
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().lastRepairStatus()).isEqualTo("guardian_repair_completed");
@@ -362,7 +362,7 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         AppGuardianService guardian = new AppGuardianService(repository, service, true);
 
-        guardian.inspectApp(repository.findById("vaultwarden").orElseThrow());
+        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
 
         assertThat(composeExecutor.restartCalled).isFalse();
     }
@@ -403,8 +403,8 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         AppGuardianService guardian = new AppGuardianService(repository, service, true);
 
-        guardian.inspectApp(repository.findById("vaultwarden").orElseThrow());
-        guardian.inspectApp(repository.findById("vaultwarden").orElseThrow());
+        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
+        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
 
         InstallSettings settings = repository.settingsFor("vaultwarden").orElseThrow();
         assertThat(settings.lastRepairAttemptAt()).isNotNull();
@@ -534,7 +534,7 @@ class AppLifecycleServiceTests {
         AppRuntimeView app = service.getApp("vaultwarden");
 
         assertThat(app.accessUrl()).isEqualTo("http://localhost:8090");
-        assertThat(repository.findById("vaultwarden").orElseThrow().accessUrl()).isEqualTo("http://localhost:8090");
+        assertThat(repository.findAppById("vaultwarden").orElseThrow().accessUrl()).isEqualTo("http://localhost:8090");
     }
 
     @Test
@@ -577,7 +577,7 @@ class AppLifecycleServiceTests {
         AppRuntimeView app = service.getApp("gitea");
 
         assertThat(app.accessUrl()).isEqualTo("http://localhost:3002");
-        assertThat(repository.findById("gitea").orElseThrow().accessUrl()).isEqualTo("http://localhost:3002");
+        assertThat(repository.findAppById("gitea").orElseThrow().accessUrl()).isEqualTo("http://localhost:3002");
     }
 
     @Test
@@ -694,7 +694,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void listAppsDoesNotAdoptRediscoveredManagedContainersFromDockerLabels() throws Exception {
-        repository.delete("vaultwarden");
+        repository.deleteApp("vaultwarden");
         Files.createDirectories(runtimeRoot.resolve("apps/vaultwarden"));
         Files.writeString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"), "services: {}\n");
         AppLifecycleService rediscoveryService = new AppLifecycleService(
@@ -714,7 +714,7 @@ class AppLifecycleServiceTests {
         assertThat(apps)
                 .extracting(AppRuntimeView::appId)
                 .doesNotContain("vaultwarden");
-        assertThat(repository.findById("vaultwarden")).isEmpty();
+        assertThat(repository.findAppById("vaultwarden")).isEmpty();
     }
 
     @Test
@@ -754,7 +754,7 @@ class AppLifecycleServiceTests {
         assertThatThrownBy(() -> service.uninstall("vaultwarden"))
                 .hasMessageContaining("Could not uninstall Vaultwarden");
 
-        assertThat(repository.findById("vaultwarden")).isPresent();
+        assertThat(repository.findAppById("vaultwarden")).isPresent();
         assertThat(repository.eventsFor("vaultwarden", 10))
                 .extracting(event -> event.type())
                 .contains("uninstall_failed");

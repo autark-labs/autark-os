@@ -22,7 +22,8 @@ class RepositoryJpaArchitectureTests {
                 Path.of("src/main/java/com/autarkos/system/ProjectSettingsRepository.java"),
                 Path.of("src/main/java/com/autarkos/network/devices/DeviceTrustRepository.java"),
                 Path.of("src/main/java/com/autarkos/discover/DiscoverSetupRepository.java"),
-                Path.of("src/main/java/com/autarkos/host/ObservedServiceRepository.java"));
+                Path.of("src/main/java/com/autarkos/host/ObservedServiceRepository.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/InstalledAppRepository.java"));
 
         for (Path repository : repositories) {
             String source = Files.readString(repository);
@@ -40,7 +41,8 @@ class RepositoryJpaArchitectureTests {
                 Path.of("src/main/java/com/autarkos/activity/ActivityLogJpaRepository.java"),
                 Path.of("src/main/java/com/autarkos/system/StorageSampleJpaRepository.java"),
                 Path.of("src/main/java/com/autarkos/monitoring/HostMetricSampleJpaRepository.java"),
-                Path.of("src/main/java/com/autarkos/monitoring/AppMetricSampleJpaRepository.java"));
+                Path.of("src/main/java/com/autarkos/monitoring/AppMetricSampleJpaRepository.java"),
+                Path.of("src/main/java/com/autarkos/database/DatabaseBackedRepository.java"));
 
         for (Path removedFacade : removedFacades) {
             assertThat(Files.exists(removedFacade))

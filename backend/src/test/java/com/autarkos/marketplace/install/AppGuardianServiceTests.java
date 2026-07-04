@@ -30,7 +30,7 @@ class AppGuardianServiceTests {
                 "autark-os-vaultwarden",
                 "http://localhost:8090",
                 Instant.parse("2026-06-21T12:00:00Z"));
-        when(repository.findAll()).thenReturn(List.of(app));
+        when(repository.findAllApps()).thenReturn(List.of(app));
         when(repository.settingsFor("vaultwarden")).thenReturn(Optional.of(new InstallSettings(
                 "http://localhost:8090",
                 null,

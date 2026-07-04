@@ -834,12 +834,12 @@ public class AppLifecycleService {
     }
 
     private InstalledApp installedApp(String appId) {
-        return repository.findById(appId)
+        return repository.findAppById(appId)
                 .orElseThrow(() -> new InstallationException("Autark-OS is not managing an app with id " + appId + "."));
     }
 
     private List<InstalledApp> managedInstalledApps() {
-        return repository.findAll().stream()
+        return repository.findAllApps().stream()
                 .filter(this::ownedByThisAutarkOs)
                 .toList();
     }

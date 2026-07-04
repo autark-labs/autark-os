@@ -112,7 +112,7 @@ class ObservedServiceServiceTests {
     @Test
     void adoptRecoverableServiceUsesRuntimeMetadataWhenObservedMetadataIsIncomplete() throws Exception {
         ObservedServiceRepository observedRepository = repository();
-        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout());
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout());
         Path appRoot = runtimeRoot.resolve("apps/syncthing");
         java.nio.file.Files.createDirectories(appRoot);
         java.nio.file.Files.writeString(appRoot.resolve("autark-os-app.json"), """
@@ -157,7 +157,7 @@ class ObservedServiceServiceTests {
         ActionResult result = service.adopt("docker:autark-os-syncthing", new ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
 
         assertThat(result.ok()).isTrue();
-        assertThat(installedRepository.findById("syncthing")).hasValueSatisfying(app -> {
+        assertThat(installedRepository.findAppById("syncthing")).hasValueSatisfying(app -> {
             assertThat(app.runtimePath()).isEqualTo(appRoot.toString());
             assertThat(app.composeProject()).isEqualTo("autarkos_dev_current_syncthing");
         });
@@ -219,7 +219,7 @@ class ObservedServiceServiceTests {
     @Test
     void adoptRecoverableServiceCreatesManagedAppStateAndPreservesObservedTruth() {
         ObservedServiceRepository observedRepository = repository();
-        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout());
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout());
         observedRepository.upsert(new ObservedService(
                 "docker:autark-os-vaultwarden",
                 "docker",
@@ -253,7 +253,7 @@ class ObservedServiceServiceTests {
 
         assertThat(plan.available()).isTrue();
         assertThat(result.ok()).isTrue();
-        assertThat(installedRepository.findById("vaultwarden")).hasValueSatisfying(app -> {
+        assertThat(installedRepository.findAppById("vaultwarden")).hasValueSatisfying(app -> {
             assertThat(app.appName()).isEqualTo("Vaultwarden");
             assertThat(app.accessUrl()).isEqualTo("http://localhost:8090");
             assertThat(app.runtimePath()).isEqualTo("/var/lib/autark-os/apps/vaultwarden");

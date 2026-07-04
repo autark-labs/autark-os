@@ -49,7 +49,7 @@ class BackupServiceCanonicalAppTests {
     @Test
     void reportOnlyIncludesCanonicalManagedApps() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
@@ -80,7 +80,7 @@ class BackupServiceCanonicalAppTests {
     @Test
     void backupEnabledWithoutRestorePointIsNotProtected() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
@@ -102,7 +102,7 @@ class BackupServiceCanonicalAppTests {
     @Test
     void completedRestorePointMakesAppProtected() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
@@ -125,7 +125,7 @@ class BackupServiceCanonicalAppTests {
     @Test
     void restoreUsesAutarkOsFileOpsServiceForAppDataReplacement() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
@@ -148,7 +148,7 @@ class BackupServiceCanonicalAppTests {
     @Test
     void restoreReportsWarningWhenAppDataRestoresButAppCannotRestart() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);

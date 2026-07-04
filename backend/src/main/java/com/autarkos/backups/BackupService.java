@@ -53,7 +53,7 @@ public class BackupService {
     private final RestoreExecutor restoreExecutor;
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, () -> installedAppRepository.findAll().stream()
+        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, () -> installedAppRepository.findAllApps().stream()
                 .map(app -> new AppInstanceView(
                         app.appId(),
                         app.appId(),
@@ -178,7 +178,7 @@ public class BackupService {
     }
 
     private BackupRunResult runAppBackup(String appId, String backupSource) {
-        InstalledApp app = installedAppRepository.findById(appId)
+        InstalledApp app = installedAppRepository.findAppById(appId)
                 .orElseThrow(() -> new InstallationException("App is not installed: " + appId));
         Path source = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         BackupPolicy policy = installedAppRepository.settingsFor(appId)
@@ -228,7 +228,7 @@ public class BackupService {
                 .distinct()
                 .toList();
         return managedAppIds.stream()
-                .map(installedAppRepository::findById)
+                .map(installedAppRepository::findAppById)
                 .flatMap(Optional::stream)
                 .toList();
     }

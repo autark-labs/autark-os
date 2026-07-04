@@ -33,7 +33,7 @@ public class AppUpdateService {
     private final AppInstanceViewProvider appInstanceViewProvider;
 
     public AppUpdateService(InstalledAppRepository repository, MarketplaceCatalogService catalogService, ComposeRenderer composeRenderer, DockerComposeExecutor composeExecutor, BackupService backupService, AppLifecycleService appLifecycleService, ActivityLogService activityLogService, ProjectSettingsService projectSettingsService) {
-        this(repository, catalogService, composeRenderer, composeExecutor, backupService, appLifecycleService, activityLogService, projectSettingsService, () -> repository.findAll().stream()
+        this(repository, catalogService, composeRenderer, composeExecutor, backupService, appLifecycleService, activityLogService, projectSettingsService, () -> repository.findAllApps().stream()
                 .map(app -> new AppInstanceView(
                         app.appId(),
                         app.appId(),
@@ -255,12 +255,12 @@ public class AppUpdateService {
         if (!managedAppIds().contains(appId)) {
             throw new InstallationException("Autark-OS is not managing an app with id " + appId + ".");
         }
-        return repository.findById(appId).orElseThrow(() -> new InstallationException("Autark-OS is not managing an app with id " + appId + "."));
+        return repository.findAppById(appId).orElseThrow(() -> new InstallationException("Autark-OS is not managing an app with id " + appId + "."));
     }
 
     private List<InstalledApp> managedInstalledApps() {
         java.util.Set<String> managedAppIds = managedAppIds();
-        return repository.findAll().stream()
+        return repository.findAllApps().stream()
                 .filter(app -> managedAppIds.contains(app.appId()))
                 .toList();
     }

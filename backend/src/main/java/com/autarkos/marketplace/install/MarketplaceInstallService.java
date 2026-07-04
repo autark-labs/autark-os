@@ -131,7 +131,7 @@ public class MarketplaceInstallService {
             recordStep(steps, sink, InstallStep.failed("Checking existing services", message));
             return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
         }
-        InstalledApp existingApp = installedAppRepository.findById(manifest.id()).orElse(null);
+        InstalledApp existingApp = installedAppRepository.findAppById(manifest.id()).orElse(null);
         if (existingApp != null && (options == null || !options.reinstallRequested())) {
             recordStep(steps, sink, InstallStep.completed("Already installed", manifest.name() + " is already managed by Autark-OS."));
             return new InstallResult(
@@ -357,7 +357,7 @@ public class MarketplaceInstallService {
                 accessUrl,
                 privateAccessUrl,
                 provisioningResult,
-                installedAppRepository.findAll().stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.toSet()));
+                installedAppRepository.findAllApps().stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.toSet()));
     }
 
     private TailscaleServeResult configurePrivateAccess(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {

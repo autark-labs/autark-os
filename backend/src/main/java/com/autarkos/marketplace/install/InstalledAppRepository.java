@@ -1,463 +1,322 @@
 package com.autarkos.marketplace.install;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.autarkos.database.DatabaseBackedRepository;
-import com.autarkos.database.AutarkOsDatabase;
-import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.marketplace.install.InstalledApps.AppEventRow;
+import com.autarkos.marketplace.install.InstalledApps.AppHealthRow;
+import com.autarkos.marketplace.install.InstalledApps.InstallSettingsRow;
 
 @Repository
-public class InstalledAppRepository extends DatabaseBackedRepository {
+public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity, String> {
 
-    @Autowired
-    public InstalledAppRepository(AutarkOsDatabase database) {
-        super(database);
+    List<InstalledAppEntity> findAllByOrderByAppNameAsc();
+
+    default void save(InstalledApp app) {
+        save(InstalledApps.entity(app, findById(app.appId()).orElse(null), Instant.now()));
     }
 
-    public InstalledAppRepository(RuntimeLayout runtimeLayout) {
-        this(new AutarkOsDatabase(runtimeLayout));
+    default List<InstalledApp> findAllApps() {
+        return findAllByOrderByAppNameAsc().stream()
+                .map(InstalledApps::app)
+                .toList();
     }
 
-    public void save(InstalledApp app) {
-        migrate();
-        String sql = """
-                insert into installed_apps(
-                    app_id,
-                    app_name,
-                    status,
-                    runtime_path,
-                    compose_project,
-                    access_url,
-                    installed_at,
-                    catalog_app_id,
-                    runtime_path_or_hash,
-                    install_state,
-                    ownership_status,
-                    created_at,
-                    updated_at
-                )
-                values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                on conflict(app_id) do update set
-                    app_name = excluded.app_name,
-                    status = excluded.status,
-                    runtime_path = excluded.runtime_path,
-                    compose_project = excluded.compose_project,
-                    access_url = excluded.access_url,
-                    installed_at = excluded.installed_at,
-                    updated_at = excluded.updated_at
-                """;
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            bindInstalledApp(statement, app);
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to save installed app state.", exception);
-        }
+    default Optional<InstalledApp> findAppById(String appId) {
+        return findById(appId).map(InstalledApps::app);
     }
 
-    public void saveOwnershipMetadata(InstalledAppOwnershipMetadata metadata) {
-        migrate();
-        String sql = """
-                update installed_apps
-                set app_instance_id = ?,
-                    catalog_app_id = ?,
-                    autark_os_instance_id = ?,
-                    runtime_path_or_hash = ?,
-                    install_state = ?,
-                    ownership_status = ?,
-                    created_at = ?,
-                    updated_at = ?
-                where app_id = ?
-                """;
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, metadata.appInstanceId());
-            statement.setString(2, metadata.catalogAppId());
-            statement.setString(3, metadata.autarkOsInstanceId());
-            statement.setString(4, metadata.runtimePathOrHash());
-            statement.setString(5, metadata.installState());
-            statement.setString(6, metadata.ownershipStatus());
-            statement.setString(7, metadata.createdAt().toString());
-            statement.setString(8, metadata.updatedAt().toString());
-            statement.setString(9, metadata.appId());
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to save installed app ownership metadata.", exception);
-        }
+    default void deleteApp(String appId) {
+        deleteById(appId);
     }
 
-    public Optional<InstalledAppOwnershipMetadata> ownershipFor(String appId) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("select * from installed_apps where app_id = ?")) {
-            statement.setString(1, appId);
-            ResultSet resultSet = statement.executeQuery();
-            if (!resultSet.next()) {
-                return Optional.empty();
-            }
-            return Optional.of(ownershipMetadata(resultSet));
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read installed app ownership metadata.", exception);
-        }
+    default void saveOwnershipMetadata(InstalledAppOwnershipMetadata metadata) {
+        findById(metadata.appId()).ifPresent(entity -> {
+            entity.updateOwnership(metadata);
+            save(entity);
+        });
     }
 
-    public List<InstalledApp> findAll() {
-        migrate();
-        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
-            ResultSet resultSet = statement.executeQuery("select * from installed_apps order by app_name");
-            List<InstalledApp> apps = new ArrayList<>();
-            while (resultSet.next()) {
-                apps.add(installedApp(resultSet));
-            }
-            return apps;
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read installed app state.", exception);
-        }
+    default Optional<InstalledAppOwnershipMetadata> ownershipFor(String appId) {
+        return findById(appId).map(InstalledApps::ownership);
     }
 
-    public Optional<InstalledApp> findById(String appId) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("select * from installed_apps where app_id = ?")) {
-            statement.setString(1, appId);
-            ResultSet resultSet = statement.executeQuery();
-            if (resultSet.next()) {
-                return Optional.of(installedApp(resultSet));
-            }
-            return Optional.empty();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read installed app state.", exception);
-        }
+    @Transactional
+    @Modifying
+    @Query("update InstalledAppEntity app set app.status = :status where app.appId = :appId")
+    void updateStatus(@Param("appId") String appId, @Param("status") String status);
+
+    default void saveSettings(String appId, InstallSettings settings) {
+        upsertSettings(
+                appId,
+                settings.accessUrl(),
+                settings.privateAccessUrl(),
+                settings.tailscaleEnabled() ? 1 : 0,
+                InstalledApps.encodeMap(settings.storageSubfolders()),
+                settings.backup().enabled() ? 1 : 0,
+                settings.backup().frequency(),
+                settings.backup().retention(),
+                settings.desiredAccessMode(),
+                settings.privateAccessRequirement(),
+                settings.expectedLocalPort(),
+                settings.expectedProtocol(),
+                InstalledApps.encodeInstant(settings.lastAccessCheckAt()),
+                InstalledApps.encodeInstant(settings.lastSuccessfulAccessAt()),
+                InstalledApps.encodeInstant(settings.lastRepairAttemptAt()),
+                settings.lastRepairStatus(),
+                settings.autoRepairEnabled() ? 1 : 0);
     }
 
-    public void updateStatus(String appId, String status) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("update installed_apps set status = ? where app_id = ?")) {
-            statement.setString(1, status);
-            statement.setString(2, appId);
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to update installed app status.", exception);
-        }
+    @Transactional
+    @Modifying
+    @Query(value = """
+            insert into installed_app_settings(
+                app_id,
+                access_url,
+                private_access_url,
+                tailscale_enabled,
+                storage_subfolders,
+                backup_enabled,
+                backup_frequency,
+                backup_retention,
+                desired_access_mode,
+                private_access_requirement,
+                expected_local_port,
+                expected_protocol,
+                last_access_check_at,
+                last_successful_access_at,
+                last_repair_attempt_at,
+                last_repair_status,
+                auto_repair_enabled
+            )
+            values(
+                :appId,
+                :accessUrl,
+                :privateAccessUrl,
+                :tailscaleEnabled,
+                :storageSubfolders,
+                :backupEnabled,
+                :backupFrequency,
+                :backupRetention,
+                :desiredAccessMode,
+                :privateAccessRequirement,
+                :expectedLocalPort,
+                :expectedProtocol,
+                :lastAccessCheckAt,
+                :lastSuccessfulAccessAt,
+                :lastRepairAttemptAt,
+                :lastRepairStatus,
+                :autoRepairEnabled
+            )
+            on conflict(app_id) do update set
+                access_url = excluded.access_url,
+                private_access_url = excluded.private_access_url,
+                tailscale_enabled = excluded.tailscale_enabled,
+                storage_subfolders = excluded.storage_subfolders,
+                backup_enabled = excluded.backup_enabled,
+                backup_frequency = excluded.backup_frequency,
+                backup_retention = excluded.backup_retention,
+                desired_access_mode = excluded.desired_access_mode,
+                private_access_requirement = excluded.private_access_requirement,
+                expected_local_port = excluded.expected_local_port,
+                expected_protocol = excluded.expected_protocol,
+                last_access_check_at = excluded.last_access_check_at,
+                last_successful_access_at = excluded.last_successful_access_at,
+                last_repair_attempt_at = excluded.last_repair_attempt_at,
+                last_repair_status = excluded.last_repair_status,
+                auto_repair_enabled = excluded.auto_repair_enabled
+            """, nativeQuery = true)
+    void upsertSettings(
+            @Param("appId") String appId,
+            @Param("accessUrl") String accessUrl,
+            @Param("privateAccessUrl") String privateAccessUrl,
+            @Param("tailscaleEnabled") int tailscaleEnabled,
+            @Param("storageSubfolders") String storageSubfolders,
+            @Param("backupEnabled") int backupEnabled,
+            @Param("backupFrequency") String backupFrequency,
+            @Param("backupRetention") int backupRetention,
+            @Param("desiredAccessMode") String desiredAccessMode,
+            @Param("privateAccessRequirement") String privateAccessRequirement,
+            @Param("expectedLocalPort") Integer expectedLocalPort,
+            @Param("expectedProtocol") String expectedProtocol,
+            @Param("lastAccessCheckAt") String lastAccessCheckAt,
+            @Param("lastSuccessfulAccessAt") String lastSuccessfulAccessAt,
+            @Param("lastRepairAttemptAt") String lastRepairAttemptAt,
+            @Param("lastRepairStatus") String lastRepairStatus,
+            @Param("autoRepairEnabled") int autoRepairEnabled);
+
+    default Optional<InstallSettings> settingsFor(String appId) {
+        return settingsRowFor(appId).map(InstalledApps::settings);
     }
 
-    public void delete(String appId) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("delete from installed_apps where app_id = ?")) {
-            statement.setString(1, appId);
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to remove installed app state.", exception);
-        }
+    @Query(value = """
+            select
+                access_url as accessUrl,
+                private_access_url as privateAccessUrl,
+                tailscale_enabled as tailscaleEnabled,
+                storage_subfolders as storageSubfolders,
+                backup_enabled as backupEnabled,
+                backup_frequency as backupFrequency,
+                backup_retention as backupRetention,
+                desired_access_mode as desiredAccessMode,
+                private_access_requirement as privateAccessRequirement,
+                expected_local_port as expectedLocalPort,
+                expected_protocol as expectedProtocol,
+                last_access_check_at as lastAccessCheckAt,
+                last_successful_access_at as lastSuccessfulAccessAt,
+                last_repair_attempt_at as lastRepairAttemptAt,
+                last_repair_status as lastRepairStatus,
+                auto_repair_enabled as autoRepairEnabled
+            from installed_app_settings
+            where app_id = :appId
+            """, nativeQuery = true)
+    Optional<InstallSettingsRow> settingsRowFor(@Param("appId") String appId);
+
+    default void recordEvent(String appId, String type, String message) {
+        insertEvent(appId, type, message, Instant.now().toString());
     }
 
-    public void saveSettings(String appId, InstallSettings settings) {
-        migrate();
-        String sql = """
-                insert into installed_app_settings(
-                    app_id,
-                    access_url,
-                    private_access_url,
-                    tailscale_enabled,
-                    storage_subfolders,
-                    backup_enabled,
-                    backup_frequency,
-                    backup_retention,
-                    desired_access_mode,
-                    private_access_requirement,
-                    expected_local_port,
-                    expected_protocol,
-                    last_access_check_at,
-                    last_successful_access_at,
-                    last_repair_attempt_at,
-                    last_repair_status,
-                    auto_repair_enabled
-                )
-                values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                on conflict(app_id) do update set
-                    access_url = excluded.access_url,
-                    private_access_url = excluded.private_access_url,
-                    tailscale_enabled = excluded.tailscale_enabled,
-                    storage_subfolders = excluded.storage_subfolders,
-                    backup_enabled = excluded.backup_enabled,
-                    backup_frequency = excluded.backup_frequency,
-                    backup_retention = excluded.backup_retention,
-                    desired_access_mode = excluded.desired_access_mode,
-                    private_access_requirement = excluded.private_access_requirement,
-                    expected_local_port = excluded.expected_local_port,
-                    expected_protocol = excluded.expected_protocol,
-                    last_access_check_at = excluded.last_access_check_at,
-                    last_successful_access_at = excluded.last_successful_access_at,
-                    last_repair_attempt_at = excluded.last_repair_attempt_at,
-                    last_repair_status = excluded.last_repair_status,
-                    auto_repair_enabled = excluded.auto_repair_enabled
-                """;
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, appId);
-            statement.setString(2, settings.accessUrl());
-            statement.setString(3, settings.privateAccessUrl());
-            statement.setInt(4, settings.tailscaleEnabled() ? 1 : 0);
-            statement.setString(5, encodeMap(settings.storageSubfolders()));
-            statement.setInt(6, settings.backup().enabled() ? 1 : 0);
-            statement.setString(7, settings.backup().frequency());
-            statement.setInt(8, settings.backup().retention());
-            statement.setString(9, settings.desiredAccessMode());
-            statement.setString(10, settings.privateAccessRequirement());
-            if (settings.expectedLocalPort() == null) {
-                statement.setNull(11, java.sql.Types.INTEGER);
-            } else {
-                statement.setInt(11, settings.expectedLocalPort());
-            }
-            statement.setString(12, settings.expectedProtocol());
-            statement.setString(13, encodeInstant(settings.lastAccessCheckAt()));
-            statement.setString(14, encodeInstant(settings.lastSuccessfulAccessAt()));
-            statement.setString(15, encodeInstant(settings.lastRepairAttemptAt()));
-            statement.setString(16, settings.lastRepairStatus());
-            statement.setInt(17, settings.autoRepairEnabled() ? 1 : 0);
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to save installed app settings.", exception);
-        }
+    @Transactional
+    @Modifying
+    @Query(value = """
+            insert into app_events(app_id, event_type, message, created_at)
+            values(:appId, :eventType, :message, :createdAt)
+            """, nativeQuery = true)
+    void insertEvent(
+            @Param("appId") String appId,
+            @Param("eventType") String eventType,
+            @Param("message") String message,
+            @Param("createdAt") String createdAt);
+
+    default List<AppEvent> eventsFor(String appId, int limit) {
+        return eventRowsFor(appId, limit).stream()
+                .map(InstalledApps::event)
+                .toList();
     }
 
-    public Optional<InstallSettings> settingsFor(String appId) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("select * from installed_app_settings where app_id = ?")) {
-            statement.setString(1, appId);
-            ResultSet resultSet = statement.executeQuery();
-            if (!resultSet.next()) {
-                return Optional.empty();
-            }
-            return Optional.of(new InstallSettings(
-                    resultSet.getString("access_url"),
-                    resultSet.getString("private_access_url"),
-                    resultSet.getInt("tailscale_enabled") == 1,
-                    decodeMap(resultSet.getString("storage_subfolders")),
-                    new BackupPolicy(
-                            resultSet.getInt("backup_enabled") == 1,
-                            resultSet.getString("backup_frequency"),
-                            resultSet.getInt("backup_retention")),
-                    resultSet.getString("desired_access_mode"),
-                    resultSet.getString("private_access_requirement"),
-                    nullableInt(resultSet, "expected_local_port"),
-                    resultSet.getString("expected_protocol"),
-                    decodeInstant(resultSet.getString("last_access_check_at")),
-                    decodeInstant(resultSet.getString("last_successful_access_at")),
-                    decodeInstant(resultSet.getString("last_repair_attempt_at")),
-                    resultSet.getString("last_repair_status"),
-                    resultSet.getInt("auto_repair_enabled") == 1));
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read installed app settings.", exception);
-        }
+    @Query(value = """
+            select
+                id,
+                app_id as appId,
+                event_type as eventType,
+                message,
+                created_at as createdAt
+            from app_events
+            where app_id = :appId
+            order by created_at desc, id desc
+            limit :limit
+            """, nativeQuery = true)
+    List<AppEventRow> eventRowsFor(@Param("appId") String appId, @Param("limit") int limit);
+
+    default void saveHealthSnapshot(AppHealthSnapshot snapshot) {
+        upsertHealthSnapshot(
+                snapshot.appId(),
+                snapshot.status(),
+                snapshot.message(),
+                snapshot.detail(),
+                snapshot.dockerStatus(),
+                snapshot.localAccessStatus(),
+                snapshot.privateAccessStatus(),
+                snapshot.startupGrace() ? 1 : 0,
+                snapshot.checkedAt().toString());
     }
 
-    public void recordEvent(String appId, String type, String message) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("insert into app_events(app_id, event_type, message, created_at) values(?, ?, ?, ?)")) {
-            statement.setString(1, appId);
-            statement.setString(2, type);
-            statement.setString(3, message);
-            statement.setString(4, Instant.now().toString());
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to record app event.", exception);
-        }
+    @Transactional
+    @Modifying
+    @Query(value = """
+            insert into app_health(
+                app_id,
+                status,
+                message,
+                detail,
+                docker_status,
+                local_access_status,
+                private_access_status,
+                startup_grace,
+                checked_at
+            )
+            values(
+                :appId,
+                :status,
+                :message,
+                :detail,
+                :dockerStatus,
+                :localAccessStatus,
+                :privateAccessStatus,
+                :startupGrace,
+                :checkedAt
+            )
+            on conflict(app_id) do update set
+                status = excluded.status,
+                message = excluded.message,
+                detail = excluded.detail,
+                docker_status = excluded.docker_status,
+                local_access_status = excluded.local_access_status,
+                private_access_status = excluded.private_access_status,
+                startup_grace = excluded.startup_grace,
+                checked_at = excluded.checked_at
+            """, nativeQuery = true)
+    void upsertHealthSnapshot(
+            @Param("appId") String appId,
+            @Param("status") String status,
+            @Param("message") String message,
+            @Param("detail") String detail,
+            @Param("dockerStatus") String dockerStatus,
+            @Param("localAccessStatus") String localAccessStatus,
+            @Param("privateAccessStatus") String privateAccessStatus,
+            @Param("startupGrace") int startupGrace,
+            @Param("checkedAt") String checkedAt);
+
+    default Optional<AppHealthSnapshot> healthFor(String appId) {
+        return healthRowFor(appId).map(InstalledApps::healthSnapshot);
     }
 
-    public List<AppEvent> eventsFor(String appId, int limit) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("select * from app_events where app_id = ? order by created_at desc, id desc limit ?")) {
-            statement.setString(1, appId);
-            statement.setInt(2, limit);
-            ResultSet resultSet = statement.executeQuery();
-            List<AppEvent> events = new ArrayList<>();
-            while (resultSet.next()) {
-                events.add(new AppEvent(
-                        resultSet.getLong("id"),
-                        resultSet.getString("app_id"),
-                        resultSet.getString("event_type"),
-                        resultSet.getString("message"),
-                        Instant.parse(resultSet.getString("created_at"))));
-            }
-            return events;
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read app events.", exception);
-        }
+    @Query(value = """
+            select
+                app_id as appId,
+                status,
+                message,
+                detail,
+                docker_status as dockerStatus,
+                local_access_status as localAccessStatus,
+                private_access_status as privateAccessStatus,
+                startup_grace as startupGrace,
+                checked_at as checkedAt
+            from app_health
+            where app_id = :appId
+            """, nativeQuery = true)
+    Optional<AppHealthRow> healthRowFor(@Param("appId") String appId);
+
+    default Map<String, AppHealthSnapshot> healthSnapshots() {
+        return healthRows().stream()
+                .map(InstalledApps::healthSnapshot)
+                .sorted(Comparator.comparing(AppHealthSnapshot::appId))
+                .collect(LinkedHashMap::new, (snapshots, snapshot) -> snapshots.put(snapshot.appId(), snapshot), LinkedHashMap::putAll);
     }
 
-    public void saveHealthSnapshot(AppHealthSnapshot snapshot) {
-        migrate();
-        String sql = """
-                insert into app_health(
-                    app_id,
-                    status,
-                    message,
-                    detail,
-                    docker_status,
-                    local_access_status,
-                    private_access_status,
-                    startup_grace,
-                    checked_at
-                )
-                values(?, ?, ?, ?, ?, ?, ?, ?, ?)
-                on conflict(app_id) do update set
-                    status = excluded.status,
-                    message = excluded.message,
-                    detail = excluded.detail,
-                    docker_status = excluded.docker_status,
-                    local_access_status = excluded.local_access_status,
-                    private_access_status = excluded.private_access_status,
-                    startup_grace = excluded.startup_grace,
-                    checked_at = excluded.checked_at
-                """;
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, snapshot.appId());
-            statement.setString(2, snapshot.status());
-            statement.setString(3, snapshot.message());
-            statement.setString(4, snapshot.detail());
-            statement.setString(5, snapshot.dockerStatus());
-            statement.setString(6, snapshot.localAccessStatus());
-            statement.setString(7, snapshot.privateAccessStatus());
-            statement.setInt(8, snapshot.startupGrace() ? 1 : 0);
-            statement.setString(9, snapshot.checkedAt().toString());
-            statement.executeUpdate();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to save app health snapshot.", exception);
-        }
-    }
-
-    public Optional<AppHealthSnapshot> healthFor(String appId) {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("select * from app_health where app_id = ?")) {
-            statement.setString(1, appId);
-            ResultSet resultSet = statement.executeQuery();
-            if (!resultSet.next()) {
-                return Optional.empty();
-            }
-            return Optional.of(healthSnapshot(resultSet));
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read app health snapshot.", exception);
-        }
-    }
-
-    public Map<String, AppHealthSnapshot> healthSnapshots() {
-        migrate();
-        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
-            ResultSet resultSet = statement.executeQuery("select * from app_health");
-            Map<String, AppHealthSnapshot> snapshots = new LinkedHashMap<>();
-            while (resultSet.next()) {
-                AppHealthSnapshot snapshot = healthSnapshot(resultSet);
-                snapshots.put(snapshot.appId(), snapshot);
-            }
-            return snapshots;
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read app health snapshots.", exception);
-        }
-    }
-
-    private void bindInstalledApp(PreparedStatement statement, InstalledApp app) throws SQLException {
-        statement.setString(1, app.appId());
-        statement.setString(2, app.appName());
-        statement.setString(3, app.status());
-        statement.setString(4, app.runtimePath());
-        statement.setString(5, app.composeProject());
-        statement.setString(6, app.accessUrl());
-        statement.setString(7, app.installedAt().toString());
-        statement.setString(8, app.appId());
-        statement.setString(9, app.runtimePath());
-        statement.setString(10, app.status());
-        statement.setString(11, "ownership_uncertain");
-        statement.setString(12, app.installedAt().toString());
-        statement.setString(13, Instant.now().toString());
-    }
-
-    private InstalledApp installedApp(ResultSet resultSet) throws SQLException {
-        return new InstalledApp(
-                resultSet.getString("app_id"),
-                resultSet.getString("app_name"),
-                resultSet.getString("status"),
-                resultSet.getString("runtime_path"),
-                resultSet.getString("compose_project"),
-                resultSet.getString("access_url"),
-                Instant.parse(resultSet.getString("installed_at")));
-    }
-
-    private InstalledAppOwnershipMetadata ownershipMetadata(ResultSet resultSet) throws SQLException {
-        return new InstalledAppOwnershipMetadata(
-                resultSet.getString("app_id"),
-                resultSet.getString("app_instance_id"),
-                resultSet.getString("catalog_app_id"),
-                resultSet.getString("autark_os_instance_id"),
-                resultSet.getString("runtime_path_or_hash"),
-                resultSet.getString("install_state"),
-                resultSet.getString("ownership_status"),
-                decodeInstant(valueOr(resultSet.getString("created_at"), resultSet.getString("installed_at"))),
-                decodeInstant(valueOr(resultSet.getString("updated_at"), resultSet.getString("installed_at"))));
-    }
-
-    private String encodeMap(Map<String, String> values) {
-        if (values == null || values.isEmpty()) {
-            return "";
-        }
-        return values.entrySet().stream()
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .reduce((left, right) -> left + ";" + right)
-                .orElse("");
-    }
-
-    private Map<String, String> decodeMap(String value) {
-        if (value == null || value.isBlank()) {
-            return Map.of();
-        }
-        Map<String, String> values = new LinkedHashMap<>();
-        for (String pair : value.split(";")) {
-            String[] parts = pair.split("=", 2);
-            if (parts.length == 2 && !parts[0].isBlank() && !parts[1].isBlank()) {
-                values.put(parts[0], parts[1]);
-            }
-        }
-        return values;
-    }
-
-    private String encodeInstant(Instant value) {
-        return value == null ? null : value.toString();
-    }
-
-    private Instant decodeInstant(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return Instant.parse(value);
-    }
-
-    private Integer nullableInt(ResultSet resultSet, String column) throws SQLException {
-        int value = resultSet.getInt(column);
-        return resultSet.wasNull() ? null : value;
-    }
-
-    private AppHealthSnapshot healthSnapshot(ResultSet resultSet) throws SQLException {
-        return new AppHealthSnapshot(
-                resultSet.getString("app_id"),
-                resultSet.getString("status"),
-                valueOr(resultSet.getString("message"), resultSet.getString("status")),
-                valueOr(resultSet.getString("detail"), ""),
-                valueOr(resultSet.getString("docker_status"), resultSet.getString("status")),
-                valueOr(resultSet.getString("local_access_status"), "not_checked"),
-                valueOr(resultSet.getString("private_access_status"), "not_checked"),
-                resultSet.getInt("startup_grace") == 1,
-                Instant.parse(resultSet.getString("checked_at")));
-    }
-
-    private String valueOr(String value, String fallback) {
-        return value == null || value.isBlank() ? fallback : value;
-    }
+    @Query(value = """
+            select
+                app_id as appId,
+                status,
+                message,
+                detail,
+                docker_status as dockerStatus,
+                local_access_status as localAccessStatus,
+                private_access_status as privateAccessStatus,
+                startup_grace as startupGrace,
+                checked_at as checkedAt
+            from app_health
+            """, nativeQuery = true)
+    List<AppHealthRow> healthRows();
 }
