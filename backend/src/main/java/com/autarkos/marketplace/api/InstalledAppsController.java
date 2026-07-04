@@ -261,7 +261,7 @@ public class InstalledAppsController {
     }
 
     private <T> T refreshAfter(T result) {
-        applicationStateService.refreshInBackground();
+        applicationStateService.invalidate();
         return result;
     }
 

@@ -24,6 +24,7 @@ import com.autarkos.marketplace.install.AppActionResult;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.AppUpdateService;
+import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -231,6 +232,29 @@ class InstalledAppsControllerTests {
         assertThat(returned.applicationState()).isEqualTo(refreshedState);
         verify(applicationStateService).invalidate();
         verify(applicationStateService).snapshot();
+        verify(applicationStateService, never()).refreshInBackground();
+    }
+
+    @Test
+    void settingsMutationInvalidatesCanonicalAppStateImmediately() {
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        InstalledAppsController controller = new InstalledAppsController(
+                lifecycleService,
+                metricsService,
+                updateService,
+                applicationStateService,
+                jobService());
+        AppRuntimeView app = appRuntimeView("gitea");
+        InstallModels.InstallSettings settings = InstallModels.InstallSettings.defaults("http://localhost:3000");
+        when(lifecycleService.updateSettings("gitea", settings)).thenReturn(app);
+
+        AppRuntimeView returned = controller.updateSettings("gitea", settings);
+
+        assertThat(returned).isEqualTo(app);
+        verify(applicationStateService).invalidate();
         verify(applicationStateService, never()).refreshInBackground();
     }
 

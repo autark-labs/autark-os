@@ -30,9 +30,11 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(page, /pendingReachabilityByServiceId/);
   assert.match(page, /applyPendingReachability\(reachabilityServices, pendingReachabilityByServiceId\)/);
   assert.match(page, /pendingReachabilityTokenRef/);
-  assert.match(page, /setPendingReachabilityByServiceId\(\(current\) => \(\{ \.\.\.current, \[service\.id\]: \{ token: pendingToken, zone: targetZone \} \}\)\)/);
+  assert.match(page, /setPendingReachabilityByServiceId\(\(current\) => \(\{ \.\.\.current, \[service\.id\]: \{ acknowledged: false, token: pendingToken, zone: targetZone \} \}\)\)/);
+  assert.match(page, /setRuntimeAppInApplicationStateCache\(queryClient, appWithReachabilityZone\(appForSettings, targetZone\)\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, \{ app: appWithReachabilityZone\(updated, targetZone\) \}\)/);
   assert.match(page, /removePendingReachabilityForToken\(current, service\.id, pendingToken\)/);
-  assert.match(page, /reachabilityServices\.find\(\(service\) => service\.id === serviceId\)\?\.zone === pending\.zone/);
+  assert.match(page, /pending\.acknowledged && reachabilityServices\.find\(\(service\) => service\.id === serviceId\)\?\.zone === pending\.zone/);
   assert.match(page, /removePendingReachabilityIds\(current, settledServiceIds\)/);
   assert.match(page, /void invalidateNetworkQueries\(queryClient\)/);
   assert.match(deepLinks, /tab.*matrix/);

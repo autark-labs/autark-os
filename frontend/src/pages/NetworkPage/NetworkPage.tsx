@@ -30,6 +30,7 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import {
+  setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
@@ -62,6 +63,7 @@ import { tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
 import type { ReachabilityService, ReachabilityTypeFilter, ReachabilityZoneId } from './extensions/NetworkPage.types';
 
 type PendingReachability = {
+  acknowledged: boolean;
   token: number;
   zone: ReachabilityZoneId;
 };
@@ -138,7 +140,7 @@ function NetworkPage() {
     const pendingToken = pendingReachabilityTokenRef.current + 1;
     pendingReachabilityTokenRef.current = pendingToken;
     setServiceProcessing(service.id, true, setProcessingServiceIds);
-    setPendingReachabilityByServiceId((current) => ({ ...current, [service.id]: { token: pendingToken, zone: targetZone } }));
+    setPendingReachabilityByServiceId((current) => ({ ...current, [service.id]: { acknowledged: false, token: pendingToken, zone: targetZone } }));
     setFocusedServiceId(service.id);
     setActionError(null);
     window.setTimeout(() => {
@@ -159,14 +161,17 @@ function NetworkPage() {
           syncCanonicalAppMutationResult(queryClient, disabled);
           appForSettings = disabled.app ?? appForSettings;
           if (targetZone === 'local') {
+            setRuntimeAppInApplicationStateCache(queryClient, appWithReachabilityZone(appForSettings, targetZone));
             showActionNotification(disabled, 'Private access turned off');
+            setPendingReachabilityByServiceId((current) => acknowledgePendingReachability(current, service.id, pendingToken));
             void invalidateNetworkQueries(queryClient);
             succeeded = true;
             return;
           }
         }
+        setRuntimeAppInApplicationStateCache(queryClient, appWithReachabilityZone(appForSettings, targetZone));
         const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(appForSettings, targetZone));
-        syncCanonicalAppMutationResult(queryClient, { app: updated });
+        syncCanonicalAppMutationResult(queryClient, { app: appWithReachabilityZone(updated, targetZone) });
         showActionNotification({
           ok: true,
           severity: 'success',
@@ -177,18 +182,20 @@ function NetworkPage() {
         }, 'Access updated');
         succeeded = true;
       }
+      setPendingReachabilityByServiceId((current) => acknowledgePendingReachability(current, service.id, pendingToken));
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       const message = apiErrorMessage(err, 'Unable to update reachability for this service.');
       setActionError(message);
       showActionErrorNotification(err, 'Reachability update failed');
+      void appState.refresh();
     } finally {
       if (!succeeded) {
         setServiceProcessing(service.id, false, setProcessingServiceIds);
         setPendingReachabilityByServiceId((current) => removePendingReachability(current, service.id));
       }
     }
-  }, [queryClient]);
+  }, [appState, queryClient]);
 
   const removeStaleMapping = useCallback(async (port: number) => {
     setStaleActionLoadingId(`stale-${port}`);
@@ -243,7 +250,7 @@ function NetworkPage() {
 
   useEffect(() => {
     const settledServiceIds = Object.entries(pendingReachabilityByServiceId)
-    .filter(([serviceId, pending]) => reachabilityServices.find((service) => service.id === serviceId)?.zone === pending.zone)
+    .filter(([serviceId, pending]) => pending.acknowledged && reachabilityServices.find((service) => service.id === serviceId)?.zone === pending.zone)
     .map(([serviceId]) => serviceId);
     if (!settledServiceIds.length) {
       return;
@@ -531,6 +538,19 @@ function removePendingReachability(current: Record<string, PendingReachability>,
   return next;
 }
 
+function acknowledgePendingReachability(current: Record<string, PendingReachability>, serviceId: string, token: number) {
+  if (current[serviceId]?.token !== token) {
+    return current;
+  }
+  return {
+    ...current,
+    [serviceId]: {
+      ...current[serviceId],
+      acknowledged: true,
+    },
+  };
+}
+
 function removePendingReachabilityForToken(current: Record<string, PendingReachability>, serviceId: string, token: number) {
   if (current[serviceId]?.token !== token) {
     return current;
@@ -555,7 +575,33 @@ function removeServiceProcessingIds(current: Record<string, boolean>, serviceIds
 }
 
 function isPrivateAccessApp(app: AppRuntimeView) {
-  return Boolean(app.settings?.tailscaleEnabled || app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private');
+  const desiredMode = app.settings?.desiredAccessMode || app.desiredAccess?.mode;
+  return Boolean(app.settings?.tailscaleEnabled || desiredMode === 'private' || desiredMode === 'local-and-private');
+}
+
+function appWithReachabilityZone(app: AppRuntimeView, zone: Exclude<ReachabilityZoneId, 'tailnet' | 'public'>): AppRuntimeView {
+  const desiredAccessMode = reachabilityZoneAccessMode(zone);
+
+  return {
+    ...app,
+    desiredAccess: app.desiredAccess ? {
+      ...app.desiredAccess,
+      mode: desiredAccessMode,
+      privateAccessRequirement: 'disabled',
+      privateUrl: null,
+    } : app.desiredAccess,
+    settings: {
+      ...(app.settings ?? settingsForReachabilityZone(app, zone)),
+      desiredAccessMode,
+      privateAccessRequirement: 'disabled',
+      privateAccessUrl: null,
+      tailscaleEnabled: false,
+    },
+  };
+}
+
+function reachabilityZoneAccessMode(zone: Exclude<ReachabilityZoneId, 'tailnet' | 'public'>) {
+  return zone === 'lan' ? 'network' : 'local';
 }
 
 function settingsForReachabilityZone(app: AppRuntimeView, zone: Exclude<ReachabilityZoneId, 'tailnet' | 'public'>): InstallSettings {
