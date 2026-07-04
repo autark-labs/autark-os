@@ -28,6 +28,7 @@ import com.autarkos.marketplace.install.AppUpdateService;
 import com.autarkos.monitoring.MonitoringMetricsService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class InstalledAppsControllerTests {
 
@@ -313,7 +314,7 @@ class InstalledAppsControllerTests {
         try {
             RuntimeLayout layout = new RuntimeLayout(
                     runtimeProperties(java.nio.file.Files.createTempDirectory("autark-os-controller-jobs").toString()));
-            return new AutarkOsJobService(new AutarkOsJobRepository(layout, () -> Instant.parse("2026-06-21T12:00:00Z")), Runnable::run, false);
+            return new AutarkOsJobService(JpaTestRepositories.jobRepository(layout), Runnable::run, false);
         } catch (java.io.IOException exception) {
             throw new IllegalStateException(exception);
         }

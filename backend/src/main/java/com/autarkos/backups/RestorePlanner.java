@@ -10,6 +10,7 @@ import java.util.function.Supplier;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.install.InstalledApp;
+import com.autarkos.marketplace.install.InstallationException;
 
 class RestorePlanner {
 
@@ -33,7 +34,9 @@ class RestorePlanner {
     }
 
     RestorePlan restorePlan(long restorePointId, String targetAppId) {
-        RestorePoint point = backupRepository.findById(restorePointId);
+        RestorePoint point = backupRepository.findById(restorePointId)
+                .map(RestorePoints::toDomain)
+                .orElseThrow(() -> new InstallationException("Restore point was not found."));
         List<InstalledApp> affected = affectedApps(point, targetAppId);
         List<String> warnings = new ArrayList<>();
         List<String> dryRunDetails = new ArrayList<>();

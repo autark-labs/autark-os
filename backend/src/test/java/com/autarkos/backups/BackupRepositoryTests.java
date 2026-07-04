@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class BackupRepositoryTests {
 
@@ -17,30 +18,31 @@ class BackupRepositoryTests {
 
     @Test
     void recordsQueriesAndUpdatesRestorePoints() {
-        BackupRepository repository = new BackupRepository(runtimeLayout());
+        BackupRepository repository = repository();
 
-        RestorePoint point = repository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.tar", "completed", 1024, "Backup completed.");
-        RestorePoint verified = repository.updateVerification(point.id(), "verified", "Archive checksum matched.", "abc123", "high");
+        RestorePointEntity point = repository.save(RestorePoints.create("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.tar", "completed", 1024, "Backup completed."));
+        point.updateVerification("verified", "Archive checksum matched.", "abc123", "high", "2026-06-20T12:00:00Z");
+        repository.save(point);
 
-        assertThat(repository.findById(point.id()))
-                .satisfies(found -> {
-                    assertThat(found.appId()).isEqualTo("vaultwarden");
-                    assertThat(found.scope()).isEqualTo("app");
-                    assertThat(found.source()).isEqualTo("manual");
-                    assertThat(found.sizeBytes()).isEqualTo(1024);
-                    assertThat(found.verificationStatus()).isEqualTo("verified");
-                    assertThat(found.checksumSha256()).isEqualTo("abc123");
-                    assertThat(found.restoreConfidence()).isEqualTo("high");
-                    assertThat(found.verifiedAt()).isNotNull();
-                });
-        assertThat(verified.verificationMessage()).isEqualTo("Archive checksum matched.");
+        RestorePoint found = repository.findById(point.id()).map(RestorePoints::toDomain).orElseThrow();
+
+        assertThat(found.appId()).isEqualTo("vaultwarden");
+        assertThat(found.scope()).isEqualTo("app");
+        assertThat(found.source()).isEqualTo("manual");
+        assertThat(found.sizeBytes()).isEqualTo(1024);
+        assertThat(found.verificationStatus()).isEqualTo("verified");
+        assertThat(found.checksumSha256()).isEqualTo("abc123");
+        assertThat(found.restoreConfidence()).isEqualTo("high");
+        assertThat(found.verifiedAt()).isNotNull();
         assertThat(repository.forApp("vaultwarden", 10)).hasSize(1);
-        assertThat(repository.recent(10)).extracting(RestorePoint::appName).containsExactly("Vaultwarden");
+        assertThat(repository.recent(10).stream().map(RestorePoints::toDomain))
+                .extracting(RestorePoint::appName)
+                .containsExactly("Vaultwarden");
     }
 
-    private RuntimeLayout runtimeLayout() {
+    private BackupRepository repository() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return new RuntimeLayout(properties);
+        return JpaTestRepositories.backupRepository(new RuntimeLayout(properties));
     }
 }

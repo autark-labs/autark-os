@@ -57,7 +57,9 @@ class BackupReportService {
                 .map(app -> appStatus(app, manifestsById))
                 .sorted(Comparator.comparing(AppBackupStatus::appName))
                 .toList();
-        List<RestorePoint> recent = backupRepository.recent(20);
+        List<RestorePoint> recent = backupRepository.recent(20).stream()
+                .map(RestorePoints::toDomain)
+                .toList();
         int protectedApps = (int) apps.stream().filter(AppBackupStatus::protectedByBackups).count();
         int failedBackups = (int) recent.stream().filter(point -> AutarkOsStates.RestorePointStatus.FAILED.equals(point.status())).count();
         long backupStorage = fileOperations.directorySize(backupRoot.get());
@@ -132,7 +134,9 @@ class BackupReportService {
     private AppBackupStatus appStatus(InstalledApp app, Map<String, ApplicationManifest> manifestsById) {
         Optional<InstallSettings> settings = installedAppRepository.settingsFor(app.appId());
         BackupPolicy policy = settings.map(InstallSettings::backup).orElse(BackupPolicy.defaults());
-        List<RestorePoint> restorePoints = backupRepository.forApp(app.appId(), 5);
+        List<RestorePoint> restorePoints = backupRepository.forApp(app.appId(), 5).stream()
+                .map(RestorePoints::toDomain)
+                .toList();
         RestorePoint latest = restorePoints.stream().findFirst().orElse(null);
         long dataSize = fileOperations.directorySize(Path.of(app.runtimePath()));
         BackupContract contract = backupContractService.backupContract(app, manifestsById.get(app.appId()));

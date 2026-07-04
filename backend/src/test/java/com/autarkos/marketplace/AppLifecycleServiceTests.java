@@ -14,6 +14,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RestorePoint;
+import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -40,6 +41,8 @@ import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleServeResult;
 import com.autarkos.network.tailscale.TailscaleService;
+import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.RestorePointTestRecords;
 
 class AppLifecycleServiceTests {
 
@@ -51,6 +54,7 @@ class AppLifecycleServiceTests {
     FakeLifecycleDockerComposeExecutor composeExecutor;
     FakeTailscaleService tailscaleService;
     RuntimeLayout runtimeLayout;
+    BackupRepository backupRepository;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -58,6 +62,7 @@ class AppLifecycleServiceTests {
         properties.setRuntimeRoot(runtimeRoot.toString());
         runtimeLayout = new RuntimeLayout(properties);
         repository = new InstalledAppRepository(runtimeLayout);
+        backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         composeExecutor = new FakeLifecycleDockerComposeExecutor();
         tailscaleService = new FakeTailscaleService();
         service = new AppLifecycleService(
@@ -67,7 +72,10 @@ class AppLifecycleServiceTests {
                 () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
-                tailscaleService);
+                tailscaleService,
+                false,
+                null,
+                backupRepository);
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
@@ -494,7 +502,7 @@ class AppLifecycleServiceTests {
         assertThat(withoutRestorePoint.remediation().state()).isEqualTo("repair_failed");
         assertThat(withoutRestorePoint.remediation().summary()).doesNotContain("restore point");
 
-        new BackupRepository(runtimeLayout).record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
 
         AppRuntimeView withRestorePoint = service.getApp("vaultwarden");
 
@@ -600,7 +608,9 @@ class AppLifecycleServiceTests {
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService(),
-                true);
+                true,
+                null,
+                backupRepository);
         repository.saveSettings("private-worker", new InstallSettings(
                 null,
                 "https://autark-os-dev.tailnet.local:8090",
@@ -669,7 +679,9 @@ class AppLifecycleServiceTests {
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
-                true);
+                true,
+                null,
+                backupRepository);
 
         AppActionResult result = devService.repair("vaultwarden");
 
@@ -692,7 +704,10 @@ class AppLifecycleServiceTests {
                 () -> List.of(new ManagedContainer("vaultwarden", "autark-os-vaultwarden", "Up 2 minutes (healthy)")),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
-                new FakeTailscaleService());
+                new FakeTailscaleService(),
+                false,
+                null,
+                backupRepository);
 
         List<AppRuntimeView> apps = rediscoveryService.listApps();
 
@@ -718,7 +733,9 @@ class AppLifecycleServiceTests {
 
         assertThat(result.status()).isEqualTo("removed");
         assertThat(result.logs()).anySatisfy(log -> assertThat(log).contains("Created safety checkpoint"));
-        List<RestorePoint> restorePoints = new BackupRepository(runtimeLayout).forApp("vaultwarden", 5);
+        List<RestorePoint> restorePoints = backupRepository.forApp("vaultwarden", 5).stream()
+                .map(RestorePoints::toDomain)
+                .toList();
         assertThat(restorePoints)
                 .anySatisfy(point -> {
                     assertThat(point.source()).isEqualTo("pre_uninstall");

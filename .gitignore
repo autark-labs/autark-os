@@ -7,6 +7,8 @@ Thumbs.db
 .vscode/
 *.iml
 
+.env
+
 # Java / Spring
 backend/target/
 backend/build/

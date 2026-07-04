@@ -17,6 +17,7 @@ import java.util.zip.ZipOutputStream;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleServeResult;
 import com.autarkos.network.tailscale.TailscaleService;
@@ -114,7 +115,7 @@ class AppUninstallService {
             Files.createDirectories(directory);
             Path destination = directory.resolve(app.appId() + "-pre-uninstall-" + SAFETY_CHECKPOINT_NAME_FORMAT.format(Instant.now()) + ".zip");
             long size = zipDirectory(source, destination);
-            backupRepository.record(app.appId(), app.appName(), "app", "pre_uninstall", app.appId(), destination.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety checkpoint created before uninstall.");
+            backupRepository.save(RestorePoints.create(app.appId(), app.appName(), "app", "pre_uninstall", app.appId(), destination.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety checkpoint created before uninstall."));
             repository.recordEvent(app.appId(), "safety_checkpoint_created", "Saved a safety checkpoint before removing " + app.appName() + ".");
             activitySuccess("safety_checkpoint_created", "Saved safety checkpoint", "Autark-OS saved a checkpoint before removing " + app.appName() + ".", app.appId());
             return new SafetyCheckpointResult(true, List.of("Created safety checkpoint " + destination));

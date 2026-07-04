@@ -38,6 +38,8 @@ import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.system.ProjectSettingsRepository;
 import com.autarkos.system.ProjectSettingsService;
 import com.autarkos.system.RuntimeFileOperations;
+import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.RestorePointTestRecords;
 
 class BackupServiceCanonicalAppTests {
 
@@ -48,7 +50,7 @@ class BackupServiceCanonicalAppTests {
     void reportOnlyIncludesCanonicalManagedApps() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
-        BackupRepository backupRepository = new BackupRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         InstalledApp staleVaultwarden = installed("vaultwarden", "Vaultwarden", runtimeLayout);
@@ -79,7 +81,7 @@ class BackupServiceCanonicalAppTests {
     void backupEnabledWithoutRestorePointIsNotProtected() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
-        BackupRepository backupRepository = new BackupRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
@@ -101,12 +103,12 @@ class BackupServiceCanonicalAppTests {
     void completedRestorePointMakesAppProtected() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
-        BackupRepository backupRepository = new BackupRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
         installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
-        backupRepository.record("homepage", "Homepage", "app", "manual", "homepage", "/backups/homepage.tar", "completed", 1024, "Backup completed.");
+        RestorePointTestRecords.record(backupRepository, "homepage", "Homepage", "app", "manual", "homepage", "/backups/homepage.tar", "completed", 1024, "Backup completed.");
 
         BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
 
@@ -124,7 +126,7 @@ class BackupServiceCanonicalAppTests {
     void restoreUsesAutarkOsFileOpsServiceForAppDataReplacement() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
-        BackupRepository backupRepository = new BackupRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
@@ -133,7 +135,7 @@ class BackupServiceCanonicalAppTests {
         Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/autark-os-full-test.zip");
         Files.createDirectories(archive.getParent());
         writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
-        RestorePoint point = backupRepository.record("__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
+        RestorePoint point = RestorePointTestRecords.record(backupRepository, "__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
         RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
         BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService);
 
@@ -147,7 +149,7 @@ class BackupServiceCanonicalAppTests {
     void restoreReportsWarningWhenAppDataRestoresButAppCannotRestart() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = new InstalledAppRepository(runtimeLayout);
-        BackupRepository backupRepository = new BackupRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
@@ -156,7 +158,7 @@ class BackupServiceCanonicalAppTests {
         Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/autark-os-full-test.zip");
         Files.createDirectories(archive.getParent());
         writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
-        RestorePoint point = backupRepository.record("__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
+        RestorePoint point = RestorePointTestRecords.record(backupRepository, "__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
         RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
         BackupService service = backupService(
                 runtimeLayout,

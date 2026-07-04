@@ -56,7 +56,9 @@ class RestoreExecutor {
         if (!plan.executable()) {
             throw new InstallationException("This restore point cannot be restored. Review the restore plan for details.");
         }
-        RestorePoint point = backupRepository.findById(restorePointId);
+        RestorePoint point = backupRepository.findById(restorePointId)
+                .map(RestorePoints::toDomain)
+                .orElseThrow(() -> new InstallationException("Restore point was not found."));
         List<InstalledApp> apps = restorePlanner.affectedApps(point, targetAppId);
         List<String> logs = new ArrayList<>();
         List<RestoreAppResult> results = new ArrayList<>();
@@ -92,7 +94,7 @@ class RestoreExecutor {
                 Files.createDirectories(backupRoot.get().resolve("pre-restore"));
                 Path safety = backupRoot.get().resolve("pre-restore").resolve(app.appId() + "-pre-restore-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
                 long size = backupArchiveService.createSafetyArchive(app.appId(), safety);
-                backupRepository.record(app.appId(), app.appName(), "app", "pre_restore", app.appId(), safety.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety backup created before restore.");
+                backupRepository.save(RestorePoints.create(app.appId(), app.appName(), "app", "pre_restore", app.appId(), safety.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety backup created before restore."));
                 logs.add("Created safety backup for " + app.appName() + ".");
             }
             backupArchiveService.restoreAppData(Path.of(point.path()), point.scope(), app.appId());

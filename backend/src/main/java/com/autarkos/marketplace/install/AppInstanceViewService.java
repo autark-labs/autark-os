@@ -12,6 +12,7 @@ import com.autarkos.api.AutarkOsIssueFactory;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RestorePoint;
+import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
@@ -205,7 +206,9 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
             return AutarkOsStates.BackupState.DISABLED;
         }
-        List<RestorePoint> restorePoints = backupRepository.forApp(appId, 10);
+        List<RestorePoint> restorePoints = backupRepository.forApp(appId, 10).stream()
+                .map(RestorePoints::toDomain)
+                .toList();
         if (restorePoints.isEmpty()) {
             return AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
         }

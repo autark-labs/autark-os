@@ -17,7 +17,6 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.apps.AppOwnershipState;
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
-import com.autarkos.backups.BackupRepository;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
@@ -37,8 +36,8 @@ import com.autarkos.marketplace.install.PortAllocator;
 import com.autarkos.marketplace.plan.InstallPlanService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
-import com.autarkos.jobs.AutarkOsJobRepository;
 import com.autarkos.jobs.AutarkOsJobService;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class DiscoverServiceTests {
 
@@ -299,7 +298,7 @@ class DiscoverServiceTests {
                         () -> new com.autarkos.system.AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                         () -> "0.2.0",
                         false),
-                new BackupRepository(runtimeLayout()));
+                JpaTestRepositories.backupRepository(runtimeLayout()));
     }
 
     private MarketplaceCatalogService catalogService() {
@@ -321,7 +320,7 @@ class DiscoverServiceTests {
     }
 
     private AutarkOsJobService jobService() {
-        return new AutarkOsJobService(new AutarkOsJobRepository(runtimeLayout(), () -> Instant.parse("2026-06-21T12:00:00Z")), Runnable::run, false);
+        return new AutarkOsJobService(JpaTestRepositories.jobRepository(runtimeLayout()), Runnable::run, false);
     }
 
     private ObservedService observed(String id, String catalogAppId, String ownershipState, String visibility) {

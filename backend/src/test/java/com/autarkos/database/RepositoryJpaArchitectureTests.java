@@ -16,7 +16,9 @@ class RepositoryJpaArchitectureTests {
                 Path.of("src/main/java/com/autarkos/activity/ActivityLogRepository.java"),
                 Path.of("src/main/java/com/autarkos/system/StorageSampleRepository.java"),
                 Path.of("src/main/java/com/autarkos/monitoring/HostMetricSampleRepository.java"),
-                Path.of("src/main/java/com/autarkos/monitoring/AppMetricSampleRepository.java"));
+                Path.of("src/main/java/com/autarkos/monitoring/AppMetricSampleRepository.java"),
+                Path.of("src/main/java/com/autarkos/backups/BackupRepository.java"),
+                Path.of("src/main/java/com/autarkos/jobs/AutarkOsJobRepository.java"));
 
         for (Path repository : repositories) {
             String source = Files.readString(repository);

@@ -27,6 +27,8 @@ import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.RestorePointTestRecords;
 import com.autarkos.system.AutarkOsIdentity;
 
 class AppOwnershipServiceTests {
@@ -234,8 +236,8 @@ class AppOwnershipServiceTests {
                 "owned",
                 Instant.parse("2026-06-21T12:00:00Z"),
                 Instant.parse("2026-06-21T12:00:00Z")));
-        BackupRepository backupRepository = new BackupRepository(runtimeLayout());
-        backupRepository.record("vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden-failed.zip", "failed", 0, "Backup failed.");
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout());
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden-failed.zip", "failed", 0, "Backup failed.");
 
         DiscoverInstalledAppSummary unprotected = service(repository, observedRepository(), backupRepository)
                 .app("vaultwarden")
@@ -246,7 +248,7 @@ class AppOwnershipServiceTests {
         assertThat(unprotected.protectedByBackups()).isFalse();
         assertThat(unprotected.firstBackupRecommended()).isTrue();
 
-        backupRepository.record("vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 1024, "Backup completed.");
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 1024, "Backup completed.");
 
         DiscoverInstalledAppSummary protectedApp = service(repository, observedRepository(), backupRepository)
                 .app("vaultwarden")
@@ -268,7 +270,7 @@ class AppOwnershipServiceTests {
                 installedRepository(),
                 observedServiceService,
                 dockerOwnershipService(),
-                new BackupRepository(runtimeLayout()));
+                JpaTestRepositories.backupRepository(runtimeLayout()));
 
         AppOwnershipView view = service.app("vaultwarden").orElseThrow();
         List<AppOwnershipView> views = service.apps();
@@ -311,7 +313,7 @@ class AppOwnershipServiceTests {
     }
 
     private AppOwnershipService service(InstalledAppRepository installedRepository, ObservedServiceRepository observedRepository) {
-        return service(installedRepository, observedRepository, new BackupRepository(runtimeLayout()));
+        return service(installedRepository, observedRepository, JpaTestRepositories.backupRepository(runtimeLayout()));
     }
 
     private AppOwnershipService service(InstalledAppRepository installedRepository, ObservedServiceRepository observedRepository, BackupRepository backupRepository) {

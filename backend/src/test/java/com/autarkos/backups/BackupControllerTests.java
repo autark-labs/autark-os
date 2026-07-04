@@ -22,6 +22,7 @@ import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class BackupControllerTests {
 
@@ -159,7 +160,7 @@ class BackupControllerTests {
     private AutarkOsJobService jobService() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        AutarkOsJobRepository repository = new AutarkOsJobRepository(new RuntimeLayout(properties), () -> Instant.parse("2026-06-21T12:00:00Z"));
+        AutarkOsJobRepository repository = JpaTestRepositories.jobRepository(new RuntimeLayout(properties));
         return new AutarkOsJobService(repository, Runnable::run, false);
     }
 }

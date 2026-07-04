@@ -15,9 +15,10 @@ import com.autarkos.marketplace.runtime.RuntimeLayout;
 public class AutarkOsDataSourceConfiguration {
 
     @Bean
-    DataSource dataSource(RuntimeLayout runtimeLayout) {
+    DataSource dataSource(RuntimeLayout runtimeLayout, AutarkOsDatabase database) {
         try {
             java.nio.file.Files.createDirectories(runtimeLayout.runtimeRoot());
+            database.migrate();
         } catch (IOException exception) {
             throw new InstallationException("Unable to create Autark-OS runtime root.", exception);
         }

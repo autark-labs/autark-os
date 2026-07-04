@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class AutarkOsJobServiceTests {
 
@@ -85,11 +86,11 @@ class AutarkOsJobServiceTests {
     void marksInterruptedQueuedAndRunningJobsAsFailedOnStartup() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        AutarkOsJobRepository repository = new AutarkOsJobRepository(new RuntimeLayout(properties), () -> Instant.parse("2026-06-20T12:00:00Z"));
+        AutarkOsJobRepository repository = JpaTestRepositories.jobRepository(new RuntimeLayout(properties));
         AutarkOsJobService previousProcess = new AutarkOsJobService(repository, Runnable::run, false);
         AutarkOsJob queued = previousProcess.start("install_app", "vaultwarden", List.of(AutarkOsJobStep.pending("download", "Downloading app")), () -> AutarkOsJobOutcome.succeeded("Installed."));
         AutarkOsJob running = previousProcess.start("backup", "vaultwarden", List.of(AutarkOsJobStep.pending("copy", "Copying app data")), () -> AutarkOsJobOutcome.succeeded("Backed up."));
-        repository.markRunning(running.jobId(), "copy");
+        previousProcess.recordProgress(running.jobId(), List.of(AutarkOsJobStep.running("copy", "Copying app data", "Copying app data.")));
 
         AutarkOsJobService restarted = new AutarkOsJobService(repository, Runnable::run, false);
         restarted.reconcileInterruptedJobs();
@@ -118,7 +119,7 @@ class AutarkOsJobServiceTests {
     private AutarkOsJobService service() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        AutarkOsJobRepository repository = new AutarkOsJobRepository(new RuntimeLayout(properties), () -> Instant.parse("2026-06-20T12:00:00Z"));
-        return new AutarkOsJobService(repository, Runnable::run, false);
+        AutarkOsJobRepository repository = JpaTestRepositories.jobRepository(new RuntimeLayout(properties));
+        return new AutarkOsJobService(repository, Runnable::run, false, () -> Instant.parse("2026-06-20T12:00:00Z"));
     }
 }

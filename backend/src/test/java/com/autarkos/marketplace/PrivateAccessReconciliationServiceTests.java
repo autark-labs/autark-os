@@ -32,6 +32,7 @@ import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleServeConfig;
 import com.autarkos.network.tailscale.TailscaleServeMapping;
 import com.autarkos.network.tailscale.TailscaleService;
+import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
 class PrivateAccessReconciliationServiceTests {
@@ -60,7 +61,10 @@ class PrivateAccessReconciliationServiceTests {
                 () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
-                tailscaleService);
+                tailscaleService,
+                false,
+                null,
+                JpaTestRepositories.backupRepository(runtimeLayout));
         reconciliationService = new PrivateAccessReconciliationService(appLifecycleService, catalogService, tailscaleService);
 
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");

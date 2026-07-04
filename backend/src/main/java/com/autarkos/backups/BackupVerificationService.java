@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
@@ -37,22 +38,22 @@ class BackupVerificationService {
 
     VerificationUpdate verifyRestorePoint(RestorePoint point) {
         if (!AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())) {
-            RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Only completed backups can be verified.", "", "low");
+            RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Only completed backups can be verified.", "", "low");
             return new VerificationUpdate(updated, result(updated));
         }
         try {
             Path path = Path.of(point.path());
             if (!Files.isRegularFile(path)) {
-                RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup file is missing.", "", "low");
+                RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup file is missing.", "", "low");
                 return new VerificationUpdate(updated, result(updated));
             }
             ZipSummary summary = inspectZip(path);
             if (summary.entries() == 0 || summary.bytes() <= 0) {
-                RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup archive is empty.", "", "low");
+                RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup archive is empty.", "", "low");
                 return new VerificationUpdate(updated, result(updated));
             }
             String checksum = checksum(path);
-            RestorePoint updated = backupRepository.updateVerification(
+            RestorePoint updated = updateVerification(
                     point.id(),
                     AutarkOsStates.RestorePointStatus.VERIFIED,
                     "Verified " + summary.entries() + " file(s) and " + summary.bytes() + " byte(s) inside the archive.",
@@ -61,7 +62,7 @@ class BackupVerificationService {
             activityLogService.success("backup", "backup_verified", "Backup verified", updated.appName() + " restore point is readable.", null);
             return new VerificationUpdate(updated, result(updated));
         } catch (RuntimeException | IOException exception) {
-            RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), "", "low");
+            RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), "", "low");
             RuntimeException logged = exception instanceof RuntimeException runtimeException ? runtimeException : new InstallationException(userMessage(exception), exception);
             activityLogService.error("backup", "backup_verification_failed", "Backup verification failed", userMessage(exception), point.appId(), logged);
             return new VerificationUpdate(updated, result(updated));
@@ -98,6 +99,18 @@ class BackupVerificationService {
                 .map(backupContractService::backupContract)
                 .filter(BackupContract::reviewRequired)
                 .isPresent() ? "medium" : "high";
+    }
+
+    private RestorePoint updateVerification(long id, String verificationStatus, String verificationMessage, String checksumSha256, String restoreConfidence) {
+        RestorePointEntity entity = backupRepository.findById(id)
+                .orElseThrow(() -> new InstallationException("Restore point was not found."));
+        entity.updateVerification(
+                RestorePoints.clean(verificationStatus, "not_checked"),
+                RestorePoints.clean(verificationMessage, "Backup verification has not run."),
+                checksumSha256 == null ? "" : checksumSha256,
+                RestorePoints.clean(restoreConfidence, "unknown"),
+                Instant.now().toString());
+        return RestorePoints.toDomain(backupRepository.save(entity));
     }
 
     private ZipSummary inspectZip(Path path) throws IOException {

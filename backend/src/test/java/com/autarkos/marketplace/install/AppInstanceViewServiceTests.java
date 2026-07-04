@@ -15,6 +15,8 @@ import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.RestorePointTestRecords;
 
 class AppInstanceViewServiceTests {
 
@@ -148,7 +150,7 @@ class AppInstanceViewServiceTests {
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
         repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
-        backupRepository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of(
                 new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
@@ -162,8 +164,8 @@ class AppInstanceViewServiceTests {
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
         repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
-        backupRepository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
-        backupRepository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "", "failed", 0, "Backup failed.");
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "", "failed", 0, "Backup failed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of(
                 new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
@@ -177,7 +179,7 @@ class AppInstanceViewServiceTests {
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
         repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
-        backupRepository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "", "failed", 0, "Backup failed.");
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "", "failed", 0, "Backup failed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of(
                 new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
@@ -207,7 +209,7 @@ class AppInstanceViewServiceTests {
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
         repository.saveSettings("vaultwarden", settingsWithRepairStatus("failed", true, new BackupPolicy(true, "daily", 7)));
-        backupRepository.record("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
+        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of());
 
         AppRemediationView remediation = service.list().getFirst().remediation();
@@ -239,7 +241,7 @@ class AppInstanceViewServiceTests {
     private BackupRepository backupRepository() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return new BackupRepository(new RuntimeLayout(properties));
+        return JpaTestRepositories.backupRepository(new RuntimeLayout(properties));
     }
 
     private InstalledApp installed(String appId, String status) {

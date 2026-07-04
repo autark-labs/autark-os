@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class AutarkOsJobControllerTests {
 
@@ -32,7 +33,7 @@ class AutarkOsJobControllerTests {
     private AutarkOsJobService service() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        AutarkOsJobRepository repository = new AutarkOsJobRepository(new RuntimeLayout(properties), () -> Instant.parse("2026-06-20T12:00:00Z"));
+        AutarkOsJobRepository repository = JpaTestRepositories.jobRepository(new RuntimeLayout(properties));
         return new AutarkOsJobService(repository, Runnable::run, false);
     }
 }
