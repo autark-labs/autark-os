@@ -28,8 +28,8 @@ final class InstalledApps {
                 Instant.parse(entity.installedAt()));
     }
 
-    static InstalledAppOwnershipMetadata ownership(InstalledAppEntity entity) {
-        return new InstalledAppOwnershipMetadata(
+    static RuntimeModels.InstalledAppOwnershipMetadata ownership(InstalledAppEntity entity) {
+        return new RuntimeModels.InstalledAppOwnershipMetadata(
                 entity.appId(),
                 valueOr(entity.appInstanceId(), ""),
                 valueOr(entity.catalogAppId(), entity.appId()),
@@ -41,13 +41,13 @@ final class InstalledApps {
                 instant(valueOr(entity.updatedAt(), entity.installedAt())));
     }
 
-    static InstallSettings settings(InstallSettingsRow row) {
-        return new InstallSettings(
+    static InstallModels.InstallSettings settings(InstallSettingsRow row) {
+        return new InstallModels.InstallSettings(
                 row.getAccessUrl(),
                 row.getPrivateAccessUrl(),
                 row.getTailscaleEnabled() == 1,
                 decodeMap(row.getStorageSubfolders()),
-                new BackupPolicy(row.getBackupEnabled() == 1, row.getBackupFrequency(), row.getBackupRetention()),
+                new InstallModels.BackupPolicy(row.getBackupEnabled() == 1, row.getBackupFrequency(), row.getBackupRetention()),
                 row.getDesiredAccessMode(),
                 row.getPrivateAccessRequirement(),
                 row.getExpectedLocalPort(),

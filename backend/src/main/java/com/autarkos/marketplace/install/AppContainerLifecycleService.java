@@ -30,21 +30,21 @@ class AppContainerLifecycleService {
     }
 
     AppActionResult start(InstalledApp app, Path composeFile) {
-        DockerComposeResult result = composeExecutor.up(composeFile, app.composeProject());
+        RuntimeModels.DockerComposeResult result = composeExecutor.up(composeFile, app.composeProject());
         return completeAction(app, "start", result, "Starting " + app.appName(), "Could not start " + app.appName());
     }
 
     AppActionResult stop(InstalledApp app, Path composeFile) {
-        DockerComposeResult result = composeExecutor.stop(composeFile, app.composeProject());
+        RuntimeModels.DockerComposeResult result = composeExecutor.stop(composeFile, app.composeProject());
         return completeAction(app, "stop", result, "Stopped " + app.appName(), "Could not stop " + app.appName());
     }
 
     AppActionResult restart(InstalledApp app, Path composeFile) {
-        DockerComposeResult result = composeExecutor.restart(composeFile, app.composeProject());
+        RuntimeModels.DockerComposeResult result = composeExecutor.restart(composeFile, app.composeProject());
         return completeAction(app, "restart", result, "Restarted " + app.appName(), "Could not restart " + app.appName());
     }
 
-    private AppActionResult completeAction(InstalledApp app, String action, DockerComposeResult result, String successMessage, String failureMessage) {
+    private AppActionResult completeAction(InstalledApp app, String action, RuntimeModels.DockerComposeResult result, String successMessage, String failureMessage) {
         if (result.successful()) {
             repository.recordEvent(app.appId(), action, successMessage + ".");
             activitySuccess(action, successMessage, successMessage + ".", app.appId());

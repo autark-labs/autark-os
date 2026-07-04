@@ -16,19 +16,19 @@ import com.autarkos.marketplace.model.UsageManifest;
 @Component
 public class PostInstallGuideBuilder {
 
-    public PostInstallGuide build(ApplicationManifest manifest, String accessUrl, PostInstallProvisioningResult provisioningResult) {
+    public GuideModels.PostInstallGuide build(ApplicationManifest manifest, String accessUrl, GuideModels.PostInstallProvisioningResult provisioningResult) {
         return build(manifest, accessUrl, null, provisioningResult);
     }
 
-    public PostInstallGuide build(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, PostInstallProvisioningResult provisioningResult) {
+    public GuideModels.PostInstallGuide build(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, GuideModels.PostInstallProvisioningResult provisioningResult) {
         UsageManifest usage = manifest.usage();
         Map<String, String> values = values(manifest, accessUrl, privateAccessUrl, provisioningResult);
 
-        List<PostInstallValue> fields = usage.fields().stream()
+        List<GuideModels.PostInstallValue> fields = usage.fields().stream()
                 .map(field -> value(field, values))
                 .toList();
 
-        return new PostInstallGuide(
+        return new GuideModels.PostInstallGuide(
                 usage.kind(),
                 usage.primaryAction(),
                 usage.openUrlLabel(),
@@ -39,14 +39,14 @@ public class PostInstallGuideBuilder {
                 usage.notes().stream().map(note -> resolve(note, values)).toList());
     }
 
-    public AppSetupGuide buildSetupGuide(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, PostInstallProvisioningResult provisioningResult, Set<String> installedAppIds) {
+    public GuideModels.AppSetupGuide buildSetupGuide(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, GuideModels.PostInstallProvisioningResult provisioningResult, Set<String> installedAppIds) {
         SetupManifest setup = manifest.setup();
         Map<String, String> values = values(manifest, accessUrl, privateAccessUrl, provisioningResult);
-        return new AppSetupGuide(
+        return new GuideModels.AppSetupGuide(
                 setup.kind(),
                 setup.automation(),
                 setup.generatedValues().stream()
-                        .map(field -> new AppSetupField(field.label(), resolve(field.value(), values), field.sensitive(), false, field.recoverable()))
+                        .map(field -> new GuideModels.AppSetupField(field.label(), resolve(field.value(), values), field.sensitive(), false, field.recoverable()))
                         .toList(),
                 setup.copyableFields().stream()
                         .map(field -> setupField(field, values, false))
@@ -55,7 +55,7 @@ public class PostInstallGuideBuilder {
                         .map(field -> setupField(field, values, true))
                         .toList(),
                 setup.integrations().stream()
-                        .map(integration -> new AppSetupIntegration(
+                        .map(integration -> new GuideModels.AppSetupIntegration(
                                 integration.id(),
                                 integration.name(),
                                 integration.targetAppId(),
@@ -70,7 +70,7 @@ public class PostInstallGuideBuilder {
                 setup.automationCapabilities().stream().map(capability -> resolve(capability, values)).toList());
     }
 
-    private Map<String, String> values(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, PostInstallProvisioningResult provisioningResult) {
+    private Map<String, String> values(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, GuideModels.PostInstallProvisioningResult provisioningResult) {
         Map<String, String> values = new HashMap<>(provisioningResult.values());
         values.put("accessUrl", accessUrl == null ? "" : accessUrl);
         values.put("privateAccessUrl", privateAccessUrl == null ? "" : privateAccessUrl);
@@ -79,16 +79,16 @@ public class PostInstallGuideBuilder {
         return values;
     }
 
-    private PostInstallValue value(UsageField field, Map<String, String> values) {
-        return new PostInstallValue(
+    private GuideModels.PostInstallValue value(UsageField field, Map<String, String> values) {
+        return new GuideModels.PostInstallValue(
                 field.label(),
                 resolve(field.value(), values),
                 field.sensitive(),
                 field.qr());
     }
 
-    private AppSetupField setupField(SetupField field, Map<String, String> values, boolean qr) {
-        return new AppSetupField(
+    private GuideModels.AppSetupField setupField(SetupField field, Map<String, String> values, boolean qr) {
+        return new GuideModels.AppSetupField(
                 field.label(),
                 resolve(field.value(), values),
                 field.sensitive(),

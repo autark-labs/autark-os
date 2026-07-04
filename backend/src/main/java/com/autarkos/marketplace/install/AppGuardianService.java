@@ -65,7 +65,7 @@ public class AppGuardianService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList());
     }
@@ -98,7 +98,7 @@ public class AppGuardianService {
         if (automationService != null && !automationService.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)) {
             return;
         }
-        InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
+        InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         if (!settings.autoRepairEnabled()) {
             return;
         }
@@ -137,7 +137,7 @@ public class AppGuardianService {
         if (automationService != null && !automationService.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)) {
             return;
         }
-        InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
+        InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         if (!settings.autoRepairEnabled()) {
             return;
         }
@@ -168,12 +168,12 @@ public class AppGuardianService {
         return !snapshot.startupGrace() && (AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(snapshot.status()) || AutarkOsStates.AppStatus.UNAVAILABLE.equals(snapshot.status()));
     }
 
-    private boolean recentlyAttempted(InstallSettings settings) {
+    private boolean recentlyAttempted(InstallModels.InstallSettings settings) {
         return settings.lastRepairAttemptAt() != null && settings.lastRepairAttemptAt().plus(REPAIR_RATE_LIMIT).isAfter(Instant.now());
     }
 
-    private void saveGuardianState(InstalledApp app, InstallSettings settings, String status, Instant attemptAt) {
-        repository.saveSettings(app.appId(), new InstallSettings(
+    private void saveGuardianState(InstalledApp app, InstallModels.InstallSettings settings, String status, Instant attemptAt) {
+        repository.saveSettings(app.appId(), new InstallModels.InstallSettings(
                 settings.accessUrl(),
                 settings.privateAccessUrl(),
                 settings.tailscaleEnabled(),

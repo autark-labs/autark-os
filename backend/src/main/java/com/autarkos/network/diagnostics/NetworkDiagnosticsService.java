@@ -9,11 +9,9 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.apps.ApplicationStateService;
-import com.autarkos.marketplace.install.AppAccessCheck;
+import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
-import com.autarkos.marketplace.install.PrivateAccessReconciliationItem;
-import com.autarkos.marketplace.install.PrivateAccessReconciliationReport;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
 import com.autarkos.network.tailscale.TailscaleDevice;
 import com.autarkos.network.tailscale.TailscaleService;
@@ -38,7 +36,7 @@ public class NetworkDiagnosticsService {
         TailscaleStatus tailscale = tailscaleService.status();
         List<TailscaleDevice> devices = tailscaleService.devices();
         List<AppRuntimeView> apps = applicationStateService.snapshot().runtimeApps();
-        Map<String, AppAccessCheck> accessChecks = cachedAccessChecks(apps);
+        Map<String, AccessModels.AppAccessCheck> accessChecks = cachedAccessChecks(apps);
         List<AppRuntimeView> privateApps = apps.stream()
                 .filter(app -> app.settings() != null && app.settings().tailscaleEnabled())
                 .toList();
@@ -54,7 +52,7 @@ public class NetworkDiagnosticsService {
         List<NetworkDiagnosticItem> appChecks = privateApps.stream()
                 .map(app -> appCheck(app, accessChecks.get(app.appId()), tailscale))
                 .toList();
-        PrivateAccessReconciliationReport reconciliation = reconciliationService.report();
+        AccessModels.PrivateAccessReconciliationReport reconciliation = reconciliationService.report();
         List<NetworkDiagnosticItem> reconciliationChecks = reconciliation.apps().stream()
                 .filter(item -> !"healthy".equals(item.status()))
                 .map(this::reconciliationCheck)
@@ -72,15 +70,15 @@ public class NetworkDiagnosticsService {
                 Instant.now());
     }
 
-    private Map<String, AppAccessCheck> cachedAccessChecks(List<AppRuntimeView> apps) {
-        Map<String, AppAccessCheck> checks = new LinkedHashMap<>();
+    private Map<String, AccessModels.AppAccessCheck> cachedAccessChecks(List<AppRuntimeView> apps) {
+        Map<String, AccessModels.AppAccessCheck> checks = new LinkedHashMap<>();
         for (AppRuntimeView app : apps) {
             if (app.healthSnapshot() == null || app.healthSnapshot().localAccessStatus() == null || "not_configured".equals(app.healthSnapshot().localAccessStatus())) {
-                checks.put(app.appId(), AppAccessCheck.notConfigured(app.appId()));
+                checks.put(app.appId(), AccessModels.AppAccessCheck.notConfigured(app.appId()));
                 continue;
             }
             String message = "reachable".equals(app.healthSnapshot().localAccessStatus()) ? "App link is responding." : "App is running, but the link is not responding.";
-            checks.put(app.appId(), new AppAccessCheck(app.appId(), app.accessUrl(), app.healthSnapshot().localAccessStatus(), message, app.healthSnapshot().checkedAt()));
+            checks.put(app.appId(), new AccessModels.AppAccessCheck(app.appId(), app.accessUrl(), app.healthSnapshot().localAccessStatus(), message, app.healthSnapshot().checkedAt()));
         }
         return checks;
     }
@@ -148,7 +146,7 @@ public class NetworkDiagnosticsService {
         return ok("private-apps", "Private apps ready", privateApps.size() + " app(s) selected for private access.", "Autark-OS can show private links for these apps.", null);
     }
 
-    private NetworkDiagnosticItem appCheck(AppRuntimeView app, AppAccessCheck accessCheck, TailscaleStatus tailscale) {
+    private NetworkDiagnosticItem appCheck(AppRuntimeView app, AccessModels.AppAccessCheck accessCheck, TailscaleStatus tailscale) {
         if (!tailscale.connected()) {
             return warn(app.appId(), app.appName(), "Private link is waiting on Tailscale.", "Connect Autark-OS to activate this app's private access.", "Connect this device");
         }
@@ -167,7 +165,7 @@ public class NetworkDiagnosticsService {
         return warn(app.appId(), app.appName(), "Local access is not responding.", "The private link may exist, but the app did not answer the local health check.", "Repair app link");
     }
 
-    private NetworkDiagnosticItem reconciliationCheck(PrivateAccessReconciliationItem item) {
+    private NetworkDiagnosticItem reconciliationCheck(AccessModels.PrivateAccessReconciliationItem item) {
         return warn("serve-" + item.appId(), item.appName(), item.message(), item.detail(), item.actionLabel());
     }
 

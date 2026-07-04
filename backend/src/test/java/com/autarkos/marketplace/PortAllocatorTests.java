@@ -7,9 +7,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.autarkos.marketplace.install.PortAllocator;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
-import com.autarkos.marketplace.install.ResolvedRuntimeConfiguration;
+import com.autarkos.marketplace.install.PortAllocator;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.CatalogSmokeTest;
@@ -25,7 +25,7 @@ class PortAllocatorTests {
         int port = availablePort();
         ApplicationManifest manifest = manifest(port + ":80");
 
-        ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
+        RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
 
         assertThat(configuration.ports()).containsExactly(port + ":80");
         assertThat(configuration.accessUrl()).isEqualTo("http://localhost:" + port);
@@ -37,7 +37,7 @@ class PortAllocatorTests {
         try (ServerSocket ignored = new ServerSocket(port)) {
             ApplicationManifest manifest = manifest(port + ":80");
 
-            ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
+            RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
 
             assertThat(configuration.ports()).containsExactly((port + 1) + ":80");
             assertThat(configuration.accessUrl()).isEqualTo("http://localhost:" + (port + 1));
@@ -59,7 +59,7 @@ class PortAllocatorTests {
         int sshPort = availablePort();
         ApplicationManifest manifest = manifest("http://localhost:" + webPort, List.of(sshPort + ":22", webPort + ":3000"));
 
-        ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
+        RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
 
         assertThat(configuration.accessUrl()).isEqualTo("http://localhost:" + webPort);
     }

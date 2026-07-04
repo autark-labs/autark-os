@@ -21,22 +21,21 @@ import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
 import com.autarkos.host.ObservedServiceService;
+import com.autarkos.jobs.AutarkOsJobService;
+import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.api.InstallOptionsRequest;
-import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
-import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.InstallCustomizationResolver;
-import com.autarkos.marketplace.install.InstallResult;
-import com.autarkos.marketplace.install.InstallStep;
+import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.InstalledApp;
+import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.MarketplaceInstallService;
 import com.autarkos.marketplace.install.PortAllocator;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.plan.InstallPlanService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
-import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.testsupport.JpaTestRepositories;
 
 class DiscoverServiceTests {
@@ -58,7 +57,7 @@ class DiscoverServiceTests {
                 "autark-os-vaultwarden",
                 "http://localhost:8090",
                 Instant.parse("2026-06-21T12:00:00Z")));
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
                 "appinst_vaultwarden",
                 "vaultwarden",
@@ -355,9 +354,9 @@ class DiscoverServiceTests {
         }
 
         @Override
-        public InstallResult install(com.autarkos.marketplace.model.ApplicationManifest manifest, InstallOptionsRequest options, java.util.function.Consumer<InstallStep> progressSink) {
+        public InstallModels.InstallResult install(com.autarkos.marketplace.model.ApplicationManifest manifest, InstallOptionsRequest options, java.util.function.Consumer<InstallModels.InstallStep> progressSink) {
             lastOptions = options;
-            return new InstallResult(manifest.id(), manifest.name(), "installed", "Installed.", manifest.accessUrl(), null, List.of(), List.of(), null, null);
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), "installed", "Installed.", manifest.accessUrl(), null, List.of(), List.of(), null, null);
         }
     }
 }

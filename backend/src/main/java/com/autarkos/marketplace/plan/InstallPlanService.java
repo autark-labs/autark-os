@@ -5,12 +5,12 @@ import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
-import com.autarkos.marketplace.install.InstallCustomizationResolver;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
+import com.autarkos.marketplace.install.InstallCustomizationResolver;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
-import com.autarkos.marketplace.install.ResolvedRuntimeConfiguration;
 
 @Service
 public class InstallPlanService {
@@ -28,7 +28,7 @@ public class InstallPlanService {
     }
 
     public InstallPlan generatePlan(ApplicationManifest manifest, InstallOptionsRequest options) {
-        ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
+        RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
         FriendlyInstallPlan friendly = new FriendlyInstallPlan(
                 manifest.name() + " will be prepared with Autark-OS managed storage, networking, access, and backups.",
                 manifest.installTime(),
@@ -63,7 +63,7 @@ public class InstallPlanService {
                 warnings(manifest, runtimeConfiguration));
     }
 
-    private List<String> effectiveVolumes(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    private List<String> effectiveVolumes(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         return declaredVolumes(manifest)
                 .map(volume -> rewriteVolume(manifest, volume, runtimeConfiguration))
                 .toList();
@@ -96,7 +96,7 @@ public class InstallPlanService {
                 .toList();
     }
 
-    private String rewriteVolume(ApplicationManifest manifest, String volume, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    private String rewriteVolume(ApplicationManifest manifest, String volume, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         String[] parts = volume.split(":", 2);
         if (parts.length != 2) {
             return volume;
@@ -112,7 +112,7 @@ public class InstallPlanService {
         return runtimeLayout.appPath(manifest.id(), relative) + ":" + parts[1];
     }
 
-    private List<String> warnings(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    private List<String> warnings(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         java.util.ArrayList<String> warnings = new java.util.ArrayList<>();
         if (manifest.runtime().network().equalsIgnoreCase("host")) {
             warnings.add("This app uses host networking so devices on your local network can discover it.");

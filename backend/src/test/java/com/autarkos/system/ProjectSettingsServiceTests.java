@@ -12,8 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.activity.ActivityLogRepository;
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.marketplace.install.BackupPolicy;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
@@ -37,12 +36,12 @@ class ProjectSettingsServiceTests {
         Instant checkedAt = Instant.parse("2026-06-21T12:30:00Z");
         installedApps.save(new InstalledApp("vaultwarden", "Vaultwarden", "Ready", "/apps/vaultwarden", "autark-os-vaultwarden", "http://localhost:8090", installedAt));
         installedApps.save(new InstalledApp("homepage", "Homepage", "Ready", "/apps/homepage", "autark-os-homepage", "http://localhost:3000", installedAt));
-        installedApps.saveSettings("vaultwarden", new InstallSettings(
+        installedApps.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 "https://vaultwarden.tailnet.ts.net",
                 true,
                 Map.of("data", "/apps/vaultwarden/data"),
-                new BackupPolicy(true, "weekly", 3),
+                new InstallModels.BackupPolicy(true, "weekly", 3),
                 "local-and-private",
                 "required",
                 8090,
@@ -83,12 +82,12 @@ class ProjectSettingsServiceTests {
             assertThat(settings.privateAccessRequirement()).isEqualTo("required");
             assertThat(settings.expectedLocalPort()).isEqualTo(8090);
             assertThat(settings.lastRepairStatus()).isEqualTo("completed");
-            assertThat(settings.backup()).isEqualTo(new BackupPolicy(false, "daily", 7));
+            assertThat(settings.backup()).isEqualTo(new InstallModels.BackupPolicy(false, "daily", 7));
             assertThat(settings.autoRepairEnabled()).isFalse();
         });
         assertThat(installedApps.settingsFor("homepage")).hasValueSatisfying(settings -> {
             assertThat(settings.accessUrl()).isEqualTo("http://localhost:3000");
-            assertThat(settings.backup()).isEqualTo(new BackupPolicy(false, "daily", 7));
+            assertThat(settings.backup()).isEqualTo(new InstallModels.BackupPolicy(false, "daily", 7));
             assertThat(settings.autoRepairEnabled()).isFalse();
         });
     }

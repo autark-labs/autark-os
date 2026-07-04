@@ -23,7 +23,7 @@ class AppSettingsPolicy {
         this.runtimeStatusResolver = runtimeStatusResolver;
     }
 
-    AppSettingsChangePlan settingsChangePlan(InstalledApp app, InstallSettings current, InstallSettings requested) {
+    InstallModels.AppSettingsChangePlan settingsChangePlan(InstalledApp app, InstallModels.InstallSettings current, InstallModels.InstallSettings requested) {
         List<String> changes = new java.util.ArrayList<>();
         List<String> warnings = new java.util.ArrayList<>();
         List<String> blocked = new java.util.ArrayList<>();
@@ -89,7 +89,7 @@ class AppSettingsPolicy {
             case "restart_required" -> "Autark-OS will save the setting and may need a restart before it is reflected.";
             default -> "Autark-OS will save these settings without restarting containers.";
         };
-        return new AppSettingsChangePlan(
+        return new InstallModels.AppSettingsChangePlan(
                 app.appId(),
                 app.appName(),
                 impact,
@@ -104,19 +104,19 @@ class AppSettingsPolicy {
                 blocked);
     }
 
-    InstallSettings sanitize(InstallSettings settings, InstalledApp app) {
+    InstallModels.InstallSettings sanitize(InstallModels.InstallSettings settings, InstalledApp app) {
         if (settings == null) {
             throw new InstallationException("Settings are required.");
         }
         String accessUrl = cleanAccessUrl(settings.accessUrl(), app.accessUrl());
         String privateAccessUrl = cleanOptionalAccessUrl(settings.privateAccessUrl());
-        BackupPolicy backup = sanitizeBackup(settings.backup());
+        InstallModels.BackupPolicy backup = sanitizeBackup(settings.backup());
         Map<String, String> storage = sanitizeStorage(settings.storageSubfolders());
         String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : null);
         String privateAccessRequirement = sanitizePrivateAccessRequirement(settings.privateAccessRequirement(), false);
         Integer expectedLocalPort = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(accessUrl) : settings.expectedLocalPort();
         String expectedProtocol = sanitizeProtocol(settings.expectedProtocol(), accessUrl);
-        return new InstallSettings(
+        return new InstallModels.InstallSettings(
                 accessUrl,
                 privateAccessUrl,
                 settings.tailscaleEnabled(),
@@ -133,18 +133,18 @@ class AppSettingsPolicy {
                 settings.autoRepairEnabled());
     }
 
-    InstallSettings normalizeSettings(InstallSettings settings, InstalledApp app, ApplicationManifest manifest, String accessUrl) {
+    InstallModels.InstallSettings normalizeSettings(InstallModels.InstallSettings settings, InstalledApp app, ApplicationManifest manifest, String accessUrl) {
         AccessManifest accessManifest = manifest == null ? AccessManifest.defaults() : manifest.access();
         String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : accessManifest.defaultMode());
         String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
         Integer expectedPort = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(accessUrl) : settings.expectedLocalPort();
         String expectedProtocol = sanitizeProtocol(settings.expectedProtocol(), accessUrl);
-        InstallSettings normalized = new InstallSettings(
+        InstallModels.InstallSettings normalized = new InstallModels.InstallSettings(
                 accessUrl == null ? settings.accessUrl() : accessUrl,
                 settings.privateAccessUrl(),
                 settings.tailscaleEnabled(),
                 settings.storageSubfolders() == null ? Map.of() : settings.storageSubfolders(),
-                settings.backup() == null ? BackupPolicy.defaults() : settings.backup(),
+                settings.backup() == null ? InstallModels.BackupPolicy.defaults() : settings.backup(),
                 desiredMode,
                 requirement,
                 expectedPort,
@@ -160,11 +160,11 @@ class AppSettingsPolicy {
         return normalized;
     }
 
-    AccessDesiredState desiredAccessState(InstallSettings settings, ApplicationManifest manifest, String accessUrl) {
+    AccessModels.AccessDesiredState desiredAccessState(InstallModels.InstallSettings settings, ApplicationManifest manifest, String accessUrl) {
         String mode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : null);
         String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
         boolean privateRecommended = manifest != null && manifest.access().privateAccessRecommended();
-        return new AccessDesiredState(
+        return new AccessModels.AccessDesiredState(
                 mode,
                 accessModeLabel(mode),
                 accessUrl,
@@ -176,7 +176,7 @@ class AppSettingsPolicy {
                 privateRecommended);
     }
 
-    AccessObservedState observedAccessState(InstallSettings settings, String accessUrl) {
+    AccessModels.AccessObservedState observedAccessState(InstallModels.InstallSettings settings, String accessUrl) {
         String privateStatus;
         if (!settings.tailscaleEnabled()) {
             privateStatus = "not_enabled";
@@ -185,7 +185,7 @@ class AppSettingsPolicy {
         } else {
             privateStatus = "configured";
         }
-        return new AccessObservedState(
+        return new AccessModels.AccessObservedState(
                 accessUrl,
                 settings.privateAccessUrl(),
                 runtimeStatusResolver.portFromUrl(accessUrl),
@@ -197,7 +197,7 @@ class AppSettingsPolicy {
                 settings.lastRepairStatus());
     }
 
-    AppAccessRoute accessRoute(InstallSettings settings, String accessUrl, AccessObservedState observedAccess) {
+    AccessModels.AppAccessRoute accessRoute(InstallModels.InstallSettings settings, String accessUrl, AccessModels.AccessObservedState observedAccess) {
         Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
         Integer privatePort = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
         String privateStatus = observedAccess == null ? "not_enabled" : observedAccess.privateLinkStatus();
@@ -207,7 +207,7 @@ class AppSettingsPolicy {
                 : firstPresent(accessUrl, settings.privateAccessUrl());
         String backendProtocol = firstPresent(settings.expectedProtocol(), runtimeStatusResolver.protocolFromUrl(accessUrl), "http");
         String backendTargetUrl = localPort == null ? null : backendProtocol + "://127.0.0.1:" + localPort;
-        return new AppAccessRoute(
+        return new AccessModels.AppAccessRoute(
                 primaryOpenUrl,
                 accessUrl,
                 settings.privateAccessUrl(),
@@ -218,7 +218,7 @@ class AppSettingsPolicy {
                 privateLinkUsesLocalHttpPort ? "port_conflict" : privateStatus);
     }
 
-    boolean privateAccessPortConflict(InstallSettings settings, String accessUrl) {
+    boolean privateAccessPortConflict(InstallModels.InstallSettings settings, String accessUrl) {
         Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
         Integer privatePort = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
         return settings.tailscaleEnabled() && localPort != null && privatePort != null && localPort.equals(privatePort);
@@ -306,9 +306,9 @@ class AppSettingsPolicy {
         return value;
     }
 
-    private BackupPolicy sanitizeBackup(BackupPolicy backup) {
+    private InstallModels.BackupPolicy sanitizeBackup(InstallModels.BackupPolicy backup) {
         if (backup == null) {
-            return BackupPolicy.defaults();
+            return InstallModels.BackupPolicy.defaults();
         }
         String frequency = backup.frequency() == null || backup.frequency().isBlank() ? "daily" : backup.frequency().trim().toLowerCase();
         if (!BACKUP_FREQUENCIES.contains(frequency)) {
@@ -317,7 +317,7 @@ class AppSettingsPolicy {
         if (backup.retention() < 1 || backup.retention() > 90) {
             throw new InstallationException("Backup retention must be between 1 and 90.");
         }
-        return new BackupPolicy(backup.enabled(), frequency, backup.retention());
+        return new InstallModels.BackupPolicy(backup.enabled(), frequency, backup.retention());
     }
 
     private Map<String, String> sanitizeStorage(Map<String, String> storageSubfolders) {

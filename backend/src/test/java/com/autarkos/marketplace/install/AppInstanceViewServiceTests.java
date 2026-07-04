@@ -13,6 +13,9 @@ import com.autarkos.backups.BackupRepository;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.ReliabilityModels;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
@@ -28,9 +31,9 @@ class AppInstanceViewServiceTests {
         InstalledAppRepository repository = repository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", "https://autark-os.example.ts.net:12890", true, java.util.Map.of(), new BackupPolicy(false, "daily", 7)));
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", "https://autark-os.example.ts.net:12890", true, java.util.Map.of(), new InstallModels.BackupPolicy(false, "daily", 7)));
         AppInstanceViewService service = service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes (healthy)", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes (healthy)", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         AppInstanceView view = service.list().getFirst();
 
@@ -82,7 +85,7 @@ class AppInstanceViewServiceTests {
     void foreignDiscoveredAppsAreExcludedFromUserFacingList() {
         InstalledAppRepository repository = repository();
         AppInstanceViewService service = service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_other_vaultwarden", "Up 2 minutes", DockerResourceOwnership.FOREIGN, "appinst_other", "autarkos_other_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_other_vaultwarden", "Up 2 minutes", DockerResourceOwnership.FOREIGN, "appinst_other", "autarkos_other_vaultwarden")));
 
         assertThat(service.list()).isEmpty();
     }
@@ -91,7 +94,7 @@ class AppInstanceViewServiceTests {
     void ownedContainerWithoutDatabaseRowIsExcludedFromUserFacingList() {
         InstalledAppRepository repository = repository();
         AppInstanceViewService service = service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         assertThat(service.list()).isEmpty();
     }
@@ -101,9 +104,9 @@ class AppInstanceViewServiceTests {
         InstalledAppRepository repository = repository();
         repository.save(installed("homepage", "Ready"));
         repository.saveOwnershipMetadata(owned("homepage", "adopted"));
-        repository.saveSettings("homepage", new InstallSettings("http://localhost:3005", null, false, java.util.Map.of(), new BackupPolicy(false, "daily", 7)));
+        repository.saveSettings("homepage", new InstallModels.InstallSettings("http://localhost:3005", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(false, "daily", 7)));
         AppInstanceViewService service = service(repository, List.of(
-                new ManagedContainer("homepage", "autark-os-homepage", "Up 2 minutes (healthy)", DockerResourceOwnership.LEGACY_UNSCOPED, "", "")));
+                new RuntimeModels.ManagedContainer("homepage", "autark-os-homepage", "Up 2 minutes (healthy)", DockerResourceOwnership.LEGACY_UNSCOPED, "", "")));
 
         assertThat(service.list())
                 .singleElement()
@@ -122,7 +125,7 @@ class AppInstanceViewServiceTests {
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
         AppInstanceViewService service = service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Exited 1 minute ago", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Exited 1 minute ago", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         AppInstanceView view = service.list().getFirst();
 
@@ -136,9 +139,9 @@ class AppInstanceViewServiceTests {
         InstalledAppRepository repository = repository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         AppInstanceViewService service = service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         assertThat(service.list().getFirst().backupState()).isEqualTo("backup_enabled_no_restore_point");
     }
@@ -149,10 +152,10 @@ class AppInstanceViewServiceTests {
         BackupRepository backupRepository = backupRepository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         assertThat(service.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
     }
@@ -163,11 +166,11 @@ class AppInstanceViewServiceTests {
         BackupRepository backupRepository = backupRepository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
         RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "", "failed", 0, "Backup failed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         assertThat(service.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
     }
@@ -178,10 +181,10 @@ class AppInstanceViewServiceTests {
         BackupRepository backupRepository = backupRepository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "", "failed", 0, "Backup failed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         assertThat(service.list().getFirst().backupState()).isEqualTo("backup_failed");
     }
@@ -191,7 +194,7 @@ class AppInstanceViewServiceTests {
         InstalledAppRepository repository = repository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", settingsWithRepairStatus("failed", true, new BackupPolicy(true, "daily", 7)));
+        repository.saveSettings("vaultwarden", settingsWithRepairStatus("failed", true, new InstallModels.BackupPolicy(true, "daily", 7)));
         AppInstanceViewService service = service(repository, List.of());
 
         AppInstanceView view = service.list().getFirst();
@@ -208,22 +211,22 @@ class AppInstanceViewServiceTests {
         BackupRepository backupRepository = backupRepository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
-        repository.saveSettings("vaultwarden", settingsWithRepairStatus("failed", true, new BackupPolicy(true, "daily", 7)));
+        repository.saveSettings("vaultwarden", settingsWithRepairStatus("failed", true, new InstallModels.BackupPolicy(true, "daily", 7)));
         RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
         AppInstanceViewService service = service(repository, backupRepository, List.of());
 
-        AppRemediationView remediation = service.list().getFirst().remediation();
+        ReliabilityModels.AppRemediationView remediation = service.list().getFirst().remediation();
 
         assertThat(remediation.state()).isEqualTo("restore_recommended");
         assertThat(remediation.nextActionLabel()).isEqualTo("Review restore");
         assertThat(remediation.summary()).contains("restore point");
     }
 
-    private AppInstanceViewService service(InstalledAppRepository repository, List<ManagedContainer> containers) {
+    private AppInstanceViewService service(InstalledAppRepository repository, List<RuntimeModels.ManagedContainer> containers) {
         return service(repository, backupRepository(), containers);
     }
 
-    private AppInstanceViewService service(InstalledAppRepository repository, BackupRepository backupRepository, List<ManagedContainer> containers) {
+    private AppInstanceViewService service(InstalledAppRepository repository, BackupRepository backupRepository, List<RuntimeModels.ManagedContainer> containers) {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         return new AppInstanceViewService(
                 repository,
@@ -248,8 +251,8 @@ class AppInstanceViewServiceTests {
         return new InstalledApp(appId, appId, status, runtimeRoot.resolve("apps").resolve(appId).toString(), "autarkos_homelab-box_" + appId, "http://localhost:8090", Instant.parse("2026-06-20T12:00:00Z"));
     }
 
-    private InstalledAppOwnershipMetadata owned(String appId, String state) {
-        return new InstalledAppOwnershipMetadata(
+    private RuntimeModels.InstalledAppOwnershipMetadata owned(String appId, String state) {
+        return new RuntimeModels.InstalledAppOwnershipMetadata(
                 appId,
                 "appinst_" + appId,
                 appId,
@@ -261,8 +264,8 @@ class AppInstanceViewServiceTests {
                 Instant.parse("2026-06-20T12:00:00Z"));
     }
 
-    private InstallSettings settingsWithRepairStatus(String lastRepairStatus, boolean autoRepairEnabled, BackupPolicy backupPolicy) {
-        return new InstallSettings(
+    private InstallModels.InstallSettings settingsWithRepairStatus(String lastRepairStatus, boolean autoRepairEnabled, InstallModels.BackupPolicy backupPolicy) {
+        return new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,

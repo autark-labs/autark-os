@@ -50,7 +50,7 @@ public class AppUpdateService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList());
     }
@@ -68,13 +68,13 @@ public class AppUpdateService {
         this.appInstanceViewProvider = appInstanceViewProvider;
     }
 
-    public List<AppUpdateStatus> statuses() {
+    public List<UpdateModels.AppUpdateStatus> statuses() {
         return managedInstalledApps().stream().map(this::status).toList();
     }
 
-    public AppUpdatePlan plan(String appId) {
+    public UpdateModels.AppUpdatePlan plan(String appId) {
         InstalledApp app = installedApp(appId);
-        AppUpdateStatus status = status(app);
+        UpdateModels.AppUpdateStatus status = status(app);
         List<String> warnings = new ArrayList<>();
         if (!status.updateAvailable()) {
             warnings.add("The installed app already matches the trusted catalog version.");
@@ -82,7 +82,7 @@ public class AppUpdateService {
         if (!"low".equals(status.risk())) {
             warnings.add("This update may need a closer review because the app uses multiple containers or database-backed storage.");
         }
-        return new AppUpdatePlan(
+        return new UpdateModels.AppUpdatePlan(
                 app.appId(),
                 app.appName(),
                 status.currentImage(),
@@ -107,11 +107,11 @@ public class AppUpdateService {
                 Instant.now());
     }
 
-    public AppUpdateResult update(String appId) {
+    public UpdateModels.AppUpdateResult update(String appId) {
         InstalledApp app = installedApp(appId);
-        AppUpdatePlan plan = plan(appId);
+        UpdateModels.AppUpdatePlan plan = plan(appId);
         if (!plan.executable()) {
-            return new AppUpdateResult(app.appId(), app.appName(), "skipped", "No trusted catalog update is available.", List.of(), appLifecycleService.getApp(appId), Instant.now());
+            return new UpdateModels.AppUpdateResult(app.appId(), app.appName(), "skipped", "No trusted catalog update is available.", List.of(), appLifecycleService.getApp(appId), Instant.now());
         }
         List<String> logs = new ArrayList<>();
         Path appRoot = Path.of(app.runtimePath()).toAbsolutePath().normalize();
@@ -130,7 +130,7 @@ public class AppUpdateService {
             repository.recordEvent(appId, "update_backup_failed", "Backup checkpoint failed before update: " + checkpoint.message());
             activityLogService.warning("applications", "update_backup_failed", "Backup checkpoint failed for " + app.appName(), checkpoint.message(), appId);
             logs.add("Update stopped because Autark-OS could not create a backup checkpoint.");
-            return new AppUpdateResult(app.appId(), app.appName(), AutarkOsStates.JobStatus.FAILED, "Update was not started because Autark-OS could not create a backup checkpoint.", logs, appLifecycleService.getApp(appId), Instant.now());
+            return new UpdateModels.AppUpdateResult(app.appId(), app.appName(), AutarkOsStates.JobStatus.FAILED, "Update was not started because Autark-OS could not create a backup checkpoint.", logs, appLifecycleService.getApp(appId), Instant.now());
         }
         try {
             Files.copy(compose, previousCompose, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -138,7 +138,7 @@ public class AppUpdateService {
             composeRenderer.render(manifest, appRoot);
             repository.recordEvent(appId, "update_started", "Applying trusted catalog version " + manifest.runtime().image() + ".");
             activityLogService.info("applications", "update_started", "Update started for " + app.appName(), "Applying " + manifest.runtime().image(), appId);
-            DockerComposeResult result = composeExecutor.up(compose, app.composeProject());
+            RuntimeModels.DockerComposeResult result = composeExecutor.up(compose, app.composeProject());
             logs.addAll(result.output());
             if (!result.successful()) {
                 throw new InstallationException("Docker Compose could not apply the update.");
@@ -152,22 +152,22 @@ public class AppUpdateService {
             }
             repository.recordEvent(appId, "update_completed", "Updated " + app.appName() + " to the trusted catalog version.");
             activityLogService.success("applications", "update_completed", "Updated " + app.appName(), "Autark-OS updated the app and health checks passed.", appId);
-            return new AppUpdateResult(app.appId(), app.appName(), "completed", "Update completed and health checks passed.", logs, appLifecycleService.getApp(appId), Instant.now());
+            return new UpdateModels.AppUpdateResult(app.appId(), app.appName(), "completed", "Update completed and health checks passed.", logs, appLifecycleService.getApp(appId), Instant.now());
         } catch (RuntimeException | IOException exception) {
             logs.add("Update failed: " + userMessage(exception));
             rollback(app, checkpoint, previousCompose, compose, logs);
             repository.recordEvent(appId, "update_rolled_back", "Update failed and Autark-OS restored the previous version. Reason: " + userMessage(exception));
             activityLogService.warning("applications", "update_rolled_back", "Rolled back " + app.appName(), userMessage(exception), appId);
-            return new AppUpdateResult(app.appId(), app.appName(), "rolled_back", "Update failed, so Autark-OS restored the previous version.", logs, appLifecycleService.getApp(appId), Instant.now());
+            return new UpdateModels.AppUpdateResult(app.appId(), app.appName(), "rolled_back", "Update failed, so Autark-OS restored the previous version.", logs, appLifecycleService.getApp(appId), Instant.now());
         }
     }
 
-    public AppUpdateResult rollback(String appId) {
+    public UpdateModels.AppUpdateResult rollback(String appId) {
         InstalledApp app = installedApp(appId);
         List<String> logs = new ArrayList<>();
         Path appRoot = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         rollback(app, null, appRoot.resolve("compose.previous.yaml"), appRoot.resolve("compose.yaml"), logs);
-        return new AppUpdateResult(app.appId(), app.appName(), "rolled_back", "Rollback command completed.", logs, appLifecycleService.getApp(appId), Instant.now());
+        return new UpdateModels.AppUpdateResult(app.appId(), app.appName(), "rolled_back", "Rollback command completed.", logs, appLifecycleService.getApp(appId), Instant.now());
     }
 
     private void rollback(InstalledApp app, BackupModels.BackupRunResult checkpoint, Path previousCompose, Path compose, List<String> logs) {
@@ -181,7 +181,7 @@ public class AppUpdateService {
                 backupService.restore(checkpoint.restorePoint().id(), app.appId());
                 logs.add("Restored data checkpoint.");
             }
-            DockerComposeResult rollback = composeExecutor.up(compose, app.composeProject());
+            RuntimeModels.DockerComposeResult rollback = composeExecutor.up(compose, app.composeProject());
             logs.addAll(rollback.output());
             repository.recordEvent(app.appId(), "rollback_completed", "Rollback completed for " + app.appName() + ".");
             activityLogService.success("applications", "rollback_completed", "Rollback completed for " + app.appName(), "Previous Compose/data checkpoint was restored where available.", app.appId());
@@ -192,13 +192,13 @@ public class AppUpdateService {
         }
     }
 
-    private AppUpdateStatus status(InstalledApp app) {
+    private UpdateModels.AppUpdateStatus status(InstalledApp app) {
         ApplicationManifest manifest = manifest(app.appId());
         String currentImage = currentImage(app).orElse(manifest.runtime().image());
         String targetImage = manifest.runtime().image();
         boolean updateAvailable = !currentImage.equals(targetImage);
         boolean rollbackAvailable = Files.isRegularFile(Path.of(app.runtimePath()).resolve("compose.previous.yaml"));
-        return new AppUpdateStatus(
+        return new UpdateModels.AppUpdateStatus(
                 app.appId(),
                 app.appName(),
                 currentImage,

@@ -4,17 +4,17 @@ import java.nio.file.Path;
 import java.util.List;
 
 public interface DockerComposeExecutor {
-    DockerComposeResult up(Path composeFile, String projectName);
+    RuntimeModels.DockerComposeResult up(Path composeFile, String projectName);
 
-    DockerComposeResult stop(Path composeFile, String projectName);
+    RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName);
 
-    DockerComposeResult restart(Path composeFile, String projectName);
+    RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName);
 
-    DockerComposeResult down(Path composeFile, String projectName);
+    RuntimeModels.DockerComposeResult down(Path composeFile, String projectName);
 
-    DockerComposeResult ps(Path composeFile, String projectName);
+    RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName);
 
-    List<DockerContainerStatus> containers(Path composeFile, String projectName);
+    List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName);
 
-    List<ContainerTelemetry> stats(List<String> containerNames);
+    List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames);
 }

@@ -7,22 +7,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import com.autarkos.apps.AppOwnershipState;
-import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.apps.AppOwnershipView;
+import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.InstallResult;
-import com.autarkos.marketplace.install.InstallStep;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.MarketplaceInstallService;
 import com.autarkos.marketplace.model.ApplicationManifest;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
 
 @Service
 public class DiscoverService {
@@ -122,7 +121,7 @@ public class DiscoverService {
         AutarkOsJob job = jobService.startWithJob("install_app", appId, installJobSteps(manifest.name()), activeJob -> {
             List<AutarkOsJobStep> liveSteps = new ArrayList<>();
             InstallOptionsRequest installOptions = installOptions(preview.installOptions(), request);
-            InstallResult result = marketplaceInstallService.install(manifest, installOptions, step -> {
+            InstallModels.InstallResult result = marketplaceInstallService.install(manifest, installOptions, step -> {
                 liveSteps.add(installStep(step));
                 jobService.recordProgress(activeJob.jobId(), List.copyOf(liveSteps));
             });
@@ -231,7 +230,7 @@ public class DiscoverService {
                 AutarkOsJobStep.pending("finish", "Finishing install"));
     }
 
-    private AutarkOsJobOutcome installOutcome(InstallResult result) {
+    private AutarkOsJobOutcome installOutcome(InstallModels.InstallResult result) {
         List<AutarkOsJobStep> steps = result.steps().stream()
                 .map(this::installStep)
                 .toList();
@@ -241,7 +240,7 @@ public class DiscoverService {
         return AutarkOsJobOutcome.succeeded(result.message(), steps);
     }
 
-    private AutarkOsJobStep installStep(InstallStep step) {
+    private AutarkOsJobStep installStep(InstallModels.InstallStep step) {
         String id = step.label().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "_").replaceAll("^_|_$", "");
         String status = "failed".equals(step.status()) ? "failed" : "completed".equals(step.status()) ? "succeeded" : step.status();
         return new AutarkOsJobStep(id.isBlank() ? "install_step" : id, step.label(), status, step.detail(), null, step.timestamp());

@@ -82,7 +82,7 @@ public class InstalledAppEntity {
         this.updatedAt = now;
     }
 
-    void updateOwnership(InstalledAppOwnershipMetadata metadata) {
+    void updateOwnership(RuntimeModels.InstalledAppOwnershipMetadata metadata) {
         this.appInstanceId = metadata.appInstanceId();
         this.catalogAppId = metadata.catalogAppId();
         this.autarkOsInstanceId = metadata.autarkOsInstanceId();

@@ -26,7 +26,7 @@ public record AppInstanceView(
         String privateUrl,
         List<AutarkOsIssue> issues,
         List<AutarkOsAction> actions,
-        AppRemediationView remediation,
+        ReliabilityModels.AppRemediationView remediation,
         Instant updatedAt) {
 
     public AppInstanceView(
@@ -45,7 +45,7 @@ public record AppInstanceView(
             String privateUrl,
             List<AutarkOsIssue> issues,
             List<AutarkOsAction> actions,
-            AppRemediationView remediation,
+            ReliabilityModels.AppRemediationView remediation,
             Instant updatedAt) {
         this(
                 appInstanceId,
@@ -106,7 +106,7 @@ public record AppInstanceView(
                 privateUrl,
                 issues,
                 actions,
-                new AppRemediationView("healthy", "Ready", name + " is ready to use.", "No action needed", "success"),
+                new ReliabilityModels.AppRemediationView("healthy", "Ready", name + " is ready to use.", "No action needed", "success"),
                 updatedAt);
     }
 }

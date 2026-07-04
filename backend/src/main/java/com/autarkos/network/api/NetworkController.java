@@ -6,23 +6,23 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestBody;
 
+import com.autarkos.marketplace.install.AccessModels;
+import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
+import com.autarkos.network.api.DeviceTrustUpdateRequest;
+import com.autarkos.network.devices.DeviceAccessReport;
+import com.autarkos.network.devices.DeviceTrustMetadata;
+import com.autarkos.network.devices.DeviceTrustService;
+import com.autarkos.network.diagnostics.NetworkDiagnosticsReport;
+import com.autarkos.network.diagnostics.NetworkDiagnosticsService;
 import com.autarkos.network.tailscale.TailscaleConnectGuide;
 import com.autarkos.network.tailscale.TailscaleDevice;
 import com.autarkos.network.tailscale.TailscaleServeResult;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
-import com.autarkos.network.devices.DeviceAccessReport;
-import com.autarkos.network.devices.DeviceTrustMetadata;
-import com.autarkos.network.devices.DeviceTrustService;
-import com.autarkos.network.api.DeviceTrustUpdateRequest;
-import com.autarkos.marketplace.install.PrivateAccessReconciliationReport;
-import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
-import com.autarkos.network.diagnostics.NetworkDiagnosticsReport;
-import com.autarkos.network.diagnostics.NetworkDiagnosticsService;
 
 @RestController
 @RequestMapping("/api/network")
@@ -66,7 +66,7 @@ public class NetworkController {
     }
 
     @GetMapping("/private-access/reconciliation")
-    public PrivateAccessReconciliationReport privateAccessReconciliation() {
+    public AccessModels.PrivateAccessReconciliationReport privateAccessReconciliation() {
         return privateAccessReconciliationService.report();
     }
 

@@ -12,15 +12,15 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.activity.ActivityLog;
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.backups.BackupModels;
 import com.autarkos.backups.BackupService;
+import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.AppLifecycleService;
-import com.autarkos.marketplace.install.AppReliabilitySummary;
-import com.autarkos.marketplace.install.PrivateAccessReconciliationReport;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
+import com.autarkos.marketplace.install.ReliabilityModels;
 
 @Service
 public class SystemSupportService {
@@ -203,7 +203,7 @@ public class SystemSupportService {
             return unavailableSummary("applications", "Applications");
         }
         try {
-            AppReliabilitySummary reliability = appLifecycleService.reliabilitySummary();
+            ReliabilityModels.AppReliabilitySummary reliability = appLifecycleService.reliabilitySummary();
             return new SupportModels.SupportDomainSummary(
                     "applications",
                     "Applications",
@@ -221,7 +221,7 @@ public class SystemSupportService {
             return unavailableSummary("private-access", "Private access");
         }
         try {
-            PrivateAccessReconciliationReport report = privateAccessReconciliationService.report();
+            AccessModels.PrivateAccessReconciliationReport report = privateAccessReconciliationService.report();
             return new SupportModels.SupportDomainSummary(
                     "private-access",
                     "Private access",

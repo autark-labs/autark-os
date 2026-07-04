@@ -8,23 +8,23 @@ import com.autarkos.marketplace.model.ApplicationManifest;
 
 class AppRuntimeStatusResolver {
 
-    List<String> containerNames(List<DockerContainerStatus> containers) {
+    List<String> containerNames(List<RuntimeModels.DockerContainerStatus> containers) {
         return containers.stream()
-                .map(DockerContainerStatus::name)
+                .map(RuntimeModels.DockerContainerStatus::name)
                 .filter(name -> name != null && !name.isBlank())
                 .toList();
     }
 
-    String accessUrl(InstalledApp app, ApplicationManifest manifest, List<DockerContainerStatus> containers) {
+    String accessUrl(InstalledApp app, ApplicationManifest manifest, List<RuntimeModels.DockerContainerStatus> containers) {
         Integer manifestPort = manifest == null ? null : portFromUrl(manifest.accessUrl());
         Integer storedPort = portFromUrl(app.accessUrl());
         return publishedAccessUrl(containers, manifestPort, storedPort)
                 .orElseGet(() -> manifestAccessUrl(app, manifest));
     }
 
-    java.util.Optional<String> publishedAccessUrl(List<DockerContainerStatus> containers, Integer manifestPort, Integer storedPort) {
+    java.util.Optional<String> publishedAccessUrl(List<RuntimeModels.DockerContainerStatus> containers, Integer manifestPort, Integer storedPort) {
         List<String> ports = containers.stream()
-                .map(DockerContainerStatus::ports)
+                .map(RuntimeModels.DockerContainerStatus::ports)
                 .flatMap(portsValue -> publishedPorts(portsValue).stream())
                 .distinct()
                 .toList();
@@ -95,7 +95,7 @@ class AppRuntimeStatusResolver {
         return app.accessUrl();
     }
 
-    AppRuntimeStatus normalize(List<DockerContainerStatus> containers) {
+    AppRuntimeStatus normalize(List<RuntimeModels.DockerContainerStatus> containers) {
         if (containers.isEmpty()) {
             return new AppRuntimeStatus(AutarkOsStates.AppStatus.STOPPED, "No managed containers found", "not running");
         }
@@ -119,30 +119,30 @@ class AppRuntimeStatusResolver {
         return new AppRuntimeStatus(AutarkOsStates.AppStatus.STARTING, technicalStatus, "pending");
     }
 
-    private boolean running(DockerContainerStatus container) {
+    private boolean running(RuntimeModels.DockerContainerStatus container) {
         return normalized(container.state()).equals("running");
     }
 
-    private boolean healthy(DockerContainerStatus container) {
+    private boolean healthy(RuntimeModels.DockerContainerStatus container) {
         return normalized(container.health()).equals("healthy");
     }
 
-    private boolean unhealthy(DockerContainerStatus container) {
+    private boolean unhealthy(RuntimeModels.DockerContainerStatus container) {
         return normalized(container.health()).equals("unhealthy");
     }
 
-    private boolean starting(DockerContainerStatus container) {
+    private boolean starting(RuntimeModels.DockerContainerStatus container) {
         String health = normalized(container.health());
         String state = normalized(container.state());
         return health.equals("starting") || state.equals("restarting");
     }
 
-    private boolean stopped(DockerContainerStatus container) {
+    private boolean stopped(RuntimeModels.DockerContainerStatus container) {
         String state = normalized(container.state());
         return state.equals("exited") || state.equals("created") || state.equals("dead") || state.equals("removing");
     }
 
-    private String technicalStatus(DockerContainerStatus container) {
+    private String technicalStatus(RuntimeModels.DockerContainerStatus container) {
         String state = container.state().isBlank() ? "unknown" : container.state();
         String health = container.health().isBlank() ? "no health check" : container.health();
         String name = container.name().isBlank() ? container.service() : container.name();

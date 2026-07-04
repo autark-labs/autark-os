@@ -9,13 +9,10 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import com.autarkos.marketplace.install.AppTelemetry;
 import com.autarkos.marketplace.install.AppTelemetryService;
-import com.autarkos.marketplace.install.ContainerTelemetry;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
-import com.autarkos.marketplace.install.DockerComposeResult;
-import com.autarkos.marketplace.install.DockerContainerStatus;
 import com.autarkos.marketplace.install.InstalledApp;
+import com.autarkos.marketplace.install.RuntimeModels;
 
 class AppTelemetryServiceTests {
 
@@ -24,7 +21,7 @@ class AppTelemetryServiceTests {
         FakeDockerComposeExecutor composeExecutor = new FakeDockerComposeExecutor();
         AppTelemetryService service = new AppTelemetryService(composeExecutor);
 
-        AppTelemetry telemetry = service.telemetry(installedApp("vaultwarden"));
+        RuntimeModels.AppTelemetry telemetry = service.telemetry(installedApp("vaultwarden"));
 
         assertThat(telemetry.cpuPercent()).isEqualTo("1.25%");
         assertThat(composeExecutor.lastComposeFile).isEqualTo(Path.of("/tmp/autark-os/apps/vaultwarden/compose.yaml"));
@@ -35,7 +32,7 @@ class AppTelemetryServiceTests {
     void telemetryForAppsUsesAppIdsAsKeys() {
         AppTelemetryService service = new AppTelemetryService(new FakeDockerComposeExecutor());
 
-        Map<String, AppTelemetry> telemetry = service.telemetryForApps(List.of(installedApp("vaultwarden")));
+        Map<String, RuntimeModels.AppTelemetry> telemetry = service.telemetryForApps(List.of(installedApp("vaultwarden")));
 
         assertThat(telemetry).containsKey("vaultwarden");
         assertThat(telemetry.get("vaultwarden").memoryPercent()).isEqualTo("4.8%");
@@ -57,35 +54,35 @@ class AppTelemetryServiceTests {
         String lastProjectName;
 
         @Override
-        public DockerComposeResult up(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult stop(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult restart(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult down(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult down(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult ps(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public List<DockerContainerStatus> containers(Path composeFile, String projectName) {
+        public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
             lastComposeFile = composeFile;
             lastProjectName = projectName;
-            return List.of(new DockerContainerStatus(
+            return List.of(new RuntimeModels.DockerContainerStatus(
                     "autark-os-vaultwarden",
                     "vaultwarden",
                     "running",
@@ -95,8 +92,8 @@ class AppTelemetryServiceTests {
         }
 
         @Override
-        public List<ContainerTelemetry> stats(List<String> containerNames) {
-            return List.of(new ContainerTelemetry(
+        public List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames) {
+            return List.of(new RuntimeModels.ContainerTelemetry(
                     "autark-os-vaultwarden",
                     "1.25%",
                     "96MiB / 2GiB",

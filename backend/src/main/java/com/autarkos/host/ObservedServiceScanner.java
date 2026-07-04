@@ -10,8 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.install.DockerOwnershipService;
-import com.autarkos.marketplace.install.DockerResourceClassification;
 import com.autarkos.marketplace.install.DockerResourceOwnership;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.system.AutarkOsIdentity;
 
 @Service
@@ -49,7 +49,7 @@ public class ObservedServiceScanner {
     }
 
     private ObservedService observed(HostModels.HostDockerContainer container, AutarkOsIdentity identity, Instant now) {
-        DockerResourceClassification classification = ownershipService == null
+        RuntimeModels.DockerResourceClassification classification = ownershipService == null
                 ? null
                 : ownershipService.classify(container.name(), container.labels());
         String appId = firstPresent(

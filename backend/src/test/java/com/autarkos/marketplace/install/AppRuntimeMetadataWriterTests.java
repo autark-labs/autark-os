@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.system.AutarkOsIdentity;
 
@@ -36,7 +37,7 @@ class AppRuntimeMetadataWriterTests {
                 () -> identity,
                 () -> Instant.parse("2026-06-20T13:00:00Z"));
 
-        AppRuntimeMetadata metadata = writer.write(manifest, appRoot, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden");
+        RuntimeModels.AppRuntimeMetadata metadata = writer.write(manifest, appRoot, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden");
 
         assertThat(metadata.appInstanceId()).isEqualTo("appinst_vaultwarden");
         assertThat(metadata.catalogAppId()).isEqualTo("vaultwarden");

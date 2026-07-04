@@ -6,8 +6,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.autarkos.system.SystemCommandRunner;
 import org.springframework.stereotype.Component;
+
+import com.autarkos.system.SystemCommandRunner;
 
 @Component
 public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
@@ -20,33 +21,33 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
     }
 
     @Override
-    public DockerComposeResult up(Path composeFile, String projectName) {
+    public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
         return run(composeFile, projectName, "up", "-d");
     }
 
     @Override
-    public DockerComposeResult stop(Path composeFile, String projectName) {
+    public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
         return run(composeFile, projectName, "stop");
     }
 
     @Override
-    public DockerComposeResult restart(Path composeFile, String projectName) {
+    public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
         return run(composeFile, projectName, "restart");
     }
 
     @Override
-    public DockerComposeResult down(Path composeFile, String projectName) {
+    public RuntimeModels.DockerComposeResult down(Path composeFile, String projectName) {
         return run(composeFile, projectName, "down");
     }
 
     @Override
-    public DockerComposeResult ps(Path composeFile, String projectName) {
+    public RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName) {
         return run(composeFile, projectName, "ps", "--all");
     }
 
     @Override
-    public List<DockerContainerStatus> containers(Path composeFile, String projectName) {
-        DockerComposeResult result = run(composeFile, projectName, "ps", "--all", "--format", "json");
+    public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
+        RuntimeModels.DockerComposeResult result = run(composeFile, projectName, "ps", "--all", "--format", "json");
         if (!result.successful() || result.output().isEmpty()) {
             return List.of();
         }
@@ -54,7 +55,7 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
     }
 
     @Override
-    public List<ContainerTelemetry> stats(List<String> containerNames) {
+    public List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames) {
         List<String> names = containerNames.stream()
                 .filter(name -> name != null && !name.isBlank())
                 .toList();
@@ -68,7 +69,7 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
                 "--format",
                 "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"));
         command.addAll(names);
-        DockerComposeResult result = runCommand(command);
+        RuntimeModels.DockerComposeResult result = runCommand(command);
         if (!result.successful() || result.output().isEmpty()) {
             return List.of();
         }
@@ -78,7 +79,7 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
                 .toList();
     }
 
-    private List<DockerContainerStatus> parseContainers(List<String> output) {
+    private List<RuntimeModels.DockerContainerStatus> parseContainers(List<String> output) {
         String body = String.join("\n", output).trim();
         if (body.isBlank()) {
             return List.of();
@@ -137,8 +138,8 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
         return objects;
     }
 
-    private DockerContainerStatus container(String object) {
-        return new DockerContainerStatus(
+    private RuntimeModels.DockerContainerStatus container(String object) {
+        return new RuntimeModels.DockerContainerStatus(
                 text(object, "Name"),
                 text(object, "Service"),
                 text(object, "State"),
@@ -159,23 +160,23 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
                 .replace("\\\\", "\\");
     }
 
-    private DockerComposeResult run(Path composeFile, String projectName, String... composeArgs) {
+    private RuntimeModels.DockerComposeResult run(Path composeFile, String projectName, String... composeArgs) {
         List<String> command = new ArrayList<>(List.of("docker", "compose", "-f", composeFile.toString(), "-p", projectName));
         command.addAll(List.of(composeArgs));
         return runCommand(command);
     }
 
-    private DockerComposeResult runCommand(List<String> command) {
+    private RuntimeModels.DockerComposeResult runCommand(List<String> command) {
         SystemCommandRunner.CommandExecutionResult result = commandRunner.run(command);
         if (result.missingCommand()) {
             throw new InstallationException("Unable to run Docker Compose. " + result.output());
         }
-        return new DockerComposeResult(result.exitCode(), result.outputLines());
+        return new RuntimeModels.DockerComposeResult(result.exitCode(), result.outputLines());
     }
 
-    private ContainerTelemetry telemetry(String line) {
+    private RuntimeModels.ContainerTelemetry telemetry(String line) {
         String[] parts = line.split("\\t", -1);
-        return new ContainerTelemetry(
+        return new RuntimeModels.ContainerTelemetry(
                 part(parts, 0),
                 part(parts, 1),
                 part(parts, 2),

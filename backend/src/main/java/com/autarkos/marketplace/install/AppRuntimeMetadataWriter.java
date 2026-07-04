@@ -9,10 +9,10 @@ import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.autarkos.marketplace.model.ApplicationManifest;
-import com.autarkos.system.InstanceIdentityService;
 import com.autarkos.system.AutarkOsIdentity;
+import com.autarkos.system.InstanceIdentityService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Component
 public class AppRuntimeMetadataWriter {
@@ -33,9 +33,9 @@ public class AppRuntimeMetadataWriter {
         this.clock = clock;
     }
 
-    public AppRuntimeMetadata write(ApplicationManifest manifest, Path appRoot, String appInstanceId, String composeProject) {
+    public RuntimeModels.AppRuntimeMetadata write(ApplicationManifest manifest, Path appRoot, String appInstanceId, String composeProject) {
         AutarkOsIdentity identity = identitySupplier.get();
-        AppRuntimeMetadata metadata = new AppRuntimeMetadata(
+        RuntimeModels.AppRuntimeMetadata metadata = new RuntimeModels.AppRuntimeMetadata(
                 appInstanceId,
                 manifest.id(),
                 identity.instanceId(),
@@ -59,7 +59,7 @@ public class AppRuntimeMetadataWriter {
             String manifestVersion,
             String createdAt) {
 
-        private static StoredMetadata from(AppRuntimeMetadata metadata) {
+        private static StoredMetadata from(RuntimeModels.AppRuntimeMetadata metadata) {
             return new StoredMetadata(
                     metadata.appInstanceId(),
                     metadata.catalogAppId(),

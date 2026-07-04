@@ -1,8 +1,8 @@
 package com.autarkos.marketplace.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,21 +13,21 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.apps.ApplicationState;
+import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobRepository;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
 import com.autarkos.marketplace.install.AppActionResult;
-import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.AppLifecycleService;
-import com.autarkos.marketplace.install.AppTelemetry;
+import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.AppUpdateService;
-import com.autarkos.monitoring.MonitoringMetricsService;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.monitoring.MonitoringMetricsService;
 import com.autarkos.testsupport.JpaTestRepositories;
 
 class InstalledAppsControllerTests {
@@ -195,7 +195,7 @@ class InstalledAppsControllerTests {
                 applicationStateService,
                 jobService());
 
-        Map<String, AppTelemetry> telemetry = controller.telemetry();
+        Map<String, RuntimeModels.AppTelemetry> telemetry = controller.telemetry();
 
         assertThat(telemetry).containsEntry("vaultwarden", app.telemetry());
         verify(lifecycleService, never()).telemetry();
@@ -302,7 +302,7 @@ class InstalledAppsControllerTests {
                 Instant.parse("2026-06-21T12:00:00Z"),
                 "Backups disabled",
                 null,
-                AppTelemetry.unavailable(),
+                RuntimeModels.AppTelemetry.unavailable(),
                 null,
                 null,
                 null,

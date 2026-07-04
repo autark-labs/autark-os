@@ -13,36 +13,31 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.autarkos.marketplace.catalog.ManifestValidator;
-import com.autarkos.marketplace.catalog.ManifestYamlReader;
-import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
 import com.autarkos.host.ObservedServiceService;
+import com.autarkos.marketplace.api.InstallOptionsRequest;
+import com.autarkos.marketplace.catalog.ManifestValidator;
+import com.autarkos.marketplace.catalog.ManifestYamlReader;
+import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.AppRuntimeMetadataWriter;
 import com.autarkos.marketplace.install.CatalogPackageCopier;
 import com.autarkos.marketplace.install.ComposeRenderer;
-import com.autarkos.marketplace.install.ContainerTelemetry;
-import com.autarkos.marketplace.install.DockerContainerStatus;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
-import com.autarkos.marketplace.install.DockerComposeResult;
-import com.autarkos.marketplace.install.BackupPolicy;
-import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstallCustomizationResolver;
-import com.autarkos.marketplace.api.InstallOptionsRequest;
-import com.autarkos.marketplace.install.InstallResult;
-import com.autarkos.marketplace.install.InstallSettings;
-import com.autarkos.marketplace.install.InstallStep;
-import com.autarkos.marketplace.install.AppRuntimeMetadataWriter;
 import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.DuplicateInstallAcknowledgementRequiredException;
+import com.autarkos.marketplace.install.GuideModels;
+import com.autarkos.marketplace.install.InstallCustomizationResolver;
+import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.InstalledApp;
+import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.MarketplaceInstallService;
 import com.autarkos.marketplace.install.PortAllocator;
 import com.autarkos.marketplace.install.PostInstallGuideBuilder;
 import com.autarkos.marketplace.install.PostInstallProvisioner;
-import com.autarkos.marketplace.install.PostInstallProvisioningResult;
 import com.autarkos.marketplace.install.RuntimeDirectoryManager;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
 import com.autarkos.marketplace.plan.InstallPlanService;
@@ -79,7 +74,7 @@ class MarketplaceInstallServiceTests {
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService());
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("installed");
         assertThat(Files.exists(runtimeRoot.resolve("apps/vaultwarden/manifest.yaml"))).isTrue();
@@ -125,7 +120,7 @@ class MarketplaceInstallServiceTests {
                 ownershipService,
                 new AppRuntimeMetadataWriter(() -> identity, () -> Instant.parse("2026-06-20T13:00:00Z")));
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         String compose = Files.readString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
         String metadata = Files.readString(runtimeRoot.resolve("apps/vaultwarden/autark-os-app.json"));
@@ -169,7 +164,7 @@ class MarketplaceInstallServiceTests {
                 new PostInstallGuideBuilder(),
                 tailscaleService);
 
-        InstallResult result = installService.install(manifest, new InstallOptionsRequest(
+        InstallModels.InstallResult result = installService.install(manifest, new InstallOptionsRequest(
                 new InstallOptionsRequest.PortOptions(19090),
                 new InstallOptionsRequest.AccessOptions(true),
                 new InstallOptionsRequest.StorageOptions(java.util.Map.of("data", "vault-data")),
@@ -196,7 +191,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Ready", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "http://localhost:19090", java.time.Instant.parse("2026-06-11T00:00:00Z")));
-        repository.saveSettings("vaultwarden", new InstallSettings("http://localhost:19090", "https://vault.tailnet.ts.net", true, java.util.Map.of("data", "vault-data"), new BackupPolicy(true, "weekly", 4)));
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:19090", "https://vault.tailnet.ts.net", true, java.util.Map.of("data", "vault-data"), new InstallModels.BackupPolicy(true, "weekly", 4)));
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
         MarketplaceInstallService installService = new MarketplaceInstallService(
                 new InstallPlanService(runtimeLayout, customizationResolver),
@@ -210,7 +205,7 @@ class MarketplaceInstallServiceTests {
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService());
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("already_installed");
         assertThat(result.accessUrl()).isEqualTo("http://localhost:19090");
@@ -240,7 +235,7 @@ class MarketplaceInstallServiceTests {
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService());
 
-        InstallResult result = installService.install(manifest, new InstallOptionsRequest(
+        InstallModels.InstallResult result = installService.install(manifest, new InstallOptionsRequest(
                 new InstallOptionsRequest.PortOptions(19090),
                 new InstallOptionsRequest.AccessOptions(true),
                 new InstallOptionsRequest.StorageOptions(java.util.Map.of("data", "vault-data")),
@@ -266,14 +261,14 @@ class MarketplaceInstallServiceTests {
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
                 new ComposeRenderer(runtimeLayout),
-                new FakeDockerComposeExecutor(List.of(new DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited (1) 2 seconds ago", ""))),
+                new FakeDockerComposeExecutor(List.of(new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited (1) 2 seconds ago", ""))),
                 repository,
                 customizationResolver,
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService());
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("failed");
         assertThat(result.message()).contains("stopped or reported unhealthy");
@@ -292,9 +287,9 @@ class MarketplaceInstallServiceTests {
                 repository,
                 observedRepository,
                 null,
-                new FakeDockerComposeExecutor(List.of(new DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited (1) 2 seconds ago", ""))));
+                new FakeDockerComposeExecutor(List.of(new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited (1) 2 seconds ago", ""))));
 
-        InstallResult failedResult = failedInstallService.install(manifest);
+        InstallModels.InstallResult failedResult = failedInstallService.install(manifest);
 
         assertThat(failedResult.status()).isEqualTo("failed");
         assertThat(repository.findAppById("vaultwarden")).isEmpty();
@@ -315,7 +310,7 @@ class MarketplaceInstallServiceTests {
                 null,
                 new FakeDockerComposeExecutor());
 
-        InstallResult successfulResult = successfulInstallService.install(manifest);
+        InstallModels.InstallResult successfulResult = successfulInstallService.install(manifest);
 
         assertThat(successfulResult.status()).isEqualTo("installed");
         assertThat(repository.findAppById("vaultwarden")).isPresent();
@@ -336,14 +331,14 @@ class MarketplaceInstallServiceTests {
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
                 new ComposeRenderer(runtimeLayout),
-                new FakeDockerComposeExecutor(List.of(new DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "running", "starting", "Up 20 seconds (health: starting)", "0.0.0.0:8090->80/tcp"))),
+                new FakeDockerComposeExecutor(List.of(new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "running", "starting", "Up 20 seconds (health: starting)", "0.0.0.0:8090->80/tcp"))),
                 repository,
                 customizationResolver,
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService());
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("installed");
         assertThat(result.steps())
@@ -368,14 +363,14 @@ class MarketplaceInstallServiceTests {
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
                 new ComposeRenderer(runtimeLayout),
-                new FakeDockerComposeExecutor(List.of(new DockerContainerStatus("autark-os-obsidian-livesync", "obsidian-livesync", "running", "", "Up 2 minutes", "0.0.0.0:5984->5984/tcp"))),
+                new FakeDockerComposeExecutor(List.of(new RuntimeModels.DockerContainerStatus("autark-os-obsidian-livesync", "obsidian-livesync", "running", "", "Up 2 minutes", "0.0.0.0:5984->5984/tcp"))),
                 repository,
                 customizationResolver,
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService());
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("installed");
         assertThat(Files.readString(runtimeRoot.resolve("apps/obsidian-livesync/compose.yaml")))
@@ -403,14 +398,14 @@ class MarketplaceInstallServiceTests {
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
                 new ComposeRenderer(runtimeLayout),
-                new FakeDockerComposeExecutor(List.of(new DockerContainerStatus("autark-os-obsidian-livesync", "obsidian-livesync", "running", "", "Up 2 minutes", "0.0.0.0:5984->5984/tcp"))),
+                new FakeDockerComposeExecutor(List.of(new RuntimeModels.DockerContainerStatus("autark-os-obsidian-livesync", "obsidian-livesync", "running", "", "Up 2 minutes", "0.0.0.0:5984->5984/tcp"))),
                 repository,
                 customizationResolver,
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
                 new FailingTailscaleService());
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("installed");
         assertThat(repository.findAppById("obsidian-livesync")).isPresent();
@@ -447,16 +442,16 @@ class MarketplaceInstallServiceTests {
                 new CatalogPackageCopier(),
                 new ComposeRenderer(runtimeLayout),
                 new FakeDockerComposeExecutor(List.of(
-                        new DockerContainerStatus("autark-os-paperless-ngx-web", "web", "running", "healthy", "Up 2 minutes (healthy)", "0.0.0.0:8010->8000/tcp"),
-                        new DockerContainerStatus("autark-os-paperless-ngx-broker", "broker", "running", "", "Up 2 minutes", ""),
-                        new DockerContainerStatus("autark-os-paperless-ngx-db", "db", "running", "", "Up 2 minutes", ""))),
+                        new RuntimeModels.DockerContainerStatus("autark-os-paperless-ngx-web", "web", "running", "healthy", "Up 2 minutes (healthy)", "0.0.0.0:8010->8000/tcp"),
+                        new RuntimeModels.DockerContainerStatus("autark-os-paperless-ngx-broker", "broker", "running", "", "Up 2 minutes", ""),
+                        new RuntimeModels.DockerContainerStatus("autark-os-paperless-ngx-db", "db", "running", "", "Up 2 minutes", ""))),
                 repository,
                 customizationResolver,
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService());
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
         String compose = Files.readString(runtimeRoot.resolve("apps/paperless-ngx/compose.yaml"));
 
         assertThat(result.status()).isEqualTo("installed");
@@ -485,7 +480,7 @@ class MarketplaceInstallServiceTests {
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));
         MarketplaceInstallService installService = installService(runtimeLayout, repository, observedRepository, null);
 
-        InstallResult result = installService.install(manifest, InstallOptionsRequest.defaults());
+        InstallModels.InstallResult result = installService.install(manifest, InstallOptionsRequest.defaults());
 
         assertThat(result.status()).isEqualTo("failed");
         assertThat(result.message()).contains("already sees Vaultwarden");
@@ -516,7 +511,7 @@ class MarketplaceInstallServiceTests {
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));
         MarketplaceInstallService installService = installService(runtimeLayout, repository, observedRepository, null);
 
-        InstallResult result = installService.install(manifest, new InstallOptionsRequest(null, null, null, null, false, true));
+        InstallModels.InstallResult result = installService.install(manifest, new InstallOptionsRequest(null, null, null, null, false, true));
 
         assertThat(result.status()).isEqualTo("installed");
         assertThat(repository.findAllApps()).extracting(InstalledApp::appId).contains("vaultwarden");
@@ -532,7 +527,7 @@ class MarketplaceInstallServiceTests {
         observedRepository.upsert(observed("docker:autark-os-vaultwarden", "vaultwarden", "legacy_autark_os", "observed"));
         MarketplaceInstallService installService = installService(runtimeLayout, repository, observedRepository, null);
 
-        InstallResult result = installService.install(manifest, new InstallOptionsRequest(null, null, null, null, false, true));
+        InstallModels.InstallResult result = installService.install(manifest, new InstallOptionsRequest(null, null, null, null, false, true));
 
         assertThat(result.status()).isEqualTo("failed");
         assertThat(result.message()).contains("recover the existing Vaultwarden service");
@@ -553,7 +548,7 @@ class MarketplaceInstallServiceTests {
                         () -> new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                         () -> Instant.parse("2026-06-20T13:00:00Z")));
 
-        InstallResult result = installService.install(manifest);
+        InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("failed");
         assertThat(result.message()).contains("could not confirm that this app is managed by this installation");
@@ -632,48 +627,48 @@ class MarketplaceInstallServiceTests {
     }
 
     private static class FakeDockerComposeExecutor implements DockerComposeExecutor {
-        private final List<DockerContainerStatus> containers;
+        private final List<RuntimeModels.DockerContainerStatus> containers;
 
         private FakeDockerComposeExecutor() {
-            this(List.of(new DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "running", "healthy", "Up 2 minutes (healthy)", "0.0.0.0:8090->80/tcp")));
+            this(List.of(new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "running", "healthy", "Up 2 minutes (healthy)", "0.0.0.0:8090->80/tcp")));
         }
 
-        private FakeDockerComposeExecutor(List<DockerContainerStatus> containers) {
+        private FakeDockerComposeExecutor(List<RuntimeModels.DockerContainerStatus> containers) {
             this.containers = containers;
         }
 
         @Override
-        public DockerComposeResult up(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of("fake docker compose up " + projectName));
+        public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("fake docker compose up " + projectName));
         }
 
         @Override
-        public DockerComposeResult stop(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of("fake docker compose stop " + projectName));
+        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("fake docker compose stop " + projectName));
         }
 
         @Override
-        public DockerComposeResult restart(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of("fake docker compose restart " + projectName));
+        public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("fake docker compose restart " + projectName));
         }
 
         @Override
-        public DockerComposeResult down(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of("fake docker compose down " + projectName));
+        public RuntimeModels.DockerComposeResult down(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("fake docker compose down " + projectName));
         }
 
         @Override
-        public DockerComposeResult ps(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of("NAME STATUS", projectName + " running healthy"));
+        public RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("NAME STATUS", projectName + " running healthy"));
         }
 
         @Override
-        public List<DockerContainerStatus> containers(Path composeFile, String projectName) {
+        public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
             return containers;
         }
 
         @Override
-        public List<ContainerTelemetry> stats(List<String> containerNames) {
+        public List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames) {
             return List.of();
         }
     }
@@ -713,17 +708,17 @@ class MarketplaceInstallServiceTests {
 
     private static class FakePostInstallProvisioner extends PostInstallProvisioner {
         @Override
-        public PostInstallProvisioningResult provision(ApplicationManifest manifest, String accessUrl) {
+        public GuideModels.PostInstallProvisioningResult provision(ApplicationManifest manifest, String accessUrl) {
             if ("obsidian-livesync".equals(manifest.id())) {
-                return new PostInstallProvisioningResult(
-                        List.of(InstallStep.completed("Preparing Obsidian sync", "Created the sync database.")),
+                return new GuideModels.PostInstallProvisioningResult(
+                        List.of(InstallModels.InstallStep.completed("Preparing Obsidian sync", "Created the sync database.")),
                         List.of("fake post-install provisioning"),
                         java.util.Map.of(
                                 "username", "autarkos",
                                 "password", "autarkos-change-me",
                                 "database", "obsidian"));
             }
-            return PostInstallProvisioningResult.empty();
+            return GuideModels.PostInstallProvisioningResult.empty();
         }
     }
 

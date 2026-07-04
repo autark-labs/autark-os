@@ -1,9 +1,9 @@
 package com.autarkos.marketplace.api;
 
-import java.util.List;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -11,8 +11,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.autarkos.api.AutarkOsStates;
@@ -21,20 +21,16 @@ import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
+import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.AppActionResult;
-import com.autarkos.marketplace.install.AppAccessCheck;
-import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppHealthSnapshot;
+import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
-import com.autarkos.marketplace.install.AppSettingsChangePlan;
-import com.autarkos.marketplace.install.AppReliabilitySummary;
-import com.autarkos.marketplace.install.AppTelemetry;
-import com.autarkos.marketplace.install.AppUpdatePlan;
-import com.autarkos.marketplace.install.AppUpdateResult;
 import com.autarkos.marketplace.install.AppUpdateService;
-import com.autarkos.marketplace.install.AppUpdateStatus;
-import com.autarkos.marketplace.install.InstallSettings;
-import com.autarkos.marketplace.install.UninstallPlan;
+import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.ReliabilityModels;
+import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.UpdateModels;
 import com.autarkos.monitoring.MonitoringMetricsService;
 
 @RestController
@@ -61,8 +57,8 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/access")
-    public Map<String, AppAccessCheck> accessChecks() {
-        Map<String, AppAccessCheck> checks = new LinkedHashMap<>();
+    public Map<String, AccessModels.AppAccessCheck> accessChecks() {
+        Map<String, AccessModels.AppAccessCheck> checks = new LinkedHashMap<>();
         for (AppRuntimeView app : applicationStateService.snapshot().runtimeApps()) {
             checks.put(app.appId(), cachedAccessCheck(app));
         }
@@ -70,10 +66,10 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/telemetry")
-    public Map<String, AppTelemetry> telemetry() {
-        Map<String, AppTelemetry> telemetry = new LinkedHashMap<>();
+    public Map<String, RuntimeModels.AppTelemetry> telemetry() {
+        Map<String, RuntimeModels.AppTelemetry> telemetry = new LinkedHashMap<>();
         for (AppRuntimeView app : applicationStateService.snapshot().runtimeApps()) {
-            telemetry.put(app.appId(), app.telemetry() == null ? AppTelemetry.unavailable() : app.telemetry());
+            telemetry.put(app.appId(), app.telemetry() == null ? RuntimeModels.AppTelemetry.unavailable() : app.telemetry());
         }
         monitoringMetricsService.recordApps(telemetry);
         return telemetry;
@@ -91,12 +87,12 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/reliability")
-    public AppReliabilitySummary reliabilitySummary() {
+    public ReliabilityModels.AppReliabilitySummary reliabilitySummary() {
         return appLifecycleService.reliabilitySummary();
     }
 
     @GetMapping("/updates")
-    public List<AppUpdateStatus> updates() {
+    public List<UpdateModels.AppUpdateStatus> updates() {
         return appUpdateService.statuses();
     }
 
@@ -106,8 +102,8 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/{id}/telemetry")
-    public AppTelemetry telemetry(@PathVariable String id) {
-        AppTelemetry telemetry = appLifecycleService.telemetry(id);
+    public RuntimeModels.AppTelemetry telemetry(@PathVariable String id) {
+        RuntimeModels.AppTelemetry telemetry = appLifecycleService.telemetry(id);
         monitoringMetricsService.recordApps(Map.of(id, telemetry));
         return telemetry;
     }
@@ -118,12 +114,12 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/{id}/uninstall-plan")
-    public UninstallPlan uninstallPlan(@PathVariable String id) {
+    public InstallModels.UninstallPlan uninstallPlan(@PathVariable String id) {
         return appLifecycleService.uninstallPlan(id);
     }
 
     @GetMapping("/{id}/update-plan")
-    public AppUpdatePlan updatePlan(@PathVariable String id) {
+    public UpdateModels.AppUpdatePlan updatePlan(@PathVariable String id) {
         return appUpdateService.plan(id);
     }
 
@@ -214,12 +210,12 @@ public class InstalledAppsController {
     }
 
     @PostMapping("/{id}/update")
-    public AppUpdateResult update(@PathVariable String id) {
+    public UpdateModels.AppUpdateResult update(@PathVariable String id) {
         return refreshAfter(appUpdateService.update(id));
     }
 
     @PostMapping("/{id}/rollback")
-    public AppUpdateResult rollback(@PathVariable String id) {
+    public UpdateModels.AppUpdateResult rollback(@PathVariable String id) {
         return refreshAfter(appUpdateService.rollback(id));
     }
 
@@ -239,12 +235,12 @@ public class InstalledAppsController {
     }
 
     @PutMapping("/{id}/settings")
-    public AppRuntimeView updateSettings(@PathVariable String id, @RequestBody InstallSettings settings) {
+    public AppRuntimeView updateSettings(@PathVariable String id, @RequestBody InstallModels.InstallSettings settings) {
         return refreshAfter(appLifecycleService.updateSettings(id, settings));
     }
 
     @PostMapping("/{id}/settings-plan")
-    public AppSettingsChangePlan settingsChangePlan(@PathVariable String id, @RequestBody InstallSettings settings) {
+    public InstallModels.AppSettingsChangePlan settingsChangePlan(@PathVariable String id, @RequestBody InstallModels.InstallSettings settings) {
         return appLifecycleService.settingsChangePlan(id, settings);
     }
 
@@ -454,13 +450,13 @@ public class InstalledAppsController {
                 : "Autark-OS ran the app command, but the app did not report ready in time.";
     }
 
-    private AppAccessCheck cachedAccessCheck(AppRuntimeView app) {
+    private AccessModels.AppAccessCheck cachedAccessCheck(AppRuntimeView app) {
         AppHealthSnapshot health = app.healthSnapshot();
         if (health == null || health.localAccessStatus() == null || "not_configured".equals(health.localAccessStatus())) {
-            return AppAccessCheck.notConfigured(app.appId());
+            return AccessModels.AppAccessCheck.notConfigured(app.appId());
         }
         String message = "reachable".equals(health.localAccessStatus()) ? "App link is responding." : "App is running, but the link is not responding.";
-        return new AppAccessCheck(app.appId(), app.accessUrl(), health.localAccessStatus(), message, health.checkedAt());
+        return new AccessModels.AppAccessCheck(app.appId(), app.accessUrl(), health.localAccessStatus(), message, health.checkedAt());
     }
 
     private List<AutarkOsJobStep> uninstallJobSteps() {

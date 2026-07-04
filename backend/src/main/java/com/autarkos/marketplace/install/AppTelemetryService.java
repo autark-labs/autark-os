@@ -17,12 +17,12 @@ public class AppTelemetryService {
         this.composeExecutor = composeExecutor;
     }
 
-    public AppTelemetry telemetry(InstalledApp app) {
-        List<DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
+    public RuntimeModels.AppTelemetry telemetry(InstalledApp app) {
+        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
         return telemetryForContainers(containers);
     }
 
-    public Map<String, AppTelemetry> telemetryForApps(List<InstalledApp> apps) {
+    public Map<String, RuntimeModels.AppTelemetry> telemetryForApps(List<InstalledApp> apps) {
         Map<String, List<String>> containerNamesByAppId = new LinkedHashMap<>();
         for (InstalledApp app : apps) {
             List<String> names = runtimeStatusResolver.containerNames(composeExecutor.containers(composeFile(app), app.composeProject()));
@@ -31,20 +31,20 @@ public class AppTelemetryService {
         List<String> containerNames = containerNamesByAppId.values().stream()
                 .flatMap(List::stream)
                 .toList();
-        Map<String, ContainerTelemetry> telemetryByContainerName = new LinkedHashMap<>();
-        for (ContainerTelemetry telemetry : composeExecutor.stats(containerNames)) {
+        Map<String, RuntimeModels.ContainerTelemetry> telemetryByContainerName = new LinkedHashMap<>();
+        for (RuntimeModels.ContainerTelemetry telemetry : composeExecutor.stats(containerNames)) {
             telemetryByContainerName.put(telemetry.containerName(), telemetry);
         }
-        Map<String, AppTelemetry> telemetryByAppId = new LinkedHashMap<>();
-        containerNamesByAppId.forEach((appId, names) -> telemetryByAppId.put(appId, AppTelemetry.from(names.stream()
+        Map<String, RuntimeModels.AppTelemetry> telemetryByAppId = new LinkedHashMap<>();
+        containerNamesByAppId.forEach((appId, names) -> telemetryByAppId.put(appId, RuntimeModels.AppTelemetry.from(names.stream()
                 .map(telemetryByContainerName::get)
                 .filter(java.util.Objects::nonNull)
                 .toList())));
         return telemetryByAppId;
     }
 
-    public AppTelemetry telemetryForContainers(List<DockerContainerStatus> containers) {
-        return AppTelemetry.from(composeExecutor.stats(runtimeStatusResolver.containerNames(containers)));
+    public RuntimeModels.AppTelemetry telemetryForContainers(List<RuntimeModels.DockerContainerStatus> containers) {
+        return RuntimeModels.AppTelemetry.from(composeExecutor.stats(runtimeStatusResolver.containerNames(containers)));
     }
 
     private Path composeFile(InstalledApp app) {

@@ -1,7 +1,5 @@
 package com.autarkos.marketplace.install;
 
-import com.autarkos.marketplace.api.InstallOptionsRequest;
-
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -16,6 +14,7 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
+import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.HealthManifest;
 import com.autarkos.marketplace.plan.InstallPlan;
@@ -104,37 +103,37 @@ public class MarketplaceInstallService {
         this(installPlanService, directoryManager, packageCopier, composeRenderer, dockerComposeExecutor, installedAppRepository, customizationResolver, postInstallProvisioner, postInstallGuideBuilder, tailscaleService, null, null, null, null);
     }
 
-    public InstallResult install(ApplicationManifest manifest) {
+    public InstallModels.InstallResult install(ApplicationManifest manifest) {
         return install(manifest, InstallOptionsRequest.defaults());
     }
 
-    public InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options) {
+    public InstallModels.InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options) {
         return install(manifest, options, ignored -> {
         });
     }
 
-    public InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options, Consumer<InstallStep> progressSink) {
-        List<InstallStep> steps = new ArrayList<>();
+    public InstallModels.InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options, Consumer<InstallModels.InstallStep> progressSink) {
+        List<InstallModels.InstallStep> steps = new ArrayList<>();
         List<String> logs = new ArrayList<>();
-        Consumer<InstallStep> sink = progressSink == null ? ignored -> { } : progressSink;
+        Consumer<InstallModels.InstallStep> sink = progressSink == null ? ignored -> { } : progressSink;
         InstallPlan plan = installPlanService.generatePlan(manifest, options);
-        ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
+        RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
         List<ObservedService> duplicates = matchingObservedDuplicates(manifest);
         List<ObservedService> recoverableDuplicates = recoverableAutarkOsDuplicates(duplicates);
         if (!recoverableDuplicates.isEmpty()) {
             String message = recoverableDuplicateMessage(manifest);
-            recordStep(steps, sink, InstallStep.failed("Checking existing services", message));
-            return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
         }
         if (!duplicates.isEmpty() && (options == null || !options.duplicateAcknowledgedRequested())) {
             String message = duplicateWarningMessage(manifest);
-            recordStep(steps, sink, InstallStep.failed("Checking existing services", message));
-            return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
         }
         InstalledApp existingApp = installedAppRepository.findAppById(manifest.id()).orElse(null);
         if (existingApp != null && (options == null || !options.reinstallRequested())) {
-            recordStep(steps, sink, InstallStep.completed("Already installed", manifest.name() + " is already managed by Autark-OS."));
-            return new InstallResult(
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Already installed", manifest.name() + " is already managed by Autark-OS."));
+            return new InstallModels.InstallResult(
                     manifest.id(),
                     manifest.name(),
                     "already_installed",
@@ -144,7 +143,7 @@ public class MarketplaceInstallService {
                     steps,
                     logs,
                     null,
-                    setupGuide(manifest, existingApp.accessUrl(), null, PostInstallProvisioningResult.empty()));
+                    setupGuide(manifest, existingApp.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
         }
         Path appRoot = null;
         String composeProject = "";
@@ -152,57 +151,57 @@ public class MarketplaceInstallService {
             String appInstanceId = newAppInstanceId();
             composeProject = composeProject(manifest);
             activityInfo("install_started", "Installing " + manifest.name(), "Autark-OS is preparing storage, networking, and containers for " + manifest.name() + ".", manifest.id());
-            recordStep(steps, sink, InstallStep.completed("Preparing app", "Validated manifest and generated install plan."));
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Preparing app", "Validated manifest and generated install plan."));
             appRoot = directoryManager.prepare(manifest);
-            recordStep(steps, sink, InstallStep.completed("Creating safe storage", appRoot.toString()));
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Creating safe storage", appRoot.toString()));
 
             packageCopier.copyManifest(manifest, appRoot);
             Path composeFile = composeRenderer.render(manifest, appRoot, runtimeConfiguration, appInstanceId, composeProject);
-            AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
-            recordStep(steps, sink, InstallStep.completed("Configuring private access", "Rendered Compose file with Autark-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
+            RuntimeModels.AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Configuring private access", "Rendered Compose file with Autark-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
 
-            DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, composeProject);
+            RuntimeModels.DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, composeProject);
             logs.addAll(composeResult.output());
             if (!composeResult.successful()) {
-                recordStep(steps, sink, InstallStep.failed("Starting services", "Docker Compose exited with code " + composeResult.exitCode()));
+                recordStep(steps, sink, InstallModels.InstallStep.failed("Starting services", "Docker Compose exited with code " + composeResult.exitCode()));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", String.join("\n", composeResult.output()));
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, "Docker Compose failed to start the app.", logs);
                 activityWarning("install_failed", "Install failed for " + manifest.name(), "Docker Compose could not start the app containers.", manifest.id());
-                return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+                return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
             }
-            recordStep(steps, sink, InstallStep.completed("Starting services", "Docker Compose started the managed services."));
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Starting services", "Docker Compose started the managed services."));
             StartupCheck startupCheck = waitForStartup(composeFile, composeProject, manifest.health());
             logs.addAll(startupCheck.logs());
             if (!startupCheck.ready()) {
-                recordStep(steps, sink, InstallStep.failed("Checking app health", startupCheck.detail()));
+                recordStep(steps, sink, InstallModels.InstallStep.failed("Checking app health", startupCheck.detail()));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", startupCheck.detail());
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, startupCheck.detail(), logs);
                 activityWarning("install_failed", "Install needs attention for " + manifest.name(), startupCheck.detail(), manifest.id());
-                return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, startupCheck.detail(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+                return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, startupCheck.detail(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
             }
-            recordStep(steps, sink, InstallStep.completed("Checking app health", startupCheck.detail()));
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Checking app health", startupCheck.detail()));
             TailscaleServeResult privateAccess = configurePrivateAccess(manifest, runtimeConfiguration);
             logs.addAll(privateAccess.output());
             if (privateAccess.configured()) {
-                recordStep(steps, sink, InstallStep.completed("Creating private HTTPS link", privateAccess.privateUrl()));
+                recordStep(steps, sink, InstallModels.InstallStep.completed("Creating private HTTPS link", privateAccess.privateUrl()));
             } else if (privateAccessRequested(manifest, runtimeConfiguration)) {
-                recordStep(steps, sink, InstallStep.warning(
+                recordStep(steps, sink, InstallModels.InstallStep.warning(
                         "Creating private HTTPS link",
                         "Private access needs setup. " + privateAccess.message()));
             }
-            PostInstallProvisioningResult provisioningResult = postInstallProvisioner.provision(manifest, runtimeConfiguration.accessUrl());
+            GuideModels.PostInstallProvisioningResult provisioningResult = postInstallProvisioner.provision(manifest, runtimeConfiguration.accessUrl());
             provisioningResult.steps().forEach(step -> recordStep(steps, sink, step));
             logs.addAll(provisioningResult.logs());
-            PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult);
+            GuideModels.PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult);
 
-            recordStep(steps, sink, InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl())));
+            recordStep(steps, sink, InstallModels.InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl())));
             if (!ownershipReconcilesToManaged(manifest.id())) {
                 String message = "Autark-OS could not confirm that this app is managed by this installation. The install was stopped so we do not show a service as installed when it is not under Autark-OS control.";
-                recordStep(steps, sink, InstallStep.failed("Confirming ownership", message));
+                recordStep(steps, sink, InstallModels.InstallStep.failed("Confirming ownership", message));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", message);
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, message, logs);
                 activityWarning("install_failed", "Install ownership check failed for " + manifest.name(), message, manifest.id());
-                return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
+                return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
             }
 
             installedAppRepository.save(new InstalledApp(
@@ -219,9 +218,9 @@ public class MarketplaceInstallService {
             clearFailedPartialInstall(manifest.id());
             activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Autark-OS.", manifest.id());
 
-            return new InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Autark-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Autark-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
         } catch (RuntimeException exception) {
-            recordStep(steps, sink, InstallStep.failed("Install failed", exception.getMessage()));
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Install failed", exception.getMessage()));
             try {
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", exception.getMessage());
             } catch (RuntimeException ignored) {
@@ -229,7 +228,7 @@ public class MarketplaceInstallService {
             }
             recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, exception.getMessage(), logs);
             activityError("install_failed", "Install failed for " + manifest.name(), exception.getMessage(), manifest.id(), exception);
-            return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, exception.getMessage(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, exception.getMessage(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
         }
     }
 
@@ -280,7 +279,7 @@ public class MarketplaceInstallService {
 
     private void recordFailedPartialInstall(
             ApplicationManifest manifest,
-            ResolvedRuntimeConfiguration runtimeConfiguration,
+            RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration,
             Path appRoot,
             String composeProject,
             String message,
@@ -312,7 +311,7 @@ public class MarketplaceInstallService {
         }
     }
 
-    private void recordStep(List<InstallStep> steps, Consumer<InstallStep> sink, InstallStep step) {
+    private void recordStep(List<InstallModels.InstallStep> steps, Consumer<InstallModels.InstallStep> sink, InstallModels.InstallStep step) {
         steps.add(step);
         sink.accept(step);
     }
@@ -324,18 +323,18 @@ public class MarketplaceInstallService {
         return dockerOwnershipService.composeProject(manifest.id());
     }
 
-    private AppRuntimeMetadata writeRuntimeMetadata(ApplicationManifest manifest, Path appRoot, String appInstanceId, String composeProject) {
+    private RuntimeModels.AppRuntimeMetadata writeRuntimeMetadata(ApplicationManifest manifest, Path appRoot, String appInstanceId, String composeProject) {
         if (appRuntimeMetadataWriter != null) {
             return appRuntimeMetadataWriter.write(manifest, appRoot, appInstanceId, composeProject);
         }
         return null;
     }
 
-    private void saveOwnershipMetadata(ApplicationManifest manifest, Path appRoot, AppRuntimeMetadata metadata, String installState) {
+    private void saveOwnershipMetadata(ApplicationManifest manifest, Path appRoot, RuntimeModels.AppRuntimeMetadata metadata, String installState) {
         if (metadata == null) {
             return;
         }
-        installedAppRepository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        installedAppRepository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 manifest.id(),
                 metadata.appInstanceId(),
                 metadata.catalogAppId(),
@@ -351,7 +350,7 @@ public class MarketplaceInstallService {
         return "appinst_" + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private AppSetupGuide setupGuide(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, PostInstallProvisioningResult provisioningResult) {
+    private GuideModels.AppSetupGuide setupGuide(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, GuideModels.PostInstallProvisioningResult provisioningResult) {
         return postInstallGuideBuilder.buildSetupGuide(
                 manifest,
                 accessUrl,
@@ -360,7 +359,7 @@ public class MarketplaceInstallService {
                 installedAppRepository.findAllApps().stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.toSet()));
     }
 
-    private TailscaleServeResult configurePrivateAccess(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    private TailscaleServeResult configurePrivateAccess(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         if (!privateAccessRequested(manifest, runtimeConfiguration)) {
             return new TailscaleServeResult(false, null, "Private HTTPS access was not requested.", List.of());
         }
@@ -372,13 +371,13 @@ public class MarketplaceInstallService {
         return tailscaleService.serveHttps(hostPort, privateHttpsPort);
     }
 
-    private InstallSettings installSettings(
+    private InstallModels.InstallSettings installSettings(
             ApplicationManifest manifest,
-            ResolvedRuntimeConfiguration runtimeConfiguration,
+            RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration,
             TailscaleServeResult privateAccess) {
         String accessUrl = runtimeConfiguration.accessUrl();
         boolean privateAccessDesired = privateAccessRequested(manifest, runtimeConfiguration);
-        return new InstallSettings(
+        return new InstallModels.InstallSettings(
                 accessUrl,
                 privateAccess.privateUrl(),
                 privateAccessDesired,
@@ -395,7 +394,7 @@ public class MarketplaceInstallService {
                 true);
     }
 
-    private boolean privateAccessRequested(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    private boolean privateAccessRequested(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         return runtimeConfiguration.tailscaleEnabled() || manifest.usage().privateHttpsRequired();
     }
 
@@ -441,9 +440,9 @@ public class MarketplaceInstallService {
 
     private StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health) {
         List<String> lastStatus = List.of();
-        List<DockerContainerStatus> lastContainers = List.of();
+        List<RuntimeModels.DockerContainerStatus> lastContainers = List.of();
         for (int attempt = 1; attempt <= 20; attempt++) {
-            List<DockerContainerStatus> containers = dockerComposeExecutor.containers(composeFile, composeProject);
+            List<RuntimeModels.DockerContainerStatus> containers = dockerComposeExecutor.containers(composeFile, composeProject);
             lastContainers = containers;
             StartupCheck check = evaluateStartup(containers, health);
             lastStatus = check.logs();
@@ -459,7 +458,7 @@ public class MarketplaceInstallService {
         return StartupCheck.failed(detail, lastStatus);
     }
 
-    private StartupCheck evaluateStartup(List<DockerContainerStatus> containers, HealthManifest health) {
+    private StartupCheck evaluateStartup(List<RuntimeModels.DockerContainerStatus> containers, HealthManifest health) {
         if (containers.isEmpty()) {
             return StartupCheck.pending("Waiting for Docker to report the app container.", List.of("No containers reported yet."));
         }
@@ -504,13 +503,13 @@ public class MarketplaceInstallService {
         return accessUrl == null || accessUrl.isBlank() ? "Ready." : accessUrl;
     }
 
-    private boolean running(DockerContainerStatus container) {
+    private boolean running(RuntimeModels.DockerContainerStatus container) {
         String state = lower(container.state());
         String status = lower(container.status());
         return state.equals("running") || status.startsWith("up ");
     }
 
-    private boolean starting(DockerContainerStatus container) {
+    private boolean starting(RuntimeModels.DockerContainerStatus container) {
         String state = lower(container.state());
         String health = lower(container.health());
         String status = lower(container.status());
@@ -520,7 +519,7 @@ public class MarketplaceInstallService {
                 || status.contains("starting");
     }
 
-    private boolean failed(DockerContainerStatus container) {
+    private boolean failed(RuntimeModels.DockerContainerStatus container) {
         String state = lower(container.state());
         String health = lower(container.health());
         String status = lower(container.status());
@@ -531,7 +530,7 @@ public class MarketplaceInstallService {
                 || status.contains("unhealthy");
     }
 
-    private String statusLine(DockerContainerStatus container) {
+    private String statusLine(RuntimeModels.DockerContainerStatus container) {
         return "%s state=%s health=%s status=%s".formatted(
                 container.name(),
                 container.state(),

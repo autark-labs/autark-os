@@ -1,20 +1,5 @@
 package com.autarkos.host;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.autarkos.activity.ActivityLogService;
-import com.autarkos.api.ApplicationBehaviorStates;
-import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.DockerOwnershipService;
-import com.autarkos.marketplace.install.InstallSettings;
-import com.autarkos.marketplace.install.AppRuntimeMetadata;
-import com.autarkos.marketplace.install.AppRuntimeMetadataReader;
-import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
-import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.model.ApplicationManifest;
-import com.autarkos.system.AutarkOsIdentity;
-
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,6 +9,20 @@ import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.ApplicationBehaviorStates;
+import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.AppRuntimeMetadataReader;
+import com.autarkos.marketplace.install.DockerOwnershipService;
+import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.InstalledApp;
+import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.model.ApplicationManifest;
+import com.autarkos.system.AutarkOsIdentity;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class ObservedServiceService {
@@ -253,18 +252,18 @@ public class ObservedServiceService {
         AutarkOsIdentity identity = currentIdentity.get();
         String accessUrl = firstPresent(service.url(), manifest == null ? null : manifest.accessUrl());
         String runtimePath = firstPresent(metadataValue(service, "dataPaths"), metadataValue(service, "runtimePath"), manifest == null ? "" : identity.runtimeRoot() + "/apps/" + appId);
-        Optional<AppRuntimeMetadata> runtimeMetadata = runtimeMetadataReader.read(java.nio.file.Path.of(runtimePath))
+        Optional<RuntimeModels.AppRuntimeMetadata> runtimeMetadata = runtimeMetadataReader.read(java.nio.file.Path.of(runtimePath))
                 .filter(metadata -> appId.equals(metadata.catalogAppId()));
         String composeProject = firstPresent(
-                runtimeMetadata.map(AppRuntimeMetadata::composeProject).orElse(""),
+                runtimeMetadata.map(RuntimeModels.AppRuntimeMetadata::composeProject).orElse(""),
                 metadataValue(service, "composeProject"),
                 service.fingerprint());
         String appInstanceId = firstPresent(
-                runtimeMetadata.map(AppRuntimeMetadata::appInstanceId).orElse(""),
+                runtimeMetadata.map(RuntimeModels.AppRuntimeMetadata::appInstanceId).orElse(""),
                 metadataValue(service, "appInstanceId"),
                 "appinst_adopted_" + appId);
         String autarkOsInstanceId = firstPresent(
-                runtimeMetadata.map(AppRuntimeMetadata::instanceId).orElse(""),
+                runtimeMetadata.map(RuntimeModels.AppRuntimeMetadata::instanceId).orElse(""),
                 identity.instanceId());
 
         installedAppRepository.save(new InstalledApp(
@@ -275,7 +274,7 @@ public class ObservedServiceService {
                 composeProject,
                 accessUrl,
                 now));
-        installedAppRepository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        installedAppRepository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 appId,
                 appInstanceId,
                 appId,
@@ -285,7 +284,7 @@ public class ObservedServiceService {
                 "owned",
                 now,
                 now));
-        installedAppRepository.saveSettings(appId, InstallSettings.defaults(accessUrl));
+        installedAppRepository.saveSettings(appId, InstallModels.InstallSettings.defaults(accessUrl));
         repository.markManaged(id, identity.instanceId(), now);
         if (activityLogService != null) {
             activityLogService.success("host", "adopt_observed_service", "Service adopted", "Autark-OS now manages " + displayName + ".", appId);

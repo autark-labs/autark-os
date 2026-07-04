@@ -51,12 +51,12 @@ class AppUninstallService {
         this.activityLogService = activityLogService;
     }
 
-    UninstallPlan uninstallPlan(InstalledApp app) {
+    InstallModels.UninstallPlan uninstallPlan(InstalledApp app) {
         boolean checkpointPlanned = hasCheckpointableData(app);
         String checkpointMessage = checkpointPlanned
                 ? "Autark-OS will save a safety checkpoint before removing containers. Your app data is still kept on disk."
                 : "Autark-OS did not find app data to checkpoint. The remove step will still keep the app folder if it exists.";
-        return new UninstallPlan(
+        return new InstallModels.UninstallPlan(
                 app.appId(),
                 app.appName(),
                 "Autark-OS can remove the running app while keeping your data on disk.",
@@ -67,7 +67,7 @@ class AppUninstallService {
                 List.of("Confirm you understand that containers will be removed", "Delete data manually later if you no longer need it"));
     }
 
-    AppActionResult uninstall(InstalledApp app, InstallSettings settings, Path composeFile) {
+    AppActionResult uninstall(InstalledApp app, InstallModels.InstallSettings settings, Path composeFile) {
         List<String> logs = new java.util.ArrayList<>();
         SafetyCheckpointResult checkpoint = createPreUninstallCheckpoint(app);
         logs.addAll(checkpoint.logs());
@@ -75,7 +75,7 @@ class AppUninstallService {
             TailscaleServeResult disableResult = disablePrivateAccessMapping(app, settings);
             logs.addAll(disableResult.output());
         }
-        DockerComposeResult result = composeExecutor.down(composeFile, app.composeProject());
+        RuntimeModels.DockerComposeResult result = composeExecutor.down(composeFile, app.composeProject());
         logs.addAll(result.output());
         if (result.successful()) {
             repository.recordEvent(app.appId(), "uninstalled", "Removed containers for " + app.appName() + "; data was kept on disk.");
@@ -88,7 +88,7 @@ class AppUninstallService {
         throw new InstallationException("Could not uninstall " + app.appName() + ". Check the recent activity for details.");
     }
 
-    private TailscaleServeResult disablePrivateAccessMapping(InstalledApp app, InstallSettings settings) {
+    private TailscaleServeResult disablePrivateAccessMapping(InstalledApp app, InstallModels.InstallSettings settings) {
         Integer port = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
         if (port == null) {
             port = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(firstPresent(settings.accessUrl(), app.accessUrl())) : settings.expectedLocalPort();

@@ -47,7 +47,7 @@ class AppAccessChecker {
         return manifest.health();
     }
 
-    AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
+    AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
         HealthManifest health = healthContract(manifest);
         if ("tcp".equals(health.type())) {
             return tcpAccessCheck(appId, accessUrl);
@@ -55,9 +55,9 @@ class AppAccessChecker {
         return accessCheck(appId, accessUrl);
     }
 
-    AppAccessCheck accessCheck(String appId, String accessUrl) {
+    AccessModels.AppAccessCheck accessCheck(String appId, String accessUrl) {
         if (accessUrl == null || accessUrl.isBlank()) {
-            return AppAccessCheck.notConfigured(appId);
+            return AccessModels.AppAccessCheck.notConfigured(appId);
         }
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(accessUrl))
@@ -66,30 +66,30 @@ class AppAccessChecker {
                     .build();
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() >= 200 && response.statusCode() < 500) {
-                return AppAccessCheck.reachable(appId, accessUrl);
+                return AccessModels.AppAccessCheck.reachable(appId, accessUrl);
             }
-            return AppAccessCheck.unreachable(appId, accessUrl);
+            return AccessModels.AppAccessCheck.unreachable(appId, accessUrl);
         } catch (IllegalArgumentException | IOException exception) {
-            return AppAccessCheck.unreachable(appId, accessUrl);
+            return AccessModels.AppAccessCheck.unreachable(appId, accessUrl);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            return AppAccessCheck.unreachable(appId, accessUrl);
+            return AccessModels.AppAccessCheck.unreachable(appId, accessUrl);
         }
     }
 
-    AppAccessCheck privateAccessCheck(String appId, String privateAccessUrl) {
+    AccessModels.AppAccessCheck privateAccessCheck(String appId, String privateAccessUrl) {
         if (privateAccessUrl == null || privateAccessUrl.isBlank()) {
-            return AppAccessCheck.notConfigured(appId);
+            return AccessModels.AppAccessCheck.notConfigured(appId);
         }
         if (devMode) {
-            return AppAccessCheck.reachable(appId, privateAccessUrl);
+            return AccessModels.AppAccessCheck.reachable(appId, privateAccessUrl);
         }
         return accessCheck(appId, privateAccessUrl);
     }
 
-    private AppAccessCheck tcpAccessCheck(String appId, String accessUrl) {
+    private AccessModels.AppAccessCheck tcpAccessCheck(String appId, String accessUrl) {
         if (accessUrl == null || accessUrl.isBlank()) {
-            return AppAccessCheck.notConfigured(appId);
+            return AccessModels.AppAccessCheck.notConfigured(appId);
         }
         try {
             URI uri = URI.create(accessUrl);
@@ -99,10 +99,10 @@ class AppAccessChecker {
             }
             try (Socket socket = new Socket()) {
                 socket.connect(new InetSocketAddress(uri.getHost(), port), (int) ACCESS_CHECK_TIMEOUT.toMillis());
-                return AppAccessCheck.reachable(appId, accessUrl);
+                return AccessModels.AppAccessCheck.reachable(appId, accessUrl);
             }
         } catch (IllegalArgumentException | IOException exception) {
-            return AppAccessCheck.unreachable(appId, accessUrl);
+            return AccessModels.AppAccessCheck.unreachable(appId, accessUrl);
         }
     }
 }

@@ -3,10 +3,10 @@ package com.autarkos.marketplace.install;
 import java.time.Instant;
 import java.util.List;
 
-import com.autarkos.api.AutarkOsStates;
 import com.autarkos.api.AppOperationView;
 import com.autarkos.api.ApplicationBehaviorStates;
 import com.autarkos.api.AutarkOsAction;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.model.ConfigurationItem;
 
 public record AppRuntimeView(
@@ -29,19 +29,19 @@ public record AppRuntimeView(
         String runtimePath,
         String composeProject,
         String accessUrl,
-        AppAccessRoute accessRoute,
-        AccessDesiredState desiredAccess,
-        AccessObservedState observedAccess,
+        AccessModels.AppAccessRoute accessRoute,
+        AccessModels.AccessDesiredState desiredAccess,
+        AccessModels.AccessObservedState observedAccess,
         Instant installedAt,
         String lastBackup,
         String canonicalBackupState,
-        InstallSettings settings,
-        AppTelemetry telemetry,
+        InstallModels.InstallSettings settings,
+        RuntimeModels.AppTelemetry telemetry,
         AppHealthSnapshot healthSnapshot,
-        PostInstallGuide usageGuide,
-        AppSetupGuide setupGuide,
+        GuideModels.PostInstallGuide usageGuide,
+        GuideModels.AppSetupGuide setupGuide,
         List<ConfigurationItem> appConfiguration,
-        AppRemediationView remediation,
+        ReliabilityModels.AppRemediationView remediation,
         List<AppEvent> recentEvents) {
 
     public AppRuntimeView(
@@ -57,19 +57,19 @@ public record AppRuntimeView(
             String runtimePath,
             String composeProject,
             String accessUrl,
-            AppAccessRoute accessRoute,
-            AccessDesiredState desiredAccess,
-            AccessObservedState observedAccess,
+            AccessModels.AppAccessRoute accessRoute,
+            AccessModels.AccessDesiredState desiredAccess,
+            AccessModels.AccessObservedState observedAccess,
             Instant installedAt,
             String lastBackup,
             String canonicalBackupState,
-            InstallSettings settings,
-            AppTelemetry telemetry,
+            InstallModels.InstallSettings settings,
+            RuntimeModels.AppTelemetry telemetry,
             AppHealthSnapshot healthSnapshot,
-            PostInstallGuide usageGuide,
-            AppSetupGuide setupGuide,
+            GuideModels.PostInstallGuide usageGuide,
+            GuideModels.AppSetupGuide setupGuide,
             List<ConfigurationItem> appConfiguration,
-            AppRemediationView remediation,
+            ReliabilityModels.AppRemediationView remediation,
             List<AppEvent> recentEvents) {
         this(
                 appId,
@@ -120,16 +120,16 @@ public record AppRuntimeView(
             String runtimePath,
             String composeProject,
             String accessUrl,
-            AppAccessRoute accessRoute,
-            AccessDesiredState desiredAccess,
-            AccessObservedState observedAccess,
+            AccessModels.AppAccessRoute accessRoute,
+            AccessModels.AccessDesiredState desiredAccess,
+            AccessModels.AccessObservedState observedAccess,
             Instant installedAt,
             String lastBackup,
-            InstallSettings settings,
-            AppTelemetry telemetry,
+            InstallModels.InstallSettings settings,
+            RuntimeModels.AppTelemetry telemetry,
             AppHealthSnapshot healthSnapshot,
-            PostInstallGuide usageGuide,
-            AppSetupGuide setupGuide,
+            GuideModels.PostInstallGuide usageGuide,
+            GuideModels.AppSetupGuide setupGuide,
             List<ConfigurationItem> appConfiguration,
             List<AppEvent> recentEvents) {
         this(
@@ -244,7 +244,7 @@ public record AppRuntimeView(
                         AutarkOsAction.post("restart", "Restart", "/api/apps/" + appId + "/restart", false, false));
     }
 
-    private static String backupStateFromSettings(InstallSettings settings) {
+    private static String backupStateFromSettings(InstallModels.InstallSettings settings) {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
             return AutarkOsStates.BackupState.DISABLED;
         }

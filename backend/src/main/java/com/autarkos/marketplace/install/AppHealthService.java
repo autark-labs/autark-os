@@ -40,19 +40,19 @@ class AppHealthService {
     }
 
     AppHealthSnapshot healthSnapshot(InstalledApp app) {
-        List<DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
+        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
         AppRuntimeStatus runtime = runtimeStatusResolver.normalize(containers);
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
         String accessUrl = runtimeStatusResolver.accessUrl(app, manifest, containers);
-        InstallSettings settings = settingsPolicy.normalizeSettings(repository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(accessUrl)), app, manifest, accessUrl);
-        AppAccessCheck localCheck = accessChecker.shouldCheckLocalAccess(manifest, accessUrl)
+        InstallModels.InstallSettings settings = settingsPolicy.normalizeSettings(repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(accessUrl)), app, manifest, accessUrl);
+        AccessModels.AppAccessCheck localCheck = accessChecker.shouldCheckLocalAccess(manifest, accessUrl)
                 ? accessChecker.localHealthCheck(app.appId(), manifest, accessUrl)
-                : AppAccessCheck.notConfigured(app.appId());
-        AppAccessCheck privateCheck = settings.tailscaleEnabled()
+                : AccessModels.AppAccessCheck.notConfigured(app.appId());
+        AccessModels.AppAccessCheck privateCheck = settings.tailscaleEnabled()
                 ? settingsPolicy.privateAccessPortConflict(settings, accessUrl)
-                        ? AppAccessCheck.unreachable(app.appId(), settings.privateAccessUrl())
+                        ? AccessModels.AppAccessCheck.unreachable(app.appId(), settings.privateAccessUrl())
                         : accessChecker.privateAccessCheck(app.appId(), settings.privateAccessUrl())
-                : AppAccessCheck.notConfigured(app.appId());
+                : AccessModels.AppAccessCheck.notConfigured(app.appId());
         settings = updateAccessCheckTimestamps(app, settings, localCheck);
         AppHealthSnapshot snapshot = buildHealthSnapshot(app, runtime, manifest, settings, localCheck, privateCheck);
         repository.healthFor(app.appId())
@@ -70,11 +70,11 @@ class AppHealthService {
         return snapshot;
     }
 
-    private InstallSettings updateAccessCheckTimestamps(InstalledApp app, InstallSettings settings, AppAccessCheck localCheck) {
+    private InstallModels.InstallSettings updateAccessCheckTimestamps(InstalledApp app, InstallModels.InstallSettings settings, AccessModels.AppAccessCheck localCheck) {
         if ("not_configured".equals(localCheck.status())) {
             return settings;
         }
-        InstallSettings updated = new InstallSettings(
+        InstallModels.InstallSettings updated = new InstallModels.InstallSettings(
                 settings.accessUrl(),
                 settings.privateAccessUrl(),
                 settings.tailscaleEnabled(),
@@ -93,7 +93,7 @@ class AppHealthService {
         return updated;
     }
 
-    private AppHealthSnapshot buildHealthSnapshot(InstalledApp app, AppRuntimeStatus runtime, ApplicationManifest manifest, InstallSettings settings, AppAccessCheck localCheck, AppAccessCheck privateCheck) {
+    private AppHealthSnapshot buildHealthSnapshot(InstalledApp app, AppRuntimeStatus runtime, ApplicationManifest manifest, InstallModels.InstallSettings settings, AccessModels.AppAccessCheck localCheck, AccessModels.AppAccessCheck privateCheck) {
         Instant now = Instant.now();
         HealthManifest health = accessChecker.healthContract(manifest);
         Duration startupGracePeriod = Duration.ofSeconds(health.startupGraceSeconds());

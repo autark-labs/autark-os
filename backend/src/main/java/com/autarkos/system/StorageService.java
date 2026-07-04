@@ -21,11 +21,12 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
-import com.autarkos.marketplace.install.AppRemediationView;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ReliabilityModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+
 @Service
 public class StorageService {
 
@@ -65,7 +66,7 @@ public class StorageService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList(), fileOperations);
     }
@@ -160,7 +161,7 @@ public class StorageService {
 
     private StorageModels.AppStorageUsage appStorage(InstalledApp app) {
         Path path = Path.of(app.runtimePath()).toAbsolutePath().normalize();
-        InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElse(null);
+        InstallModels.InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElse(null);
         long usedBytes = fileOperations.directorySize(path);
         List<StorageModels.StorageTrendPoint> trend = storageSampleRepository.forAppSince(app.appId(), Instant.now().minus(STORAGE_SAMPLE_RETENTION).toString()).stream()
                 .map(sample -> new StorageModels.StorageTrendPoint(sample.usedBytes(), Instant.parse(sample.sampledAt())))

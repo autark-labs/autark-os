@@ -8,6 +8,13 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.autarkos.marketplace.install.AccessModels;
+import com.autarkos.marketplace.install.GuideModels;
+import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.ReliabilityModels;
+import com.autarkos.marketplace.install.RuntimeModels;
+import com.autarkos.marketplace.install.UpdateModels;
+
 class BackendModelGroupingArchitectureTests {
 
     @Test
@@ -18,6 +25,12 @@ class BackendModelGroupingArchitectureTests {
                 Path.of("src/main/java/com/autarkos/backups/BackupModels.java"),
                 Path.of("src/main/java/com/autarkos/backups/RestoreModels.java"),
                 Path.of("src/main/java/com/autarkos/host/HostModels.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/AccessModels.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/GuideModels.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/InstallModels.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/ReliabilityModels.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/RuntimeModels.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/UpdateModels.java"),
                 Path.of("src/main/java/com/autarkos/system/OnboardingModels.java"),
                 Path.of("src/main/java/com/autarkos/system/SetupProgressModels.java"),
                 Path.of("src/main/java/com/autarkos/system/SupportModels.java"),
@@ -38,6 +51,12 @@ class BackendModelGroupingArchitectureTests {
                 Path.of("src/main/java/com/autarkos/backups/RestorePlan.java"),
                 Path.of("src/main/java/com/autarkos/host/ObservedServiceAdoptionPlan.java"),
                 Path.of("src/main/java/com/autarkos/host/ObservedServiceMatchRequest.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/AppAccessCheck.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/AppReliabilitySummary.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/AppSetupGuide.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/InstallSettings.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/AppTelemetry.java"),
+                Path.of("src/main/java/com/autarkos/marketplace/install/AppUpdatePlan.java"),
                 Path.of("src/main/java/com/autarkos/system/api/OnboardingState.java"),
                 Path.of("src/main/java/com/autarkos/system/api/SupportBundle.java"),
                 Path.of("src/main/java/com/autarkos/system/api/SystemSetupStatus.java"),

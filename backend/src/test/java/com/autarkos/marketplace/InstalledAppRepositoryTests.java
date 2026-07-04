@@ -10,11 +10,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.install.AppHealthSnapshot;
-import com.autarkos.marketplace.install.BackupPolicy;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
@@ -31,12 +30,12 @@ class InstalledAppRepositoryTests {
         Instant checkedAt = Instant.parse("2026-06-19T01:00:00Z");
 
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", "/apps/vaultwarden", "autark-os-vaultwarden", "http://localhost:8090", installedAt));
-        repository.saveSettings("vaultwarden", new InstallSettings(
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 "https://vaultwarden.tail.ts.net",
                 true,
                 Map.of("data", "/apps/vaultwarden/data"),
-                new BackupPolicy(true, "weekly", 3),
+                new InstallModels.BackupPolicy(true, "weekly", 3),
                 "private",
                 "recommended",
                 8090,
@@ -70,7 +69,7 @@ class InstalledAppRepositoryTests {
         Instant updatedAt = Instant.parse("2026-06-19T01:00:00Z");
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", "/apps/vaultwarden", "autarkos_homelab-box_vaultwarden", "http://localhost:8090", installedAt));
 
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
                 "appinst_vaultwarden",
                 "vaultwarden",

@@ -10,8 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.autarkos.system.InstanceIdentityService;
 import com.autarkos.system.AutarkOsIdentity;
+import com.autarkos.system.InstanceIdentityService;
 
 @Service
 public class DockerOwnershipService {
@@ -82,26 +82,26 @@ public class DockerOwnershipService {
         return parsed;
     }
 
-    public DockerResourceClassification classify(String containerName, Map<String, String> labels) {
+    public RuntimeModels.DockerResourceClassification classify(String containerName, Map<String, String> labels) {
         String appId = labels.getOrDefault(APP_ID, "");
         String appInstanceId = labels.getOrDefault(APP_INSTANCE_ID, "");
         String composeProject = labels.getOrDefault(COMPOSE_PROJECT, "");
         if (!"true".equalsIgnoreCase(labels.getOrDefault(MANAGED, ""))) {
             if (containerName != null && containerName.startsWith("autark-os-")) {
-                return new DockerResourceClassification(DockerResourceOwnership.LEGACY_UNSCOPED, appId, appInstanceId, composeProject);
+                return new RuntimeModels.DockerResourceClassification(DockerResourceOwnership.LEGACY_UNSCOPED, appId, appInstanceId, composeProject);
             }
-            return new DockerResourceClassification(DockerResourceOwnership.UNMANAGED, appId, appInstanceId, composeProject);
+            return new RuntimeModels.DockerResourceClassification(DockerResourceOwnership.UNMANAGED, appId, appInstanceId, composeProject);
         }
 
         AutarkOsIdentity identity = identitySupplier.get();
         if (identity.instanceId().equals(labels.get(INSTANCE_ID))
                 && identity.runtimeRootHash().equals(labels.get(RUNTIME_ROOT_HASH))) {
-            return new DockerResourceClassification(DockerResourceOwnership.OWNED, appId, appInstanceId, composeProject);
+            return new RuntimeModels.DockerResourceClassification(DockerResourceOwnership.OWNED, appId, appInstanceId, composeProject);
         }
         if (isBlank(labels.get(INSTANCE_ID)) || isBlank(labels.get(RUNTIME_ROOT_HASH))) {
-            return new DockerResourceClassification(DockerResourceOwnership.LEGACY_UNSCOPED, appId, appInstanceId, composeProject);
+            return new RuntimeModels.DockerResourceClassification(DockerResourceOwnership.LEGACY_UNSCOPED, appId, appInstanceId, composeProject);
         }
-        return new DockerResourceClassification(DockerResourceOwnership.FOREIGN, appId, appInstanceId, composeProject);
+        return new RuntimeModels.DockerResourceClassification(DockerResourceOwnership.FOREIGN, appId, appInstanceId, composeProject);
     }
 
     private static String shortInstanceId(String instanceId) {

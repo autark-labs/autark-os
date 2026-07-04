@@ -22,7 +22,7 @@ public class ProcessManagedContainerDiscovery implements ManagedContainerDiscove
     }
 
     @Override
-    public List<ManagedContainer> findManagedContainers() {
+    public List<RuntimeModels.ManagedContainer> findManagedContainers() {
         List<String> command = List.of(
                 "docker",
                 "ps",
@@ -35,7 +35,7 @@ public class ProcessManagedContainerDiscovery implements ManagedContainerDiscove
         if (!result.successful()) {
             return List.of();
         }
-        List<ManagedContainer> containers = new ArrayList<>();
+        List<RuntimeModels.ManagedContainer> containers = new ArrayList<>();
         for (String line : result.outputLines()) {
             String[] fields = line.split("\t", -1);
             if (fields.length >= 7 && !fields[1].isBlank()) {
@@ -46,8 +46,8 @@ public class ProcessManagedContainerDiscovery implements ManagedContainerDiscove
                         DockerOwnershipService.RUNTIME_ROOT_HASH, fields[4],
                         DockerOwnershipService.APP_INSTANCE_ID, fields[5],
                         DockerOwnershipService.COMPOSE_PROJECT, fields[6]);
-                DockerResourceClassification classification = dockerOwnershipService.classify(fields[0], labels);
-                containers.add(new ManagedContainer(fields[1], fields[0], fields[2], classification.ownership(), classification.appInstanceId(), classification.composeProject()));
+                RuntimeModels.DockerResourceClassification classification = dockerOwnershipService.classify(fields[0], labels);
+                containers.add(new RuntimeModels.ManagedContainer(fields[1], fields[0], fields[2], classification.ownership(), classification.appInstanceId(), classification.composeProject()));
             }
         }
         return containers;

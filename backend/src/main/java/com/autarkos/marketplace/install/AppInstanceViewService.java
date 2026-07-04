@@ -49,8 +49,8 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     private AppInstanceView view(AppReconciliationItem item) {
         InstalledApp app = repository.findAppById(item.appId()).orElse(null);
-        InstalledAppOwnershipMetadata ownership = repository.ownershipFor(item.appId()).orElse(null);
-        InstallSettings settings = repository.settingsFor(item.appId()).orElse(null);
+        RuntimeModels.InstalledAppOwnershipMetadata ownership = repository.ownershipFor(item.appId()).orElse(null);
+        InstallModels.InstallSettings settings = repository.settingsFor(item.appId()).orElse(null);
         ApplicationManifest manifest = catalogService.findById(item.appId()).orElse(null);
         String backupState = backupState(item.appId(), settings);
         List<AutarkOsIssue> issues = issues(item, app, backupState);
@@ -77,7 +77,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                 Instant.now());
     }
 
-    private AppRemediationView remediation(AppReconciliationItem item, String backupState, InstallSettings settings) {
+    private ReliabilityModels.AppRemediationView remediation(AppReconciliationItem item, String backupState, InstallModels.InstallSettings settings) {
         String lastRepairStatus = settings == null ? null : settings.lastRepairStatus();
         boolean autoRepairEnabled = settings == null || settings.autoRepairEnabled();
         boolean hasRestorePoint = AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(backupState);
@@ -202,7 +202,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         return "not_ready";
     }
 
-    private String backupState(String appId, InstallSettings settings) {
+    private String backupState(String appId, InstallModels.InstallSettings settings) {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
             return AutarkOsStates.BackupState.DISABLED;
         }

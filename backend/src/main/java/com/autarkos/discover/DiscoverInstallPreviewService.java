@@ -6,12 +6,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.stereotype.Service;
+
 import com.autarkos.marketplace.api.InstallOptionsRequest;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.plan.InstallPlan;
 import com.autarkos.marketplace.plan.InstallPlanService;
-
-import org.springframework.stereotype.Service;
 
 @Service
 public class DiscoverInstallPreviewService {

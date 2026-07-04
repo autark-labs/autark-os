@@ -21,22 +21,15 @@ import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppActionResult;
 import com.autarkos.marketplace.install.AppGuardianService;
 import com.autarkos.marketplace.install.AppHealthSnapshot;
-import com.autarkos.marketplace.install.AppReliabilitySummary;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
-import com.autarkos.marketplace.install.AppSettingsChangePlan;
-import com.autarkos.marketplace.install.BackupPolicy;
-import com.autarkos.marketplace.install.ContainerTelemetry;
-import com.autarkos.marketplace.install.DockerContainerStatus;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
-import com.autarkos.marketplace.install.DockerComposeResult;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.ManagedContainer;
 import com.autarkos.marketplace.install.PostInstallGuideBuilder;
-import com.autarkos.marketplace.install.UninstallPlan;
+import com.autarkos.marketplace.install.ReliabilityModels;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleServeResult;
@@ -80,7 +73,7 @@ class AppLifecycleServiceTests {
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", appRoot.toString(), "autark-os-vaultwarden", "http://localhost:8090", Instant.parse("2026-06-11T00:00:00Z")));
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
                 "appinst_vaultwarden",
                 "vaultwarden",
@@ -115,7 +108,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void lifecycleActionRejectsLegacyUnscopedAppsBeforeCallingDocker() {
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
                 "",
                 "vaultwarden",
@@ -172,7 +165,7 @@ class AppLifecycleServiceTests {
     @Test
     void healthSnapshotTreatsSlowStartupAsStartingDuringGracePeriod() {
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "http://localhost:8090", Instant.now()));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -189,7 +182,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void healthSnapshotMarksStoppedContainersAsPaused() {
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "exited",
@@ -206,7 +199,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void runtimeViewExposesPausedAndUnreachableApplicationStates() {
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "exited",
@@ -219,7 +212,7 @@ class AppLifecycleServiceTests {
         assertThat(paused.readinessState()).isEqualTo("paused");
         assertThat(paused.attentionState()).isEqualTo("none");
 
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -276,7 +269,7 @@ class AppLifecycleServiceTests {
     @Test
     void repairStartsPausedApp() {
         composeExecutor.transitionToStarting = true;
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "exited",
@@ -297,7 +290,7 @@ class AppLifecycleServiceTests {
     @Test
     void repairRestartsUnhealthyApp() {
         composeExecutor.transitionToStarting = true;
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -318,7 +311,7 @@ class AppLifecycleServiceTests {
     void guardianRepairsUnhealthyAppAndRecordsSteps() {
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "http://localhost:8090", Instant.now()));
         composeExecutor.transitionToStarting = true;
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -338,12 +331,12 @@ class AppLifecycleServiceTests {
 
     @Test
     void guardianSkipsAppsWhenAutoRepairIsDisabled() {
-        repository.saveSettings("vaultwarden", new InstallSettings(
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
                 java.util.Map.of(),
-                BackupPolicy.defaults(),
+                InstallModels.BackupPolicy.defaults(),
                 "local",
                 "optional",
                 8090,
@@ -353,7 +346,7 @@ class AppLifecycleServiceTests {
                 null,
                 null,
                 false));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -369,7 +362,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void guardianPersistsBackoffWhenOwnershipBlocksAutomaticRepair() {
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
                 "",
                 "vaultwarden",
@@ -379,12 +372,12 @@ class AppLifecycleServiceTests {
                 "legacy_unscoped",
                 Instant.parse("2026-06-11T00:00:00Z"),
                 Instant.parse("2026-06-11T00:00:00Z")));
-        repository.saveSettings("vaultwarden", new InstallSettings(
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
                 java.util.Map.of(),
-                BackupPolicy.defaults(),
+                InstallModels.BackupPolicy.defaults(),
                 "local",
                 "optional",
                 8090,
@@ -394,7 +387,7 @@ class AppLifecycleServiceTests {
                 null,
                 null,
                 true));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -406,7 +399,7 @@ class AppLifecycleServiceTests {
         guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
         guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
 
-        InstallSettings settings = repository.settingsFor("vaultwarden").orElseThrow();
+        InstallModels.InstallSettings settings = repository.settingsFor("vaultwarden").orElseThrow();
         assertThat(settings.lastRepairAttemptAt()).isNotNull();
         assertThat(settings.lastRepairStatus()).isEqualTo("guardian_repair_blocked");
         assertThat(composeExecutor.restartCalled).isFalse();
@@ -417,7 +410,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void reliabilitySummaryHighlightsIssuesAndRepairActivity() {
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -427,7 +420,7 @@ class AppLifecycleServiceTests {
         service.healthSnapshot("vaultwarden");
         repository.recordEvent("vaultwarden", "guardian_repair_failed", "Docker did not restart the app.");
 
-        AppReliabilitySummary summary = service.reliabilitySummary();
+        ReliabilityModels.AppReliabilitySummary summary = service.reliabilitySummary();
 
         assertThat(summary.posture()).isEqualTo("warning");
         assertThat(summary.needsAttentionApps()).isEqualTo(1);
@@ -442,12 +435,12 @@ class AppLifecycleServiceTests {
 
     @Test
     void runtimeViewExposesCanonicalRemediationState() {
-        repository.saveSettings("vaultwarden", new InstallSettings(
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
                 java.util.Map.of(),
-                BackupPolicy.defaults(),
+                InstallModels.BackupPolicy.defaults(),
                 "local",
                 "optional",
                 8090,
@@ -457,7 +450,7 @@ class AppLifecycleServiceTests {
                 Instant.parse("2026-06-20T12:05:00Z"),
                 "guardian_repair_running",
                 true));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -474,12 +467,12 @@ class AppLifecycleServiceTests {
 
     @Test
     void runtimeViewOnlyRecommendsRestoreWhenCompletedRestorePointExists() {
-        repository.saveSettings("vaultwarden", new InstallSettings(
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
                 java.util.Map.of(),
-                new BackupPolicy(true, "daily", 7),
+                new InstallModels.BackupPolicy(true, "daily", 7),
                 "local",
                 "optional",
                 8090,
@@ -489,7 +482,7 @@ class AppLifecycleServiceTests {
                 Instant.parse("2026-06-20T12:05:00Z"),
                 "guardian_repair_failed",
                 true));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -512,7 +505,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void runningContainerIsReadyEvenWhenRawStatusMentionsCreatedTime() {
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -540,7 +533,7 @@ class AppLifecycleServiceTests {
     @Test
     void refreshCorrectsStaleAccessUrlFromDockerJsonEscapedPorts() {
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "https://vault.home", Instant.parse("2026-06-11T00:00:00Z")));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -566,7 +559,7 @@ class AppLifecycleServiceTests {
                 "autark-os-gitea",
                 "http://localhost:2222",
                 Instant.parse("2026-06-11T00:00:00Z")));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-gitea",
                 "gitea",
                 "running",
@@ -593,7 +586,7 @@ class AppLifecycleServiceTests {
                 "autark-os-private-worker",
                 null,
                 Instant.parse("2026-06-11T00:00:00Z")));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-private-worker",
                 "private-worker",
                 "running",
@@ -611,12 +604,12 @@ class AppLifecycleServiceTests {
                 true,
                 null,
                 backupRepository);
-        repository.saveSettings("private-worker", new InstallSettings(
+        repository.saveSettings("private-worker", new InstallModels.InstallSettings(
                 null,
                 "https://autark-os-dev.tailnet.local:8090",
                 true,
                 java.util.Map.of(),
-                BackupPolicy.defaults()));
+                InstallModels.BackupPolicy.defaults()));
 
         AppHealthSnapshot snapshot = devService.healthSnapshot("private-worker");
 
@@ -640,12 +633,12 @@ class AppLifecycleServiceTests {
 
     @Test
     void refreshDoesNotUsePrivateLinkWhenItConflictsWithTheLocalHttpPort() {
-        repository.saveSettings("vaultwarden", new InstallSettings(
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 "https://autark-os.example.ts.net:8090",
                 true,
                 java.util.Map.of(),
-                BackupPolicy.defaults()));
+                InstallModels.BackupPolicy.defaults()));
 
         AppRuntimeView app = service.getApp("vaultwarden");
 
@@ -656,12 +649,12 @@ class AppLifecycleServiceTests {
 
     @Test
     void repairRecreatesPrivateAccessWhenStoredPrivateLinkConflictsWithLocalHttpPort() {
-        repository.saveSettings("vaultwarden", new InstallSettings(
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 "https://autark-os.example.ts.net:8090",
                 true,
                 java.util.Map.of(),
-                BackupPolicy.defaults(),
+                InstallModels.BackupPolicy.defaults(),
                 "private",
                 "optional",
                 8090,
@@ -701,7 +694,7 @@ class AppLifecycleServiceTests {
                 repository,
                 composeExecutor,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                () -> List.of(new ManagedContainer("vaultwarden", "autark-os-vaultwarden", "Up 2 minutes (healthy)")),
+                () -> List.of(new RuntimeModels.ManagedContainer("vaultwarden", "autark-os-vaultwarden", "Up 2 minutes (healthy)")),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService(),
@@ -719,7 +712,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void uninstallPlanKeepsDataByDefault() {
-        UninstallPlan plan = service.uninstallPlan("vaultwarden");
+        InstallModels.UninstallPlan plan = service.uninstallPlan("vaultwarden");
 
         assertThat(plan.willStop()).contains("Remove the Compose project");
         assertThat(plan.willKeep()).anySatisfy(item -> assertThat(item).contains("apps/vaultwarden"));
@@ -762,12 +755,12 @@ class AppLifecycleServiceTests {
 
     @Test
     void updateSettingsPersistsValidatedUserPreferences() {
-        AppRuntimeView app = service.updateSettings("vaultwarden", new InstallSettings(
+        AppRuntimeView app = service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 true,
                 java.util.Map.of(),
-                new BackupPolicy(true, "weekly", 14)));
+                new InstallModels.BackupPolicy(true, "weekly", 14)));
 
         assertThat(app.settings().tailscaleEnabled()).isTrue();
         assertThat(app.settings().backup().frequency()).isEqualTo("weekly");
@@ -789,7 +782,7 @@ class AppLifecycleServiceTests {
                 "autark-os-obsidian-livesync",
                 "http://localhost:5984",
                 Instant.parse("2026-06-11T00:00:00Z")));
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "obsidian-livesync",
                 "appinst_obsidian_livesync",
                 "obsidian-livesync",
@@ -800,12 +793,12 @@ class AppLifecycleServiceTests {
                 Instant.parse("2026-06-11T00:00:00Z"),
                 Instant.parse("2026-06-11T00:00:00Z")));
 
-        AppRuntimeView app = service.updateSettings("obsidian-livesync", new InstallSettings(
+        AppRuntimeView app = service.updateSettings("obsidian-livesync", new InstallModels.InstallSettings(
                 "http://localhost:5984",
                 null,
                 false,
                 java.util.Map.of(),
-                BackupPolicy.defaults()));
+                InstallModels.BackupPolicy.defaults()));
 
         assertThat(app.settings().tailscaleEnabled()).isFalse();
         assertThat(app.settings().privateAccessRequirement()).isEqualTo("recommended");
@@ -814,34 +807,34 @@ class AppLifecycleServiceTests {
 
     @Test
     void settingsPlanBlocksStorageFolderChangesUntilMigrationExists() {
-        AppSettingsChangePlan plan = service.settingsChangePlan("vaultwarden", new InstallSettings(
+        InstallModels.AppSettingsChangePlan plan = service.settingsChangePlan("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
                 java.util.Map.of("data", "vault-data"),
-                BackupPolicy.defaults()));
+                InstallModels.BackupPolicy.defaults()));
 
         assertThat(plan.saveAllowed()).isFalse();
         assertThat(plan.dataMigrationRequired()).isTrue();
         assertThat(plan.blockedReasons()).anyMatch(reason -> reason.contains("guarded data migration"));
-        assertThatThrownBy(() -> service.updateSettings("vaultwarden", new InstallSettings(
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
                 java.util.Map.of("data", "vault-data"),
-                BackupPolicy.defaults())))
+                InstallModels.BackupPolicy.defaults())))
                 .hasMessageContaining("guarded data migration");
     }
 
     @Test
     void changingLocalPortRendersComposeAndRestartsApp() throws Exception {
-        AppSettingsChangePlan plan = service.settingsChangePlan("vaultwarden", new InstallSettings(
+        InstallModels.AppSettingsChangePlan plan = service.settingsChangePlan("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:19090",
                 null,
                 false,
                 java.util.Map.of(),
-                BackupPolicy.defaults()));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+                InstallModels.BackupPolicy.defaults()));
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -849,12 +842,12 @@ class AppLifecycleServiceTests {
                 "Up 1 second (healthy)",
                 "0.0.0.0:19090->80/tcp"));
 
-        AppRuntimeView app = service.updateSettings("vaultwarden", new InstallSettings(
+        AppRuntimeView app = service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:19090",
                 null,
                 false,
                 java.util.Map.of(),
-                BackupPolicy.defaults()));
+                InstallModels.BackupPolicy.defaults()));
 
         assertThat(plan.redeployRequired()).isTrue();
         assertThat(app.accessUrl()).isEqualTo("http://localhost:19090");
@@ -867,7 +860,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void changingLocalPortKeepsOwnedAppVisibleInRuntimeList() {
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -875,12 +868,12 @@ class AppLifecycleServiceTests {
                 "Up 1 second (healthy)",
                 "0.0.0.0:19090->80/tcp"));
 
-        service.updateSettings("vaultwarden", new InstallSettings(
+        service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:19090",
                 null,
                 false,
                 java.util.Map.of(),
-                BackupPolicy.defaults()));
+                InstallModels.BackupPolicy.defaults()));
 
         assertThat(service.listApps())
                 .extracting(AppRuntimeView::appId)
@@ -920,7 +913,7 @@ class AppLifecycleServiceTests {
                 "autark-os-obsidian-livesync",
                 "http://localhost:5984",
                 Instant.parse("2026-06-11T00:00:00Z")));
-        composeExecutor.containers = List.of(new DockerContainerStatus(
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-obsidian-livesync",
                 "obsidian-livesync",
                 "running",
@@ -952,7 +945,7 @@ class AppLifecycleServiceTests {
     }
 
     private static class FakeLifecycleDockerComposeExecutor implements DockerComposeExecutor {
-        List<DockerContainerStatus> containers = List.of(new DockerContainerStatus(
+        List<RuntimeModels.DockerContainerStatus> containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
                 "vaultwarden",
                 "running",
@@ -967,46 +960,46 @@ class AppLifecycleServiceTests {
         String requiredProjectName;
 
         @Override
-        public DockerComposeResult up(Path composeFile, String projectName) {
+        public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
             upCalled = true;
             if (!failUpOutput.isEmpty()) {
-                return new DockerComposeResult(1, failUpOutput);
+                return new RuntimeModels.DockerComposeResult(1, failUpOutput);
             }
             if (transitionToStarting) {
                 containers = startingContainer();
             }
-            return new DockerComposeResult(0, List.of("started " + projectName));
+            return new RuntimeModels.DockerComposeResult(0, List.of("started " + projectName));
         }
 
         @Override
-        public DockerComposeResult stop(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of("stopped " + projectName));
+        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("stopped " + projectName));
         }
 
         @Override
-        public DockerComposeResult restart(Path composeFile, String projectName) {
+        public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
             restartCalled = true;
             if (transitionToStarting) {
                 containers = startingContainer();
             }
-            return new DockerComposeResult(0, List.of("restarted " + projectName));
+            return new RuntimeModels.DockerComposeResult(0, List.of("restarted " + projectName));
         }
 
         @Override
-        public DockerComposeResult down(Path composeFile, String projectName) {
+        public RuntimeModels.DockerComposeResult down(Path composeFile, String projectName) {
             if (failDown) {
-                return new DockerComposeResult(1, List.of("failed to remove " + projectName));
+                return new RuntimeModels.DockerComposeResult(1, List.of("failed to remove " + projectName));
             }
-            return new DockerComposeResult(0, List.of("removed " + projectName));
+            return new RuntimeModels.DockerComposeResult(0, List.of("removed " + projectName));
         }
 
         @Override
-        public DockerComposeResult ps(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of("NAME STATUS", projectName + " running healthy"));
+        public RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("NAME STATUS", projectName + " running healthy"));
         }
 
         @Override
-        public List<DockerContainerStatus> containers(Path composeFile, String projectName) {
+        public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
             if (requiredProjectName != null && !requiredProjectName.equals(projectName)) {
                 return List.of();
             }
@@ -1014,8 +1007,8 @@ class AppLifecycleServiceTests {
         }
 
         @Override
-        public List<ContainerTelemetry> stats(List<String> containerNames) {
-            return List.of(new ContainerTelemetry(
+        public List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames) {
+            return List.of(new RuntimeModels.ContainerTelemetry(
                     "autark-os-vaultwarden",
                     "1.25%",
                     "96MiB / 2GiB",
@@ -1024,8 +1017,8 @@ class AppLifecycleServiceTests {
                     "4MB / 1MB"));
         }
 
-        private List<DockerContainerStatus> startingContainer() {
-            return List.of(new DockerContainerStatus(
+        private List<RuntimeModels.DockerContainerStatus> startingContainer() {
+            return List.of(new RuntimeModels.DockerContainerStatus(
                     "autark-os-vaultwarden",
                     "vaultwarden",
                     "running",

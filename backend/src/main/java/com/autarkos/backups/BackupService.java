@@ -15,18 +15,17 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
-import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
-import com.autarkos.marketplace.install.AppRemediationView;
-import com.autarkos.marketplace.install.BackupPolicy;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.AppLifecycleService;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ReliabilityModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettings;
 import com.autarkos.system.ProjectSettingsRepository;
@@ -70,7 +69,7 @@ public class BackupService {
                         null,
                         List.of(),
                         List.of(),
-                        new AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
+                        new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
                 .toList(), new RuntimeFileOperations());
     }
@@ -141,7 +140,7 @@ public class BackupService {
     public BackupModels.BackupRunResult runFullBackup(String source) {
         List<InstalledApp> apps = managedInstalledApps();
         List<InstalledApp> protectedApps = apps.stream()
-                .filter(app -> installedAppRepository.settingsFor(app.appId()).map(InstallSettings::backup).orElse(BackupPolicy.defaults()).enabled())
+                .filter(app -> installedAppRepository.settingsFor(app.appId()).map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults()).enabled())
                 .toList();
         if (protectedApps.isEmpty()) {
             RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, "No apps are currently eligible for backup.");
@@ -181,9 +180,9 @@ public class BackupService {
         InstalledApp app = installedAppRepository.findAppById(appId)
                 .orElseThrow(() -> new InstallationException("App is not installed: " + appId));
         Path source = Path.of(app.runtimePath()).toAbsolutePath().normalize();
-        BackupPolicy policy = installedAppRepository.settingsFor(appId)
-                .map(InstallSettings::backup)
-                .orElse(BackupPolicy.defaults());
+        InstallModels.BackupPolicy policy = installedAppRepository.settingsFor(appId)
+                .map(InstallModels.InstallSettings::backup)
+                .orElse(InstallModels.BackupPolicy.defaults());
         if (!policy.enabled()) {
             RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, "Backups are turned off for this app.");
             return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());

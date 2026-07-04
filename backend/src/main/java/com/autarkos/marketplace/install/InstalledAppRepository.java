@@ -41,14 +41,14 @@ public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity
         deleteById(appId);
     }
 
-    default void saveOwnershipMetadata(InstalledAppOwnershipMetadata metadata) {
+    default void saveOwnershipMetadata(RuntimeModels.InstalledAppOwnershipMetadata metadata) {
         findById(metadata.appId()).ifPresent(entity -> {
             entity.updateOwnership(metadata);
             save(entity);
         });
     }
 
-    default Optional<InstalledAppOwnershipMetadata> ownershipFor(String appId) {
+    default Optional<RuntimeModels.InstalledAppOwnershipMetadata> ownershipFor(String appId) {
         return findById(appId).map(InstalledApps::ownership);
     }
 
@@ -57,7 +57,7 @@ public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity
     @Query("update InstalledAppEntity app set app.status = :status where app.appId = :appId")
     void updateStatus(@Param("appId") String appId, @Param("status") String status);
 
-    default void saveSettings(String appId, InstallSettings settings) {
+    default void saveSettings(String appId, InstallModels.InstallSettings settings) {
         upsertSettings(
                 appId,
                 settings.accessUrl(),
@@ -156,7 +156,7 @@ public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity
             @Param("lastRepairStatus") String lastRepairStatus,
             @Param("autoRepairEnabled") int autoRepairEnabled);
 
-    default Optional<InstallSettings> settingsFor(String appId) {
+    default Optional<InstallModels.InstallSettings> settingsFor(String appId) {
         return settingsRowFor(appId).map(InstalledApps::settings);
     }
 

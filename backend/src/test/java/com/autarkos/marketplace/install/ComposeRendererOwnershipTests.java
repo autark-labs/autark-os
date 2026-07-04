@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -33,7 +34,7 @@ class ComposeRendererOwnershipTests {
         Path compose = renderer.render(
                 manifest,
                 runtimeLayout.appRoot(manifest.id()),
-                new ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()),
+                new RuntimeModels.ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()),
                 "appinst_vaultwarden",
                 composeProject);
 
@@ -59,7 +60,7 @@ class ComposeRendererOwnershipTests {
         Path compose = renderer.render(
                 manifest,
                 runtimeLayout.appRoot(manifest.id()),
-                new ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()),
+                new RuntimeModels.ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()),
                 "appinst_paperless",
                 composeProject);
 

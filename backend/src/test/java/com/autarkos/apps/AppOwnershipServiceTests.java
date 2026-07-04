@@ -22,14 +22,15 @@ import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.DockerOwnershipService;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.testsupport.RestorePointTestRecords;
-import com.autarkos.system.AutarkOsIdentity;
 
 class AppOwnershipServiceTests {
 
@@ -47,7 +48,7 @@ class AppOwnershipServiceTests {
                 "autarkos_current_vaultwarden",
                 "http://localhost:8090",
                 Instant.parse("2026-06-21T12:00:00Z")));
-        installedRepository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        installedRepository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
                 "appinst_vaultwarden",
                 "vaultwarden",
@@ -65,7 +66,7 @@ class AppOwnershipServiceTests {
                 "autarkos_other_jellyfin",
                 "http://localhost:8096",
                 Instant.parse("2026-06-21T12:00:00Z")));
-        installedRepository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        installedRepository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "jellyfin",
                 "appinst_jellyfin",
                 "jellyfin",
@@ -226,7 +227,7 @@ class AppOwnershipServiceTests {
                 "http://localhost:8090",
                 Instant.parse("2026-06-21T12:00:00Z"));
         repository.save(vaultwarden);
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
                 "appinst_vaultwarden",
                 "vaultwarden",
@@ -293,7 +294,7 @@ class AppOwnershipServiceTests {
                 "autark-os-homepage",
                 "http://localhost:3000",
                 Instant.parse("2026-06-21T12:00:00Z")));
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "homepage",
                 "appinst_homepage",
                 "homepage",

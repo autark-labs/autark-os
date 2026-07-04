@@ -1,7 +1,5 @@
 package com.autarkos.network.devices;
 
-import com.autarkos.network.api.DeviceTrustUpdateRequest;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -9,9 +7,9 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.marketplace.install.PrivateAccessReconciliationItem;
-import com.autarkos.marketplace.install.PrivateAccessReconciliationReport;
+import com.autarkos.marketplace.install.AccessModels;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
+import com.autarkos.network.api.DeviceTrustUpdateRequest;
 import com.autarkos.network.tailscale.TailscaleDevice;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
@@ -35,7 +33,7 @@ public class DeviceTrustService {
         Instant checkedAt = Instant.now();
         TailscaleStatus status = tailscaleService.status();
         List<TailscaleDevice> devices = tailscaleService.devices();
-        PrivateAccessReconciliationReport reconciliation = privateAccessReconciliationService.report();
+        AccessModels.PrivateAccessReconciliationReport reconciliation = privateAccessReconciliationService.report();
         Map<String, DeviceTrustMetadata> metadataById = repository.metadataByDeviceId();
         int expectedPrivateApps = reconciliation.apps().size();
         int healthyPrivateApps = (int) reconciliation.apps().stream()
@@ -101,7 +99,7 @@ public class DeviceTrustService {
         return new DeviceReachability("needs_attention", "Check links", "Autark-OS cannot verify any private app links from this host yet.", true, true, false, 0, expectedPrivateApps, checkedAt);
     }
 
-    private static boolean healthy(PrivateAccessReconciliationItem item) {
+    private static boolean healthy(AccessModels.PrivateAccessReconciliationItem item) {
         return "healthy".equalsIgnoreCase(item.status());
     }
 

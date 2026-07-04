@@ -16,7 +16,7 @@ public class AppRuntimeMetadataReader {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public Optional<AppRuntimeMetadata> read(Path appRoot) {
+    public Optional<RuntimeModels.AppRuntimeMetadata> read(Path appRoot) {
         if (appRoot == null) {
             return Optional.empty();
         }
@@ -34,7 +34,7 @@ public class AppRuntimeMetadataReader {
             if (catalogAppId.isBlank() || composeProject.isBlank()) {
                 return Optional.empty();
             }
-            return Optional.of(new AppRuntimeMetadata(
+            return Optional.of(new RuntimeModels.AppRuntimeMetadata(
                     appInstanceId,
                     catalogAppId,
                     instanceId,

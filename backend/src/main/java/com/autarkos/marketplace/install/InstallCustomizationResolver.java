@@ -1,7 +1,5 @@
 package com.autarkos.marketplace.install;
 
-import com.autarkos.marketplace.api.InstallOptionsRequest;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -10,6 +8,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Component
@@ -23,11 +22,11 @@ public class InstallCustomizationResolver {
         this.portAllocator = portAllocator;
     }
 
-    public ResolvedRuntimeConfiguration resolve(ApplicationManifest manifest, InstallOptionsRequest request) {
+    public RuntimeModels.ResolvedRuntimeConfiguration resolve(ApplicationManifest manifest, InstallOptionsRequest request) {
         InstallOptionsRequest options = request == null ? InstallOptionsRequest.defaults() : request;
         Map<String, List<String>> servicePorts = portAllocator.resolveServicePorts(manifest, options.ports());
         List<String> ports = servicePorts.values().stream().flatMap(List::stream).toList();
-        return new ResolvedRuntimeConfiguration(
+        return new RuntimeModels.ResolvedRuntimeConfiguration(
                 ports,
                 servicePorts,
                 portAllocator.accessUrl(manifest, ports),
@@ -68,9 +67,9 @@ public class InstallCustomizationResolver {
         return safeHostPaths;
     }
 
-    private BackupPolicy backupPolicy(InstallOptionsRequest.BackupOptions backup) {
+    private InstallModels.BackupPolicy backupPolicy(InstallOptionsRequest.BackupOptions backup) {
         if (backup == null) {
-            return BackupPolicy.defaults();
+            return InstallModels.BackupPolicy.defaults();
         }
         boolean enabled = backup.enabled() == null || backup.enabled();
         String frequency = backup.frequency() == null || backup.frequency().isBlank() ? "daily" : backup.frequency().trim().toLowerCase();
@@ -81,7 +80,7 @@ public class InstallCustomizationResolver {
         if (retention < 1 || retention > 90) {
             throw new InstallationException("Backup retention must be between 1 and 90.");
         }
-        return new BackupPolicy(enabled, frequency, retention);
+        return new InstallModels.BackupPolicy(enabled, frequency, retention);
     }
 
     private String safeName(String value, String label) {

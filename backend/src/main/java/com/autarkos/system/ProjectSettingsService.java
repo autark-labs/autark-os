@@ -9,8 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.marketplace.install.BackupPolicy;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 
@@ -62,10 +61,10 @@ public class ProjectSettingsService {
             return new ProjectSettingsAppDefaultsResult(false, "error", "App defaults unavailable", "Autark-OS cannot update app defaults in this runtime.", 0, Instant.now());
         }
         int updated = 0;
-        BackupPolicy backup = new BackupPolicy(sanitized.automaticBackupsEnabled(), sanitized.backupFrequency(), sanitized.backupRetentionDays());
+        InstallModels.BackupPolicy backup = new InstallModels.BackupPolicy(sanitized.automaticBackupsEnabled(), sanitized.backupFrequency(), sanitized.backupRetentionDays());
         for (InstalledApp app : installedAppRepository.findAllApps()) {
-            InstallSettings current = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
-            installedAppRepository.saveSettings(app.appId(), new InstallSettings(
+            InstallModels.InstallSettings current = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
+            installedAppRepository.saveSettings(app.appId(), new InstallModels.InstallSettings(
                     current.accessUrl(),
                     current.privateAccessUrl(),
                     current.tailscaleEnabled(),

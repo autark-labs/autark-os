@@ -6,6 +6,7 @@ import java.util.Map;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.discover.DiscoverSetupModels.DiscoverSetupAnswersRequest;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.plan.InstallPlan;
 
 public final class DiscoverInstallModels {

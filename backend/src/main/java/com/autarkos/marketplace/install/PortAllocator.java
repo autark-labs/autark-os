@@ -1,7 +1,5 @@
 package com.autarkos.marketplace.install;
 
-import com.autarkos.marketplace.api.InstallOptionsRequest;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -12,6 +10,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
 
@@ -20,9 +19,9 @@ public class PortAllocator {
 
     private static final int MAX_PORT = 65535;
 
-    public ResolvedRuntimeConfiguration resolve(ApplicationManifest manifest) {
+    public RuntimeModels.ResolvedRuntimeConfiguration resolve(ApplicationManifest manifest) {
         List<String> resolvedPorts = resolvePorts(manifest, null);
-        return new ResolvedRuntimeConfiguration(resolvedPorts, accessUrl(manifest, resolvedPorts));
+        return new RuntimeModels.ResolvedRuntimeConfiguration(resolvedPorts, accessUrl(manifest, resolvedPorts));
     }
 
     public List<String> resolvePorts(ApplicationManifest manifest, InstallOptionsRequest.PortOptions options) {

@@ -16,10 +16,10 @@ import com.autarkos.host.ObservedServiceService;
 import com.autarkos.host.ObservedServiceView;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.DockerOwnershipService;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Service
@@ -128,7 +128,7 @@ public class AppOwnershipService {
     }
 
     private String backupState(InstalledApp app) {
-        InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
+        InstallModels.InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         if (settings.backup() == null || !settings.backup().enabled()) {
             return AutarkOsStates.BackupState.DISABLED;
         }
@@ -143,11 +143,11 @@ public class AppOwnershipService {
     }
 
     private boolean ownershipCompatible(String appId) {
-        Optional<InstalledAppOwnershipMetadata> metadata = installedAppRepository.ownershipFor(appId);
+        Optional<RuntimeModels.InstalledAppOwnershipMetadata> metadata = installedAppRepository.ownershipFor(appId);
         if (metadata.isEmpty()) {
             return true;
         }
-        InstalledAppOwnershipMetadata ownership = metadata.get();
+        RuntimeModels.InstalledAppOwnershipMetadata ownership = metadata.get();
         if ("owned".equals(ownership.ownershipStatus())) {
             String instanceId = ownership.autarkOsInstanceId();
             return instanceId == null || instanceId.isBlank() || instanceId.equals(dockerOwnershipService.currentIdentity().instanceId());

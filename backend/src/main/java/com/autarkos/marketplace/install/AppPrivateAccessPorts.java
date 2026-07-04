@@ -15,7 +15,7 @@ final class AppPrivateAccessPorts {
     static int selectHttpsPort(String appId, int localPort, InstalledAppRepository repository) {
         Set<Integer> usedPorts = usedPorts(appId, repository);
         Integer existingPrivatePort = repository.settingsFor(appId)
-                .map(InstallSettings::privateAccessUrl)
+                .map(InstallModels.InstallSettings::privateAccessUrl)
                 .map(AppPrivateAccessPorts::portFromUrl)
                 .filter(port -> port != null && port != localPort && !usedPorts.contains(port))
                 .orElse(null);

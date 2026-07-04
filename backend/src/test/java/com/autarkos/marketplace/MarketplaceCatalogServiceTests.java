@@ -10,6 +10,7 @@ import com.autarkos.discover.DiscoverController;
 import com.autarkos.discover.DiscoverInstallModels;
 import com.autarkos.discover.DiscoverSetupModels;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.plan.InstallPlan;
 import com.autarkos.marketplace.plan.InstallPlanService;

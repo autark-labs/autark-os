@@ -33,14 +33,14 @@ public class ComposeRenderer {
     }
 
     public Path render(ApplicationManifest manifest, Path appRoot) {
-        return render(manifest, appRoot, new ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()));
+        return render(manifest, appRoot, new RuntimeModels.ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()));
     }
 
-    public Path render(ApplicationManifest manifest, Path appRoot, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    public Path render(ApplicationManifest manifest, Path appRoot, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         return render(manifest, appRoot, runtimeConfiguration, "", "");
     }
 
-    public Path render(ApplicationManifest manifest, Path appRoot, ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
+    public Path render(ApplicationManifest manifest, Path appRoot, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
         String compose = composeYaml(manifest, runtimeConfiguration, appInstanceId, composeProject);
         Path composePath = appRoot.resolve("compose.yaml");
         try {
@@ -52,7 +52,7 @@ public class ComposeRenderer {
         }
     }
 
-    private String composeYaml(ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
+    private String composeYaml(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
         StringBuilder yaml = new StringBuilder();
         yaml.append("services:\n");
         if (manifest.runtime().multiService()) {
@@ -73,7 +73,7 @@ public class ComposeRenderer {
         return yaml.toString();
     }
 
-    private void appendLegacyService(StringBuilder yaml, ApplicationManifest manifest, ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
+    private void appendLegacyService(StringBuilder yaml, ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
         yaml.append("  ").append(manifest.runtime().containerName()).append(":\n");
         yaml.append("    image: ").append(manifest.runtime().image()).append("\n");
         yaml.append("    container_name: ").append(containerName(manifest, composeProject)).append("\n");
@@ -85,7 +85,7 @@ public class ComposeRenderer {
         appendLabels(yaml, labels(manifest, manifest.runtime().labels(), appInstanceId, composeProject));
     }
 
-    private void appendService(StringBuilder yaml, ApplicationManifest manifest, RuntimeServiceManifest service, List<String> servicePorts, ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
+    private void appendService(StringBuilder yaml, ApplicationManifest manifest, RuntimeServiceManifest service, List<String> servicePorts, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {
         yaml.append("  ").append(service.name()).append(":\n");
         yaml.append("    image: ").append(service.image()).append("\n");
         yaml.append("    container_name: ").append(containerName(service, composeProject)).append("\n");
@@ -103,7 +103,7 @@ public class ComposeRenderer {
         appendLabels(yaml, labels(manifest, serviceLabels(manifest, service), appInstanceId, composeProject));
     }
 
-    private List<String> servicePorts(ResolvedRuntimeConfiguration runtimeConfiguration, RuntimeServiceManifest service, int serviceIndex) {
+    private List<String> servicePorts(RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration, RuntimeServiceManifest service, int serviceIndex) {
         List<String> ports = runtimeConfiguration.portsFor(service.name());
         if (!ports.isEmpty() || !runtimeConfiguration.servicePorts().isEmpty()) {
             return ports;
@@ -129,7 +129,7 @@ public class ComposeRenderer {
         }
     }
 
-    private void appendVolumes(StringBuilder yaml, ApplicationManifest manifest, List<String> volumes, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    private void appendVolumes(StringBuilder yaml, ApplicationManifest manifest, List<String> volumes, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         if (!volumes.isEmpty()) {
             yaml.append("    volumes:\n");
             for (String volume : volumes) {
@@ -200,7 +200,7 @@ public class ComposeRenderer {
         return composeProject + "_" + service.name();
     }
 
-    private String rewriteVolume(ApplicationManifest manifest, String volume, ResolvedRuntimeConfiguration runtimeConfiguration) {
+    private String rewriteVolume(ApplicationManifest manifest, String volume, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         String[] parts = volume.split(":", 2);
         if (parts.length != 2) {
             return volume;

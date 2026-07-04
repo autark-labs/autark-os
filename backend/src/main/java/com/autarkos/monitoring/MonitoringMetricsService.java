@@ -8,7 +8,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
-import com.autarkos.marketplace.install.AppTelemetry;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.system.SystemMetrics;
 
 @Service
@@ -42,7 +42,7 @@ public class MonitoringMetricsService {
         enforceRetention();
     }
 
-    public void recordApps(Map<String, AppTelemetry> telemetryByAppId) {
+    public void recordApps(Map<String, RuntimeModels.AppTelemetry> telemetryByAppId) {
         if (telemetryByAppId == null || telemetryByAppId.isEmpty()) {
             return;
         }

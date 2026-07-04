@@ -40,13 +40,13 @@ public class PrivateAccessReconciliationService {
         this.tailscaleService = tailscaleService;
     }
 
-    public PrivateAccessReconciliationReport report() {
+    public AccessModels.PrivateAccessReconciliationReport report() {
         TailscaleStatus status = tailscaleService.status();
         List<AppRuntimeView> privateApps = runtimeApps.get().stream()
                 .filter(this::wantsPrivateAccess)
                 .toList();
         if (privateApps.isEmpty()) {
-            return new PrivateAccessReconciliationReport(
+            return new AccessModels.PrivateAccessReconciliationReport(
                     "healthy",
                     "No private app links to verify",
                     "Apps will appear here after private access is enabled.",
@@ -62,13 +62,13 @@ public class PrivateAccessReconciliationService {
         }
 
         TailscaleServeConfig config = tailscaleService.serveConfig();
-        List<PrivateAccessReconciliationItem> items = privateApps.stream()
+        List<AccessModels.PrivateAccessReconciliationItem> items = privateApps.stream()
                 .map(app -> reconcile(app, config))
                 .toList();
-        List<PrivateAccessStaleMapping> staleMappings = staleMappings(privateApps, config);
+        List<AccessModels.PrivateAccessStaleMapping> staleMappings = staleMappings(privateApps, config);
         boolean warning = items.stream().anyMatch(item -> !"healthy".equals(item.status())) || !staleMappings.isEmpty();
         long healthy = items.stream().filter(item -> "healthy".equals(item.status())).count();
-        return new PrivateAccessReconciliationReport(
+        return new AccessModels.PrivateAccessReconciliationReport(
                 warning ? "warning" : "healthy",
                 warning ? "Some private links need review" : "Private links are verified",
                 healthy + " of " + items.size() + " private app link(s) match Tailscale Serve."
@@ -100,9 +100,9 @@ public class PrivateAccessReconciliationService {
         return result;
     }
 
-    private PrivateAccessReconciliationReport unavailableReport(String status, String headline, String summary, List<AppRuntimeView> apps, String actionLabel) {
-        List<PrivateAccessReconciliationItem> items = apps.stream()
-                .map(app -> new PrivateAccessReconciliationItem(
+    private AccessModels.PrivateAccessReconciliationReport unavailableReport(String status, String headline, String summary, List<AppRuntimeView> apps, String actionLabel) {
+        List<AccessModels.PrivateAccessReconciliationItem> items = apps.stream()
+                .map(app -> new AccessModels.PrivateAccessReconciliationItem(
                         app.appId(),
                         app.appName(),
                         "waiting",
@@ -122,10 +122,10 @@ public class PrivateAccessReconciliationService {
                         "Tailscale is not ready, so live Serve mappings were not inspected.",
                         null))
                 .toList();
-        return new PrivateAccessReconciliationReport(status, headline, summary, items, List.of(), Instant.now());
+        return new AccessModels.PrivateAccessReconciliationReport(status, headline, summary, items, List.of(), Instant.now());
     }
 
-    private PrivateAccessReconciliationItem reconcile(AppRuntimeView app, TailscaleServeConfig config) {
+    private AccessModels.PrivateAccessReconciliationItem reconcile(AppRuntimeView app, TailscaleServeConfig config) {
         Integer expectedPort = expectedPort(app);
         String expectedUrl = expectedPrivateUrl(app);
         Integer expectedHttpsPort = expectedHttpsPort(expectedUrl, expectedPort);
@@ -164,8 +164,8 @@ public class PrivateAccessReconciliationService {
         return item(app, "healthy", "Private link verified", "Tailscale Serve is routing this private link to the expected local app port.", null, expectedUrl, expectedPort, mapping.servePort(), mapping.target(), expectedHttpsPort, desiredMapping, liveMappings, "Live Serve mapping matches the expected local app port and private endpoint.");
     }
 
-    private PrivateAccessReconciliationItem item(AppRuntimeView app, String status, String message, String detail, String actionLabel, String expectedPrivateUrl, Integer expectedPort, Integer actualPort, String target, Integer expectedHttpsPort, String desiredMapping, List<String> liveMappings, String matchReason) {
-        return new PrivateAccessReconciliationItem(
+    private AccessModels.PrivateAccessReconciliationItem item(AppRuntimeView app, String status, String message, String detail, String actionLabel, String expectedPrivateUrl, Integer expectedPort, Integer actualPort, String target, Integer expectedHttpsPort, String desiredMapping, List<String> liveMappings, String matchReason) {
+        return new AccessModels.PrivateAccessReconciliationItem(
                 app.appId(),
                 app.appName(),
                 status,
@@ -291,7 +291,7 @@ public class PrivateAccessReconciliationService {
         return "";
     }
 
-    private List<PrivateAccessStaleMapping> staleMappings(List<AppRuntimeView> privateApps, TailscaleServeConfig config) {
+    private List<AccessModels.PrivateAccessStaleMapping> staleMappings(List<AppRuntimeView> privateApps, TailscaleServeConfig config) {
         if (!config.available() || "dev_mock".equals(config.status())) {
             return List.of();
         }
@@ -304,7 +304,7 @@ public class PrivateAccessReconciliationService {
                 .filter(mapping -> mapping.servePort() != null)
                 .filter(mapping -> autarkOsPorts.contains(mapping.servePort()))
                 .filter(mapping -> !expectedPorts.contains(mapping.servePort()))
-                .map(mapping -> new PrivateAccessStaleMapping(
+                .map(mapping -> new AccessModels.PrivateAccessStaleMapping(
                         mapping.serviceName() == null || mapping.serviceName().isBlank()
                                 ? "port-" + mapping.servePort()
                                 : mapping.serviceName() + "-" + mapping.servePort(),

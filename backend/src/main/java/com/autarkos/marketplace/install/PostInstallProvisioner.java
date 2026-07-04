@@ -34,24 +34,24 @@ public class PostInstallProvisioner {
         this.httpClient = httpClient;
     }
 
-    public PostInstallProvisioningResult provision(ApplicationManifest manifest, String accessUrl) {
+    public GuideModels.PostInstallProvisioningResult provision(ApplicationManifest manifest, String accessUrl) {
         if ("obsidian-livesync".equals(manifest.id())) {
             return provisionObsidianLiveSync(manifest, accessUrl);
         }
-        return PostInstallProvisioningResult.empty();
+        return GuideModels.PostInstallProvisioningResult.empty();
     }
 
-    private PostInstallProvisioningResult provisionObsidianLiveSync(ApplicationManifest manifest, String accessUrl) {
+    private GuideModels.PostInstallProvisioningResult provisionObsidianLiveSync(ApplicationManifest manifest, String accessUrl) {
         Map<String, String> environment = environment(manifest);
         String username = environment.getOrDefault("COUCHDB_USER", "autarkos");
         String password = environment.getOrDefault("COUCHDB_PASSWORD", "");
         List<String> logs = new ArrayList<>();
-        List<InstallStep> steps = new ArrayList<>();
+        List<InstallModels.InstallStep> steps = new ArrayList<>();
 
         if (password.isBlank()) {
             String detail = "CouchDB credentials were not available, so Autark-OS could not finish Obsidian LiveSync setup.";
-            steps.add(InstallStep.failed("Preparing Obsidian sync", detail));
-            return new PostInstallProvisioningResult(steps, logs, Map.of(
+            steps.add(InstallModels.InstallStep.failed("Preparing Obsidian sync", detail));
+            return new GuideModels.PostInstallProvisioningResult(steps, logs, Map.of(
                     "username", username,
                     "database", OBSIDIAN_DATABASE));
         }
@@ -71,12 +71,12 @@ public class PostInstallProvisioner {
         putConfig(accessUrl, username, password, "cors", "headers", "accept, authorization, content-type, origin, referer", logs);
         createDatabase(accessUrl, username, password, OBSIDIAN_DATABASE, logs);
 
-        steps.add(InstallStep.completed("Preparing Obsidian sync", "Created the sync database and enabled browser access for the Obsidian plugin."));
+        steps.add(InstallModels.InstallStep.completed("Preparing Obsidian sync", "Created the sync database and enabled browser access for the Obsidian plugin."));
         Map<String, String> values = new LinkedHashMap<>();
         values.put("username", username);
         values.put("password", password);
         values.put("database", OBSIDIAN_DATABASE);
-        return new PostInstallProvisioningResult(steps, logs, values);
+        return new GuideModels.PostInstallProvisioningResult(steps, logs, values);
     }
 
     private void waitForCouchDb(String accessUrl, String username, String password, List<String> logs) {

@@ -18,9 +18,9 @@ import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppUpdateService;
-import com.autarkos.marketplace.install.AppUpdateStatus;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.UpdateModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettingsRepository;
@@ -51,7 +51,7 @@ class AppUpdateServiceCanonicalAppTests {
                 () -> List.of(appInstance("homepage")));
 
         assertThat(service.statuses())
-                .extracting(AppUpdateStatus::appId)
+                .extracting(UpdateModels.AppUpdateStatus::appId)
                 .containsExactly("homepage");
     }
 

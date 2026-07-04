@@ -14,8 +14,7 @@ import java.util.function.Supplier;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.BackupPolicy;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.model.ApplicationManifest;
@@ -132,8 +131,8 @@ class BackupReportService {
     }
 
     private BackupModels.AppBackupStatus appStatus(InstalledApp app, Map<String, ApplicationManifest> manifestsById) {
-        Optional<InstallSettings> settings = installedAppRepository.settingsFor(app.appId());
-        BackupPolicy policy = settings.map(InstallSettings::backup).orElse(BackupPolicy.defaults());
+        Optional<InstallModels.InstallSettings> settings = installedAppRepository.settingsFor(app.appId());
+        InstallModels.BackupPolicy policy = settings.map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults());
         List<RestorePoint> restorePoints = backupRepository.forApp(app.appId(), 5).stream()
                 .map(RestorePoints::toDomain)
                 .toList();
@@ -158,7 +157,7 @@ class BackupReportService {
                 Instant.now());
     }
 
-    private String appBackupStatus(BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
+    private String appBackupStatus(InstallModels.BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
         if (!policy.enabled()) {
             return "unprotected";
         }
@@ -177,7 +176,7 @@ class BackupReportService {
         return "not_backed_up";
     }
 
-    private String statusMessage(BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
+    private String statusMessage(InstallModels.BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
         if (!policy.enabled()) {
             return "Backups are off.";
         }
@@ -235,7 +234,7 @@ class BackupReportService {
         }
     }
 
-    private String nextBackup(BackupPolicy policy) {
+    private String nextBackup(InstallModels.BackupPolicy policy) {
         if (!policy.enabled()) {
             return "Not scheduled";
         }

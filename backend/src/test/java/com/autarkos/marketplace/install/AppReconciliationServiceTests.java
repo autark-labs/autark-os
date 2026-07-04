@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
@@ -27,7 +28,7 @@ class AppReconciliationServiceTests {
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
         AppReconciliationService service = service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes (healthy)", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes (healthy)", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
         assertThat(service.reconcile())
                 .singleElement()
@@ -59,7 +60,7 @@ class AppReconciliationServiceTests {
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
 
         assertThat(service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autark-os-vaultwarden", "Up 2 minutes", DockerResourceOwnership.LEGACY_UNSCOPED, "", ""))).reconcile())
+                new RuntimeModels.ManagedContainer("vaultwarden", "autark-os-vaultwarden", "Up 2 minutes", DockerResourceOwnership.LEGACY_UNSCOPED, "", ""))).reconcile())
                 .singleElement()
                 .satisfies(item -> {
                     assertThat(item.status()).isEqualTo("Needs attention");
@@ -68,7 +69,7 @@ class AppReconciliationServiceTests {
                 });
 
         assertThat(service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_other_vaultwarden", "Up 2 minutes", DockerResourceOwnership.FOREIGN, "appinst_other", "autarkos_other_vaultwarden"))).reconcile())
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_other_vaultwarden", "Up 2 minutes", DockerResourceOwnership.FOREIGN, "appinst_other", "autarkos_other_vaultwarden"))).reconcile())
                 .singleElement()
                 .satisfies(item -> {
                     assertThat(item.status()).isEqualTo("Managed elsewhere");
@@ -82,7 +83,7 @@ class AppReconciliationServiceTests {
         InstalledAppRepository repository = repository();
 
         assertThat(service(repository, List.of(
-                new ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden"))).reconcile())
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden"))).reconcile())
                 .singleElement()
                 .satisfies(item -> {
                     assertThat(item.status()).isEqualTo("Needs setup");
@@ -91,7 +92,7 @@ class AppReconciliationServiceTests {
         assertThat(repository.findAppById("vaultwarden")).isEmpty();
     }
 
-    private AppReconciliationService service(InstalledAppRepository repository, List<ManagedContainer> containers) {
+    private AppReconciliationService service(InstalledAppRepository repository, List<RuntimeModels.ManagedContainer> containers) {
         return new AppReconciliationService(
                 repository,
                 () -> containers,
@@ -108,8 +109,8 @@ class AppReconciliationServiceTests {
         return new InstalledApp(appId, appId, status, runtimeRoot.resolve("apps").resolve(appId).toString(), "autarkos_homelab-box_" + appId, "http://localhost:8090", Instant.parse("2026-06-20T12:00:00Z"));
     }
 
-    private InstalledAppOwnershipMetadata owned(String appId, String state) {
-        return new InstalledAppOwnershipMetadata(
+    private RuntimeModels.InstalledAppOwnershipMetadata owned(String appId, String state) {
+        return new RuntimeModels.InstalledAppOwnershipMetadata(
                 appId,
                 "appinst_" + appId,
                 appId,

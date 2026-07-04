@@ -15,23 +15,19 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.activity.ActivityLogRepository;
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppLifecycleService;
-import com.autarkos.marketplace.install.BackupPolicy;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
-import com.autarkos.marketplace.install.DockerComposeResult;
-import com.autarkos.marketplace.install.DockerContainerStatus;
-import com.autarkos.marketplace.install.InstallSettings;
+import com.autarkos.marketplace.install.InstallModels;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.InstalledAppOwnershipMetadata;
 import com.autarkos.marketplace.install.PostInstallGuideBuilder;
-import com.autarkos.marketplace.install.ContainerTelemetry;
+import com.autarkos.marketplace.install.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleService;
@@ -56,8 +52,8 @@ class BackupServiceCanonicalAppTests {
         InstalledApp staleVaultwarden = installed("vaultwarden", "Vaultwarden", runtimeLayout);
         installedRepository.save(homepage);
         installedRepository.save(staleVaultwarden);
-        installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
-        installedRepository.saveSettings("vaultwarden", new InstallSettings(staleVaultwarden.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        installedRepository.saveSettings("vaultwarden", new InstallModels.InstallSettings(staleVaultwarden.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
 
         BackupService service = new BackupService(
                 runtimeLayout,
@@ -85,7 +81,7 @@ class BackupServiceCanonicalAppTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
-        installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
 
         BackupModels.BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
 
@@ -107,7 +103,7 @@ class BackupServiceCanonicalAppTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
-        installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         RestorePointTestRecords.record(backupRepository, "homepage", "Homepage", "app", "manual", "homepage", "/backups/homepage.tar", "completed", 1024, "Backup completed.");
 
         BackupModels.BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
@@ -131,7 +127,7 @@ class BackupServiceCanonicalAppTests {
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
         saveOwned(installedRepository, homepage);
-        installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/autark-os-full-test.zip");
         Files.createDirectories(archive.getParent());
         writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
@@ -154,7 +150,7 @@ class BackupServiceCanonicalAppTests {
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
         saveOwned(installedRepository, homepage);
-        installedRepository.saveSettings("homepage", new InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new BackupPolicy(true, "daily", 7)));
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/autark-os-full-test.zip");
         Files.createDirectories(archive.getParent());
         writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
@@ -263,7 +259,7 @@ class BackupServiceCanonicalAppTests {
     }
 
     private void saveOwned(InstalledAppRepository repository, InstalledApp app) {
-        repository.saveOwnershipMetadata(new InstalledAppOwnershipMetadata(
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 app.appId(),
                 "appinst_" + app.appId(),
                 app.appId(),
@@ -283,45 +279,45 @@ class BackupServiceCanonicalAppTests {
 
     private static class NoopDockerComposeExecutor implements DockerComposeExecutor {
         @Override
-        public DockerComposeResult up(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult stop(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult restart(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult down(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult down(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public DockerComposeResult ps(Path composeFile, String projectName) {
-            return new DockerComposeResult(0, List.of());
+        public RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
         @Override
-        public List<DockerContainerStatus> containers(Path composeFile, String projectName) {
+        public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
             return List.of();
         }
 
         @Override
-        public List<ContainerTelemetry> stats(List<String> containerNames) {
+        public List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames) {
             return List.of();
         }
     }
 
     private static class FailingStartDockerComposeExecutor extends NoopDockerComposeExecutor {
         @Override
-        public DockerComposeResult up(Path composeFile, String projectName) {
-            return new DockerComposeResult(1, List.of("failed to bind host port 0.0.0.0:8080/tcp: address already in use"));
+        public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(1, List.of("failed to bind host port 0.0.0.0:8080/tcp: address already in use"));
         }
     }
 

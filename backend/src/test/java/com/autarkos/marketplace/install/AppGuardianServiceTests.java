@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.marketplace.install.InstallModels;
+import com.autarkos.marketplace.install.RuntimeModels;
 
 class AppGuardianServiceTests {
 
@@ -31,12 +33,12 @@ class AppGuardianServiceTests {
                 "http://localhost:8090",
                 Instant.parse("2026-06-21T12:00:00Z"));
         when(repository.findAllApps()).thenReturn(List.of(app));
-        when(repository.settingsFor("vaultwarden")).thenReturn(Optional.of(new InstallSettings(
+        when(repository.settingsFor("vaultwarden")).thenReturn(Optional.of(new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
                 false,
                 Map.of(),
-                BackupPolicy.defaults(),
+                InstallModels.BackupPolicy.defaults(),
                 "local",
                 "optional",
                 8090,
@@ -86,7 +88,7 @@ class AppGuardianServiceTests {
                 Instant.parse("2026-06-21T12:00:00Z"),
                 "Backups disabled",
                 null,
-                AppTelemetry.unavailable(),
+                RuntimeModels.AppTelemetry.unavailable(),
                 health,
                 null,
                 null,
