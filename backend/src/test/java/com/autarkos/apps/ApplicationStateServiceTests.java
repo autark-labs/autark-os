@@ -23,6 +23,7 @@ import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 import java.nio.file.Path;
 
@@ -586,7 +587,7 @@ class ApplicationStateServiceTests {
     }
 
     private ObservedServiceRepository repository() {
-        return new ObservedServiceRepository(runtimeLayout());
+        return JpaTestRepositories.observedServiceRepository(runtimeLayout());
     }
 
     private RuntimeLayout runtimeLayout() {

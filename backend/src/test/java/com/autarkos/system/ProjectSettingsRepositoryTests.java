@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class ProjectSettingsRepositoryTests {
 
@@ -19,7 +20,7 @@ class ProjectSettingsRepositoryTests {
 
     @Test
     void savesSettingsValuesAndResolvesBackupDestination() {
-        ProjectSettingsRepository repository = new ProjectSettingsRepository(runtimeLayout());
+        ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout());
 
         repository.save(new ProjectSettings(
                 "autark-os-test",

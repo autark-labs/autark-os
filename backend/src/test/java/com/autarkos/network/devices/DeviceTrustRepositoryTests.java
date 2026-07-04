@@ -11,6 +11,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class DeviceTrustRepositoryTests {
 
@@ -19,13 +20,13 @@ class DeviceTrustRepositoryTests {
 
     @Test
     void upsertsAndReadsDeviceTrustMetadata() {
-        DeviceTrustRepository repository = new DeviceTrustRepository(runtimeLayout());
+        DeviceTrustRepository repository = JpaTestRepositories.deviceTrustRepository(runtimeLayout());
 
         repository.upsert("device-1", new DeviceTrustUpdateRequest("Jack's phone", "Personal", true, "Daily driver"));
         DeviceTrustMetadata updated = repository.upsert("device-1", new DeviceTrustUpdateRequest("Jack's phone", "Personal", false, "Temporarily blocked"));
 
         assertThat(updated.trusted()).isFalse();
-        assertThat(repository.findAll())
+        assertThat(repository.metadataByDeviceId())
                 .containsOnlyKeys("device-1")
                 .extractingByKey("device-1")
                 .satisfies(metadata -> {

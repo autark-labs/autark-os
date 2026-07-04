@@ -51,6 +51,7 @@ import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleServeResult;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.system.AutarkOsIdentity;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class MarketplaceInstallServiceTests {
 
@@ -285,7 +286,7 @@ class MarketplaceInstallServiceTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
-        ObservedServiceRepository observedRepository = new ObservedServiceRepository(runtimeLayout);
+        ObservedServiceRepository observedRepository = observedRepository(runtimeLayout);
         MarketplaceInstallService failedInstallService = installService(
                 runtimeLayout,
                 repository,
@@ -297,7 +298,7 @@ class MarketplaceInstallServiceTests {
 
         assertThat(failedResult.status()).isEqualTo("failed");
         assertThat(repository.findById("vaultwarden")).isEmpty();
-        assertThat(observedRepository.findAll())
+        assertThat(observedRepository.findAllServices())
                 .singleElement()
                 .satisfies(service -> {
                     assertThat(service.catalogAppId()).isEqualTo("vaultwarden");
@@ -318,7 +319,7 @@ class MarketplaceInstallServiceTests {
 
         assertThat(successfulResult.status()).isEqualTo("installed");
         assertThat(repository.findById("vaultwarden")).isPresent();
-        assertThat(observedRepository.findAll()).isEmpty();
+        assertThat(observedRepository.findAllServices()).isEmpty();
     }
 
     @Test
@@ -480,7 +481,7 @@ class MarketplaceInstallServiceTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
-        ObservedServiceRepository observedRepository = new ObservedServiceRepository(runtimeLayout);
+        ObservedServiceRepository observedRepository = observedRepository(runtimeLayout);
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));
         MarketplaceInstallService installService = installService(runtimeLayout, repository, observedRepository, null);
 
@@ -496,7 +497,7 @@ class MarketplaceInstallServiceTests {
         RuntimeLayout runtimeLayout = runtimeLayout();
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
-        ObservedServiceRepository observedRepository = new ObservedServiceRepository(runtimeLayout);
+        ObservedServiceRepository observedRepository = observedRepository(runtimeLayout);
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));
         MarketplaceInstallService installService = installService(runtimeLayout, new InstalledAppRepository(runtimeLayout), observedRepository, null);
 
@@ -511,7 +512,7 @@ class MarketplaceInstallServiceTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
-        ObservedServiceRepository observedRepository = new ObservedServiceRepository(runtimeLayout);
+        ObservedServiceRepository observedRepository = observedRepository(runtimeLayout);
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));
         MarketplaceInstallService installService = installService(runtimeLayout, repository, observedRepository, null);
 
@@ -527,7 +528,7 @@ class MarketplaceInstallServiceTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
-        ObservedServiceRepository observedRepository = new ObservedServiceRepository(runtimeLayout);
+        ObservedServiceRepository observedRepository = observedRepository(runtimeLayout);
         observedRepository.upsert(observed("docker:autark-os-vaultwarden", "vaultwarden", "legacy_autark_os", "observed"));
         MarketplaceInstallService installService = installService(runtimeLayout, repository, observedRepository, null);
 
@@ -547,7 +548,7 @@ class MarketplaceInstallServiceTests {
         MarketplaceInstallService installService = installService(
                 runtimeLayout,
                 repository,
-                new ObservedServiceRepository(runtimeLayout),
+                observedRepository(runtimeLayout),
                 new AppRuntimeMetadataWriter(
                         () -> new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                         () -> Instant.parse("2026-06-20T13:00:00Z")));
@@ -594,6 +595,10 @@ class MarketplaceInstallServiceTests {
                 null,
                 metadataWriter,
                 observedService);
+    }
+
+    private ObservedServiceRepository observedRepository(RuntimeLayout runtimeLayout) {
+        return JpaTestRepositories.observedServiceRepository(runtimeLayout);
     }
 
     private ObservedService observed(String id, String catalogAppId, String ownershipState, String visibility) {

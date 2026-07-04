@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettingsRepository;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class AdminSecurityServiceTests {
 
@@ -59,6 +60,6 @@ class AdminSecurityServiceTests {
     private AdminSecurityService service(boolean devMode) {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return new AdminSecurityService(new ProjectSettingsRepository(new RuntimeLayout(properties)), devMode);
+        return new AdminSecurityService(JpaTestRepositories.projectSettingsRepository(new RuntimeLayout(properties)), devMode);
     }
 }

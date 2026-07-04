@@ -22,9 +22,13 @@ import org.springframework.transaction.PlatformTransactionManager;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.database.AutarkOsDataSourceConfiguration;
 import com.autarkos.database.AutarkOsDatabase;
+import com.autarkos.discover.DiscoverSetupRepository;
+import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.jobs.AutarkOsJobRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.network.devices.DeviceTrustRepository;
+import com.autarkos.system.ProjectSettingsRepository;
 
 public final class JpaTestRepositories {
 
@@ -41,6 +45,22 @@ public final class JpaTestRepositories {
         return context(layout).getBean(AutarkOsJobRepository.class);
     }
 
+    public static ProjectSettingsRepository projectSettingsRepository(RuntimeLayout layout) {
+        return context(layout).getBean(ProjectSettingsRepository.class);
+    }
+
+    public static DeviceTrustRepository deviceTrustRepository(RuntimeLayout layout) {
+        return context(layout).getBean(DeviceTrustRepository.class);
+    }
+
+    public static DiscoverSetupRepository discoverSetupRepository(RuntimeLayout layout) {
+        return context(layout).getBean(DiscoverSetupRepository.class);
+    }
+
+    public static ObservedServiceRepository observedServiceRepository(RuntimeLayout layout) {
+        return context(layout).getBean(ObservedServiceRepository.class);
+    }
+
     private static ConfigurableApplicationContext context(RuntimeLayout layout) {
         String runtimeRoot = layout.runtimeRoot().toString();
         return CONTEXTS.computeIfAbsent(runtimeRoot, root -> new SpringApplicationBuilder(JpaRepositoryTestConfiguration.class)
@@ -49,7 +69,14 @@ public final class JpaTestRepositories {
     }
 
     @TestConfiguration
-    @EnableJpaRepositories(basePackageClasses = { BackupRepository.class, AutarkOsJobRepository.class })
+    @EnableJpaRepositories(basePackageClasses = {
+            BackupRepository.class,
+            AutarkOsJobRepository.class,
+            ProjectSettingsRepository.class,
+            DeviceTrustRepository.class,
+            DiscoverSetupRepository.class,
+            ObservedServiceRepository.class
+    })
     @Import(AutarkOsDataSourceConfiguration.class)
     static class JpaRepositoryTestConfiguration {
 
@@ -69,7 +96,13 @@ public final class JpaTestRepositories {
         LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource dataSource) {
             LocalContainerEntityManagerFactoryBean factory = new LocalContainerEntityManagerFactoryBean();
             factory.setDataSource(dataSource);
-            factory.setPackagesToScan("com.autarkos.backups", "com.autarkos.jobs");
+            factory.setPackagesToScan(
+                    "com.autarkos.backups",
+                    "com.autarkos.jobs",
+                    "com.autarkos.system",
+                    "com.autarkos.network.devices",
+                    "com.autarkos.discover",
+                    "com.autarkos.host");
             factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
             factory.setJpaPropertyMap(Map.of(
                     "hibernate.hbm2ddl.auto", "none",

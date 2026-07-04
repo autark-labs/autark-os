@@ -174,7 +174,7 @@ class DiscoverServiceTests {
 
     @Test
     void setupAnswersArePersistedWithInstallIntent() {
-        DiscoverSetupRepository setupRepository = new DiscoverSetupRepository(runtimeLayout());
+        DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(runtimeLayout());
         DiscoverSetupAnswers answers = new DiscoverSetupAnswers(Map.of(
                 "displayName", "Family Passwords",
                 "accessMode", "private_lan",
@@ -184,7 +184,7 @@ class DiscoverServiceTests {
 
         setupRepository.save("vaultwarden", "vaultwarden", answers);
 
-        assertThat(setupRepository.findByAppId("vaultwarden")).hasValueSatisfying(record -> {
+        assertThat(setupRepository.recordByAppId("vaultwarden")).hasValueSatisfying(record -> {
             assertThat(record.displayName()).isEqualTo("Family Passwords");
             assertThat(record.accessMode()).isEqualTo("private_lan");
             assertThat(record.backupPolicy()).isEqualTo("enabled_first_checkpoint");
@@ -208,7 +208,7 @@ class DiscoverServiceTests {
     @Test
     void installPersistsSetupAnswersBeforeStartingInstallJob() {
         RuntimeLayout layout = runtimeLayout();
-        DiscoverSetupRepository setupRepository = new DiscoverSetupRepository(layout);
+        DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
         DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         DiscoverService service = new DiscoverService(
@@ -226,7 +226,7 @@ class DiscoverServiceTests {
                 "backupPolicy", "enabled_first_checkpoint",
                 "localBrowserPort", "auto"), false, true));
 
-        assertThat(setupRepository.findByAppId("vaultwarden")).hasValueSatisfying(record -> {
+        assertThat(setupRepository.recordByAppId("vaultwarden")).hasValueSatisfying(record -> {
             assertThat(record.displayName()).isEqualTo("Family Passwords");
             assertThat(record.accessMode()).isEqualTo("private_lan");
             assertThat(record.backupPolicy()).isEqualTo("enabled_first_checkpoint");
@@ -236,7 +236,7 @@ class DiscoverServiceTests {
     @Test
     void installInvalidatesApplicationStateWhenJobIsAccepted() {
         RuntimeLayout layout = runtimeLayout();
-        DiscoverSetupRepository setupRepository = new DiscoverSetupRepository(layout);
+        DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
         DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
@@ -264,7 +264,7 @@ class DiscoverServiceTests {
     private DiscoverService discoverService(ObservedServiceRepository observedRepository) {
         RuntimeLayout layout = runtimeLayout();
         InstalledAppRepository installedAppRepository = repository();
-        DiscoverSetupRepository setupRepository = new DiscoverSetupRepository(layout);
+        DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
         DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
@@ -277,7 +277,7 @@ class DiscoverServiceTests {
     private DiscoverService discoverService(ObservedServiceRepository observedRepository, MarketplaceInstallService installService, AutarkOsJobService jobService) {
         RuntimeLayout layout = runtimeLayout();
         InstalledAppRepository installedAppRepository = repository();
-        DiscoverSetupRepository setupRepository = new DiscoverSetupRepository(layout);
+        DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
         DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
@@ -310,7 +310,7 @@ class DiscoverServiceTests {
     }
 
     private ObservedServiceRepository observedRepository() {
-        return new ObservedServiceRepository(runtimeLayout());
+        return JpaTestRepositories.observedServiceRepository(runtimeLayout());
     }
 
     private RuntimeLayout runtimeLayout() {

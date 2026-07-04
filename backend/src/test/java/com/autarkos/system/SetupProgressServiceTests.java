@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class SetupProgressServiceTests {
 
@@ -78,6 +79,6 @@ class SetupProgressServiceTests {
     private ProjectSettingsRepository repository() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return new ProjectSettingsRepository(new RuntimeLayout(properties));
+        return JpaTestRepositories.projectSettingsRepository(new RuntimeLayout(properties));
     }
 }

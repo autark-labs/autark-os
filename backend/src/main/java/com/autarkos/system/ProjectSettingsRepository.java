@@ -1,73 +1,33 @@
 package com.autarkos.system;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-import com.autarkos.database.DatabaseBackedRepository;
-import com.autarkos.database.AutarkOsDatabase;
-import com.autarkos.marketplace.install.InstallationException;
-import com.autarkos.marketplace.runtime.RuntimeLayout;
+public interface ProjectSettingsRepository extends JpaRepository<ProjectSettingEntity, String> {
 
-@Repository
-public class ProjectSettingsRepository extends DatabaseBackedRepository {
-
-    private final RuntimeLayout runtimeLayout;
-
-    @Autowired
-    public ProjectSettingsRepository(AutarkOsDatabase database, RuntimeLayout runtimeLayout) {
-        super(database);
-        this.runtimeLayout = runtimeLayout;
+    default Map<String, String> readAll() {
+        return findAll().stream()
+                .collect(Collectors.toMap(ProjectSettingEntity::settingKey, ProjectSettingEntity::settingValue));
     }
 
-    public ProjectSettingsRepository(RuntimeLayout runtimeLayout) {
-        this(new AutarkOsDatabase(runtimeLayout), runtimeLayout);
-    }
-
-    public Map<String, String> readAll() {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("select setting_key, setting_value from project_settings")) {
-            ResultSet resultSet = statement.executeQuery();
-            Map<String, String> settings = new HashMap<>();
-            while (resultSet.next()) {
-                settings.put(resultSet.getString("setting_key"), resultSet.getString("setting_value"));
-            }
-            return settings;
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read Autark-OS settings.", exception);
-        }
-    }
-
-    public Path backupDestination(Path fallback) {
-        Map<String, String> values = readAll();
-        String destination = values.get("backupDestination");
+    default Path backupDestination(Path fallback) {
+        String destination = readAll().get("backupDestination");
         if (destination == null || destination.isBlank()) {
             return fallback.toAbsolutePath().normalize();
         }
         return Path.of(destination).toAbsolutePath().normalize();
     }
 
-    public boolean hasAnySettings() {
-        migrate();
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("select 1 from project_settings limit 1")) {
-            ResultSet resultSet = statement.executeQuery();
-            return resultSet.next();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to read Autark-OS settings.", exception);
-        }
+    default boolean hasAnySettings() {
+        return count() > 0;
     }
 
-    public void save(ProjectSettings settings) {
-        migrate();
-        Map<String, String> values = Map.ofEntries(
+    default void save(ProjectSettings settings) {
+        saveValues(Map.ofEntries(
                 Map.entry("deviceName", settings.deviceName()),
                 Map.entry("timeZone", settings.timeZone()),
                 Map.entry("language", settings.language()),
@@ -84,45 +44,18 @@ public class ProjectSettingsRepository extends DatabaseBackedRepository {
                 Map.entry("backupTime", settings.backupTime()),
                 Map.entry("updateChannel", settings.updateChannel()),
                 Map.entry("showAdvancedMetrics", Boolean.toString(settings.showAdvancedMetrics())),
-                Map.entry("updatedAt", settings.updatedAt().toString()));
-
-        String sql = """
-                insert into project_settings(setting_key, setting_value, updated_at)
-                values(?, ?, ?)
-                on conflict(setting_key) do update set setting_value = excluded.setting_value, updated_at = excluded.updated_at
-                """;
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (Map.Entry<String, String> entry : values.entrySet()) {
-                statement.setString(1, entry.getKey());
-                statement.setString(2, entry.getValue());
-                statement.setString(3, settings.updatedAt().toString());
-                statement.addBatch();
-            }
-            statement.executeBatch();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to save Autark-OS settings.", exception);
-        }
+                Map.entry("updatedAt", settings.updatedAt().toString())),
+                settings.updatedAt());
     }
 
-    public void saveValues(Map<String, String> values) {
-        migrate();
-        String updatedAt = Instant.now().toString();
-        String sql = """
-                insert into project_settings(setting_key, setting_value, updated_at)
-                values(?, ?, ?)
-                on conflict(setting_key) do update set setting_value = excluded.setting_value, updated_at = excluded.updated_at
-                """;
-        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement(sql)) {
-            for (Map.Entry<String, String> entry : values.entrySet()) {
-                statement.setString(1, entry.getKey());
-                statement.setString(2, entry.getValue() == null ? "" : entry.getValue());
-                statement.setString(3, updatedAt);
-                statement.addBatch();
-            }
-            statement.executeBatch();
-        } catch (SQLException exception) {
-            throw new InstallationException("Unable to save Autark-OS settings.", exception);
-        }
+    default void saveValues(Map<String, String> values) {
+        saveValues(values, Instant.now());
     }
 
+    private void saveValues(Map<String, String> values, Instant updatedAt) {
+        String timestamp = updatedAt.toString();
+        saveAll(values.entrySet().stream()
+                .map(entry -> new ProjectSettingEntity(entry.getKey(), entry.getValue() == null ? "" : entry.getValue(), timestamp))
+                .toList());
+    }
 }

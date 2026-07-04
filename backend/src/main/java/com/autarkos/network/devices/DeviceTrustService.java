@@ -36,7 +36,7 @@ public class DeviceTrustService {
         TailscaleStatus status = tailscaleService.status();
         List<TailscaleDevice> devices = tailscaleService.devices();
         PrivateAccessReconciliationReport reconciliation = privateAccessReconciliationService.report();
-        Map<String, DeviceTrustMetadata> metadataById = repository.findAll();
+        Map<String, DeviceTrustMetadata> metadataById = repository.metadataByDeviceId();
         int expectedPrivateApps = reconciliation.apps().size();
         int healthyPrivateApps = (int) reconciliation.apps().stream()
                 .filter(DeviceTrustService::healthy)

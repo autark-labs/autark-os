@@ -22,6 +22,7 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
@@ -66,7 +67,7 @@ class OnboardingServiceTests {
 
     private OnboardingService service() {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        ProjectSettingsRepository repository = new ProjectSettingsRepository(runtimeLayout);
+        ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);
         ProjectSettingsService settingsService = new ProjectSettingsService(repository, new ActivityLogService(mock(ActivityLogRepository.class)));
         return new OnboardingService(repository, settingsService, runtimeLayout, new FakeTailscaleService(), new FakeSystemDoctorService());
     }

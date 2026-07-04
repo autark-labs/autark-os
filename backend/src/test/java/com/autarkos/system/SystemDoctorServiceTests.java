@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.system.api.SystemDoctorStatus;
 import com.autarkos.system.api.SystemSetupCheck;
 import com.autarkos.system.api.SystemSetupStatus;
@@ -64,7 +65,7 @@ class SystemDoctorServiceTests {
 
     private SystemDoctorService service(List<SystemSetupCheck> setupChecks) {
         RuntimeLayout runtimeLayout = runtimeLayout();
-        ProjectSettingsRepository repository = new ProjectSettingsRepository(runtimeLayout);
+        ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);
         return new SystemDoctorService(new FakeSystemSetupService(setupChecks), repository, runtimeLayout);
     }
 

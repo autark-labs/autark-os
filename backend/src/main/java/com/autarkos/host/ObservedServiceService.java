@@ -96,7 +96,7 @@ public class ObservedServiceService {
         if (scanner != null) {
             List<ObservedService> scannedServices = scanner.scan(now);
             for (ObservedService scanned : scannedServices) {
-                ObservedService merged = repository.findBySourceAndFingerprint(scanned.source(), scanned.fingerprint())
+                ObservedService merged = repository.findServiceBySourceAndFingerprint(scanned.source(), scanned.fingerprint())
                         .map(existing -> merge(existing, scanned))
                         .orElse(scanned);
                 repository.upsert(merged);
@@ -113,18 +113,18 @@ public class ObservedServiceService {
     }
 
     public List<ObservedServiceView> list(boolean includeIgnored) {
-        return repository.findAll().stream()
+        return repository.findAllServices().stream()
                 .filter(service -> includeIgnored || !"ignored".equals(service.userVisibility()))
                 .map(ObservedServiceService::toView)
                 .toList();
     }
 
     public List<ObservedService> observedServices() {
-        return repository.findAll();
+        return repository.findAllServices();
     }
 
     public ObservedServiceView get(String id) {
-        return repository.findById(id)
+        return repository.findServiceById(id)
                 .map(ObservedServiceService::toView)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
     }
@@ -156,7 +156,7 @@ public class ObservedServiceService {
 
     public List<ObservedService> matchingCatalogServices(String appId) {
         String normalized = normalizeToken(appId);
-        return repository.findAll().stream()
+        return repository.findAllServices().stream()
                 .filter(service -> appId.equals(service.catalogAppId()) || (service.catalogAppId() == null && matchesNameOrUrl(service, normalized)))
                 .toList();
     }
@@ -197,7 +197,7 @@ public class ObservedServiceService {
     }
 
     public ObservedServiceAdoptionPlan adoptionPlan(String id) {
-        ObservedService service = repository.findById(id)
+        ObservedService service = repository.findServiceById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
         String displayName = displayName(service);
         if (!ObservedServiceSource.DOCKER.equals(service.source())) {
@@ -244,7 +244,7 @@ public class ObservedServiceService {
         if (installedAppRepository == null || catalogService == null) {
             return new ActionResult(false, "error", "Adoption unavailable", "Autark-OS cannot save managed app state in this runtime.", id, "review_adoption_plan");
         }
-        ObservedService service = repository.findById(id)
+        ObservedService service = repository.findServiceById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
         String appId = service.catalogAppId();
         ApplicationManifest manifest = catalogService.findById(appId).orElse(null);

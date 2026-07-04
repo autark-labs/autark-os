@@ -16,6 +16,7 @@ import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class ObservedServiceServiceTests {
 
@@ -31,7 +32,7 @@ class ObservedServiceServiceTests {
         ActionResult result = service.unpin("obs_vaultwarden");
 
         assertThat(result.ok()).isTrue();
-        assertThat(repository.findById("obs_vaultwarden")).hasValueSatisfying(observed -> {
+        assertThat(repository.findServiceById("obs_vaultwarden")).hasValueSatisfying(observed -> {
             assertThat(observed.userVisibility()).isEqualTo("observed");
             assertThat(observed.pinnedAt()).isNull();
         });
@@ -53,7 +54,7 @@ class ObservedServiceServiceTests {
 
         service.refresh();
 
-        assertThat(repository.findById("docker:autark-os-vault")).hasValueSatisfying(observed -> {
+        assertThat(repository.findServiceById("docker:autark-os-vault")).hasValueSatisfying(observed -> {
             assertThat(observed.catalogAppId()).isEqualTo("vaultwarden");
             assertThat(observed.catalogMatchConfidence()).isEqualTo("user");
             assertThat(observed.userVisibility()).isEqualTo("pinned");
@@ -102,10 +103,10 @@ class ObservedServiceServiceTests {
 
         service.refresh();
 
-        assertThat(repository.findById("docker:old-autark-os-vault")).isEmpty();
-        assertThat(repository.findById("docker:pinned-lab-link")).isPresent();
-        assertThat(repository.findById("manual:gitlab")).isPresent();
-        assertThat(repository.findById("docker:current-worker")).isPresent();
+        assertThat(repository.findServiceById("docker:old-autark-os-vault")).isEmpty();
+        assertThat(repository.findServiceById("docker:pinned-lab-link")).isPresent();
+        assertThat(repository.findServiceById("manual:gitlab")).isPresent();
+        assertThat(repository.findServiceById("docker:current-worker")).isPresent();
     }
 
     @Test
@@ -263,7 +264,7 @@ class ObservedServiceServiceTests {
             assertThat(ownership.autarkOsInstanceId()).isEqualTo("current-instance");
         });
         assertThat(installedRepository.settingsFor("vaultwarden")).hasValueSatisfying(settings -> assertThat(settings.accessUrl()).isEqualTo("http://localhost:8090"));
-        assertThat(observedRepository.findById("docker:autark-os-vaultwarden")).hasValueSatisfying(observed -> {
+        assertThat(observedRepository.findServiceById("docker:autark-os-vaultwarden")).hasValueSatisfying(observed -> {
             assertThat(observed.ownershipState()).isEqualTo("owned_managed");
             assertThat(observed.userVisibility()).isEqualTo("observed");
             assertThat(observed.autarkOsInstanceId()).isEqualTo("current-instance");
@@ -286,7 +287,7 @@ class ObservedServiceServiceTests {
     }
 
     private ObservedServiceRepository repository() {
-        return new ObservedServiceRepository(runtimeLayout());
+        return JpaTestRepositories.observedServiceRepository(runtimeLayout());
     }
 
     private RuntimeLayout runtimeLayout() {

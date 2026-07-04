@@ -13,6 +13,7 @@ import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceSource;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class SetupStatusServiceTests {
 
@@ -58,7 +59,7 @@ class SetupStatusServiceTests {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
         return new SetupProgressService(
-                new ProjectSettingsRepository(new RuntimeLayout(properties)),
+                JpaTestRepositories.projectSettingsRepository(new RuntimeLayout(properties)),
                 () -> Instant.parse("2026-06-20T12:00:00Z"));
     }
 

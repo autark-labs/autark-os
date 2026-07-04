@@ -334,7 +334,7 @@ class AppOwnershipServiceTests {
     }
 
     private ObservedServiceRepository observedRepository() {
-        return new ObservedServiceRepository(runtimeLayout());
+        return JpaTestRepositories.observedServiceRepository(runtimeLayout());
     }
 
     private ObservedServiceService observedService(ObservedServiceRepository repository) {

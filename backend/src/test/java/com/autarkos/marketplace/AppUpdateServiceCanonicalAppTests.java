@@ -25,6 +25,7 @@ import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettingsRepository;
 import com.autarkos.system.ProjectSettingsService;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class AppUpdateServiceCanonicalAppTests {
 
@@ -46,7 +47,7 @@ class AppUpdateServiceCanonicalAppTests {
                 null,
                 null,
                 activityLogService,
-                new ProjectSettingsService(new ProjectSettingsRepository(runtimeLayout), activityLogService),
+                new ProjectSettingsService(JpaTestRepositories.projectSettingsRepository(runtimeLayout), activityLogService),
                 () -> List.of(appInstance("homepage")));
 
         assertThat(service.statuses())

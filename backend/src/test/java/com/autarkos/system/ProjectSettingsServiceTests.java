@@ -18,6 +18,7 @@ import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.testsupport.JpaTestRepositories;
 
 class ProjectSettingsServiceTests {
 
@@ -29,7 +30,7 @@ class ProjectSettingsServiceTests {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedApps = new InstalledAppRepository(runtimeLayout);
         ProjectSettingsService service = new ProjectSettingsService(
-                new ProjectSettingsRepository(runtimeLayout),
+                JpaTestRepositories.projectSettingsRepository(runtimeLayout),
                 new ActivityLogService(mock(ActivityLogRepository.class)),
                 installedApps);
         Instant installedAt = Instant.parse("2026-06-21T12:00:00Z");
