@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 
@@ -71,7 +72,7 @@ public class RecommendedActionService implements RecommendedActionProvider {
         return switch (issue.reasonCode()) {
             case "docker_unavailable" -> 10;
             case "app_managed_elsewhere", "app_missing_container", "app_needs_attention" -> 20;
-            case "backup_enabled_no_restore_point" -> 30;
+            case AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT -> 30;
             case "private_access_needs_setup" -> 40;
             default -> switch (issue.severity()) {
                 case "critical" -> 15;

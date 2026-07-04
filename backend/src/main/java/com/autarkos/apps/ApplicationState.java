@@ -3,6 +3,7 @@ package com.autarkos.apps;
 import java.time.Instant;
 import java.util.List;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.host.ObservedServiceView;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppRuntimeView;
@@ -38,7 +39,7 @@ public record ApplicationState(
                 foundServices,
                 ownershipViews,
                 updatedAt,
-                "idle",
+                AutarkOsStates.SnapshotState.IDLE,
                 updatedAt,
                 updatedAt,
                 false,

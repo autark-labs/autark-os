@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -78,7 +79,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
     private AppRemediationView remediation(AppReconciliationItem item, String backupState, InstallSettings settings) {
         String lastRepairStatus = settings == null ? null : settings.lastRepairStatus();
         boolean autoRepairEnabled = settings == null || settings.autoRepairEnabled();
-        boolean hasRestorePoint = "protected_by_restore_point".equals(backupState);
+        boolean hasRestorePoint = AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(backupState);
         return AppRemediationPolicy.remediation(
                 item.appName(),
                 item.status(),
@@ -90,7 +91,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     private List<AutarkOsIssue> issues(AppReconciliationItem item, InstalledApp app, String backupState) {
         List<AutarkOsIssue> issues = new ArrayList<>();
-        if ("Missing".equals(item.status())) {
+        if (AutarkOsStates.AppStatus.MISSING.equals(item.status())) {
             issues.add(AutarkOsIssueFactory.appIssue(
                     "app-missing-" + item.appId(),
                     item.appId(),
@@ -108,7 +109,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     item.appName() + " is managed elsewhere",
                     "Autark-OS found this app, but it belongs to another Autark-OS instance or an older unscoped install.",
                     AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics")));
-        } else if ("Needs attention".equals(item.status())) {
+        } else if (AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(item.status())) {
             issues.add(AutarkOsIssueFactory.appIssue(
                     "app-needs-attention-" + item.appId(),
                     item.appId(),
@@ -127,12 +128,12 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     "Autark-OS found app resources without a complete installed app record.",
                     AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics")));
         }
-        if ("backup_enabled_no_restore_point".equals(backupState)) {
+        if (AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(backupState)) {
             issues.add(AutarkOsIssueFactory.backupIssue(
                     "backup-not-protected-" + item.appId(),
                     item.appId(),
                     "info",
-                    "backup_enabled_no_restore_point",
+                    AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT,
                     item.appName() + " is not backed up yet",
                     "Backup protection is enabled, but Autark-OS has not created a successful restore point for this app.",
                     AutarkOsAction.route("open-backups-" + item.appId(), "Open backups", "/backups")));
@@ -151,13 +152,13 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     private List<AutarkOsAction> actions(AppReconciliationItem item, InstalledApp app, String localUrl, String privateUrl) {
         List<AutarkOsAction> actions = new ArrayList<>();
-        if ("Ready".equals(item.status()) && app != null) {
+        if (AutarkOsStates.AppStatus.READY.equals(item.status()) && app != null) {
             actions.add(AutarkOsAction.get("open-" + item.appId(), "Open", firstPresent(privateUrl, localUrl, app.accessUrl())));
             actions.add(AutarkOsAction.post("restart-" + item.appId(), "Restart", "/api/apps/" + item.appId() + "/restart", false, false));
-        } else if ("Missing".equals(item.status()) && item.ownership() == DockerResourceOwnership.OWNED && app != null) {
+        } else if (AutarkOsStates.AppStatus.MISSING.equals(item.status()) && item.ownership() == DockerResourceOwnership.OWNED && app != null) {
             actions.add(AutarkOsAction.post("repair-" + item.appId(), "Repair", "/api/apps/" + item.appId() + "/repair", false, false));
             actions.add(AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics"));
-        } else if ("Stopped".equals(item.status()) && app != null) {
+        } else if (AutarkOsStates.AppStatus.STOPPED.equals(item.status()) && app != null) {
             actions.add(AutarkOsAction.post("start-" + item.appId(), "Start", "/api/apps/" + item.appId() + "/start", false, false));
         } else if ("Managed elsewhere".equals(item.status()) || "Needs setup".equals(item.status())) {
             actions.add(AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics"));
@@ -167,10 +168,10 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     private String runtimeState(String userStatus) {
         return switch (userStatus) {
-            case "Ready" -> "running";
-            case "Starting" -> "starting";
-            case "Stopped" -> "stopped";
-            case "Missing" -> "missing";
+            case AutarkOsStates.AppStatus.READY -> AutarkOsStates.ReadinessState.READY;
+            case AutarkOsStates.AppStatus.STARTING -> AutarkOsStates.ReadinessState.STARTING;
+            case AutarkOsStates.AppStatus.STOPPED -> AutarkOsStates.ReadinessState.STOPPED;
+            case AutarkOsStates.AppStatus.MISSING -> "missing";
             case "Managed elsewhere" -> "foreign";
             case "Needs setup" -> "needs_setup";
             default -> "needs_attention";
@@ -178,7 +179,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
     }
 
     private boolean needsUserAction(String status) {
-        return "Needs attention".equals(status) || "Unavailable".equals(status) || "Missing".equals(status);
+        return AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(status) || AutarkOsStates.AppStatus.UNAVAILABLE.equals(status) || AutarkOsStates.AppStatus.MISSING.equals(status);
     }
 
     private String ownershipState(DockerResourceOwnership ownership) {
@@ -191,10 +192,10 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
     }
 
     private String accessState(String userStatus, String localUrl, String privateUrl) {
-        if ("Ready".equals(userStatus) && privateUrl != null && !privateUrl.isBlank()) {
+        if (AutarkOsStates.AppStatus.READY.equals(userStatus) && privateUrl != null && !privateUrl.isBlank()) {
             return "private_ready";
         }
-        if ("Ready".equals(userStatus) && localUrl != null && !localUrl.isBlank()) {
+        if (AutarkOsStates.AppStatus.READY.equals(userStatus) && localUrl != null && !localUrl.isBlank()) {
             return "local_ready";
         }
         return "not_ready";
@@ -202,22 +203,22 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     private String backupState(String appId, InstallSettings settings) {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
-            return "backup_disabled";
+            return AutarkOsStates.BackupState.DISABLED;
         }
         List<RestorePoint> restorePoints = backupRepository.forApp(appId, 10);
         if (restorePoints.isEmpty()) {
-            return "backup_enabled_no_restore_point";
+            return AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
         }
         boolean hasCompletedRestorePoint = restorePoints.stream()
-                .anyMatch(restorePoint -> "completed".equalsIgnoreCase(restorePoint.status()));
+                .anyMatch(restorePoint -> AutarkOsStates.RestorePointStatus.COMPLETED.equalsIgnoreCase(restorePoint.status()));
         if (hasCompletedRestorePoint) {
-            return "protected_by_restore_point";
+            return AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT;
         }
         RestorePoint latest = restorePoints.getFirst();
-        if ("failed".equalsIgnoreCase(latest.status())) {
+        if (AutarkOsStates.RestorePointStatus.FAILED.equalsIgnoreCase(latest.status())) {
             return "backup_failed";
         }
-        return "backup_enabled_no_restore_point";
+        return AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
     }
 
     private String firstPresent(String... values) {

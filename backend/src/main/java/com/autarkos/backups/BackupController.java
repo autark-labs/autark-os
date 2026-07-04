@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
@@ -37,7 +38,7 @@ public class BackupController {
 
     @PostMapping("/apps/{appId}/run")
     public AutarkOsJob run(@PathVariable String appId) {
-        AutarkOsJob job = jobService.start("backup", appId, backupSteps(), () -> {
+        AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP, appId, backupSteps(), () -> {
             BackupRunResult result = backupService.run(appId);
             invalidateApplicationState();
             return backupOutcome(result);
@@ -48,12 +49,12 @@ public class BackupController {
 
     @PostMapping("/full/run")
     public AutarkOsJob runFull() {
-        return jobService.start("backup", "__full__", backupSteps(), () -> backupOutcome(backupService.runFullBackup("manual")));
+        return jobService.start(AutarkOsStates.JobType.BACKUP, "__full__", backupSteps(), () -> backupOutcome(backupService.runFullBackup("manual")));
     }
 
     @PostMapping("/routine/run")
     public AutarkOsJob runRoutine() {
-        return jobService.start("backup", "__routine__", backupSteps(), () -> backupOutcome(backupService.runAutomatic()));
+        return jobService.start(AutarkOsStates.JobType.BACKUP, "__routine__", backupSteps(), () -> backupOutcome(backupService.runAutomatic()));
     }
 
     @GetMapping("/restore-points/{id}/plan")
@@ -63,13 +64,13 @@ public class BackupController {
 
     @PostMapping("/restore-points/{id}/verify")
     public AutarkOsJob verify(@PathVariable long id) {
-        return jobService.start("backup_verify", Long.toString(id), verificationSteps(), () -> verificationOutcome(backupService.verify(id)));
+        return jobService.start(AutarkOsStates.JobType.BACKUP_VERIFY, Long.toString(id), verificationSteps(), () -> verificationOutcome(backupService.verify(id)));
     }
 
     @PostMapping("/restore-points/{id}/restore")
     public AutarkOsJob restore(@PathVariable long id, @RequestBody(required = false) RestoreRequest request) {
         String appId = request == null ? null : request.appId();
-        AutarkOsJob job = jobService.start("backup_restore", restoreSubject(id, appId), restoreSteps(), () -> {
+        AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP_RESTORE, restoreSubject(id, appId), restoreSteps(), () -> {
             RestoreResult result = backupService.restore(id, appId);
             invalidateApplicationState();
             return restoreOutcome(result);
@@ -87,7 +88,7 @@ public class BackupController {
     }
 
     private AutarkOsJobOutcome backupOutcome(BackupRunResult result) {
-        if ("failed".equals(result.status())) {
+        if (AutarkOsStates.JobStatus.FAILED.equals(result.status())) {
             java.util.List<AutarkOsJobStep> steps = java.util.List.of(
                     AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
                     AutarkOsJobStep.failed("copy_data", "Copying app data", result.message()),
@@ -114,12 +115,12 @@ public class BackupController {
     private AutarkOsJobOutcome verificationOutcome(BackupVerificationResult result) {
         java.util.List<AutarkOsJobStep> steps = java.util.List.of(
                 AutarkOsJobStep.succeeded("load_restore_point", "Loading restore point", "Restore point loaded."),
-                "failed".equals(result.status())
+                AutarkOsStates.JobStatus.FAILED.equals(result.status())
                         ? AutarkOsJobStep.failed("verify_archive", "Verifying backup archive", result.message())
                         : AutarkOsJobStep.succeeded("verify_archive", "Verifying backup archive", result.message()),
                 AutarkOsJobStep.succeeded("record_result", "Recording verification result", "Verification status saved."),
                 AutarkOsJobStep.succeeded("finish", "Finishing verification", result.message()));
-        if ("failed".equals(result.status())) {
+        if (AutarkOsStates.JobStatus.FAILED.equals(result.status())) {
             return AutarkOsJobOutcome.failed(result.message(), steps);
         }
         return AutarkOsJobOutcome.succeeded(result.message(), steps);
@@ -136,8 +137,8 @@ public class BackupController {
     }
 
     private AutarkOsJobOutcome restoreOutcome(RestoreResult result) {
-        boolean failed = "failed".equals(result.status());
-        boolean warning = "warning".equals(result.status());
+        boolean failed = AutarkOsStates.JobStatus.FAILED.equals(result.status());
+        boolean warning = AutarkOsStates.Tone.WARNING.equals(result.status());
         java.util.List<AutarkOsJobStep> steps = java.util.List.of(
                 AutarkOsJobStep.succeeded("validate_restore_point", "Validating restore point", "Restore point is ready."),
                 AutarkOsJobStep.succeeded("stop_apps", "Stopping affected apps", "Affected apps were prepared for restore."),

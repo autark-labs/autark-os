@@ -1,8 +1,6 @@
 package com.autarkos.fileops;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -12,13 +10,13 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.system.SystemCommandRunner;
 
 @Service
 public class AutarkOsFileOpsService {
@@ -33,7 +31,7 @@ public class AutarkOsFileOpsService {
 
     @Autowired
     public AutarkOsFileOpsService(RuntimeLayout runtimeLayout, AutarkOsFileOperations localOperations) {
-        this(runtimeLayout, localOperations, new ProcessCommandRunner(), defaultHelperCommand());
+        this(runtimeLayout, localOperations, new ProcessCommandRunner(new SystemCommandRunner()), defaultHelperCommand());
     }
 
     AutarkOsFileOpsService(RuntimeLayout runtimeLayout, AutarkOsFileOperations localOperations, CommandRunner commandRunner) {
@@ -200,30 +198,20 @@ public class AutarkOsFileOpsService {
     }
 
     private static class ProcessCommandRunner implements CommandRunner {
+        private final SystemCommandRunner systemCommandRunner;
+
+        private ProcessCommandRunner(SystemCommandRunner systemCommandRunner) {
+            this.systemCommandRunner = systemCommandRunner;
+        }
+
         @Override
         public CommandResult run(String... command) {
-            ProcessBuilder processBuilder = new ProcessBuilder(command);
-            processBuilder.redirectErrorStream(true);
-            try {
-                Process process = processBuilder.start();
-                List<String> output = new ArrayList<>();
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        output.add(line);
-                    }
-                }
-                if (!process.waitFor(COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly();
-                    return new CommandResult(124, output, false);
-                }
-                return new CommandResult(process.exitValue(), output, false);
-            } catch (IOException exception) {
-                return new CommandResult(127, List.of(), true);
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                return new CommandResult(130, List.of(), false);
-            }
+            SystemCommandRunner.CommandExecutionResult result = systemCommandRunner.run(
+                    List.of(command),
+                    COMMAND_TIMEOUT,
+                    "Autark-OS file operation timed out.",
+                    "Autark-OS file operation was interrupted.");
+            return new CommandResult(result.exitCode(), result.outputLines(), result.missingCommand());
         }
     }
 

@@ -32,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -143,11 +144,11 @@ public class AppLifecycleService {
     public AppReliabilitySummary reliabilitySummary() {
         List<InstalledApp> apps = managedInstalledApps();
         Instant checkedAt = Instant.now();
-        int ready = countByStatus(apps, "Ready");
-        int starting = countByStatus(apps, "Starting");
-        int paused = countByStatus(apps, "Paused");
-        int needsAttention = countByStatus(apps, "Needs attention");
-        int unavailable = countByStatus(apps, "Unavailable");
+        int ready = countByStatus(apps, AutarkOsStates.AppStatus.READY);
+        int starting = countByStatus(apps, AutarkOsStates.AppStatus.STARTING);
+        int paused = countByStatus(apps, AutarkOsStates.AppStatus.PAUSED);
+        int needsAttention = countByStatus(apps, AutarkOsStates.AppStatus.NEEDS_ATTENTION);
+        int unavailable = countByStatus(apps, AutarkOsStates.AppStatus.UNAVAILABLE);
         List<AppReliabilityIssue> issues = apps.stream()
                 .filter(this::hasReliabilityIssue)
                 .map(this::reliabilityIssue)
@@ -198,8 +199,8 @@ public class AppLifecycleService {
 
     private boolean hasReliabilityIssue(InstalledApp app) {
         String status = displayHealthStatus(app);
-        return "Needs attention".equals(status)
-                || "Unavailable".equals(status)
+        return AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(status)
+                || AutarkOsStates.AppStatus.UNAVAILABLE.equals(status)
                 || privateLinkMissing(app);
     }
 
@@ -217,7 +218,7 @@ public class AppLifecycleService {
                 message,
                 detail,
                 action,
-                !"Paused".equals(status),
+                !AutarkOsStates.AppStatus.PAUSED.equals(status),
                 health == null ? Instant.now() : health.checkedAt());
     }
 
@@ -227,10 +228,10 @@ public class AppLifecycleService {
             return health.status();
         }
         return switch (app.status()) {
-            case "Ready", "Starting", "Needs attention", "Unavailable", "Paused" -> app.status();
-            case "Stopped" -> "Paused";
-            case "Installed" -> "Ready";
-            default -> "Starting";
+            case AutarkOsStates.AppStatus.READY, AutarkOsStates.AppStatus.STARTING, AutarkOsStates.AppStatus.NEEDS_ATTENTION, AutarkOsStates.AppStatus.UNAVAILABLE, AutarkOsStates.AppStatus.PAUSED -> app.status();
+            case AutarkOsStates.AppStatus.STOPPED -> AutarkOsStates.AppStatus.PAUSED;
+            case AutarkOsStates.AppStatus.INSTALLED -> AutarkOsStates.AppStatus.READY;
+            default -> AutarkOsStates.AppStatus.STARTING;
         };
     }
 
@@ -327,7 +328,7 @@ public class AppLifecycleService {
         logs.add("Before repair: " + before.status() + " - " + before.message());
         String eventPrefix = automatic ? "guardian_" : "";
 
-        if ("Ready".equals(before.status())) {
+        if (AutarkOsStates.AppStatus.READY.equals(before.status())) {
             saveRepairState(app, automatic ? "guardian_skipped_ready" : "manual_skipped_ready");
             repository.recordEvent(app.appId(), eventPrefix + "repair_skipped", app.appName() + " already looked ready.");
             activityInfo(eventPrefix + "repair_skipped", "Repair skipped for " + app.appName(), app.appName() + " already looks ready.", app.appId());
@@ -348,7 +349,7 @@ public class AppLifecycleService {
                 activityError(eventPrefix + "repair_failed", "Repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
                 throw exception;
             }
-        } else if ("Paused".equals(before.status())) {
+        } else if (AutarkOsStates.AppStatus.PAUSED.equals(before.status())) {
             DockerComposeResult result = composeExecutor.up(composeFile(app), app.composeProject());
             logs.addAll(result.output());
             if (!result.successful()) {
@@ -373,11 +374,11 @@ public class AppLifecycleService {
         AppHealthSnapshot after = healthSnapshot(app);
         logs.add("After repair: " + after.status() + " - " + after.message());
         boolean privateAccessRepaired = repairingPrivateAccess && "reachable".equals(after.privateAccessStatus());
-        String status = "Ready".equals(after.status()) || "Starting".equals(after.status()) || privateAccessRepaired ? "completed" : "needs_attention";
+        String status = AutarkOsStates.AppStatus.READY.equals(after.status()) || AutarkOsStates.AppStatus.STARTING.equals(after.status()) || privateAccessRepaired ? AutarkOsStates.RestorePointStatus.COMPLETED : "needs_attention";
         String message = repairMessage(app, before, after, privateAccessRepaired);
         saveRepairState(app, automatic ? "guardian_repair_" + status : "manual_repair_" + status);
         repository.recordEvent(app.appId(), eventPrefix + "repair_completed", message);
-        if ("completed".equals(status)) {
+        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(status)) {
             activitySuccess(eventPrefix + "repair_completed", "Repair completed for " + app.appName(), message, app.appId());
         } else {
             activityWarning(eventPrefix + "repair_needs_attention", "Repair still needs attention for " + app.appName(), message, app.appId());
@@ -692,10 +693,10 @@ public class AppLifecycleService {
         if (privateAccessRepaired) {
             return "Autark-OS repaired the private network link for " + app.appName() + ".";
         }
-        if ("Ready".equals(after.status())) {
+        if (AutarkOsStates.AppStatus.READY.equals(after.status())) {
             return "Autark-OS repaired " + app.appName() + ". It is ready now.";
         }
-        if ("Starting".equals(after.status())) {
+        if (AutarkOsStates.AppStatus.STARTING.equals(after.status())) {
             return "Autark-OS repaired " + app.appName() + " and it is starting now.";
         }
         if (before.status().equals(after.status())) {
@@ -708,7 +709,7 @@ public class AppLifecycleService {
         if (shouldRepairPrivateAccess(snapshot)) {
             return "It is recreating the private HTTPS link.";
         }
-        if ("Paused".equals(snapshot.status())) {
+        if (AutarkOsStates.AppStatus.PAUSED.equals(snapshot.status())) {
             return "It is starting the app containers.";
         }
         return "It is restarting the app containers and checking again.";
@@ -888,7 +889,7 @@ public class AppLifecycleService {
                 remediationStatus,
                 settings.lastRepairStatus(),
                 settings.autoRepairEnabled(),
-                "protected_by_restore_point".equals(backupState),
+                AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(backupState),
                 isRepairAvailable(remediationStatus));
         return new AppRuntimeView(
                 app.appId(),
@@ -921,15 +922,15 @@ public class AppLifecycleService {
 
     private String backupState(String appId, InstallSettings settings) {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
-            return "backup_disabled";
+            return AutarkOsStates.BackupState.DISABLED;
         }
         boolean hasCompletedRestorePoint = backupRepository.forApp(appId, 10).stream()
-                .anyMatch(restorePoint -> "completed".equalsIgnoreCase(restorePoint.status()));
-        return hasCompletedRestorePoint ? "protected_by_restore_point" : "backup_enabled_no_restore_point";
+                .anyMatch(restorePoint -> AutarkOsStates.RestorePointStatus.COMPLETED.equalsIgnoreCase(restorePoint.status()));
+        return hasCompletedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
     }
 
     private boolean isRepairAvailable(String status) {
-        return "Needs attention".equals(status) || "Unavailable".equals(status) || "Missing".equals(status) || "Paused".equals(status);
+        return AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(status) || AutarkOsStates.AppStatus.UNAVAILABLE.equals(status) || AutarkOsStates.AppStatus.MISSING.equals(status) || AutarkOsStates.AppStatus.PAUSED.equals(status);
     }
 
     private AppHealthSnapshot healthSnapshot(InstalledApp app) {
@@ -953,7 +954,7 @@ public class AppLifecycleService {
                 .ifPresent(previous -> {
                     String message = app.appName() + " changed from " + previous.status() + " to " + snapshot.status() + ".";
                     repository.recordEvent(app.appId(), "health_changed", message);
-                    if ("Ready".equals(snapshot.status())) {
+                    if (AutarkOsStates.AppStatus.READY.equals(snapshot.status())) {
                         activitySuccess("health_changed", app.appName() + " is ready", message, app.appId());
                     } else {
                         activityWarning("health_changed", app.appName() + " needs attention", message, app.appId());
@@ -990,7 +991,7 @@ public class AppLifecycleService {
         Instant now = Instant.now();
         HealthManifest health = healthContract(manifest);
         Duration startupGracePeriod = Duration.ofSeconds(health.startupGraceSeconds());
-        boolean startupGrace = "Starting".equals(runtime.friendlyStatus()) && app.installedAt().plus(startupGracePeriod).isAfter(now);
+        boolean startupGrace = AutarkOsStates.AppStatus.STARTING.equals(runtime.friendlyStatus()) && app.installedAt().plus(startupGracePeriod).isAfter(now);
         boolean localRequired = shouldCheckLocalAccess(manifest, localCheck.url());
         boolean localBroken = localRequired && "unreachable".equals(localCheck.status());
         boolean privateBroken = settings != null
@@ -1002,40 +1003,40 @@ public class AppLifecycleService {
         String status;
         String message;
         String detail;
-        if ("Ready".equals(runtime.friendlyStatus()) && !localBroken && !privateBroken && !privateEnabledBroken) {
-            status = "Ready";
+        if (AutarkOsStates.AppStatus.READY.equals(runtime.friendlyStatus()) && !localBroken && !privateBroken && !privateEnabledBroken) {
+            status = AutarkOsStates.AppStatus.READY;
             message = health.successLabel();
             detail = containerOnly ? health.description() : "Docker is running and expected links are responding.";
-        } else if ("Starting".equals(runtime.friendlyStatus()) && startupGrace) {
-            status = "Starting";
+        } else if (AutarkOsStates.AppStatus.STARTING.equals(runtime.friendlyStatus()) && startupGrace) {
+            status = AutarkOsStates.AppStatus.STARTING;
             message = health.startingLabel();
             detail = "Autark-OS is giving this app up to " + health.startupGraceSeconds() + " seconds to finish startup before marking it as unhealthy.";
-        } else if ("Stopped".equals(runtime.friendlyStatus())) {
-            status = "Paused";
+        } else if (AutarkOsStates.AppStatus.STOPPED.equals(runtime.friendlyStatus())) {
+            status = AutarkOsStates.AppStatus.PAUSED;
             message = "Paused";
             detail = "The app containers are stopped. Start the app when you want to use it.";
-        } else if ("Stopped".equals(runtime.friendlyStatus()) || "not running".equals(runtime.healthCheck())) {
-            status = "Unavailable";
+        } else if (AutarkOsStates.AppStatus.STOPPED.equals(runtime.friendlyStatus()) || "not running".equals(runtime.healthCheck())) {
+            status = AutarkOsStates.AppStatus.UNAVAILABLE;
             message = "Unavailable";
             detail = "Autark-OS could not find running managed containers for this app.";
         } else if (localBroken) {
-            status = "Needs attention";
+            status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
             message = health.failureLabel();
             detail = "Docker reports the app is running, but the local app link did not answer.";
         } else if (privateBroken || privateEnabledBroken) {
-            status = "Needs attention";
+            status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
             message = "Private link is not responding";
             detail = "Private access is expected, but the private HTTPS link did not answer.";
-        } else if ("Needs attention".equals(runtime.friendlyStatus())) {
-            status = "Needs attention";
+        } else if (AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(runtime.friendlyStatus())) {
+            status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
             message = "Container health check is failing";
             detail = runtime.technicalStatus();
-        } else if ("Starting".equals(runtime.friendlyStatus())) {
-            status = "Needs attention";
+        } else if (AutarkOsStates.AppStatus.STARTING.equals(runtime.friendlyStatus())) {
+            status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
             message = "Startup is taking longer than expected";
             detail = "This app is still starting after its expected startup window of " + health.startupGraceSeconds() + " seconds.";
         } else {
-            status = "Unavailable";
+            status = AutarkOsStates.AppStatus.UNAVAILABLE;
             message = "Status is unclear";
             detail = runtime.technicalStatus();
         }

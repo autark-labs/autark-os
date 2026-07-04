@@ -3,6 +3,7 @@ package com.autarkos.marketplace.install;
 import java.net.URI;
 import java.util.List;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
 class AppRuntimeStatusResolver {
@@ -96,26 +97,26 @@ class AppRuntimeStatusResolver {
 
     AppRuntimeStatus normalize(List<DockerContainerStatus> containers) {
         if (containers.isEmpty()) {
-            return new AppRuntimeStatus("Stopped", "No managed containers found", "not running");
+            return new AppRuntimeStatus(AutarkOsStates.AppStatus.STOPPED, "No managed containers found", "not running");
         }
         String technicalStatus = containers.stream()
                 .map(this::technicalStatus)
                 .reduce((left, right) -> left + "; " + right)
                 .orElse("No managed containers found");
         if (containers.stream().anyMatch(this::unhealthy)) {
-            return new AppRuntimeStatus("Needs attention", technicalStatus, "failing");
+            return new AppRuntimeStatus(AutarkOsStates.AppStatus.NEEDS_ATTENTION, technicalStatus, "failing");
         }
         if (containers.stream().anyMatch(this::starting)) {
-            return new AppRuntimeStatus("Starting", technicalStatus, "starting");
+            return new AppRuntimeStatus(AutarkOsStates.AppStatus.STARTING, technicalStatus, "starting");
         }
         if (containers.stream().allMatch(this::stopped)) {
-            return new AppRuntimeStatus("Stopped", technicalStatus, "not running");
+            return new AppRuntimeStatus(AutarkOsStates.AppStatus.STOPPED, technicalStatus, "not running");
         }
         if (containers.stream().anyMatch(this::running)) {
             String health = containers.stream().anyMatch(this::healthy) ? "passing" : "running";
-            return new AppRuntimeStatus("Ready", technicalStatus, health);
+            return new AppRuntimeStatus(AutarkOsStates.AppStatus.READY, technicalStatus, health);
         }
-        return new AppRuntimeStatus("Starting", technicalStatus, "pending");
+        return new AppRuntimeStatus(AutarkOsStates.AppStatus.STARTING, technicalStatus, "pending");
     }
 
     private boolean running(DockerContainerStatus container) {

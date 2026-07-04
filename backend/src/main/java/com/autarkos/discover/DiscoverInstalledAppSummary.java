@@ -1,5 +1,7 @@
 package com.autarkos.discover;
 
+import com.autarkos.api.AutarkOsStates;
+
 public record DiscoverInstalledAppSummary(
         String appId,
         String appName,
@@ -10,6 +12,6 @@ public record DiscoverInstalledAppSummary(
         boolean firstBackupRecommended) {
 
     public DiscoverInstalledAppSummary(String appId, String appName, String status, String accessUrl) {
-        this(appId, appName, status, accessUrl, "backup_enabled_no_restore_point", false, true);
+        this(appId, appName, status, accessUrl, AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT, false, true);
     }
 }

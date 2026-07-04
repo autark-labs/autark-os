@@ -1,42 +1,37 @@
 package com.autarkos.host;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.autarkos.system.SystemCommandRunner;
+
 @Component
 public class ProcessHostDockerContainerDiscovery implements HostDockerContainerDiscovery {
 
+    private final SystemCommandRunner commandRunner;
+
+    public ProcessHostDockerContainerDiscovery(SystemCommandRunner commandRunner) {
+        this.commandRunner = commandRunner;
+    }
+
     @Override
     public List<HostDockerContainer> findContainers() {
-        ProcessBuilder processBuilder = new ProcessBuilder(
+        SystemCommandRunner.CommandExecutionResult result = commandRunner.run(
                 "docker",
                 "ps",
                 "-a",
                 "--format",
                 "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Labels}}\t{{.Ports}}");
-        processBuilder.redirectErrorStream(true);
-        try {
-            Process process = processBuilder.start();
-            List<HostDockerContainer> containers;
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                containers = reader.lines()
-                        .map(this::container)
-                        .filter(container -> !container.name().isBlank())
-                        .toList();
-            }
-            return process.waitFor() == 0 ? containers : List.of();
-        } catch (IOException exception) {
-            return List.of();
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
+        if (!result.successful()) {
             return List.of();
         }
+        return result.outputLines().stream()
+                .map(this::container)
+                .filter(container -> !container.name().isBlank())
+                .toList();
     }
 
     private HostDockerContainer container(String line) {

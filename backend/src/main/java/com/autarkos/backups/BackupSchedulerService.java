@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsStates;
 
 @Service
 public class BackupSchedulerService {
@@ -36,7 +37,7 @@ public class BackupSchedulerService {
         try {
             Optional<BackupRunResult> result = backupService.runAutomaticIfDue();
             result.ifPresent(run -> {
-                if ("completed".equals(run.status())) {
+                if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(run.status())) {
                     activityLogService.success("backup", "scheduled_backup_completed", "Routine backup completed", run.message(), null);
                 } else {
                     activityLogService.error("backup", "scheduled_backup_failed", "Routine backup failed", run.message(), null, null);

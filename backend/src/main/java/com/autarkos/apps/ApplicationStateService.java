@@ -18,10 +18,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.api.AppOperationView;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
+import com.autarkos.host.ObservedServiceStatus;
 import com.autarkos.host.ObservedServiceView;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobService;
@@ -121,7 +123,7 @@ public class ApplicationStateService {
                 List.of(),
                 List.of(),
                 now,
-                "stale",
+                AutarkOsStates.SnapshotState.STALE,
                 null,
                 null,
                 true,
@@ -201,10 +203,10 @@ public class ApplicationStateService {
                 .map(ObservedServiceService::toView)
                 .toList();
         List<ObservedServiceView> pinned = observedViews.stream()
-                .filter(service -> "pinned_external".equals(service.userStatus()))
+                .filter(service -> ObservedServiceStatus.PINNED.equals(service.userStatus()))
                 .toList();
         List<ObservedServiceView> found = observedViews.stream()
-                .filter(service -> !service.managedByThisAutarkOs() && !"pinned_external".equals(service.userStatus()))
+                .filter(service -> !service.managedByThisAutarkOs() && !ObservedServiceStatus.PINNED.equals(service.userStatus()))
                 .toList();
         List<AppOwnershipView> ownership = appOwnershipService == null ? List.of() : appOwnershipService.apps(observed);
         Instant completedAt = clock.get();
@@ -216,7 +218,7 @@ public class ApplicationStateService {
                 found,
                 ownership,
                 completedAt,
-                "idle",
+                AutarkOsStates.SnapshotState.IDLE,
                 startedAt,
                 completedAt,
                 false,
@@ -255,10 +257,24 @@ public class ApplicationStateService {
     }
 
     private boolean isLifecycleOperationJob(AutarkOsJob job) {
-        if (job == null || !List.of("queued", "running", "failed", "succeeded", "cancelled", "canceled").contains(job.status())) {
+        if (job == null || !List.of(
+                AutarkOsStates.JobStatus.QUEUED,
+                AutarkOsStates.JobStatus.RUNNING,
+                AutarkOsStates.JobStatus.FAILED,
+                AutarkOsStates.JobStatus.SUCCEEDED,
+                AutarkOsStates.JobStatus.CANCELLED,
+                AutarkOsStates.JobStatus.CANCELED).contains(job.status())) {
             return false;
         }
-        return List.of("start_app", "stop_app", "restart_app", "repair_app", "backup", "backup_verify", "backup_restore", "uninstall_app").contains(job.type());
+        return List.of(
+                AutarkOsStates.JobType.START_APP,
+                AutarkOsStates.JobType.STOP_APP,
+                AutarkOsStates.JobType.RESTART_APP,
+                AutarkOsStates.JobType.REPAIR_APP,
+                AutarkOsStates.JobType.BACKUP,
+                AutarkOsStates.JobType.BACKUP_VERIFY,
+                AutarkOsStates.JobType.BACKUP_RESTORE,
+                AutarkOsStates.JobType.UNINSTALL_APP).contains(job.type());
     }
 
     private boolean jobTargetsApp(AutarkOsJob job, String appId) {
@@ -268,7 +284,7 @@ public class ApplicationStateService {
         if (appId.equals(job.subjectId())) {
             return true;
         }
-        if (!"backup_restore".equals(job.type())) {
+        if (!AutarkOsStates.JobType.BACKUP_RESTORE.equals(job.type())) {
             return false;
         }
         String restoreTarget = restoreTarget(job.subjectId());
@@ -287,13 +303,13 @@ public class ApplicationStateService {
         if (job == null) {
             return AppOperationView.idle();
         }
-        if ("failed".equals(job.status())) {
+        if (AutarkOsStates.JobStatus.FAILED.equals(job.status())) {
             if (!failedLifecycleJobStillRelevant(job, app)) {
                 return AppOperationView.idle();
             }
             return AppOperationView.failed(operationLabel(job.type()), job.jobId(), job.error() == null ? "" : job.error().message());
         }
-        if (!"queued".equals(job.status()) && !"running".equals(job.status())) {
+        if (!AutarkOsStates.JobStatus.QUEUED.equals(job.status()) && !AutarkOsStates.JobStatus.RUNNING.equals(job.status())) {
             return AppOperationView.idle();
         }
         return AppOperationView.running(operationKind(job.type()), operationLabel(job.type()), job.jobId(), currentStepText(job), currentStepText(job));
@@ -303,46 +319,46 @@ public class ApplicationStateService {
         if (isFailedFullRestore(job)) {
             return false;
         }
-        if (job != null && List.of("backup", "backup_verify", "backup_restore").contains(job.type())) {
+        if (job != null && List.of(AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY, AutarkOsStates.JobType.BACKUP_RESTORE).contains(job.type())) {
             return true;
         }
         String readinessState = app.readinessState() == null ? "" : app.readinessState();
-        if (List.of("ready", "starting", "paused").contains(readinessState)) {
+        if (List.of(AutarkOsStates.ReadinessState.READY, AutarkOsStates.ReadinessState.STARTING, AutarkOsStates.ReadinessState.PAUSED).contains(readinessState)) {
             return false;
         }
         String friendlyStatus = app.friendlyStatus() == null ? "" : app.friendlyStatus();
-        return !List.of("Ready", "Starting", "Paused").contains(friendlyStatus);
+        return !List.of(AutarkOsStates.AppStatus.READY, AutarkOsStates.AppStatus.STARTING, AutarkOsStates.AppStatus.PAUSED).contains(friendlyStatus);
     }
 
     private boolean isFailedFullRestore(AutarkOsJob job) {
         return job != null
-                && "backup_restore".equals(job.type())
-                && "failed".equals(job.status())
+                && AutarkOsStates.JobType.BACKUP_RESTORE.equals(job.type())
+                && AutarkOsStates.JobStatus.FAILED.equals(job.status())
                 && "all".equals(restoreTarget(job.subjectId()));
     }
 
     private String operationKind(String type) {
         return switch (type) {
-            case "start_app" -> "starting";
-            case "stop_app" -> "stopping";
-            case "restart_app" -> "restarting";
-            case "repair_app" -> "repairing";
-            case "backup", "backup_verify" -> "backing_up";
-            case "backup_restore" -> "restoring";
-            case "uninstall_app" -> "uninstalling";
-            default -> "idle";
+            case AutarkOsStates.JobType.START_APP -> AutarkOsStates.OperationKind.STARTING;
+            case AutarkOsStates.JobType.STOP_APP -> AutarkOsStates.OperationKind.STOPPING;
+            case AutarkOsStates.JobType.RESTART_APP -> AutarkOsStates.OperationKind.RESTARTING;
+            case AutarkOsStates.JobType.REPAIR_APP -> AutarkOsStates.OperationKind.REPAIRING;
+            case AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY -> AutarkOsStates.OperationKind.BACKING_UP;
+            case AutarkOsStates.JobType.BACKUP_RESTORE -> AutarkOsStates.OperationKind.RESTORING;
+            case AutarkOsStates.JobType.UNINSTALL_APP -> AutarkOsStates.OperationKind.UNINSTALLING;
+            default -> AutarkOsStates.OperationKind.IDLE;
         };
     }
 
     private String operationLabel(String type) {
         return switch (type) {
-            case "start_app" -> "Starting";
-            case "stop_app" -> "Pausing";
-            case "restart_app" -> "Restarting";
-            case "repair_app" -> "Repairing";
-            case "backup", "backup_verify" -> "Creating backup";
-            case "backup_restore" -> "Restoring";
-            case "uninstall_app" -> "Uninstalling safely";
+            case AutarkOsStates.JobType.START_APP -> "Starting";
+            case AutarkOsStates.JobType.STOP_APP -> "Pausing";
+            case AutarkOsStates.JobType.RESTART_APP -> "Restarting";
+            case AutarkOsStates.JobType.REPAIR_APP -> "Repairing";
+            case AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY -> "Creating backup";
+            case AutarkOsStates.JobType.BACKUP_RESTORE -> "Restoring";
+            case AutarkOsStates.JobType.UNINSTALL_APP -> "Uninstalling safely";
             default -> "Working";
         };
     }
@@ -352,10 +368,10 @@ public class ApplicationStateService {
                 .filter(candidate -> candidate.id().equals(job.currentStep()))
                 .findFirst()
                 .orElseGet(() -> job.steps().stream()
-                        .filter(candidate -> "running".equals(candidate.status()))
+                        .filter(candidate -> AutarkOsStates.JobStatus.RUNNING.equals(candidate.status()))
                         .findFirst()
                         .orElseGet(() -> job.steps().stream()
-                                .filter(candidate -> "pending".equals(candidate.status()))
+                                .filter(candidate -> AutarkOsStates.JobStatus.PENDING.equals(candidate.status()))
                                 .findFirst()
                                 .orElse(null)));
         if (step == null) {
@@ -365,10 +381,10 @@ public class ApplicationStateService {
     }
 
     private List<AutarkOsAction> availableActions(AppRuntimeView app, AppOperationView operation) {
-        if (operation != null && !"idle".equals(operation.kind()) && !"failed".equals(operation.kind())) {
+        if (operation != null && !AutarkOsStates.OperationKind.IDLE.equals(operation.kind()) && !AutarkOsStates.OperationKind.FAILED.equals(operation.kind())) {
             return List.of();
         }
-        boolean paused = "paused".equals(app.readinessState()) || "stopped".equals(app.readinessState()) || "Stopped".equals(app.friendlyStatus());
+        boolean paused = AutarkOsStates.ReadinessState.PAUSED.equals(app.readinessState()) || AutarkOsStates.ReadinessState.STOPPED.equals(app.readinessState()) || AutarkOsStates.AppStatus.STOPPED.equals(app.friendlyStatus());
         List<AutarkOsAction> runtimeActions = paused
                 ? List.of(
                         AutarkOsAction.post("start", "Start", "/api/apps/" + app.appId() + "/start", false, false),
@@ -394,7 +410,7 @@ public class ApplicationStateService {
             return true;
         }
         String friendlyStatus = app.friendlyStatus() == null ? "" : app.friendlyStatus();
-        return List.of("Needs review", "Unavailable").contains(friendlyStatus);
+        return List.of("Needs review", AutarkOsStates.AppStatus.UNAVAILABLE).contains(friendlyStatus);
     }
 
     private String managedSortName(AppRuntimeView app) {
@@ -411,7 +427,7 @@ public class ApplicationStateService {
                 previous.foundServices(),
                 previous.ownershipViews(),
                 previous.updatedAt(),
-                "error",
+                AutarkOsStates.SnapshotState.ERROR,
                 startedAt,
                 completedAt,
                 true,
@@ -428,7 +444,7 @@ public class ApplicationStateService {
                 previous.foundServices(),
                 previous.ownershipViews(),
                 previous.updatedAt(),
-                "running",
+                AutarkOsStates.JobStatus.RUNNING,
                 startedAt,
                 previous.refreshCompletedAt(),
                 true,

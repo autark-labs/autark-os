@@ -1,20 +1,23 @@
 package com.autarkos.marketplace.install;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.autarkos.system.SystemCommandRunner;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
 
     private static final Pattern FIELD_PATTERN = Pattern.compile("\"%s\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
+    private final SystemCommandRunner commandRunner;
+
+    public ProcessDockerComposeExecutor(SystemCommandRunner commandRunner) {
+        this.commandRunner = commandRunner;
+    }
 
     @Override
     public DockerComposeResult up(Path composeFile, String projectName) {
@@ -163,25 +166,11 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
     }
 
     private DockerComposeResult runCommand(List<String> command) {
-        ProcessBuilder processBuilder = new ProcessBuilder(command);
-        processBuilder.redirectErrorStream(true);
-        try {
-            Process process = processBuilder.start();
-            List<String> output = new ArrayList<>();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.add(line);
-                }
-            }
-            int exitCode = process.waitFor();
-            return new DockerComposeResult(exitCode, output);
-        } catch (IOException exception) {
-            throw new InstallationException("Unable to run Docker Compose.", exception);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new InstallationException("Docker Compose execution was interrupted.", exception);
+        SystemCommandRunner.CommandExecutionResult result = commandRunner.run(command);
+        if (result.missingCommand()) {
+            throw new InstallationException("Unable to run Docker Compose. " + result.output());
         }
+        return new DockerComposeResult(result.exitCode(), result.outputLines());
     }
 
     private ContainerTelemetry telemetry(String line) {

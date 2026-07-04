@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRunResult;
 import com.autarkos.backups.BackupService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -44,7 +45,7 @@ public class AppUpdateService {
                         app.status(),
                         "owned",
                         app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        "backup_disabled",
+                        AutarkOsStates.BackupState.DISABLED,
                         app.accessUrl(),
                         null,
                         List.of(),
@@ -122,14 +123,14 @@ public class AppUpdateService {
         activityLogService.info("applications", "update_backup_started", "Backup checkpoint started for " + app.appName(), "Autark-OS creates a restore point before updating.", appId);
         BackupRunResult checkpoint = backupService.run(appId);
         logs.add("Backup checkpoint: " + checkpoint.message());
-        if ("completed".equals(checkpoint.status())) {
+        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(checkpoint.status())) {
             repository.recordEvent(appId, "update_backup_completed", "Backup checkpoint completed before update.");
             activityLogService.success("applications", "update_backup_completed", "Backup checkpoint completed for " + app.appName(), checkpoint.message(), appId);
         } else {
             repository.recordEvent(appId, "update_backup_failed", "Backup checkpoint failed before update: " + checkpoint.message());
             activityLogService.warning("applications", "update_backup_failed", "Backup checkpoint failed for " + app.appName(), checkpoint.message(), appId);
             logs.add("Update stopped because Autark-OS could not create a backup checkpoint.");
-            return new AppUpdateResult(app.appId(), app.appName(), "failed", "Update was not started because Autark-OS could not create a backup checkpoint.", logs, appLifecycleService.getApp(appId), Instant.now());
+            return new AppUpdateResult(app.appId(), app.appName(), AutarkOsStates.JobStatus.FAILED, "Update was not started because Autark-OS could not create a backup checkpoint.", logs, appLifecycleService.getApp(appId), Instant.now());
         }
         try {
             Files.copy(compose, previousCompose, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -144,7 +145,7 @@ public class AppUpdateService {
             }
             AppHealthSnapshot health = appLifecycleService.healthSnapshot(appId);
             logs.add("Health after update: " + health.status() + " - " + health.message());
-            if ("Unavailable".equals(health.status()) || "Needs attention".equals(health.status())) {
+            if (AutarkOsStates.AppStatus.UNAVAILABLE.equals(health.status()) || AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(health.status())) {
                 repository.recordEvent(appId, "update_health_failed", "Health check failed after update: " + health.message());
                 activityLogService.warning("applications", "update_health_failed", "Update health check failed for " + app.appName(), health.message(), appId);
                 throw new InstallationException("Health check failed after update: " + health.message());

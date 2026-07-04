@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
@@ -128,17 +129,17 @@ public class InstalledAppsController {
 
     @PostMapping("/{id}/start")
     public AutarkOsJob start(@PathVariable String id) {
-        return startLifecycleJob("start", "start_app", id);
+        return startLifecycleJob("start", AutarkOsStates.JobType.START_APP, id);
     }
 
     @PostMapping("/{id}/stop")
     public AutarkOsJob stop(@PathVariable String id) {
-        return startLifecycleJob("stop", "stop_app", id);
+        return startLifecycleJob("stop", AutarkOsStates.JobType.STOP_APP, id);
     }
 
     @PostMapping("/{id}/restart")
     public AutarkOsJob restart(@PathVariable String id) {
-        return startLifecycleJob("restart", "restart_app", id);
+        return startLifecycleJob("restart", AutarkOsStates.JobType.RESTART_APP, id);
     }
 
     @PostMapping("/{id}/repair")
@@ -148,7 +149,7 @@ public class InstalledAppsController {
             applicationStateService.invalidate();
             return active;
         }
-        AutarkOsJob created = jobService.startWithJob("repair_app", id, repairJobSteps(), job -> {
+        AutarkOsJob created = jobService.startWithJob(AutarkOsStates.JobType.REPAIR_APP, id, repairJobSteps(), job -> {
             List<AutarkOsJobStep> inspecting = repairJobSteps().stream()
                     .map(step -> "inspect_app".equals(step.id())
                             ? AutarkOsJobStep.running(step.id(), step.label(), "Autark-OS is checking the app before repair.")
@@ -249,7 +250,7 @@ public class InstalledAppsController {
 
     @PostMapping("/{id}/uninstall")
     public AutarkOsJob startUninstall(@PathVariable String id) {
-        AutarkOsJob job = jobService.start("uninstall_app", id, uninstallJobSteps(), () -> {
+        AutarkOsJob job = jobService.start(AutarkOsStates.JobType.UNINSTALL_APP, id, uninstallJobSteps(), () -> {
             AppActionResult result = appLifecycleService.uninstall(id);
             applicationStateService.invalidate();
             return AutarkOsJobOutcome.succeeded(result.message());
@@ -330,8 +331,8 @@ public class InstalledAppsController {
     private AutarkOsJob activeLifecycleJob(String id) {
         return jobService.list().stream()
                 .filter(job -> id.equals(job.subjectId()))
-                .filter(job -> List.of("start_app", "stop_app", "restart_app", "repair_app").contains(job.type()))
-                .filter(job -> "queued".equals(job.status()) || "running".equals(job.status()))
+                .filter(job -> List.of(AutarkOsStates.JobType.START_APP, AutarkOsStates.JobType.STOP_APP, AutarkOsStates.JobType.RESTART_APP, AutarkOsStates.JobType.REPAIR_APP).contains(job.type()))
+                .filter(job -> AutarkOsStates.JobStatus.QUEUED.equals(job.status()) || AutarkOsStates.JobStatus.RUNNING.equals(job.status()))
                 .findFirst()
                 .orElse(null);
     }

@@ -1,8 +1,6 @@
 package com.autarkos.network.tailscale;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -10,13 +8,13 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
+import com.autarkos.system.SystemCommandRunner;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -31,7 +29,7 @@ public class TailscaleService {
     private final CommandRunner commandRunner;
 
     public TailscaleService() {
-        this(new ProcessCommandRunner());
+        this(new ProcessCommandRunner(new SystemCommandRunner()));
     }
 
     TailscaleService(CommandRunner commandRunner) {
@@ -445,30 +443,20 @@ public class TailscaleService {
     }
 
     private static class ProcessCommandRunner implements CommandRunner {
+        private final SystemCommandRunner systemCommandRunner;
+
+        private ProcessCommandRunner(SystemCommandRunner systemCommandRunner) {
+            this.systemCommandRunner = systemCommandRunner;
+        }
+
         @Override
         public CommandResult run(String... command) {
-            ProcessBuilder processBuilder = new ProcessBuilder(command);
-            processBuilder.redirectErrorStream(true);
-            try {
-                Process process = processBuilder.start();
-                List<String> output = new ArrayList<>();
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        output.add(line);
-                    }
-                }
-                if (!process.waitFor(COMMAND_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly();
-                    return new CommandResult(124, output, false);
-                }
-                return new CommandResult(process.exitValue(), output, false);
-            } catch (IOException exception) {
-                return new CommandResult(127, List.of(), true);
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                return new CommandResult(130, List.of(), false);
-            }
+            SystemCommandRunner.CommandExecutionResult result = systemCommandRunner.run(
+                    List.of(command),
+                    COMMAND_TIMEOUT,
+                    "Tailscale command timed out.",
+                    "Tailscale command was interrupted.");
+            return new CommandResult(result.exitCode(), result.outputLines(), result.missingCommand());
         }
     }
 

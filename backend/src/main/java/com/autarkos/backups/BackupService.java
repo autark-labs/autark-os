@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -79,7 +80,7 @@ public class BackupService {
                         app.status(),
                         "owned",
                         app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        "backup_disabled",
+                        AutarkOsStates.BackupState.DISABLED,
                         app.accessUrl(),
                         null,
                         List.of(),
@@ -118,7 +119,7 @@ public class BackupService {
                 .toList();
         List<RestorePoint> recent = backupRepository.recent(20);
         int protectedApps = (int) apps.stream().filter(AppBackupStatus::protectedByBackups).count();
-        int failedBackups = (int) recent.stream().filter(point -> "failed".equals(point.status())).count();
+        int failedBackups = (int) recent.stream().filter(point -> AutarkOsStates.RestorePointStatus.FAILED.equals(point.status())).count();
         long backupStorage = fileOperations.directorySize(backupRoot());
         String status = status(apps, failedBackups);
         ProjectSettings settings = projectSettingsService.current();
@@ -127,11 +128,11 @@ public class BackupService {
                 .findFirst()
                 .orElse(null);
         RestorePoint lastSuccessfulRoutine = recent.stream()
-                .filter(point -> "automatic".equals(point.source()) && "completed".equals(point.status()))
+                .filter(point -> "automatic".equals(point.source()) && AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status()))
                 .findFirst()
                 .orElse(null);
         RestorePoint lastSuccessfulVerification = recent.stream()
-                .filter(point -> "verified".equals(point.verificationStatus()))
+                .filter(point -> AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus()))
                 .findFirst()
                 .orElse(null);
                 
@@ -169,8 +170,8 @@ public class BackupService {
     public BackupRunResult runAutomatic() {
         ProjectSettings settings = projectSettingsService.current();
         if (!settings.automaticBackupsEnabled()) {
-            RestorePoint point = backupRepository.record("__full__", "All apps", "full", "automatic", "", "", "failed", 0, "Automatic backups are turned off.");
-            return new BackupRunResult("__full__", "All apps", "failed", point.message(), point, Instant.now());
+            RestorePoint point = backupRepository.record("__full__", "All apps", "full", "automatic", "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, "Automatic backups are turned off.");
+            return new BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
         return runFullBackup("automatic");
     }
@@ -205,8 +206,8 @@ public class BackupService {
                 .filter(app -> installedAppRepository.settingsFor(app.appId()).map(InstallSettings::backup).orElse(BackupPolicy.defaults()).enabled())
                 .toList();
         if (protectedApps.isEmpty()) {
-            RestorePoint point = backupRepository.record("__full__", "All apps", "full", cleanSource(source), "", "", "failed", 0, "No apps are currently eligible for backup.");
-            return new BackupRunResult("__full__", "All apps", "failed", point.message(), point, Instant.now());
+            RestorePoint point = backupRepository.record("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, "No apps are currently eligible for backup.");
+            return new BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
         try {
             Files.createDirectories(backupRoot().resolve("full"));
@@ -214,15 +215,15 @@ public class BackupService {
             validateFullBackup(protectedApps);
             long size = zipApps(protectedApps, destination);
             String included = protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(","));
-            RestorePoint point = backupRepository.record("__full__", "All apps", "full", cleanSource(source), included, destination.toString(), "completed", size, "Full backup completed for " + protectedApps.size() + " app(s).");
+            RestorePoint point = backupRepository.record("__full__", "All apps", "full", cleanSource(source), included, destination.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Full backup completed for " + protectedApps.size() + " app(s).");
             point = verifyRestorePoint(point).restorePoint();
             activityLogService.success("backup", cleanSource(source) + "_full_backup", "Full backup completed", point.message(), null);
             protectedApps.forEach(app -> installedAppRepository.recordEvent(app.appId(), "backup_completed", "Included in full " + cleanSource(source) + " backup."));
-            return new BackupRunResult("__full__", "All apps", "completed", point.message(), point, Instant.now());
+            return new BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.COMPLETED, point.message(), point, Instant.now());
         } catch (RuntimeException | IOException exception) {
-            RestorePoint point = backupRepository.record("__full__", "All apps", "full", cleanSource(source), protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(",")), "", "failed", 0, userMessage(exception));
+            RestorePoint point = backupRepository.record("__full__", "All apps", "full", cleanSource(source), protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(",")), "", AutarkOsStates.RestorePointStatus.FAILED, 0, userMessage(exception));
             activityLogService.error("backup", cleanSource(source) + "_full_backup", "Full backup failed", userMessage(exception), null, exception);
-            return new BackupRunResult("__full__", "All apps", "failed", point.message(), point, Instant.now());
+            return new BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
     }
 
@@ -231,7 +232,7 @@ public class BackupService {
         List<InstalledApp> affected = affectedApps(point, targetAppId);
         List<String> warnings = new ArrayList<>();
         List<String> dryRunDetails = new ArrayList<>();
-        if (!"completed".equals(point.status())) {
+        if (!AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())) {
             warnings.add("This restore point did not complete successfully.");
         }
         if (affected.isEmpty()) {
@@ -245,15 +246,15 @@ public class BackupService {
                 warnings.add(app.appName() + " uses " + contract.label().toLowerCase() + ". Autark-OS will restore managed files, but database/application consistency should be reviewed after restore.");
             }
         }
-        if ("failed".equals(point.verificationStatus())) {
+        if (AutarkOsStates.RestorePointStatus.FAILED.equals(point.verificationStatus())) {
             warnings.add("Autark-OS could not verify this restore point: " + point.verificationMessage());
-        } else if (!"verified".equals(point.verificationStatus())) {
+        } else if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
             warnings.add("This restore point has not been verified yet.");
         }
         RestoreSimulationResult simulation = simulateRestore(point, affected);
-        if ("failed".equals(simulation.status())) {
+        if (AutarkOsStates.RestoreSimulationStatus.FAILED.equals(simulation.status())) {
             warnings.add(simulation.message());
-        } else if ("warning".equals(simulation.status())) {
+        } else if (AutarkOsStates.RestoreSimulationStatus.WARNING.equals(simulation.status())) {
             warnings.add("Restore simulation needs review: " + simulation.message());
         }
         List<String> steps = List.of(
@@ -278,7 +279,7 @@ public class BackupService {
                 point.verificationMessage(),
                 simulation,
                 restoreConfidence(point, affected),
-                "completed".equals(point.status()) && !affected.isEmpty() && Files.isRegularFile(Path.of(point.path())) && !"failed".equals(simulation.status()),
+                AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status()) && !affected.isEmpty() && Files.isRegularFile(Path.of(point.path())) && !AutarkOsStates.RestoreSimulationStatus.FAILED.equals(simulation.status()),
                 Instant.now());
     }
 
@@ -304,13 +305,13 @@ public class BackupService {
         if (!restartFailures.isEmpty()) {
             String message = restoreRestartWarningMessage(apps, restartFailures);
             activityLogService.warning("backup", "restore_restart_failed", "Restore needs attention", message, null);
-            return new RestoreResult(point.id(), "warning", message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
+            return new RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.WARNING, message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
         }
         String message = plan.scope().equals("full")
                 ? "Full restore completed for " + apps.size() + " app(s)."
                 : "Restore completed for " + apps.getFirst().appName() + ".";
         activityLogService.success("backup", "restore_completed", message, String.join(", ", apps.stream().map(InstalledApp::appName).toList()), null);
-        return new RestoreResult(point.id(), "completed", message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
+        return new RestoreResult(point.id(), AutarkOsStates.RestorePointStatus.COMPLETED, message, apps.stream().map(InstalledApp::appId).toList(), logs, Instant.now());
     }
 
     private BackupRunResult runAppBackup(String appId, String backupSource) {
@@ -321,24 +322,24 @@ public class BackupService {
                 .map(InstallSettings::backup)
                 .orElse(BackupPolicy.defaults());
         if (!policy.enabled()) {
-            RestorePoint point = backupRepository.record(app.appId(), app.appName(), "", "failed", 0, "Backups are turned off for this app.");
-            return new BackupRunResult(app.appId(), app.appName(), "failed", point.message(), point, Instant.now());
+            RestorePoint point = backupRepository.record(app.appId(), app.appName(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, "Backups are turned off for this app.");
+            return new BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
         try {
             validateBackup(source);
             Files.createDirectories(backupRoot().resolve(app.appId()));
             Path destination = backupRoot().resolve(app.appId()).resolve(app.appId() + "-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
             long size = fileOpsService.createSafetyArchive(app.appId(), destination);
-            RestorePoint point = backupRepository.record(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), destination.toString(), "completed", size, "Backup completed.");
+            RestorePoint point = backupRepository.record(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), destination.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Backup completed.");
             point = verifyRestorePoint(point).restorePoint();
             activityLogService.success("backup", cleanSource(backupSource) + "_app_backup", "Backup completed", app.appName() + " backup is ready.", app.appId());
             installedAppRepository.recordEvent(app.appId(), "backup_completed", "Backup completed.");
-            return new BackupRunResult(app.appId(), app.appName(), "completed", "Backup completed.", point, Instant.now());
+            return new BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.COMPLETED, "Backup completed.", point, Instant.now());
         } catch (RuntimeException | IOException exception) {
-            RestorePoint point = backupRepository.record(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", "failed", 0, userMessage(exception));
+            RestorePoint point = backupRepository.record(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, userMessage(exception));
             activityLogService.error("backup", cleanSource(backupSource) + "_app_backup", "Backup failed", userMessage(exception), app.appId(), exception);
             installedAppRepository.recordEvent(app.appId(), "backup_failed", userMessage(exception));
-            return new BackupRunResult(app.appId(), app.appName(), "failed", userMessage(exception), point, Instant.now());
+            return new BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), point, Instant.now());
         }
     }
 
@@ -417,7 +418,7 @@ public class BackupService {
                 Files.createDirectories(backupRoot().resolve("pre-restore"));
                 Path safety = backupRoot().resolve("pre-restore").resolve(app.appId() + "-pre-restore-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
                 long size = fileOpsService.createSafetyArchive(app.appId(), safety);
-                backupRepository.record(app.appId(), app.appName(), "app", "pre_restore", app.appId(), safety.toString(), "completed", size, "Safety backup created before restore.");
+                backupRepository.record(app.appId(), app.appName(), "app", "pre_restore", app.appId(), safety.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety backup created before restore.");
                 logs.add("Created safety backup for " + app.appName() + ".");
             }
             fileOpsService.restoreAppData(Path.of(point.path()), point.scope(), app.appId());
@@ -484,15 +485,15 @@ public class BackupService {
     }
 
     private RestoreSimulationResult simulateRestore(RestorePoint point, List<InstalledApp> affected) {
-        if (!"completed".equals(point.status())) {
-            return new RestoreSimulationResult("failed", "Only completed restore points can be simulated.", List.of("Backup status is " + point.status() + "."), Instant.now());
+        if (!AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())) {
+            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Only completed restore points can be simulated.", List.of("Backup status is " + point.status() + "."), Instant.now());
         }
         if (affected.isEmpty()) {
-            return new RestoreSimulationResult("failed", "No installed app matches this restore point.", List.of("Autark-OS could not find a current app for this restore point."), Instant.now());
+            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "No installed app matches this restore point.", List.of("Autark-OS could not find a current app for this restore point."), Instant.now());
         }
         Path zipPath = Path.of(point.path()).toAbsolutePath().normalize();
         if (!Files.isRegularFile(zipPath)) {
-            return new RestoreSimulationResult("failed", "Backup file is missing, so Autark-OS cannot simulate restore.", List.of(zipPath.toString()), Instant.now());
+            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Backup file is missing, so Autark-OS cannot simulate restore.", List.of(zipPath.toString()), Instant.now());
         }
 
         List<String> details = new ArrayList<>();
@@ -529,12 +530,12 @@ public class BackupService {
         }
 
         if (failed) {
-            return new RestoreSimulationResult("failed", "Autark-OS could not prove this restore point can be safely extracted.", details, Instant.now());
+            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.FAILED, "Autark-OS could not prove this restore point can be safely extracted.", details, Instant.now());
         }
         if (reviewRequired) {
-            return new RestoreSimulationResult("warning", "File restore simulation passed where supported, but at least one app needs a stronger backup contract.", details, Instant.now());
+            return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.WARNING, "File restore simulation passed where supported, but at least one app needs a stronger backup contract.", details, Instant.now());
         }
-        return new RestoreSimulationResult("passed", "Autark-OS simulated this restore into a temporary folder and found restorable files.", details, Instant.now());
+        return new RestoreSimulationResult(AutarkOsStates.RestoreSimulationStatus.PASSED, "Autark-OS simulated this restore into a temporary folder and found restorable files.", details, Instant.now());
     }
 
     private SimulationStats extractAppForSimulation(RestorePoint point, InstalledApp app, Path destination) throws IOException {
@@ -631,10 +632,10 @@ public class BackupService {
         if (latest == null) {
             return "not_backed_up";
         }
-        if ("failed".equals(latest.status())) {
-            return "failed";
+        if (AutarkOsStates.RestorePointStatus.FAILED.equals(latest.status())) {
+            return AutarkOsStates.RestorePointStatus.FAILED;
         }
-        if ("completed".equals(latest.status())) {
+        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())) {
             return "protected";
         }
         return "not_backed_up";
@@ -650,10 +651,10 @@ public class BackupService {
         if (latest == null) {
             return "No restore point yet.";
         }
-        if ("failed".equals(latest.status())) {
+        if (AutarkOsStates.RestorePointStatus.FAILED.equals(latest.status())) {
             return latest.message();
         }
-        if ("completed".equals(latest.status())) {
+        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())) {
             return "Protected by restore point.";
         }
         return "No completed restore point yet.";
@@ -735,7 +736,7 @@ public class BackupService {
         if (!settings.automaticBackupsEnabled()) {
             return "off";
         }
-        if (lastRoutine != null && "failed".equals(lastRoutine.status())) {
+        if (lastRoutine != null && AutarkOsStates.RestorePointStatus.FAILED.equals(lastRoutine.status())) {
             return "warning";
         }
         return "healthy";
@@ -745,7 +746,7 @@ public class BackupService {
         if (!settings.automaticBackupsEnabled()) {
             return "Automatic backups are turned off in Settings.";
         }
-        if (lastRoutine != null && "failed".equals(lastRoutine.status())) {
+        if (lastRoutine != null && AutarkOsStates.RestorePointStatus.FAILED.equals(lastRoutine.status())) {
             return "The latest routine backup failed: " + lastRoutine.message();
         }
         return "Routine backups are scheduled in the background. Autark-OS records these runs separately from manual checkpoints.";
@@ -811,32 +812,32 @@ public class BackupService {
     }
 
     private VerificationUpdate verifyRestorePoint(RestorePoint point) {
-        if (!"completed".equals(point.status())) {
-            RestorePoint updated = backupRepository.updateVerification(point.id(), "failed", "Only completed backups can be verified.", "", "low");
+        if (!AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())) {
+            RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Only completed backups can be verified.", "", "low");
             return new VerificationUpdate(updated, result(updated));
         }
         try {
             Path path = Path.of(point.path());
             if (!Files.isRegularFile(path)) {
-                RestorePoint updated = backupRepository.updateVerification(point.id(), "failed", "Backup file is missing.", "", "low");
+                RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup file is missing.", "", "low");
                 return new VerificationUpdate(updated, result(updated));
             }
             ZipSummary summary = inspectZip(path);
             if (summary.entries() == 0 || summary.bytes() <= 0) {
-                RestorePoint updated = backupRepository.updateVerification(point.id(), "failed", "Backup archive is empty.", "", "low");
+                RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup archive is empty.", "", "low");
                 return new VerificationUpdate(updated, result(updated));
             }
             String checksum = checksum(path);
             RestorePoint updated = backupRepository.updateVerification(
                     point.id(),
-                    "verified",
+                    AutarkOsStates.RestorePointStatus.VERIFIED,
                     "Verified " + summary.entries() + " file(s) and " + summary.bytes() + " byte(s) inside the archive.",
                     checksum,
                     confidenceFor(point));
             activityLogService.success("backup", "backup_verified", "Backup verified", updated.appName() + " restore point is readable.", null);
             return new VerificationUpdate(updated, result(updated));
         } catch (RuntimeException | IOException exception) {
-            RestorePoint updated = backupRepository.updateVerification(point.id(), "failed", userMessage(exception), "", "low");
+            RestorePoint updated = backupRepository.updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), "", "low");
             RuntimeException logged = exception instanceof RuntimeException runtimeException ? runtimeException : new InstallationException(userMessage(exception), exception);
             activityLogService.error("backup", "backup_verification_failed", "Backup verification failed", userMessage(exception), point.appId(), logged);
             return new VerificationUpdate(updated, result(updated));
@@ -848,10 +849,10 @@ public class BackupService {
     }
 
     private String restoreConfidence(RestorePoint point, List<InstalledApp> affected) {
-        if ("failed".equals(point.verificationStatus())) {
+        if (AutarkOsStates.RestorePointStatus.FAILED.equals(point.verificationStatus())) {
             return "Low";
         }
-        if (!"verified".equals(point.verificationStatus())) {
+        if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
             return "Unknown";
         }
         boolean reviewRequired = affected.stream().map(this::backupContract).anyMatch(BackupContract::reviewRequired);

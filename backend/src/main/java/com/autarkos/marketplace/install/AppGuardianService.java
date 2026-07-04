@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.automation.AutomationService;
 
@@ -59,7 +60,7 @@ public class AppGuardianService {
                         app.status(),
                         "owned",
                         app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        "backup_disabled",
+                        AutarkOsStates.BackupState.DISABLED,
                         app.accessUrl(),
                         null,
                         List.of(),
@@ -164,7 +165,7 @@ public class AppGuardianService {
     }
 
     private boolean shouldRepair(AppHealthSnapshot snapshot) {
-        return !snapshot.startupGrace() && ("Needs attention".equals(snapshot.status()) || "Unavailable".equals(snapshot.status()));
+        return !snapshot.startupGrace() && (AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(snapshot.status()) || AutarkOsStates.AppStatus.UNAVAILABLE.equals(snapshot.status()));
     }
 
     private boolean recentlyAttempted(InstallSettings settings) {

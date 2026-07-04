@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.AppRemediationView;
@@ -59,7 +60,7 @@ public class StorageService {
                         app.status(),
                         "owned",
                         app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        "backup_disabled",
+                        AutarkOsStates.BackupState.DISABLED,
                         app.accessUrl(),
                         null,
                         List.of(),

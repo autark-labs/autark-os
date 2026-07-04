@@ -3,6 +3,7 @@ package com.autarkos.marketplace.install;
 import java.time.Instant;
 import java.util.List;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.api.AppOperationView;
 import com.autarkos.api.ApplicationBehaviorStates;
 import com.autarkos.api.AutarkOsAction;
@@ -207,24 +208,24 @@ public record AppRuntimeView(
     }
 
     private static String operationReadinessState(AppOperationView operationState, String current) {
-        if (operationState == null || "idle".equals(operationState.kind())) {
+        if (operationState == null || AutarkOsStates.OperationKind.IDLE.equals(operationState.kind())) {
             return current;
         }
         return switch (operationState.kind()) {
-            case "starting", "restarting" -> "starting";
-            case "stopping" -> "paused";
-            case "uninstalling" -> "unknown";
+            case AutarkOsStates.OperationKind.STARTING, AutarkOsStates.OperationKind.RESTARTING -> AutarkOsStates.ReadinessState.STARTING;
+            case AutarkOsStates.OperationKind.STOPPING -> AutarkOsStates.ReadinessState.PAUSED;
+            case AutarkOsStates.OperationKind.UNINSTALLING -> AutarkOsStates.ReadinessState.UNKNOWN;
             default -> current;
         };
     }
 
     private static String operationFriendlyStatus(AppOperationView operationState, String current) {
-        if (operationState == null || "idle".equals(operationState.kind())) {
+        if (operationState == null || AutarkOsStates.OperationKind.IDLE.equals(operationState.kind())) {
             return current;
         }
         return switch (operationState.kind()) {
-            case "starting", "restarting" -> "Starting";
-            case "stopping" -> "Paused";
+            case AutarkOsStates.OperationKind.STARTING, AutarkOsStates.OperationKind.RESTARTING -> AutarkOsStates.AppStatus.STARTING;
+            case AutarkOsStates.OperationKind.STOPPING -> AutarkOsStates.AppStatus.PAUSED;
             default -> current;
         };
     }
@@ -233,7 +234,7 @@ public record AppRuntimeView(
         if (appId == null || appId.isBlank()) {
             return List.of();
         }
-        boolean paused = "Stopped".equals(friendlyStatus) || "Paused".equals(friendlyStatus);
+        boolean paused = AutarkOsStates.AppStatus.STOPPED.equals(friendlyStatus) || AutarkOsStates.AppStatus.PAUSED.equals(friendlyStatus);
         return paused
                 ? List.of(
                         AutarkOsAction.post("start", "Start", "/api/apps/" + appId + "/start", false, false),
@@ -245,8 +246,8 @@ public record AppRuntimeView(
 
     private static String backupStateFromSettings(InstallSettings settings) {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
-            return "backup_disabled";
+            return AutarkOsStates.BackupState.DISABLED;
         }
-        return "backup_enabled_no_restore_point";
+        return AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
     }
 }

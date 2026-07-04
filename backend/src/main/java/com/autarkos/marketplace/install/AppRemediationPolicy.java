@@ -1,5 +1,7 @@
 package com.autarkos.marketplace.install;
 
+import com.autarkos.api.AutarkOsStates;
+
 public final class AppRemediationPolicy {
 
     private AppRemediationPolicy() {
@@ -86,11 +88,11 @@ public final class AppRemediationPolicy {
     }
 
     private static boolean healthy(String status) {
-        return "Ready".equals(status) || "Running".equals(status);
+        return AutarkOsStates.AppStatus.READY.equals(status) || "Running".equals(status);
     }
 
     private static boolean needsUserAction(String status) {
-        return "Needs attention".equals(status) || "Unavailable".equals(status) || "Missing".equals(status);
+        return AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(status) || AutarkOsStates.AppStatus.UNAVAILABLE.equals(status) || AutarkOsStates.AppStatus.MISSING.equals(status);
     }
 
     private static boolean repairRunning(String normalizedRepairStatus) {

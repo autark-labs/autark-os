@@ -7,6 +7,7 @@ import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
@@ -122,13 +123,13 @@ public class SystemSummaryService implements SystemSummaryProvider {
                 .toList();
         return new AppsSummary(
                 apps.size(),
-                (int) apps.stream().filter(app -> "Ready".equals(app.userStatus())).count(),
-                (int) apps.stream().filter(app -> List.of("Missing", "Needs attention", "Managed elsewhere").contains(app.userStatus())).count(),
+                (int) apps.stream().filter(app -> AutarkOsStates.AppStatus.READY.equals(app.userStatus())).count(),
+                (int) apps.stream().filter(app -> List.of(AutarkOsStates.AppStatus.MISSING, AutarkOsStates.AppStatus.NEEDS_ATTENTION, "Managed elsewhere").contains(app.userStatus())).count(),
                 readyToOpen);
     }
 
     private BackupSummary backups(List<AppInstanceView> apps) {
-        boolean needsFirstRestorePoint = apps.stream().anyMatch(app -> "backup_enabled_no_restore_point".equals(app.backupState()));
+        boolean needsFirstRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(app.backupState()));
         return needsFirstRestorePoint
                 ? new BackupSummary("needs_restore_point", "At least one app has backups enabled but no restore point yet.")
                 : new BackupSummary("not_configured", "No restore point is required yet.");

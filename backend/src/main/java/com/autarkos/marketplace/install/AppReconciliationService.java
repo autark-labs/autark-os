@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.model.ApplicationManifest;
 
@@ -56,7 +57,7 @@ public class AppReconciliationService {
             return item(app.appId(), app.appName(), "Managed elsewhere", ownershipFrom(metadata), false, "Stored app metadata is not owned by this Autark-OS instance.");
         }
         if (containers.isEmpty()) {
-            return item(app.appId(), app.appName(), "Missing", DockerResourceOwnership.OWNED, false, "No owned containers were found for this app.");
+            return item(app.appId(), app.appName(), AutarkOsStates.AppStatus.MISSING, DockerResourceOwnership.OWNED, false, "No owned containers were found for this app.");
         }
         DockerResourceOwnership ownership = strongestOwnership(containers);
         if (ownership == DockerResourceOwnership.FOREIGN) {
@@ -67,7 +68,7 @@ public class AppReconciliationService {
                 String status = statusFromContainers(containers);
                 return item(app.appId(), app.appName(), status, DockerResourceOwnership.OWNED, lifecycleEligible(status, DockerResourceOwnership.OWNED), "Autark-OS explicitly adopted this legacy container.");
             }
-            return item(app.appId(), app.appName(), "Needs attention", ownership, false, "Docker reports legacy Autark-OS containers without instance ownership labels.");
+            return item(app.appId(), app.appName(), AutarkOsStates.AppStatus.NEEDS_ATTENTION, ownership, false, "Docker reports legacy Autark-OS containers without instance ownership labels.");
         }
         String status = statusFromContainers(containers);
         return item(app.appId(), app.appName(), status, ownership, lifecycleEligible(status, ownership), "Reconciled from owned Docker containers.");
@@ -123,23 +124,23 @@ public class AppReconciliationService {
                 .map(value -> value == null ? "" : value.toLowerCase())
                 .reduce("", (left, right) -> left + " " + right);
         if (joined.contains("unhealthy") || joined.contains("error")) {
-            return "Needs attention";
+            return AutarkOsStates.AppStatus.NEEDS_ATTENTION;
         }
         if (joined.contains("restarting") || joined.contains("starting") || joined.contains("created")) {
-            return "Starting";
+            return AutarkOsStates.AppStatus.STARTING;
         }
         if (joined.contains("exited") || joined.contains("dead")) {
-            return "Stopped";
+            return AutarkOsStates.AppStatus.STOPPED;
         }
         if (joined.contains("up") || joined.contains("running")) {
-            return "Ready";
+            return AutarkOsStates.AppStatus.READY;
         }
-        return "Starting";
+        return AutarkOsStates.AppStatus.STARTING;
     }
 
     private boolean lifecycleEligible(String status, DockerResourceOwnership ownership) {
         return ownership == DockerResourceOwnership.OWNED
-                && ("Ready".equals(status) || "Starting".equals(status) || "Stopped".equals(status));
+                && (AutarkOsStates.AppStatus.READY.equals(status) || AutarkOsStates.AppStatus.STARTING.equals(status) || AutarkOsStates.AppStatus.STOPPED.equals(status));
     }
 
     private AppReconciliationItem item(String appId, String appName, String status, DockerResourceOwnership ownership, boolean lifecycleEligible, String detail) {

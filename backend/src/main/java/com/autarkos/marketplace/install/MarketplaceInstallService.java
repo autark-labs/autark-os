@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
 import com.autarkos.marketplace.model.ApplicationManifest;
@@ -123,12 +124,12 @@ public class MarketplaceInstallService {
         if (!recoverableDuplicates.isEmpty()) {
             String message = recoverableDuplicateMessage(manifest);
             recordStep(steps, sink, InstallStep.failed("Checking existing services", message));
-            return new InstallResult(manifest.id(), manifest.name(), "failed", message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
         }
         if (!duplicates.isEmpty() && (options == null || !options.duplicateAcknowledgedRequested())) {
             String message = duplicateWarningMessage(manifest);
             recordStep(steps, sink, InstallStep.failed("Checking existing services", message));
-            return new InstallResult(manifest.id(), manifest.name(), "failed", message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
         }
         InstalledApp existingApp = installedAppRepository.findById(manifest.id()).orElse(null);
         if (existingApp != null && (options == null || !options.reinstallRequested())) {
@@ -167,7 +168,7 @@ public class MarketplaceInstallService {
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", String.join("\n", composeResult.output()));
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, "Docker Compose failed to start the app.", logs);
                 activityWarning("install_failed", "Install failed for " + manifest.name(), "Docker Compose could not start the app containers.", manifest.id());
-                return new InstallResult(manifest.id(), manifest.name(), "failed", "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+                return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
             }
             recordStep(steps, sink, InstallStep.completed("Starting services", "Docker Compose started the managed services."));
             StartupCheck startupCheck = waitForStartup(composeFile, composeProject, manifest.health());
@@ -177,7 +178,7 @@ public class MarketplaceInstallService {
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", startupCheck.detail());
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, startupCheck.detail(), logs);
                 activityWarning("install_failed", "Install needs attention for " + manifest.name(), startupCheck.detail(), manifest.id());
-                return new InstallResult(manifest.id(), manifest.name(), "failed", startupCheck.detail(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+                return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, startupCheck.detail(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
             }
             recordStep(steps, sink, InstallStep.completed("Checking app health", startupCheck.detail()));
             TailscaleServeResult privateAccess = configurePrivateAccess(manifest, runtimeConfiguration);
@@ -201,13 +202,13 @@ public class MarketplaceInstallService {
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", message);
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, message, logs);
                 activityWarning("install_failed", "Install ownership check failed for " + manifest.name(), message, manifest.id());
-                return new InstallResult(manifest.id(), manifest.name(), "failed", message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
+                return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
             }
 
             installedAppRepository.save(new InstalledApp(
                     manifest.id(),
                     manifest.name(),
-                    startupCheck.warmingUp() ? "Starting" : "Ready",
+                    startupCheck.warmingUp() ? AutarkOsStates.AppStatus.STARTING : AutarkOsStates.AppStatus.READY,
                     appRoot.toString(),
                     composeProject,
                     runtimeConfiguration.accessUrl(),
@@ -228,7 +229,7 @@ public class MarketplaceInstallService {
             }
             recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, exception.getMessage(), logs);
             activityError("install_failed", "Install failed for " + manifest.name(), exception.getMessage(), manifest.id(), exception);
-            return new InstallResult(manifest.id(), manifest.name(), "failed", exception.getMessage(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
+            return new InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, exception.getMessage(), runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, PostInstallProvisioningResult.empty()));
         }
     }
 

@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.discover.DiscoverInstalledAppSummary;
@@ -70,12 +71,12 @@ public class AppOwnershipService {
         InstalledApp installed = installedAppRepository.findById(manifest.id())
                 .filter(app -> ownershipCompatible(manifest.id()))
                 .orElse(null);
-        ObservedService recoverable = matchingObserved(manifest.id(), observedServices, service -> "legacy_autark_os".equals(service.ownershipState())).orElse(null);
-        ObservedService managedElsewhere = matchingObserved(manifest.id(), observedServices, service -> "foreign_autark_os".equals(service.ownershipState())).orElse(null);
-        ObservedService failedInstall = matchingObserved(manifest.id(), observedServices, service -> "failed_install".equals(service.ownershipState())).orElse(null);
-        ObservedService blocked = matchingObserved(manifest.id(), observedServices, service -> "unknown_conflict".equals(service.ownershipState())).orElse(null);
+        ObservedService recoverable = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);
+        ObservedService managedElsewhere = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS.equals(service.ownershipState())).orElse(null);
+        ObservedService failedInstall = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.FAILED_INSTALL.equals(service.ownershipState())).orElse(null);
+        ObservedService blocked = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.UNKNOWN_CONFLICT.equals(service.ownershipState())).orElse(null);
         ObservedService pinned = matchingObserved(manifest.id(), observedServices, service -> "pinned".equals(service.userVisibility())).orElse(null);
-        ObservedService found = matchingObserved(manifest.id(), observedServices, service -> !"owned_managed".equals(service.ownershipState())).orElse(null);
+        ObservedService found = matchingObserved(manifest.id(), observedServices, service -> !AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
 
         AppOwnershipState state = state(installed, recoverable, managedElsewhere, failedInstall, blocked, pinned, found);
         ObservedService observedService = switch (state) {
@@ -114,7 +115,7 @@ public class AppOwnershipService {
 
     private DiscoverInstalledAppSummary installedSummary(InstalledApp app) {
         String backupState = backupState(app);
-        boolean protectedByBackups = "protected_by_restore_point".equals(backupState);
+        boolean protectedByBackups = AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(backupState);
         return new DiscoverInstalledAppSummary(
                 app.appId(),
                 app.appName(),
@@ -122,21 +123,21 @@ public class AppOwnershipService {
                 app.accessUrl(),
                 backupState,
                 protectedByBackups,
-                "backup_enabled_no_restore_point".equals(backupState));
+                AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(backupState));
     }
 
     private String backupState(InstalledApp app) {
         InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallSettings.defaults(app.accessUrl()));
         if (settings.backup() == null || !settings.backup().enabled()) {
-            return "backup_disabled";
+            return AutarkOsStates.BackupState.DISABLED;
         }
         boolean hasCompletedRestorePoint = backupRepository.forApp(app.appId(), 10).stream()
                 .anyMatch(this::completedRestorePoint);
-        return hasCompletedRestorePoint ? "protected_by_restore_point" : "backup_enabled_no_restore_point";
+        return hasCompletedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
     }
 
     private boolean completedRestorePoint(RestorePoint restorePoint) {
-        return "completed".equalsIgnoreCase(restorePoint.status());
+        return AutarkOsStates.RestorePointStatus.COMPLETED.equalsIgnoreCase(restorePoint.status());
     }
 
     private boolean ownershipCompatible(String appId) {
