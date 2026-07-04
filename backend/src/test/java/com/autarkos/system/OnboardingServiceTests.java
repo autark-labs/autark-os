@@ -2,6 +2,7 @@ package com.autarkos.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import com.autarkos.system.api.OnboardingUpdateRequest;
 import com.autarkos.system.api.OnboardingState;
@@ -66,7 +67,7 @@ class OnboardingServiceTests {
     private OnboardingService service() {
         RuntimeLayout runtimeLayout = runtimeLayout();
         ProjectSettingsRepository repository = new ProjectSettingsRepository(runtimeLayout);
-        ProjectSettingsService settingsService = new ProjectSettingsService(repository, new ActivityLogService(new ActivityLogRepository(runtimeLayout)));
+        ProjectSettingsService settingsService = new ProjectSettingsService(repository, new ActivityLogService(mock(ActivityLogRepository.class)));
         return new OnboardingService(repository, settingsService, runtimeLayout, new FakeTailscaleService(), new FakeSystemDoctorService());
     }
 

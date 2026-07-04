@@ -12,7 +12,6 @@ import java.util.Locale;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.autarkos.activity.ActivityLogRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 
@@ -47,21 +46,6 @@ class AutarkOsDatabaseTests {
             assertThat(columnExists(statement, "app_health", "startup_grace")).isTrue();
             assertThat(columnExists(statement, "app_backups", "restore_confidence")).isTrue();
         }
-    }
-
-    @Test
-    void repositoriesUseSharedDatabaseMigrationPath() {
-        AutarkOsDatabase database = new AutarkOsDatabase(runtimeLayout());
-        ActivityLogRepository repository = new ActivityLogRepository(database);
-
-        repository.record("success", "system", "database_test", "Database migrated", "Migration-backed repository worked.", null, "completed", "");
-
-        assertThat(repository.recent(5))
-                .singleElement()
-                .satisfies(log -> {
-                    assertThat(log.category()).isEqualTo("system");
-                    assertThat(log.action()).isEqualTo("database_test");
-                });
     }
 
     @Test

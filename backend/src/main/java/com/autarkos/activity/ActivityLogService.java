@@ -1,5 +1,6 @@
 package com.autarkos.activity;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -7,6 +8,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ActivityLogService {
@@ -50,20 +52,62 @@ public class ActivityLogService {
     }
 
     public List<ActivityLog> recent(int limit) {
-        return repository.recent(limit);
+        return repository.recent(safeLimit(limit)).stream()
+                .map(this::activityLog)
+                .toList();
     }
 
     public List<ActivityLog> recent(int limit, String level, String category, String outcome, String appId) {
-        return repository.recent(limit, cleanFilter(level), cleanFilter(category), cleanFilter(outcome), cleanFilter(appId));
+        return repository.recentFiltered(
+                        safeLimit(limit),
+                        cleanFilter(level),
+                        cleanFilter(category),
+                        cleanFilter(outcome),
+                        cleanFilter(appId))
+                .stream()
+                .map(this::activityLog)
+                .toList();
     }
 
+    @Transactional
     private void record(String level, String category, String action, String title, String message, String appId, String outcome, String details) {
         try {
-            repository.record(level, category, action, title, message, appId, outcome, details);
+            repository.save(new ActivityLogEntity(
+                    clean(level, "info"),
+                    clean(category, "system"),
+                    clean(action, "activity"),
+                    clean(title, "Autark-OS activity"),
+                    clean(message, ""),
+                    cleanFilter(appId),
+                    clean(outcome, "recorded"),
+                    clean(details, ""),
+                    Instant.now().toString()));
             logToConsole(level, category, action, title, message, appId, outcome);
         } catch (RuntimeException exception) {
             LOGGER.warn("Unable to write Autark-OS activity log: {}", exception.getMessage());
         }
+    }
+
+    private ActivityLog activityLog(ActivityLogEntity entity) {
+        return new ActivityLog(
+                entity.id() == null ? 0 : entity.id(),
+                entity.level(),
+                entity.category(),
+                entity.action(),
+                entity.title(),
+                entity.message(),
+                entity.appId(),
+                entity.outcome(),
+                entity.details(),
+                Instant.parse(entity.createdAt()));
+    }
+
+    private int safeLimit(int limit) {
+        return Math.max(1, Math.min(limit, 200));
+    }
+
+    private String clean(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 
     private void logToConsole(String level, String category, String action, String title, String message, String appId, String outcome) {

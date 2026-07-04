@@ -1,6 +1,7 @@
 package com.autarkos.backups;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -60,9 +61,9 @@ class BackupServiceCanonicalAppTests {
                 runtimeLayout,
                 installedRepository,
                 backupRepository,
-                new ActivityLogService(new ActivityLogRepository(runtimeLayout)),
+                new ActivityLogService(mock(ActivityLogRepository.class)),
                 new ProjectSettingsRepository(runtimeLayout),
-                new ProjectSettingsService(new ProjectSettingsRepository(runtimeLayout), new ActivityLogService(new ActivityLogRepository(runtimeLayout))),
+                new ProjectSettingsService(new ProjectSettingsRepository(runtimeLayout), new ActivityLogService(mock(ActivityLogRepository.class))),
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository),
                 catalogService,
                 () -> List.of(appInstance("homepage", "Homepage")),
@@ -200,9 +201,9 @@ class BackupServiceCanonicalAppTests {
                 runtimeLayout,
                 installedRepository,
                 backupRepository,
-                new ActivityLogService(new ActivityLogRepository(runtimeLayout)),
+                new ActivityLogService(mock(ActivityLogRepository.class)),
                 new ProjectSettingsRepository(runtimeLayout),
-                new ProjectSettingsService(new ProjectSettingsRepository(runtimeLayout), new ActivityLogService(new ActivityLogRepository(runtimeLayout))),
+                new ProjectSettingsService(new ProjectSettingsRepository(runtimeLayout), new ActivityLogService(mock(ActivityLogRepository.class))),
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository, composeExecutor),
                 catalogService,
                 () -> List.of(appInstance("homepage", "Homepage")),

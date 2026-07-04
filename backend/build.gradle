@@ -28,6 +28,8 @@ dependencies {
 	implementation 'org.flywaydb:flyway-database-nc-sqlite:12.4.0'
 	implementation 'org.yaml:snakeyaml:2.5'
 	implementation 'org.xerial:sqlite-jdbc:3.50.3.0'
+	implementation 'org.hibernate.orm:hibernate-community-dialects'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'

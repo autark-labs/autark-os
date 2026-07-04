@@ -162,7 +162,9 @@ public class StorageService {
         Path path = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElse(null);
         long usedBytes = fileOperations.directorySize(path);
-        List<StorageTrendPoint> trend = storageSampleRepository.forAppSince(app.appId(), Instant.now().minus(STORAGE_SAMPLE_RETENTION));
+        List<StorageTrendPoint> trend = storageSampleRepository.forAppSince(app.appId(), Instant.now().minus(STORAGE_SAMPLE_RETENTION).toString()).stream()
+                .map(sample -> new StorageTrendPoint(sample.usedBytes(), Instant.parse(sample.sampledAt())))
+                .toList();
         long growth = trend.isEmpty() ? 0 : usedBytes - trend.getFirst().usedBytes();
         return new AppStorageUsage(
                 app.appId(),
@@ -180,9 +182,9 @@ public class StorageService {
     private void recordStorageSamples(List<AppStorageUsage> apps) {
         Instant sampledAt = Instant.now();
         for (AppStorageUsage app : apps) {
-            storageSampleRepository.record(app.appId(), app.usedBytes(), sampledAt);
+            storageSampleRepository.save(new StorageSampleEntity(app.appId(), app.usedBytes(), sampledAt.toString()));
         }
-        storageSampleRepository.deleteBefore(sampledAt.minus(STORAGE_SAMPLE_RETENTION));
+        storageSampleRepository.deleteBefore(sampledAt.minus(STORAGE_SAMPLE_RETENTION).toString());
     }
 
     private List<OrphanedStorage> orphanedStorage(Path appsRoot, Set<String> installedIds) {

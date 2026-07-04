@@ -1,6 +1,7 @@
 package com.autarkos.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -29,7 +30,7 @@ class ProjectSettingsServiceTests {
         InstalledAppRepository installedApps = new InstalledAppRepository(runtimeLayout);
         ProjectSettingsService service = new ProjectSettingsService(
                 new ProjectSettingsRepository(runtimeLayout),
-                new ActivityLogService(new ActivityLogRepository(runtimeLayout)),
+                new ActivityLogService(mock(ActivityLogRepository.class)),
                 installedApps);
         Instant installedAt = Instant.parse("2026-06-21T12:00:00Z");
         Instant checkedAt = Instant.parse("2026-06-21T12:30:00Z");

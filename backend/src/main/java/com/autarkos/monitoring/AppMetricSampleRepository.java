@@ -1,4 +1,4 @@
-package com.autarkos.system;
+package com.autarkos.monitoring;
 
 import java.util.List;
 
@@ -8,17 +8,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
-public interface StorageSampleRepository extends JpaRepository<StorageSampleEntity, Long> {
+public interface AppMetricSampleRepository extends JpaRepository<AppMetricSampleEntity, Long> {
 
     @Query(value = """
-            select * from app_storage_samples
-            where app_id = :appId and sampled_at >= :since
-            order by sampled_at asc
+            select * from app_metric_samples
+            where sampled_at >= :since
+            order by sampled_at asc, app_id asc
             """, nativeQuery = true)
-    List<StorageSampleEntity> forAppSince(@Param("appId") String appId, @Param("since") String since);
+    List<AppMetricSampleEntity> since(@Param("since") String since);
 
     @Modifying
     @Transactional
-    @Query(value = "delete from app_storage_samples where sampled_at < :cutoff", nativeQuery = true)
+    @Query(value = "delete from app_metric_samples where sampled_at < :cutoff", nativeQuery = true)
     int deleteBefore(@Param("cutoff") String cutoff);
 }

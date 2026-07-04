@@ -1,6 +1,7 @@
 package com.autarkos.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,8 +35,8 @@ class StorageServiceTests {
         StorageService service = new StorageService(
                 layout,
                 repository,
-                new ActivityLogService(new ActivityLogRepository(layout)),
-                new StorageSampleRepository(layout),
+                new ActivityLogService(mock(ActivityLogRepository.class)),
+                mock(StorageSampleRepository.class),
                 () -> List.of(appInstance("homepage")),
                 new RuntimeFileOperations());
 
@@ -49,8 +50,8 @@ class StorageServiceTests {
         return new StorageService(
                 layout,
                 new InstalledAppRepository(layout),
-                new ActivityLogService(new ActivityLogRepository(layout)),
-                new StorageSampleRepository(layout),
+                new ActivityLogService(mock(ActivityLogRepository.class)),
+                mock(StorageSampleRepository.class),
                 new RuntimeFileOperations());
     }
 

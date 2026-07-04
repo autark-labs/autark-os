@@ -1,6 +1,7 @@
 package com.autarkos.marketplace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,7 +37,7 @@ class AppUpdateServiceCanonicalAppTests {
         InstalledAppRepository repository = new InstalledAppRepository(runtimeLayout);
         repository.save(installed(runtimeLayout, "homepage", "Homepage"));
         repository.save(installed(runtimeLayout, "vaultwarden", "Vaultwarden"));
-        ActivityLogService activityLogService = new ActivityLogService(new ActivityLogRepository(runtimeLayout));
+        ActivityLogService activityLogService = new ActivityLogService(mock(ActivityLogRepository.class));
         AppUpdateService service = new AppUpdateService(
                 repository,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),

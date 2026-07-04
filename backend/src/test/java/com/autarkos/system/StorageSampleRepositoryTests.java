@@ -7,37 +7,43 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
-import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
-import com.autarkos.marketplace.runtime.RuntimeLayout;
-
+@SpringBootTest(properties = {
+        "autark-os.guardian.enabled=false",
+        "autark-os.backups.scheduler.enabled=false"
+})
 class StorageSampleRepositoryTests {
 
     @TempDir
-    Path runtimeRoot;
+    static Path runtimeRoot;
+
+    @Autowired
+    StorageSampleRepository repository;
+
+    @DynamicPropertySource
+    static void runtimeProperties(DynamicPropertyRegistry registry) {
+        registry.add("autark-os.runtime-root", () -> runtimeRoot.toString());
+    }
 
     @Test
     void recordsQueriesAndDeletesSamplesByAppAndTime() {
-        StorageSampleRepository repository = new StorageSampleRepository(runtimeLayout());
         Instant old = Instant.parse("2026-06-19T00:00:00Z");
         Instant current = Instant.parse("2026-06-19T01:00:00Z");
 
-        repository.record("vaultwarden", 100, old);
-        repository.record("vaultwarden", 200, current);
-        repository.record("gitea", 999, current);
-        repository.deleteBefore(current);
+        repository.save(new StorageSampleEntity("vaultwarden", 100, old.toString()));
+        repository.save(new StorageSampleEntity("vaultwarden", 200, current.toString()));
+        repository.save(new StorageSampleEntity("gitea", 999, current.toString()));
+        repository.deleteBefore(current.toString());
 
-        assertThat(repository.forAppSince("vaultwarden", old))
-                .extracting(StorageTrendPoint::usedBytes)
+        assertThat(repository.forAppSince("vaultwarden", old.toString()))
+                .extracting(StorageSampleEntity::usedBytes)
                 .containsExactly(200L);
-        assertThat(repository.forAppSince("gitea", old))
-                .extracting(StorageTrendPoint::usedBytes)
+        assertThat(repository.forAppSince("gitea", old.toString()))
+                .extracting(StorageSampleEntity::usedBytes)
                 .containsExactly(999L);
-    }
-
-    private RuntimeLayout runtimeLayout() {
-        AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
-        properties.setRuntimeRoot(runtimeRoot.toString());
-        return new RuntimeLayout(properties);
     }
 }

@@ -17,17 +17,19 @@ public class MonitoringMetricsService {
     private static final int DEFAULT_WINDOW_MINUTES = 60;
     private static final int RETENTION_MINUTES = 360;
 
-    private final MonitoringMetricsRepository repository;
+    private final HostMetricSampleRepository hostSamples;
+    private final AppMetricSampleRepository appSamples;
 
-    public MonitoringMetricsService(MonitoringMetricsRepository repository) {
-        this.repository = repository;
+    public MonitoringMetricsService(HostMetricSampleRepository hostSamples, AppMetricSampleRepository appSamples) {
+        this.hostSamples = hostSamples;
+        this.appSamples = appSamples;
     }
 
     public void recordHost(SystemMetrics metrics) {
         if (metrics == null) {
             return;
         }
-        repository.recordHost(new HostMetricSample(
+        hostSamples.save(new HostMetricSampleEntity(new HostMetricSample(
                 normalize(metrics.systemCpuPercent()),
                 normalize(metrics.processCpuPercent()),
                 normalize(metrics.usedMemoryPercent()),
@@ -36,7 +38,7 @@ public class MonitoringMetricsService {
                 metrics.freeMemoryBytes(),
                 metrics.runtimeTotalBytes(),
                 metrics.runtimeUsableBytes(),
-                metrics.checkedAt()));
+                metrics.checkedAt())));
         enforceRetention();
     }
 
@@ -49,12 +51,12 @@ public class MonitoringMetricsService {
             if (appId == null || appId.isBlank() || telemetry == null) {
                 return;
             }
-            repository.recordApp(new AppMetricSample(
+            appSamples.save(new AppMetricSampleEntity(new AppMetricSample(
                     appId,
                     parsePercent(telemetry.cpuPercent()),
                     parsePercent(telemetry.memoryPercent()),
                     telemetry.memoryUsage(),
-                    telemetry.checkedAt() == null ? sampledAt : telemetry.checkedAt()));
+                    telemetry.checkedAt() == null ? sampledAt : telemetry.checkedAt())));
         });
         enforceRetention();
     }
@@ -66,8 +68,8 @@ public class MonitoringMetricsService {
                 windowMinutes,
                 RETENTION_MINUTES,
                 windowLabel(windowMinutes),
-                repository.hostSamplesSince(since),
-                repository.appSamplesSince(since),
+                hostSamples.since(since.toString()).stream().map(HostMetricSampleEntity::toSample).toList(),
+                appSamples.since(since.toString()).stream().map(AppMetricSampleEntity::toSample).toList(),
                 Instant.now());
     }
 
@@ -93,7 +95,9 @@ public class MonitoringMetricsService {
     }
 
     private void enforceRetention() {
-        repository.deleteBefore(Instant.now().minus(Duration.ofMinutes(RETENTION_MINUTES)));
+        String cutoff = Instant.now().minus(Duration.ofMinutes(RETENTION_MINUTES)).toString();
+        hostSamples.deleteBefore(cutoff);
+        appSamples.deleteBefore(cutoff);
     }
 
     private int safeWindow(Integer requestedWindowMinutes) {

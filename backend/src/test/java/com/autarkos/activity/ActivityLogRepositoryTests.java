@@ -6,35 +6,42 @@ import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
-import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
-import com.autarkos.marketplace.runtime.RuntimeLayout;
-
+@SpringBootTest(properties = {
+        "autark-os.guardian.enabled=false",
+        "autark-os.backups.scheduler.enabled=false"
+})
 class ActivityLogRepositoryTests {
 
     @TempDir
-    Path runtimeRoot;
+    static Path runtimeRoot;
+
+    @Autowired
+    ActivityLogRepository repository;
+
+    @Autowired
+    ActivityLogService service;
+
+    @DynamicPropertySource
+    static void runtimeProperties(DynamicPropertyRegistry registry) {
+        registry.add("autark-os.runtime-root", () -> runtimeRoot.toString());
+    }
 
     @Test
     void recordsAndReadsRecentActivity() {
-        ActivityLogRepository repository = new ActivityLogRepository(runtimeLayout());
+        service.success("marketplace", "install_completed", "Installed Vaultwarden", "Vaultwarden is ready.", "vaultwarden");
 
-        repository.record("success", "marketplace", "install_completed", "Installed Vaultwarden", "Vaultwarden is ready.", "vaultwarden", "completed", "durationMs=1200");
-
-        assertThat(repository.recent(10))
+        assertThat(service.recent(10))
                 .singleElement()
                 .satisfies(log -> {
                     assertThat(log.level()).isEqualTo("success");
                     assertThat(log.category()).isEqualTo("marketplace");
                     assertThat(log.action()).isEqualTo("install_completed");
                     assertThat(log.appId()).isEqualTo("vaultwarden");
-                    assertThat(log.details()).isEqualTo("durationMs=1200");
                 });
-    }
-
-    private RuntimeLayout runtimeLayout() {
-        AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
-        properties.setRuntimeRoot(runtimeRoot.toString());
-        return new RuntimeLayout(properties);
     }
 }
