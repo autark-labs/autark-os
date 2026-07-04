@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'vitest';
-import { proStatusViewModel } from '../ProPage.logic';
+import { normalizeLicenseCode, proStatusViewModel } from '../ProPage.logic';
 import type { ProStatus } from '@/types/pro';
 
 function status(overrides: Partial<ProStatus> = {}): ProStatus {
@@ -42,5 +42,12 @@ describe('proStatusViewModel', () => {
     assert.equal(proStatusViewModel(status({ registered: true, installId: 'install_local_123' })).badge, 'Registered');
     assert.equal(proStatusViewModel(status({ enabled: true, registered: true, mode: 'accountless', entitlementStatus: 'active', plan: 'Pro' })).badge, 'Active');
     assert.equal(proStatusViewModel(status({ enabled: false, registered: true, mode: 'accountless', entitlementStatus: 'active' })).badge, 'Disabled');
+  });
+});
+
+describe('normalizeLicenseCode', () => {
+  test('trims license codes before submit and rejects empty input locally', () => {
+    assert.equal(normalizeLicenseCode(' AUTARK-PRO-TEST-0001 '), 'AUTARK-PRO-TEST-0001');
+    assert.equal(normalizeLicenseCode('   '), '');
   });
 });

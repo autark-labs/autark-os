@@ -1,6 +1,7 @@
 package com.autarkos.pro;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.reflect.RecordComponent;
 import java.nio.file.Path;
@@ -174,6 +175,102 @@ class ProServiceTests {
         });
     }
 
+    @Test
+    void redeemLicenseActivatesAccountlessProForRegisteredInstall() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        Instant createdAt = Instant.parse("2026-07-04T10:00:00Z");
+        repository.saveSettings(new ProModels.ProSettings(
+                true,
+                "free",
+                "ins_registered",
+                "tok_registered",
+                false,
+                null,
+                null,
+                "none",
+                null,
+                true,
+                true,
+                true,
+                false,
+                null,
+                null,
+                null,
+                null,
+                createdAt,
+                createdAt));
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T12:30:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        ProModels.ProStatus status = service.redeemLicense(" AUTARK-PRO-TEST-0001 ");
+
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.mode()).isEqualTo("accountless");
+        assertThat(status.registered()).isTrue();
+        assertThat(status.installId()).isEqualTo("ins_registered");
+        assertThat(status.plan()).isEqualTo("autark_pro_test");
+        assertThat(status.entitlementStatus()).isEqualTo("active");
+        assertThat(status.entitlementExpiresAt()).isEqualTo(Instant.parse("2027-07-04T00:00:00Z"));
+        assertThat(status.lastEntitlementCheckAt()).isEqualTo(Instant.parse("2026-07-04T12:30:00Z"));
+        assertThat(remoteClient.redeemCalls.get()).isEqualTo(1);
+        assertThat(remoteClient.lastRedeemRequest.installId()).isEqualTo("ins_registered");
+        assertThat(remoteClient.lastRedeemRequest.licenseCode()).isEqualTo("AUTARK-PRO-TEST-0001");
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.installTokenProtected()).isEqualTo("tok_registered");
+            assertThat(settings.mode()).isEqualTo("accountless");
+            assertThat(settings.plan()).isEqualTo("autark_pro_test");
+        });
+    }
+
+    @Test
+    void redeemLicenseAutoRegistersFreshInstallInLocalMockMode() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T12:30:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        ProModels.ProStatus status = service.redeemLicense("AUTARK-PRO-TEST-0001");
+
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.mode()).isEqualTo("accountless");
+        assertThat(status.installId()).isEqualTo("ins_story_4");
+        assertThat(remoteClient.registerCalls.get()).isEqualTo(1);
+        assertThat(remoteClient.redeemCalls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void redeemLicenseRejectsInvalidLicenseWithProSpecificCopy() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        repository.saveSettings(ProModels.ProSettings.defaults(Instant.parse("2026-07-04T10:00:00Z")));
+        RecordingRemoteClient remoteClient = new RecordingRemoteClient();
+        ProService service = new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T12:30:00Z"),
+                false,
+                remoteClient,
+                () -> "1.2.3");
+
+        assertThatThrownBy(() -> service.redeemLicense("NOPE"))
+                .isInstanceOf(ProRemoteException.class)
+                .hasMessageContaining("Autark Pro could not activate that license");
+
+        assertThat(remoteClient.registerCalls.get()).isEqualTo(1);
+        assertThat(remoteClient.redeemCalls.get()).isEqualTo(1);
+        assertThat(repository.settings()).hasValueSatisfying(settings -> {
+            assertThat(settings.mode()).isEqualTo("free");
+            assertThat(settings.entitlementStatus()).isEqualTo("none");
+        });
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -188,7 +285,9 @@ class ProServiceTests {
 
     private static class RecordingRemoteClient implements ProRemoteClient {
         private final AtomicInteger registerCalls = new AtomicInteger();
+        private final AtomicInteger redeemCalls = new AtomicInteger();
         private ProRemoteModels.RegisterInstallRequest lastRegisterRequest;
+        private ProRemoteModels.RedeemLicenseRequest lastRedeemRequest;
 
         @Override
         public ProRemoteModels.RegisterInstallResponse registerInstall(ProRemoteModels.RegisterInstallRequest request) {
@@ -202,7 +301,20 @@ class ProServiceTests {
 
         @Override
         public ProRemoteModels.RedeemLicenseResponse redeemLicense(ProRemoteModels.RedeemLicenseRequest request) {
-            throw new UnsupportedOperationException();
+            redeemCalls.incrementAndGet();
+            lastRedeemRequest = request;
+            if (request.licenseCode() != null && request.licenseCode().startsWith("AUTARK-PRO-")) {
+                return new ProRemoteModels.RedeemLicenseResponse(
+                        "autark_pro_test",
+                        "active",
+                        Instant.parse("2027-07-04T00:00:00Z"),
+                        "License accepted.");
+            }
+            return new ProRemoteModels.RedeemLicenseResponse(
+                    null,
+                    "none",
+                    null,
+                    "This license code was not accepted.");
         }
 
         @Override

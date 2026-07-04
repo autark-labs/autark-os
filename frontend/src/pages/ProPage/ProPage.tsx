@@ -5,18 +5,23 @@ import { ProAPIClient } from '@/api/proApi';
 import { apiErrorMessage } from '@/api/httpClient';
 import { PageShell } from '@/components/layout/PageShell';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import type { ProStatus } from '@/types/pro';
-import { formatProTimestamp, proStatusViewModel } from './ProPage.logic';
+import { formatProTimestamp, normalizeLicenseCode, proStatusViewModel } from './ProPage.logic';
 
 function ProPage() {
   const [status, setStatus] = useState<ProStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [redeeming, setRedeeming] = useState(false);
+  const [licenseCode, setLicenseCode] = useState('');
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load(background = false) {
@@ -57,6 +62,34 @@ function ProPage() {
       showActionErrorNotification(registerError, 'Autark Pro registration failed');
     } finally {
       setRegistering(false);
+    }
+  }
+
+  async function redeemLicense() {
+    const trimmedLicenseCode = normalizeLicenseCode(licenseCode);
+    if (!trimmedLicenseCode) {
+      setLicenseError('Enter a license code before activating Pro.');
+      return;
+    }
+
+    setRedeeming(true);
+    setLicenseError(null);
+    setError(null);
+    try {
+      const redeemedStatus = await ProAPIClient.redeemLicense(trimmedLicenseCode);
+      setStatus(redeemedStatus);
+      setLicenseCode('');
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: 'Autark Pro activated',
+        message: 'This install is now using accountless Pro.',
+      }, 'Autark Pro activated');
+    } catch (redeemError) {
+      setLicenseError(apiErrorMessage(redeemError, 'Autark Pro activation failed.'));
+      showActionErrorNotification(redeemError, 'Autark Pro activation failed');
+    } finally {
+      setRedeeming(false);
     }
   }
 
@@ -140,7 +173,17 @@ function ProPage() {
             </ProjectPanel>
 
             <div className="grid gap-5 lg:grid-cols-2">
-              <ActivationPanel onRegister={registerInstall} registering={registering} status={status} />
+              <ActivationPanel
+                licenseCode={licenseCode}
+                licenseError={licenseError}
+                onLicenseCodeChange={setLicenseCode}
+                onLicenseErrorClear={() => setLicenseError(null)}
+                onRedeem={redeemLicense}
+                onRegister={registerInstall}
+                redeeming={redeeming}
+                registering={registering}
+                status={status}
+              />
               <PrivacyPanel status={status} />
               <HeartbeatPanel status={status} />
               <FeedPanel status={status} />
@@ -177,14 +220,28 @@ function StatusFact({ label, value }: { label: string; value: string }) {
 }
 
 function ActivationPanel({
+  licenseCode,
+  licenseError,
+  onLicenseCodeChange,
+  onLicenseErrorClear,
+  onRedeem,
   onRegister,
+  redeeming,
   registering,
   status,
 }: {
+  licenseCode: string;
+  licenseError: string | null;
+  onLicenseCodeChange: (value: string) => void;
+  onLicenseErrorClear: () => void;
+  onRedeem: () => void;
   onRegister: () => void;
+  redeeming: boolean;
   registering: boolean;
   status: ProStatus;
 }) {
+  const active = status.enabled && status.mode === 'accountless' && status.entitlementStatus === 'active';
+
   return (
     <ProjectPanel>
       <SectionHeading icon={Sparkles} title="Activation" />
@@ -193,10 +250,31 @@ function ActivationPanel({
           <p className="text-sm font-bold text-white">{status.registered ? 'This install is registered.' : 'Register this install to enable Pro actions later.'}</p>
           <p className="mt-1 text-sm leading-6 text-slate-400">Account linking is coming later.</p>
         </ProjectInset>
-        <ProjectPrimaryButton disabled={registering || status.registered} onClick={onRegister} type="button">
+        <ProjectPrimaryButton disabled={registering || status.registered || redeeming} onClick={onRegister} type="button">
           {registering && <Loader2 className="size-4 animate-spin" />}
           {status.registered ? 'Install registered' : 'Register this Autark install'}
         </ProjectPrimaryButton>
+        <div className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
+          <Label className="text-sky-100" htmlFor="pro-license-code">Accountless license</Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              className="border-sky-400/30 bg-slate-950 text-slate-50 placeholder:text-slate-500"
+              disabled={redeeming || active}
+              id="pro-license-code"
+              onChange={(event) => {
+                onLicenseErrorClear();
+                onLicenseCodeChange(event.target.value);
+              }}
+              placeholder="AUTARK-PRO-XXXX-XXXX"
+              value={licenseCode}
+            />
+            <ProjectPrimaryButton className="shrink-0" disabled={redeeming || active} onClick={onRedeem} type="button">
+              {redeeming && <Loader2 className="size-4 animate-spin" />}
+              {active ? 'Accountless Pro active' : 'Activate accountless Pro'}
+            </ProjectPrimaryButton>
+          </div>
+          {licenseError && <p className="text-sm font-semibold text-orange-200">{licenseError}</p>}
+        </div>
       </div>
     </ProjectPanel>
   );

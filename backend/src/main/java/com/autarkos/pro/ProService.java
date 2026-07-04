@@ -90,6 +90,56 @@ public class ProService {
         return ProModels.ProStatus.from(registered, remoteApiConfigured, null);
     }
 
+    public ProModels.ProStatus redeemLicense(String licenseCode) {
+        String trimmedLicenseCode = licenseCode == null ? "" : licenseCode.trim();
+        if (!hasText(trimmedLicenseCode)) {
+            throw new ProRemoteException("Enter a license code before activating Autark Pro.");
+        }
+
+        ProModels.ProSettings current = repository.settings()
+                .orElseGet(() -> ProModels.ProSettings.defaults(clock.get()));
+        if (!hasText(current.installId())) {
+            if (remoteApiConfigured) {
+                throw new ProRemoteException("Register this Autark-OS install before redeeming a Pro license.");
+            }
+            registerInstall();
+            current = repository.settings()
+                    .orElseGet(() -> ProModels.ProSettings.defaults(clock.get()));
+        }
+
+        ProRemoteModels.RedeemLicenseResponse response = remoteClient.redeemLicense(new ProRemoteModels.RedeemLicenseRequest(
+                current.installId(),
+                trimmedLicenseCode));
+        if (!"active".equalsIgnoreCase(response.entitlementStatus())) {
+            String detail = firstPresent(response.userMessage(), "Check the code and try again.");
+            throw new ProRemoteException("Autark Pro could not activate that license. " + detail);
+        }
+
+        Instant now = clock.get();
+        ProModels.ProSettings activated = new ProModels.ProSettings(
+                true,
+                "accountless",
+                current.installId(),
+                current.installTokenProtected(),
+                current.accountLinked(),
+                current.accountEmail(),
+                response.plan(),
+                response.entitlementStatus(),
+                response.entitlementExpiresAt(),
+                current.healthReportingEnabled(),
+                current.alertsEnabled(),
+                current.proFeedEnabled(),
+                current.configSnapshotEnabled(),
+                current.lastHeartbeatAt(),
+                current.lastHeartbeatResult(),
+                now,
+                current.lastFeedSyncAt(),
+                current.createdAt() == null ? now : current.createdAt(),
+                now);
+        repository.saveSettings(activated);
+        return ProModels.ProStatus.from(activated, remoteApiConfigured, null);
+    }
+
     private static String platform() {
         return firstPresent(System.getProperty("os.name"), "unknown")
                 + "-"

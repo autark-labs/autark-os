@@ -11,4 +11,9 @@ export const ProAPIClient = {
     const response = await httpClient.post<ProStatus>('/api/pro/register');
     return response.data;
   },
+
+  async redeemLicense(licenseCode: string) {
+    const response = await httpClient.post<ProStatus>('/api/pro/redeem-license', { licenseCode });
+    return response.data;
+  },
 };

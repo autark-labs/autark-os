@@ -54,3 +54,7 @@ export function formatProTimestamp(value: string | null) {
     timeStyle: 'short',
   }).format(new Date(value));
 }
+
+export function normalizeLicenseCode(value: string) {
+  return value.trim();
+}

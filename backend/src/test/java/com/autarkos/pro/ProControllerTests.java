@@ -46,6 +46,24 @@ class ProControllerTests {
         });
     }
 
+    @Test
+    void redeemsAccountlessLicense() {
+        ProSettingsRepository repository = JpaTestRepositories.proSettingsRepository(runtimeLayout());
+        ProController controller = new ProController(new ProService(
+                repository,
+                () -> Instant.parse("2026-07-04T10:00:00Z"),
+                false,
+                new ControllerRemoteClient(),
+                () -> "1.2.3"));
+
+        var status = controller.redeemLicense(new ProController.RedeemLicenseRequest(" AUTARK-PRO-CONTROLLER "));
+
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.mode()).isEqualTo("accountless");
+        assertThat(status.entitlementStatus()).isEqualTo("active");
+        assertThat(status.installId()).isEqualTo("ins_controller");
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -60,7 +78,11 @@ class ProControllerTests {
 
         @Override
         public ProRemoteModels.RedeemLicenseResponse redeemLicense(ProRemoteModels.RedeemLicenseRequest request) {
-            throw new UnsupportedOperationException();
+            return new ProRemoteModels.RedeemLicenseResponse(
+                    "autark_pro_controller",
+                    "active",
+                    Instant.parse("2027-07-04T00:00:00Z"),
+                    "License accepted.");
         }
 
         @Override

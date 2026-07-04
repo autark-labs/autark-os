@@ -26,6 +26,7 @@ test('Pro page has a local route, navigation entry, typed API client, and no hos
   const api = source('src/api/proApi.ts');
   assert.match(api, /get<ProStatus>\('\/api\/pro\/status'\)/);
   assert.match(api, /post<ProStatus>\('\/api\/pro\/register'\)/);
+  assert.match(api, /post<ProStatus>\('\/api\/pro\/redeem-license'/);
   assert.doesNotMatch(api, /supabase/i);
 
   const page = source('src/pages/ProPage/ProPage.tsx');
@@ -49,5 +50,20 @@ test('Pro registration action updates status and uses action notifications', () 
   assert.match(page, /showActionNotification\(\{[\s\S]*title: 'Autark Pro registered'/);
   assert.match(page, /showActionErrorNotification\(registerError, 'Autark Pro registration failed'\)/);
   assert.match(page, /Register this Autark install/);
-  assert.match(page, /disabled=\{registering \|\| status\.registered\}/);
+  assert.match(page, /disabled=\{registering \|\| status\.registered \|\| redeeming\}/);
+});
+
+test('Pro license redemption trims input, avoids empty network calls, and refreshes status', () => {
+  const page = source('src/pages/ProPage/ProPage.tsx');
+
+  assert.match(page, /const \[licenseCode, setLicenseCode\]/);
+  assert.match(page, /async function redeemLicense/);
+  assert.match(page, /normalizeLicenseCode\(licenseCode\)/);
+  assert.match(page, /setLicenseError\('Enter a license code before activating Pro\.'\)/);
+  assert.match(page, /await ProAPIClient\.redeemLicense\(trimmedLicenseCode\)/);
+  assert.match(page, /setStatus\(redeemedStatus\)/);
+  assert.match(page, /showActionNotification\(\{[\s\S]*title: 'Autark Pro activated'/);
+  assert.match(page, /showActionErrorNotification\(redeemError, 'Autark Pro activation failed'\)/);
+  assert.match(page, /placeholder="AUTARK-PRO-XXXX-XXXX"/);
+  assert.match(page, /Activate accountless Pro/);
 });
