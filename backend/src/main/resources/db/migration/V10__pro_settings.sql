@@ -1,0 +1,22 @@
+create table if not exists pro_settings(
+    id integer primary key check (id = 1),
+    enabled integer not null default 0,
+    mode text not null default 'free',
+    install_id text,
+    install_token_protected text,
+    account_linked integer not null default 0,
+    account_email text,
+    plan text,
+    entitlement_status text not null default 'none',
+    entitlement_expires_at text,
+    health_reporting_enabled integer not null default 1,
+    alerts_enabled integer not null default 1,
+    pro_feed_enabled integer not null default 1,
+    config_snapshot_enabled integer not null default 0,
+    last_heartbeat_at text,
+    last_heartbeat_result text,
+    last_entitlement_check_at text,
+    last_feed_sync_at text,
+    created_at text not null,
+    updated_at text not null
+);
