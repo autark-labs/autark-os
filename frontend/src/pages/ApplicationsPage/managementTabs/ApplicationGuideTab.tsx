@@ -1,4 +1,5 @@
-import { Copy, ExternalLink, KeyRound, ListChecks, QrCode, Sparkles } from 'lucide-react';
+import { ExternalLink, KeyRound, ListChecks, QrCode, Sparkles } from 'lucide-react';
+import { CopyTextButton } from '@/components/autark-os/CopyTextButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { AppSetupField, AppUsageValue } from '@/types/app';
@@ -99,19 +100,9 @@ function CopyValue({ label, sensitive = false, value }: { label: string; sensiti
     <div className="grid gap-2 rounded-lg bg-slate-900 p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-medium text-sky-100/60">{label}</span>
-        <Button
-          aria-label={`Copy ${label}`}
-          className="border-sky-400/30 bg-slate-800 text-sky-50 hover:bg-slate-700"
-          disabled={!value}
-          onClick={() => void navigator.clipboard?.writeText(value)}
-          size="icon-sm"
-          type="button"
-          variant="outline"
-        >
-          <Copy />
-        </Button>
+        <CopyTextButton label={label} value={value} />
       </div>
-      <p className="truncate font-mono text-xs text-white">{sensitive ? '••••••••••••' : value || 'Not available'}</p>
+      <p className="select-text truncate font-mono text-xs text-white">{sensitive ? '••••••••••••' : value || 'Not available'}</p>
     </div>
   );
 }

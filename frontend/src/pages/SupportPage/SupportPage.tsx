@@ -10,6 +10,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { copyText } from '@/lib/copyText';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -90,8 +91,13 @@ function SupportPage() {
     try {
       const bundle = await SystemAPIClient.supportBundle();
       setState((current) => ({ ...current, bundle, summary: summaryFromBundle(bundle), setup: bundle.setup || current.setup, logs: bundle.logs || current.logs }));
-      await navigator.clipboard.writeText(bundle.bundleText);
-      showActionNotification({ ok: true, severity: 'success', title: 'Support bundle copied', message: 'Redacted diagnostics are ready to share.' }, 'Support bundle copied');
+      const copyResult = await copyText(bundle.bundleText);
+      if (copyResult.ok) {
+        showActionNotification({ ok: true, severity: 'success', title: 'Support bundle copied', message: 'Redacted diagnostics are ready to share.' }, 'Support bundle copied');
+      } else {
+        showActionNotification({ ok: true, severity: 'success', title: 'Support bundle ready', message: 'Redacted diagnostics are ready to share below.' }, 'Support bundle ready');
+        showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: copyResult.message }, 'Copy unavailable');
+      }
     } catch (err) {
       showActionErrorNotification(err, 'Support bundle failed');
     } finally {
@@ -265,10 +271,10 @@ function SupportPage() {
             </div>
           </SupportPanel>
 
-          {showAdvancedMetrics && (
+          {(showAdvancedMetrics || state.bundle) && (
             <SupportPanel>
               <SectionHeader compact icon={Copy} title="Support bundle preview" description="Shown after you generate a bundle." />
-              <pre className="mt-4 max-h-[260px] overflow-auto whitespace-pre-wrap rounded-lg border border-sky-400/25 bg-slate-950/70 p-4 text-xs leading-5 text-slate-400">{state.bundle?.bundleText || 'Generate a support bundle to preview redacted details.'}</pre>
+              <pre className="mt-4 max-h-[260px] select-text overflow-auto whitespace-pre-wrap rounded-lg border border-sky-400/25 bg-slate-950/70 p-4 text-xs leading-5 text-slate-400">{state.bundle?.bundleText || 'Generate a support bundle to preview redacted details.'}</pre>
             </SupportPanel>
           )}
 

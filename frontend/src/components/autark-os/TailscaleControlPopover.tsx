@@ -5,6 +5,7 @@ import { NetworkAPIClient } from '@/api/NetworkAPIClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { copyText } from '@/lib/copyText';
 import {
   Popover,
   PopoverContent,
@@ -60,7 +61,11 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
   async function copyHostname() {
     const hostname = status?.dnsName || status?.deviceName || '';
     if (!hostname) return;
-    await navigator.clipboard.writeText(hostname);
+    const result = await copyText(hostname);
+    if (!result.ok) {
+      showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+      return;
+    }
     setCopied(true);
     showActionNotification({ ok: true, severity: 'success', title: 'Hostname copied', message: hostname }, 'Hostname copied');
     window.setTimeout(() => setCopied(false), 1600);
@@ -68,7 +73,11 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
 
   async function copySetupCommand() {
     const command = check?.actionCommand || 'sudo tailscale up';
-    await navigator.clipboard.writeText(command);
+    const result = await copyText(command);
+    if (!result.ok) {
+      showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+      return;
+    }
     showActionNotification({ ok: true, severity: 'success', title: 'Tailscale command copied', message: command }, 'Tailscale command copied');
   }
 

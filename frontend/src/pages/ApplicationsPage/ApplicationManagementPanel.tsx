@@ -7,6 +7,8 @@ import {
 } from '@/components/ui/accordion';
 import { Copy } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { showActionNotification } from '@/lib/actionNotifications';
+import { copyText } from '@/lib/copyText';
 import { cn } from '@/lib/utils';
 import { ApplicationDarkControlButton } from './components/ApplicationButtons';
 import { DestructiveActionDialog } from './components/DestructiveActionDialog';
@@ -284,8 +286,13 @@ function formatRuntimeTimestamp(value?: string) {
   }).format(timestamp);
 }
 
-function copySupportDetails(item: ApplicationSurfaceItem) {
-  void navigator.clipboard?.writeText(supportDetailsText(item));
+async function copySupportDetails(item: ApplicationSurfaceItem) {
+  const result = await copyText(supportDetailsText(item));
+  if (!result.ok) {
+    showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+    return;
+  }
+  showActionNotification({ ok: true, severity: 'success', title: 'Support details copied', message: 'App details are ready to share.' }, 'Support details copied');
 }
 
 function supportDetailsText(item: ApplicationSurfaceItem) {

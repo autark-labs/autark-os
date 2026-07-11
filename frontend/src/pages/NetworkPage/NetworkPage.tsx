@@ -27,6 +27,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { copyText } from '@/lib/copyText';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import {
@@ -128,7 +129,11 @@ function NetworkPage() {
 
   const copyAccessLink = useCallback(async (appId: string, linkKind: string, url: string | null) => {
     if (!url) return;
-    await navigator.clipboard.writeText(url);
+    const result = await copyText(url);
+    if (!result.ok) {
+      showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+      return;
+    }
     showActionNotification({ ok: true, severity: 'success', title: 'Link copied', message: url }, 'Link copied');
     const copiedKey = `${appId}:${linkKind}`;
     setCopiedLinkKey(copiedKey);

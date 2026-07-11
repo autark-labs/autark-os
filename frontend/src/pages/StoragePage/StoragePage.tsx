@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { backupSafetyChecklist } from '@/lib/backupSafety';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { copyText } from '@/lib/copyText';
 import { cn } from '@/lib/utils';
 import { useCleanupOrphanMutation, useStorageReportRepository } from '@/repositories/storageRepository';
 import type { AppStorageUsage, OrphanedStorage, StorageRecommendation, StorageReport, StorageUsage } from '@/types/system';
@@ -34,8 +35,13 @@ function StoragePage() {
   const error = actionError ?? (storage.error ? apiErrorMessage(storage.error, 'Storage data could not be loaded.') : null);
 
   async function copy(value: string, id: string) {
-    await navigator.clipboard.writeText(value);
+    const result = await copyText(value);
+    if (!result.ok) {
+      showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+      return;
+    }
     setCopied(id);
+    showActionNotification({ ok: true, severity: 'success', title: 'Path copied', message: value }, 'Path copied');
     window.setTimeout(() => setCopied(null), 1600);
   }
 

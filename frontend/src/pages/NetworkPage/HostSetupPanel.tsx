@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { CheckCircle2, Copy, ServerCog, ShieldAlert, Terminal } from 'lucide-react';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
+import { showActionNotification } from '@/lib/actionNotifications';
+import { copyText } from '@/lib/copyText';
 import { cn } from '@/lib/utils';
 import type { SystemSetupCheck, SystemSetupStatus } from '@/types/network';
 import { NetworkInset, NetworkPanel } from './NetworkPage.shared';
@@ -10,8 +12,13 @@ export function HostSetupPanel({ setup }: { setup: SystemSetupStatus | null }) {
   const [copied, setCopied] = useState<string | null>(null);
 
   async function copy(value: string, id: string) {
-    await navigator.clipboard.writeText(value);
+    const result = await copyText(value);
+    if (!result.ok) {
+      showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+      return;
+    }
     setCopied(id);
+    showActionNotification({ ok: true, severity: 'success', title: 'Command copied', message: value }, 'Command copied');
     window.setTimeout(() => setCopied((current) => current === id ? null : current), 1500);
   }
 
@@ -49,7 +56,7 @@ export function HostSetupPanel({ setup }: { setup: SystemSetupStatus | null }) {
             <Terminal className="size-3.5" />
             Recommended setup
           </div>
-          <code className="mt-2 block overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-sm text-cyan-100">{setup.installCommand}</code>
+          <code className="mt-2 block select-text overflow-x-auto rounded-md bg-slate-900 px-3 py-2 text-sm text-cyan-100">{setup.installCommand}</code>
           <p className="mt-2 text-xs leading-5 text-sky-100/50">Run once on the Autark-OS host. It creates the service user, prepares folders, and grants Tailscale Serve permission when Tailscale is available.</p>
         </NetworkInset>
       </div>

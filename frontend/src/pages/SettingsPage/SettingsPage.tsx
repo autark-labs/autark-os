@@ -54,6 +54,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { copyText } from '@/lib/copyText';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
@@ -246,8 +247,13 @@ function SettingsPage() {
   }, [dirty]);
 
   async function copy(value: string, id: string) {
-    await navigator.clipboard.writeText(value);
+    const result = await copyText(value);
+    if (!result.ok) {
+      showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+      return;
+    }
     setCopied(id);
+    showActionNotification({ ok: true, severity: 'success', title: 'Command copied', message: value }, 'Command copied');
     window.setTimeout(() => setCopied(null), 1600);
   }
 

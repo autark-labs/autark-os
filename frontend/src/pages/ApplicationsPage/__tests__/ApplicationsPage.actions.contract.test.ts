@@ -295,7 +295,8 @@ test('applications page advanced tab can copy compact support details', () => {
 
   assert.match(panel, /Support details/);
   assert.match(panel, /copySupportDetails\(item\)/);
-  assert.match(panel, /navigator\.clipboard\?\.writeText\(supportDetailsText\(item\)\)/);
+  assert.match(panel, /copyText\(supportDetailsText\(item\)\)/);
+  assert.match(panel, /Support details copied/);
   assert.match(panel, /App ID:/);
   assert.match(panel, /Compose project:/);
   assert.match(panel, /Runtime path:/);
