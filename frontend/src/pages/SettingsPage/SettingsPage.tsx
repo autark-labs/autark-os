@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
@@ -33,6 +34,16 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select as UiSelect,
   SelectContent,
   SelectGroup,
@@ -48,7 +59,6 @@ import { useApplicationStateRepository } from '@/repositories/applicationStateRe
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
-import { shouldApplyProjectSettingsToApps } from './SettingsPage.logic';
 import { defaultSettingsGroup, sectionsForGroup, settingsGroups as topLevelSettingsGroups } from './SettingsPage.sections';
 
 type SettingsState = {
@@ -126,17 +136,17 @@ function SettingsLoadingState() {
   );
 }
 
-function SettingsErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+function SettingsErrorState({ actionLabel = 'Retry', message, onAction, title }: { actionLabel?: string; message: string; onAction: () => void; title: string }) {
   return (
     <Surface className="border-red-400/35 bg-red-500/10 p-4 text-red-100" tone="danger">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-black text-white">Settings could not refresh</h2>
+          <h2 className="text-sm font-black text-white">{title}</h2>
           <p className="mt-1 text-sm leading-6 text-red-100/85">{message}</p>
         </div>
-        <ProjectDarkControlButton onClick={onRetry} type="button">
+        <ProjectDarkControlButton onClick={onAction} type="button">
           <RefreshCw className="size-4" />
-          Retry
+          {actionLabel}
         </ProjectDarkControlButton>
       </div>
     </Surface>
@@ -144,6 +154,7 @@ function SettingsErrorState({ message, onRetry }: { message: string; onRetry: ()
 }
 
 function SettingsPage() {
+  const navigate = useNavigate();
   const { setProjectSettings } = useProjectSettings();
   const appState = useApplicationStateRepository();
   const doctorQuery = useSystemDoctorQuery();
@@ -153,8 +164,11 @@ function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [refreshConfirmationOpen, setRefreshConfirmationOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
 
   async function load(background = false) {
     if (background) {
@@ -162,7 +176,7 @@ function SettingsPage() {
     } else {
       setLoading(true);
     }
-    setError(null);
+    setLoadError(null);
     try {
       const [setup, metrics, projectSettings, version, backupReport] = await Promise.all([
         SystemAPIClient.setupStatus(),
@@ -177,7 +191,7 @@ function SettingsPage() {
       setState((current) => ({ ...current, backupRoot: backupReport?.backupRoot ?? null, metrics, projectSettings, setup, version }));
       setDraft(projectSettings);
     } catch (loadError) {
-      setError(apiErrorMessage(loadError, 'Settings could not be loaded.'));
+      setLoadError(apiErrorMessage(loadError, 'Settings could not be loaded.'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -196,6 +210,41 @@ function SettingsPage() {
   const dirty = Boolean(draft && state.projectSettings && JSON.stringify(draft) !== JSON.stringify(state.projectSettings));
   const doctor = doctorQuery.data ?? state.doctor;
 
+  useEffect(() => {
+    if (!dirty) {
+      return undefined;
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [dirty]);
+
+  useEffect(() => {
+    if (!dirty) {
+      return undefined;
+    }
+    const guardNavigation = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      const anchor = (event.target instanceof Element ? event.target.closest('a[href]') : null) as HTMLAnchorElement | null;
+      if (!anchor || anchor.target || anchor.hasAttribute('download')) {
+        return;
+      }
+      const destination = anchor.href;
+      if (!destination || destination === window.location.href || destination.startsWith('mailto:') || destination.startsWith('tel:')) {
+        return;
+      }
+      event.preventDefault();
+      setPendingNavigation(destination);
+    };
+    document.addEventListener('click', guardNavigation, true);
+    return () => document.removeEventListener('click', guardNavigation, true);
+  }, [dirty]);
+
   async function copy(value: string, id: string) {
     await navigator.clipboard.writeText(value);
     setCopied(id);
@@ -211,36 +260,66 @@ function SettingsPage() {
       return;
     }
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     try {
-      const previous = state.projectSettings;
-      const saved = await SystemAPIClient.updateSettings(draft);
-      let appDefaultsMessage = '';
-      if (shouldApplyProjectSettingsToApps(previous, saved)) {
-        const result = await SystemAPIClient.applyAppDefaults(saved);
-        appDefaultsMessage = result.message;
-        await appState.refresh();
-      }
+      const result = await SystemAPIClient.updateSettings(draft);
+      const saved = result.settings;
       setState((current) => ({ ...current, projectSettings: saved }));
       setDraft(saved);
       setProjectSettings(saved);
+      if (result.appDefaults.updatedApps > 0) {
+        try {
+          await appState.refresh();
+        } catch (refreshError) {
+          console.warn('Settings were saved, but managed apps could not refresh immediately.', refreshError);
+        }
+      }
       showActionNotification({
         ok: true,
         severity: 'success',
         title: 'Settings saved',
-        message: appDefaultsMessage || 'Autark-OS settings were saved.',
+        message: result.appDefaults.message,
       }, 'Settings saved');
     } catch (saveError) {
       const message = apiErrorMessage(saveError, 'Settings could not be saved.');
-      setError(message);
+      setSaveError(message);
       showActionErrorNotification(saveError, 'Settings could not be saved');
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading || appState.isLoading || !draft) {
+  function requestRefresh() {
+    if (dirty) {
+      setRefreshConfirmationOpen(true);
+      return;
+    }
+    void load(true);
+    void doctorQuery.refetch();
+  }
+
+  function continueNavigation() {
+    if (!pendingNavigation) {
+      return;
+    }
+    const destination = new URL(pendingNavigation, window.location.origin);
+    if (destination.origin === window.location.origin) {
+      navigate(destination.pathname + destination.search + destination.hash);
+      return;
+    }
+    window.location.assign(destination.toString());
+  }
+
+  if (loading) {
     return <SettingsLoadingState />;
+  }
+
+  if (!draft) {
+    return (
+      <PageShell>
+        <SettingsErrorState actionLabel="Try again" message={loadError || 'Autark-OS could not load settings.'} onAction={() => void load()} title="Settings are unavailable" />
+      </PageShell>
+    );
   }
 
   return (
@@ -256,8 +335,8 @@ function SettingsPage() {
             <Badge className={cn('border', dirty ? 'border-orange-300/35 bg-orange-500/10 text-orange-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
               {dirty ? 'Unsaved changes' : 'Saved'}
             </Badge>
-            <DisabledAction disabled={refreshing} reason="Settings are already refreshing.">
-              <ProjectDarkControlButton disabled={refreshing} onClick={() => { void load(true); void doctorQuery.refetch(); }} type="button">
+            <DisabledAction disabled={refreshing || saving} reason={saving ? 'Wait for the current save to finish.' : 'Settings are already refreshing.'}>
+              <ProjectDarkControlButton disabled={refreshing || saving} onClick={requestRefresh} type="button">
                 <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
                 Refresh
               </ProjectDarkControlButton>
@@ -277,7 +356,8 @@ function SettingsPage() {
         </div>
       </Surface>
 
-      {error && <SettingsErrorState message={error} onRetry={() => { void load(true); void doctorQuery.refetch(); }} />}
+      {loadError && <SettingsErrorState message={loadError} onAction={() => { void load(true); void doctorQuery.refetch(); }} title="Settings could not refresh" />}
+      {saveError && <SettingsErrorState actionLabel="Try save again" message={`${saveError} Your edits are still here.`} onAction={() => void save()} title="Settings could not save" />}
 
       <Surface as="nav" className="grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-4" tone="panel">
         {topLevelSettingsGroups.map((group) => {
@@ -341,6 +421,40 @@ function SettingsPage() {
           </div>
         </Surface>
       </div>
+
+      <AlertDialog open={refreshConfirmationOpen} onOpenChange={setRefreshConfirmationOpen}>
+        <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">Refreshing reloads the saved appliance settings and removes the edits on this page.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={refreshing}>Keep editing</AlertDialogCancel>
+            <AlertDialogAction className="bg-orange-500 text-white hover:bg-orange-400" disabled={refreshing} onClick={() => {
+              setRefreshConfirmationOpen(false);
+              void load(true);
+              void doctorQuery.refetch();
+            }}>
+              Discard and refresh
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(pendingNavigation)} onOpenChange={(open) => !open && setPendingNavigation(null)}>
+        <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">Your settings edits have not been saved. Keep editing or discard them before leaving this page.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction className="bg-orange-500 text-white hover:bg-orange-400" onClick={continueNavigation}>
+              Discard and leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

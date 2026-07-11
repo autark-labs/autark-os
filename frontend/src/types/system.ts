@@ -257,6 +257,11 @@ export type ProjectSettingsAppDefaultsResult = {
   completedAt: string;
 };
 
+export type ProjectSettingsSaveResult = {
+  settings: ProjectSettings;
+  appDefaults: ProjectSettingsAppDefaultsResult;
+};
+
 export type StorageUsage = {
   label: string;
   path: string;

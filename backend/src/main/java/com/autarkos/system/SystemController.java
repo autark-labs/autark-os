@@ -99,14 +99,11 @@ public class SystemController {
     }
 
     @PutMapping("/settings")
-    public ProjectSettings updateSettings(@RequestBody ProjectSettings settings) {
-        return projectSettingsService.update(settings);
-    }
-
-    @PostMapping("/settings/app-defaults/apply")
-    public ProjectSettingsAppDefaultsResult applyAppDefaults(@RequestBody ProjectSettings settings) {
-        ProjectSettingsAppDefaultsResult result = projectSettingsService.applyAppDefaults(settings);
-        applicationStateService.refreshInBackground();
+    public ProjectSettingsSaveResult updateSettings(@RequestBody ProjectSettings settings) {
+        ProjectSettingsSaveResult result = projectSettingsService.save(settings);
+        if (result.appDefaults().updatedApps() > 0) {
+            applicationStateService.refreshInBackground();
+        }
         return result;
     }
 

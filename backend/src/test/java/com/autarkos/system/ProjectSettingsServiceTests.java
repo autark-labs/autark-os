@@ -52,7 +52,7 @@ class ProjectSettingsServiceTests {
                 "completed",
                 true));
 
-        ProjectSettingsAppDefaultsResult result = service.applyAppDefaults(new ProjectSettings(
+        ProjectSettingsSaveResult saveResult = service.save(new ProjectSettings(
                 "autark-os",
                 "America/Chicago",
                 "en-US",
@@ -70,9 +70,11 @@ class ProjectSettingsServiceTests {
                 "stable",
                 false,
                 Instant.parse("2026-06-21T13:00:00Z")));
+        ProjectSettingsAppDefaultsResult result = saveResult.appDefaults();
 
         assertThat(result.ok()).isTrue();
         assertThat(result.updatedApps()).isEqualTo(2);
+        assertThat(saveResult.settings().automaticBackupsEnabled()).isFalse();
         assertThat(installedApps.settingsFor("vaultwarden")).hasValueSatisfying(settings -> {
             assertThat(settings.accessUrl()).isEqualTo("http://localhost:8090");
             assertThat(settings.privateAccessUrl()).isEqualTo("https://vaultwarden.tailnet.ts.net");

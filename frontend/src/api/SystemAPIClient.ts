@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectSettingsAppDefaultsResult, ProjectVersionInfo, RecommendedAction, SetupProgress, SetupStatus, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
+import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectSettingsSaveResult, ProjectVersionInfo, RecommendedAction, SetupProgress, SetupStatus, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
 
 export const SystemAPIClient = {
   async summary() {
@@ -88,12 +88,7 @@ export const SystemAPIClient = {
   },
 
   async updateSettings(settings: ProjectSettings) {
-    const response = await httpClient.put<ProjectSettings>('/api/system/settings', settings);
-    return response.data;
-  },
-
-  async applyAppDefaults(settings: ProjectSettings) {
-    const response = await httpClient.post<ProjectSettingsAppDefaultsResult>('/api/system/settings/app-defaults/apply', settings);
+    const response = await httpClient.put<ProjectSettingsSaveResult>('/api/system/settings', settings);
     return response.data;
   },
 
