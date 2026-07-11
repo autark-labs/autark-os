@@ -98,7 +98,7 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
           <AppImage app={app.app} />
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
-              <strong className="truncate text-base text-slate-50">{app.name}</strong>
+              <strong className="line-clamp-2 min-w-0 break-words text-base text-slate-50" title={app.name}>{app.name}</strong>
               <Badge className={stateBadgeClass(app.statusTone)} variant="outline">{app.stateLabel}</Badge>
               {installing && <Badge className="gap-1 border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline"><Loader2 className="size-3 animate-spin" />Installing</Badge>}
             </span>
@@ -162,7 +162,7 @@ function BasicAppStoreCard({ app, installing, isSelected, onSelect }: { app: Dis
             <AppImage app={app.app} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-base font-bold text-slate-50">{app.name}</span>
+            <span className="line-clamp-2 min-h-10 break-words text-base font-bold text-slate-50" title={app.name}>{app.name}</span>
             <span className="mt-1 block truncate text-xs font-medium text-slate-400">{app.categoryLabel}</span>
             <Badge className={cn('mt-2 rounded-full px-2 py-0.5 text-[0.7rem]', stateBadgeClass(app.statusTone))} variant="outline">
               {app.stateLabel}

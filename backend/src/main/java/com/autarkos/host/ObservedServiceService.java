@@ -143,6 +143,14 @@ public class ObservedServiceService {
     }
 
     public HostModels.ActionResult updateCatalogMatch(String id, String catalogAppId) {
+        if (catalogAppId != null && !catalogAppId.isBlank()) {
+            if (catalogService == null) {
+                return new HostModels.ActionResult(false, "warning", "Catalog unavailable", "Autark-OS cannot verify that catalog app while the catalog is unavailable. Try again after the catalog loads.", id, "refresh_observed_services");
+            }
+            if (catalogService.findById(catalogAppId).isEmpty()) {
+                return new HostModels.ActionResult(false, "warning", "Catalog app not found", "Choose an app that is currently included in the Autark-OS catalog.", id, "refresh_observed_services");
+            }
+        }
         boolean updated = repository.updateCatalogMatch(id, catalogAppId, catalogAppId == null || catalogAppId.isBlank() ? "unknown" : "user");
         if (!updated) {
             return new HostModels.ActionResult(false, "warning", "Observed service not found", "Autark-OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");

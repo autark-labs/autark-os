@@ -112,38 +112,18 @@ usage:
       sensitive: false
       qr: false
   notes:
-    - Autark-OS should eventually warn clearly before enabling any public transfer ports.
+    - The included configuration does not open public transfer ports; review qBittorrent network settings before changing them.
 setup:
   kind: media-stack
-  automation: planned
+  automation: manual
   copyableFields:
     - label: Web UI
       value: "{accessUrl}"
       sensitive: false
-  integrations:
-    - id: qbittorrent-sonarr
-      name: Receive Sonarr downloads
-      targetAppId: sonarr
-      description: Let Sonarr send approved TV downloads to this qBittorrent instance.
-      requiresApproval: true
-      plannedActions:
-        - Confirm Sonarr is installed and reachable.
-        - Ask before adding qBittorrent as a Sonarr download client.
-    - id: qbittorrent-radarr
-      name: Receive Radarr downloads
-      targetAppId: radarr
-      description: Let Radarr send approved movie downloads to this qBittorrent instance.
-      requiresApproval: true
-      plannedActions:
-        - Confirm Radarr is installed and reachable.
-        - Ask before adding qBittorrent as a Radarr download client.
   userSteps:
     - Review download folders and credentials in qBittorrent.
-    - Approve media-app connections before Autark-OS changes anything.
-  automationCapabilities:
-    - Can detect Sonarr and Radarr.
-    - Can propose download-client wiring.
-    - Will require approval before changing qBittorrent or media apps.
+    - Add Sonarr or Radarr as download clients manually from each app's own settings if needed.
+  automationCapabilities: []
 health:
   type: http
   path: /

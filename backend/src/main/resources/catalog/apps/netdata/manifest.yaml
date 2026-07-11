@@ -63,7 +63,7 @@ user:
     - Container and host visibility
   plainLanguage: Netdata gives you an immediate live dashboard for CPU, memory, disks, network, and containers without building charts first.
 technical:
-  summary: Deploys Netdata with persistent configuration and dashboard access. Host-level depth may require future privileged/capability support.
+  summary: Deploys Netdata with persistent configuration and dashboard access using non-privileged container defaults.
   requirements:
     - 1 CPU core
     - 512 MB RAM
@@ -110,7 +110,7 @@ usage:
       sensitive: false
       qr: false
   notes:
-    - Future Autark-OS work can add an advanced full-host metrics mode.
+    - This catalog entry uses non-privileged container defaults, so some host metrics may be limited.
 health:
   type: http
   path: /

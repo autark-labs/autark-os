@@ -94,6 +94,31 @@ access:
   notes:
     - Private access is useful when working with documents away from home.
     - Public exposure is not recommended because PDFs may contain sensitive information.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Stirling PDF
+  headline: Process documents privately
+  summary: Open Stirling PDF and try one small document before using it for important files.
+  setupSteps:
+    - Open Stirling PDF.
+    - Process a small non-sensitive document to confirm the workflow.
+    - Use private access when working away from your local network.
+  fields:
+    - label: Web UI
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Processed documents can contain sensitive information; do not expose this service publicly.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 240
+  successLabel: PDF tools are ready
+  startingLabel: Starting Stirling PDF
+  failureLabel: Stirling PDF is not responding
+  description: Autark-OS checks that the Stirling PDF web interface answers.
 runtime:
   containerName: stirling-pdf
   composeProject: autark-os-stirling-pdf

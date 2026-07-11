@@ -94,6 +94,31 @@ access:
   notes:
     - Private access is recommended because monitor names and notification settings may reveal internal services.
     - First-run setup creates the admin account and notification preferences.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Uptime Kuma
+  headline: Add your first service check
+  summary: Open Uptime Kuma, create the administrator account, then add a simple monitor for a service you control.
+  setupSteps:
+    - Open Uptime Kuma and create the administrator account.
+    - Add one HTTP or ping monitor and verify it reports correctly.
+    - Add notification channels only after confirming the monitor behavior.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Keep monitor names and notification settings on your local or private network.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 180
+  successLabel: Monitoring dashboard is ready
+  startingLabel: Starting Uptime Kuma
+  failureLabel: Uptime Kuma is not responding
+  description: Autark-OS checks that the Uptime Kuma dashboard answers.
 runtime:
   containerName: uptime-kuma
   composeProject: autark-os-uptime-kuma

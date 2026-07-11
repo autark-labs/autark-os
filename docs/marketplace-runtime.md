@@ -83,12 +83,15 @@ catalog/
 └── apps/
     ├── syncthing/
     │   ├── manifest.yaml
-    │   ├── compose.yaml
-    │   └── icon.svg
+    │   └── compose.yaml
     └── vaultwarden/
         ├── manifest.yaml
-        ├── compose.yaml
-        └── icon.svg
+        └── compose.yaml
+
+Dedicated catalog icons live at `backend/src/main/resources/static/app-images/<app-id>.svg`.
+The source layout and manifest validator reject incomplete entries, missing icons, missing setup
+guidance, unsupported future-facing copy, and missing lifecycle/backup expectations. See
+`docs/catalog-release-qualification.md` for the promotion requirements for `Ready` apps.
 ```
 
 Future versions may support remote catalogs and signed manifests. The local catalog remains the source of truth for the current beta.

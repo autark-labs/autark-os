@@ -114,6 +114,14 @@ usage:
   notes:
     - Router setup varies by brand, so Autark-OS shows the values and keeps advanced network details nearby.
     - Keep the admin dashboard private.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 180
+  successLabel: DNS dashboard is ready
+  startingLabel: Starting DNS filtering
+  failureLabel: AdGuard Home is not responding
+  description: Autark-OS checks that the AdGuard Home setup dashboard answers.
 runtime:
   containerName: adguard-home
   composeProject: autark-os-adguard-home

@@ -95,7 +95,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                       <div className="flex items-center gap-3">
                         <ApplicationIcon item={item} size="sm" />
                         <div className="min-w-0">
-                          <div className="font-medium text-slate-950">{item.name}</div>
+                          <div className="break-words font-medium text-slate-950" title={item.name}>{item.name}</div>
                         </div>
                       </div>
                     </TableCell>

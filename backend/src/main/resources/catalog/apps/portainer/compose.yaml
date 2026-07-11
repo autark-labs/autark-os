@@ -1,0 +1,2 @@
+# Autark-OS renders the runtime compose file from manifest.yaml.
+services: {}

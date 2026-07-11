@@ -92,7 +92,7 @@ access:
   requiresFirstRunSetup: false
   notes:
     - Private access is useful if you want a single dashboard while away from home.
-    - Autark-OS should eventually autowire installed apps into this dashboard.
+    - Add managed app links from Homepage's own configuration when you want them on the dashboard.
 usage:
   kind: web-app
   primaryAction: open-dashboard
@@ -109,31 +109,18 @@ usage:
       sensitive: false
       qr: true
   notes:
-    - Future Autark-OS autowire work should populate this dashboard automatically.
+    - Add and maintain dashboard entries in Homepage's configuration files.
 setup:
   kind: dashboard
-  automation: planned
+  automation: manual
   copyableFields:
     - label: Dashboard URL
       value: "{accessUrl}"
       sensitive: false
-  integrations:
-    - id: homepage-autark-os-apps
-      name: List Autark-OS apps
-      targetAppId: ""
-      description: Let Homepage display apps managed by Autark-OS so users have one friendly launch page.
-      requiresApproval: true
-      plannedActions:
-        - Read installed app names, icons, and links from Autark-OS.
-        - Write a Homepage services configuration after user approval.
-        - Keep Homepage entries in sync when apps are installed or removed.
   userSteps:
     - Open Homepage after install.
-    - Approve app-list wiring when Autark-OS offers it in a future release.
-  automationCapabilities:
-    - Can discover installed Autark-OS apps.
-    - Can prepare a Homepage services list.
-    - Will ask before changing Homepage configuration.
+    - Add services, bookmarks, and widgets from Homepage's dashboard settings.
+  automationCapabilities: []
 health:
   type: http
   path: /

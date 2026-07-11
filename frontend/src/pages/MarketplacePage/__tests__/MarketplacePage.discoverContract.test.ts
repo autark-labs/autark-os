@@ -88,3 +88,11 @@ test('marketplace hides dead link controls when an app lacks URLs or review targ
   assert.doesNotMatch(detail, /cannot open the existing service review yet|does not publish a source URL yet|does not publish documentation yet/);
   assert.doesNotMatch(duplicateWarning, /cannot open the existing service review yet|Review existing service[\s\S]*disabled/);
 });
+
+test('catalog cards keep long app names readable instead of clipping them to one line', () => {
+  const list = source('MarketplaceAppList.tsx');
+
+  assert.match(list, /line-clamp-2 min-w-0 break-words text-base text-slate-50/);
+  assert.match(list, /line-clamp-2 min-h-10 break-words text-base font-bold text-slate-50/);
+  assert.match(list, /title=\{app\.name\}/);
+});

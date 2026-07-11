@@ -208,6 +208,9 @@ public class ComposeRenderer {
         }
         String hostPath = parts[0];
         String containerPath = parts[1];
+        if (!hostPath.startsWith(manifest.runtime().runtimeRoot())) {
+            return volume;
+        }
         String relative = hostPath.replace(manifest.runtime().runtimeRoot(), "");
         while (relative.startsWith("/")) {
             relative = relative.substring(1);

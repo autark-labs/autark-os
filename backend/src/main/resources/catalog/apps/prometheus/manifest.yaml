@@ -93,7 +93,7 @@ access:
   requiresFirstRunSetup: true
   notes:
     - Dashboard access should stay private because metrics may reveal internal services.
-    - Autark-OS should eventually autowire scrape targets for managed apps.
+    - Add scrape targets explicitly in the Prometheus configuration when you need them.
 usage:
   kind: infrastructure
   primaryAction: open-dashboard

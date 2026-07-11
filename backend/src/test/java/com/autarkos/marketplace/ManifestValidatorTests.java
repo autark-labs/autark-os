@@ -83,6 +83,20 @@ class ManifestValidatorTests {
                 .hasMessageContaining("health.startupGraceSeconds");
     }
 
+    @Test
+    void rejectsCatalogCopyThatPromisesFutureBehavior() {
+        ApplicationManifest manifest = manifest(
+                "future-copy",
+                "8090:80",
+                "http://localhost:8090",
+                HealthManifest.defaults(AccessManifest.defaults(), UsageManifest.defaults()),
+                "A future automation feature will configure this app.");
+
+        assertThatThrownBy(() -> validator.validate(manifest))
+                .isInstanceOf(ManifestValidationException.class)
+                .hasMessageContaining("currently available behavior");
+    }
+
     private ApplicationManifest manifest(String id, String port) {
         return manifest(id, port, "http://localhost:8090");
     }
@@ -92,11 +106,15 @@ class ManifestValidatorTests {
     }
 
     private ApplicationManifest manifest(String id, String port, String accessUrl, HealthManifest health) {
+        return manifest(id, port, accessUrl, health, "Test app");
+    }
+
+    private ApplicationManifest manifest(String id, String port, String accessUrl, HealthManifest health, String description) {
         return new ApplicationManifest(
                 id,
                 "Test App",
                 "Utilities",
-                "Test app",
+                description,
                 "Test app",
                 "Verified",
                 "0",

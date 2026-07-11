@@ -95,6 +95,31 @@ access:
   notes:
     - Local access is useful for TVs and streaming boxes at home.
     - Private access helps phones and laptops stream while away without opening a public port.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Jellyfin
+  headline: Build your private media library
+  summary: Open Jellyfin, create the administrator account, and add the media folders you want to share.
+  setupSteps:
+    - Open Jellyfin and create the administrator account.
+    - Add a media library and let Jellyfin scan a small folder first.
+    - Add household user profiles and trusted playback devices.
+  fields:
+    - label: Web UI
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Keep remote streaming on the private access link instead of exposing a public port.
+health:
+  type: http
+  path: /health
+  startupGraceSeconds: 240
+  successLabel: Media server is ready
+  startingLabel: Starting Jellyfin
+  failureLabel: Jellyfin is not responding
+  description: Autark-OS checks Jellyfin's health endpoint before calling the media server ready.
 runtime:
   containerName: jellyfin
   composeProject: autark-os-jellyfin

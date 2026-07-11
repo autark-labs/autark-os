@@ -22,11 +22,12 @@ public class ManifestValidator {
     private static final Pattern ENVIRONMENT_KEY = Pattern.compile("[A-Z_][A-Z0-9_]*");
     private static final Pattern SAFE_RUNTIME_PATH = Pattern.compile("/var/lib/autark-os/apps/[a-z0-9][a-z0-9-]*(/[A-Za-z0-9._-]+)*");
     private static final Pattern CONTAINER_PATH = Pattern.compile("/[A-Za-z0-9._/-]+");
+    private static final Pattern UNIMPLEMENTED_CATALOG_COPY = Pattern.compile("(?i)\\b(future|coming\\s+soon|eventually|planned)\\b");
     private static final Set<String> ACCESS_KINDS = Set.of("web", "api", "background", "multi-port");
     private static final Set<String> ACCESS_MODES = Set.of("local", "private", "local-and-private", "none");
     private static final Set<String> USAGE_KINDS = Set.of("web-app", "companion-service", "admin-service", "background-service", "infrastructure");
     private static final Set<String> SETUP_KINDS = Set.of("basic", "companion", "dashboard", "integration", "media-stack", "infrastructure");
-    private static final Set<String> SETUP_AUTOMATION = Set.of("manual", "guided", "ready", "planned");
+    private static final Set<String> SETUP_AUTOMATION = Set.of("manual", "guided", "ready");
     private static final Set<String> HEALTH_TYPES = Set.of("http", "tcp", "container", "no-web-ui", "none");
     private static final Set<String> SUPPORT_LEVELS = Set.of("Ready", "Needs testing", "Advanced", "Experimental");
     private static final Set<String> SMOKE_TEST_STATUSES = Set.of("Passed", "Needs hardware test", "Needs end-to-end test", "Blocked", "Not applicable");
@@ -41,6 +42,7 @@ public class ManifestValidator {
         require(errors, "name", manifest.name());
         require(errors, "category", manifest.category());
         require(errors, "description", manifest.description());
+        require(errors, "metadata.image", manifest.image());
         require(errors, "metadata.sourceUrl", manifest.sourceUrl());
         require(errors, "metadata.supportLevel", manifest.supportLevel());
         require(errors, "metadata.supportSummary", manifest.supportSummary());
@@ -58,9 +60,15 @@ public class ManifestValidator {
         require(errors, "usage.kind", manifest.usage().kind());
         require(errors, "usage.primaryAction", manifest.usage().primaryAction());
         require(errors, "usage.openUrlLabel", manifest.usage().openUrlLabel());
+        require(errors, "usage.headline", manifest.usage().headline());
+        require(errors, "usage.summary", manifest.usage().summary());
         require(errors, "setup.kind", manifest.setup().kind());
         require(errors, "setup.automation", manifest.setup().automation());
         require(errors, "health.type", manifest.health().type());
+        require(errors, "health.successLabel", manifest.health().successLabel());
+        require(errors, "health.startingLabel", manifest.health().startingLabel());
+        require(errors, "health.failureLabel", manifest.health().failureLabel());
+        require(errors, "health.description", manifest.health().description());
 
         if (!manifest.runtime().image().isBlank() && !IMAGE.matcher(manifest.runtime().image()).matches()) {
             errors.add("runtime.image must be a valid container image reference");
@@ -72,6 +80,22 @@ public class ManifestValidator {
 
         if (declaredVolumes(manifest).isEmpty()) {
             errors.add("runtime.volumes must contain at least one managed storage mapping");
+        }
+
+        if (declaredPorts(manifest).isEmpty()) {
+            errors.add("runtime.ports must contain at least one service port");
+        }
+
+        if (manifest.requirements().isEmpty()) {
+            errors.add("technical.requirements must describe the app resource expectations");
+        }
+
+        if (manifest.runtime().backupPaths().isEmpty()) {
+            errors.add("runtime.backupPaths must declare the app data preserved by backups and uninstall");
+        }
+
+        if (manifest.usage().setupSteps().isEmpty()) {
+            errors.add("usage.setupSteps must provide a user-safe setup guide");
         }
 
         for (String volume : declaredVolumes(manifest)) {
@@ -134,6 +158,10 @@ public class ManifestValidator {
             errors.add("health.path must start with / when provided");
         }
 
+        if ("http".equals(manifest.health().type()) && manifest.health().path().isBlank()) {
+            errors.add("health.path is required for HTTP health checks");
+        }
+
         for (var field : manifest.usage().fields()) {
             if (field.label() == null || field.label().isBlank()) {
                 errors.add("usage.fields label is required");
@@ -142,6 +170,8 @@ public class ManifestValidator {
                 errors.add("usage.fields value is required for " + field.label());
             }
         }
+
+        validateProductionCopy(errors, manifest);
 
         for (var field : manifest.setup().generatedValues()) {
             require(errors, "setup.generatedValues.label", field.label());
@@ -193,6 +223,10 @@ public class ManifestValidator {
 
         validateHttpUrl(errors, "metadata.sourceUrl", manifest.sourceUrl());
         validateHttpUrl(errors, "metadata.documentationUrl", manifest.documentationUrl());
+
+        if (!manifest.runtime().labels().contains("autark-os.app-id=" + manifest.id())) {
+            errors.add("runtime.labels must declare autark-os.app-id=" + manifest.id() + " for found-service reconciliation");
+        }
 
         if (!errors.isEmpty()) {
             throw new ManifestValidationException(manifest.id(), errors);
@@ -250,6 +284,9 @@ public class ManifestValidator {
         }
         String hostPath = parts[0];
         String containerPath = parts[1];
+        if (isAllowedSystemMount(manifest, volume)) {
+            return;
+        }
         if (!hostPath.startsWith(manifest.runtime().runtimeRoot())) {
             errors.add("runtime.volumes host path is outside the Autark-OS runtime root: " + volume);
         }
@@ -259,6 +296,46 @@ public class ManifestValidator {
         if (!CONTAINER_PATH.matcher(containerPath).matches()) {
             errors.add("runtime.volumes container path must be absolute and use safe path characters: " + volume);
         }
+    }
+
+    private boolean isAllowedSystemMount(ApplicationManifest manifest, String volume) {
+        return "portainer".equals(manifest.id())
+                && "Advanced".equals(manifest.supportLevel())
+                && "admin-service".equals(manifest.usage().kind())
+                && "/var/run/docker.sock:/var/run/docker.sock".equals(volume);
+    }
+
+    private void validateProductionCopy(List<String> errors, ApplicationManifest manifest) {
+        catalogCopy(manifest).stream()
+                .filter(value -> value != null && UNIMPLEMENTED_CATALOG_COPY.matcher(value).find())
+                .findFirst()
+                .ifPresent(value -> errors.add("catalog copy must describe currently available behavior, not future or planned capabilities: " + value));
+    }
+
+    private List<String> catalogCopy(ApplicationManifest manifest) {
+        List<String> copy = new ArrayList<>();
+        copy.add(manifest.description());
+        copy.add(manifest.shortValue());
+        copy.add(manifest.supportSummary());
+        copy.add(manifest.plainLanguage());
+        copy.add(manifest.technicalSummary());
+        copy.addAll(manifest.access().notes());
+        copy.add(manifest.usage().headline());
+        copy.add(manifest.usage().summary());
+        copy.addAll(manifest.usage().setupSteps());
+        copy.addAll(manifest.usage().notes());
+        copy.addAll(manifest.setup().userSteps());
+        copy.addAll(manifest.setup().automationCapabilities());
+        copy.add(manifest.health().successLabel());
+        copy.add(manifest.health().startingLabel());
+        copy.add(manifest.health().failureLabel());
+        copy.add(manifest.health().description());
+        for (var integration : manifest.setup().integrations()) {
+            copy.add(integration.name());
+            copy.add(integration.description());
+            copy.addAll(integration.plannedActions());
+        }
+        return copy;
     }
 
     private void validateServices(List<String> errors, ApplicationManifest manifest) {

@@ -49,6 +49,7 @@ class MarketplaceCatalogServiceTests {
                         "obsidian-livesync",
                         "paperless-ngx",
                         "pi-hole",
+                        "portainer",
                         "prometheus",
                         "prowlarr",
                         "qbittorrent",
@@ -62,7 +63,7 @@ class MarketplaceCatalogServiceTests {
 
     @Test
     void exposesCatalogAndInstallPreviewThroughDiscoverController() {
-        assertThat(discoverController.apps()).hasSize(26);
+        assertThat(discoverController.apps()).hasSize(27);
         DiscoverInstallModels.DiscoverInstallPreview preview = discoverController.installPreview("vaultwarden", new DiscoverSetupModels.DiscoverSetupAnswersRequest(java.util.Map.of()));
 
         assertThat(preview.technicalDetails())
@@ -123,6 +124,27 @@ class MarketplaceCatalogServiceTests {
                     if (!"background".equals(manifest.access().kind())) {
                         assertThat(plan.customization().accessUrl()).isNotBlank();
                     }
+                });
+    }
+
+    @Test
+    void everyCatalogManifestHasReleaseCompleteMetadataAndLifecycleExpectations() {
+        assertThat(catalogService.findAll())
+                .allSatisfy(manifest -> {
+                    assertThat(manifest.image()).isEqualTo("/app-images/" + manifest.id() + ".svg");
+                    assertThat(manifest.description()).isNotBlank();
+                    assertThat(manifest.supportLevel()).isIn("Ready", "Advanced", "Needs testing", "Experimental");
+                    assertThat(manifest.requirements()).isNotEmpty();
+                    assertThat(manifest.runtime().multiService()
+                            ? manifest.runtime().services().stream().flatMap(service -> service.ports().stream()).toList()
+                            : manifest.runtime().ports()).isNotEmpty();
+                    assertThat(manifest.runtime().multiService()
+                            ? manifest.runtime().services().stream().flatMap(service -> service.volumes().stream()).toList()
+                            : manifest.runtime().volumes()).isNotEmpty();
+                    assertThat(manifest.runtime().backupPaths()).isNotEmpty();
+                    assertThat(manifest.health().type()).isNotBlank();
+                    assertThat(manifest.usage().setupSteps()).isNotEmpty();
+                    assertThat(manifest.runtime().labels()).contains("autark-os.app-id=" + manifest.id());
                 });
     }
 }

@@ -71,6 +71,25 @@ class ComposeRendererOwnershipTests {
                 .contains("autark-os.app-instance-id=appinst_paperless");
     }
 
+    @Test
+    void preservesTheExplicitPortainerDockerSocketMount() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        DockerOwnershipService ownershipService = ownershipService(false);
+        ApplicationManifest manifest = manifest("portainer");
+        ComposeRenderer renderer = new ComposeRenderer(runtimeLayout, ownershipService);
+
+        Path compose = renderer.render(
+                manifest,
+                runtimeLayout.appRoot(manifest.id()),
+                new RuntimeModels.ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()),
+                "appinst_portainer",
+                ownershipService.composeProject(manifest.id()));
+
+        assertThat(Files.readString(compose))
+                .contains("/var/run/docker.sock:/var/run/docker.sock")
+                .doesNotContain("/apps/portainer/var/run/docker.sock");
+    }
+
     private DockerOwnershipService ownershipService(boolean devMode) {
         AutarkOsIdentity identity = new AutarkOsIdentity(
                 "pos_abcdef1234567890",

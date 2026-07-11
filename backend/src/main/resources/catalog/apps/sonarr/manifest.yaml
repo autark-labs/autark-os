@@ -94,7 +94,7 @@ access:
   requiresFirstRunSetup: true
   notes:
     - Dashboard access should stay private because it can control media workflows.
-    - Autark-OS should eventually autowire this with Prowlarr and qBittorrent.
+    - Connect indexers and download clients from Sonarr's own settings when you are ready.
 usage:
   kind: companion-service
   primaryAction: open-dashboard
@@ -115,37 +115,15 @@ usage:
     - This is a power-user media tool. It is not required for Jellyfin playback.
 setup:
   kind: media-stack
-  automation: planned
+  automation: manual
   copyableFields:
     - label: Dashboard URL
       value: "{accessUrl}"
       sensitive: false
-  integrations:
-    - id: sonarr-prowlarr
-      name: Connect Prowlarr indexers
-      targetAppId: prowlarr
-      description: Use Prowlarr as the central indexer source for Sonarr.
-      requiresApproval: true
-      plannedActions:
-        - Confirm Prowlarr is installed and reachable.
-        - Ask for approval before creating a Sonarr app entry in Prowlarr.
-        - Ask for approval before adding Prowlarr as a Sonarr indexer source.
-    - id: sonarr-qbittorrent
-      name: Connect qBittorrent downloads
-      targetAppId: qbittorrent
-      description: Let Sonarr send approved TV downloads to qBittorrent.
-      requiresApproval: true
-      plannedActions:
-        - Confirm qBittorrent is installed and reachable.
-        - Ask for approval before adding qBittorrent as a Sonarr download client.
-        - Keep download paths inside Autark-OS managed folders.
   userSteps:
     - Review media folders before enabling automated downloads.
-    - Approve each connection before Autark-OS changes Sonarr.
-  automationCapabilities:
-    - Can detect whether Prowlarr and qBittorrent are installed.
-    - Can propose indexer and download-client wiring.
-    - Will require approval before changing Sonarr or companion apps.
+    - Configure indexers and download clients manually from Sonarr's settings.
+  automationCapabilities: []
 health:
   type: http
   path: /

@@ -93,7 +93,7 @@ access:
   requiresFirstRunSetup: true
   notes:
     - Dashboard access should stay private because it stores indexer and app credentials.
-    - Autark-OS should eventually autowire Prowlarr to Sonarr and Radarr.
+    - Connect companion media apps from Prowlarr's own settings when you are ready.
 usage:
   kind: companion-service
   primaryAction: open-dashboard
@@ -113,35 +113,15 @@ usage:
     - Prowlarr is an advanced companion service, not a media player.
 setup:
   kind: media-stack
-  automation: planned
+  automation: manual
   copyableFields:
     - label: Dashboard URL
       value: "{accessUrl}"
       sensitive: false
-  integrations:
-    - id: prowlarr-sonarr
-      name: Share indexers with Sonarr
-      targetAppId: sonarr
-      description: Let Prowlarr provide approved TV indexers to Sonarr.
-      requiresApproval: true
-      plannedActions:
-        - Confirm Sonarr is installed and reachable.
-        - Ask for approval before writing app connection settings.
-    - id: prowlarr-radarr
-      name: Share indexers with Radarr
-      targetAppId: radarr
-      description: Let Prowlarr provide approved movie indexers to Radarr.
-      requiresApproval: true
-      plannedActions:
-        - Confirm Radarr is installed and reachable.
-        - Ask for approval before writing app connection settings.
   userSteps:
     - Add only indexers you are allowed to use.
-    - Approve each media-app connection before Autark-OS changes Prowlarr.
-  automationCapabilities:
-    - Can detect Sonarr and Radarr.
-    - Can propose app connection wiring.
-    - Will require approval before changing Prowlarr.
+    - Configure Sonarr or Radarr connections manually from Prowlarr's Apps settings.
+  automationCapabilities: []
 health:
   type: http
   path: /

@@ -65,6 +65,28 @@ class ObservedServiceServiceTests {
     }
 
     @Test
+    void onlyAllowsFoundServicesToMatchIncludedCatalogApps() {
+        ObservedServiceRepository repository = repository();
+        repository.upsert(observed("docker:portainer", "docker", "portainer", "Portainer", null, "external_docker", "observed"));
+        ObservedServiceService service = new ObservedServiceService(
+                repository,
+                new ObservedServiceScanner(List::of, currentIdentity()),
+                null,
+                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                currentIdentity(),
+                null);
+
+        HostModels.ActionResult saved = service.updateCatalogMatch("docker:portainer", "portainer");
+        HostModels.ActionResult rejected = service.updateCatalogMatch("docker:portainer", "not-a-catalog-app");
+
+        assertThat(saved.ok()).isTrue();
+        assertThat(rejected.ok()).isFalse();
+        assertThat(rejected.title()).isEqualTo("Catalog app not found");
+        assertThat(repository.findServiceById("docker:portainer"))
+                .hasValueSatisfying(observed -> assertThat(observed.catalogAppId()).isEqualTo("portainer"));
+    }
+
+    @Test
     void refreshReturnsUnmatchedAndIgnoredContainers() {
         ObservedServiceRepository repository = repository();
         repository.upsert(observed("docker:ignored-postgres", "docker", "ignored-postgres", "Postgres", null, "external_docker", "ignored"));

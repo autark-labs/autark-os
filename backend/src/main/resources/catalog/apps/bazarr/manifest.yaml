@@ -94,7 +94,7 @@ access:
   requiresFirstRunSetup: true
   notes:
     - Dashboard access should stay private because it can modify media library metadata.
-    - Autark-OS should eventually autowire Bazarr to Sonarr and Radarr.
+    - Connect Sonarr and Radarr from Bazarr's own settings when you are ready.
 usage:
   kind: companion-service
   primaryAction: open-dashboard

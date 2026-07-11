@@ -94,6 +94,31 @@ access:
   notes:
     - Private access is recommended because notes often contain sensitive personal information.
     - First-run setup creates the first user and workspace preferences.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Memos
+  headline: Start a private notes space
+  summary: Open Memos, create the first account, then add a note to confirm the workspace is ready.
+  setupSteps:
+    - Open Memos and create the first user account.
+    - Create a test note and confirm it remains after refreshing the page.
+    - Keep access private if your notes include personal or work information.
+  fields:
+    - label: Web UI
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Use a private access link rather than a public URL for personal notes.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 180
+  successLabel: Notes service is ready
+  startingLabel: Starting Memos
+  failureLabel: Memos is not responding
+  description: Autark-OS checks that the Memos web interface answers.
 runtime:
   containerName: memos
   composeProject: autark-os-memos

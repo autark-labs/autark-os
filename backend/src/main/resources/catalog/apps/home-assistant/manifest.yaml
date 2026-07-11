@@ -95,6 +95,31 @@ access:
   notes:
     - Local network access helps smart home discovery and dashboards.
     - Private access is recommended for managing your home while away.
+usage:
+  kind: web-app
+  primaryAction: open-dashboard
+  openUrlLabel: Open Home Assistant
+  headline: Connect your home one step at a time
+  summary: Open Home Assistant, create the administrator account, then add devices and integrations you trust.
+  setupSteps:
+    - Open Home Assistant and create the administrator account.
+    - Add one device or integration at a time and confirm it appears correctly.
+    - Set up private access before controlling your home away from the local network.
+  fields:
+    - label: Dashboard URL
+      value: "{accessUrl}"
+      sensitive: false
+      qr: false
+  notes:
+    - Review each integration's permissions before connecting it to your home.
+health:
+  type: http
+  path: /
+  startupGraceSeconds: 300
+  successLabel: Home Assistant is ready
+  startingLabel: Starting Home Assistant
+  failureLabel: Home Assistant is not responding
+  description: Autark-OS checks that the Home Assistant dashboard answers.
 runtime:
   containerName: home-assistant
   composeProject: autark-os-home-assistant

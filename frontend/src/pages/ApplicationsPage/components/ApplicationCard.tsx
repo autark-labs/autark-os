@@ -7,7 +7,6 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { CompactOperationStatus } from './AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './AppStateBadges';
 import { ApplicationOpenButton } from './ApplicationButtons';
 import { ApplicationIcon } from '../extensions/ApplicationVisuals';
@@ -54,7 +53,12 @@ export function ApplicationCard({
         <div className="flex min-w-0 flex-col items-center gap-2">
           <ApplicationIcon item={item} size="lg" />
           <div className="flex min-w-0 flex-col items-center gap-1 text-center">
-            <CardTitle className=" bg-slate-300 rounded-md border px-1 border-sky-300 absolute top-29.5 max-w-full truncate text-lg text-slate-950">{item.name}</CardTitle>
+            <CardTitle
+              className="line-clamp-2 min-h-11 max-w-full rounded-md border border-sky-300 bg-slate-300 px-2 text-center text-lg leading-tight text-slate-950"
+              title={item.name}
+            >
+              {item.name}
+            </CardTitle>
             <div className="flex max-w-full flex-wrap justify-center gap-1">
               <ManagementBadge item={item} />
               <AttentionIndicator item={item} className="absolute" />
@@ -62,9 +66,6 @@ export function ApplicationCard({
           </div>
         </div>
       </CardHeader>
-
-      {/* <CompactOperationStatus item={item} className="mx-3" /> */}
-
       <CardFooter
         className="mt-auto gap-2 p-2"
         onClick={(event) => event.stopPropagation()}
