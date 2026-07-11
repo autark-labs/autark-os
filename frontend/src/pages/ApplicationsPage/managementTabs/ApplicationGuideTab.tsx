@@ -1,8 +1,7 @@
 import { ExternalLink, KeyRound, ListChecks, QrCode, Sparkles } from 'lucide-react';
-import { CopyTextButton } from '@/components/autark-os/CopyTextButton';
+import { CopyField } from '@/components/autark-os/CopyField';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { AppSetupField, AppUsageValue } from '@/types/app';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) {
@@ -52,9 +51,9 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
         <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
           <SectionTitle icon={KeyRound} title="Values" />
           <div className="grid gap-2 sm:grid-cols-2">
-            {copyableFields.map((field) => <SetupFieldRow field={field} key={`copy-${field.label}`} />)}
-            {generatedValues.map((field) => <SetupFieldRow field={field} key={`generated-${field.label}`} />)}
-            {usageValues.map((value) => <UsageValueRow key={`usage-${value.label}`} value={value} />)}
+            {copyableFields.map((field) => <CopyField key={`copy-${field.label}`} model={field} />)}
+            {generatedValues.map((field) => <CopyField key={`generated-${field.label}`} model={field} />)}
+            {usageValues.map((value) => <CopyField key={`usage-${value.label}`} model={value} />)}
           </div>
         </section>
       )}
@@ -63,7 +62,7 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
         <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
           <SectionTitle icon={QrCode} title="QR values" />
           <div className="grid gap-2 sm:grid-cols-2">
-            {qrFields.map((field) => <SetupFieldRow field={field} key={`qr-${field.label}`} />)}
+          {qrFields.map((field) => <CopyField key={`qr-${field.label}`} model={field} />)}
           </div>
         </section>
       )}
@@ -83,26 +82,6 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
           ))}
         </section>
       )}
-    </div>
-  );
-}
-
-function SetupFieldRow({ field }: { field: AppSetupField }) {
-  return <CopyValue label={field.label} sensitive={field.sensitive} value={field.value} />;
-}
-
-function UsageValueRow({ value }: { value: AppUsageValue }) {
-  return <CopyValue label={value.label} sensitive={value.sensitive} value={value.value} />;
-}
-
-function CopyValue({ label, sensitive = false, value }: { label: string; sensitive?: boolean; value: string }) {
-  return (
-    <div className="grid gap-2 rounded-lg bg-slate-900 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-sky-100/60">{label}</span>
-        <CopyTextButton label={label} value={value} />
-      </div>
-      <p className="select-text truncate font-mono text-xs text-white">{sensitive ? '••••••••••••' : value || 'Not available'}</p>
     </div>
   );
 }

@@ -25,6 +25,9 @@ import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import {
   Popover,
   PopoverContent,
@@ -55,7 +58,6 @@ import { Switch } from '@/components/ui/switch';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { copyText } from '@/lib/copyText';
-import { formatLocalizedDateTime } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
@@ -129,32 +131,13 @@ const SettingsInset = ProjectInset;
 function SettingsLoadingState() {
   return (
     <PageShell>
-      <Surface className="flex min-h-[24rem] items-center justify-center p-6 text-center" tone="panel">
-        <div className="max-w-md">
-          <Loader2 className="mx-auto size-8 animate-spin text-cyan-200" />
-          <h1 className="mt-4 text-2xl font-black text-white">Loading settings</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-400">Reading appliance preferences, setup checks, and app defaults.</p>
-        </div>
-      </Surface>
+      <PageLoadingState model={{ description: 'Reading appliance preferences, setup checks, and app defaults.', title: 'Loading settings' }} />
     </PageShell>
   );
 }
 
 function SettingsErrorState({ actionLabel = 'Retry', message, onAction, title }: { actionLabel?: string; message: string; onAction: () => void; title: string }) {
-  return (
-    <Surface className="border-red-400/35 bg-red-500/10 p-4 text-red-100" tone="danger">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-black text-white">{title}</h2>
-          <p className="mt-1 text-sm leading-6 text-red-100/85">{message}</p>
-        </div>
-        <ProjectDarkControlButton onClick={onAction} type="button">
-          <RefreshCw className="size-4" />
-          {actionLabel}
-        </ProjectDarkControlButton>
-      </div>
-    </Surface>
-  );
+  return <PageLoadError model={{ actionLabel, message, title }} onRetry={onAction} />;
 }
 
 function SettingsPage() {
@@ -533,7 +516,7 @@ function BackupsPanel({ apps, backupRoot, backupSchedule, draft, onUpdate }: Pan
         <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
       <ReadOnlyRow label="Backup folder" note="Current destination used by routine and manual restore points." value={backupRoot || 'Unavailable'} />
-      <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={backupSchedule?.nextRoutineRun ? formatLocalizedDateTime(backupSchedule.nextRoutineRun, draft.timeZone, 'Not scheduled') : 'Not scheduled'} />
+      <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={<LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule?.nextRoutineRun }} />} />
       <ReadOnlyRow label="Apps protected" note="Installed apps with at least one completed restore point." value={`${protectedApps}/${apps.length}`} />
     </SettingsGroup>
   );
@@ -717,7 +700,7 @@ function SettingRow({ children, helpId, label, note }: { children: ReactNode; he
   );
 }
 
-function ReadOnlyRow({ label, note, value }: { label: string; note: string; value: string }) {
+function ReadOnlyRow({ label, note, value }: { label: string; note: string; value: ReactNode }) {
   return (
     <div className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_32px] md:items-center">
       <div>

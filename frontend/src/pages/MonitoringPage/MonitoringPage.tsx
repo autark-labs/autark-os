@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
@@ -200,20 +201,7 @@ function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string
 }
 
 function MonitoringErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="border-b border-red-400/40 bg-red-500/10 px-6 py-4 text-red-100">
-      <div className="flex gap-3">
-        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-current">Monitoring data could not refresh</p>
-          <p className="mt-1 text-sm leading-6 text-current/80">{message}</p>
-          <ProjectDarkControlButton className="mt-3 border-red-300/30 text-red-100 hover:bg-red-500/20" onClick={onRetry} size="sm" type="button">
-            Try again
-          </ProjectDarkControlButton>
-        </div>
-      </div>
-    </div>
-  );
+  return <PageLoadError className="rounded-none border-x-0 border-t-0 px-6 py-4" model={{ message, title: 'Monitoring data could not refresh' }} onRetry={onRetry} />;
 }
 
 function postureIcon(posture?: string) {

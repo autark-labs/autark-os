@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
-import { AlertTriangle, Boxes, CheckCircle2, Database, Pin, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
+import { Boxes, CheckCircle2, Database, Pin, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import {
-  HomeActionCard,
   HomeActivityTimeline,
   HomeIssueBanner,
   HomeMetricCard,
@@ -12,8 +11,10 @@ import {
   HomeSoftCard,
 } from './components/HomeCards';
 import { HomeHero } from './components/HomeHero';
+import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
+import { RecommendedActionCard } from '@/components/autark-os/RecommendedActionCard';
 import { PageShell } from '@/components/layout/PageShell';
-import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
+import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useHomeRepository } from '@/repositories/homeRepository';
@@ -54,49 +55,39 @@ function OverviewPage() {
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start">
         <div className="grid gap-5">
           {primaryAction ? (
-            <HomeActionCard
-              action={primaryAction.primaryAction}
-              body={primaryAction.body}
-              dismissible={primaryAction.dismissible}
+            <RecommendedActionCard
+              model={{
+                body: primaryAction.body,
+                dismissible: primaryAction.dismissible,
+                primaryAction: primaryAction.primaryAction,
+                severity: primaryAction.severity,
+                title: primaryAction.title,
+              }}
               dismissing={dismissRecommendedAction.isPending}
               onDismiss={primaryAction.dismissible ? () => dismissRecommendedAction.mutate(primaryAction.id) : undefined}
-              severity={primaryAction.severity}
-              title={primaryAction.title}
             />
           ) : summaryAvailability === 'unavailable' ? (
-            <HomeActionCard
-              body="Autark-OS could not load the current server summary. Try refreshing Home once the service is available."
-              severity="warning"
-              title="System status unavailable"
-            />
+            <RecommendedActionCard model={{ body: 'Autark-OS could not load the current server summary. Try refreshing Home once the service is available.', severity: 'warning', title: 'System status unavailable' }} />
           ) : (
-            <HomeActionCard
-              action={{ id: 'open-discover', label: apps.length ? 'Discover apps' : 'Install your first app', route: '/discover', confirmationRequired: false, danger: false }}
-              body={apps.length ? 'Autark-OS does not see anything urgent right now.' : 'Start with a verified app and Autark-OS will guide the setup.'}
-              severity="success"
-              title={apps.length ? 'Everything important looks good' : 'Start with Discover'}
+            <RecommendedActionCard
+              model={{
+                body: apps.length ? 'Autark-OS does not see anything urgent right now.' : 'Start with a verified app and Autark-OS will guide the setup.',
+                primaryAction: { id: 'open-discover', label: apps.length ? 'Discover apps' : 'Install your first app', route: '/discover', confirmationRequired: false, danger: false },
+                severity: 'success',
+                title: apps.length ? 'Everything important looks good' : 'Start with Discover',
+              }}
             />
           )}
 
           {observedNeedingReview.length > 0 && (
-            <HomeSoftCard className="border-orange-400/45 bg-slate-800">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 gap-3">
-                  <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-orange-400/30 bg-orange-500/10 text-orange-200">
-                    <AlertTriangle className="size-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="m-0 text-sm font-bold text-slate-50">Services found on this server</p>
-                    <p className="m-0 mt-1 text-sm leading-5 text-sky-100/70">
-                      Autark-OS found {observedNeedingReview.length} service{observedNeedingReview.length === 1 ? '' : 's'} that need review before they are treated as managed apps.
-                    </p>
-                  </div>
-                </div>
-                <ProjectWarningButton asChild className="shrink-0" size="sm">
-                  <Link to="/apps/found">Review existing apps</Link>
-                </ProjectWarningButton>
-              </div>
-            </HomeSoftCard>
+            <FoundAppsPrompt
+              model={{
+                count: observedNeedingReview.length,
+                description: `Autark-OS found ${observedNeedingReview.length} service${observedNeedingReview.length === 1 ? '' : 's'} that need review before they are treated as managed apps.`,
+                reviewHref: '/apps/found',
+                title: 'Services found on this server',
+              }}
+            />
           )}
 
           <HomeSection

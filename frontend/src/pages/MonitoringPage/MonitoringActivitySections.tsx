@@ -5,9 +5,9 @@ import { Link } from 'react-router-dom';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
+import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
 import { Badge } from '@/components/ui/badge';
 import { buildAppRemediationFromIssue } from '@/lib/appRemediation';
-import { formatLocalizedDateTime } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
 import type { ActivityLog } from '@/types/activity';
 import type { AppReliabilityIssue, AppReliabilitySummary } from '@/types/app';
@@ -205,7 +205,7 @@ function CompactActivityItem({ event, timeZone }: { event: ActivityLog; timeZone
       <div className="min-w-0">
         <p className="truncate font-semibold text-white">{event.title}</p>
         <p className="mt-1 line-clamp-2 text-slate-300">{event.message}</p>
-        <p className="mt-1 text-xs text-slate-500">{formatLocalizedDateTime(event.createdAt, timeZone)}</p>
+        <LocalizedDateTime className="mt-1 text-xs text-slate-500" model={{ timeZone, value: event.createdAt }} />
       </div>
     </div>
   );
@@ -298,7 +298,7 @@ function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics, timeZone 
           </span>
           <span className="mt-1 block text-sm text-slate-300">{event.message}</span>
         </span>
-        <span className="text-xs text-slate-500 sm:text-right">{formatLocalizedDateTime(event.createdAt, timeZone)}</span>
+        <LocalizedDateTime className="text-xs text-slate-500 sm:text-right" model={{ timeZone, value: event.createdAt }} />
         <span className="text-slate-400">{expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
       </button>
       {expanded && showAdvancedMetrics && (

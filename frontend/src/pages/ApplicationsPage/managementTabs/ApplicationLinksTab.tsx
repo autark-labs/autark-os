@@ -1,5 +1,5 @@
 import { ExternalLink, KeyRound, Link2, Server } from 'lucide-react';
-import { CopyTextButton } from '@/components/autark-os/CopyTextButton';
+import { CopyField } from '@/components/autark-os/CopyField';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { accessDeepLinkForManagedApp, accessDeepLinkForObservedService } from '@/pages/NetworkPage/extensions/NetworkPage.deepLinks';
@@ -50,27 +50,17 @@ function LiveLinkRow({ icon: Icon, label, value }: { icon: typeof ExternalLink; 
   const canOpen = Boolean(value && /^https?:\/\//i.test(value));
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-900 px-3 py-2">
-      <div className="min-w-0">
-        <p className="flex items-center gap-2 text-xs font-medium text-sky-100/60">
-          <Icon data-icon="inline-start" />
-          {label}
-        </p>
-        <p className="mt-1 select-text truncate font-mono text-xs text-white">{value || 'Not configured'}</p>
-      </div>
-      {value && (
-        <div className="flex shrink-0 items-center gap-2">
-          <CopyTextButton label={`${label} link`} value={value} />
-          {canOpen && (
-            <Button asChild className="border-sky-400/30 bg-slate-800 text-sky-50 hover:bg-slate-700" size="sm" variant="outline">
-              <a href={value} rel="noreferrer" target="_blank">
-                <ExternalLink data-icon="inline-start" />
-                Open
-              </a>
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
+    <CopyField
+      action={canOpen && value ? (
+        <Button asChild className="border-sky-400/30 bg-slate-800 text-sky-50 hover:bg-slate-700" size="sm" variant="outline">
+          <a href={value} rel="noreferrer" target="_blank">
+            <ExternalLink data-icon="inline-start" />
+            Open
+          </a>
+        </Button>
+      ) : undefined}
+      icon={Icon}
+      model={{ emptyLabel: 'Not configured', label: `${label} link`, value }}
+    />
   );
 }

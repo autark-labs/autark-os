@@ -7,8 +7,11 @@ import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { PageShell } from '@/components/layout/PageShell';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { StatusPill } from '@/components/primitives/StatusPill';
 import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
@@ -90,14 +93,11 @@ function ResolveExistingAppsPage() {
 
   return (
     <PageShell>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="m-0 text-3xl font-bold text-white">Resolve Existing Apps</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-            Review services Autark-OS found on this server before installing duplicate managed apps.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        description="Review services Autark-OS found on this server before installing duplicate managed apps."
+        title="Resolve Existing Apps"
+      >
+        <div className="flex flex-wrap gap-2 p-4">
           <DisabledAction disabled={appState.isFetching} reason="Autark-OS is already refreshing existing apps.">
             <ProjectDarkControlButton disabled={appState.isFetching} onClick={() => void refreshObservedServices()} type="button">
               <RefreshCw className={cn('size-4', appState.isFetching && 'animate-spin')} />
@@ -108,32 +108,16 @@ function ResolveExistingAppsPage() {
             <Link to="/apps">My Apps</Link>
           </ProjectPrimaryButton>
         </div>
-      </div>
+      </PageHeader>
 
       {error && (
-        <Surface className="border-red-400/35 bg-red-500/10 p-4 text-red-100" tone="danger">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-black text-white">Existing apps could not load</h2>
-              <p className="mt-1 text-sm leading-6 text-red-100/85">{error}</p>
-            </div>
-            <ProjectDarkControlButton className="border-red-300/30 text-red-100 hover:bg-red-500/20" onClick={() => void refreshObservedServices()} type="button">
-              Retry
-            </ProjectDarkControlButton>
-          </div>
-        </Surface>
+        <PageLoadError model={{ actionLabel: 'Retry', message: error, title: 'Existing apps could not load' }} onRetry={() => void refreshObservedServices()} />
       )}
 
       {appState.isLoading ? (
-        <Surface className="grid min-h-[22rem] place-items-center p-8 text-center" tone="panel">
-          <div>
-            <RefreshCw className="mx-auto size-7 animate-spin text-cyan-200" />
-            <p className="mt-4 text-base font-black text-white">Loading existing apps</p>
-            <p className="mt-1 text-sm leading-6 text-slate-400">Checking observed services and ownership state.</p>
-          </div>
-        </Surface>
+        <PageLoadingState className="min-h-[22rem]" model={{ description: 'Checking observed services and ownership state.', title: 'Loading existing apps' }} />
       ) : (
-        <div className="grid items-start gap-5 xl:grid-cols-[minmax(360px,0.8fr)_minmax(0,1.2fr)]">
+        <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(360px,0.8fr)_minmax(0,1.2fr)]">
           <ResolvePanel>
             <div>
               <h2 className="text-lg font-bold text-white">{visibleServices.length} observed service{visibleServices.length === 1 ? '' : 's'}</h2>
@@ -200,7 +184,7 @@ function ServiceSummaryCard({
       <button className="w-full text-left" onClick={onReview} type="button">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="m-0 text-lg font-bold text-white">{service.displayName}</h2>
-          <StatusPill tone={stateTone(service)}>{stateLabel(service)}</StatusPill>
+          <StatusBadge tone={stateTone(service)}>{stateLabel(service)}</StatusBadge>
         </div>
         <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Autark-OS found this service on the server.'}</p>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -265,7 +249,7 @@ function ServiceDetailsPreview({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="m-0 text-2xl font-bold text-white">{service.displayName}</h3>
-              <StatusPill tone={stateTone(service)}>{stateLabel(service)}</StatusPill>
+              <StatusBadge tone={stateTone(service)}>{stateLabel(service)}</StatusBadge>
             </div>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{service.userStatusDescription || 'Autark-OS found this service on the server.'}</p>
           </div>
@@ -320,11 +304,11 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 function ResolvePanel({ children }: { children: ReactNode }) {
-  return <Surface className="grid gap-4 p-5" tone="panel">{children}</Surface>;
+  return <Surface className="grid min-w-0 gap-4 p-5" tone="panel">{children}</Surface>;
 }
 
 function ResolveCard({ children, className }: { children: ReactNode; className?: string }) {
-  return <Surface className={cn('p-4', className)} tone="muted">{children}</Surface>;
+  return <Surface className={cn('min-w-0 p-4', className)} tone="muted">{children}</Surface>;
 }
 
 function stateLabel(service: ObservedServiceView) {

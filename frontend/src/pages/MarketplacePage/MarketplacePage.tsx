@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { PageShell } from '@/components/layout/PageShell';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
 import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import {
   Dialog,
   DialogContent,
@@ -73,32 +74,13 @@ type StarterRecommendation = {
 function DiscoverLoadingState() {
   return (
     <PageShell>
-      <Surface className="flex min-h-[24rem] items-center justify-center p-6 text-center" tone="panel">
-        <div className="max-w-md">
-          <RefreshCw className="mx-auto size-8 animate-spin text-cyan-200" />
-          <h1 className="mt-4 text-2xl font-black text-white">Loading Discover</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-400">Checking the catalog, installed apps, and recent marketplace activity.</p>
-        </div>
-      </Surface>
+      <PageLoadingState model={{ description: 'Checking the catalog, installed apps, and recent marketplace activity.', title: 'Loading Discover' }} />
     </PageShell>
   );
 }
 
 function DiscoverErrorState({ message, onRetry, title = 'Discover needs attention', className }: { message: string; onRetry: () => void; title?: string; className?: string }) {
-  return (
-    <Surface className={cn('border-red-400/35 bg-red-500/10 p-4 text-red-100', className)} tone="danger">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-black text-white">{title}</h2>
-          <p className="mt-1 text-sm leading-6 text-red-100/85">{message}</p>
-        </div>
-        <ProjectDarkControlButton onClick={onRetry} type="button">
-          <RefreshCw className="size-4" />
-          Retry
-        </ProjectDarkControlButton>
-      </div>
-    </Surface>
-  );
+  return <PageLoadError className={className} model={{ actionLabel: 'Retry', message, title }} onRetry={onRetry} />;
 }
 
 function MarketplacePage() {

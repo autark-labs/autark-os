@@ -21,11 +21,11 @@ test('Discover uses a route-backed detail selection and preserves catalog contex
   assert.match(page, /\{detailView && \(/);
 });
 
-test('Discover details use a Sheet below wide desktop layouts and keep durable jobs attached', () => {
+test('Discover details use the shared responsive details sheet below wide desktop layouts and keep durable jobs attached', () => {
   const detail = source('src/pages/MarketplacePage/MarketplaceAppDetail.tsx');
   const page = source('src/pages/MarketplacePage/MarketplacePage.tsx');
 
-  assert.match(detail, /<Sheet/);
+  assert.match(detail, /<ResponsiveDetailsSheet/);
   assert.match(detail, /min-width: 1536px/);
   assert.match(detail, /onOpenChange=\{\(open\) => !open && onBack\(\)\}/);
   assert.match(detail, /<JobProgress/);

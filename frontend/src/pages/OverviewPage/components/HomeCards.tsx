@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, Info, MoreVertical, Sparkles, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, MoreVertical, Sparkles, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -107,54 +107,6 @@ export function HomeSoftCard({
     >
       {children}
     </Surface>
-  );
-}
-
-export function HomeActionCard({
-  action,
-  body,
-  className,
-  dismissible = false,
-  dismissing = false,
-  onDismiss,
-  severity = 'info',
-  title,
-}: {
-  action?: AutarkOsAction | null;
-  body: ReactNode;
-  className?: string;
-  dismissible?: boolean;
-  dismissing?: boolean;
-  onDismiss?: () => void;
-  severity?: string;
-  title: ReactNode;
-}) {
-  const tone = issueTone(severity);
-  const Icon = issueIcon(severity);
-
-  return (
-    <HomeSoftCard className={cn('relative overflow-hidden shadow-2xl', toneClasses[tone].glow, className)}>
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-        <div className="flex min-w-0 gap-3">
-          <div className={cn('grid size-11 shrink-0 place-items-center rounded-xl', toneClasses[tone].icon)}>
-            <Icon className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="m-0 text-base font-bold text-slate-50">{title}</p>
-            <p className="m-0 mt-1 text-sm leading-6 text-sky-100/70">{body}</p>
-            {dismissible && <p className="m-0 mt-1 text-xs text-sky-100/55">You can dismiss this after reviewing it.</p>}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <HomeActionButton action={action} className="w-full sm:w-auto" />
-          {dismissible && onDismiss && (
-            <ProjectDarkControlButton aria-label="Dismiss recommendation" disabled={dismissing} onClick={onDismiss} size="icon" type="button">
-              <X className="size-4" />
-            </ProjectDarkControlButton>
-          )}
-        </div>
-      </div>
-    </HomeSoftCard>
   );
 }
 

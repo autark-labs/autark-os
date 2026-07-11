@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, HardDrive, Loader2, Network, ServerCog, ShieldCheck, Sparkles } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, HardDrive, Loader2, Network, ServerCog, ShieldCheck, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -350,11 +352,11 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
 }
 
 function OnboardingLoadingState() {
-  return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-300" role="status"><div className="grid justify-items-center gap-3"><Loader2 className="size-7 animate-spin text-cyan-200" /><span>Loading setup</span></div></main>;
+  return <PageLoadingState fullScreen model={{ description: 'Checking your setup progress and appliance readiness.', title: 'Loading setup' }} />;
 }
 
 function OnboardingLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-50"><section className="w-full max-w-lg rounded-2xl border border-red-300/25 bg-slate-900 p-6 shadow-xl shadow-slate-950/30"><AlertTriangle className="size-6 text-red-200" /><h1 className="mt-4 text-2xl font-black text-white">Setup could not load</h1><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p><ProjectPrimaryButton autoFocus className="mt-5" onClick={onRetry} type="button">Try again</ProjectPrimaryButton></section></main>;
+  return <PageLoadError fullScreen model={{ message, title: 'Setup could not load' }} onRetry={onRetry} />;
 }
 
 function emptyDraft(): OnboardingDraft {

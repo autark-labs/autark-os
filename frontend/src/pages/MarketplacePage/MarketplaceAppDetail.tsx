@@ -6,14 +6,8 @@ import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
+import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
@@ -222,15 +216,13 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
   }
 
   return (
-    <Sheet onOpenChange={(open) => !open && onBack()} open>
-      <SheetContent className="w-full overflow-y-auto border-slate-700 bg-slate-950 text-slate-100 sm:max-w-xl lg:max-w-2xl">
-        <SheetHeader className="border-b border-slate-800 pb-4 pr-10">
-          <SheetTitle className="break-words text-xl font-bold text-white">{app.name}</SheetTitle>
-          <SheetDescription className="mt-2 leading-6 text-slate-400">{app.description}</SheetDescription>
-        </SheetHeader>
-        <div className="p-4">{content}</div>
-      </SheetContent>
-    </Sheet>
+    <ResponsiveDetailsSheet
+      model={{ description: app.description, title: app.name }}
+      onOpenChange={(open) => !open && onBack()}
+      open
+    >
+      {content}
+    </ResponsiveDetailsSheet>
   );
 }
 

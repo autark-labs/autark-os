@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertTriangle, ClipboardList, Copy, Download, FileText, LifeBuoy, ListChecks, LockKeyhole, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
+import { ClipboardList, Copy, Download, FileText, LifeBuoy, ListChecks, LockKeyhole, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
@@ -169,7 +172,7 @@ function SupportPage() {
                     : 'Needs attention. Start with health checks, then generate a support report or view logs if you need more detail.'}
               </p>
             </div>
-            <StatusBadge ready={headline === 'Ready'}>{headline}</StatusBadge>
+            <StatusBadge tone={headline === 'Ready' ? 'success' : 'warning'}>{headline}</StatusBadge>
           </div>
         </div>
 
@@ -328,15 +331,6 @@ function SupportPage() {
   );
 }
 
-function StatusBadge({ children, ready }: { children: string; ready: boolean }) {
-  return (
-    <Badge className={cn('px-3 py-1.5 text-sm font-black', ready ? 'border-emerald-300/25 bg-emerald-500/15 text-emerald-100' : 'border-orange-400/45 bg-orange-500/10 text-orange-200')} variant="outline">
-      {ready ? <ShieldCheck className="size-4" /> : <AlertTriangle className="size-4" />}
-      {children}
-    </Badge>
-  );
-}
-
 function SummaryRow({ label, tone, value }: { label: string; tone: string; value: string }) {
   const tones = {
     success: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
@@ -433,36 +427,13 @@ function RepairLine({ app }: { app: AppRuntimeView }) {
 function DiagnosticsLoadingState() {
   return (
     <PageShell>
-      <Surface className="grid min-h-[520px] place-items-center p-8 text-center" tone="panel">
-        <div className="grid justify-items-center gap-3">
-          <span className="grid size-12 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/10 text-cyan-100">
-            <RefreshCw className="size-5 animate-spin" />
-          </span>
-          <div>
-            <p className="font-black text-white">Loading diagnostics</p>
-            <p className="mt-1 max-w-md text-sm leading-6 text-sky-100/80">Checking health, setup state, found apps, and recent logs.</p>
-          </div>
-        </div>
-      </Surface>
+      <PageLoadingState className="min-h-[520px]" model={{ description: 'Checking health, setup state, found apps, and recent logs.', title: 'Loading diagnostics' }} />
     </PageShell>
   );
 }
 
 function DiagnosticsErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="border-b border-red-400/40 bg-red-500/10 px-6 py-4 text-red-100">
-      <div className="flex gap-3">
-        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-current">Diagnostics could not refresh</p>
-          <p className="mt-1 text-sm leading-6 text-current/80">{message}</p>
-          <ProjectDarkControlButton className="mt-3 border-red-300/30 text-red-100 hover:bg-red-500/20" onClick={onRetry} size="sm" type="button">
-            Try again
-          </ProjectDarkControlButton>
-        </div>
-      </div>
-    </div>
-  );
+  return <PageLoadError className="rounded-none border-x-0 border-t-0 px-6 py-4" model={{ message, title: 'Diagnostics could not refresh' }} onRetry={onRetry} />;
 }
 
 function hasRepairDetail(app: AppRuntimeView) {

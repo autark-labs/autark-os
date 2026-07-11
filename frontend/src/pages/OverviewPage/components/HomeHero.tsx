@@ -1,6 +1,6 @@
 import { Clock3 } from 'lucide-react';
 import overviewBackground from '@/assets/overviewBackground.webp';
-import { StatusPill } from '@/components/primitives/StatusPill';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import type { SystemSummary } from '@/types/system';
 import type { HomeSummaryAvailability } from '../extensions/OverviewPage.systemStatus';
 
@@ -43,7 +43,7 @@ export function HomeHero({
             </div>
 
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-              <StatusPill tone={statusTone}>{readyStatus}</StatusPill>
+              <StatusBadge tone={statusTone}>{readyStatus}</StatusBadge>
               {loading && (
                 <span className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-100 shadow-md shadow-cyan-950/15">
                   <Clock3 className="size-3.5" />

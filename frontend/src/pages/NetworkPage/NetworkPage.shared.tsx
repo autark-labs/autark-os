@@ -2,8 +2,9 @@ import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { ProjectEmptyState } from '@/components/primitives/EmptyState';
-import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { cn } from '@/lib/utils';
 import type { NetworkDiagnosticsReport } from '@/types/network';
 import { diagnosticTone } from './extensions/NetworkPage.theme';
@@ -64,19 +65,7 @@ export function InfoLine({ label, value }: { label: string; value: string }) {
 }
 
 export function AccessPageLoadingState({ label, sublabel }: { label: string; sublabel: string }) {
-  return (
-    <section className="grid min-h-[520px] w-full place-items-center rounded-2xl border border-sky-400/30 bg-slate-900 p-8 text-center text-slate-50 shadow-xl shadow-slate-950/30">
-      <div className="grid justify-items-center gap-3">
-        <span className="grid size-12 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/10 text-cyan-100">
-          <Activity className="size-5 animate-pulse" />
-        </span>
-        <div>
-          <p className="font-black text-slate-50">{label}</p>
-          <p className="mt-1 max-w-md text-sm leading-6 text-sky-100/70">{sublabel}</p>
-        </div>
-      </div>
-    </section>
-  );
+  return <PageLoadingState className="min-h-[520px]" model={{ description: sublabel, title: label }} />;
 }
 
 export function AccessPageErrorState({
@@ -88,22 +77,7 @@ export function AccessPageErrorState({
   onRetry?: () => void;
   title: string;
 }) {
-  return (
-    <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
-      <div className="flex gap-3">
-        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-current">{title}</p>
-          <p className="mt-1 leading-6 text-current/80">{message}</p>
-          {onRetry && (
-            <ProjectDarkControlButton className="mt-3" onClick={onRetry} size="sm" type="button">
-              Try again
-            </ProjectDarkControlButton>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <PageLoadError model={{ message, title }} onRetry={onRetry} />;
 }
 
 export function AccessLine({ label, value }: { label: string; value: string }) {

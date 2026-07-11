@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
 import { showActionErrorNotification } from '@/lib/actionNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -11,14 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 import {
   catalogAppIsManaged,
@@ -53,14 +46,14 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
 
   if (!service) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="border-slate-700 bg-slate-950 text-slate-100 sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>Service not found</SheetTitle>
-            <SheetDescription>Autark-OS could not find that observed service in the current inventory.</SheetDescription>
-          </SheetHeader>
-        </SheetContent>
-      </Sheet>
+      <ResponsiveDetailsSheet
+        className="sm:max-w-lg"
+        model={{ description: 'Autark-OS could not find that observed service in the current inventory.', title: 'Service not found' }}
+        onOpenChange={onOpenChange}
+        open={open}
+      >
+        <p className="text-sm leading-6 text-slate-300">Refresh the existing-app inventory and choose the service again.</p>
+      </ResponsiveDetailsSheet>
     );
   }
 
@@ -111,19 +104,16 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full overflow-y-auto border-slate-700 bg-slate-950 text-slate-100 sm:max-w-xl">
-        <SheetHeader className="border-b border-slate-800 pb-4">
-          <div className="flex flex-wrap items-start justify-between gap-3 pr-10">
-            <div className="min-w-0">
-              <SheetTitle className="truncate text-xl font-black text-white">{service.displayName}</SheetTitle>
-              <SheetDescription className="mt-2 leading-6 text-slate-400">{service.userStatusDescription || 'Autark-OS observes this service but does not manage it.'}</SheetDescription>
-            </div>
-            <Badge className={stateBadgeClass(service)} variant="outline">{service.userStatusLabel || (service.pinned ? 'Pinned' : 'Found')}</Badge>
-          </div>
-        </SheetHeader>
-
-        <div className="grid gap-5 px-4">
+    <ResponsiveDetailsSheet
+      className="sm:max-w-xl"
+      footer={<Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" onClick={() => onOpenChange(false)} type="button" variant="outline">Close</Button>}
+      headerAccessory={<Badge className={stateBadgeClass(service)} variant="outline">{service.userStatusLabel || (service.pinned ? 'Pinned' : 'Found')}</Badge>}
+      model={{ description: service.userStatusDescription || 'Autark-OS observes this service but does not manage it.', title: service.displayName }}
+      onOpenChange={onOpenChange}
+      open={open}
+      titleClassName="font-black"
+    >
+        <div className="grid gap-5">
           {localError && (
             <Alert className="border-red-300/25 bg-red-500/10 text-red-100">
               <ShieldAlert className="size-4" />
@@ -250,12 +240,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
             {Object.entries(service.metadata || {}).length ? Object.entries(service.metadata).map(([key, value]) => <Detail key={key} label={key} value={value || 'Unknown'} />) : <p>No extra details reported.</p>}
           </section>
         </div>
-
-        <SheetFooter className="border-t border-slate-800">
-          <Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" onClick={() => onOpenChange(false)} type="button" variant="outline">Close</Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+    </ResponsiveDetailsSheet>
   );
 }
 

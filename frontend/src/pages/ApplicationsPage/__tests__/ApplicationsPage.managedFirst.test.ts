@@ -24,7 +24,7 @@ test('My Apps renders canonical managed and linked collections without mixing in
 
 test('My Apps sends non-managed services to the dedicated existing-app review flow', () => {
   assert.match(page, /const foundServices = appState\.foundServices/);
-  assert.match(page, /Found on this server/);
-  assert.match(page, /Review existing apps/);
+  assert.match(page, /FoundAppsPrompt/);
+  assert.match(page, /reviewHref: '\/apps\/found'/);
   assert.match(page, /navigate\(`\/apps\/found\$\{serviceQuery\}`, \{ replace: true \}\)/);
 });

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
+import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { MetricCard } from '@/components/primitives/MetricCard';
-import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { Surface } from '@/components/primitives/Surface';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -574,15 +574,7 @@ export const ApplicationsPage = () => {
       </PageHeader>
 
       {foundServices.length > 0 && (
-        <Surface className="flex flex-col gap-4 border-orange-400/35 bg-orange-500/10 p-4 sm:flex-row sm:items-center sm:justify-between" tone="panel">
-          <div>
-            <h2 className="text-sm font-black text-white">Found on this server</h2>
-            <p className="mt-1 text-sm leading-6 text-orange-100/80">Autark-OS found {foundServices.length} service{foundServices.length === 1 ? '' : 's'} that this installation does not manage.</p>
-          </div>
-          <ProjectDarkControlButton asChild className="shrink-0">
-            <Link to="/apps/found">Review existing apps</Link>
-          </ProjectDarkControlButton>
-        </Surface>
+        <FoundAppsPrompt model={{ count: foundServices.length, reviewHref: '/apps/found' }} />
       )}
 
       <div className="grid gap-3">
