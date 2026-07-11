@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Bell, Info, RefreshCw, Sparkles, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +57,11 @@ import {
 import { MarketplaceAppDetail } from './MarketplaceAppDetail';
 import { MarketplaceAppList } from './MarketplaceAppList';
 import { defaultAnswersFromSchema } from './MarketplaceSetupPanel';
+import {
+  marketplaceDetailId,
+  marketplaceSearchWithDetail,
+  marketplaceSearchWithoutDetail,
+} from './extensions/MarketplacePage.detailRoute';
 
 type StarterRecommendation = {
   app: MarketplaceApp;
@@ -98,7 +103,7 @@ function DiscoverErrorState({ message, onRetry, title = 'Discover needs attentio
 
 function MarketplacePage() {
   const { showAdvancedMetrics } = useProjectSettings();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedAppId, setSelectedAppId] = useState('vaultwarden');
   const [sortBy, setSortBy] = useState('Recommended');
@@ -112,8 +117,13 @@ function MarketplacePage() {
   const [backupJob, setBackupJob] = useState<AutarkOsJob | null>(null);
   const [duplicateAcknowledgedAppId, setDuplicateAcknowledgedAppId] = useState<string | null>(null);
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
+  const detailTriggerRef = useRef<HTMLElement | null>(null);
+  const catalogScrollPositionRef = useRef(0);
+  const previousDetailAppIdRef = useRef<string | null>(null);
   const recoveryAppId = searchParams.get('app');
   const recoveryMode = searchParams.get('mode');
+  const explicitDetailAppId = marketplaceDetailId(searchParams);
+  const detailAppId = explicitDetailAppId ?? recoveryAppId;
   const appsQuery = useDiscoverAppsQuery();
   const activityQuery = useMarketplaceActivityQuery();
   const readinessQuery = useDiscoverReadinessQuery();
@@ -141,7 +151,8 @@ function MarketplacePage() {
     }
     return basicCatalogMode === 'all-safe' ? safeBasicCatalogApps : starterCatalogApps;
   }, [apps, basicCatalogMode, safeBasicCatalogApps, showAdvancedMetrics, starterCatalogApps]);
-  const selectedView = useMemo(() => apps.find((app) => app.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, selectedAppId]);
+  const detailView = useMemo(() => detailAppId ? apps.find((app) => app.id === detailAppId) ?? null : null, [apps, detailAppId]);
+  const selectedView = useMemo(() => detailView ?? apps.find((app) => app.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, detailView, selectedAppId]);
   const selectedApp = selectedView?.app;
   const selectedInstalledApp = selectedView?.installedApp ?? null;
   const fallbackInstallOptions: InstallOptions = {
@@ -193,6 +204,22 @@ function MarketplacePage() {
       setSelectedAppId(recoveryAppId);
     }
   }, [apps, recoveryAppId]);
+
+  useEffect(() => {
+    if (detailAppId && apps.some((app) => app.id === detailAppId)) {
+      setSelectedAppId(detailAppId);
+    }
+  }, [apps, detailAppId]);
+
+  useEffect(() => {
+    if (previousDetailAppIdRef.current && !detailAppId) {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: catalogScrollPositionRef.current });
+        detailTriggerRef.current?.focus();
+      });
+    }
+    previousDetailAppIdRef.current = detailAppId;
+  }, [detailAppId]);
 
   useEffect(() => {
     if (!showAdvancedMetrics) {
@@ -333,10 +360,15 @@ function MarketplacePage() {
   );
   const discoverFilterValue = showAdvancedMetrics ? selectedCategory : basicCatalogMode;
 
-  function selectRecommendedApp(appId: string) {
-    setSearchQuery('');
-    setSelectedCategory('All');
+  function openAppDetails(appId: string) {
+    detailTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    catalogScrollPositionRef.current = window.scrollY;
     setSelectedAppId(appId);
+    setSearchParams(marketplaceSearchWithDetail(searchParams, appId));
+  }
+
+  function closeAppDetails() {
+    setSearchParams(marketplaceSearchWithoutDetail(searchParams, Boolean(recoveryAppId)), { replace: true });
   }
 
   function changeDiscoverFilter(nextFilter: string) {
@@ -398,7 +430,7 @@ function MarketplacePage() {
         <StarterAppHandoff
           recommendations={starterRecommendations}
           onDismiss={dismissStartHere}
-          onSelect={selectRecommendedApp}
+          onSelect={openAppDetails}
         />
       )}
 
@@ -431,8 +463,34 @@ function MarketplacePage() {
       />
 
       <div className="grid items-start gap-6 2xl:grid-cols-[minmax(620px,1fr)_minmax(420px,560px)]">
-        <MarketplaceAppList apps={visibleApps} density={showAdvancedMetrics ? 'full' : 'basic'} installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null} modeLabel={showAdvancedMetrics ? 'All apps' : basicCatalogMode === 'all-safe' ? 'Ready apps' : 'Starter apps'} onSelect={setSelectedAppId} onSortChange={setSortBy} selectedAppId={selectedApp.id} sortBy={sortBy} />
-        <MarketplaceAppDetail app={selectedApp} appView={selectedView} backupJob={backupJob?.subjectId === selectedApp.id ? backupJob : null} installJob={installJob?.subjectId === selectedApp.id ? installJob : null} installLocked={selectedAppInstallLocked} installOptions={installOptions ?? fallbackInstallOptions} installPreview={installPreview} installStatusMessage={installStatusMessage} installing={selectedAppInstalling} installPlan={installPlan} installedApp={selectedInstalledApp} onBack={() => { setSearchQuery(''); setSelectedCategory('All'); }} onCreateBackup={createFirstBackup} onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(selectedApp.id)} onInstall={(options) => installApp(selectedApp.id, options)} onReinstallCurrent={reinstallWithCurrentSettings} onRequestPlan={(options) => requestPlan(selectedApp.id, options)} onSetupAnswersChange={changeSetupAnswers} planLoading={planLoading} recoveryMode={recoveryAppId === selectedApp.id ? recoveryMode : null} setupAnswers={setupAnswers} setupReady={installPreview?.valid ?? true} setupSchema={selectedView.setupSchema} />
+        <MarketplaceAppList apps={visibleApps} density={showAdvancedMetrics ? 'full' : 'basic'} installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null} modeLabel={showAdvancedMetrics ? 'All apps' : basicCatalogMode === 'all-safe' ? 'Ready apps' : 'Starter apps'} onSelect={openAppDetails} onSortChange={setSortBy} selectedAppId={detailAppId ?? ''} sortBy={sortBy} />
+        {detailView && (
+          <MarketplaceAppDetail
+            app={detailView.app}
+            appView={detailView}
+            backupJob={backupJob?.subjectId === detailView.id ? backupJob : null}
+            installJob={installJob?.subjectId === detailView.id ? installJob : null}
+            installLocked={selectedAppInstallLocked}
+            installOptions={installOptions ?? fallbackInstallOptions}
+            installPlan={installPlan}
+            installPreview={installPreview}
+            installStatusMessage={installStatusMessage}
+            installing={selectedAppInstalling}
+            installedApp={detailView.installedApp ?? null}
+            onBack={closeAppDetails}
+            onCreateBackup={createFirstBackup}
+            onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(detailView.id)}
+            onInstall={(options) => installApp(detailView.id, options)}
+            onReinstallCurrent={reinstallWithCurrentSettings}
+            onRequestPlan={(options) => requestPlan(detailView.id, options)}
+            onSetupAnswersChange={changeSetupAnswers}
+            planLoading={planLoading}
+            recoveryMode={recoveryAppId === detailView.id ? recoveryMode : null}
+            setupAnswers={setupAnswers}
+            setupReady={installPreview?.valid ?? true}
+            setupSchema={detailView.setupSchema}
+          />
+        )}
       </div>
     </PageShell>
   );

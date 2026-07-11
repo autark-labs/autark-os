@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,13 @@ import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } 
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
@@ -60,6 +67,7 @@ type AppDetailProps = {
 export function MarketplaceAppDetail({ app, appView, backupJob, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onReinstallCurrent, onRequestPlan, onSetupAnswersChange, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
+  const sideBySideLayout = useSideBySideDetailLayout();
   const isInstalled = Boolean(installedApp);
   const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
   const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId) : '/apps';
@@ -88,9 +96,8 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
     openInstallReview();
   }
 
-  return (
-    <Card className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border-sky-400/25 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
-      <CardContent className="grid gap-5 p-5">
+  const content = (
+    <div className="grid gap-5">
         <ProjectDarkControlButton className="w-fit" onClick={onBack} type="button">
           <ArrowLeft className="size-4" />
           Back to apps
@@ -203,9 +210,43 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
             </div>
           </CollapsibleContent>
         </Collapsible>
-      </CardContent>
-    </Card>
+    </div>
   );
+
+  if (sideBySideLayout) {
+    return (
+      <Card className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border-sky-400/25 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
+        <CardContent className="p-5">{content}</CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Sheet onOpenChange={(open) => !open && onBack()} open>
+      <SheetContent className="w-full overflow-y-auto border-slate-700 bg-slate-950 text-slate-100 sm:max-w-xl lg:max-w-2xl">
+        <SheetHeader className="border-b border-slate-800 pb-4 pr-10">
+          <SheetTitle className="break-words text-xl font-bold text-white">{app.name}</SheetTitle>
+          <SheetDescription className="mt-2 leading-6 text-slate-400">{app.description}</SheetDescription>
+        </SheetHeader>
+        <div className="p-4">{content}</div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function useSideBySideDetailLayout() {
+  const query = '(min-width: 1536px)';
+  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+    const update = () => setMatches(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener('change', update);
+    return () => mediaQuery.removeEventListener('change', update);
+  }, []);
+
+  return matches;
 }
 
 function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
