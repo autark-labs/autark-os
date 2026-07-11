@@ -55,15 +55,18 @@ import { Switch } from '@/components/ui/switch';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { copyText } from '@/lib/copyText';
+import { formatLocalizedDateTime } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
+import type { BackupSettingsSummary } from '@/types/backup';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
 import { defaultSettingsGroup, sectionsForGroup, settingsGroups as topLevelSettingsGroups } from './SettingsPage.sections';
 
 type SettingsState = {
   backupRoot: string | null;
+  backupSchedule: BackupSettingsSummary | null;
   doctor: SystemDoctorStatus | null;
   metrics: SystemMetrics | null;
   projectSettings: ProjectSettings | null;
@@ -160,7 +163,7 @@ function SettingsPage() {
   const appState = useApplicationStateRepository();
   const doctorQuery = useSystemDoctorQuery();
   const [activeGroup, setActiveGroup] = useState<SettingsGroupId>('general');
-  const [state, setState] = useState<SettingsState>({ backupRoot: null, doctor: null, metrics: null, projectSettings: null, setup: null, version: null });
+  const [state, setState] = useState<SettingsState>({ backupRoot: null, backupSchedule: null, doctor: null, metrics: null, projectSettings: null, setup: null, version: null });
   const [draft, setDraft] = useState<ProjectSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -189,7 +192,7 @@ function SettingsPage() {
           return null;
         }),
       ]);
-      setState((current) => ({ ...current, backupRoot: backupReport?.backupRoot ?? null, metrics, projectSettings, setup, version }));
+      setState((current) => ({ ...current, backupRoot: backupReport?.backupRoot ?? null, backupSchedule: backupReport?.settings ?? null, metrics, projectSettings, setup, version }));
       setDraft(projectSettings);
     } catch (loadError) {
       setLoadError(apiErrorMessage(loadError, 'Settings could not be loaded.'));
@@ -411,6 +414,7 @@ function SettingsPage() {
                 advancedChecks={advancedChecks}
                 apps={appState.apps}
                 backupRoot={state.backupRoot}
+                backupSchedule={state.backupSchedule}
                 copied={copied}
                 doctor={doctor}
                 draft={draft}
@@ -512,7 +516,7 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
   );
 }
 
-function BackupsPanel({ apps, backupRoot, draft, onUpdate }: PanelProps & { apps: AppRuntimeView[]; backupRoot: string | null }) {
+function BackupsPanel({ apps, backupRoot, backupSchedule, draft, onUpdate }: PanelProps & { apps: AppRuntimeView[]; backupRoot: string | null; backupSchedule: BackupSettingsSummary | null }) {
   const protectedApps = apps.filter((app) => app.canonicalBackupState === 'protected_by_restore_point').length;
   return (
     <SettingsGroup description="Control automatic backup behavior for all app data." title="Backups">
@@ -529,6 +533,7 @@ function BackupsPanel({ apps, backupRoot, draft, onUpdate }: PanelProps & { apps
         <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
       <ReadOnlyRow label="Backup folder" note="Current destination used by routine and manual restore points." value={backupRoot || 'Unavailable'} />
+      <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={backupSchedule?.nextRoutineRun ? formatLocalizedDateTime(backupSchedule.nextRoutineRun, draft.timeZone, 'Not scheduled') : 'Not scheduled'} />
       <ReadOnlyRow label="Apps protected" note="Installed apps with at least one completed restore point." value={`${protectedApps}/${apps.length}`} />
     </SettingsGroup>
   );
@@ -623,6 +628,7 @@ type SettingsPanelBySectionProps = {
   advancedChecks: SystemSetupCheck[];
   apps: AppRuntimeView[];
   backupRoot: string | null;
+  backupSchedule: BackupSettingsSummary | null;
   copied: string | null;
   doctor: SystemDoctorStatus | null;
   draft: ProjectSettings;
@@ -635,7 +641,7 @@ type SettingsPanelBySectionProps = {
   version: ProjectVersionInfo | null;
 };
 
-function SettingsPanelBySection({ advancedChecks, apps, backupRoot, copied, doctor, draft, metrics, onCopy, onUpdate, requiredChecks, sectionId, setup, version }: SettingsPanelBySectionProps) {
+function SettingsPanelBySection({ advancedChecks, apps, backupRoot, backupSchedule, copied, doctor, draft, metrics, onCopy, onUpdate, requiredChecks, sectionId, setup, version }: SettingsPanelBySectionProps) {
   switch (sectionId) {
     case 'general':
       return <GeneralPanel draft={draft} onUpdate={onUpdate} />;
@@ -644,7 +650,7 @@ function SettingsPanelBySection({ advancedChecks, apps, backupRoot, copied, doct
     case 'applications':
       return <ApplicationsPanel apps={apps} draft={draft} onUpdate={onUpdate} />;
     case 'backups':
-      return <BackupsPanel apps={apps} backupRoot={backupRoot} draft={draft} onUpdate={onUpdate} />;
+      return <BackupsPanel apps={apps} backupRoot={backupRoot} backupSchedule={backupSchedule} draft={draft} onUpdate={onUpdate} />;
     case 'storage':
       return <StoragePanel metrics={metrics} />;
     case 'network':

@@ -46,7 +46,7 @@ import {
   SectionHeader,
 } from './BackupsPage.components';
 import type { RestoreFlowState } from './BackupsPage.components';
-import { backupJobRunningId, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
+import { activeBackupJobs, backupJobRunningId, backupOperationAvailability, backupOperationForJob, backupOperationForRunningId, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
 
 type RestoreView = 'timeline' | 'list';
 
@@ -69,6 +69,18 @@ function BackupsPage() {
     return recovered;
   }, [activeJob, backupJobsQuery.data]);
   const currentActiveJob = activeJob && !terminalJob(activeJob) ? activeJob : recoveredActiveJob;
+  const activeBackupOperations = useMemo(() => {
+    const durableOperations = activeBackupJobs(backupJobsQuery.data ?? [])
+      .map((job) => backupOperationForJob(job))
+      .filter((operation): operation is NonNullable<typeof operation> => Boolean(operation));
+    const localOperation = backupOperationForRunningId(running);
+    return [...new Set(localOperation ? [...durableOperations, localOperation] : durableOperations)];
+  }, [backupJobsQuery.data, running]);
+  const appBackupAvailability = backupOperationAvailability('app_backup', activeBackupOperations);
+  const fullBackupAvailability = backupOperationAvailability('full_backup', activeBackupOperations);
+  const restoreAvailability = backupOperationAvailability('restore', activeBackupOperations);
+  const routineBackupAvailability = backupOperationAvailability('routine_backup', activeBackupOperations);
+  const verifyAvailability = backupOperationAvailability('verify', activeBackupOperations);
   const backupReport = useBackupReportRepository({ paused: Boolean(restoreFlow || running || currentActiveJob) });
   const runAppBackupMutation = useRunAppBackupMutation();
   const runFullBackupMutation = useRunFullBackupMutation();
@@ -123,14 +135,17 @@ function BackupsPage() {
   }, [backupJobsQuery.error]);
 
   async function runManualAppBackup(app: AppBackupStatus) {
+    if (appBackupAvailability.disabled) return;
     await runBackup(`app-${app.appId}`, () => runAppBackupMutation.mutateAsync(app.appId));
   }
 
   async function runFullBackup() {
+    if (fullBackupAvailability.disabled) return;
     await runBackup('full', () => runFullBackupMutation.mutateAsync());
   }
 
   async function runRoutineBackup() {
+    if (routineBackupAvailability.disabled) return;
     await runBackup('routine', () => runRoutineBackupMutation.mutateAsync());
   }
 
@@ -182,6 +197,7 @@ function BackupsPage() {
   }
 
   async function openRestore(point: RestorePoint, appId?: string | null) {
+    if (restoreAvailability.disabled) return;
     rememberRestoreOrigin();
     setError(null);
     await loadRestorePlan(point, appId || null);
@@ -224,7 +240,7 @@ function BackupsPage() {
   }
 
   async function executeRestore() {
-    if (!restoreFlow?.plan || restoreFlow.phase !== 'confirm' || !restoreFlow.plan.executable) {
+    if (restoreAvailability.disabled || !restoreFlow?.plan || restoreFlow.phase !== 'confirm' || !restoreFlow.plan.executable) {
       return;
     }
     const { point, targetAppId } = restoreFlow;
@@ -250,6 +266,7 @@ function BackupsPage() {
   }
 
   async function verifyRestorePoint(point: RestorePoint) {
+    if (verifyAvailability.disabled) return;
     setRunning(`verify-${point.id}`);
     setError(null);
     try {
@@ -301,15 +318,15 @@ function BackupsPage() {
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 md:text-base">{protectionHero.summary}</p>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
-              <DisabledAction disabled={running === 'routine' || !report?.settings.automaticBackupsEnabled} reason={running === 'routine' ? 'Wait for the current routine backup to finish.' : 'Turn on routine backups in Settings first.'}>
-                <ProjectPrimaryButton disabled={running === 'routine' || !report?.settings.automaticBackupsEnabled} onClick={() => void runRoutineBackup()} type="button">
+              <DisabledAction disabled={routineBackupAvailability.disabled || !report?.settings.automaticBackupsEnabled} reason={routineBackupAvailability.disabled ? routineBackupAvailability.reason : 'Turn on routine backups in Settings first.'}>
+                <ProjectPrimaryButton disabled={routineBackupAvailability.disabled || !report?.settings.automaticBackupsEnabled} onClick={() => void runRoutineBackup()} type="button">
                   {running === 'routine' ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
                   Run routine backup
                 </ProjectPrimaryButton>
               </DisabledAction>
               {showAdvancedMetrics && (
-                <DisabledAction disabled={running === 'full'} reason="Wait for the current full checkpoint to finish.">
-                  <ProjectDarkControlButton disabled={running === 'full'} onClick={() => void runFullBackup()} type="button">
+                <DisabledAction disabled={fullBackupAvailability.disabled} reason={fullBackupAvailability.reason}>
+                  <ProjectDarkControlButton disabled={fullBackupAvailability.disabled} onClick={() => void runFullBackup()} type="button">
                     {running === 'full' ? <Loader2 className="size-4 animate-spin" /> : <Layers3 className="size-4" />}
                     Full checkpoint
                   </ProjectDarkControlButton>
@@ -337,6 +354,8 @@ function BackupsPage() {
                   busy={running === 'full'}
                   description="One restore point for every supported installed app."
                   icon={Layers3}
+                  disabled={fullBackupAvailability.disabled}
+                  disabledReason={fullBackupAvailability.reason}
                   label="Full checkpoint"
                   onClick={() => void runFullBackup()}
                   title="Back up everything"
@@ -356,8 +375,8 @@ function BackupsPage() {
                 <ActionCard
                   busy={running === 'routine'}
                   description={report.settings.automaticBackupsEnabled ? `${capitalizeBackupLabel(report.settings.frequency)} near ${report.settings.backupTime} (${report.settings.timeZone || 'UTC'})` : 'Turn on routine backups in Settings.'}
-                  disabled={!report.settings.automaticBackupsEnabled}
-                  disabledReason="Turn on routine backups in Settings first."
+                  disabled={routineBackupAvailability.disabled || !report.settings.automaticBackupsEnabled}
+                  disabledReason={routineBackupAvailability.disabled ? routineBackupAvailability.reason : 'Turn on routine backups in Settings first.'}
                   icon={CalendarClock}
                   label="Routine path"
                   onClick={() => void runRoutineBackup()}
@@ -381,9 +400,9 @@ function BackupsPage() {
               </div>
               <div className="mt-3 min-h-[400px]">
                 {restoreView === 'timeline' ? (
-                  <RoutineTimeline apps={report.apps} latestRestore={latestRestore} nextRun={report.settings.nextRoutineRun} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} points={routineRestorePoints} running={running} timeZone={report.settings.timeZone || 'UTC'} />
+                  <RoutineTimeline apps={report.apps} latestRestore={latestRestore} nextRun={report.settings.nextRoutineRun} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} points={routineRestorePoints} restoreAvailability={restoreAvailability} running={running} timeZone={report.settings.timeZone || 'UTC'} verifyAvailability={verifyAvailability} />
                 ) : (
-                  <RestoreList apps={report.apps} appRestorePoints={appRestorePoints} fullRestorePoints={fullRestorePoints} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} running={running} />
+                  <RestoreList apps={report.apps} appRestorePoints={appRestorePoints} fullRestorePoints={fullRestorePoints} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} restoreAvailability={restoreAvailability} running={running} timeZone={report.settings.timeZone || 'UTC'} verifyAvailability={verifyAvailability} />
                 )}
               </div>
             </BackupPanel>
@@ -392,7 +411,7 @@ function BackupsPage() {
               <SectionHeader icon={Boxes} title="App backups" description="Create a focused backup for a specific app." />
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {report.apps.length ? report.apps.map((app) => (
-                  <AppBackupCard app={app} key={app.appId} onRun={runManualAppBackup} running={running === `app-${app.appId}`} showAdvancedMetrics={showAdvancedMetrics} />
+                  <AppBackupCard app={app} key={app.appId} onRun={runManualAppBackup} operationAvailability={appBackupAvailability} running={running === `app-${app.appId}`} showAdvancedMetrics={showAdvancedMetrics} timeZone={report.settings.timeZone || 'UTC'} />
                 )) : (
                   <EmptyState title="No apps installed" description="Install apps to begin backup protection." />
                 )}
@@ -433,8 +452,11 @@ function BackupsPage() {
         onRetryPlan={retryRestorePlan}
         onTargetChange={changeRestoreTarget}
         onVerify={(point) => void verifyRestorePoint(point)}
+        restoreAvailability={restoreAvailability}
         running={running}
         showAdvancedMetrics={showAdvancedMetrics}
+        timeZone={report?.settings.timeZone || 'UTC'}
+        verifyAvailability={verifyAvailability}
       />
     </PageShell>
   );

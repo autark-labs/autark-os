@@ -28,7 +28,8 @@ const MonitoringChartsSection = lazy(() => import('./MonitoringChartsSection'));
 const MonitoringPanel = ProjectPanel;
 
 function MonitoringPage() {
-  const { showAdvancedMetrics } = useProjectSettings();
+  const { settings, showAdvancedMetrics } = useProjectSettings();
+  const timeZone = settings?.timeZone || 'UTC';
   const appState = useApplicationStateRepository();
   const [level, setLevel] = useState('all');
   const [category, setCategory] = useState('all');
@@ -131,7 +132,7 @@ function MonitoringPage() {
         </div>
       </Surface>
 
-      <SystemActivitySummary highlightedIssue={highlightedIssue} recentFixes={recentFixes} recentEvents={monitoring.activity.slice(0, 5)} reliability={reliability} />
+      <SystemActivitySummary highlightedIssue={highlightedIssue} recentFixes={recentFixes} recentEvents={monitoring.activity.slice(0, 5)} reliability={reliability} timeZone={timeZone} />
 
       {showAdvancedMetrics && (
         <Suspense fallback={<MonitoringChartsFallback />}>
@@ -159,6 +160,7 @@ function MonitoringPage() {
         onLevelChange={setLevel}
         reliability={reliability}
         showAdvancedMetrics={showAdvancedMetrics}
+        timeZone={timeZone}
       />
     </PageShell>
   );

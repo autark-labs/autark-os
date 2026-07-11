@@ -7,6 +7,7 @@ import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { Badge } from '@/components/ui/badge';
 import { buildAppRemediationFromIssue } from '@/lib/appRemediation';
+import { formatLocalizedDateTime } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
 import type { ActivityLog } from '@/types/activity';
 import type { AppReliabilityIssue, AppReliabilitySummary } from '@/types/app';
@@ -23,6 +24,7 @@ type MonitoringActivityFeedProps = {
   onLevelChange: (value: string) => void;
   reliability: AppReliabilitySummary | null;
   showAdvancedMetrics: boolean;
+  timeZone: string;
 };
 
 const MonitoringPanel = ProjectPanel;
@@ -33,11 +35,13 @@ export function SystemActivitySummary({
   recentEvents,
   recentFixes,
   reliability,
+  timeZone,
 }: {
   highlightedIssue: AppReliabilityIssue | null;
   recentEvents: ActivityLog[];
   recentFixes: ActivityLog[];
   reliability: AppReliabilitySummary | null;
+  timeZone: string;
 }) {
   return (
     <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -53,7 +57,7 @@ export function SystemActivitySummary({
           <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-100">{recentEvents.length} recent</Badge>
         </div>
         <div className="mt-5 grid gap-3">
-          {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} />) : (
+          {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} timeZone={timeZone} />) : (
             <EmptyState compact title="No recent activity" description="Autark-OS has not logged visible work for the current filters yet." />
           )}
         </div>
@@ -88,7 +92,7 @@ export function SystemActivitySummary({
             </div>
           </div>
           <div className="mt-4 grid gap-2">
-            {recentFixes.slice(0, 3).map((event) => <CompactActivityItem event={event} key={event.id} />)}
+            {recentFixes.slice(0, 3).map((event) => <CompactActivityItem event={event} key={event.id} timeZone={timeZone} />)}
             {!recentFixes.length && <EmptyState compact title="Quiet is good" description="Autark-OS will list safe repair work here when it happens." />}
           </div>
         </MonitoringPanel>
@@ -110,6 +114,7 @@ export function MonitoringActivityFeed({
   onLevelChange,
   reliability,
   showAdvancedMetrics,
+  timeZone,
 }: MonitoringActivityFeedProps) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -149,6 +154,7 @@ export function MonitoringActivityFeed({
                 key={event.id}
                 onToggle={() => setExpandedId((current) => current === event.id ? null : event.id)}
                 showAdvancedMetrics={showAdvancedMetrics}
+                timeZone={timeZone}
               />
             ))
           ) : (
@@ -189,7 +195,7 @@ export function MonitoringActivityFeed({
   );
 }
 
-function CompactActivityItem({ event }: { event: ActivityLog }) {
+function CompactActivityItem({ event, timeZone }: { event: ActivityLog; timeZone: string }) {
   const Icon = eventIcon(event);
   return (
     <div className={cn('flex gap-3 rounded-lg border bg-slate-900/45 p-3 text-sm', eventTone(event))}>
@@ -199,7 +205,7 @@ function CompactActivityItem({ event }: { event: ActivityLog }) {
       <div className="min-w-0">
         <p className="truncate font-semibold text-white">{event.title}</p>
         <p className="mt-1 line-clamp-2 text-slate-300">{event.message}</p>
-        <p className="mt-1 text-xs text-slate-500">{formatDate(event.createdAt)}</p>
+        <p className="mt-1 text-xs text-slate-500">{formatLocalizedDateTime(event.createdAt, timeZone)}</p>
       </div>
     </div>
   );
@@ -276,7 +282,7 @@ function FilterBar({ label, onChange, options, value }: { label: string; options
   );
 }
 
-function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics }: { event: ActivityLog; expanded: boolean; onToggle: () => void; showAdvancedMetrics: boolean }) {
+function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics, timeZone }: { event: ActivityLog; expanded: boolean; onToggle: () => void; showAdvancedMetrics: boolean; timeZone: string }) {
   const Icon = eventIcon(event);
   return (
     <article className={cn('rounded-lg border bg-slate-900/45 transition', eventTone(event))}>
@@ -292,7 +298,7 @@ function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics }: { event
           </span>
           <span className="mt-1 block text-sm text-slate-300">{event.message}</span>
         </span>
-        <span className="text-xs text-slate-500 sm:text-right">{formatDate(event.createdAt)}</span>
+        <span className="text-xs text-slate-500 sm:text-right">{formatLocalizedDateTime(event.createdAt, timeZone)}</span>
         <span className="text-slate-400">{expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
       </button>
       {expanded && showAdvancedMetrics && (
@@ -389,16 +395,4 @@ function badgeTone(level: string) {
     return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
   }
   return 'border-slate-700 bg-slate-950 text-slate-300';
-}
-
-function formatDate(value?: string | null) {
-  if (!value) {
-    return 'Not recorded';
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value));
 }

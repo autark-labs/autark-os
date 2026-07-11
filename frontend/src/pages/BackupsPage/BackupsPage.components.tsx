@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import type { AppBackupStatus, BackupReport, RestorePlan, RestorePoint } from '@/types/backup';
 import { restorePointDetails } from './BackupsPage.restoreDetails';
 import {
+  type BackupOperationAvailability,
   backupAppBadgeTone,
   backupSchedulerLabel,
   backupSchedulerTone,
@@ -39,6 +40,7 @@ export type RestoreFlowState = {
 };
 
 export function ProtectionPanel({ latestRestore, report }: { latestRestore: RestorePoint | null; report: BackupReport | null }) {
+  const timeZone = report?.settings.timeZone || 'UTC';
   const protectedPercent = report?.totalApps ? Math.round((report.protectedApps / report.totalApps) * 100) : 0;
   return (
     <BackupInset className="bg-slate-900 shadow-none">
@@ -62,7 +64,7 @@ export function ProtectionPanel({ latestRestore, report }: { latestRestore: Rest
       </div>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <MiniStat icon={Archive} label="Restore points" value={`${report?.recentRestorePoints.length ?? 0}`} />
-        <MiniStat icon={Clock3} label="Latest" value={latestRestore ? formatBackupDate(latestRestore.createdAt) : 'None'} />
+        <MiniStat icon={Clock3} label="Latest" value={latestRestore ? formatBackupDate(latestRestore.createdAt, timeZone) : 'None'} />
       </div>
     </BackupInset>
   );
@@ -116,38 +118,38 @@ export function ActionCard({ busy, description, disabled = false, disabledReason
   );
 }
 
-export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRestore, onVerify, points, running, timeZone }: { apps: AppBackupStatus[]; latestRestore: RestorePoint | null; nextRun: string | null; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; points: RestorePoint[]; running: string | null; timeZone: string }) {
+export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRestore, onVerify, points, restoreAvailability, running, timeZone, verifyAvailability }: { apps: AppBackupStatus[]; latestRestore: RestorePoint | null; nextRun: string | null; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; points: RestorePoint[]; restoreAvailability: BackupOperationAvailability; running: string | null; timeZone: string; verifyAvailability: BackupOperationAvailability }) {
   if (!points.length) {
     return <EmptyState title="No restore points yet" description="Run a routine backup after installing an app to create the first restore point." />;
   }
   return (
     <BackupInset className="overflow-hidden p-4">
       <div className="mb-4 grid gap-3 md:grid-cols-2">
-        <TimelineSummary icon={CheckCircle2} label="Last successful backup" value={latestRestore ? formatBackupDate(latestRestore.createdAt) : 'None yet'} />
+        <TimelineSummary icon={CheckCircle2} label="Last successful backup" value={latestRestore ? formatBackupDate(latestRestore.createdAt, timeZone) : 'None yet'} />
         <TimelineSummary icon={CalendarClock} label="Next scheduled backup" value={nextRun ? formatBackupDate(nextRun, timeZone) : 'Not scheduled'} />
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {points.map((point, index) => (
-          <TimelinePoint apps={apps} first={index === 0} key={point.id} onDetails={onDetails} onRestore={onRestore} onVerify={onVerify} point={point} running={running === `verify-${point.id}`} />
+          <TimelinePoint apps={apps} first={index === 0} key={point.id} onDetails={onDetails} onRestore={onRestore} onVerify={onVerify} point={point} restoreAvailability={restoreAvailability} running={running === `verify-${point.id}`} timeZone={timeZone} verifyAvailability={verifyAvailability} />
         ))}
       </div>
     </BackupInset>
   );
 }
 
-export function RestoreList({ apps, appRestorePoints, fullRestorePoints, onDetails, onRestore, onVerify, running }: { apps: AppBackupStatus[]; appRestorePoints: RestorePoint[]; fullRestorePoints: RestorePoint[]; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; running: string | null }) {
+export function RestoreList({ apps, appRestorePoints, fullRestorePoints, onDetails, onRestore, onVerify, restoreAvailability, running, timeZone, verifyAvailability }: { apps: AppBackupStatus[]; appRestorePoints: RestorePoint[]; fullRestorePoints: RestorePoint[]; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; restoreAvailability: BackupOperationAvailability; running: string | null; timeZone: string; verifyAvailability: BackupOperationAvailability }) {
   const allPoints = [...fullRestorePoints, ...appRestorePoints].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   if (!allPoints.length) {
     return <EmptyState title="No restore points yet" description="Run a routine or manual backup to create the first restore point." />;
   }
   return (
     <div className="grid gap-3">
-      {allPoints.map((point) => <RestorePointRow apps={apps} key={point.id} onDetails={onDetails} onRestore={onRestore} onVerify={onVerify} point={point} running={running === `verify-${point.id}`} />)}
+      {allPoints.map((point) => <RestorePointRow apps={apps} key={point.id} onDetails={onDetails} onRestore={onRestore} onVerify={onVerify} point={point} restoreAvailability={restoreAvailability} running={running === `verify-${point.id}`} timeZone={timeZone} verifyAvailability={verifyAvailability} />)}
     </div>
   );
 }
 
-export function AppBackupCard({ app, onRun, running, showAdvancedMetrics }: { app: AppBackupStatus; onRun: (app: AppBackupStatus) => void; running: boolean; showAdvancedMetrics: boolean }) {
+export function AppBackupCard({ app, onRun, operationAvailability, running, showAdvancedMetrics, timeZone }: { app: AppBackupStatus; onRun: (app: AppBackupStatus) => void; operationAvailability: BackupOperationAvailability; running: boolean; showAdvancedMetrics: boolean; timeZone: string }) {
   return (
     <BackupInset className="p-4">
       <div className="flex items-start justify-between gap-3">
@@ -165,7 +167,7 @@ export function AppBackupCard({ app, onRun, running, showAdvancedMetrics }: { ap
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Metric label="Data" value={formatBackupBytes(app.dataSizeBytes)} />
-        <Metric label="Latest" value={app.latestBackup ? formatBackupDate(app.latestBackup.createdAt) : 'None'} />
+        <Metric label="Latest" value={app.latestBackup ? formatBackupDate(app.latestBackup.createdAt, timeZone) : 'None'} />
       </div>
       {showAdvancedMetrics && (
         <BackupInset className="mt-3 bg-slate-900 p-3">
@@ -174,8 +176,8 @@ export function AppBackupCard({ app, onRun, running, showAdvancedMetrics }: { ap
           <p className="mt-1 text-xs leading-5 text-slate-500">{app.backupContract.summary}</p>
         </BackupInset>
       )}
-      <DisabledAction className="mt-4 w-full" disabled={running || app.status === 'unprotected'} reason={running ? 'Wait for the current app backup to finish.' : 'Turn backups on for this app before creating a restore point.'}>
-        <ProjectDarkControlButton className="mt-4 w-full" disabled={running || app.status === 'unprotected'} onClick={() => onRun(app)} size="sm" type="button">
+      <DisabledAction className="mt-4 w-full" disabled={operationAvailability.disabled || app.status === 'unprotected'} reason={operationAvailability.disabled ? operationAvailability.reason : 'Turn backups on for this app before creating a restore point.'}>
+        <ProjectDarkControlButton className="mt-4 w-full" disabled={operationAvailability.disabled || app.status === 'unprotected'} onClick={() => onRun(app)} size="sm" type="button">
           {running ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
           {running ? 'Running' : 'Back up app'}
         </ProjectDarkControlButton>
@@ -193,8 +195,11 @@ export function RestoreFlowDialog({
   onRetryPlan,
   onTargetChange,
   onVerify,
+  restoreAvailability,
   running,
   showAdvancedMetrics,
+  timeZone,
+  verifyAvailability,
 }: {
   appOptions: AppBackupStatus[];
   flow: RestoreFlowState | null;
@@ -204,8 +209,11 @@ export function RestoreFlowDialog({
   onRetryPlan: () => void;
   onTargetChange: (appId: string | null) => void;
   onVerify: (point: RestorePoint) => void;
+  restoreAvailability: BackupOperationAvailability;
   running: string | null;
   showAdvancedMetrics: boolean;
+  timeZone: string;
+  verifyAvailability: BackupOperationAvailability;
 }) {
   const point = flow?.point ?? null;
   const plan = flow?.plan ?? null;
@@ -237,7 +245,7 @@ export function RestoreFlowDialog({
         {reviewingDetails && point && details && (
           <div className="grid gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
-              <FactRow label="Created" value={formatBackupDate(point.createdAt)} />
+              <FactRow label="Created" value={formatBackupDate(point.createdAt, timeZone)} />
               <FactRow label="Size" value={formatBackupBytes(point.sizeBytes)} />
               <FactRow label="Source" value={point.source} />
             </div>
@@ -303,21 +311,23 @@ export function RestoreFlowDialog({
           <ProjectDarkControlButton onClick={onClose} type="button">{reviewingDetails ? 'Close' : 'Cancel'}</ProjectDarkControlButton>
           {reviewingDetails && point && (
             <>
-              <DisabledAction disabled={running === `verify-${point.id}`} reason="Autark-OS is already verifying this restore point.">
-                <ProjectDarkControlButton disabled={running === `verify-${point.id}`} onClick={() => onVerify(point)} type="button">
+              <DisabledAction disabled={verifyAvailability.disabled} reason={verifyAvailability.reason}>
+                <ProjectDarkControlButton disabled={verifyAvailability.disabled} onClick={() => onVerify(point)} type="button">
                   {running === `verify-${point.id}` ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
                   Verify
                 </ProjectDarkControlButton>
               </DisabledAction>
-              <ProjectPrimaryButton onClick={() => onTargetChange(null)} type="button">
-                <RotateCcw className="size-4" />
-                Restore
-              </ProjectPrimaryButton>
+              <DisabledAction disabled={restoreAvailability.disabled} reason={restoreAvailability.reason}>
+                <ProjectPrimaryButton disabled={restoreAvailability.disabled} onClick={() => onTargetChange(null)} type="button">
+                  <RotateCcw className="size-4" />
+                  Restore
+                </ProjectPrimaryButton>
+              </DisabledAction>
             </>
           )}
           {flow?.phase === 'confirm' && (
-            <DisabledAction disabled={!plan?.executable || loading} reason={loading ? 'Wait for the restore job to start.' : 'This restore point cannot be restored until the complete restore plan is executable.'}>
-              <ProjectPrimaryButton disabled={!plan?.executable || loading} onClick={onRestore} type="button">
+            <DisabledAction disabled={restoreAvailability.disabled || !plan?.executable || loading} reason={restoreAvailability.disabled ? restoreAvailability.reason : loading ? 'Wait for the restore job to start.' : 'This restore point cannot be restored until the complete restore plan is executable.'}>
+              <ProjectPrimaryButton disabled={restoreAvailability.disabled || !plan?.executable || loading} onClick={onRestore} type="button">
                 {loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
                 Restore now
               </ProjectPrimaryButton>
@@ -371,7 +381,7 @@ export function AttentionCard({ app }: { app: AppBackupStatus }) {
   );
 }
 
-function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, running }: { apps: AppBackupStatus[]; first: boolean; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; point: RestorePoint; running: boolean }) {
+function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, restoreAvailability, running, timeZone, verifyAvailability }: { apps: AppBackupStatus[]; first: boolean; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; point: RestorePoint; restoreAvailability: BackupOperationAvailability; running: boolean; timeZone: string; verifyAvailability: BackupOperationAvailability }) {
   const included = point.includedAppIds.split(',').map((id) => id.trim()).filter(Boolean);
   const eligibleApps = apps.filter((app) => included.includes(app.appId));
   return (
@@ -384,7 +394,7 @@ function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, run
           </span>
           <Badge className="border-sky-300/20 bg-sky-500/10 text-sky-100">Routine</Badge>
         </div>
-        <p className="mt-4 text-lg font-black text-white">{formatBackupDate(point.createdAt)}</p>
+        <p className="mt-4 text-lg font-black text-white">{formatBackupDate(point.createdAt, timeZone)}</p>
         <p className="mt-1 text-xs text-slate-500">{formatBackupBytes(point.sizeBytes)} stored</p>
         <VerificationBadge point={point} />
         <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
@@ -396,16 +406,18 @@ function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, run
             <Info className="size-3.5" />
             Details
           </ProjectDarkControlButton>
-          <ProjectPrimaryButton onClick={() => onRestore(point, null)} size="sm" type="button">
-            Restore all
-          </ProjectPrimaryButton>
-          <DisabledAction disabled={!eligibleApps.length} reason="No currently installed app matches this restore point.">
-            <ProjectDarkControlButton disabled={!eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button">
+          <DisabledAction disabled={restoreAvailability.disabled} reason={restoreAvailability.reason}>
+            <ProjectPrimaryButton disabled={restoreAvailability.disabled} onClick={() => onRestore(point, null)} size="sm" type="button">
+              Restore all
+            </ProjectPrimaryButton>
+          </DisabledAction>
+          <DisabledAction disabled={restoreAvailability.disabled || !eligibleApps.length} reason={restoreAvailability.disabled ? restoreAvailability.reason : 'No currently installed app matches this restore point.'}>
+            <ProjectDarkControlButton disabled={restoreAvailability.disabled || !eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button">
               One app
             </ProjectDarkControlButton>
           </DisabledAction>
-          <DisabledAction disabled={running} reason="Autark-OS is already verifying this restore point.">
-            <ProjectDarkControlButton disabled={running} onClick={() => onVerify(point)} size="sm" type="button">
+          <DisabledAction disabled={verifyAvailability.disabled} reason={verifyAvailability.reason}>
+            <ProjectDarkControlButton disabled={verifyAvailability.disabled} onClick={() => onVerify(point)} size="sm" type="button">
               {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
               Verify
             </ProjectDarkControlButton>
@@ -416,7 +428,7 @@ function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, run
   );
 }
 
-function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, running }: { apps: AppBackupStatus[]; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; point: RestorePoint; running: boolean }) {
+function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, restoreAvailability, running, timeZone, verifyAvailability }: { apps: AppBackupStatus[]; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; point: RestorePoint; restoreAvailability: BackupOperationAvailability; running: boolean; timeZone: string; verifyAvailability: BackupOperationAvailability }) {
   const included = point.includedAppIds.split(',').map((id) => id.trim()).filter(Boolean);
   const eligibleApps = point.scope === 'full' ? apps.filter((app) => included.includes(app.appId)) : apps.filter((app) => app.appId === point.appId);
   return (
@@ -431,24 +443,26 @@ function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, running 
         <p className="mt-1 text-xs text-slate-500">{point.message}</p>
       </div>
       <Metric label="Size" value={formatBackupBytes(point.sizeBytes)} />
-      <Metric label="Created" value={formatBackupDate(point.createdAt)} />
+      <Metric label="Created" value={formatBackupDate(point.createdAt, timeZone)} />
       <div className="flex flex-wrap gap-2 xl:justify-end">
         <ProjectDarkControlButton onClick={() => onDetails(point)} size="sm" type="button">
           <Info className="size-3.5" />
           Details
         </ProjectDarkControlButton>
         {point.scope === 'full' && (
-          <ProjectDarkControlButton onClick={() => onRestore(point, null)} size="sm" type="button">
-            Restore all
-          </ProjectDarkControlButton>
+          <DisabledAction disabled={restoreAvailability.disabled} reason={restoreAvailability.reason}>
+            <ProjectDarkControlButton disabled={restoreAvailability.disabled} onClick={() => onRestore(point, null)} size="sm" type="button">
+              Restore all
+            </ProjectDarkControlButton>
+          </DisabledAction>
         )}
-        <DisabledAction disabled={!eligibleApps.length} reason="No currently installed app matches this restore point.">
-          <ProjectDarkControlButton disabled={!eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button">
+        <DisabledAction disabled={restoreAvailability.disabled || !eligibleApps.length} reason={restoreAvailability.disabled ? restoreAvailability.reason : 'No currently installed app matches this restore point.'}>
+          <ProjectDarkControlButton disabled={restoreAvailability.disabled || !eligibleApps.length} onClick={() => onRestore(point, eligibleApps[0]?.appId || null)} size="sm" type="button">
             Restore app
           </ProjectDarkControlButton>
         </DisabledAction>
-        <DisabledAction disabled={running} reason="Autark-OS is already verifying this restore point.">
-          <ProjectDarkControlButton disabled={running} onClick={() => onVerify(point)} size="sm" type="button">
+        <DisabledAction disabled={verifyAvailability.disabled} reason={verifyAvailability.reason}>
+          <ProjectDarkControlButton disabled={verifyAvailability.disabled} onClick={() => onVerify(point)} size="sm" type="button">
             {running ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
             Verify
           </ProjectDarkControlButton>

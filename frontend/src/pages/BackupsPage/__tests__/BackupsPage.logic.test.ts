@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { activeBackupJobs, backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, backupStatusLabel, formatBackupDate, selectActiveBackupJob } from '../BackupsPage.logic';
+import { activeBackupJobs, backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupOperationAvailability, backupOperationForJob, backupPageViewModel, backupStatusLabel, formatBackupDate, selectActiveBackupJob } from '../BackupsPage.logic';
 
 const baseReport = {
   apps: [
@@ -120,4 +120,17 @@ test('activeBackupJobs recovers only in-progress backup jobs in newest order', (
   assert.equal(backupJobRunningId({ type: 'backup_verify', subjectId: '42' }), 'verify-42');
   assert.equal(backupJobRunningId({ type: 'backup', subjectId: 'vaultwarden' }), 'app-vaultwarden');
   assert.equal(backupJobRunningId({ type: 'backup', subjectId: '__full__' }), 'full');
+});
+
+test('backup operations use one conflict matrix for durable job state', () => {
+  assert.equal(backupOperationForJob({ type: 'backup_restore', subjectId: '12:vaultwarden' }), 'restore');
+  assert.equal(backupOperationForJob({ type: 'backup_verify', subjectId: '12' }), 'verify');
+  assert.equal(backupOperationForJob({ type: 'backup', subjectId: '__routine__' }), 'routine_backup');
+  assert.equal(backupOperationForJob({ type: 'backup', subjectId: 'vaultwarden' }), 'app_backup');
+
+  const duringRestore = backupOperationAvailability('app_backup', ['restore']);
+  assert.equal(duringRestore.disabled, true);
+  assert.match(duringRestore.reason, /restore/i);
+  assert.equal(backupOperationAvailability('verify', ['full_backup']).disabled, true);
+  assert.equal(backupOperationAvailability('cleanup', []).disabled, false);
 });
