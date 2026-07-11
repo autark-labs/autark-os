@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, HardDrive, Loader2, Network, ServerCog, ShieldCheck, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, HardDrive, Loader2, Network, ServerCog, ShieldCheck, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
@@ -8,19 +9,23 @@ import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/pri
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import type { OnboardingState, SystemSetupStatus } from '@/types/system';
-import { Link } from 'react-router-dom';
+import {
+  clampOnboardingStep,
+  cleanPrivateAccessChoice,
+  completedOnboardingSteps,
+  onboardingSteps,
+  validateOnboardingStep,
+  type BackupPosture,
+  type OnboardingDraft,
+  type PrivateAccessChoice,
+} from './OnboardingWizard.logic';
 
 type OnboardingWizardProps = {
   onComplete: () => void;
 };
-
-type BackupPosture = 'routine' | 'external' | 'later';
-type PrivateAccessChoice = 'setup-now' | 'local-only' | 'already-connected';
 
 const starterApps = [
   { id: 'vaultwarden', label: 'Vaultwarden', detail: 'Private password vault' },
@@ -29,77 +34,126 @@ const starterApps = [
 ];
 
 function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
-  const { showAdvancedMetrics } = useProjectSettings();
   const [state, setState] = useState<OnboardingState | null>(null);
   const [setupStatus, setSetupStatus] = useState<SystemSetupStatus | null>(null);
-  const [deviceName, setDeviceName] = useState('Autark-OS');
-  const [automaticBackups, setAutomaticBackups] = useState(true);
-  const [backupPosture, setBackupPosture] = useState<BackupPosture>('routine');
-  const [backupDestination, setBackupDestination] = useState('');
-  const [privateAccessChoice, setPrivateAccessChoice] = useState<PrivateAccessChoice>('local-only');
-  const [selectedApps, setSelectedApps] = useState<string[]>(starterApps.map((app) => app.id));
+  const [draft, setDraft] = useState<OnboardingDraft>(emptyDraft());
+  const [step, setStep] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [advancedFinish, setAdvancedFinish] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadRequestId = useRef(0);
 
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([SystemAPIClient.onboarding(), SystemAPIClient.setupStatus()])
-      .then(([next, setup]) => {
-        if (!mounted) {
-          return;
-        }
-        setSetupStatus(setup);
-        setState(next);
-        setDeviceName(next.deviceName || 'Autark-OS');
-        setAutomaticBackups(next.automaticBackupsEnabled);
-        const defaultBackupDestination = `${next.runtimePath}/backups`;
-        const savedBackupDestination = next.backupDestination || defaultBackupDestination;
-        setBackupDestination(savedBackupDestination);
-        setBackupPosture(!next.automaticBackupsEnabled ? 'later' : savedBackupDestination === defaultBackupDestination ? 'routine' : 'external');
-        setPrivateAccessChoice(cleanPrivateAccessChoice(next.privateAccessChoice, next.tailscaleConnected));
-        setSelectedApps(next.recommendedApps.length ? next.recommendedApps : starterApps.map((app) => app.id));
-      })
-      .catch((loadError) => setError(apiErrorMessage(loadError, 'Setup could not be loaded.')));
-    return () => {
-      mounted = false;
-    };
+  const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const [nextState, nextSetup] = await Promise.all([SystemAPIClient.onboarding(), SystemAPIClient.setupStatus()]);
+      if (loadRequestId.current !== requestId) return;
+      setState(nextState);
+      setSetupStatus(nextSetup);
+      setDraft(draftFromState(nextState));
+      setStep(clampOnboardingStep(nextState.currentStep));
+    } catch (loadError) {
+      if (loadRequestId.current !== requestId) return;
+      setError(apiErrorMessage(loadError, 'Setup could not be loaded.'));
+    } finally {
+      if (loadRequestId.current === requestId) setLoading(false);
+    }
   }, []);
 
-  async function finish() {
-    if (!state) {
+  useEffect(() => {
+    void load();
+    return () => {
+      loadRequestId.current += 1;
+    };
+  }, [load]);
+
+  const defaultBackupDestination = state ? `${state.runtimePath}/backups` : '';
+  const readiness = state?.doctor.readiness;
+  const current = onboardingSteps[step];
+  const isReviewStep = current?.id === 'review';
+  const canFinish = Boolean(readiness?.canCompleteOnboarding && (!readiness.finishAnywayRequiresAdvanced || advancedFinish));
+  const existingInstall = setupStatus?.existingInstall;
+  const showExistingInstallWarning = Boolean(existingInstall?.conflict || (setupStatus?.devMode && existingInstall?.resources?.length));
+
+  const persistDraft = useCallback(async (nextStep: number) => {
+    if (!state) return null;
+    const destination = draft.backupPosture === 'external' ? draft.backupDestination.trim() : defaultBackupDestination;
+    const nextState = await SystemAPIClient.updateOnboarding({
+      status: 'in_progress',
+      currentStep: nextStep,
+      deviceName: draft.deviceName.trim(),
+      backupDestination: nextStep >= 4 ? destination : undefined,
+      automaticBackupsEnabled: nextStep >= 4 ? (draft.backupPosture === 'later' ? false : draft.automaticBackups) : undefined,
+      privateAccessChoice: nextStep >= 3 ? draft.privateAccessChoice : undefined,
+      recommendedApps: nextStep >= 5 ? draft.selectedApps : undefined,
+      completedSteps: completedOnboardingSteps(nextStep),
+    });
+    setState(nextState);
+    setDraft(draftFromState(nextState));
+    setStep(clampOnboardingStep(nextStep));
+    return nextState;
+  }, [defaultBackupDestination, draft, state]);
+
+  const moveBack = useCallback(async () => {
+    const previousStep = Math.max(0, step - 1);
+    if (previousStep === step || !state) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const nextState = await SystemAPIClient.updateOnboarding({
+        status: 'in_progress',
+        currentStep: previousStep,
+        completedSteps: completedOnboardingSteps(previousStep),
+      });
+      setState(nextState);
+      setStep(previousStep);
+    } catch (saveError) {
+      setError(apiErrorMessage(saveError, 'Autark-OS could not save setup progress.'));
+    } finally {
+      setSaving(false);
+    }
+  }, [state, step]);
+
+  const moveNext = useCallback(async () => {
+    const validation = validateOnboardingStep(step, draft);
+    if (validation) {
+      setError(validation);
       return;
     }
-    const readiness = state.doctor.readiness;
+    setSaving(true);
+    setError(null);
+    try {
+      await persistDraft(Math.min(step + 1, onboardingSteps.length - 1));
+    } catch (saveError) {
+      setError(apiErrorMessage(saveError, 'Autark-OS could not save this setup step.'));
+    } finally {
+      setSaving(false);
+    }
+  }, [draft, persistDraft, step]);
+
+  const finish = useCallback(async () => {
+    if (!state || !readiness) return;
+    const validation = validateOnboardingStep(3, draft);
+    if (validation) {
+      setError(validation);
+      return;
+    }
     if (!readiness.canCompleteOnboarding) {
       setError(readiness.summary);
       return;
     }
     if (readiness.finishAnywayRequiresAdvanced && !advancedFinish) {
-      setError('Review the setup items below, then use Advanced finish if you want to continue before every optional feature is ready.');
+      setError('Review Advanced finish before completing setup with remaining optional work.');
       return;
     }
     setSaving(true);
     setError(null);
-    const backupValidation = validateBackupDestination(backupPosture, backupDestination);
-    if (backupValidation) {
-      setSaving(false);
-      setError(backupValidation);
-      return;
-    }
     try {
-      const defaultBackupDestination = `${state.runtimePath}/backups`;
-      await SystemAPIClient.updateOnboarding({
-        status: 'in_progress',
-        currentStep: 5,
-        deviceName,
-        backupDestination: backupPosture === 'external' ? backupDestination.trim() : defaultBackupDestination,
-        automaticBackupsEnabled: backupPosture === 'later' ? false : automaticBackups,
-        privateAccessChoice,
-        recommendedApps: selectedApps,
-        completedSteps: ['device', 'doctor', 'tailscale', 'storage', 'backups', 'apps'],
-      });
-      await persistSetupProgress(privateAccessChoice);
+      await persistDraft(6);
+      await persistSetupProgress(draft.privateAccessChoice);
       await SystemAPIClient.completeOnboarding();
       onComplete();
     } catch (saveError) {
@@ -107,300 +161,183 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     } finally {
       setSaving(false);
     }
-  }
+  }, [advancedFinish, draft, onComplete, persistDraft, readiness, state]);
 
-  function toggleApp(appId: string) {
-    setSelectedApps((current) => current.includes(appId) ? current.filter((id) => id !== appId) : [...current, appId]);
-  }
+  const updateDraft = useCallback((updates: Partial<OnboardingDraft>) => {
+    setDraft((currentDraft) => ({ ...currentDraft, ...updates }));
+  }, []);
 
-  if (!state) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-slate-800 text-slate-300">
-        <Loader2 className="size-6 animate-spin text-cyan-200" />
-      </main>
-    );
-  }
+  const toggleApp = useCallback((appId: string) => {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      selectedApps: currentDraft.selectedApps.includes(appId)
+        ? currentDraft.selectedApps.filter((id) => id !== appId)
+        : [...currentDraft.selectedApps, appId],
+    }));
+  }, []);
 
-  const checks = state.doctor.checks;
-  const defaultBackupDestination = `${state.runtimePath}/backups`;
-  const readiness = state.doctor.readiness;
-  const privateAccessGroup = readiness.groups.find((group) => group.id === 'private-access');
-  const tailscaleCheck = checks.find((check) => check.id === 'tailscale');
-  const operatorCheck = checks.find((check) => check.id === 'tailscale-operator');
-  const canFinish = readiness.canCompleteOnboarding && (!readiness.finishAnywayRequiresAdvanced || advancedFinish);
-  const existingInstall = setupStatus?.existingInstall;
-  const showExistingInstallWarning = Boolean(existingInstall?.conflict || (setupStatus?.devMode && existingInstall?.resources?.length));
-  const finishDisabled = saving || !canFinish;
-  const finishDisabledReason = saving
-    ? 'Autark-OS is already saving setup.'
-    : readiness.finishAnywayRequiresAdvanced && !advancedFinish
-      ? 'Review Advanced finish before continuing with remaining setup items.'
-      : readiness.summary;
+  const stepContent = useMemo(() => {
+    if (!state || !current) return null;
+    if (current.id === 'device') return <DeviceStep deviceName={draft.deviceName} onDeviceNameChange={(deviceName) => updateDraft({ deviceName })} />;
+    if (current.id === 'readiness') return <ReadinessStep existingInstall={existingInstall} setupStatus={setupStatus} state={state} showExistingInstallWarning={showExistingInstallWarning} />;
+    if (current.id === 'access') return <AccessStep draft={draft} onChange={updateDraft} state={state} />;
+    if (current.id === 'backups') return <BackupsStep defaultDestination={defaultBackupDestination} draft={draft} onChange={updateDraft} />;
+    if (current.id === 'apps') return <AppsStep selectedApps={draft.selectedApps} onToggleApp={toggleApp} />;
+    return <ReviewStep advancedFinish={advancedFinish} draft={draft} onAdvancedFinishChange={setAdvancedFinish} readiness={readiness} state={state} />;
+  }, [advancedFinish, current, defaultBackupDestination, draft, existingInstall, readiness, setupStatus, showExistingInstallWarning, state, toggleApp, updateDraft]);
+
+  if (loading) return <OnboardingLoadingState />;
+  if (!state) return <OnboardingLoadError message={error || 'Setup could not be loaded.'} onRetry={() => void load()} />;
 
   return (
-    <main className="min-h-screen bg-slate-800 p-4 text-slate-100 md:p-8">
-      <section className="mx-auto grid max-w-6xl gap-5">
+    <main className="min-h-screen bg-slate-950 p-4 text-slate-100 md:p-8">
+      <section className="mx-auto grid max-w-4xl gap-5">
         <header className="rounded-2xl border border-sky-400/30 bg-slate-900 p-6 shadow-xl shadow-slate-950/30 md:p-8">
           <Badge className="border-cyan-300/30 bg-cyan-400/10 text-cyan-100">First boot</Badge>
-          <h1 className="mt-4 text-4xl font-black tracking-normal text-white md:text-6xl">Set up your homelab</h1>
-          <p className="mt-3 max-w-3xl text-base text-slate-300">Autark-OS will check this device, prepare safe defaults, and point you to the apps that make sense first.</p>
-          {error && <div className="mt-4 rounded-lg border border-red-300/20 bg-red-500/10 p-3 text-sm text-red-100">{error}</div>}
+          <h1 className="mt-4 text-3xl font-black tracking-normal text-white md:text-5xl">Set up Autark-OS</h1>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">A few guided choices will prepare this device for your first apps. You can revisit optional choices later.</p>
+          <ol className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-6" aria-label="Setup progress">
+            {onboardingSteps.map((item, index) => (
+              <li className="min-w-0" key={item.id}>
+                <div className={cn('h-1 rounded-full', index < step ? 'bg-emerald-400' : index === step ? 'bg-cyan-300' : 'bg-slate-700')} />
+                <span aria-current={index === step ? 'step' : undefined} className={cn('mt-2 block truncate text-xs font-semibold', index === step ? 'text-cyan-100' : index < step ? 'text-emerald-200' : 'text-slate-500')}>{item.label}</span>
+              </li>
+            ))}
+          </ol>
         </header>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="grid gap-5">
-            {showExistingInstallWarning && (
-              <WizardCard
-                icon={AlertTriangle}
-                title={existingInstall?.headline || 'Existing Autark-OS install found'}
-                text={existingInstall?.summary || 'Review apps found on this server before continuing setup.'}
-              >
-                <div className={`rounded-lg border p-4 text-sm ${existingInstall?.conflict ? 'border-amber-300/25 bg-amber-500/10 text-amber-100' : 'border-sky-300/25 bg-sky-500/10 text-sky-100'}`}>
-                  <p className="font-semibold text-white">{existingInstall?.resources?.length || 0} item{existingInstall?.resources?.length === 1 ? '' : 's'} found on this server</p>
-                  <p className="mt-1 opacity-85">
-                    {existingInstall?.conflict
-                      ? 'Recover or review these apps before creating another production instance.'
-                      : `Development mode is using the isolated instance ${setupStatus?.instanceSlug || 'autark-os-dev'}.`}
-                  </p>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <ProjectPrimaryButton asChild>
-                    <Link to="/resolve-existing-apps">Recover existing apps</Link>
-                  </ProjectPrimaryButton>
-                  <ProjectDarkControlButton asChild>
-                    <Link to="/home">Abort setup</Link>
-                  </ProjectDarkControlButton>
-                  {setupStatus?.devMode && showAdvancedMetrics && (
-                    <Badge className="border-sky-300/25 bg-sky-500/10 px-3 py-2 text-sky-100" variant="outline">Separate development instance allowed</Badge>
-                  )}
-                </div>
-                {showAdvancedMetrics && Boolean(existingInstall?.resources?.length) && (
-                  <Collapsible className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
-                    <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-white">Advanced found-app details</CollapsibleTrigger>
-                    <CollapsibleContent className="mt-3 grid gap-2">
-                      {existingInstall?.resources.map((resource) => (
-                        <div className="rounded-lg border border-sky-400/25 bg-slate-900 p-3" key={resource.id}>
-                          <p className="font-semibold text-white">{resource.label}</p>
-                          <p className="mt-1 text-slate-400">{resource.summary}</p>
-                          <p className="mt-1 text-xs text-slate-500">Owner: {resource.ownerInstanceId || 'Unknown'}</p>
-                        </div>
-                      ))}
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-              </WizardCard>
-            )}
+        {error && <div className="rounded-xl border border-red-300/25 bg-red-500/10 p-4 text-sm text-red-100" role="alert">{error}</div>}
 
-            <WizardCard icon={ServerCog} title="Name this device" text="This name appears in Autark-OS and helps identify the box on your network.">
-              <Input className="max-w-md border-sky-400/25 bg-slate-800 text-white" onChange={(event) => setDeviceName(event.target.value)} value={deviceName} />
-            </WizardCard>
+        <WizardCard icon={iconForStep(current.id)} text={descriptionForStep(current.id)} title={current.label}>
+          {stepContent}
+        </WizardCard>
 
-            <WizardCard icon={ShieldCheck} title="Device readiness" text={readiness.summary}>
-              <div className={`mb-3 rounded-lg border p-4 ${readiness.canCompleteOnboarding ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100' : 'border-amber-300/25 bg-amber-500/10 text-amber-100'}`}>
-                <div className="flex items-center gap-2 font-semibold">
-                  {readiness.canCompleteOnboarding ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
-                  <span>{readiness.headline}</span>
-                </div>
-                <p className="mt-1 text-sm opacity-85">{readiness.summary}</p>
-              </div>
-              <div className="mb-3 grid gap-2 md:grid-cols-2">
-                {readiness.groups.map((group) => (
-                  <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3" key={group.id}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-white">{group.label}</span>
-                      <Badge className={group.status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : group.status === 'warning' ? 'bg-amber-500/15 text-amber-100' : 'bg-slate-700 text-slate-200'}>{readinessLabel(group.status)}</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-400">{group.message}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="grid gap-2 md:grid-cols-2">
-                {checks.map((check) => (
-                  <div className="rounded-lg border border-sky-400/25 bg-slate-800 p-3" key={check.id}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-semibold text-white">{check.label}</span>
-                      <Badge className={check.status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : check.status === 'warning' ? 'bg-amber-500/15 text-amber-100' : 'bg-slate-700 text-slate-200'}>{check.status}</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-400">{check.message}</p>
-                    {check.actionLabel && (
-                      <p className="mt-2 text-xs font-semibold text-cyan-200">{check.actionLabel}: {check.actionCommand || 'Open the linked setup step'}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </WizardCard>
-
-            <WizardCard icon={Network} title="Private access" text={state.tailscaleConnected ? 'Tailscale is connected, so private app links can be created.' : 'Tailscale is not connected yet. Autark-OS will keep local access working and guide private access later.'}>
-              <div className="grid gap-3 lg:grid-cols-3">
-                <PrivateAccessChoiceCard
-                  active={privateAccessChoice === 'setup-now'}
-                  detail="Use Tailscale for private app links from your own devices."
-                  label="Set up private access now"
-                  onClick={() => setPrivateAccessChoice('setup-now')}
-                />
-                <PrivateAccessChoiceCard
-                  active={privateAccessChoice === 'local-only'}
-                  detail="Keep apps available on this home network and revisit private access later."
-                  label="Use local-only for now"
-                  onClick={() => setPrivateAccessChoice('local-only')}
-                />
-                <PrivateAccessChoiceCard
-                  active={privateAccessChoice === 'already-connected'}
-                  detail="Use this when Tailscale is already connected or managed outside Autark-OS."
-                  label="I already use Tailscale"
-                  onClick={() => setPrivateAccessChoice('already-connected')}
-                />
-              </div>
-              <div className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
-                <div>LAN setup URL: <span className="font-semibold text-white">{state.doctor.lanUrl}</span></div>
-                {privateAccessChoice === 'setup-now' && (
-                  <div className="mt-3 grid gap-2 text-slate-400">
-                    <p>{privateAccessGroup?.message || 'Autark-OS will use Tailscale for private app links.'}</p>
-                    {!state.tailscaleConnected && <p>Next action: <span className="font-semibold text-white">{tailscaleCheck?.actionCommand || 'tailscale up'}</span></p>}
-                    {state.tailscaleConnected && operatorCheck?.status === 'warning' && <p>Tailscale Serve permission: <span className="font-semibold text-white">{operatorCheck.actionCommand}</span></p>}
-                    <p>MagicDNS and HTTPS must be enabled in Tailscale before private app links can use friendly secure names.</p>
-                  </div>
-                )}
-                {privateAccessChoice === 'local-only' && <p className="mt-3 text-slate-400">Local-only setup is supported. Network can continue the private-access setup path later.</p>}
-                {privateAccessChoice === 'already-connected' && <p className="mt-3 text-slate-400">{state.tailscaleConnected ? 'Autark-OS sees Tailscale connected.' : 'Autark-OS does not see Tailscale connected yet. You can finish local setup and reconnect from Network later.'}</p>}
-              </div>
-            </WizardCard>
-
-            <WizardCard icon={HardDrive} title="Storage and backups" text="Choose how protected you want this first setup to be. You can change this later.">
-              <div className="grid gap-3 lg:grid-cols-3">
-                <BackupChoice
-                  active={backupPosture === 'routine'}
-                  detail="Autark-OS keeps app restore points on this device. This helps with app mistakes, but it does not protect against drive failure."
-                  label="Same-device backups"
-                  onClick={() => {
-                    setBackupPosture('routine');
-                    setAutomaticBackups(true);
-                  }}
-                />
-                <BackupChoice
-                  active={backupPosture === 'external'}
-                  detail="Use another mounted drive or off-device location. Autark-OS will store routine restore points there after setup."
-                  label="External backup location"
-                  onClick={() => {
-                    setBackupPosture('external');
-                    setAutomaticBackups(true);
-                  }}
-                />
-                <BackupChoice
-                  active={backupPosture === 'later'}
-                  detail="Skip routine backups for now. You can still run manual backups after setup."
-                  label="Configure backups later"
-                  onClick={() => {
-                    setBackupPosture('later');
-                    setAutomaticBackups(false);
-                  }}
-                />
-              </div>
-              {backupPosture === 'external' && (
-                <div className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
-                  <label className="block text-sm font-semibold text-white" htmlFor="backup-destination">Backup destination</label>
-                  <Input
-                    className="mt-2 border-sky-400/25 bg-slate-900 text-white"
-                    id="backup-destination"
-                    onChange={(event) => setBackupDestination(event.target.value)}
-                    placeholder="/mnt/backup-drive/autark-os-backups"
-                    value={backupDestination}
-                  />
-                  <p className="mt-2 text-sm text-slate-400">Use an absolute path on a mounted drive. Autark-OS will check that it can create and write this folder before setup finishes.</p>
-                </div>
-              )}
-              {backupPosture !== 'later' && (
-                <label className="mt-3 flex items-center gap-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
-                  <Checkbox checked={automaticBackups} onCheckedChange={(checked) => setAutomaticBackups(Boolean(checked))} />
-                  <span>
-                    <span className="block font-semibold text-white">Run routine backups</span>
-                    <span className="text-sm text-slate-400">{backupPosture === 'external' ? `Use ${backupDestination || 'the selected backup destination'}` : `Use ${defaultBackupDestination}`}</span>
-                  </span>
-                </label>
-              )}
-              <Collapsible className="mt-3 rounded-lg border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
-                <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-white">Advanced backup details</CollapsibleTrigger>
-                <CollapsibleContent className="mt-3 grid gap-2 text-slate-400">
-                  <p>Autark-OS runtime path: {state.runtimePath}</p>
-                  <p>Default backup path: {defaultBackupDestination}</p>
-                  <p>Same-device backups are useful restore points, but external backups are safer if the main drive fails.</p>
-                </CollapsibleContent>
-              </Collapsible>
-            </WizardCard>
-
-            <WizardCard icon={Sparkles} title="Recommended starter apps" text="These are suggestions only. Autark-OS will not install them until you confirm from Marketplace.">
-              <div className="grid gap-3 md:grid-cols-3">
-                {starterApps.map((app) => (
-                  <button className={cn('rounded-lg border p-4 text-left transition', selectedApps.includes(app.id) ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} key={app.id} onClick={() => toggleApp(app.id)} type="button">
-                    <span className="font-semibold text-white">{app.label}</span>
-                    <span className="mt-1 block text-sm text-slate-400">{app.detail}</span>
-                  </button>
-                ))}
-              </div>
-            </WizardCard>
-          </div>
-
-          <aside className="h-fit rounded-2xl border border-sky-400/30 bg-slate-900 p-5 shadow-xl shadow-slate-950/30">
-            <h2 className="text-lg font-bold text-white">Setup summary</h2>
-            <div className="mt-4 grid gap-3 text-sm">
-              <SummaryLine label="Device" value={deviceName} />
-              <SummaryLine label="Readiness" value={readiness.headline} />
-              <SummaryLine label="Private access" value={privateAccessSummary(privateAccessChoice, state.tailscaleConnected)} />
-              <SummaryLine label="Backups" value={backupSummary(backupPosture, automaticBackups)} />
-              <SummaryLine label="Starter apps" value={`${selectedApps.length} selected`} />
-            </div>
-            {readiness.finishAnywayRequiresAdvanced && readiness.canCompleteOnboarding && (
-              <Collapsible className="mt-4 rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-300">
-                <CollapsibleTrigger className="w-full cursor-pointer text-left font-semibold text-white">Advanced finish</CollapsibleTrigger>
-                <CollapsibleContent asChild>
-                  <label className="mt-3 flex items-center gap-3">
-                  <Checkbox checked={advancedFinish} onCheckedChange={(checked) => setAdvancedFinish(Boolean(checked))} />
-                  <span>Finish anyway and handle the remaining setup items later.</span>
-                  </label>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-            <DisabledAction className="mt-5 w-full" disabled={finishDisabled} reason={finishDisabledReason}>
-              <ProjectPrimaryButton className="w-full" disabled={finishDisabled} onClick={finish} type="button">
+        <footer className="flex flex-col-reverse gap-3 rounded-2xl border border-sky-400/25 bg-slate-900 p-4 shadow-xl shadow-slate-950/25 sm:flex-row sm:items-center sm:justify-between">
+          <ProjectDarkControlButton disabled={saving || step === 0} onClick={() => void moveBack()} type="button">
+            <ChevronLeft className="size-4" />
+            Back
+          </ProjectDarkControlButton>
+          {isReviewStep ? (
+            <DisabledAction disabled={saving || !canFinish} reason={saving ? 'Autark-OS is already saving setup.' : readiness?.summary || 'Review setup before finishing.'}>
+              <ProjectPrimaryButton disabled={saving || !canFinish} onClick={() => void finish()} type="button">
                 {saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
-                {readiness.finishAnywayRequiresAdvanced && advancedFinish ? 'Finish anyway' : 'Finish setup'}
+                {advancedFinish ? 'Finish anyway' : 'Finish setup'}
               </ProjectPrimaryButton>
             </DisabledAction>
-            {!readiness.canCompleteOnboarding && <p className="mt-3 text-sm text-amber-200">{readiness.summary}</p>}
-          </aside>
-        </div>
+          ) : (
+            <ProjectPrimaryButton disabled={saving} onClick={() => void moveNext()} type="button">
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <ChevronRight className="size-4" />}
+              Continue
+            </ProjectPrimaryButton>
+          )}
+        </footer>
       </section>
     </main>
   );
 }
 
-async function persistSetupProgress(privateAccessChoice: PrivateAccessChoice) {
-  await SystemAPIClient.completeSetupStep('welcome');
-  await SystemAPIClient.completeSetupStep('host_check');
-  await SystemAPIClient.completeSetupStep('docker_check');
-  await SystemAPIClient.completeSetupStep('access_choice');
-  if (privateAccessChoice === 'local-only') {
-    await SystemAPIClient.skipSetupStep('tailscale_connect');
-  } else {
-    await SystemAPIClient.completeSetupStep('tailscale_connect');
-  }
-  await SystemAPIClient.completeSetupStep('starter_apps');
-  await SystemAPIClient.skipSetupStep('first_backup');
-  await SystemAPIClient.completeSetupStep('done');
+function DeviceStep({ deviceName, onDeviceNameChange }: { deviceName: string; onDeviceNameChange: (value: string) => void }) {
+  return (
+    <div className="grid gap-4">
+      <label className="grid max-w-md gap-2 text-sm font-semibold text-white" htmlFor="device-name">
+        Device name
+        <Input className="border-sky-400/25 bg-slate-800 text-white" id="device-name" onChange={(event) => onDeviceNameChange(event.target.value)} value={deviceName} />
+      </label>
+      <p className="text-sm leading-6 text-slate-400">This name appears in Autark-OS and helps identify this device on your network.</p>
+    </div>
+  );
 }
 
-function WizardCard({ children, icon: Icon, text, title }: { children: ReactNode; icon: typeof ServerCog; text: string; title: string }) {
+function ReadinessStep({ existingInstall, setupStatus, state, showExistingInstallWarning }: { existingInstall?: SystemSetupStatus['existingInstall'] | null; setupStatus: SystemSetupStatus | null; state: OnboardingState; showExistingInstallWarning: boolean }) {
+  const readiness = state.doctor.readiness;
+  return (
+    <div className="grid gap-4">
+      <div className={cn('rounded-xl border p-4', readiness.canCompleteOnboarding ? 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100' : 'border-amber-300/25 bg-amber-500/10 text-amber-100')}>
+        <p className="font-semibold">{readiness.headline}</p>
+        <p className="mt-1 text-sm leading-6 opacity-85">{readiness.summary}</p>
+      </div>
+      {showExistingInstallWarning && (
+        <div className="rounded-xl border border-amber-300/25 bg-amber-500/10 p-4 text-amber-100">
+          <p className="font-semibold">{existingInstall?.headline || 'Existing apps found on this server'}</p>
+          <p className="mt-1 text-sm leading-6">{existingInstall?.summary || 'Autark-OS will keep these services separate until you review them after setup.'}</p>
+          <p className="mt-2 text-xs text-amber-100/75">{existingInstall?.resources?.length || 0} resource{existingInstall?.resources?.length === 1 ? '' : 's'} found{setupStatus?.devMode ? ` in ${setupStatus.instanceSlug || 'the isolated development instance'}` : ''}.</p>
+        </div>
+      )}
+      <div className="grid gap-3 md:grid-cols-2">
+        {readiness.groups.map((group) => (
+          <div className="rounded-xl border border-sky-400/25 bg-slate-800 p-4" key={group.id}>
+            <div className="flex items-center justify-between gap-3"><span className="font-semibold text-white">{group.label}</span><Badge className={group.status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : 'bg-amber-500/15 text-amber-100'}>{group.status === 'ok' ? 'Ready' : 'Needs attention'}</Badge></div>
+            <p className="mt-2 text-sm leading-6 text-slate-400">{group.message}</p>
+          </div>
+        ))}
+      </div>
+      <details className="rounded-xl border border-sky-400/25 bg-slate-800 p-4 text-sm text-slate-300">
+        <summary className="cursor-pointer font-semibold text-white">Technical readiness details</summary>
+        <div className="mt-3 grid gap-2">{state.doctor.checks.map((check) => <p key={check.id}><span className="font-semibold text-white">{check.label}:</span> {check.message}</p>)}</div>
+      </details>
+    </div>
+  );
+}
+
+function AccessStep({ draft, onChange, state }: { draft: OnboardingDraft; onChange: (updates: Partial<OnboardingDraft>) => void; state: OnboardingState }) {
+  const accessGroup = state.doctor.readiness.groups.find((group) => group.id === 'private-access');
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        <ChoiceCard active={draft.privateAccessChoice === 'setup-now'} detail="Use Tailscale for private app links from your own devices." label="Set up private access now" onClick={() => onChange({ privateAccessChoice: 'setup-now' })} />
+        <ChoiceCard active={draft.privateAccessChoice === 'local-only'} detail="Keep apps on this home network and revisit private access later." label="Use local-only for now" onClick={() => onChange({ privateAccessChoice: 'local-only' })} />
+        <ChoiceCard active={draft.privateAccessChoice === 'already-connected'} detail="Use this when Tailscale is already managed outside Autark-OS." label="I already use Tailscale" onClick={() => onChange({ privateAccessChoice: 'already-connected' })} />
+      </div>
+      <div className="rounded-xl border border-sky-400/25 bg-slate-800 p-4 text-sm leading-6 text-slate-300">
+        <p>Local setup URL: <span className="font-semibold text-white">{state.doctor.lanUrl}</span></p>
+        {draft.privateAccessChoice === 'setup-now' && <p className="mt-2">{accessGroup?.message || 'Autark-OS will guide private links after setup.'}</p>}
+        {draft.privateAccessChoice === 'local-only' && <p className="mt-2">Local-only setup is supported. You can configure private access from Access later.</p>}
+        {draft.privateAccessChoice === 'already-connected' && <p className="mt-2">{state.tailscaleConnected ? 'Autark-OS sees Tailscale connected.' : 'Autark-OS does not see Tailscale connected yet; local access remains available.'}</p>}
+      </div>
+    </div>
+  );
+}
+
+function BackupsStep({ defaultDestination, draft, onChange }: { defaultDestination: string; draft: OnboardingDraft; onChange: (updates: Partial<OnboardingDraft>) => void }) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        <ChoiceCard active={draft.backupPosture === 'routine'} detail="Keep restore points on this device for routine recovery." label="Same-device backups" onClick={() => onChange({ automaticBackups: true, backupPosture: 'routine' })} />
+        <ChoiceCard active={draft.backupPosture === 'external'} detail="Use a mounted external drive or off-device folder." label="External backup location" onClick={() => onChange({ automaticBackups: true, backupPosture: 'external' })} />
+        <ChoiceCard active={draft.backupPosture === 'later'} detail="Skip routine backups for now; manual backups remain available." label="Configure backups later" onClick={() => onChange({ automaticBackups: false, backupPosture: 'later' })} />
+      </div>
+      {draft.backupPosture === 'external' && <label className="grid gap-2 text-sm font-semibold text-white" htmlFor="backup-destination">Backup destination<Input className="border-sky-400/25 bg-slate-800 text-white" id="backup-destination" onChange={(event) => onChange({ backupDestination: event.target.value })} placeholder="/mnt/backup-drive/autark-os-backups" value={draft.backupDestination} /></label>}
+      {draft.backupPosture !== 'later' && <label className="flex items-center gap-3 rounded-xl border border-sky-400/25 bg-slate-800 p-4"><Checkbox checked={draft.automaticBackups} onCheckedChange={(checked) => onChange({ automaticBackups: Boolean(checked) })} /><span><span className="block font-semibold text-white">Run routine backups</span><span className="text-sm text-slate-400">{draft.backupPosture === 'external' ? draft.backupDestination || 'Choose a destination above.' : `Use ${defaultDestination}`}</span></span></label>}
+      <p className="text-sm leading-6 text-slate-400">Same-device restore points help with app mistakes. Use an external location to protect against drive failure.</p>
+    </div>
+  );
+}
+
+function AppsStep({ onToggleApp, selectedApps }: { onToggleApp: (appId: string) => void; selectedApps: string[] }) {
+  return <div className="grid gap-3 md:grid-cols-3">{starterApps.map((app) => <ChoiceCard active={selectedApps.includes(app.id)} detail={app.detail} key={app.id} label={app.label} onClick={() => onToggleApp(app.id)} />)}</div>;
+}
+
+function ReviewStep({ advancedFinish, draft, onAdvancedFinishChange, readiness, state }: { advancedFinish: boolean; draft: OnboardingDraft; onAdvancedFinishChange: (value: boolean) => void; readiness: OnboardingState['doctor']['readiness'] | undefined; state: OnboardingState }) {
+  return (
+    <div className="grid gap-4">
+      <div className="grid gap-3 rounded-xl border border-sky-400/25 bg-slate-800 p-4 text-sm"><SummaryLine label="Device" value={draft.deviceName} /><SummaryLine label="Readiness" value={readiness?.headline || 'Checking'} /><SummaryLine label="Private access" value={privateAccessSummary(draft.privateAccessChoice, state.tailscaleConnected)} /><SummaryLine label="Backups" value={backupSummary(draft.backupPosture, draft.automaticBackups)} /><SummaryLine label="Starter apps" value={`${draft.selectedApps.length} selected`} /></div>
+      {readiness?.finishAnywayRequiresAdvanced && readiness.canCompleteOnboarding && <label className="flex gap-3 rounded-xl border border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100"><Checkbox checked={advancedFinish} onCheckedChange={(checked) => onAdvancedFinishChange(Boolean(checked))} /><span><span className="block font-semibold">Finish with optional work remaining</span><span className="mt-1 block leading-6">You can return to Access or Diagnostics after setup to finish the remaining optional checks.</span></span></label>}
+      {!readiness?.canCompleteOnboarding && <div className="rounded-xl border border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100">{readiness?.summary || 'Autark-OS is still checking whether setup can finish.'}</div>}
+    </div>
+  );
+}
+
+function ChoiceCard({ active, detail, label, onClick }: { active: boolean; detail: string; label: string; onClick: () => void }) {
+  return <button aria-pressed={active} className={cn('rounded-xl border p-4 text-left transition', active ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} onClick={onClick} type="button"><span className="font-semibold text-white">{label}</span><span className="mt-1 block text-sm leading-6 text-slate-400">{detail}</span></button>;
+}
+
+function WizardCard({ children, icon: Icon, text, title }: { children: ReactNode; icon: LucideIcon; text: string; title: string }) {
   return (
     <Card className="border-sky-400/30 bg-slate-900 py-0 text-slate-100 shadow-xl shadow-slate-950/30">
-      <CardContent className="p-5">
-        <div className="mb-4 flex gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-cyan-300/30 bg-cyan-400/10 text-cyan-100">
-            <Icon className="size-5" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">{title}</h2>
-            <p className="mt-1 text-sm text-slate-400">{text}</p>
-          </div>
+      <CardContent className="p-5 md:p-6">
+        <div className="mb-5 flex gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/30 bg-cyan-400/10 text-cyan-100"><Icon className="size-5" /></span>
+          <div><h2 className="text-xl font-bold text-white">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-400">{text}</p></div>
         </div>
         {children}
       </CardContent>
@@ -408,53 +345,56 @@ function WizardCard({ children, icon: Icon, text, title }: { children: ReactNode
   );
 }
 
-function BackupChoice({ active, detail, label, onClick }: { active: boolean; detail: string; label: string; onClick: () => void }) {
-  return (
-    <button className={cn('rounded-lg border p-4 text-left transition', active ? 'border-emerald-300/50 bg-emerald-500/15' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} onClick={onClick} type="button">
-      <span className="font-semibold text-white">{label}</span>
-      <span className="mt-1 block text-sm text-slate-400">{detail}</span>
-    </button>
-  );
-}
-
-function PrivateAccessChoiceCard({ active, detail, label, onClick }: { active: boolean; detail: string; label: string; onClick: () => void }) {
-  return (
-    <button className={cn('rounded-lg border p-4 text-left transition', active ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} onClick={onClick} type="button">
-      <span className="font-semibold text-white">{label}</span>
-      <span className="mt-1 block text-sm text-slate-400">{detail}</span>
-    </button>
-  );
-}
-
 function SummaryLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3 border-b border-sky-400/20 pb-2">
-      <span className="text-slate-400">{label}</span>
-      <span className="text-right font-semibold text-white">{value}</span>
-    </div>
-  );
+  return <div className="flex justify-between gap-3 border-b border-sky-400/20 pb-2 last:border-0 last:pb-0"><span className="text-slate-400">{label}</span><span className="text-right font-semibold text-white">{value}</span></div>;
 }
 
-function validateBackupDestination(posture: BackupPosture, destination: string) {
-  if (posture !== 'external') return null;
-  const value = destination.trim();
-  if (!value) return 'Choose a backup destination, or pick a different backup option.';
-  if (!value.startsWith('/')) return 'Backup destination must be an absolute path that starts with /.';
-  if (value === '/' || value === '/tmp') return 'Choose a dedicated backup folder instead of a system or temporary folder.';
-  return null;
+function OnboardingLoadingState() {
+  return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-300" role="status"><div className="grid justify-items-center gap-3"><Loader2 className="size-7 animate-spin text-cyan-200" /><span>Loading setup</span></div></main>;
 }
 
-function cleanPrivateAccessChoice(value: string, tailscaleConnected: boolean): PrivateAccessChoice {
-  if (value === 'setup-now' || value === 'local-only' || value === 'already-connected') {
-    return value;
-  }
-  return tailscaleConnected ? 'already-connected' : 'local-only';
+function OnboardingLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-slate-50"><section className="w-full max-w-lg rounded-2xl border border-red-300/25 bg-slate-900 p-6 shadow-xl shadow-slate-950/30"><AlertTriangle className="size-6 text-red-200" /><h1 className="mt-4 text-2xl font-black text-white">Setup could not load</h1><p className="mt-2 text-sm leading-6 text-slate-300">{message}</p><ProjectPrimaryButton autoFocus className="mt-5" onClick={onRetry} type="button">Try again</ProjectPrimaryButton></section></main>;
 }
 
-function readinessLabel(status: string) {
-  if (status === 'ok') return 'Ready';
-  if (status === 'warning') return 'Needs setup';
-  return 'Later';
+function emptyDraft(): OnboardingDraft {
+  return { automaticBackups: true, backupDestination: '', backupPosture: 'routine', deviceName: 'Autark-OS', privateAccessChoice: 'local-only', selectedApps: starterApps.map((app) => app.id) };
+}
+
+function draftFromState(state: OnboardingState): OnboardingDraft {
+  const defaultDestination = `${state.runtimePath}/backups`;
+  const backupDestination = state.backupDestination || defaultDestination;
+  const backupPosture: BackupPosture = !state.automaticBackupsEnabled ? 'later' : backupDestination === defaultDestination ? 'routine' : 'external';
+  return { automaticBackups: state.automaticBackupsEnabled, backupDestination, backupPosture, deviceName: state.deviceName || 'Autark-OS', privateAccessChoice: cleanPrivateAccessChoice(state.privateAccessChoice, state.tailscaleConnected), selectedApps: state.recommendedApps.length ? state.recommendedApps : starterApps.map((app) => app.id) };
+}
+
+async function persistSetupProgress(privateAccessChoice: PrivateAccessChoice) {
+  await SystemAPIClient.completeSetupStep('welcome');
+  await SystemAPIClient.completeSetupStep('host_check');
+  await SystemAPIClient.completeSetupStep('docker_check');
+  await SystemAPIClient.completeSetupStep('access_choice');
+  if (privateAccessChoice === 'local-only') await SystemAPIClient.skipSetupStep('tailscale_connect');
+  else await SystemAPIClient.completeSetupStep('tailscale_connect');
+  await SystemAPIClient.completeSetupStep('starter_apps');
+  await SystemAPIClient.skipSetupStep('first_backup');
+  await SystemAPIClient.completeSetupStep('done');
+}
+
+function iconForStep(step: string): LucideIcon {
+  if (step === 'device') return ServerCog;
+  if (step === 'readiness') return ShieldCheck;
+  if (step === 'access') return Network;
+  if (step === 'backups') return HardDrive;
+  return Sparkles;
+}
+
+function descriptionForStep(step: string): string {
+  if (step === 'device') return 'Choose a name that makes this device easy to recognize.';
+  if (step === 'readiness') return 'Review the device checks Autark-OS needs before installing apps.';
+  if (step === 'access') return 'Choose how you want to reach apps from your own devices.';
+  if (step === 'backups') return 'Choose how restore points should be stored.';
+  if (step === 'apps') return 'Pick a few suggestions to explore after setup.';
+  return 'Review your choices before Autark-OS applies them.';
 }
 
 function privateAccessSummary(choice: PrivateAccessChoice, connected: boolean) {

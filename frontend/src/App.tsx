@@ -1,9 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { AdminSecurityAPIClient } from './api/AdminSecurityAPIClient';
 import { SystemAPIClient } from './api/SystemAPIClient';
 import { loadApplicationBootstrap, type ApplicationBootstrap } from './App.bootstrap';
+import { safePostSetupPath, setupRedirectTarget } from './App.onboarding';
 import { ProjectSettingsProvider } from './contexts/ProjectSettingsContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProjectPrimaryButton } from './components/primitives/ProjectButtons';
@@ -142,6 +143,18 @@ function ReadyApplication({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   const [authenticated, setAuthenticated] = useState(bootstrap.authenticated);
   const [onboardingComplete, setOnboardingComplete] = useState(bootstrap.onboardingComplete);
 
+  if (!onboardingComplete) {
+    return (
+      <ProjectSettingsProvider>
+        {bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode && !authenticated ? (
+          <AdminSecurityGate onAuthenticated={() => setAuthenticated(true)} status={bootstrap.securityStatus} />
+        ) : (
+          <IncompleteOnboardingRoutes onComplete={() => setOnboardingComplete(true)} />
+        )}
+      </ProjectSettingsProvider>
+    );
+  }
+
   return (
     <ProjectSettingsProvider>
       {bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode && !authenticated ? (
@@ -149,12 +162,12 @@ function ReadyApplication({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
       ) : (
         <Routes>
           <Route element={<AppShell />}>
-            <Route index element={<Navigate replace to={onboardingComplete ? '/home' : '/setup'} />} />
+            <Route index element={<Navigate replace to="/home" />} />
             {Object.entries(routeAliases).map(([from, to]) => (
               <Route element={<Navigate replace to={to} />} key={from} path={from} />
             ))}
-            <Route path="/home" element={onboardingComplete ? <Suspense fallback={<PageFallback />}><OverviewPage /></Suspense> : <Navigate replace to="/setup" />} />
-            <Route path="/setup" element={<Suspense fallback={<PageFallback />}><SetupRoute onComplete={() => setOnboardingComplete(true)} /></Suspense>} />
+            <Route path="/home" element={<Suspense fallback={<PageFallback />}><OverviewPage /></Suspense>} />
+            <Route path="/setup" element={<Navigate replace to="/home" />} />
             <Route path="/apps" element={<Suspense fallback={<PageFallback />}><ApplicationsPage /></Suspense>} />
             <Route path="/apps/found" element={<Suspense fallback={<PageFallback />}><ResolveExistingAppsPage /></Suspense>} />
             <Route path="/resolve-existing-apps" element={<Navigate replace to="/apps/found" />} />
@@ -173,13 +186,29 @@ function ReadyApplication({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   );
 }
 
+function IncompleteOnboardingRoutes({ onComplete }: { onComplete: () => void }) {
+  return (
+    <Routes>
+      <Route path="/setup" element={<Suspense fallback={<PageFallback fullScreen />}><SetupRoute onComplete={onComplete} /></Suspense>} />
+      <Route path="*" element={<RedirectToSetup />} />
+    </Routes>
+  );
+}
+
+function RedirectToSetup() {
+  const location = useLocation();
+  return <Navigate replace to={setupRedirectTarget(location.pathname, location.search, location.hash)} />;
+}
+
 function SetupRoute({ onComplete }: { onComplete: () => void }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = safePostSetupPath(searchParams.get('returnTo'));
   return (
     <OnboardingWizard
       onComplete={() => {
         onComplete();
-        navigate('/home', { replace: true });
+        navigate(returnTo, { replace: true });
       }}
     />
   );
