@@ -96,6 +96,14 @@ test('private-link-only health warnings do not make ready apps look globally bro
   assert.equal(appNeedsAttentionFromCanonicalState(app, app.healthSnapshot, accessById.vaultwarden, app.telemetry), false);
 });
 
+test('missing runtime state stays unknown instead of being treated as ready', () => {
+  const app = runtimeApp('vaultwarden', '');
+  app.healthSnapshot = null;
+
+  assert.equal(displayStatusFromCanonicalState(app, app.healthSnapshot), 'Unknown');
+  assert.equal(appNeedsAttentionFromCanonicalState(app, app.healthSnapshot, accessByAppId({ runtimeApps: [app] }).vaultwarden, app.telemetry), true);
+});
+
 test('only explicit unhealthy or unreachable states need attention', () => {
   const healthyApp = runtimeApp('vaultwarden', 'Ready', health('Ready', 'reachable'));
   const unhealthyApp = runtimeApp('jellyfin', 'Ready', {

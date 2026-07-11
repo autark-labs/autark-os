@@ -22,6 +22,7 @@ export type HomeRepositoryView = {
   recommendedAction: RecommendedAction | null;
   refresh: () => Promise<void>;
   summary: SystemSummary | null;
+  summaryError: string | null;
 };
 
 export function useHomeSummaryQuery() {
@@ -66,6 +67,7 @@ export function useHomeRepository(): HomeRepositoryView {
     recommendedAction: recommendedActionQuery.data ?? null,
     refresh,
     summary: summaryQuery.data ?? null,
+    summaryError: summaryQuery.error ? apiErrorMessage(summaryQuery.error, 'Home status could not be loaded.') : null,
   };
 }
 

@@ -72,6 +72,29 @@ class SystemSummaryServiceTests {
     }
 
     @Test
+    void reportsBackupProtectionOnlyWhenAManagedAppHasARestorePoint() {
+        AppInstanceView protectedApp = app(
+                "appinst_vaultwarden",
+                "vaultwarden",
+                "Vaultwarden",
+                "Ready",
+                "http://localhost:8090",
+                List.of(),
+                "protected_by_restore_point");
+        SystemSummaryService service = new SystemSummaryService(
+                () -> List.of(protectedApp),
+                () -> ProjectSettings.defaults("autark-os-test"),
+                () -> new AutarkOsIdentity("pos_test", "autark-os-test", "/runtime", "sha256:test", Instant.parse("2026-06-20T12:00:00Z"), 1),
+                () -> setupStatus("ready", "Docker 29.6.0"),
+                () -> "http://localhost:8082",
+                Instant::now);
+
+        SystemSummaryModels.SystemSummary summary = service.summary();
+
+        assertThat(summary.backups().state()).isEqualTo("protected_by_restore_point");
+    }
+
+    @Test
     void usesCanonicalSetupProgressWhenAvailable() {
         SystemSummaryService service = new SystemSummaryService(
                 List::of,
@@ -90,6 +113,10 @@ class SystemSummaryServiceTests {
     }
 
     private AppInstanceView app(String appInstanceId, String catalogAppId, String name, String status, String url, List<AutarkOsIssue> issues) {
+        return app(appInstanceId, catalogAppId, name, status, url, issues, "backup_disabled");
+    }
+
+    private AppInstanceView app(String appInstanceId, String catalogAppId, String name, String status, String url, List<AutarkOsIssue> issues, String backupState) {
         return new AppInstanceView(
                 appInstanceId,
                 catalogAppId,
@@ -101,7 +128,7 @@ class SystemSummaryServiceTests {
                 status.toLowerCase(),
                 "owned",
                 url.isBlank() ? "not_ready" : "local_ready",
-                "backup_disabled",
+                backupState,
                 url,
                 null,
                 issues,

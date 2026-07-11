@@ -2,19 +2,22 @@ import { Clock3 } from 'lucide-react';
 import overviewBackground from '@/assets/overviewBackground.webp';
 import { StatusPill } from '@/components/primitives/StatusPill';
 import type { SystemSummary } from '@/types/system';
+import type { HomeSummaryAvailability } from '../extensions/OverviewPage.systemStatus';
 
 export function HomeHero({
   deviceName,
-  loading,
+  summaryAvailability,
   summary,
 }: {
   deviceName: string;
-  loading: boolean;
+  summaryAvailability: HomeSummaryAvailability;
   summary: SystemSummary | null;
 }) {
   const needsReview = Boolean(summary?.issues.length);
-  const statusTone = loading ? 'info' : needsReview ? 'warning' : 'success';
-  const readyStatus = loading ? 'Checking' : needsReview ? 'Needs review' : 'Ready';
+  const loading = summaryAvailability === 'loading';
+  const unavailable = summaryAvailability === 'unavailable';
+  const statusTone = loading ? 'info' : unavailable || needsReview ? 'warning' : 'success';
+  const readyStatus = loading ? 'Checking' : unavailable ? 'Status unavailable' : needsReview ? 'Needs review' : 'Ready';
 
   return (
     <header className="relative overflow-hidden rounded-2xl border border-cyan-800/20 bg-slate-900/70 shadow-2xl shadow-cyan-950/20">
@@ -32,7 +35,7 @@ export function HomeHero({
                 {timeGreeting()}, {shortName(deviceName)}.
               </h1>
               <p className="mt-4 max-w-xl text-lg font-semibold leading-7 text-slate-100/90">
-                {homeHeroSubtitle(summary, loading)}
+                {homeHeroSubtitle(summary, summaryAvailability)}
               </p>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
                 Open apps, handle the next setup step, and keep your home server calm.
@@ -55,8 +58,9 @@ export function HomeHero({
   );
 }
 
-function homeHeroSubtitle(summary: SystemSummary | null, loading: boolean) {
-  if (loading && !summary) return 'Autark-OS is checking your home server.';
+function homeHeroSubtitle(summary: SystemSummary | null, availability: HomeSummaryAvailability) {
+  if (availability === 'loading' && !summary) return 'Autark-OS is checking your home server.';
+  if (availability === 'unavailable' && !summary) return 'Autark-OS could not load the current server status.';
   if (summary?.issues.length) return 'Your server needs a quick look.';
   if (summary?.setup.complete === false) return summary.setup.summary || 'Finish setup to unlock the full Autark-OS experience.';
   return 'Your digital home is ready.';

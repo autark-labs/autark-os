@@ -20,6 +20,7 @@ import { useHomeRepository } from '@/repositories/homeRepository';
 import { managedAppIconUrl, observedServiceIconUrl } from './extensions/OverviewPage.appTiles';
 import { homeMajorActivity } from './extensions/OverviewPage.activity';
 import { shouldShowActivityLogLink } from './extensions/OverviewPage.activityLink';
+import { homeSummaryAvailability, homeSystemMetrics } from './extensions/OverviewPage.systemStatus';
 import type { ActivityLog } from '@/types/activity';
 import type { AppInstanceView } from '@/types/app';
 
@@ -37,13 +38,14 @@ function OverviewPage() {
   const showActivityLogLink = shouldShowActivityLogLink(viewMode, majorActivity);
   const primaryAction = home.recommendedAction?.id === 'no-action-needed' ? null : home.recommendedAction;
   const deviceName = home.summary?.deviceName || 'Autark-OS';
-  const pageLoading = home.isLoading || appState.isLoading;
+  const summaryAvailability = homeSummaryAvailability(home.summary, home.summaryError);
+  const systemMetrics = homeSystemMetrics(home.summary, summaryAvailability);
 
   return (
     <PageShell>
       <HomeHero
         deviceName={deviceName}
-        loading={pageLoading}
+        summaryAvailability={summaryAvailability}
         summary={home.summary}
       />
 
@@ -56,6 +58,12 @@ function OverviewPage() {
               dismissible={primaryAction.dismissible}
               severity={primaryAction.severity}
               title={primaryAction.title}
+            />
+          ) : summaryAvailability === 'unavailable' ? (
+            <HomeActionCard
+              body="Autark-OS could not load the current server summary. Try refreshing Home once the service is available."
+              severity="warning"
+              title="System status unavailable"
             />
           ) : (
             <HomeActionCard
@@ -152,11 +160,11 @@ function OverviewPage() {
         <div className="grid gap-5">
           <HomeSection title="System Status">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-              <HomeMetricCard detail={home.summary?.docker.summary || 'Checking Docker'} icon={Boxes} label="Docker" tone={home.summary?.docker.ready ? 'success' : 'warning'} value={home.summary?.docker.ready ? 'Ready' : 'Needs setup'} />
+              <HomeMetricCard detail={systemMetrics.docker.detail} icon={Boxes} label="Docker" tone={systemMetrics.docker.tone} value={systemMetrics.docker.value} />
               <HomeMetricCard detail={observedNeedingReview.length ? `${observedNeedingReview.length} observed service${observedNeedingReview.length === 1 ? '' : 's'} to review` : `${pinnedServices.length} pinned external service${pinnedServices.length === 1 ? '' : 's'}`} icon={Pin} label="Pinned" tone="info" value={pinnedServices.length ? 'Available' : 'None'} />
-              <HomeMetricCard detail={home.summary?.access.summary || 'Checking access'} icon={LockKeyhole} label="Access" tone={home.summary?.access.mode === 'private_ready' ? 'success' : 'info'} value={accessModeLabel(home.summary?.access.mode)} />
-              <HomeMetricCard detail={home.summary?.backups.summary || 'Checking backups'} icon={ShieldCheck} label="Backups" tone={home.summary?.backups.state === 'needs_restore_point' ? 'warning' : 'success'} value={backupStateLabel(home.summary?.backups.state)} />
-              <HomeMetricCard detail={home.summary?.storage.summary || 'Checking storage'} icon={Database} label="Storage" tone="teal" value={home.summary?.storage.state || 'Checking'} />
+              <HomeMetricCard detail={systemMetrics.access.detail} icon={LockKeyhole} label="Access" tone={systemMetrics.access.tone} value={systemMetrics.access.value} />
+              <HomeMetricCard detail={systemMetrics.backups.detail} icon={ShieldCheck} label="Backups" tone={systemMetrics.backups.tone} value={systemMetrics.backups.value} />
+              <HomeMetricCard detail={systemMetrics.storage.detail} icon={Database} label="Storage" tone={systemMetrics.storage.tone} value={systemMetrics.storage.value} />
             </div>
           </HomeSection>
 
@@ -196,19 +204,6 @@ function accessLabel(app: AppInstanceView) {
   if (app.privateUrl) return 'Private link';
   if (app.localUrl) return 'Local link';
   return 'No link yet';
-}
-
-function accessModeLabel(mode?: string) {
-  if (mode === 'private_ready') return 'Private ready';
-  if (mode === 'private_needs_setup') return 'Needs setup';
-  if (mode === 'mocked_dev') return 'Dev mock';
-  return 'Local ready';
-}
-
-function backupStateLabel(state?: string) {
-  if (state === 'needs_restore_point') return 'First backup needed';
-  if (state === 'not_configured') return 'Not configured';
-  return 'Protected by restore point';
 }
 
 function formatRelativeTime(value?: string | null) {

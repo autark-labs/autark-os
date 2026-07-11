@@ -136,7 +136,11 @@ function SupportPage() {
               <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Diagnostics</p>
               <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">Autark-OS Diagnostics</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-                {headline === 'Ready' ? 'Ready. Health checks, support bundle, and technical logs are available when you need them.' : 'Needs attention. Start with health checks, then use the support bundle or logs if you need more detail.'}
+                {headline === 'Ready'
+                  ? 'Ready. Health checks, support bundle, and technical logs are available when you need them.'
+                  : headline === 'Status unavailable'
+                    ? 'Autark-OS could not load current diagnostics. Try refreshing the health checks once the service is available.'
+                    : 'Needs attention. Start with health checks, then use the support bundle or logs if you need more detail.'}
               </p>
             </div>
             <StatusBadge ready={headline === 'Ready'}>{headline}</StatusBadge>

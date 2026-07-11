@@ -77,7 +77,7 @@ export function displayStatusFromCanonicalState(app?: AppRuntimeView | null, hea
     return app.canonicalUserStatus;
   }
   if (isPrivateAccessOnlyWarning(app, health)) {
-    return normalizeDisplayStatus(app?.friendlyStatus ?? 'Ready');
+    return normalizeDisplayStatus(app?.friendlyStatus);
   }
   if (health?.status) {
     return normalizeDisplayStatus(health.status);
@@ -92,7 +92,7 @@ export function appNeedsAttentionFromCanonicalState(
   telemetry?: AppTelemetry | null,
 ) {
   const status = displayStatusFromCanonicalState(app, health);
-  if (status === 'Needs attention' || status === 'Unavailable' || status === 'Missing') {
+  if (status === 'Needs attention' || status === 'Unavailable' || status === 'Missing' || status === 'Unknown') {
     return true;
   }
   if (status === 'Ready' && access?.status === 'unreachable') {
@@ -603,7 +603,7 @@ function normalizeDisplayStatus(status?: string | null) {
     return 'Paused';
   }
   if (!status) {
-    return 'Starting';
+    return 'Unknown';
   }
   return status;
 }
@@ -612,8 +612,8 @@ function isPrivateAccessOnlyWarning(app?: AppRuntimeView | null, health?: AppHea
   if (health?.status !== 'Needs attention') {
     return false;
   }
-  const appLooksReady = !app?.friendlyStatus || app.friendlyStatus === 'Ready';
-  const containerLooksReady = !health.dockerStatus || health.dockerStatus === 'Ready';
+  const appLooksReady = app?.friendlyStatus === 'Ready';
+  const containerLooksReady = health.dockerStatus === 'Ready';
   const localAccessWorks = health.localAccessStatus === 'reachable' || health.localAccessStatus === 'not_configured';
   const privateAccessProblem = ['missing', 'unreachable', 'not_configured'].includes(health.privateAccessStatus);
   return appLooksReady && containerLooksReady && localAccessWorks && privateAccessProblem;

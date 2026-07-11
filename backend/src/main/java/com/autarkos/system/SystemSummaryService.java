@@ -129,9 +129,12 @@ public class SystemSummaryService implements SystemSummaryProvider {
 
     private SystemSummaryModels.BackupSummary backups(List<AppInstanceView> apps) {
         boolean needsFirstRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(app.backupState()));
+        boolean protectedByRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(app.backupState()));
         return needsFirstRestorePoint
                 ? new SystemSummaryModels.BackupSummary("needs_restore_point", "At least one app has backups enabled but no restore point yet.")
-                : new SystemSummaryModels.BackupSummary("not_configured", "No restore point is required yet.");
+                : protectedByRestorePoint
+                    ? new SystemSummaryModels.BackupSummary("protected_by_restore_point", "Every managed app with backups enabled has a restore point.")
+                    : new SystemSummaryModels.BackupSummary("not_configured", "No restore point is required yet.");
     }
 
     private SystemSummaryModels.StorageSummary storage() {

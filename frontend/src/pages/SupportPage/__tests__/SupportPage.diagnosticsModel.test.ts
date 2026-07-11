@@ -5,6 +5,19 @@ import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary 
 test('Diagnostics headline prefers plain Ready and Needs attention states', () => {
   assert.equal(diagnosticsHeadline({ status: 'ready', findings: [] }, { status: 'ready' }), 'Ready');
   assert.equal(diagnosticsHeadline({ status: 'ready', findings: [{ id: 'docker' }] }, { status: 'ready' }), 'Needs attention');
+  assert.equal(diagnosticsHeadline(null, null), 'Status unavailable');
+});
+
+test('Diagnostics summary does not render missing data as ready', () => {
+  const rows = diagnosticsSummaryRows({ summary: null, doctor: null, setup: null });
+
+  assert.deepEqual(rows.map((row) => [row.value, row.tone]), [
+    ['Status unavailable', 'warning'],
+    ['Status unavailable', 'warning'],
+    ['Status unavailable', 'warning'],
+    ['Status unavailable', 'warning'],
+    ['Status unavailable', 'warning'],
+  ]);
 });
 
 test('Diagnostics summary includes apps found on the server without treating owned apps as issues', () => {

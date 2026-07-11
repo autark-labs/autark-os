@@ -147,7 +147,7 @@ function managedStatus(displayStatus: string, app: AppRuntimeView): ApplicationS
   if (displayStatus === 'Paused' || displayStatus === 'Stopped' || app.friendlyStatus === 'Stopped') {
     return 'Paused';
   }
-  if (['Needs attention', 'Unavailable', 'Missing', 'Managed elsewhere'].includes(displayStatus)) {
+  if (['Needs attention', 'Unavailable', 'Missing', 'Managed elsewhere', 'Unknown'].includes(displayStatus)) {
     return 'Needs review';
   }
   return 'Ready';
@@ -166,7 +166,7 @@ function managedReadinessState(displayStatus: string, app: AppRuntimeView, acces
   if (displayStatus === 'Unavailable' || access?.status === 'unreachable') {
     return 'unreachable';
   }
-  if (displayStatus === 'Missing' || displayStatus === 'Managed elsewhere') {
+  if (displayStatus === 'Missing' || displayStatus === 'Managed elsewhere' || displayStatus === 'Unknown') {
     return 'unknown';
   }
   return 'ready';
@@ -179,7 +179,7 @@ function managedAttentionState(displayStatus: string, app: AppRuntimeView, needs
   if (displayStatus === 'Missing' || app.canonicalIssues?.some((issue) => issue.severity === 'error')) {
     return 'blocked';
   }
-  if (needsAttention || displayStatus === 'Needs attention' || displayStatus === 'Unavailable') {
+  if (needsAttention || displayStatus === 'Needs attention' || displayStatus === 'Unavailable' || displayStatus === 'Unknown') {
     return 'needs_review';
   }
   return 'none';

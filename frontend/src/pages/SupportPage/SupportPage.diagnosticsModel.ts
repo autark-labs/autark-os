@@ -13,6 +13,9 @@ type DiagnosticsSummaryRow = {
 type DiagnosticsSummaryRowId = (typeof summaryOrder)[number];
 
 export function diagnosticsHeadline(summary: SupportSummary | null | undefined, doctor: SystemDoctorStatus | null | undefined) {
+  if (!summary && !doctor) {
+    return 'Status unavailable';
+  }
   const needsAttention = summary?.status === 'needs_admin_setup' || doctor?.status === 'needs_attention' || (summary?.findings || []).length > 0;
   return needsAttention ? 'Needs attention' : 'Ready';
 }
@@ -33,13 +36,14 @@ export function diagnosticsSummaryRows({
   setup?: SystemSetupStatus | null;
   summary?: SupportSummary | null;
 }) {
+  const statusUnavailable = !summary && !doctor && !setup;
   const checks = new Map<string, SystemSetupCheck>((doctor?.checks || setup?.checks || []).map((check) => [check.id, check]));
   const rows: Record<DiagnosticsSummaryRowId, DiagnosticsSummaryRow> = {
-    docker: statusRow('Docker', checkLabel(checks.get('docker'), summary?.dockerStatus)),
-    apps: appRow(observedServices, managedApps),
-    tailscale: statusRow('Tailscale', checkLabel(checks.get('tailscale'), summary?.tailscaleStatus)),
-    backups: statusRow('Backups', backupLabel(summary)),
-    storage: statusRow('Storage', storageLabel(summary)),
+    docker: statusRow('Docker', checkLabel(checks.get('docker'), summary?.dockerStatus), statusUnavailable),
+    apps: appRow(observedServices, managedApps, statusUnavailable),
+    tailscale: statusRow('Tailscale', checkLabel(checks.get('tailscale'), summary?.tailscaleStatus), statusUnavailable),
+    backups: statusRow('Backups', backupLabel(summary), statusUnavailable),
+    storage: statusRow('Storage', storageLabel(summary), statusUnavailable),
   };
   return summaryOrder.map((id) => ({ id, ...rows[id] }));
 }
@@ -64,13 +68,19 @@ export function productionConflictSummary(setup: SystemSetupStatus | null | unde
   };
 }
 
-function statusRow(label: string, value: string | null | undefined): DiagnosticsSummaryRow {
+function statusRow(label: string, value: string | null | undefined, unavailable = false): DiagnosticsSummaryRow {
+  if (unavailable) {
+    return { label, value: 'Status unavailable', tone: 'warning' };
+  }
   const clean = String(value || '').toLowerCase();
   const tone = clean.includes('ready') || clean.includes('connected') || clean.includes('ok') ? 'success' : clean.includes('no ') || clean.includes('missing') || clean.includes('not ') || clean.includes('issue') ? 'warning' : 'neutral';
   return { label, value: value || 'Unknown', tone };
 }
 
-function appRow(observedServices: ObservedServiceView[], managedApps: AppRuntimeView[]): DiagnosticsSummaryRow {
+function appRow(observedServices: ObservedServiceView[], managedApps: AppRuntimeView[], unavailable = false): DiagnosticsSummaryRow {
+  if (unavailable) {
+    return { label: 'Apps', value: 'Status unavailable', tone: 'warning' };
+  }
   const issues = (observedServices || []).filter((service) => service.userStatus !== 'installed_managed');
   const repairing = (managedApps || []).filter((app) => app?.remediation?.state === 'auto_repairing').length;
   const failed = (managedApps || []).filter((app) => ['repair_failed', 'restore_recommended'].includes(app?.remediation?.state ?? '')).length;
@@ -94,11 +104,17 @@ function checkLabel(check: SystemSetupCheck | undefined, fallback: string | null
 }
 
 function backupLabel(summary: SupportSummary | null | undefined) {
+  if (!summary) {
+    return 'Status unavailable';
+  }
   const finding = (summary?.findings || []).find((item) => item.area === 'backups');
   return finding?.title || 'No restore point yet';
 }
 
 function storageLabel(summary: SupportSummary | null | undefined) {
+  if (!summary) {
+    return 'Status unavailable';
+  }
   const finding = (summary?.findings || []).find((item) => item.area === 'storage');
   return finding?.title || 'Ready';
 }
