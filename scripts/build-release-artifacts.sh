@@ -330,7 +330,7 @@ PAYLOAD_MARKER="__AUTARK_OS_PAYLOAD_BELOW__"
 
 usage() {
   cat <<USAGE
-Autark-OS Installer ${AUTARK_OS_INSTALLER_VERSION}
+Autark-OS Portable Installer ${AUTARK_OS_INSTALLER_VERSION}
 
 Usage: $0 [options]
 
@@ -342,9 +342,8 @@ Options:
   --port PORT         Run Autark-OS on PORT.
   -h, --help          Show this help.
 
-Run without options to start the guided Autark-OS installer. When launched
-from a Linux desktop with zenity and a terminal available, this installer asks
-for confirmation graphically and opens a terminal for progress.
+Run without options to start the terminal-based portable installer. On a Linux
+desktop, zenity may show an optional confirmation before terminal progress.
 USAGE
 }
 
@@ -431,9 +430,11 @@ main() {
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "${temp_dir}"' EXIT
   extract_payload "${temp_dir}"
+  [[ -f "${temp_dir}/SHA256SUMS" ]] || { printf 'Autark-OS Portable Installer error: release checksums are missing.\n' >&2; exit 1; }
+  (cd "${temp_dir}" && sha256sum -c SHA256SUMS --ignore-missing) || { printf 'Autark-OS Portable Installer error: release checksum verification failed.\n' >&2; exit 1; }
 
-  printf 'Autark-OS Installer %s\n' "${AUTARK_OS_INSTALLER_VERSION}"
-  printf 'This installer will check this device, install Autark-OS, and start the service.\n'
+  printf 'Autark-OS Portable Installer %s\n' "${AUTARK_OS_INSTALLER_VERSION}"
+  printf 'This terminal installer will check this device, install Autark-OS, and start the service.\n'
   "${temp_dir}/scripts/autark-os" install --release-bundle "${temp_dir}" --guided "${install_args[@]}"
 }
 

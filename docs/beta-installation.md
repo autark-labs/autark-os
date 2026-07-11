@@ -8,7 +8,7 @@ For the intended normal-user path, start with [Install Autark-OS](./non-technica
 
 Autark-OS beta releases publish three Linux install artifacts:
 
-- **Guided executable installer:** `Autark-OS-Installer-<version>-<arch>.run`, the recommended non-technical beta path.
+- **Portable executable installer:** `Autark-OS-Installer-<version>-<arch>.run`, a terminal fallback for offline or support scenarios.
 - **Debian package:** `autark-os_<version>_<arch>.deb`, the apt-based path for Debian, Ubuntu, and Raspberry Pi OS users who want package-manager installation.
 - **General tarball:** `autark-os-<version>.tar.gz`, the fallback path for support, advanced users, and hosts where package installation is not desired.
 
@@ -51,7 +51,7 @@ chmod +x Autark-OS-Installer-<version>-amd64.run
 ./Autark-OS-Installer-<version>-amd64.run
 ```
 
-When launched from a Linux desktop with `zenity` and a terminal available, the `.run` installer shows a graphical confirmation and opens a terminal for progress. On minimal servers or SSH sessions, it falls back to the same guided terminal installer.
+When launched from a Linux desktop with `zenity` and a terminal available, the `.run` installer may show a graphical confirmation before terminal progress. On minimal servers or SSH sessions, it runs directly in the current terminal.
 
 Preview host changes first:
 

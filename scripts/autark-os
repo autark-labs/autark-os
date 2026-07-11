@@ -412,21 +412,43 @@ INSTALL_USAGE
 }
 
 repair_command() {
+  local plan=0 apply=0
+  if [[ "${1:-}" == "--plan" ]]; then plan=1; shift; fi
+  if [[ "${1:-}" == "--apply" ]]; then apply=1; shift; fi
   case "${1:-}" in
     -h|--help)
       cat <<REPAIR_USAGE
 Usage: autark-os repair [options]
 
-Checks installed Autark-OS and prints recovery actions. Deeper automated
-repair steps are planned for the lifecycle phase.
+Checks installed Autark-OS and offers a reviewed repair plan.
 
 Options:
+  --plan     Print the repair plan without changing the host.
+  --apply    Reinstall service configuration and helper files, then verify.
   --json     Print doctor JSON when the backend is reachable.
   -h, --help Show this help.
 REPAIR_USAGE
       return 0
       ;;
   esac
+
+  local install_dir repair_script
+  install_dir="$(configured_value AUTARK_OS_INSTALL_DIR)"
+  [[ -n "${install_dir}" ]] || install_dir="/opt/autark-os"
+  repair_script="${install_dir}/bin/install-autark-os-service.sh"
+  if [[ "${plan}" -eq 1 ]]; then
+    log "Repair plan: verify ${SERVICE_NAME}.service, bundled runtime, helper files, and Docker access."
+    log "Apply: sudo ${repair_script}"
+    return 0
+  fi
+  if [[ "${apply}" -eq 1 ]]; then
+    [[ -x "${repair_script}" ]] || die "Repair installer is missing: ${repair_script}. Reinstall the current package or release bundle."
+    log "Applying repair plan. Existing runtime app data is preserved."
+    sudo "${repair_script}"
+    doctor || die "Repair applied, but verification still needs attention. Run 'autark-os logs' and retry."
+    log "Repair verified."
+    return 0
+  fi
 
   log "Checking installed Autark-OS before repair."
   if doctor "$@"; then

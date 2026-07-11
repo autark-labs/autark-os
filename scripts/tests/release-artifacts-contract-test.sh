@@ -59,7 +59,7 @@ grep -q 'pre-upgrade-' "${control_dir}/preinst"
 grep -q 'package-upgrades' "${control_dir}/preinst"
 grep -q 'preserved on remove and purge' "${control_dir}/postrm"
 
-"${run_installer}" --help | grep -q 'Autark-OS Installer'
+"${run_installer}" --help | grep -q 'Autark-OS Portable Installer'
 extract_dir="${tmp_dir}/run-extract"
 "${run_installer}" --extract-only "${extract_dir}" >/dev/null
 [[ -x "${extract_dir}/scripts/autark-os" ]]
