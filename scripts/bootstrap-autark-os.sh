@@ -1196,14 +1196,11 @@ install_dependencies_apt() {
     fi
   fi
   if ! has_command docker || ! docker compose version >/dev/null 2>&1; then
-    log "Installing or repairing Docker using Docker's official convenience script."
-    if [[ "${DRY_RUN}" -eq 1 ]]; then
-      printf '+ curl -fsSL https://get.docker.com | sh\n'
-    else
-      run_external_installer "Docker" "https://get.docker.com"
-    fi
+    log "Installing Docker Engine, Buildx, and Compose v2 from apt packages."
+    run_root apt-get install -y docker.io docker-buildx-plugin docker-compose-plugin
+    run_root systemctl enable --now docker
   else
-    log "Docker is already installed."
+    log "Existing Docker Engine and Compose v2 installation is compatible; preserving it."
   fi
   if ! has_command tailscale; then
     log "Installing Tailscale using Tailscale's official install script."
@@ -1214,6 +1211,15 @@ install_dependencies_apt() {
     fi
   else
     log "Tailscale is already installed."
+  fi
+}
+
+verify_docker_runtime() {
+  [[ "${DRY_RUN}" -eq 0 ]] || { log "Dry run: Docker daemon and disposable-container verification would run after package installation."; return 0; }
+  docker version >/dev/null 2>&1 || die "Docker is installed but its daemon is not reachable. Start Docker, then rerun this installer."
+  docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required before Autark-OS can install apps. Install docker-compose-plugin, then rerun this installer."
+  if has_command timeout; then
+    timeout 30 docker run --rm --pull=never hello-world >/dev/null 2>&1 || die "Docker could not run a disposable verification container. Check Docker daemon access and retry."
   fi
 }
 
@@ -1353,6 +1359,7 @@ preflight() {
   else
     log "Docker is not installed yet. The service installer will warn and continue, but app installs need Docker."
   fi
+  verify_docker_runtime
   if has_command tailscale; then
     tailscale status >/dev/null 2>&1 || log "Tailscale is installed, but this host is not connected yet. Private app links can be enabled after Tailscale setup."
   else
