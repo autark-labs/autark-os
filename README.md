@@ -27,6 +27,8 @@ Autark-OS should help users answer four questions quickly:
 
 Autark-OS is ready for controlled beta testing on Linux homelab hosts. It is not yet a polished public installer.
 
+Supported initial hosts: Debian 12, Ubuntu 22.04/24.04, and Raspberry Pi OS 12 on x86-64 or ARM64 with systemd, 2 GB memory, and 10 GB free disk. Run `./scripts/autark-os install --doctor --json` before installing.
+
 The current beta path supports source installs and local release-bundle installs. The planned normal-user path is a GUI installer that checks the device, asks where app data should live, configures private access, and opens Autark-OS in the browser.
 
 ## What Autark-OS Does

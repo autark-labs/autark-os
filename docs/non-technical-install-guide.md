@@ -28,7 +28,7 @@ Use a device that can stay powered on, connected to your home network, and attac
 
 Before you start:
 
-- Install a supported Linux system such as Debian, Ubuntu, or Raspberry Pi OS.
+- Install one of the supported releases: Debian 12, Ubuntu 22.04 or 24.04, or Raspberry Pi OS 12, on x86-64 or ARM64 hardware with at least 2 GB memory and 10 GB free disk space.
 - Connect the device to the internet.
 - Sign in with an account that can approve administrator prompts.
 - Attach an SSD if you want app data and backups stored away from the system drive.

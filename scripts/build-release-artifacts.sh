@@ -232,6 +232,24 @@ CONTROL
 
 write_deb_scripts() {
   local deb_root="$1"
+  cat >"${deb_root}/DEBIAN/preinst" <<'PREINST'
+#!/usr/bin/env bash
+set -euo pipefail
+matrix=/usr/lib/autark-os/release/scripts/supported-host-matrix.env
+[[ -r "${matrix}" ]] || exit 1
+source "${matrix}"
+. /etc/os-release
+arch="$(uname -m)"
+contains() { [[ " $1 " == *" $2 "* ]]; }
+case "${ID}" in
+  debian) versions="${AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS}" ;;
+  ubuntu) versions="${AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS}" ;;
+  raspbian) versions="${AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS}" ;;
+  *) echo "Autark-OS: unsupported host. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}" >&2; exit 1 ;;
+esac
+contains "${versions}" "${VERSION_ID}" && contains "${AUTARK_OS_SUPPORTED_ARCHITECTURES}" "${arch}" || { echo "Autark-OS: unsupported OS version or architecture. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}" >&2; exit 1; }
+command -v systemctl >/dev/null || { echo "Autark-OS: systemd is required." >&2; exit 1; }
+PREINST
   cat >"${deb_root}/DEBIAN/postinst" <<POSTINST
 #!/usr/bin/env bash
 set -euo pipefail
@@ -254,7 +272,7 @@ if [[ "${1:-}" == "remove" || "${1:-}" == "deconfigure" ]]; then
   fi
 fi
 PRERM
-  chmod 0755 "${deb_root}/DEBIAN/postinst" "${deb_root}/DEBIAN/prerm"
+  chmod 0755 "${deb_root}/DEBIAN/preinst" "${deb_root}/DEBIAN/postinst" "${deb_root}/DEBIAN/prerm"
 }
 
 package_deb() {

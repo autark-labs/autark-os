@@ -115,6 +115,8 @@ enforce_supported_host() {
   has_command systemctl || die "This host does not provide required ${AUTARK_OS_REQUIRED_INIT}. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}."
   local available_kb; available_kb="$(disk_available_kb "$(runtime_dir)")"
   [[ "${available_kb:-0}" -ge "${AUTARK_OS_MIN_DISK_KB}" ]] || die "At least ${AUTARK_OS_MIN_DISK_KB} KB free disk is required before installation."
+  local memory_kb; memory_kb="$(awk '/MemTotal:/ {print $2; exit}' /proc/meminfo 2>/dev/null || true)"
+  [[ "${memory_kb:-0}" -ge "$((AUTARK_OS_MIN_MEMORY_MB * 1024))" ]] || die "At least ${AUTARK_OS_MIN_MEMORY_MB} MB memory is required before installation."
 }
 
 run_root() {
@@ -350,8 +352,10 @@ dependency_status() {
 }
 
 package_manager_status() {
-  if supported_apt_host; then
+  if [[ "$(host_support_status)" == 'supported' ]]; then
     printf 'apt-supported'
+  elif supported_apt_host; then
+    printf 'apt-untested'
   elif is_apt_host; then
     printf 'apt-unsupported'
   else
@@ -834,6 +838,11 @@ doctor_checks_json() {
     first=0
     json_check "$@"
   }
+  case "$(host_support_status)" in
+    supported) emit_check "host-matrix" "Supported host" "ok" "This OS version and architecture are supported for this release." "" ;;
+    untested) emit_check "host-matrix" "Supported host" "warning" "This host is recognized but not tested for this release." "Use a listed release host: ${AUTARK_OS_SUPPORTED_HOST_GUIDE}" ;;
+    *) emit_check "host-matrix" "Supported host" "blocked" "This OS version or architecture is unsupported for this release." "See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}" ;;
+  esac
   case "${package_manager}" in
     apt-supported) emit_check "os" "Operating system" "ok" "This host uses a supported apt-based Linux distribution." "" ;;
     apt-unsupported) emit_check "os" "Operating system" "warning" "This host uses apt, but the distribution is not in the fully supported list." "Use manual dependency setup or a supported Debian, Ubuntu, or Raspberry Pi OS host." ;;
@@ -929,6 +938,8 @@ print_doctor_json() {
   json_string "$(os_field PRETTY_NAME || true)"
   printf ',"architecture":'
   json_string "$(uname -m)"
+  printf ',"supportStatus":'
+  json_string "$(host_support_status)"
   printf ',"packageManager":'
   json_string "$(package_manager_status)"
   printf '}'

@@ -202,6 +202,8 @@ Run preinstall checks:
 ./scripts/autark-os install --doctor --json
 ```
 
+The initial supported host matrix is Debian 12, Ubuntu 22.04/24.04, and Raspberry Pi OS 12 on x86-64 or ARM64, with systemd, 2 GB memory, 10 GB free disk space, and Docker Compose v2 for app workloads. The doctor command reports `supported`, `untested`, or `unsupported` before installation changes the host.
+
 The older bootstrap entry point still works for troubleshooting:
 
 ```bash
