@@ -11,6 +11,7 @@ import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.flywaydb.core.Flyway;
 
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -56,6 +57,36 @@ class AutarkOsDatabaseTests {
         assertThat(databaseSource)
                 .doesNotContain("ensurecolumn")
                 .doesNotContain("alter table");
+    }
+
+    @Test
+    void removesPersistedProTablesWhenUpgradingToTheFreeRelease() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        String jdbcUrl = "jdbc:sqlite:" + runtimeLayout.databasePath();
+
+        Flyway.configure()
+                .dataSource(jdbcUrl, null, null)
+                .baselineOnMigrate(true)
+                .baselineVersion("0")
+                .target("14")
+                .load()
+                .migrate();
+
+        try (Connection connection = java.sql.DriverManager.getConnection(jdbcUrl); Statement statement = connection.createStatement()) {
+            assertThat(tableExists(statement, "pro_settings")).isTrue();
+            assertThat(tableExists(statement, "pro_feed_cache")).isTrue();
+            assertThat(tableExists(statement, "pro_notifications")).isTrue();
+            assertThat(tableExists(statement, "pro_mobile_pairing")).isTrue();
+        }
+
+        new AutarkOsDatabase(runtimeLayout).migrate();
+
+        try (Connection connection = java.sql.DriverManager.getConnection(jdbcUrl); Statement statement = connection.createStatement()) {
+            assertThat(tableExists(statement, "pro_settings")).isFalse();
+            assertThat(tableExists(statement, "pro_feed_cache")).isFalse();
+            assertThat(tableExists(statement, "pro_notifications")).isFalse();
+            assertThat(tableExists(statement, "pro_mobile_pairing")).isFalse();
+        }
     }
 
     private boolean tableExists(Statement statement, String tableName) throws Exception {

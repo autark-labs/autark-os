@@ -29,7 +29,6 @@ import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.devices.DeviceTrustRepository;
-import com.autarkos.pro.ProSettingsRepository;
 import com.autarkos.system.ProjectSettingsRepository;
 
 public final class JpaTestRepositories {
@@ -50,10 +49,6 @@ public final class JpaTestRepositories {
 
     public static ProjectSettingsRepository projectSettingsRepository(RuntimeLayout layout) {
         return context(layout).getBean(ProjectSettingsRepository.class);
-    }
-
-    public static ProSettingsRepository proSettingsRepository(RuntimeLayout layout) {
-        return context(layout).getBean(ProSettingsRepository.class);
     }
 
     public static DeviceTrustRepository deviceTrustRepository(RuntimeLayout layout) {
@@ -104,7 +99,6 @@ public final class JpaTestRepositories {
             BackupRepository.class,
             AutarkOsJobRepository.class,
             ProjectSettingsRepository.class,
-            ProSettingsRepository.class,
             DeviceTrustRepository.class,
             DiscoverSetupRepository.class,
             ObservedServiceRepository.class,
@@ -134,7 +128,6 @@ public final class JpaTestRepositories {
                     "com.autarkos.jobs",
                     "com.autarkos.system",
                     "com.autarkos.network.devices",
-                    "com.autarkos.pro",
                     "com.autarkos.discover",
                     "com.autarkos.host",
                     "com.autarkos.marketplace.install");

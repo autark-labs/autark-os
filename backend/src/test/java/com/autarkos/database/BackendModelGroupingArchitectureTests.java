@@ -31,8 +31,6 @@ class BackendModelGroupingArchitectureTests {
                 Path.of("src/main/java/com/autarkos/marketplace/install/models/ReliabilityModels.java"),
                 Path.of("src/main/java/com/autarkos/marketplace/install/models/RuntimeModels.java"),
                 Path.of("src/main/java/com/autarkos/marketplace/install/models/UpdateModels.java"),
-                Path.of("src/main/java/com/autarkos/pro/models/ProModels.java"),
-                Path.of("src/main/java/com/autarkos/pro/models/ProRemoteModels.java"),
                 Path.of("src/main/java/com/autarkos/system/OnboardingModels.java"),
                 Path.of("src/main/java/com/autarkos/system/SetupProgressModels.java"),
                 Path.of("src/main/java/com/autarkos/system/SupportModels.java"),
