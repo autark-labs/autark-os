@@ -92,6 +92,36 @@ class ProjectSettingsServiceTests {
         });
     }
 
+    @Test
+    void rejectsAnInvalidTimeZoneBeforeItCanBreakBackupScheduling() {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        ProjectSettingsService service = new ProjectSettingsService(
+                JpaTestRepositories.projectSettingsRepository(runtimeLayout),
+                new ActivityLogService(mock(ActivityLogRepository.class)));
+        ProjectSettings defaults = ProjectSettings.defaults("autark-os");
+
+        ProjectSettings saved = service.update(new ProjectSettings(
+                defaults.deviceName(),
+                "not-a-time-zone",
+                defaults.language(),
+                defaults.temperatureUnit(),
+                defaults.dateFormat(),
+                defaults.timeFormat(),
+                defaults.startOnBoot(),
+                defaults.telemetryEnabled(),
+                defaults.defaultInstallAccess(),
+                defaults.automaticRepairEnabled(),
+                defaults.automaticBackupsEnabled(),
+                defaults.backupFrequency(),
+                defaults.backupRetentionDays(),
+                defaults.backupTime(),
+                defaults.updateChannel(),
+                defaults.showAdvancedMetrics(),
+                Instant.now()));
+
+        assertThat(saved.timeZone()).isEqualTo("America/Chicago");
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

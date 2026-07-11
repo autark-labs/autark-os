@@ -38,3 +38,10 @@ test('does not expose unfinished MVP settings controls', () => {
   assert.doesNotMatch(page, /Show advanced disk info|Coming soon|Audit logging|Update channel|Update checks|UpdatesPanel/);
   assert.doesNotMatch(sections, /updates|Update channel/);
 });
+
+test('keeps storage-only preferences out of the free settings surface', () => {
+  const page = readFileSync(resolve(here, '../SettingsPage.tsx'), 'utf8');
+
+  assert.doesNotMatch(page, /label="Language"|label="Temperature unit"|label="Date format"|label="Time format"/);
+  assert.doesNotMatch(page, /Start Autark-OS on boot|Default install access|Prefer private installs/);
+});

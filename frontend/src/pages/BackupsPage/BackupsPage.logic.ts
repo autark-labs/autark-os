@@ -6,9 +6,13 @@ import type { AutarkOsJob } from '@/types/jobs';
  * @param {string | null | undefined} value
  * @returns {string}
  */
-export function formatBackupDate(value: string | null | undefined) {
+export function formatBackupDate(value: string | null | undefined, timeZone = 'UTC') {
   if (!value) return 'None';
-  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value));
+  try {
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone }).format(new Date(value));
+  } catch {
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(new Date(value));
+  }
 }
 
 /**
@@ -170,7 +174,7 @@ export function backupProtectionHero(report: BackupReport | null | undefined, la
       };
     }
     return {
-      summary: `Your apps are protected by a restore point. The latest restore point was created ${formatBackupDate(latestRestore.createdAt)}, and the next scheduled backup is ${report.settings.nextRoutineRun ? formatBackupDate(report.settings.nextRoutineRun) : 'not scheduled'}.`,
+      summary: `Your apps are protected by a restore point. The latest restore point was created ${formatBackupDate(latestRestore.createdAt)}, and the next scheduled backup is ${report.settings.nextRoutineRun ? formatBackupDate(report.settings.nextRoutineRun, report.settings.timeZone) : 'not scheduled'}.`,
       title: 'Protected by restore point',
     };
   }

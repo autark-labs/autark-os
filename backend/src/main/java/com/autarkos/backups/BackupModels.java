@@ -64,6 +64,7 @@ public final class BackupModels {
             String frequency,
             int retentionDays,
             String backupTime,
+            String timeZone,
             String nextRunLabel,
             String schedulerHealth,
             String schedulerMessage,

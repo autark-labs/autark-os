@@ -311,7 +311,7 @@ function BackupsPage() {
                 />
                 <ActionCard
                   busy={running === 'routine'}
-                  description={report.settings.automaticBackupsEnabled ? `${capitalizeBackupLabel(report.settings.frequency)} near ${report.settings.backupTime}` : 'Turn on routine backups in Settings.'}
+                  description={report.settings.automaticBackupsEnabled ? `${capitalizeBackupLabel(report.settings.frequency)} near ${report.settings.backupTime} (${report.settings.timeZone || 'UTC'})` : 'Turn on routine backups in Settings.'}
                   disabled={!report.settings.automaticBackupsEnabled}
                   disabledReason="Turn on routine backups in Settings first."
                   icon={CalendarClock}
@@ -337,7 +337,7 @@ function BackupsPage() {
               </div>
               <div className="mt-3 min-h-[400px]">
                 {restoreView === 'timeline' ? (
-                  <RoutineTimeline apps={report.apps} latestRestore={latestRestore} nextRun={report.settings.nextRoutineRun} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} points={routineRestorePoints} running={running} />
+                  <RoutineTimeline apps={report.apps} latestRestore={latestRestore} nextRun={report.settings.nextRoutineRun} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} points={routineRestorePoints} running={running} timeZone={report.settings.timeZone || 'UTC'} />
                 ) : (
                   <RestoreList apps={report.apps} appRestorePoints={appRestorePoints} fullRestorePoints={fullRestorePoints} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} running={running} />
                 )}

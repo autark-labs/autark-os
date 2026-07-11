@@ -1,7 +1,9 @@
 package com.autarkos.system;
 
 import java.net.InetAddress;
+import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Map;
 import java.util.Set;
 
@@ -91,7 +93,7 @@ public class ProjectSettingsService {
         }
         return new ProjectSettings(
                 clean(settings.deviceName(), fallback.deviceName(), 48),
-                clean(settings.timeZone(), fallback.timeZone(), 64),
+                timeZone(settings.timeZone(), fallback.timeZone()),
                 clean(settings.language(), fallback.language(), 16),
                 oneOf(settings.temperatureUnit(), TEMPERATURE_UNITS, fallback.temperatureUnit()),
                 clean(settings.dateFormat(), fallback.dateFormat(), 32),
@@ -112,7 +114,7 @@ public class ProjectSettingsService {
     private ProjectSettings from(Map<String, String> values, ProjectSettings fallback) {
         return new ProjectSettings(
                 string(values, "deviceName", fallback.deviceName()),
-                string(values, "timeZone", fallback.timeZone()),
+                timeZone(string(values, "timeZone", fallback.timeZone()), fallback.timeZone()),
                 string(values, "language", fallback.language()),
                 oneOf(string(values, "temperatureUnit", fallback.temperatureUnit()), TEMPERATURE_UNITS, fallback.temperatureUnit()),
                 string(values, "dateFormat", fallback.dateFormat()),
@@ -170,6 +172,15 @@ public class ProjectSettingsService {
         }
         String trimmed = value.trim();
         return trimmed.length() > maxLength ? trimmed.substring(0, maxLength) : trimmed;
+    }
+
+    private String timeZone(String value, String fallback) {
+        String candidate = clean(value, fallback, 64);
+        try {
+            return ZoneId.of(candidate).getId();
+        } catch (DateTimeException exception) {
+            return fallback;
+        }
     }
 
     private String oneOf(String value, Set<String> allowed, String fallback) {

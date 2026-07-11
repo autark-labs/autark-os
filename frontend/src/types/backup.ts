@@ -48,6 +48,7 @@ export type BackupSettingsSummary = {
   frequency: 'hourly' | 'daily' | 'weekly' | string;
   retentionDays: number;
   backupTime: string;
+  timeZone: string;
   nextRunLabel: string;
   schedulerHealth: 'off' | 'manual_only' | 'warning' | 'healthy' | string;
   schedulerMessage: string;

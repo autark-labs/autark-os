@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { activeBackupJobs, backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, backupStatusLabel, selectActiveBackupJob } from '../BackupsPage.logic';
+import { activeBackupJobs, backupJobBannerTitle, backupJobCompletedMessage, backupJobRunningId, backupJobStartedMessage, backupPageViewModel, backupStatusLabel, formatBackupDate, selectActiveBackupJob } from '../BackupsPage.logic';
 
 const baseReport = {
   apps: [
@@ -77,6 +77,16 @@ test('backup status labels distinguish backups on from recoverable restore point
   assert.equal(backupStatusLabel('unprotected'), 'Backups off');
   assert.equal(backupStatusLabel('not_backed_up'), 'No restore point yet');
   assert.equal(backupStatusLabel('protected'), 'Protected by restore point');
+});
+
+test('formats scheduled backup times in the configured time zone', () => {
+  const scheduledAt = '2026-01-15T02:00:00Z';
+
+  assert.equal(
+    formatBackupDate(scheduledAt, 'America/New_York'),
+    new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }).format(new Date(scheduledAt)),
+  );
+  assert.notEqual(formatBackupDate(scheduledAt, 'America/New_York'), formatBackupDate(scheduledAt, 'UTC'));
 });
 
 test('backup job copy distinguishes backup, verification, and restore jobs', () => {

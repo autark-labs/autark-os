@@ -89,16 +89,9 @@ const settingHelp: Record<string, SettingHelp> = {
   timeZone: {
     id: 'timeZone',
     title: 'Time zone',
-    body: 'Controls how Autark-OS stores scheduling preferences for logs, backups, and future automation windows.',
-    usedFor: ['Backup schedule display', 'Activity timestamps', 'Maintenance windows'],
+    body: 'Sets the local time used to calculate and show automatic backup windows.',
+    usedFor: ['Backup schedule calculation', 'Backup schedule display'],
     tip: 'Use an IANA time zone like America/Chicago for predictable scheduling.',
-  },
-  startOnBoot: {
-    id: 'startOnBoot',
-    title: 'Start Autark-OS on boot',
-    body: 'Records whether Autark-OS should be treated as an always-on background service.',
-    usedFor: ['Setup checks', 'Production install expectations', 'Future service management'],
-    tip: 'Leave this on for a normal homelab appliance experience.',
   },
   automaticRepairEnabled: {
     id: 'automaticRepairEnabled',
@@ -110,16 +103,9 @@ const settingHelp: Record<string, SettingHelp> = {
   automaticBackupsEnabled: {
     id: 'automaticBackupsEnabled',
     title: 'Automatic backups',
-    body: 'Turns backup protection on or off for installed apps and stores the global default for future backup scheduling.',
-    usedFor: ['Installed app backup policy', 'Future global backup scheduler', 'Restore point planning'],
+    body: 'Turns routine backup protection on or off for managed apps and updates their default backup policy.',
+    usedFor: ['Installed app backup policy', 'Routine backup scheduler', 'Restore point planning'],
     tip: 'Manual backups will remain available even when automatic backups are off.',
-  },
-  defaultInstallAccess: {
-    id: 'defaultInstallAccess',
-    title: 'Default install access',
-    body: 'Stores the preferred access posture for new installs. Manifests can still require stricter behavior for safety.',
-    usedFor: ['Marketplace defaults', 'Private access recommendations', 'Future install wizard defaults'],
-    tip: 'Manifest default is safest while the catalog is still growing.',
   },
 };
 
@@ -264,7 +250,7 @@ function SettingsPage() {
           <div>
             <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Settings</p>
             <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Autark-OS controls</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, services, app defaults, backups, and advanced host details.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, managed-app defaults, backups, and advanced host details. Changes apply when you save them.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={cn('border', dirty ? 'border-orange-300/35 bg-orange-500/10 text-orange-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
@@ -361,35 +347,20 @@ function SettingsPage() {
 
 function GeneralPanel({ draft, onUpdate }: PanelProps) {
   return (
-    <SettingsGroup description="Basic system settings and preferences." title="General">
+    <SettingsGroup description="Name this appliance and set the local time used for routine backups." title="General">
       <SettingRow helpId="deviceName" label="Device name" note="This name is used to identify your device on the network.">
         <Input className="max-w-md border-sky-400/30 bg-slate-950 text-slate-100" onChange={(event) => onUpdate({ deviceName: event.target.value })} value={draft.deviceName} />
       </SettingRow>
-      <SettingRow helpId="timeZone" label="Time zone" note="Used for system services, logs, and backup schedules.">
+      <SettingRow helpId="timeZone" label="Time zone" note="Used to calculate and show routine backup schedules.">
         <SettingsSelect value={draft.timeZone} onChange={(value) => onUpdate({ timeZone: value })} options={[['America/Chicago', '(UTC-06:00) Central Time'], ['America/New_York', '(UTC-05:00) Eastern Time'], ['America/Denver', '(UTC-07:00) Mountain Time'], ['America/Los_Angeles', '(UTC-08:00) Pacific Time'], ['UTC', 'UTC']]} />
-      </SettingRow>
-      <SettingRow helpId="language" label="Language" note="Select the language for the Autark-OS interface.">
-        <SettingsSelect value={draft.language} onChange={(value) => onUpdate({ language: value })} options={[['en-US', 'English (US)'], ['en-GB', 'English (UK)']]} />
-      </SettingRow>
-      <SettingRow helpId="temperatureUnit" label="Temperature unit" note="Preferred unit for temperature displays.">
-        <SettingsSelect value={draft.temperatureUnit} onChange={(value) => onUpdate({ temperatureUnit: value })} options={[['fahrenheit', 'Fahrenheit (°F)'], ['celsius', 'Celsius (°C)']]} />
-      </SettingRow>
-      <SettingRow helpId="dateFormat" label="Date format" note="Choose how dates are displayed.">
-        <SettingsSelect value={draft.dateFormat} onChange={(value) => onUpdate({ dateFormat: value })} options={[['MMM d, yyyy', 'Jan 5, 2026'], ['yyyy-MM-dd', '2026-01-05'], ['MM/dd/yyyy', '01/05/2026']]} />
-      </SettingRow>
-      <SettingRow helpId="timeFormat" label="Time format" note="Choose 12 or 24 hour time format.">
-        <SettingsSelect value={draft.timeFormat} onChange={(value) => onUpdate({ timeFormat: value })} options={[['12-hour', '12-hour'], ['24-hour', '24-hour']]} />
       </SettingRow>
     </SettingsGroup>
   );
 }
 
-function SystemPanel({ checks, copied, doctor, metrics, onCopy, onUpdate, settings, setup, version }: SystemPanelProps) {
+function SystemPanel({ checks, copied, doctor, metrics, onCopy, setup, version }: SystemPanelProps) {
   return (
     <SettingsGroup description="Core service behavior and host readiness." title="System">
-      <SettingRow helpId="startOnBoot" label="Start Autark-OS on boot" note="Automatically start Autark-OS services when the system boots.">
-        <Switch checked={settings.startOnBoot} onCheckedChange={(checked) => onUpdate({ startOnBoot: checked })} />
-      </SettingRow>
       <ReadOnlyRow label="Run mode" note={`Active profiles: ${setup?.activeProfiles || 'default'}`} value={setup?.devMode ? 'Development' : 'Production'} />
       <ReadOnlyRow label="Autark-OS version" note={version?.buildSha ? `Build ${shortSha(version.buildSha)}` : 'Build metadata'} value={version?.version || 'Unknown'} />
       <ReadOnlyRow label="Readiness" note={doctor?.readiness.summary || 'First-boot readiness status.'} value={doctor?.readiness.headline || setup?.headline || 'Unknown'} />
@@ -402,14 +373,10 @@ function SystemPanel({ checks, copied, doctor, metrics, onCopy, onUpdate, settin
   );
 }
 
-function NetworkPanel({ draft, onUpdate, setup }: PanelProps & { setup: SystemSetupStatus | null }) {
+function NetworkPanel({ setup }: { setup: SystemSetupStatus | null }) {
   return (
-    <SettingsGroup description="Configure network behavior and local service defaults." title="Network">
+    <SettingsGroup description="Review local and private-network availability." title="Network">
       <ReadOnlyRow label="Tailscale" note="Used for private app links." value={setup?.tailscaleVersion || 'Not detected'} />
-      <SettingRow helpId="defaultInstallAccess" label="Default install access" note="Preferred access posture for new app installs.">
-        <SettingsSelect value={draft.defaultInstallAccess} onChange={(value) => onUpdate({ defaultInstallAccess: value })} options={[['manifest-default', 'Manifest default'], ['local', 'Local only'], ['private', 'Private network'], ['local-and-private', 'Local and private']]} />
-      </SettingRow>
-      <ReadOnlyRow label="Hostname (mDNS)" note="Local hostname for network discovery." value={draft.deviceName.toLowerCase().replaceAll(' ', '-') + '.local'} />
       <ReadOnlyRow label="Local access URL" note="Base URL used for local web access." value={apiOrigin(setup)} />
     </SettingsGroup>
   );
@@ -469,15 +436,12 @@ function SecurityPanel({ setup }: { setup: SystemSetupStatus | null }) {
   );
 }
 
-function RemoteAccessPanel({ apps, draft, onUpdate, setup }: PanelProps & { apps: AppRuntimeView[]; setup: SystemSetupStatus | null }) {
+function RemoteAccessPanel({ apps, setup }: { apps: AppRuntimeView[]; setup: SystemSetupStatus | null }) {
   const privateApps = apps.filter((app) => app.settings?.tailscaleEnabled || app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private').length;
   return (
     <SettingsGroup description="Configure secure access from your private devices." title="Remote Access">
       <ReadOnlyRow label="Tailscale status" note="Private links require a connected Tailscale device." value={setup?.tailscaleVersion || 'Not detected'} />
       <ReadOnlyRow label="Private apps" note="Apps currently marked for private access." value={`${privateApps}`} />
-      <SettingRow helpId="defaultInstallAccess" label="Prefer private installs" note="Set default install access to private network.">
-        <Switch checked={draft.defaultInstallAccess === 'private'} onCheckedChange={(checked) => onUpdate({ defaultInstallAccess: checked ? 'private' : 'manifest-default' })} />
-      </SettingRow>
     </SettingsGroup>
   );
 }
@@ -525,13 +489,12 @@ type PanelProps = {
   onUpdate: (update: Partial<ProjectSettings>) => void;
 };
 
-type SystemPanelProps = PanelProps & {
+type SystemPanelProps = {
   checks: SystemSetupCheck[];
   copied: string | null;
   doctor: SystemDoctorStatus | null;
   metrics: SystemMetrics | null;
   onCopy: (value: string, id: string) => void;
-  settings: ProjectSettings;
   setup: SystemSetupStatus | null;
   version: ProjectVersionInfo | null;
 };
@@ -557,7 +520,7 @@ function SettingsPanelBySection({ advancedChecks, apps, backupRoot, copied, doct
     case 'general':
       return <GeneralPanel draft={draft} onUpdate={onUpdate} />;
     case 'system':
-      return <SystemPanel checks={requiredChecks} copied={copied} doctor={doctor} draft={draft} metrics={metrics} onCopy={onCopy} onUpdate={onUpdate} settings={draft} setup={setup} version={version} />;
+      return <SystemPanel checks={requiredChecks} copied={copied} doctor={doctor} metrics={metrics} onCopy={onCopy} setup={setup} version={version} />;
     case 'applications':
       return <ApplicationsPanel apps={apps} draft={draft} onUpdate={onUpdate} />;
     case 'backups':
@@ -565,13 +528,13 @@ function SettingsPanelBySection({ advancedChecks, apps, backupRoot, copied, doct
     case 'storage':
       return <StoragePanel metrics={metrics} />;
     case 'network':
-      return <NetworkPanel draft={draft} onUpdate={onUpdate} setup={setup} />;
+      return <NetworkPanel setup={setup} />;
     case 'remote-access':
-      return <RemoteAccessPanel apps={apps} draft={draft} onUpdate={onUpdate} setup={setup} />;
+      return <RemoteAccessPanel apps={apps} setup={setup} />;
     case 'security':
       return <SecurityPanel setup={setup} />;
     case 'advanced':
-      return <AdvancedPanel checks={advancedChecks} copied={copied} doctor={doctor} draft={draft} metrics={metrics} onCopy={onCopy} onUpdate={onUpdate} settings={draft} setup={setup} version={version} />;
+      return <AdvancedPanel checks={advancedChecks} copied={copied} doctor={doctor} metrics={metrics} onCopy={onCopy} setup={setup} version={version} />;
     default:
       return null;
   }

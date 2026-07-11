@@ -62,6 +62,7 @@ export function ProtectionPanel({ latestRestore, report }: { latestRestore: Rest
 
 export function RoutineHealthPanel({ report, showAdvancedMetrics }: { report: BackupReport; showAdvancedMetrics: boolean }) {
   const tone = backupSchedulerTone(report.settings.schedulerHealth);
+  const timeZone = report.settings.timeZone || 'UTC';
   return (
     <BackupPanel>
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -70,7 +71,7 @@ export function RoutineHealthPanel({ report, showAdvancedMetrics }: { report: Ba
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <FactRow label="Last successful backup" value={report.settings.lastSuccessfulRoutineRun ? formatBackupDate(report.settings.lastSuccessfulRoutineRun.createdAt) : 'None yet'} />
-        <FactRow label="Next scheduled backup" value={report.settings.nextRoutineRun ? formatBackupDate(report.settings.nextRoutineRun) : 'Not scheduled'} />
+        <FactRow label="Next scheduled backup" value={report.settings.nextRoutineRun ? formatBackupDate(report.settings.nextRoutineRun, timeZone) : 'Not scheduled'} />
         <FactRow label="Protected by restore point" value={`${report.protectedApps}/${report.totalApps}`} />
       </div>
       <BackupInset className="mt-4 text-sm leading-6 text-slate-300">{report.settings.schedulerMessage}</BackupInset>
@@ -107,7 +108,7 @@ export function ActionCard({ busy, description, disabled = false, disabledReason
   );
 }
 
-export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRestore, onVerify, points, running }: { apps: AppBackupStatus[]; latestRestore: RestorePoint | null; nextRun: string | null; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; points: RestorePoint[]; running: string | null }) {
+export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRestore, onVerify, points, running, timeZone }: { apps: AppBackupStatus[]; latestRestore: RestorePoint | null; nextRun: string | null; onDetails: (point: RestorePoint) => void; onRestore: (point: RestorePoint, appId?: string | null) => void; onVerify: (point: RestorePoint) => void; points: RestorePoint[]; running: string | null; timeZone: string }) {
   if (!points.length) {
     return <EmptyState title="No restore points yet" description="Run a routine backup after installing an app to create the first restore point." />;
   }
@@ -115,7 +116,7 @@ export function RoutineTimeline({ apps, latestRestore, nextRun, onDetails, onRes
     <BackupInset className="overflow-hidden p-4">
       <div className="mb-4 grid gap-3 md:grid-cols-2">
         <TimelineSummary icon={CheckCircle2} label="Last successful backup" value={latestRestore ? formatBackupDate(latestRestore.createdAt) : 'None yet'} />
-        <TimelineSummary icon={CalendarClock} label="Next scheduled backup" value={nextRun ? formatBackupDate(nextRun) : 'Not scheduled'} />
+        <TimelineSummary icon={CalendarClock} label="Next scheduled backup" value={nextRun ? formatBackupDate(nextRun, timeZone) : 'Not scheduled'} />
       </div>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {points.map((point, index) => (

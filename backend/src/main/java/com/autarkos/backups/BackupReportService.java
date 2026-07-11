@@ -3,9 +3,9 @@ package com.autarkos.backups;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +86,7 @@ class BackupReportService {
                         settings.backupFrequency(),
                         settings.backupRetentionDays(),
                         settings.backupTime(),
+                        settings.timeZone(),
                         nextRunLabel(settings),
                         schedulerHealth(settings, lastRoutine),
                         schedulerMessage(settings, lastRoutine),
@@ -105,29 +106,22 @@ class BackupReportService {
     }
 
     String nextRoutineRun(ProjectSettings settings, RestorePoint lastRoutine) {
+        return nextRoutineRun(settings, lastRoutine, Instant.now());
+    }
+
+    String nextRoutineRun(ProjectSettings settings, RestorePoint lastRoutine, Instant now) {
         if (!settings.automaticBackupsEnabled()) {
             return "";
         }
-        LocalTime backupTime = parseBackupTime(settings.backupTime());
-        LocalDate startDate = LocalDate.now(ZoneOffset.UTC);
-        if (lastRoutine != null) {
-            startDate = LocalDateTime.ofInstant(lastRoutine.createdAt(), ZoneOffset.UTC).toLocalDate();
-        }
-        LocalDate nextDate = switch (settings.backupFrequency()) {
-            case "hourly" -> LocalDate.now(ZoneOffset.UTC);
-            case "weekly" -> startDate.plusWeeks(1);
-            default -> startDate.plusDays(1);
-        };
-        LocalDateTime candidate = LocalDateTime.of(nextDate, backupTime);
-        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        Instant candidate = scheduledWindow(settings, lastRoutine, now);
         while (!candidate.isAfter(now)) {
-            candidate = switch (settings.backupFrequency()) {
-                case "hourly" -> candidate.plusHours(1);
-                case "weekly" -> candidate.plusWeeks(1);
-                default -> candidate.plusDays(1);
-            };
+            candidate = advance(settings, candidate);
         }
-        return candidate.toInstant(ZoneOffset.UTC).toString();
+        return candidate.toString();
+    }
+
+    boolean routineBackupDue(ProjectSettings settings, RestorePoint lastRoutine, Instant now) {
+        return settings.automaticBackupsEnabled() && !scheduledWindow(settings, lastRoutine, now).isAfter(now);
     }
 
     private BackupModels.AppBackupStatus appStatus(InstalledApp app, Map<String, ApplicationManifest> manifestsById) {
@@ -199,8 +193,37 @@ class BackupReportService {
         if (!settings.automaticBackupsEnabled()) {
             return "Automatic backups are off";
         }
-        String next = nextRoutineRun(settings, null);
-        return next.isBlank() ? "Next " + settings.backupFrequency() + " window near " + settings.backupTime() : "Next routine backup: " + next;
+        return "Next " + settings.backupFrequency() + " backup near " + settings.backupTime() + " " + settings.timeZone();
+    }
+
+    private Instant scheduledWindow(ProjectSettings settings, RestorePoint lastRoutine, Instant now) {
+        ZoneId zone = ZoneId.of(settings.timeZone());
+        LocalDate startDate = lastRoutine == null
+                ? ZonedDateTime.ofInstant(now, zone).toLocalDate()
+                : ZonedDateTime.ofInstant(lastRoutine.createdAt(), zone).toLocalDate();
+        LocalDate scheduledDate = switch (settings.backupFrequency()) {
+            case "weekly" -> lastRoutine == null ? startDate : startDate.plusWeeks(1);
+            case "daily" -> lastRoutine == null ? startDate : startDate.plusDays(1);
+            default -> startDate;
+        };
+        Instant candidate = ZonedDateTime.of(scheduledDate, parseBackupTime(settings.backupTime()), zone).toInstant();
+        if (lastRoutine == null) {
+            return candidate;
+        }
+        while (!candidate.isAfter(lastRoutine.createdAt())) {
+            candidate = advance(settings, candidate);
+        }
+        return candidate;
+    }
+
+    private Instant advance(ProjectSettings settings, Instant candidate) {
+        ZoneId zone = ZoneId.of(settings.timeZone());
+        ZonedDateTime localCandidate = ZonedDateTime.ofInstant(candidate, zone);
+        return switch (settings.backupFrequency()) {
+            case "weekly" -> localCandidate.plusWeeks(1).toInstant();
+            case "daily" -> localCandidate.plusDays(1).toInstant();
+            default -> localCandidate.plusHours(1).toInstant();
+        };
     }
 
     private String schedulerHealth(ProjectSettings settings, RestorePoint lastRoutine) {

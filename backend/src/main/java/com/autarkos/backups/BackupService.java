@@ -122,8 +122,7 @@ public class BackupService {
                 .filter(point -> "automatic".equals(point.source()))
                 .findFirst()
                 .orElse(null);
-        String nextRun = backupReportService.nextRoutineRun(settings, lastRoutine);
-        if (nextRun.isBlank() || Instant.parse(nextRun).isAfter(Instant.now())) {
+        if (!backupReportService.routineBackupDue(settings, lastRoutine, Instant.now())) {
             return Optional.empty();
         }
         if (!automaticBackupRunning.compareAndSet(false, true)) {
