@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Archive, CheckCircle2, Copy, Database, FolderSearch, HardDrive, Info, Loader2, PackageOpen, Trash2 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
@@ -18,6 +19,8 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { copyText } from '@/lib/copyText';
 import { cn } from '@/lib/utils';
 import { useCleanupOrphanMutation, useStorageReportRepository } from '@/repositories/storageRepository';
+import { invalidateApplicationState } from '@/repositories/applicationStateRepository';
+import { homeQueryKeys } from '@/repositories/homeRepository';
 import type { AppStorageUsage, OrphanedStorage, StorageRecommendation, StorageReport, StorageUsage } from '@/types/system';
 
 const StoragePanel = ProjectPanel;
@@ -25,12 +28,14 @@ const StorageInset = ProjectInset;
 
 function StoragePage() {
   const { showAdvancedMetrics } = useProjectSettings();
+  const queryClient = useQueryClient();
   const storage = useStorageReportRepository();
   const cleanupOrphanMutation = useCleanupOrphanMutation();
   const [actionError, setActionError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<OrphanedStorage | null>(null);
   const [cleanupConfirmation, setCleanupConfirmation] = useState('');
+  const [showAllCleanupCandidates, setShowAllCleanupCandidates] = useState(false);
   const report = storage.report;
   const error = actionError ?? (storage.error ? apiErrorMessage(storage.error, 'Storage data could not be loaded.') : null);
 
@@ -60,6 +65,12 @@ function StoragePage() {
       }, 'Unused data cleaned up');
       setCleanupTarget(null);
       setCleanupConfirmation('');
+      await Promise.all([
+        storage.refresh(),
+        invalidateApplicationState(queryClient),
+        queryClient.invalidateQueries({ queryKey: homeQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['monitoring'] }),
+      ]);
     } catch (cleanupError) {
       const message = apiErrorMessage(cleanupError, 'Unused data could not be cleaned up.');
       setActionError(message);
@@ -71,7 +82,9 @@ function StoragePage() {
   const appsWithBackupsOn = report?.apps.filter((app) => app.backupEnabled).length ?? 0;
   const appDataBytes = useMemo(() => report?.apps.reduce((total, app) => total + app.usedBytes, 0) ?? 0, [report]);
   const storageHero = getStorageHero(report);
-  const cleanupCandidates = report?.orphanedData.slice(0, 4) ?? [];
+  const allCleanupCandidates = report?.orphanedData ?? [];
+  const cleanupCandidates = showAllCleanupCandidates ? allCleanupCandidates : allCleanupCandidates.slice(0, 4);
+  const hiddenCleanupCandidateCount = Math.max(0, allCleanupCandidates.length - cleanupCandidates.length);
 
   if (storage.isLoading) {
     return (
@@ -176,6 +189,11 @@ function StoragePage() {
                     <EmptyState compact title="No unused folders" description="Autark-OS did not find orphaned app data." />
                   )}
                 </div>
+                {allCleanupCandidates.length > 4 && (
+                  <ProjectDarkControlButton className="mt-4 w-full" onClick={() => setShowAllCleanupCandidates((current) => !current)} size="sm" type="button">
+                    {showAllCleanupCandidates ? 'Show less' : `Show all ${allCleanupCandidates.length} folders${hiddenCleanupCandidateCount ? ` (${hiddenCleanupCandidateCount} more)` : ''}`}
+                  </ProjectDarkControlButton>
+                )}
               </StoragePanel>
             </aside>
           </div>
@@ -280,7 +298,7 @@ function AppStorageRow({ app, copied, onCopy, showAdvancedMetrics }: { app: AppS
           </Badge>
         </div>
         <p className="mt-1 text-xs text-slate-500">Managed app data</p>
-        {showAdvancedMetrics && <p className="mt-1 truncate font-mono text-xs text-slate-600">{app.path}</p>}
+        {showAdvancedMetrics && <p className="mt-1 select-text truncate font-mono text-xs text-slate-300">{app.path}</p>}
       </div>
       <div>
         <p className="text-xs font-bold uppercase text-slate-500">Used</p>
@@ -330,7 +348,7 @@ function OrphanedRow({ onCleanup, orphan, showAdvancedMetrics }: { onCleanup: (o
           <p className="font-bold text-white">{orphan.name}</p>
           <p className="mt-1 text-xs text-orange-100/70">{formatBytes(orphan.usedBytes)}</p>
           <p className="mt-1 text-xs text-orange-100/60">Not tied to an installed app</p>
-          {showAdvancedMetrics && <p className="mt-1 break-all font-mono text-xs text-orange-100/50">{orphan.path}</p>}
+          {showAdvancedMetrics && <p className="mt-1 select-text break-all font-mono text-xs text-orange-100/85">{orphan.path}</p>}
         </div>
         </div>
         <ProjectWarningButton onClick={() => onCleanup(orphan)} size="sm" type="button">
@@ -404,7 +422,7 @@ function FactRow({ label, value }: { label: string; value: string }) {
   return (
     <StorageInset>
       <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-sm text-slate-200">{value}</p>
+      <p className="mt-1 select-text break-words text-sm text-slate-100">{value}</p>
     </StorageInset>
   );
 }
