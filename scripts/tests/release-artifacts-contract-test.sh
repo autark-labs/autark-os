@@ -52,13 +52,19 @@ mkdir -p "${control_dir}"
 dpkg-deb -e "${deb}" "${control_dir}"
 grep -q '/usr/lib/autark-os/release/scripts/install-autark-os-service.sh' "${control_dir}/postinst"
 grep -q 'AUTARK_OS_BACKEND_JAR=/usr/lib/autark-os/release/backend/autark-os-backend.jar' "${control_dir}/postinst"
+grep -q 'open http://localhost:8082 to complete setup' "${control_dir}/postinst"
+grep -q 'Docker Engine and Docker Compose v2' "${control_dir}/postinst"
 grep -q 'systemctl stop autark-os.service' "${control_dir}/prerm"
+grep -q 'pre-upgrade-' "${control_dir}/preinst"
+grep -q 'package-upgrades' "${control_dir}/preinst"
+grep -q 'preserved on remove and purge' "${control_dir}/postrm"
 
 "${run_installer}" --help | grep -q 'Autark-OS Installer'
 extract_dir="${tmp_dir}/run-extract"
 "${run_installer}" --extract-only "${extract_dir}" >/dev/null
 [[ -x "${extract_dir}/scripts/autark-os" ]]
 [[ -x "${extract_dir}/scripts/bootstrap-autark-os.sh" ]]
+[[ -f "${extract_dir}/scripts/supported-host-matrix.env" ]]
 [[ -f "${extract_dir}/backend/autark-os-backend.jar" ]]
 
 grep -q 'autark-os-3.4.5.tar.gz' "${checksums}"

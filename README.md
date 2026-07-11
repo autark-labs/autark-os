@@ -51,7 +51,15 @@ Start with the [non-technical install guide](docs/non-technical-install-guide.md
 
 Use the [Autark-OS GitHub Releases page](https://github.com/autark-labs/autark-os/releases) for beta builds.
 
-Recommended executable installer:
+Primary package install on a supported Debian-family host:
+
+```bash
+sudo apt install ./autark-os_<version>_amd64.deb
+```
+
+The package runs the host preflight before service setup. After it completes, open the printed local URL and finish first-run setup. Docker Engine and Docker Compose v2 must be ready before you can install catalog apps.
+
+Direct download alternative:
 
 ```bash
 chmod +x Autark-OS-Installer-<version>-amd64.run
@@ -59,12 +67,6 @@ chmod +x Autark-OS-Installer-<version>-amd64.run
 ```
 
 On Linux desktops, the `.run` installer can show a graphical confirmation before opening a terminal for install progress. On servers and SSH sessions, it falls back to the guided terminal installer.
-
-Debian/Ubuntu package install:
-
-```bash
-sudo apt install ./autark-os_<version>_amd64.deb
-```
 
 General tarball install:
 

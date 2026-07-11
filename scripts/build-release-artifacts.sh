@@ -249,6 +249,13 @@ case "${ID}" in
 esac
 contains "${versions}" "${VERSION_ID}" && contains "${AUTARK_OS_SUPPORTED_ARCHITECTURES}" "${arch}" || { echo "Autark-OS: unsupported OS version or architecture. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}" >&2; exit 1; }
 command -v systemctl >/dev/null || { echo "Autark-OS: systemd is required." >&2; exit 1; }
+if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system/autark-os.service ]]; then
+  checkpoint_dir=/var/lib/autark-os/backups/package-upgrades
+  mkdir -p "${checkpoint_dir}"
+  checkpoint="${checkpoint_dir}/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+  tar -czf "${checkpoint}" /etc/autark-os /etc/systemd/system/autark-os.service 2>/dev/null || true
+  echo "Autark-OS: saved package configuration checkpoint at ${checkpoint}." >&2
+fi
 PREINST
   cat >"${deb_root}/DEBIAN/postinst" <<POSTINST
 #!/usr/bin/env bash
@@ -260,6 +267,14 @@ if [[ "\${1:-configure}" == "configure" ]]; then
   AUTARK_OS_BUILD_SHA=$(build_sha) \\
   AUTARK_OS_BUILD_DATE=$(build_date) \\
     /usr/lib/autark-os/release/scripts/install-autark-os-service.sh
+  echo "Autark-OS service installed."
+  echo "Next: open http://localhost:8082 to complete setup."
+  echo "Logs: journalctl -u autark-os.service -f"
+  if docker compose version >/dev/null 2>&1; then
+    echo "Docker Engine and Docker Compose v2 are ready for catalog apps."
+  else
+    echo "Autark-OS is running, but catalog app installs are unavailable until Docker Engine and Docker Compose v2 are installed and running."
+  fi
 fi
 POSTINST
   cat >"${deb_root}/DEBIAN/prerm" <<'PRERM'
@@ -272,7 +287,16 @@ if [[ "${1:-}" == "remove" || "${1:-}" == "deconfigure" ]]; then
   fi
 fi
 PRERM
-  chmod 0755 "${deb_root}/DEBIAN/preinst" "${deb_root}/DEBIAN/postinst" "${deb_root}/DEBIAN/prerm"
+  cat >"${deb_root}/DEBIAN/postrm" <<'POSTRM'
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Runtime data, apps, backups, and package-upgrade checkpoints are deliberately
+# preserved on remove and purge. Use `autark-os uninstall --remove-data` only
+# after reviewing its explicit destructive plan.
+exit 0
+POSTRM
+  chmod 0755 "${deb_root}/DEBIAN/preinst" "${deb_root}/DEBIAN/postinst" "${deb_root}/DEBIAN/prerm" "${deb_root}/DEBIAN/postrm"
 }
 
 package_deb() {
