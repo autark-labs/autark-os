@@ -21,6 +21,10 @@ STATE_DIR_OVERRIDE=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+HOST_MATRIX_FILE="${AUTARK_OS_HOST_MATRIX_FILE:-${SCRIPT_DIR}/supported-host-matrix.env}"
+[[ -r "${HOST_MATRIX_FILE}" ]] || { printf '[autark-os bootstrap] error: supported host policy is missing: %s\n' "${HOST_MATRIX_FILE}" >&2; exit 1; }
+# shellcheck source=supported-host-matrix.env
+source "${HOST_MATRIX_FILE}"
 INSTALL_SCRIPT="${SCRIPT_DIR}/install-autark-os-service.sh"
 
 usage() {
@@ -90,6 +94,27 @@ supported_apt_host() {
     *debian*|*ubuntu*|*raspbian*) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+host_matrix_contains() { [[ " $1 " == *" $2 "* ]]; }
+
+host_support_status() {
+  local os_id version arch
+  os_id="$(os_field ID || true)"; version="$(os_field VERSION_ID || true)"; arch="$(uname -m)"
+  host_matrix_contains "${AUTARK_OS_SUPPORTED_ARCHITECTURES}" "${arch}" || { printf 'unsupported'; return; }
+  case "${os_id}" in
+    debian) host_matrix_contains "${AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS}" "${version}" ;;
+    ubuntu) host_matrix_contains "${AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS}" "${version}" ;;
+    raspbian) host_matrix_contains "${AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS}" "${version}" ;;
+    *) return 1 ;;
+  esac && printf 'supported' || printf 'untested'
+}
+
+enforce_supported_host() {
+  [[ "$(host_support_status)" == 'supported' ]] || die "This host is not in the supported release matrix. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE} for supported hosts and manual guidance."
+  has_command systemctl || die "This host does not provide required ${AUTARK_OS_REQUIRED_INIT}. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}."
+  local available_kb; available_kb="$(disk_available_kb "$(runtime_dir)")"
+  [[ "${available_kb:-0}" -ge "${AUTARK_OS_MIN_DISK_KB}" ]] || die "At least ${AUTARK_OS_MIN_DISK_KB} KB free disk is required before installation."
 }
 
 run_root() {
@@ -1473,6 +1498,7 @@ main() {
     print_install_plan
     exit 0
   fi
+  enforce_supported_host
   preflight
   guide_tailscale_connection
   if [[ "${AUTARK_OS_TAILSCALE_ONBOARDING_ONLY:-0}" == "1" ]]; then

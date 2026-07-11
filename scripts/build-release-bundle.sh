@@ -34,6 +34,7 @@ The bundle layout is:
   SHA256SUMS
   backend/autark-os-backend.jar
   scripts/bootstrap-autark-os.sh
+  scripts/supported-host-matrix.env
   scripts/install-autark-os-service.sh
   scripts/install-autark-os.sh
   scripts/autark-os-gui-installer.sh
@@ -245,6 +246,7 @@ create_bundle() {
   run_cmd mkdir -p "${OUTPUT_DIR}/backend" "${OUTPUT_DIR}/scripts"
   run_cmd cp "${jar}" "${OUTPUT_DIR}/backend/autark-os-backend.jar"
   run_cmd cp "${SCRIPT_DIR}/bootstrap-autark-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh"
+  run_cmd cp "${SCRIPT_DIR}/supported-host-matrix.env" "${OUTPUT_DIR}/scripts/supported-host-matrix.env"
   run_cmd cp "${SCRIPT_DIR}/install-autark-os-service.sh" "${OUTPUT_DIR}/scripts/install-autark-os-service.sh"
   run_cmd cp "${SCRIPT_DIR}/install-autark-os.sh" "${OUTPUT_DIR}/scripts/install-autark-os.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh"
