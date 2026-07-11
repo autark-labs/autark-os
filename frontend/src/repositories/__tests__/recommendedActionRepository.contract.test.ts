@@ -30,9 +30,12 @@ test('primary pages render canonical recommended action through shared component
 
   assert.match(repository, /recommendedActionQueryKeys/);
   assert.match(repository, /SystemAPIClient\.recommendedAction/);
+  assert.match(repository, /useDismissRecommendedActionMutation/);
+  assert.match(repository, /SystemAPIClient\.dismissRecommendedAction/);
   assert.match(component, /useRecommendedActionQuery/);
   assert.match(component, /PrimaryActionCard/);
   assert.match(component, /no-action-needed/);
+  assert.match(component, /Dismiss recommendation/);
 });
 
 test('recommended actions never render a generic unavailable button', () => {

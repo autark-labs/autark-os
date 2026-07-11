@@ -17,7 +17,9 @@ import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } 
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useHomeRepository } from '@/repositories/homeRepository';
+import { useDismissRecommendedActionMutation } from '@/repositories/recommendedActionRepository';
 import { managedAppIconUrl, observedServiceIconUrl } from './extensions/OverviewPage.appTiles';
+import { applicationDeepLinkForManagedApp, applicationDeepLinkForObservedService } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { homeMajorActivity } from './extensions/OverviewPage.activity';
 import { shouldShowActivityLogLink } from './extensions/OverviewPage.activityLink';
 import { homeSummaryAvailability, homeSystemMetrics } from './extensions/OverviewPage.systemStatus';
@@ -28,6 +30,7 @@ function OverviewPage() {
   const { viewMode } = useProjectSettings();
   const appState = useApplicationStateRepository();
   const home = useHomeRepository();
+  const dismissRecommendedAction = useDismissRecommendedActionMutation();
 
   const apps = appState.applicationState?.managedApps ?? [];
   const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
@@ -55,6 +58,8 @@ function OverviewPage() {
               action={primaryAction.primaryAction}
               body={primaryAction.body}
               dismissible={primaryAction.dismissible}
+              dismissing={dismissRecommendedAction.isPending}
+              onDismiss={primaryAction.dismissible ? () => dismissRecommendedAction.mutate(primaryAction.id) : undefined}
               severity={primaryAction.severity}
               title={primaryAction.title}
             />
@@ -110,7 +115,7 @@ function OverviewPage() {
                     key={app.appInstanceId}
                     name={app.name}
                     secondaryActionLabel="Manage"
-                    secondaryTo="/apps"
+                    secondaryTo={applicationDeepLinkForManagedApp(app.catalogAppId, { panel: 'manage' })}
                     status={accessLabel(app)}
                     statusTone="info"
                   />
@@ -146,7 +151,7 @@ function OverviewPage() {
                     key={service.id}
                     name={service.displayName}
                     secondaryActionLabel="Review"
-                    secondaryTo="/apps/found"
+                    secondaryTo={applicationDeepLinkForObservedService(service, { panel: 'manage' })}
                     status="Pinned"
                     statusTone="info"
                   />
