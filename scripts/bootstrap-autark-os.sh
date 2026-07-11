@@ -1513,6 +1513,31 @@ If this is a headless or remote homelab host, use the LAN URL from another devic
 NEXT
 }
 
+service_url() {
+  printf 'http://localhost:%s' "${SERVER_PORT_OVERRIDE:-8082}"
+}
+
+verify_service_health() {
+  [[ "${DRY_RUN}" -eq 0 ]] || return 0
+  local url attempt
+  url="$(service_url)/api/health"
+  for attempt in $(seq 1 30); do
+    if curl --fail --silent --show-error --max-time 2 "${url}" >/dev/null 2>&1; then
+      write_installer_state "completed" "service-health"
+      return 0
+    fi
+    sleep 1
+  done
+  write_installer_state "failed" "service-health"
+  die "Autark-OS did not become ready. Check 'autark-os logs', then rerun this installer to resume. Create a support report with 'autark-os support-bundle --output ./autark-os-support.tar.gz'."
+}
+
+open_browser_when_available() {
+  [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] || return 0
+  has_command xdg-open || return 0
+  xdg-open "$(service_url)" >/dev/null 2>&1 || log "Browser could not be opened automatically. Use $(service_url)."
+}
+
 main() {
   parse_args "$@"
   if [[ "${DOCTOR_ONLY}" -eq 1 ]]; then
@@ -1534,7 +1559,9 @@ main() {
   fi
   build_project
   install_service
+  verify_service_health
   print_next_steps
+  open_browser_when_available
 }
 
 main "$@"
