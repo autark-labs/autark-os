@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -30,7 +30,7 @@ import {
   invalidateApplicationState,
   setAutarkOsJobInApplicationStateCache,
 } from '@/repositories/applicationStateRepository';
-import type { AppBackupStatus, RestorePlan, RestorePoint } from '@/types/backup';
+import type { AppBackupStatus, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
 import {
   ActionCard,
@@ -39,13 +39,13 @@ import {
   AttentionCard,
   FactRow,
   ProtectionPanel,
-  RestoreDialog,
+  RestoreFlowDialog,
   RestoreList,
-  RestorePointDetailsDialog,
   RoutineHealthPanel,
   RoutineTimeline,
   SectionHeader,
 } from './BackupsPage.components';
+import type { RestoreFlowState } from './BackupsPage.components';
 import { backupJobRunningId, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
 
 type RestoreView = 'timeline' | 'list';
@@ -54,14 +54,12 @@ function BackupsPage() {
   const queryClient = useQueryClient();
   const { showAdvancedMetrics } = useProjectSettings();
   const [running, setRunning] = useState<string | null>(null);
-  const [restorePlan, setRestorePlan] = useState<RestorePlan | null>(null);
-  const [restorePoint, setRestorePoint] = useState<RestorePoint | null>(null);
-  const [detailPlan, setDetailPlan] = useState<RestorePlan | null>(null);
-  const [detailPoint, setDetailPoint] = useState<RestorePoint | null>(null);
-  const [restoreTargetAppId, setRestoreTargetAppId] = useState<string | null>(null);
+  const [restoreFlow, setRestoreFlow] = useState<RestoreFlowState | null>(null);
   const [restoreView, setRestoreView] = useState<RestoreView>('timeline');
   const [activeJob, setActiveJob] = useState<AutarkOsJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const restoreOriginRef = useRef<HTMLElement | null>(null);
+  const restorePlanTokenRef = useRef(0);
   const backupJobsQuery = useBackupJobsQuery();
   const recoveredActiveJob = useMemo(() => {
     const recovered = selectActiveBackupJob(backupJobsQuery.data ?? []) as AutarkOsJob | null;
@@ -71,12 +69,11 @@ function BackupsPage() {
     return recovered;
   }, [activeJob, backupJobsQuery.data]);
   const currentActiveJob = activeJob && !terminalJob(activeJob) ? activeJob : recoveredActiveJob;
-  const backupReport = useBackupReportRepository({ paused: Boolean(restorePoint || running || currentActiveJob) });
+  const backupReport = useBackupReportRepository({ paused: Boolean(restoreFlow || running || currentActiveJob) });
   const runAppBackupMutation = useRunAppBackupMutation();
   const runFullBackupMutation = useRunFullBackupMutation();
   const runRoutineBackupMutation = useRunRoutineBackupMutation();
   const restorePlanMutation = useRestorePlanMutation();
-  const restoreDetailPlanMutation = useRestorePlanMutation();
   const restoreBackupMutation = useRestoreBackupMutation();
   const verifyRestorePointMutation = useVerifyRestorePointMutation();
   const activeJobQuery = useAutarkOsJobQuery(currentActiveJob && !terminalJob(currentActiveJob) ? currentActiveJob.jobId : null);
@@ -156,50 +153,97 @@ function BackupsPage() {
     }
   }
 
-  async function openRestore(point: RestorePoint, appId?: string | null) {
-    setError(null);
-    setRestorePoint(point);
-    setRestoreTargetAppId(appId || null);
+  function rememberRestoreOrigin() {
+    restoreOriginRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+
+  function closeRestoreFlow() {
+    setRestoreFlow(null);
+    window.setTimeout(() => restoreOriginRef.current?.focus(), 0);
+  }
+
+  async function loadRestorePlan(point: RestorePoint, appId: string | null, phase: 'details' | 'planning' = 'planning') {
+    const token = restorePlanTokenRef.current + 1;
+    restorePlanTokenRef.current = token;
+    setRestoreFlow((current) => current && current.point.id === point.id
+      ? { ...current, error: null, phase, plan: phase === 'planning' ? null : current.plan, targetAppId: appId }
+      : { error: null, phase, plan: null, point, targetAppId: appId });
     try {
-      setRestorePlan(await restorePlanMutation.mutateAsync({ restorePointId: point.id, appId }));
+      const plan = await restorePlanMutation.mutateAsync({ restorePointId: point.id, appId });
+      setRestoreFlow((current) => token === restorePlanTokenRef.current && current && current.point.id === point.id
+        ? { ...current, error: null, phase: phase === 'details' ? 'details' : 'confirm', plan, targetAppId: appId }
+        : current);
     } catch (planError) {
-      setRestorePoint(null);
-      setRestorePlan(null);
-      setError(apiErrorMessage(planError, 'Restore plan could not be loaded.'));
+      const message = apiErrorMessage(planError, 'Restore plan could not be loaded.');
+      setRestoreFlow((current) => token === restorePlanTokenRef.current && current && current.point.id === point.id
+        ? { ...current, error: message, phase: phase === 'details' ? 'details' : 'plan_error', plan: null, targetAppId: appId }
+        : current);
     }
+  }
+
+  async function openRestore(point: RestorePoint, appId?: string | null) {
+    rememberRestoreOrigin();
+    setError(null);
+    await loadRestorePlan(point, appId || null);
   }
 
   async function openRestorePointDetails(point: RestorePoint) {
+    rememberRestoreOrigin();
     setError(null);
-    setDetailPoint(point);
-    setDetailPlan(null);
-    try {
-      setDetailPlan(await restoreDetailPlanMutation.mutateAsync({ restorePointId: point.id }));
-    } catch (planError) {
-      console.warn('Restore detail plan could not be loaded.', planError);
+    setRestoreFlow({ error: null, phase: 'details', plan: null, point, targetAppId: null });
+    await loadRestorePlan(point, null, 'details');
+  }
+
+  function prepareRestoreFromDetails() {
+    if (!restoreFlow) {
+      return;
     }
+    if (restoreFlow.plan && restoreFlow.plan.targetAppId === restoreFlow.targetAppId) {
+      setRestoreFlow((current) => current ? { ...current, error: null, phase: 'confirm' } : current);
+      return;
+    }
+    void loadRestorePlan(restoreFlow.point, restoreFlow.targetAppId);
+  }
+
+  function changeRestoreTarget(appId: string | null) {
+    if (!restoreFlow) {
+      return;
+    }
+    if (restoreFlow.phase === 'details') {
+      prepareRestoreFromDetails();
+      return;
+    }
+    void loadRestorePlan(restoreFlow.point, appId);
+  }
+
+  function retryRestorePlan() {
+    if (!restoreFlow) {
+      return;
+    }
+    void loadRestorePlan(restoreFlow.point, restoreFlow.targetAppId, restoreFlow.phase === 'details' ? 'details' : 'planning');
   }
 
   async function executeRestore() {
-    if (!restorePoint || !restorePlan) {
+    if (!restoreFlow?.plan || restoreFlow.phase !== 'confirm' || !restoreFlow.plan.executable) {
       return;
     }
-    setRunning(`restore-${restorePoint.id}`);
+    const { point, targetAppId } = restoreFlow;
+    setRunning(`restore-${point.id}`);
     setError(null);
+    setRestoreFlow((current) => current ? { ...current, error: null } : current);
     try {
-      const result = await restoreBackupMutation.mutateAsync({ restorePointId: restorePoint.id, appId: restoreTargetAppId });
+      const result = await restoreBackupMutation.mutateAsync({ restorePointId: point.id, appId: targetAppId });
       setActiveJob(result);
       showJobNotification(result);
       if (result.status === 'failed') {
         setError(result.error?.message || 'Restore could not be started.');
       }
-      setRestorePoint(null);
-      setRestorePlan(null);
-      setRestoreTargetAppId(null);
+      closeRestoreFlow();
       await backupReport.refresh();
     } catch (restoreError) {
       const notificationMessage = apiErrorMessage(restoreError, 'Restore could not be completed.');
       setError(notificationMessage);
+      setRestoreFlow((current) => current ? { ...current, error: notificationMessage } : current);
       showActionNotification({ severity: 'error', title: 'Restore could not start', message: notificationMessage }, 'Restore could not start');
       setRunning(null);
     }
@@ -271,7 +315,7 @@ function BackupsPage() {
                   </ProjectDarkControlButton>
                 </DisabledAction>
               )}
-              <RefreshStatus intervalLabel={restorePoint || running ? 'Auto-update paused' : 'Auto-updates every 30s'} onRefresh={() => void backupReport.refresh()} refreshing={backupReport.isFetching || activeJobQuery.isFetching} updatedAt={backupReport.updatedAt} />
+              <RefreshStatus intervalLabel={restoreFlow || running ? 'Auto-update paused' : 'Auto-updates every 30s'} onRefresh={() => void backupReport.refresh()} refreshing={backupReport.isFetching || activeJobQuery.isFetching} updatedAt={backupReport.updatedAt} />
             </div>
           </div>
           <ProtectionPanel latestRestore={latestRestore} report={report} />
@@ -380,32 +424,17 @@ function BackupsPage() {
         </div>
       )}
 
-      <RestoreDialog
+      <RestoreFlowDialog
         appOptions={report?.apps ?? []}
-        loading={running === `restore-${restorePoint?.id}`}
-        onClose={() => {
-          setRestorePoint(null);
-          setRestorePlan(null);
-          setRestoreTargetAppId(null);
-        }}
+        flow={restoreFlow}
+        loading={running === `restore-${restoreFlow?.point.id}`}
+        onClose={closeRestoreFlow}
         onRestore={() => void executeRestore()}
-        onTargetChange={(appId) => restorePoint && void openRestore(restorePoint, appId)}
-        plan={restorePlan}
-        point={restorePoint}
-        targetAppId={restoreTargetAppId}
-        showAdvancedMetrics={showAdvancedMetrics}
-      />
-      <RestorePointDetailsDialog
-        apps={report?.apps ?? []}
-        onClose={() => {
-          setDetailPoint(null);
-          setDetailPlan(null);
-        }}
-        onRestore={(point) => void openRestore(point, null)}
+        onRetryPlan={retryRestorePlan}
+        onTargetChange={changeRestoreTarget}
         onVerify={(point) => void verifyRestorePoint(point)}
-        plan={detailPlan}
-        point={detailPoint}
         running={running}
+        showAdvancedMetrics={showAdvancedMetrics}
       />
     </PageShell>
   );

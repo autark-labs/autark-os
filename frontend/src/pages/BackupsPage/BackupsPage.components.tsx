@@ -30,6 +30,14 @@ import {
 export const BackupPanel = ProjectPanel;
 export const BackupInset = ProjectInset;
 
+export type RestoreFlowState = {
+  error: string | null;
+  phase: 'details' | 'plan_error' | 'planning' | 'confirm';
+  plan: RestorePlan | null;
+  point: RestorePoint;
+  targetAppId: string | null;
+};
+
 export function ProtectionPanel({ latestRestore, report }: { latestRestore: RestorePoint | null; report: BackupReport | null }) {
   const protectedPercent = report?.totalApps ? Math.round((report.protectedApps / report.totalApps) * 100) : 0;
   return (
@@ -176,17 +184,57 @@ export function AppBackupCard({ app, onRun, running, showAdvancedMetrics }: { ap
   );
 }
 
-export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, plan, point, running }: { apps: AppBackupStatus[]; onClose: () => void; onRestore: (point: RestorePoint) => void; onVerify: (point: RestorePoint) => void; plan: RestorePlan | null; point: RestorePoint | null; running: string | null }) {
-  const open = Boolean(point);
-  const details = point ? restorePointDetails(point, apps, plan) : null;
+export function RestoreFlowDialog({
+  appOptions,
+  flow,
+  loading,
+  onClose,
+  onRestore,
+  onRetryPlan,
+  onTargetChange,
+  onVerify,
+  running,
+  showAdvancedMetrics,
+}: {
+  appOptions: AppBackupStatus[];
+  flow: RestoreFlowState | null;
+  loading: boolean;
+  onClose: () => void;
+  onRestore: () => void;
+  onRetryPlan: () => void;
+  onTargetChange: (appId: string | null) => void;
+  onVerify: (point: RestorePoint) => void;
+  running: string | null;
+  showAdvancedMetrics: boolean;
+}) {
+  const point = flow?.point ?? null;
+  const plan = flow?.plan ?? null;
+  const details = point ? restorePointDetails(point, appOptions, plan) : null;
+  const included = point?.includedAppIds.split(',').map((id) => id.trim()).filter(Boolean) ?? [];
+  const selectableApps = point?.scope === 'full'
+    ? appOptions.filter((app) => included.includes(app.appId))
+    : appOptions.filter((app) => app.appId === point?.appId);
+  const reviewingDetails = flow?.phase === 'details';
+  const planLoading = flow?.phase === 'planning';
+  const planFailed = flow?.phase === 'plan_error';
+
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="min-w-200 border-sky-400/30 bg-slate-900 text-slate-100">
+    <Dialog open={Boolean(flow)} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-2xl overflow-y-auto border-sky-400/30 bg-slate-900 text-slate-100 sm:w-full">
         <DialogHeader>
-          <DialogTitle>{details?.title || 'Restore point details'}</DialogTitle>
-          <DialogDescription className="text-slate-400">Review what this backup contains before verifying or restoring it.</DialogDescription>
+          <DialogTitle>{reviewingDetails ? details?.title || 'Restore point details' : plan?.title || 'Restore backup'}</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            {reviewingDetails
+              ? 'Review what this backup contains before verifying or restoring it.'
+              : planLoading
+                ? 'Autark-OS is checking the restore plan before it can be confirmed.'
+                : planFailed
+                  ? 'Autark-OS could not load a complete restore plan. Retry before restoring.'
+                  : plan?.summary || 'Review what Autark-OS will restore before continuing.'}
+          </DialogDescription>
         </DialogHeader>
-        {point && details && (
+
+        {reviewingDetails && point && details && (
           <div className="grid gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
               <FactRow label="Created" value={formatBackupDate(point.createdAt)} />
@@ -197,11 +245,63 @@ export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, 
             <InfoBlock title="Verification" values={[details.verification, point.verificationMessage || 'No verification note recorded.', `Checksum: ${details.checksum}`]} />
             <InfoBlock tone="warning" title="Warnings" values={details.warnings} />
             <InfoBlock title="Stored at" values={[details.location]} />
+            {flow.error && <RestoreIssue message={flow.error} onRetry={onRetryPlan} title="Restore plan unavailable" />}
+            {flow.plan && <InfoBlock title="Restore preview" values={[details.restoreSummary]} />}
+          </div>
+        )}
+
+        {planLoading && (
+          <div className="grid place-items-center gap-3 rounded-lg border border-sky-400/25 bg-slate-950/60 p-6 text-center">
+            <Loader2 className="size-5 animate-spin text-cyan-200" />
+            <p className="text-sm text-slate-300">Loading the restore plan…</p>
+          </div>
+        )}
+
+        {planFailed && <RestoreIssue message={flow?.error || 'Restore plan could not be loaded.'} onRetry={onRetryPlan} title="Restore plan unavailable" />}
+
+        {flow?.phase === 'confirm' && point && (
+          <div className="grid gap-4">
+            {point.scope === 'full' && (
+              <BackupInset>
+                <label className="text-xs font-bold uppercase text-slate-500" htmlFor="restore-target">Restore target</label>
+                <Select onValueChange={(value) => onTargetChange(value === 'all' ? null : value)} value={flow.targetAppId || 'all'}>
+                  <SelectTrigger className="mt-2 h-10 w-full border-slate-700 bg-slate-950/70 text-slate-100" id="restore-target">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-slate-950 text-slate-100">
+                    <SelectGroup>
+                      <SelectItem className="focus:bg-slate-800 focus:text-white" value="all">Everything in this full backup</SelectItem>
+                      {selectableApps.map((app) => (
+                        <SelectItem className="focus:bg-slate-800 focus:text-white" key={app.appId} value={app.appId}>{app.appName} only</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </BackupInset>
+            )}
+            {plan && (
+              <>
+                <InfoBlock title="Autark-OS will restore" values={plan.affectedApps.length ? plan.affectedApps : ['No installed app matches this restore point.']} />
+                <InfoBlock title="What will change" values={plan.steps.length ? plan.steps : ['Autark-OS will stop affected apps, replace their data with this restore point, then start them again.']} />
+                <InfoBlock tone="warning" title="What is preserved" values={plan.warnings.length ? plan.warnings : ['A safety restore point is created before data is replaced. Other apps are left unchanged.']} />
+                {flow.error && <RestoreIssue message={flow.error} onRetry={onRetryPlan} title="Restore could not start" />}
+                {showAdvancedMetrics && (
+                  <details className="rounded-lg border border-sky-400/20 bg-slate-950/60 p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-slate-200">Technical restore details</summary>
+                    <div className="mt-3 grid gap-3">
+                      <InfoBlock title="Archive verification" values={[`${plan.restoreConfidence}: ${plan.verificationMessage || 'No verification details recorded yet.'}`]} />
+                      <InfoBlock tone={plan.simulation.status === 'failed' || plan.simulation.status === 'warning' ? 'warning' : 'default'} title="Restore simulation" values={[plan.simulation.message, ...plan.simulation.details]} />
+                      <InfoBlock title="Backup contract check" values={plan.dryRunDetails.length ? plan.dryRunDetails : ['No app-specific backup contract details were found.']} />
+                    </div>
+                  </details>
+                )}
+              </>
+            )}
           </div>
         )}
         <DialogFooter>
-          <ProjectDarkControlButton onClick={onClose} type="button">Close</ProjectDarkControlButton>
-          {point && (
+          <ProjectDarkControlButton onClick={onClose} type="button">{reviewingDetails ? 'Close' : 'Cancel'}</ProjectDarkControlButton>
+          {reviewingDetails && point && (
             <>
               <DisabledAction disabled={running === `verify-${point.id}`} reason="Autark-OS is already verifying this restore point.">
                 <ProjectDarkControlButton disabled={running === `verify-${point.id}`} onClick={() => onVerify(point)} type="button">
@@ -209,11 +309,19 @@ export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, 
                   Verify
                 </ProjectDarkControlButton>
               </DisabledAction>
-              <ProjectPrimaryButton onClick={() => onRestore(point)} type="button">
+              <ProjectPrimaryButton onClick={() => onTargetChange(null)} type="button">
                 <RotateCcw className="size-4" />
                 Restore
               </ProjectPrimaryButton>
             </>
+          )}
+          {flow?.phase === 'confirm' && (
+            <DisabledAction disabled={!plan?.executable || loading} reason={loading ? 'Wait for the restore job to start.' : 'This restore point cannot be restored until the complete restore plan is executable.'}>
+              <ProjectPrimaryButton disabled={!plan?.executable || loading} onClick={onRestore} type="button">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
+                Restore now
+              </ProjectPrimaryButton>
+            </DisabledAction>
           )}
         </DialogFooter>
       </DialogContent>
@@ -221,60 +329,13 @@ export function RestorePointDetailsDialog({ apps, onClose, onRestore, onVerify, 
   );
 }
 
-export function RestoreDialog({ appOptions, loading, onClose, onRestore, onTargetChange, plan, point, showAdvancedMetrics, targetAppId }: { appOptions: AppBackupStatus[]; loading: boolean; onClose: () => void; onRestore: () => void; onTargetChange: (appId: string | null) => void; plan: RestorePlan | null; point: RestorePoint | null; showAdvancedMetrics: boolean; targetAppId: string | null }) {
-  const open = Boolean(point);
-  const included = point?.includedAppIds.split(',').map((id) => id.trim()).filter(Boolean) ?? [];
-  const selectableApps = point?.scope === 'full' ? appOptions.filter((app) => included.includes(app.appId)) : appOptions.filter((app) => app.appId === point?.appId);
+function RestoreIssue({ message, onRetry, title }: { message: string; onRetry: () => void; title: string }) {
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-2xl border-sky-400/30 bg-slate-900 text-slate-100">
-        <DialogHeader>
-          <DialogTitle>{plan?.title || 'Restore backup'}</DialogTitle>
-          <DialogDescription className="text-slate-400">{plan?.summary || 'Review what Autark-OS will restore before continuing.'}</DialogDescription>
-        </DialogHeader>
-        {point?.scope === 'full' && (
-          <BackupInset>
-            <label className="text-xs font-bold uppercase text-slate-500" htmlFor="restore-target">Restore target</label>
-            <Select onValueChange={(value) => onTargetChange(value === 'all' ? null : value)} value={targetAppId || 'all'}>
-              <SelectTrigger className="mt-2 h-10 w-full border-slate-700 bg-slate-950/70 text-slate-100" id="restore-target">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="border-slate-700 bg-slate-950 text-slate-100">
-                <SelectGroup>
-                  <SelectItem className="focus:bg-slate-800 focus:text-white" value="all">Everything in this full backup</SelectItem>
-                  {selectableApps.map((app) => (
-                    <SelectItem className="focus:bg-slate-800 focus:text-white" key={app.appId} value={app.appId}>{app.appName} only</SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </BackupInset>
-        )}
-        {plan && (
-          <div className="grid gap-4">
-            <InfoBlock title="Affected apps" values={plan.affectedApps.length ? plan.affectedApps : ['No installed app matches this restore point.']} />
-            {plan.warnings.length > 0 && <InfoBlock tone="warning" title="Important warnings" values={plan.warnings} />}
-            {showAdvancedMetrics && (
-              <>
-                <InfoBlock title="Archive verification" values={[`${plan.restoreConfidence}: ${plan.verificationMessage || 'No verification details recorded yet.'}`]} />
-                <InfoBlock tone={plan.simulation.status === 'failed' || plan.simulation.status === 'warning' ? 'warning' : 'default'} title="Restore simulation" values={[plan.simulation.message, ...plan.simulation.details]} />
-                <InfoBlock title="Steps Autark-OS will take" values={plan.steps} />
-                <InfoBlock title="Backup contract check" values={plan.dryRunDetails.length ? plan.dryRunDetails : ['No app-specific backup contract details were found.']} />
-              </>
-            )}
-          </div>
-        )}
-        <DialogFooter>
-          <ProjectDarkControlButton onClick={onClose} type="button">Cancel</ProjectDarkControlButton>
-          <DisabledAction disabled={!plan?.executable || loading} reason={loading ? 'Wait for the restore job to start.' : 'This restore point cannot be restored until the restore plan is executable.'}>
-            <ProjectPrimaryButton disabled={!plan?.executable || loading} onClick={onRestore} type="button">
-              {loading ? <Loader2 className="size-4 animate-spin" /> : <RotateCcw className="size-4" />}
-              Restore
-            </ProjectPrimaryButton>
-          </DisabledAction>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <div className="rounded-lg border border-red-400/45 bg-red-500/10 p-4 text-sm text-red-100" role="alert">
+      <p className="font-semibold">{title}</p>
+      <p className="mt-1 leading-5 text-red-100/80">{message}</p>
+      <ProjectDarkControlButton className="mt-3" onClick={onRetry} size="sm" type="button">Retry plan</ProjectDarkControlButton>
+    </div>
   );
 }
 
