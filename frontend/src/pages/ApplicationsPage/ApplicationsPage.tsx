@@ -10,6 +10,7 @@ import { MetricCard } from '@/components/primitives/MetricCard';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { Surface } from '@/components/primitives/Surface';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import {
@@ -31,6 +32,7 @@ import { AdvancedApplicationsView } from './AdvancedApplicationsView';
 import { mapUninstallPlanToDestructiveActionPlan } from './extensions/ApplicationsPage.destructiveActions';
 import {
   applicationDeepLinkForSurfaceItem,
+  filterForApplicationDeepLinkTarget,
   findApplicationDeepLinkTarget,
   parseApplicationsDeepLink,
 } from './extensions/ApplicationsPage.deepLinks';
@@ -45,6 +47,7 @@ import type {
 } from './extensions/ApplicationsPage.types';
 
 type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'backup'>;
+type ApplicationCollectionFilter = 'managed' | 'linked' | 'attention';
 
 export const ApplicationsPage = () => {
   const { viewMode } = useProjectSettings();
@@ -54,6 +57,7 @@ export const ApplicationsPage = () => {
   const appState = useApplicationStateRepository();
   const jobsQuery = useAutarkOsJobsQuery();
   const [query, setQuery] = useState('');
+  const [collectionFilters, setCollectionFilters] = useState<ApplicationCollectionFilter[]>([]);
   const [managementOpen, setManagementOpen] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
@@ -99,10 +103,19 @@ export const ApplicationsPage = () => {
   ]);
 
   const managedItems = useMemo(() => items.filter((item) => item.managementState === 'managed'), [items]);
+  const linkedItems = useMemo(() => items.filter((item) => item.managementState === 'linked'), [items]);
   const foundServices = appState.foundServices;
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return managedItems.filter((item) => {
+    return items.filter((item) => {
+      if (item.managementState === 'found') {
+        return false;
+      }
+
+      if (!matchesCollectionFilters(item, collectionFilters)) {
+        return false;
+      }
+
       if (!normalizedQuery) {
         return true;
       }
@@ -110,13 +123,14 @@ export const ApplicationsPage = () => {
       return [item.name, item.managementState, item.readinessState, item.attentionState, item.access, item.backup, item.nextAction?.label ?? '', item.description]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
-  }, [managedItems, query]);
+  }, [collectionFilters, items, query]);
 
-  const selectedItem = managedItems.find((item) => item.id === selectedId) ?? null;
+  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
   const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
   const managedCount = managedItems.length;
-  const attentionCount = managedItems.filter((item) => item.attentionState !== 'none').length;
-  const emptyState = emptyStateForManagedApps(query);
+  const linkedCount = linkedItems.length;
+  const attentionCount = items.filter((item) => item.managementState !== 'found' && item.attentionState !== 'none').length;
+  const emptyState = emptyStateForApplicationCollection(collectionFilters, query);
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
@@ -128,11 +142,11 @@ export const ApplicationsPage = () => {
   }, [navigate]);
 
   const handleSelectItem = useCallback((id: string) => {
-    const item = managedItems.find((candidate) => candidate.id === id);
+    const item = visibleItems.find((candidate) => candidate.id === id);
     if (item) {
       focusApplicationItem(item);
     }
-  }, [focusApplicationItem, managedItems]);
+  }, [focusApplicationItem, visibleItems]);
 
   const clearApplicationFocus = useCallback(() => {
     appliedDeepLinkKeyRef.current = '';
@@ -153,47 +167,67 @@ export const ApplicationsPage = () => {
     setManagementOpen(true);
   }, [clearApplicationFocus, focusApplicationItem, selectedItem]);
 
+  const handleCollectionFilterChange = useCallback((nextFilters: string[]) => {
+    const normalizedFilters = nextFilters.filter((filter): filter is ApplicationCollectionFilter => (
+      filter === 'managed' || filter === 'linked' || filter === 'attention'
+    ));
+
+    if (selectedItem && !matchesCollectionFilters(selectedItem, normalizedFilters)) {
+      if (!canCloseManagement()) {
+        return;
+      }
+      clearApplicationFocus();
+    }
+
+    setCollectionFilters(normalizedFilters);
+  }, [canCloseManagement, clearApplicationFocus, selectedItem]);
+
   useEffect(() => {
     if (!deepLinkTarget.kind || !deepLinkTarget.id) {
       appliedDeepLinkKeyRef.current = '';
       return;
     }
 
-    if (deepLinkTarget.kind === 'service' || deepLinkTarget.kind === 'catalog') {
+    if (!items.length || appliedDeepLinkKeyRef.current === deepLinkTarget.key) {
+      return;
+    }
+
+    const targetItem = findApplicationDeepLinkTarget(items, deepLinkTarget);
+    if (!targetItem || targetItem.managementState === 'found') {
       const serviceQuery = deepLinkTarget.kind === 'service' ? `?service=${encodeURIComponent(deepLinkTarget.id)}` : '';
       navigate(`/apps/found${serviceQuery}`, { replace: true });
       return;
     }
 
-    if (!managedItems.length || appliedDeepLinkKeyRef.current === deepLinkTarget.key) {
-      return;
-    }
-
-    const targetItem = findApplicationDeepLinkTarget(managedItems, deepLinkTarget);
-    if (!targetItem || !canCloseManagement()) {
+    if (!canCloseManagement()) {
       return;
     }
 
     setQuery('');
+    const requiredFilter = filterForApplicationDeepLinkTarget(targetItem);
+    if (requiredFilter === 'managed' || requiredFilter === 'pinned') {
+      const filter = requiredFilter === 'pinned' ? 'linked' : requiredFilter;
+      setCollectionFilters((current) => current.length === 0 || current.includes(filter) ? current : [...current, filter]);
+    }
     setSelectedId(targetItem.id);
     setManagementOpen(deepLinkTarget.panel === 'manage');
     appliedDeepLinkKeyRef.current = deepLinkTarget.key;
-  }, [canCloseManagement, deepLinkTarget, managedItems, navigate]);
+  }, [canCloseManagement, deepLinkTarget, items, navigate]);
 
   useEffect(() => {
     if (!selectedId) {
       return;
     }
 
-    if (!managedItems.length) {
+    if (!items.length) {
       clearApplicationFocus();
       return;
     }
 
-    if (!managedItems.some((item) => item.id === selectedId)) {
+    if (!items.some((item) => item.id === selectedId)) {
       clearApplicationFocus();
     }
-  }, [clearApplicationFocus, managedItems, selectedId]);
+  }, [clearApplicationFocus, items, selectedId]);
 
   useEffect(() => {
     if (!managementOpen) {
@@ -500,7 +534,7 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    if (item?.managementState === 'managed') {
+    if (item && item.managementState !== 'found') {
       focusApplicationItem(item, true);
     }
     void invalidateApplicationState(queryClient);
@@ -529,11 +563,12 @@ export const ApplicationsPage = () => {
   return (
     <PageShell>
       <PageHeader
-        description="Open and manage the apps owned by this Autark-OS installation."
+        description="Open managed apps and keep the linked services on this server in view."
         title="My Apps"
       >
-        <div className="grid gap-3 p-4 sm:grid-cols-2">
+        <div className="grid gap-3 p-4 sm:grid-cols-3">
           <MetricCard label="Managed" value={managedCount} />
+          <MetricCard label="Linked" value={linkedCount} />
           <MetricCard label="Needs review" tone={attentionCount > 0 ? 'attention' : 'default'} value={attentionCount} />
         </div>
       </PageHeader>
@@ -552,16 +587,17 @@ export const ApplicationsPage = () => {
 
       <div className="grid gap-3">
         <SearchFilterBar
-          filterAriaLabel="Managed app filters"
+          actions={<ApplicationCollectionFilterDropdown filters={collectionFilters} onChange={handleCollectionFilterChange} />}
+          filterAriaLabel="Filter app types"
           onSearchChange={setQuery}
-          searchAriaLabel="Search managed apps"
-          searchPlaceholder="Search managed apps"
+          searchAriaLabel="Search managed and linked apps"
+          searchPlaceholder="Search managed and linked apps"
           searchValue={query}
         />
 
         {(appState.isLoading || Boolean(appState.error)) && (
           <Surface className="px-3 py-2 text-sm text-sky-100/80" tone="muted">
-            {appState.isLoading ? 'Loading managed apps.' : 'Could not load the current managed apps list.'}
+            {appState.isLoading ? 'Loading managed and linked apps.' : 'Could not load the current app list.'}
           </Surface>
         )}
       </div>
@@ -683,16 +719,64 @@ function appActionLabel(action: ApplicationRuntimeAction) {
   return 'App action';
 }
 
-function emptyStateForManagedApps(query: string) {
+function ApplicationCollectionFilterDropdown({
+  filters,
+  onChange,
+}: {
+  filters: ApplicationCollectionFilter[];
+  onChange: (filters: string[]) => void;
+}) {
+  return (
+    <MultiSelect
+      onValueChange={onChange}
+      options={[
+        { label: 'Managed apps', value: 'managed' },
+        { label: 'Linked services', value: 'linked' },
+        { label: 'Needs attention', value: 'attention' },
+      ]}
+      placeholder="All app types"
+      searchPlaceholder="Filter app types"
+      value={filters}
+    />
+  );
+}
+
+function matchesCollectionFilters(item: ApplicationSurfaceItem, filters: ApplicationCollectionFilter[]) {
+  if (!filters.length) {
+    return true;
+  }
+
+  return filters.some((filter) => (
+    (filter === 'managed' && item.managementState === 'managed')
+    || (filter === 'linked' && item.managementState === 'linked')
+    || (filter === 'attention' && item.attentionState !== 'none')
+  ));
+}
+
+function emptyStateForApplicationCollection(filters: ApplicationCollectionFilter[], query: string) {
   if (query.trim()) {
     return {
-      title: 'No matching managed apps',
-      description: 'Adjust the search or clear it to see the apps managed by this Autark-OS installation.',
+      title: 'No matching apps or linked services',
+      description: 'Adjust the search or app-type filters to see the matching services.',
+    };
+  }
+
+  if (filters.length === 1 && filters[0] === 'linked') {
+    return {
+      title: 'No linked services',
+      description: 'Link a service from the existing-app review flow to keep it visible here without managing its runtime.',
+    };
+  }
+
+  if (filters.length === 1 && filters[0] === 'attention') {
+    return {
+      title: 'No apps need review',
+      description: 'The managed apps and linked services in this view are not asking for action right now.',
     };
   }
 
   return {
-    title: 'No managed apps installed',
-    description: 'Install an app from Discover to have Autark-OS manage its runtime, access, and backups.',
+    title: 'No managed apps or linked services',
+    description: 'Install an app from Discover or link an existing service to keep it visible without managing its runtime.',
   };
 }
