@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AlertTriangle, ClipboardList, Copy, FileText, LifeBuoy, ListChecks, LockKeyhole, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Copy, Download, FileText, LifeBuoy, ListChecks, LockKeyhole, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
@@ -21,6 +21,7 @@ import type { AppRuntimeView } from '@/types/app';
 import type { SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemSetupStatus } from '@/types/system';
 import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from './SupportPage.diagnosticsModel';
 import { formatDate, humanize, shortSha, summaryFromBundle } from './SupportPage.logic';
+import { downloadSupportReport } from './SupportPage.supportReport';
 import { FindingCard, InfoLine, LogLine, RedactionRuleCard, RelatedLink, SectionHeader, SupportInset, SupportPanel } from './SupportPage.components';
 
 type SupportState = {
@@ -46,8 +47,10 @@ function SupportPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [bundleBusy, setBundleBusy] = useState(false);
+  const [logsBusy, setLogsBusy] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const logsContentRef = useRef<HTMLDivElement | null>(null);
 
   async function load(background = false) {
     if (background) {
@@ -91,15 +94,9 @@ function SupportPage() {
     try {
       const bundle = await SystemAPIClient.supportBundle();
       setState((current) => ({ ...current, bundle, summary: summaryFromBundle(bundle), setup: bundle.setup || current.setup, logs: bundle.logs || current.logs }));
-      const copyResult = await copyText(bundle.bundleText);
-      if (copyResult.ok) {
-        showActionNotification({ ok: true, severity: 'success', title: 'Support bundle copied', message: 'Redacted diagnostics are ready to share.' }, 'Support bundle copied');
-      } else {
-        showActionNotification({ ok: true, severity: 'success', title: 'Support bundle ready', message: 'Redacted diagnostics are ready to share below.' }, 'Support bundle ready');
-        showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: copyResult.message }, 'Copy unavailable');
-      }
+      showActionNotification({ ok: true, severity: 'success', title: 'Support report ready', message: 'Download or copy the redacted report below.' }, 'Support report ready');
     } catch (err) {
-      showActionErrorNotification(err, 'Support bundle failed');
+      showActionErrorNotification(err, 'Support report failed');
     } finally {
       setBundleBusy(false);
     }
@@ -107,13 +104,36 @@ function SupportPage() {
 
   async function viewLogs() {
     setLogsOpen(true);
+    setLogsBusy(true);
     try {
       const logs = await SystemAPIClient.supportLogs(160);
       setState((current) => ({ ...current, logs }));
+      window.setTimeout(() => logsContentRef.current?.focus(), 0);
       showActionNotification({ ok: true, severity: 'info', title: 'Technical logs loaded', message: 'Recent redacted log lines are available below.' }, 'Technical logs loaded');
     } catch (err) {
       showActionErrorNotification(err, 'Logs could not load');
+    } finally {
+      setLogsBusy(false);
     }
+  }
+
+  async function copyBundle() {
+    if (!state.bundle) return;
+    const result = await copyText(state.bundle.bundleText);
+    if (result.ok) {
+      showActionNotification({ ok: true, severity: 'success', title: 'Support report copied', message: 'Redacted diagnostics are ready to share.' }, 'Support report copied');
+      return;
+    }
+    showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
+  }
+
+  function downloadBundle() {
+    if (!state.bundle) return;
+    if (downloadSupportReport(state.bundle.bundleText, state.bundle.generatedAt)) {
+      showActionNotification({ ok: true, severity: 'success', title: 'Support report downloaded', message: 'The redacted report was saved as a text file.' }, 'Support report downloaded');
+      return;
+    }
+    showActionNotification({ ok: false, severity: 'warning', title: 'Download unavailable', message: 'Your browser could not start a download. Select the report below and copy it manually.' }, 'Download unavailable');
   }
 
   const summary = state.summary;
@@ -143,10 +163,10 @@ function SupportPage() {
               <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">Autark-OS Diagnostics</h1>
               <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
                 {headline === 'Ready'
-                  ? 'Ready. Health checks, support bundle, and technical logs are available when you need them.'
+                  ? 'Ready. Health checks, a support report, and technical logs are available when you need them.'
                   : headline === 'Status unavailable'
                     ? 'Autark-OS could not load current diagnostics. Try refreshing the health checks once the service is available.'
-                    : 'Needs attention. Start with health checks, then use the support bundle or logs if you need more detail.'}
+                    : 'Needs attention. Start with health checks, then generate a support report or view logs if you need more detail.'}
               </p>
             </div>
             <StatusBadge ready={headline === 'Ready'}>{headline}</StatusBadge>
@@ -184,12 +204,13 @@ function SupportPage() {
         />
         <DiagnosticAction
           busy={bundleBusy}
-          detail="Copy a redacted support bundle with version, setup, health, and recent failure context."
+          detail="Prepare a redacted support report with version, setup, health, and recent failure context."
           icon={ClipboardList}
-          label="Generate support bundle"
+          label="Generate support report"
           onClick={() => void generateBundle()}
         />
         <DiagnosticAction
+          busy={logsBusy}
           detail="Open recent backend logs. Autark-OS masks secrets before showing them."
           icon={TerminalSquare}
           label="View technical logs"
@@ -237,8 +258,8 @@ function SupportPage() {
             </div>
           </AdvancedSection>
 
-          <AdvancedSection defaultOpen={logsOpen} icon={TerminalSquare} title="Recent logs">
-            <div className="max-h-[380px] overflow-y-auto rounded-lg border border-slate-800 bg-black/55 p-3 font-mono text-xs leading-5 text-slate-300">
+          <AdvancedSection icon={TerminalSquare} onOpenChange={setLogsOpen} open={logsOpen} title="Recent logs">
+            <div className="max-h-[380px] overflow-y-auto rounded-lg border border-slate-800 bg-black/55 p-3 font-mono text-xs leading-5 text-slate-300" ref={logsContentRef} tabIndex={-1}>
               {state.logs.length ? state.logs.map((line, index) => <LogLine key={`${line.line}-${index}`} line={line} />) : <p className="text-slate-500">No logs were available.</p>}
             </div>
           </AdvancedSection>
@@ -273,8 +294,22 @@ function SupportPage() {
 
           {(showAdvancedMetrics || state.bundle) && (
             <SupportPanel>
-              <SectionHeader compact icon={Copy} title="Support bundle preview" description="Shown after you generate a bundle." />
-              <pre className="mt-4 max-h-[260px] select-text overflow-auto whitespace-pre-wrap rounded-lg border border-sky-400/25 bg-slate-950/70 p-4 text-xs leading-5 text-slate-400">{state.bundle?.bundleText || 'Generate a support bundle to preview redacted details.'}</pre>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <SectionHeader compact icon={FileText} title="Support report" description="Redacted plain-text diagnostics for sharing with support." />
+                {state.bundle && (
+                  <div className="flex flex-wrap gap-2">
+                    <ProjectDarkControlButton onClick={() => void copyBundle()} size="sm" type="button">
+                      <Copy className="size-4" />
+                      Copy report
+                    </ProjectDarkControlButton>
+                    <ProjectPrimaryButton onClick={downloadBundle} size="sm" type="button">
+                      <Download className="size-4" />
+                      Download report
+                    </ProjectPrimaryButton>
+                  </div>
+                )}
+              </div>
+              <pre className="mt-4 max-h-[260px] select-text overflow-auto whitespace-pre-wrap rounded-lg border border-sky-400/25 bg-slate-950/70 p-4 text-xs leading-5 text-slate-400">{state.bundle?.bundleText || 'Generate a support report to preview redacted details.'}</pre>
             </SupportPanel>
           )}
 
@@ -333,9 +368,9 @@ function DiagnosticAction({ busy = false, detail, icon: Icon, label, onClick }: 
   );
 }
 
-function AdvancedSection({ children, defaultOpen, icon: Icon, title }: { children: ReactNode; defaultOpen: boolean; icon: LucideIcon; title: string }) {
+function AdvancedSection({ children, defaultOpen, icon: Icon, onOpenChange, open, title }: { children: ReactNode; defaultOpen?: boolean; icon: LucideIcon; onOpenChange?: (open: boolean) => void; open?: boolean; title: string }) {
   return (
-    <Collapsible className="rounded-2xl border border-sky-400/30 bg-slate-900 p-5 text-slate-50 shadow-xl shadow-slate-950/30" defaultOpen={defaultOpen}>
+    <Collapsible className="rounded-2xl border border-sky-400/30 bg-slate-900 p-5 text-slate-50 shadow-xl shadow-slate-950/30" defaultOpen={defaultOpen} onOpenChange={onOpenChange} open={open}>
       <CollapsibleTrigger className="flex w-full cursor-pointer items-center gap-3 text-left font-black text-white">
         <span className="grid size-9 place-items-center rounded-lg border border-sky-400/25 bg-slate-800 text-cyan-200"><Icon className="size-4" /></span>
         {title}

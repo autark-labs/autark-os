@@ -111,6 +111,8 @@ To save a support report, use the installer’s **Save support report** action. 
 autark-os support-bundle --output ./autark-os-support.tar.gz
 ```
 
+When the Autark-OS Diagnostics page is available, select **Generate support bundle**, then choose **Download report** to save the redacted `.txt` report. **Copy report** is optional, and **View technical logs** opens the recent redacted logs.
+
 If Autark-OS is installed but the page will not open, these commands are useful for support:
 
 ```bash

@@ -144,6 +144,8 @@ Create a redacted support bundle:
 autark-os support-bundle --output ./autark-os-support.tar.gz
 ```
 
+In the Autark-OS Diagnostics page, choose **Generate support bundle** to prepare a redacted plain-text support report. Use **Download report** to save a `.txt` file, **Copy report** to place it on the clipboard, or **View technical logs** to expand the recent redacted logs.
+
 Build and test from source:
 
 ```bash
