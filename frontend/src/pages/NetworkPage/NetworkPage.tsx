@@ -78,7 +78,7 @@ function NetworkPage() {
   const removeStalePrivateAccess = useRemoveStalePrivateAccessMutation();
   const [actionError, setActionError] = useState<string | null>(null);
   const [copiedLinkKey, setCopiedLinkKey] = useState<string | null>(null);
-  const [processingServiceIds, setProcessingServiceIds] = useState<Record<string, boolean>>({});
+  const [processingServiceTokens, setProcessingServiceTokens] = useState<Record<string, number>>({});
   const [pendingReachabilityByServiceId, setPendingReachabilityByServiceId] = useState<Record<string, PendingReachability>>({});
   const [staleActionLoadingId, setStaleActionLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -119,6 +119,10 @@ function NetworkPage() {
     () => filterReachabilityServices(displayedReachabilityServices, query, typeFilters),
     [displayedReachabilityServices, query, typeFilters],
   );
+  const loadingServiceIds = useMemo(
+    () => Object.fromEntries(Object.keys(processingServiceTokens).map((serviceId) => [serviceId, true])),
+    [processingServiceTokens],
+  );
   const selectedTab = !showAdvancedMetrics && activeTab && !['matrix', 'issues'].includes(activeTab) ? 'matrix' : activeTab ?? deepLinkTarget.tab ?? 'matrix';
   const focusedService = useMemo(() => displayedReachabilityServices.find((service) => service.id === focusedServiceId) ?? null, [displayedReachabilityServices, focusedServiceId]);
 
@@ -139,12 +143,12 @@ function NetworkPage() {
     let succeeded = false;
     const pendingToken = pendingReachabilityTokenRef.current + 1;
     pendingReachabilityTokenRef.current = pendingToken;
-    setServiceProcessing(service.id, true, setProcessingServiceIds);
+    setServiceProcessingToken(service.id, pendingToken, setProcessingServiceTokens);
     setPendingReachabilityByServiceId((current) => ({ ...current, [service.id]: { acknowledged: false, token: pendingToken, zone: targetZone } }));
     setFocusedServiceId(service.id);
     setActionError(null);
     window.setTimeout(() => {
-      setServiceProcessing(service.id, false, setProcessingServiceIds);
+      setProcessingServiceTokens((current) => removeServiceProcessingForToken(current, service.id, pendingToken));
       setPendingReachabilityByServiceId((current) => removePendingReachabilityForToken(current, service.id, pendingToken));
     }, 20000);
     try {
@@ -191,8 +195,8 @@ function NetworkPage() {
       void appState.refresh();
     } finally {
       if (!succeeded) {
-        setServiceProcessing(service.id, false, setProcessingServiceIds);
-        setPendingReachabilityByServiceId((current) => removePendingReachability(current, service.id));
+        setProcessingServiceTokens((current) => removeServiceProcessingForToken(current, service.id, pendingToken));
+        setPendingReachabilityByServiceId((current) => removePendingReachabilityForToken(current, service.id, pendingToken));
       }
     }
   }, [appState, queryClient]);
@@ -255,7 +259,7 @@ function NetworkPage() {
     if (!settledServiceIds.length) {
       return;
     }
-    setProcessingServiceIds((current) => removeServiceProcessingIds(current, settledServiceIds));
+    setProcessingServiceTokens((current) => removeServiceProcessingIds(current, settledServiceIds));
     setPendingReachabilityByServiceId((current) => removePendingReachabilityIds(current, settledServiceIds));
   }, [pendingReachabilityByServiceId, reachabilityServices]);
 
@@ -300,7 +304,7 @@ function NetworkPage() {
                 copiedLinkKey={copiedLinkKey}
                 focusedServiceId={focusedServiceId}
                 items={filteredReachabilityServices}
-                loadingServiceIds={processingServiceIds}
+                loadingServiceIds={loadingServiceIds}
                 onCopyLink={copyAccessLink}
                 onFocusService={focusReachabilityService}
                 onMoveService={moveReachabilityService}
@@ -343,7 +347,7 @@ function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconcil
           <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Private access setup path</p>
           <h3 className="mt-2 text-xl font-black text-slate-50">{statusLabel}</h3>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">
-            Local access works without Tailscale. Private app links need this device connected to Tailscale, MagicDNS/HTTPS enabled, and Tailscale Serve permission granted to Autark-OS.
+            Local access works without Tailscale. Use the Tailscale control in the app header to sign in or check its status before turning on private links.
           </p>
         </div>
         <Badge className={connected ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/45 bg-orange-500/10 text-orange-200'} variant="outline">
@@ -517,19 +521,21 @@ function processingReachabilityDetail(zone: ReachabilityZoneId) {
   return 'Autark-OS is updating this service.';
 }
 
-function setServiceProcessing(
+function setServiceProcessingToken(
   serviceId: string,
-  processing: boolean,
-  setProcessingServiceIds: Dispatch<SetStateAction<Record<string, boolean>>>,
+  token: number,
+  setProcessingServiceTokens: Dispatch<SetStateAction<Record<string, number>>>,
 ) {
-  setProcessingServiceIds((current) => {
-    if (processing) {
-      return { ...current, [serviceId]: true };
-    }
-    const next = { ...current };
-    delete next[serviceId];
-    return next;
-  });
+  setProcessingServiceTokens((current) => ({ ...current, [serviceId]: token }));
+}
+
+function removeServiceProcessingForToken(current: Record<string, number>, serviceId: string, token: number) {
+  if (current[serviceId] !== token) {
+    return current;
+  }
+  const next = { ...current };
+  delete next[serviceId];
+  return next;
 }
 
 function removePendingReachability(current: Record<string, PendingReachability>, serviceId: string) {
@@ -566,7 +572,7 @@ function removePendingReachabilityIds(current: Record<string, PendingReachabilit
   return next;
 }
 
-function removeServiceProcessingIds(current: Record<string, boolean>, serviceIds: string[]) {
+function removeServiceProcessingIds(current: Record<string, number>, serviceIds: string[]) {
   const next = { ...current };
   for (const serviceId of serviceIds) {
     delete next[serviceId];

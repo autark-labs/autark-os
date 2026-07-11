@@ -1,9 +1,10 @@
 import { CheckCircle2, CircleAlert, Copy, ExternalLink, GripVertical, Lock, Router, Server, ShieldAlert, ShieldCheck } from 'lucide-react';
-import type { DragEvent, MouseEvent } from 'react';
+import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ProjectDarkControlButton, ProjectOpenButton } from '@/components/primitives/ProjectButtons';
@@ -24,7 +25,7 @@ type Zone = {
 const zones: Zone[] = [
   {
     id: 'local',
-    title: 'This server',
+    title: 'This Server',
     summary: 'Keep the service closest to this device.',
     emptyText: 'No server-only services',
     icon: Server,
@@ -32,7 +33,7 @@ const zones: Zone[] = [
   },
   {
     id: 'lan',
-    title: 'Home network',
+    title: 'Home Network / LAN',
     summary: 'Useful from devices on this LAN.',
     emptyText: 'No home-network services',
     icon: Router,
@@ -40,7 +41,7 @@ const zones: Zone[] = [
   },
   {
     id: 'tailnet',
-    title: 'Private Tailnet',
+    title: 'Private / Tailscale',
     summary: 'Private links for trusted Tailscale devices.',
     emptyText: 'No private services yet',
     icon: ShieldCheck,
@@ -48,7 +49,7 @@ const zones: Zone[] = [
   },
   {
     id: 'public',
-    title: 'Public Internet',
+    title: 'Open Internet',
     summary: 'Monitored only. Public publishing is not enabled here.',
     emptyText: 'Public access is off',
     icon: ShieldAlert,
@@ -76,6 +77,7 @@ export function ReachabilityMatrix({
 }) {
   const [draggedServiceId, setDraggedServiceId] = useState<string | null>(null);
   const [activeDropZone, setActiveDropZone] = useState<ReachabilityZoneId | null>(null);
+  const [mobileZone, setMobileZone] = useState<ReachabilityZoneId>('tailnet');
   const counts = new Map<ReachabilityZoneId, number>();
   zones.forEach((zone) => counts.set(zone.id, items.filter((item) => item.zone === zone.id).length));
   const draggedService = items.find((item) => item.id === draggedServiceId) ?? null;
@@ -91,6 +93,13 @@ export function ReachabilityMatrix({
         inline: 'nearest',
       });
     }, 80);
+  }, [focusedServiceId, items]);
+
+  useEffect(() => {
+    const focusedService = items.find((item) => item.id === focusedServiceId);
+    if (focusedService) {
+      setMobileZone(focusedService.zone);
+    }
   }, [focusedServiceId, items]);
 
   function handleDragStart(event: DragEvent<HTMLElement>, service: ReachabilityService) {
@@ -151,10 +160,31 @@ export function ReachabilityMatrix({
     <NetworkPanel
       action={<Badge className="border-sky-400/25 bg-slate-900 text-sky-100/80" variant="outline">{items.length} services</Badge>}
       className="overflow-hidden xl:max-h-[calc(100vh-17rem)]"
-      description="Drag a managed service to change where Autark-OS should make it reachable. Open the details only when you need links or repair actions."
+      description="On a phone, choose an access zone and use Details and actions to change a managed app. On desktop, you can also drag managed apps between zones."
       title="Reachability matrix"
     >
-      <div className="grid gap-3 xl:grid-cols-4 xl:overflow-hidden">
+      <Tabs className="grid gap-3 xl:hidden" onValueChange={(value) => setMobileZone(value as ReachabilityZoneId)} value={mobileZone}>
+        <TabsList className="grid w-full grid-cols-2 gap-1 rounded-xl border border-sky-400/20 bg-slate-900 p-1" variant="default">
+          {zones.map((zone) => <TabsTrigger className="min-h-10 px-2 text-xs text-sky-100/70 data-active:bg-cyan-300/15 data-active:text-cyan-100" key={zone.id} value={zone.id}>{mobileZoneLabel(zone.id)}</TabsTrigger>)}
+        </TabsList>
+        {zones.map((zone) => (
+          <TabsContent key={zone.id} value={zone.id}>
+            <MobileReachabilityZone
+              copiedLinkKey={copiedLinkKey}
+              focusedServiceId={focusedServiceId}
+              loadingServiceIds={loadingServiceIds}
+              onCopyLink={onCopyLink}
+              onFocusService={onFocusService}
+              onMoveService={onMoveService}
+              serviceCount={counts.get(zone.id) ?? 0}
+              services={items.filter((item) => item.zone === zone.id)}
+              zone={zone}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
+
+      <div className="hidden gap-3 xl:grid xl:grid-cols-4 xl:overflow-hidden">
         {zones.map((zone) => {
           const Icon = zone.icon;
           const zoneItems = items.filter((item) => item.zone === zone.id);
@@ -235,8 +265,8 @@ function ReachabilityCard({
   focused: boolean;
   loading: boolean;
   onCopyLink: (serviceId: string, linkKind: 'local' | 'private', url: string | null) => void;
-  onDragEnd: () => void;
-  onDragStart: (event: DragEvent<HTMLElement>, service: ReachabilityService) => void;
+  onDragEnd?: () => void;
+  onDragStart?: (event: DragEvent<HTMLElement>, service: ReachabilityService) => void;
   onFocusService: (service: ReachabilityService) => void;
   onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId) => void;
   service: ReachabilityService;
@@ -254,20 +284,33 @@ function ReachabilityCard({
     onFocusService(service);
   }
 
+  function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if ((event.key === 'Enter' || event.key === ' ') && !isInteractiveClick(event.target)) {
+      event.preventDefault();
+      onFocusService(service);
+    }
+  }
+
+  const dragEnabled = service.draggable && !loading && Boolean(onDragStart && onDragEnd);
+
   return (
     <NetworkInset
       className={cn(
         'overflow-hidden border-cyan-200/35 bg-cyan-950/80 p-0 shadow-sm shadow-cyan-950/25 transition hover:border-cyan-200/55 hover:bg-cyan-900/70',
         service.status === 'warning' && 'border-orange-300/45 bg-orange-950/75 shadow-orange-950/20 hover:border-orange-300/65 hover:bg-orange-900/70',
         focused && 'border-cyan-200 bg-cyan-800/80 shadow-lg shadow-cyan-500/20 ring-2 ring-cyan-300/50',
-        service.draggable && !loading && 'cursor-grab active:cursor-grabbing',
+        dragEnabled && 'cursor-grab active:cursor-grabbing',
         loading && 'animate-pulse opacity-80 ring-1 ring-cyan-300/40',
       )}
-      draggable={service.draggable && !loading}
+      aria-label={`${service.label}. ${service.statusLabel}. Press Enter for details and actions.`}
+      draggable={dragEnabled}
       id={reachabilityServiceElementId(service.id)}
       onClick={handleCardClick}
-      onDragEnd={onDragEnd}
-      onDragStart={(event) => onDragStart(event, service)}
+      onDragEnd={dragEnabled ? onDragEnd : undefined}
+      onDragStart={dragEnabled ? (event) => onDragStart?.(event, service) : undefined}
+      onKeyDown={handleCardKeyDown}
+      role="group"
+      tabIndex={0}
     >
       <div className="grid gap-2 p-2.5">
         <div className="flex w-full items-center gap-2 text-left">
@@ -279,7 +322,7 @@ function ReachabilityCard({
             </div>
             <p className="truncate text-xs text-cyan-50/65">{service.issue || service.detail}</p>
           </div>
-          {service.draggable && !loading && <GripVertical className="size-4 shrink-0 text-cyan-100/45" />}
+          {dragEnabled && <GripVertical className="size-4 shrink-0 text-cyan-100/45" />}
         </div>
 
         <div className="flex items-center gap-2">
@@ -328,6 +371,71 @@ function ReachabilityCard({
       </Accordion>
     </NetworkInset>
   );
+}
+
+function MobileReachabilityZone({
+  copiedLinkKey,
+  focusedServiceId,
+  loadingServiceIds,
+  onCopyLink,
+  onFocusService,
+  onMoveService,
+  serviceCount,
+  services,
+  zone,
+}: {
+  copiedLinkKey: string | null;
+  focusedServiceId: string | null;
+  loadingServiceIds: Record<string, boolean>;
+  onCopyLink: (serviceId: string, linkKind: 'local' | 'private', url: string | null) => void;
+  onFocusService: (service: ReachabilityService) => void;
+  onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId) => void;
+  serviceCount: number;
+  services: ReachabilityService[];
+  zone: Zone;
+}) {
+  const Icon = zone.icon;
+  return (
+    <section aria-label={zone.title} className={cn('grid gap-3 rounded-xl border p-3', zone.warning ? 'border-orange-400/30 bg-orange-500/10' : 'border-sky-400/25 bg-slate-800')}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 gap-2">
+          <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border', zone.warning ? 'border-orange-400/30 bg-orange-500/10 text-orange-100' : 'border-sky-400/25 bg-slate-900 text-cyan-100')}>
+            <Icon className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-slate-50">{zone.title}</h3>
+            <p className="mt-0.5 text-xs leading-5 text-sky-100/60">{zone.summary}</p>
+          </div>
+        </div>
+        <Badge className="shrink-0 border border-sky-400/25 bg-slate-900 text-sky-100/80" variant="outline">{zone.warning && !serviceCount ? 'Off' : serviceCount}</Badge>
+      </div>
+      {services.length ? (
+        <div className="grid gap-2">
+          {services.map((service) => (
+            <ReachabilityCard
+              copiedLinkKey={copiedLinkKey}
+              focused={focusedServiceId === service.id}
+              key={service.id}
+              loading={Boolean(loadingServiceIds[service.id])}
+              onCopyLink={onCopyLink}
+              onFocusService={onFocusService}
+              onMoveService={onMoveService}
+              service={service}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-sky-400/20 px-3 py-3 text-center text-sm text-sky-100/45">{zone.emptyText}</div>
+      )}
+    </section>
+  );
+}
+
+function mobileZoneLabel(zone: ReachabilityZoneId) {
+  if (zone === 'public') return 'Internet';
+  if (zone === 'tailnet') return 'Private';
+  if (zone === 'lan') return 'Home';
+  return 'Server';
 }
 
 function ServiceIcon({ loading, service, statusClass }: { loading: boolean; service: ReachabilityService; statusClass: string }) {
