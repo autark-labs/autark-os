@@ -6,7 +6,9 @@ import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/E
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
+import { semanticStatusVariants } from '@/components/primitives/SemanticVariants';
 import { buildAppRemediationFromIssue } from '@/lib/appRemediation';
 import { cn } from '@/lib/utils';
 import type { ActivityLog } from '@/types/activity';
@@ -54,7 +56,7 @@ export function SystemActivitySummary({
             </div>
             <p className="mt-1 text-sm text-slate-400">Recent checks, background repairs, and app activity in plain language.</p>
           </div>
-          <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-100">{recentEvents.length} recent</Badge>
+          <MetadataBadge tone="info">{recentEvents.length} recent</MetadataBadge>
         </div>
         <div className="mt-5 grid gap-3">
           {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} timeZone={timeZone} />) : (
@@ -129,7 +131,7 @@ export function MonitoringActivityFeed({
             </div>
             <p className="mt-1 text-sm text-slate-400">{showAdvancedMetrics ? 'Install progress, health checks, repairs, private access changes, and backend warnings.' : 'The latest visible work Autark-OS has done for apps, backups, access, and repairs.'}</p>
           </div>
-          <Badge className="border-slate-700 bg-slate-900 text-slate-300">{activity.length} events</Badge>
+          <MetadataBadge>{activity.length} events</MetadataBadge>
         </div>
 
         {showAdvancedMetrics && (
@@ -170,9 +172,9 @@ export function MonitoringActivityFeed({
               <h2 className="text-lg font-black text-white">Needs attention</h2>
               <p className="mt-1 text-sm text-slate-400">Apps Autark-OS cannot fully fix on its own.</p>
             </div>
-            <Badge className={cn('border', (reliability?.issues.length ?? 0) > 0 ? 'border-orange-400/45 bg-orange-500/10 text-orange-200' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
+            <StatusBadge tone={(reliability?.issues.length ?? 0) > 0 ? 'warning' : 'success'}>
               {reliability?.issues.length ?? 0}
-            </Badge>
+            </StatusBadge>
           </div>
           <div className="mt-4 grid gap-3">
             {reliability?.issues.length ? reliability.issues.map((issue) => <IssueCard issue={issue} key={`${issue.appId}-${issue.status}`} />) : (
@@ -246,13 +248,9 @@ function HighlightedIssueCard({ issue }: { issue: AppReliabilityIssue | null }) 
 }
 
 function MiniCount({ label, tone, value }: { label: string; tone: 'green' | 'orange' | 'red'; value: string }) {
-  const tones = {
-    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
-    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
-    red: 'border-red-400/40 bg-red-500/10 text-red-200',
-  };
+  const statusTone: StatusBadgeTone = tone === 'green' ? 'success' : tone === 'orange' ? 'warning' : 'danger';
   return (
-    <div className={cn('rounded-lg border p-3', tones[tone])}>
+    <div className={cn('rounded-lg p-3', semanticStatusVariants({ tone: statusTone }))}>
       <p className="text-xl font-black text-white">{value}</p>
       <p className="mt-1 text-xs font-bold uppercase text-current/70">{label}</p>
     </div>
@@ -293,8 +291,8 @@ function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics, timeZone 
         <span className="min-w-0">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-bold text-white">{event.title}</span>
-            <Badge className={cn('border text-[11px] capitalize', badgeTone(event.level))}>{event.category}</Badge>
-            {event.appId && <Badge className="border-slate-700 bg-slate-950 text-slate-300">{event.appId}</Badge>}
+            <StatusBadge className="text-[11px] capitalize" tone={badgeTone(event.level)}>{event.category}</StatusBadge>
+            {event.appId && <MetadataBadge>{event.appId}</MetadataBadge>}
           </span>
           <span className="mt-1 block text-sm text-slate-300">{event.message}</span>
         </span>
@@ -326,7 +324,7 @@ function IssueCard({ issue }: { issue: AppReliabilityIssue }) {
           <p className="font-bold text-white">{issue.appName}</p>
           <p className="mt-1">{remediation?.summary || issue.message}</p>
         </div>
-        <Badge className="border-orange-400/45 bg-orange-500/10 text-orange-200">{issue.status}</Badge>
+        <StatusBadge tone="warning">{issue.status}</StatusBadge>
       </div>
       <p className="mt-3 text-xs text-orange-100/75">{remediation?.nextStep || issue.suggestedAction}</p>
       {issue.detail && remediation?.summary !== issue.detail && <p className="mt-2 text-xs text-orange-100/60">{issue.detail}</p>}
@@ -373,26 +371,20 @@ function eventIcon(event: ActivityLog) {
 
 function eventTone(event: ActivityLog) {
   if (event.level === 'error' || event.outcome === 'failed') {
-    return 'border-red-400/40 text-red-200';
+    return semanticStatusVariants({ tone: 'danger' });
   }
   if (event.level === 'warning' || event.outcome === 'needs_attention') {
-    return 'border-orange-400/45 text-orange-200';
+    return semanticStatusVariants({ tone: 'warning' });
   }
   if (event.level === 'success') {
-    return 'border-emerald-300/20 text-emerald-100';
+    return semanticStatusVariants({ tone: 'success' });
   }
-  return 'border-slate-800 text-slate-300';
+  return semanticStatusVariants({ tone: 'neutral' });
 }
 
-function badgeTone(level: string) {
-  if (level === 'error') {
-    return 'border-red-400/40 bg-red-500/10 text-red-200';
-  }
-  if (level === 'warning') {
-    return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
-  }
-  if (level === 'success') {
-    return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
-  }
-  return 'border-slate-700 bg-slate-950 text-slate-300';
+function badgeTone(level: string): StatusBadgeTone {
+  if (level === 'error') return 'danger';
+  if (level === 'warning') return 'warning';
+  if (level === 'success') return 'success';
+  return 'neutral';
 }

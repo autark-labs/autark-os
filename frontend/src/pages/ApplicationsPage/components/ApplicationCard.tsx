@@ -61,7 +61,7 @@ export function ApplicationCard({
             </CardTitle>
             <div className="flex max-w-full flex-wrap justify-center gap-1">
               <ManagementBadge item={item} />
-              <AttentionIndicator item={item} className="absolute" />
+              <AttentionIndicator item={item} className="absolute right-3 top-11" />
             </div>
           </div>
         </div>

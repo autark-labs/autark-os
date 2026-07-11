@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
@@ -22,7 +23,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
@@ -275,7 +275,7 @@ function NetworkPage() {
           <h2 className="text-2xl font-bold leading-none text-slate-50 md:text-3xl">Access</h2>
           <p className="mt-2 max-w-2xl text-sm text-sky-100/70">Open local links, review private Tailscale links, and fix access issues from one place.</p>
         </div>
-        <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} tone="cyan" updatedAt={appState.updatedAt ?? network.updatedAt} />
+        <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} tone="info" updatedAt={appState.updatedAt ?? network.updatedAt} />
       </header>
 
       <CanonicalRecommendedAction />
@@ -355,9 +355,9 @@ function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconcil
             Local access works without Tailscale. Use the Tailscale control in the app header to sign in or check its status before turning on private links.
           </p>
         </div>
-        <Badge className={connected ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/45 bg-orange-500/10 text-orange-200'} variant="outline">
+        <StatusBadge tone={connected ? 'success' : 'warning'}>
           {connected ? 'Connected' : 'Local-only available'}
-        </Badge>
+        </StatusBadge>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {tasks.map((task) => (
@@ -397,7 +397,7 @@ function StalePrivateLinksPanel({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-semibold text-slate-50">HTTPS port {mapping.servePort ?? 'unknown'}</h3>
-              <Badge className="border-orange-400/45 bg-orange-500/10 text-orange-200" variant="outline">Stale private link</Badge>
+              <StatusBadge tone="warning">Stale private link</StatusBadge>
             </div>
             <p className="mt-2 text-sm text-orange-100/80">{mapping.detail}</p>
             <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
@@ -440,9 +440,9 @@ function SetupStep({ action, detail, label, status }: { action: string; detail: 
     <NetworkInset className="p-4">
       <div className="flex items-center justify-between gap-3">
         <h4 className="font-semibold text-slate-50">{label}</h4>
-        <Badge className={status === 'ok' ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : status === 'warning' ? 'border-orange-400/45 bg-orange-500/10 text-orange-200' : 'border-sky-400/25 bg-slate-900 text-sky-100/80'} variant="outline">
+        <StatusBadge tone={status === 'ok' ? 'success' : status === 'warning' ? 'warning' : 'neutral'}>
           {status === 'ok' ? 'Ready' : status === 'warning' ? 'Needs setup' : 'Later'}
-        </Badge>
+        </StatusBadge>
       </div>
       <p className="mt-2 text-sm leading-6 text-sky-100/70">{detail}</p>
       <p className="mt-3 text-xs font-semibold text-cyan-200">{action}</p>

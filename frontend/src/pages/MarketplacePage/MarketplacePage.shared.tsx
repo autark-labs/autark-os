@@ -1,5 +1,5 @@
 import { Check, ShieldCheck, TriangleAlert } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { MarketplaceApp } from '@/types/marketplace';
@@ -19,10 +19,9 @@ export function AppImage({ app, size = 'default' }: { app: MarketplaceApp; size?
 export function CatalogConfidenceBadge({ app }: { app: MarketplaceApp }) {
   const verified = catalogVerified(app);
   return (
-    <Badge className={cn('gap-1', verified ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200')} variant="outline">
-      {verified ? <ShieldCheck className="size-3" /> : <TriangleAlert className="size-3" />}
+    <StatusBadge icon={verified ? ShieldCheck : TriangleAlert} tone={verified ? 'success' : 'warning'}>
       {verified ? 'Verified' : 'Validation needed'}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -33,27 +32,32 @@ export function catalogVerified(app: MarketplaceApp) {
 }
 
 export function SupportBadge({ level }: { level: string }) {
-  const tone = supportTone(level);
   return (
-    <Badge className={cn('gap-1 border px-2.5 py-1', tone)} variant="outline">
-      {level}
-    </Badge>
+    <StatusBadge tone={supportTone(level)}>{level}</StatusBadge>
   );
 }
 
-function supportTone(level: string) {
+function supportTone(level: string): StatusBadgeTone {
   switch (level) {
     case 'Ready':
-      return 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200';
+      return 'success';
     case 'Advanced':
-      return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
+      return 'warning';
     case 'Needs testing':
-      return 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200';
+      return 'info';
     case 'Experimental':
-      return 'border-red-400/35 bg-red-500/10 text-red-200';
+      return 'danger';
     default:
-      return 'border-sky-400/25 bg-slate-800 text-slate-300';
+      return 'neutral';
   }
+}
+
+export function marketplaceStatusTone(tone: string): StatusBadgeTone {
+  if (tone === 'success') return 'success';
+  if (tone === 'warning' || tone === 'observed') return 'warning';
+  if (tone === 'danger') return 'danger';
+  if (tone === 'info') return 'info';
+  return 'neutral';
 }
 
 export function StatusLine({ label, value }: { label: string; value: string }) {

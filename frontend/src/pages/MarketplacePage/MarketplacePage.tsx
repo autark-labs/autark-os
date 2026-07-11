@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Bell, Info, RefreshCw, Sparkles, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { PageShell } from '@/components/layout/PageShell';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
@@ -523,7 +524,7 @@ function DiscoverGuidedHeader({
             <Sparkles className="size-5" />
           </span>
           <div>
-            <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline">Discover</Badge>
+            <MetadataBadge tone="info">Discover</MetadataBadge>
             <h2 className="mt-2 text-2xl font-bold leading-none text-slate-50 md:text-3xl">Discover Apps</h2>
             <p className="mt-2 max-w-2xl text-sm leading-5 text-slate-400">
               Install useful self-hosted apps without managing Docker by hand.
@@ -615,9 +616,9 @@ function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss
             {recommendation.notes[0] || 'A safe first app to review before installing.'}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Badge className={recommendation.readiness === 'blocked' ? 'border-orange-400/40 bg-orange-500/10 text-orange-200' : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200'} variant="outline">
+            <StatusBadge tone={recommendation.readiness === 'blocked' ? 'warning' : 'info'}>
               {recommendation.readiness === 'blocked' ? 'Readiness review needed' : recommendation.readiness === 'review' ? 'Review first' : 'Ready to review'}
-            </Badge>
+            </StatusBadge>
             <DisabledAction disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
               <ProjectPrimaryButton disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} size="sm" type="button">
                 <Sparkles className="size-4" />

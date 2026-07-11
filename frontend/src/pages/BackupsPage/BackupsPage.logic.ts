@@ -1,4 +1,5 @@
 import { activeJobs } from '../../repositories/jobRepository.logic';
+import type { SemanticStatusTone } from '@/components/primitives/SemanticVariants';
 import { formatLocalizedDateTime } from '@/lib/dateTime';
 import type { AppBackupStatus, BackupReport, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
@@ -64,21 +65,21 @@ export function backupSchedulerLabel(status: string) {
  * @param {string} status
  * @returns {string}
  */
-export function backupSchedulerTone(status: string) {
-  if (status === 'healthy') return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
-  if (status === 'warning') return 'border-red-400/40 bg-red-500/10 text-red-200';
-  if (status === 'off') return 'border-slate-700 bg-slate-900 text-slate-300';
-  return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
+export function backupSchedulerTone(status: string): SemanticStatusTone {
+  if (status === 'healthy') return 'success';
+  if (status === 'warning') return 'danger';
+  if (status === 'off') return 'muted';
+  return 'warning';
 }
 
 /**
  * @param {string} status
  * @returns {string}
  */
-export function backupAppBadgeTone(status: string) {
-  if (status === 'protected') return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
-  if (status === 'failed') return 'border-red-400/40 bg-red-500/10 text-red-200';
-  return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
+export function backupAppBadgeTone(status: string): SemanticStatusTone {
+  if (status === 'protected') return 'success';
+  if (status === 'failed') return 'danger';
+  return 'warning';
 }
 
 /**

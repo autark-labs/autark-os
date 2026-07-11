@@ -2,6 +2,7 @@ import * as React from 'react';
 import { CheckIcon, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { semanticStatusVariants } from '@/components/primitives/SemanticVariants';
 import {
   Command,
   CommandEmpty,
@@ -74,12 +75,12 @@ export function MultiSelect({
             ) : (
               <>
                 {selectedOptions.slice(0, maxVisible).map((option) => (
-                  <Badge className="border-cyan-200/35 bg-cyan-300/15 text-cyan-50" key={option.value} variant="outline">
+                  <Badge className={semanticStatusVariants({ tone: 'info' })} key={option.value} variant="outline">
                     {option.label}
                   </Badge>
                 ))}
                 {hiddenCount > 0 && (
-                  <Badge className="border-sky-400/25 bg-slate-900 text-sky-100/80" variant="outline">
+                  <Badge className={semanticStatusVariants({ tone: 'neutral' })} variant="outline">
                     +{hiddenCount}
                   </Badge>
                 )}

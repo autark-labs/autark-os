@@ -1,9 +1,10 @@
 import { AlertTriangle, CheckCircle2, ChevronRight, Copy, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
+import { semanticStatusVariants, type SemanticStatusTone } from '@/components/primitives/SemanticVariants';
 import { cn } from '@/lib/utils';
 import type { SupportFinding, SupportLogLine, SupportRedactionRule } from '@/types/system';
 import { humanize } from './SupportPage.logic';
@@ -12,16 +13,8 @@ export const SupportPanel = ProjectPanel;
 export const SupportInset = ProjectInset;
 
 export function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'red' | 'slate' | 'cyan' | 'sky'; value: string }) {
-  const tones = {
-    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-200',
-    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
-    red: 'border-red-400/40 bg-red-500/10 text-red-200',
-    slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
-    cyan: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
-    sky: 'border-sky-300/20 bg-sky-500/10 text-sky-100',
-  };
   return (
-    <div className={cn('rounded-lg border p-4', tones[tone])}>
+    <div className={cn('rounded-lg p-4', semanticStatusVariants({ tone: supportTone(tone) }))}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase text-current/70">{label}</p>
         <Icon className="size-4" />
@@ -42,13 +35,8 @@ export function InfoLine({ label, value }: { label: string; value: string }) {
 }
 
 export function BasicSupportCard({ detail, label, tone, value }: { detail: string; label: string; tone: 'green' | 'orange' | 'red'; value: string }) {
-  const tones = {
-    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
-    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
-    red: 'border-red-400/40 bg-red-500/10 text-red-200',
-  };
   return (
-    <div className={cn('rounded-lg border p-4', tones[tone])}>
+    <div className={cn('rounded-lg p-4', semanticStatusVariants({ tone: supportTone(tone) }))}>
       <p className="text-xs font-bold uppercase text-current/70">{label}</p>
       <p className="mt-3 text-3xl font-black text-white">{value}</p>
       <p className="mt-1 text-sm leading-5 text-current/75">{detail}</p>
@@ -62,8 +50,8 @@ export function FindingCard({ finding }: { finding: SupportFinding }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="border-current/20 bg-black/20 text-current" variant="outline">{finding.area}</Badge>
-            <Badge className="border-current/20 bg-black/20 text-current" variant="outline">{humanize(finding.severity)}</Badge>
+            <MetadataBadge>{finding.area}</MetadataBadge>
+            <MetadataBadge>{humanize(finding.severity)}</MetadataBadge>
           </div>
           <p className="mt-3 font-bold text-white">{finding.title}</p>
           <p className="mt-1 text-sm leading-5 text-current/75">{finding.message}</p>
@@ -152,10 +140,18 @@ export function statusTone(status?: string): 'green' | 'orange' | 'red' | 'slate
 
 function findingTone(severity: string) {
   if (severity === 'error') {
-    return 'border-red-400/40 bg-red-500/10 text-red-200';
+    return semanticStatusVariants({ tone: 'danger' });
   }
   if (severity === 'warning') {
-    return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
+    return semanticStatusVariants({ tone: 'warning' });
   }
-  return 'border-sky-300/20 bg-sky-500/10 text-sky-100';
+  return semanticStatusVariants({ tone: 'info' });
+}
+
+function supportTone(tone: 'green' | 'orange' | 'red' | 'slate' | 'cyan' | 'sky'): SemanticStatusTone {
+  if (tone === 'green') return 'success';
+  if (tone === 'orange') return 'warning';
+  if (tone === 'red') return 'danger';
+  if (tone === 'slate') return 'muted';
+  return 'info';
 }

@@ -7,7 +7,7 @@ import {
   ProjectOpenButton,
   ProjectPrimaryButton,
 } from '@/components/primitives/ProjectButtons';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Surface } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { AutarkOsAction, AutarkOsIssue } from '@/types/app';
@@ -353,9 +353,9 @@ function HomeGlowBadge({
   tone?: Tone;
 }) {
   return (
-    <Badge className={cn('border px-2.5 py-1', toneClasses[tone].badge, className)} variant="outline">
+    <StatusBadge className={cn('px-2.5 py-1', className)} tone={tone}>
       {children}
-    </Badge>
+    </StatusBadge>
   );
 }
 

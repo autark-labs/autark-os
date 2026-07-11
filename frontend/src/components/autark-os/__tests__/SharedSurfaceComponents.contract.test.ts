@@ -29,6 +29,10 @@ test('shared surface components provide typed accessible primitives', () => {
   const loading = source('src/components/autark-os/PageLoadingState.tsx');
   const error = source('src/components/autark-os/PageLoadError.tsx');
   const status = source('src/components/autark-os/StatusBadge.tsx');
+  const metadata = source('src/components/autark-os/MetadataBadge.tsx');
+  const variants = source('src/components/primitives/SemanticVariants.ts');
+  const buttons = source('src/components/primitives/ProjectButtons.tsx');
+  const baseButton = source('src/components/ui/button.tsx');
   const copy = source('src/components/autark-os/CopyField.tsx');
   const detail = source('src/components/autark-os/ResponsiveDetailsSheet.tsx');
   const dateTime = source('src/components/autark-os/LocalizedDateTime.tsx');
@@ -43,6 +47,19 @@ test('shared surface components provide typed accessible primitives', () => {
   assert.match(error, /autoFocus/);
   assert.match(status, /export type StatusBadgeTone/);
   assert.match(status, /<Badge/);
+  assert.match(status, /statusIcon/);
+  assert.match(status, /data-icon="inline-start"/);
+  assert.match(metadata, /export type MetadataBadgeTone/);
+  assert.match(variants, /semanticStatusVariants/);
+  assert.match(variants, /semanticSolidStatusVariants/);
+  assert.match(variants, /bg-emerald-700 text-white/);
+  assert.match(variants, /semanticSurfaceVariants/);
+  assert.match(variants, /semanticDisabledClass/);
+  assert.match(variants, /disabled:bg-app-disabled-surface/);
+  assert.match(buttons, /semanticPrimaryActionClass/);
+  assert.match(baseButton, /semanticDisabledClass/);
+  assert.match(status, /StatusBadgeAppearance = 'soft' \| 'solid'/);
+  assert.match(metadata, /MetadataBadgeAppearance = 'soft' \| 'solid'/);
   assert.match(copy, /export type CopyFieldModel/);
   assert.match(copy, /CopyTextButton/);
   assert.match(copy, /sensitive/);
@@ -55,6 +72,25 @@ test('shared surface components provide typed accessible primitives', () => {
   assert.match(pageHeader, /<Separator/);
   assert.match(jobProgress, /<Progress/);
   assert.match(jobProgress, /terminalJob/);
+});
+
+test('active pages delegate status and metadata badges to the shared semantic primitives', () => {
+  const pages = [
+    'src/pages/ApplicationsPage/components/AppStateBadges.tsx',
+    'src/pages/BackupsPage/BackupsPage.components.tsx',
+    'src/pages/MarketplacePage/MarketplaceAppList.tsx',
+    'src/pages/MonitoringPage/MonitoringActivitySections.tsx',
+    'src/pages/NetworkPage/NetworkPage.tsx',
+    'src/pages/SettingsPage/SettingsPage.tsx',
+    'src/pages/StoragePage/StoragePage.tsx',
+    'src/pages/SupportPage/SupportPage.tsx',
+  ];
+
+  for (const page of pages) {
+    const content = source(page);
+    assert.doesNotMatch(content, /from ['"]@\/components\/ui\/badge['"]/);
+    assert.match(content, /(StatusBadge|MetadataBadge|semanticStatusVariants)/, `${page} should use a shared semantic visual primitive`);
+  }
 });
 
 test('active pages use shared surface components instead of local page state cards', () => {

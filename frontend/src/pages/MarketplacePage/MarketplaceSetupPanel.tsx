@@ -1,5 +1,6 @@
 import { CheckCircle2, HelpCircle, Info, ShieldCheck, TriangleAlert } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
@@ -47,17 +48,15 @@ export function MarketplaceSetupPanel({
     <section className="grid gap-4 rounded-lg border border-sky-400/25 bg-slate-800 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline">
-            Guided setup
-          </Badge>
+          <MetadataBadge tone="info">Guided setup</MetadataBadge>
           <h4 className="mt-3 font-bold text-slate-50">Choose how {app.name} should start</h4>
           <p className="mt-1 text-sm leading-6 text-slate-400">
             These choices come from Autark-OS and are checked on the server before install.
           </p>
         </div>
-        <Badge className={preview?.valid ?? true ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200'} variant="outline">
+        <StatusBadge tone={preview?.valid ?? true ? 'success' : 'warning'}>
           {preview?.valid ?? true ? 'Ready to review' : 'Needs a choice'}
-        </Badge>
+        </StatusBadge>
       </div>
 
       <div className="grid gap-4">
@@ -74,7 +73,7 @@ export function MarketplaceSetupPanel({
                     <span className="block text-sm font-bold text-slate-50">{group.label}</span>
                     <span className="mt-1 block text-xs leading-5 text-slate-400">{group.description}</span>
                   </span>
-                  <Badge className="border-sky-400/25 bg-slate-800 text-slate-300" variant="outline">Optional</Badge>
+                  <MetadataBadge>Optional</MetadataBadge>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="mt-3 grid gap-3">
@@ -148,9 +147,9 @@ export function InstallPlanPreview({ preview }: { preview: DiscoverInstallPrevie
           <h4 className="font-bold text-slate-50">Install preview</h4>
           <p className="mt-1 text-sm leading-6 text-slate-400">Plain-language summary from the backend before Autark-OS changes this server.</p>
         </div>
-        <Badge className={preview?.valid ?? true ? 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/40 bg-orange-500/10 text-orange-200'} variant="outline">
+        <StatusBadge tone={preview?.valid ?? true ? 'success' : 'warning'}>
           {preview?.valid ?? true ? 'Ready' : 'Needs setup'}
-        </Badge>
+        </StatusBadge>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

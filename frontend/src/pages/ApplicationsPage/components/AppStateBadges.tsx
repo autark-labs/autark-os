@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, CircleHelp, Link2, Loader2, Pause, Search, Server, XCircle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { cn } from '@/lib/utils';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
@@ -11,20 +12,15 @@ export function ReadinessBadge({ item, overlay = false }: { item: ApplicationSur
   const Icon = readinessIcon(item.readinessState);
 
   return (
-    <Badge
-      className={cn(
-        overlay && 'absolute right-3 top-3',
-        item.readinessState === 'ready' && 'bg-emerald-300 text-emerald-950',
-        item.readinessState === 'starting' && 'bg-cyan-100 text-slate-950',
-        item.readinessState === 'paused' && 'bg-slate-700 text-white',
-        item.readinessState === 'stopped' && 'bg-slate-600 text-white',
-        item.readinessState === 'unreachable' && 'bg-orange-500 text-white',
-        item.readinessState === 'unknown' && 'bg-slate-300 text-slate-950',
-      )}
+    <StatusBadge
+      appearance="solid"
+      className={cn(overlay && 'absolute right-3 top-3')}
+      icon={Icon}
+      iconClassName={item.readinessState === 'starting' ? 'animate-spin' : undefined}
+      tone={readinessTone(item.readinessState)}
     >
-      <Icon className={item.readinessState === 'starting' ? 'animate-spin' : undefined} data-icon="inline-start" />
       {labelForReadiness(item.readinessState)}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -32,10 +28,10 @@ export function ManagementBadge({ item }: { item: ApplicationSurfaceItem }) {
   const Icon = item.managementState === 'managed' ? Server : item.managementState === 'linked' ? Link2 : Search;
 
   return (
-    <Badge className="bg-slate-800 text-sky-50">
+    <MetadataBadge appearance="solid" tone="neutral">
       <Icon data-icon="inline-start" />
       {labelForManagementState(item.managementState)}
-    </Badge>
+    </MetadataBadge>
   );
 }
 
@@ -45,17 +41,9 @@ export function AttentionIndicator({ item, className }: { item: ApplicationSurfa
   }
 
   return (
-    <Badge
-      className={cn(
-        className,
-        item.attentionState === 'needs_review' && 'bg-orange-500 text-white',
-        item.attentionState === 'conflict' && 'bg-red-600 text-white',
-        item.attentionState === 'blocked' && 'bg-red-700 text-white',
-      )}
-    >
-      <AlertTriangle data-icon="inline-start" />
+    <StatusBadge appearance="solid" className={className} icon={AlertTriangle} tone={item.attentionState === 'needs_review' ? 'warning' : 'danger'}>
       {labelForAttention(item.attentionState)}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -68,15 +56,15 @@ export function OperationBadge({ item, overlay = false }: { item: ApplicationSur
   const Icon = failed ? AlertTriangle : Loader2;
 
   return (
-    <Badge
-      className={cn(
-        overlay && 'absolute right-3 top-3',
-        failed ? 'bg-red-700 text-white' : 'bg-cyan-300 text-slate-950',
-      )}
+    <StatusBadge
+      appearance="solid"
+      className={cn(overlay && 'absolute right-3 top-3')}
+      icon={Icon}
+      iconClassName={failed ? undefined : 'animate-spin'}
+      tone={failed ? 'danger' : 'info'}
     >
-      <Icon className={failed ? undefined : 'animate-spin'} data-icon="inline-start" />
       {item.operationState.label}
-    </Badge>
+    </StatusBadge>
   );
 }
 
@@ -112,4 +100,11 @@ function readinessIcon(state: ApplicationSurfaceItem['readinessState']) {
   if (state === 'paused') return Pause;
   if (state === 'stopped' || state === 'unreachable') return XCircle;
   return CircleHelp;
+}
+
+export function readinessTone(state: ApplicationSurfaceItem['readinessState']): StatusBadgeTone {
+  if (state === 'ready') return 'success';
+  if (state === 'starting') return 'info';
+  if (state === 'unreachable') return 'warning';
+  return 'neutral';
 }

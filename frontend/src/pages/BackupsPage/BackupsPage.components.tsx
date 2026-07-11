@@ -1,10 +1,12 @@
 import { AppWindow, Archive, CalendarClock, CheckCircle2, Clock3, Info, Loader2, Play, RotateCcw, ShieldCheck, Sparkles, TimerReset } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
+import { semanticStatusVariants } from '@/components/primitives/SemanticVariants';
 import {
   Dialog,
   DialogContent,
@@ -49,7 +51,7 @@ export function ProtectionPanel({ latestRestore, report }: { latestRestore: Rest
           <p className="text-sm font-bold text-white">{report?.settings.automaticBackupsEnabled ? 'Routine backups on' : 'Routine backups off'}</p>
           <p className="mt-1 text-xs text-slate-400">{report?.settings.nextRunLabel || 'Schedule unavailable'}</p>
         </div>
-        <span className={cn('grid size-11 place-items-center rounded-lg border', report?.settings.automaticBackupsEnabled ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/45 bg-orange-500/10 text-orange-200')}>
+        <span className={cn('grid size-11 place-items-center rounded-lg', semanticStatusVariants({ tone: report?.settings.automaticBackupsEnabled ? 'success' : 'warning' }))}>
           <ShieldCheck className="size-5" />
         </span>
       </div>
@@ -77,7 +79,7 @@ export function RoutineHealthPanel({ report, showAdvancedMetrics }: { report: Ba
     <BackupPanel>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <SectionHeader icon={TimerReset} title="Protection rhythm" description="Last good checkpoint, next scheduled run, and current scheduler status." />
-        <Badge className={cn('border', tone)}>{backupSchedulerLabel(report.settings.schedulerHealth)}</Badge>
+        <StatusBadge tone={tone}>{backupSchedulerLabel(report.settings.schedulerHealth)}</StatusBadge>
       </div>
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <FactRow label="Last successful backup" value={report.settings.lastSuccessfulRoutineRun ? formatBackupDate(report.settings.lastSuccessfulRoutineRun.createdAt) : 'None yet'} />
@@ -96,20 +98,16 @@ export function RoutineHealthPanel({ report, showAdvancedMetrics }: { report: Ba
 }
 
 export function ActionCard({ busy, description, disabled = false, disabledReason = 'This action is unavailable for the current backup state.', icon: Icon, label, onClick, title, tone }: { busy: boolean; description: string; disabled?: boolean; disabledReason?: string; icon: LucideIcon; label: string; onClick: () => void; title: string; tone: 'cyan' | 'sky' | 'emerald' }) {
-  const tones = {
-    cyan: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
-    sky: 'border-sky-400/30 bg-sky-500/10 text-sky-100',
-    emerald: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
-  };
   const isDisabled = busy || disabled;
+  const statusTone = tone === 'emerald' ? 'success' : 'info';
   return (
     <DisabledAction className="w-full" disabled={isDisabled} reason={busy ? 'Wait for the current backup job to finish.' : disabledReason}>
-      <button className={cn('group w-full rounded-lg border p-4 text-left transition hover:-translate-y-0.5 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50', tones[tone])} disabled={isDisabled} onClick={onClick} type="button">
+      <button className={cn('group w-full rounded-lg p-4 text-left transition hover:-translate-y-0.5 hover:bg-app-panel disabled:cursor-not-allowed', semanticStatusVariants({ tone: isDisabled ? 'muted' : statusTone }))} disabled={isDisabled} onClick={onClick} type="button">
         <div className="flex items-start justify-between gap-3">
           <span className="grid size-11 place-items-center rounded-lg border border-sky-400/25 bg-slate-900 text-white">
             {busy ? <Loader2 className="size-5 animate-spin" /> : <Icon className="size-5" />}
           </span>
-          <Badge className="border-sky-400/20 bg-slate-900 text-current">{label}</Badge>
+          <MetadataBadge>{label}</MetadataBadge>
         </div>
         <p className="mt-4 font-black text-white">{title}</p>
         <p className="mt-2 text-sm leading-6 text-current/75">{description}</p>
@@ -156,8 +154,8 @@ export function AppBackupCard({ app, onRun, operationAvailability, running, show
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-bold text-white">{app.appName}</p>
-            <Badge className={cn('border', backupAppBadgeTone(app.status))}>{backupStatusLabel(app.status)}</Badge>
-            {app.backupContract.reviewRequired && <Badge className="border-orange-400/45 bg-orange-500/10 text-orange-200">Review</Badge>}
+            <StatusBadge tone={backupAppBadgeTone(app.status)}>{backupStatusLabel(app.status)}</StatusBadge>
+            {app.backupContract.reviewRequired && <StatusBadge tone="warning">Review</StatusBadge>}
           </div>
           <p className="mt-1 text-xs leading-5 text-slate-500">{app.message}</p>
         </div>
@@ -392,7 +390,7 @@ function TimelinePoint({ apps, first, onDetails, onRestore, onVerify, point, res
           <span className="grid size-12 place-items-center rounded-lg border border-cyan-300/40 bg-cyan-300 text-slate-950 shadow-lg shadow-cyan-500/20">
             <Archive className="size-5" />
           </span>
-          <Badge className="border-sky-300/20 bg-sky-500/10 text-sky-100">Routine</Badge>
+          <MetadataBadge tone="info">Routine</MetadataBadge>
         </div>
         <p className="mt-4 text-lg font-black text-white">{formatBackupDate(point.createdAt, timeZone)}</p>
         <p className="mt-1 text-xs text-slate-500">{formatBackupBytes(point.sizeBytes)} stored</p>
@@ -436,8 +434,8 @@ function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, restoreA
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-bold text-white">{point.scope === 'full' ? 'Full backup' : point.appName}</p>
-          <Badge className={cn('border', point.source === 'automatic' ? 'border-sky-300/20 bg-sky-500/10 text-sky-100' : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100')}>{point.source}</Badge>
-          <Badge className="border-slate-700 bg-slate-950 text-slate-300">{point.scope}</Badge>
+          <MetadataBadge tone="info">{point.source}</MetadataBadge>
+          <MetadataBadge>{point.scope}</MetadataBadge>
           <VerificationBadge point={point} />
         </div>
         <p className="mt-1 text-xs text-slate-500">{point.message}</p>
@@ -474,13 +472,9 @@ function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, restoreA
 
 function VerificationBadge({ point }: { point: RestorePoint }) {
   const status = point.verificationStatus || 'not_checked';
-  const tone = status === 'verified'
-    ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100'
-    : status === 'failed'
-      ? 'border-red-400/40 bg-red-500/10 text-red-200'
-      : 'border-orange-400/45 bg-orange-500/10 text-orange-200';
+  const tone = status === 'verified' ? 'success' : status === 'failed' ? 'danger' : 'warning';
   const label = status === 'verified' ? `Verified · ${capitalizeBackupLabel(point.restoreConfidence || 'unknown')}` : status === 'failed' ? 'Verification failed' : 'Not verified';
-  return <Badge className={tone}>{label}</Badge>;
+  return <StatusBadge tone={tone}>{label}</StatusBadge>;
 }
 
 function MiniStat({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {

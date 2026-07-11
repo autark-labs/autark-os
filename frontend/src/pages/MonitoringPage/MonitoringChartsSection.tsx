@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import type { AppReliabilitySummary } from '@/types/app';
@@ -103,7 +103,7 @@ function AutarkOsMetricsPanel({
           </div>
           <p className="mt-1 text-sm text-slate-400">A quick read on system activity, app health, and managed app resource usage.</p>
         </div>
-        <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-100">{history?.windowLabel || 'Last 60 minutes'}</Badge>
+        <MetadataBadge tone="info">{history?.windowLabel || 'Last 60 minutes'}</MetadataBadge>
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -257,7 +257,7 @@ function DeviceInstrumentationPanel({
             Current host readings for the device running Autark-OS. Memory uses Linux available memory so cache does not look like active app usage.
           </p>
         </div>
-        <Badge className="border-cyan-300/20 bg-cyan-500/10 text-cyan-100">{metrics ? formatDate(metrics.checkedAt) : 'Waiting'}</Badge>
+        <MetadataBadge tone="info">{metrics ? formatDate(metrics.checkedAt) : 'Waiting'}</MetadataBadge>
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">

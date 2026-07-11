@@ -1,11 +1,7 @@
 import { cn } from '@/lib/utils';
+import { semanticStatusVariants } from './SemanticVariants';
 
 type MetricCardTone = 'default' | 'attention';
-
-const metricToneClass: Record<MetricCardTone, string> = {
-  default: 'border-sky-400/25 bg-slate-800 text-sky-50',
-  attention: 'border-orange-400 bg-orange-200 text-orange-950 shadow-lg shadow-orange-500/20',
-};
 
 export function MetricCard({
   className,
@@ -21,10 +17,9 @@ export function MetricCard({
   const attention = tone === 'attention';
 
   return (
-    <div className={cn('min-w-28 rounded-xl border px-4 py-3', metricToneClass[tone], className)}>
+    <div className={cn('min-w-28 rounded-xl px-4 py-3', tone === 'attention' ? semanticStatusVariants({ tone: 'warning' }) : 'border border-app-border-muted bg-app-panel-muted text-app-text', className)}>
       <div className="text-2xl font-semibold">{value}</div>
-      <div className={attention ? 'text-sm text-orange-800' : 'text-sm text-sky-100/70'}>{label}</div>
+      <div className={attention ? 'text-sm text-current/75' : 'text-sm text-app-text-secondary/80'}>{label}</div>
     </div>
   );
 }
-

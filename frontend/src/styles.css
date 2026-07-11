@@ -35,6 +35,24 @@
   --app-danger: var(--color-red-600);
   --app-info: var(--color-cyan-300);
   --app-teal: var(--color-teal-400);
+  --app-status-success-border: rgb(52 211 153 / 0.35);
+  --app-status-success-surface: rgb(16 185 129 / 0.12);
+  --app-status-success-text: var(--color-emerald-200);
+  --app-status-warning-border: rgb(251 146 60 / 0.45);
+  --app-status-warning-surface: rgb(249 115 22 / 0.12);
+  --app-status-warning-text: var(--color-orange-200);
+  --app-status-danger-border: rgb(248 113 113 / 0.4);
+  --app-status-danger-surface: rgb(239 68 68 / 0.12);
+  --app-status-danger-text: var(--color-red-200);
+  --app-status-info-border: rgb(103 232 249 / 0.35);
+  --app-status-info-surface: rgb(34 211 238 / 0.1);
+  --app-status-info-text: var(--color-cyan-100);
+  --app-status-muted-border: var(--app-border-muted);
+  --app-status-muted-surface: var(--app-panel-muted);
+  --app-status-muted-text: var(--app-text-secondary);
+  --app-disabled-surface: color-mix(in srgb, var(--app-panel-muted) 88%, var(--app-page));
+  --app-disabled-border: color-mix(in srgb, var(--app-border-muted) 65%, transparent);
+  --app-disabled-text: var(--app-text-disabled);
   --app-shadow-sm: 0 8px 24px rgb(2 6 23 / 0.14);
   --app-shadow-md: 0 18px 54px rgb(2 6 23 / 0.2);
   --app-shadow-lg: 0 28px 90px rgb(2 6 23 / 0.28);
@@ -308,6 +326,25 @@
   --color-app-danger: var(--app-danger);
   --color-app-info: var(--app-info);
   --color-app-teal: var(--app-teal);
+  --color-app-status-success-border: var(--app-status-success-border);
+  --color-app-status-success-surface: var(--app-status-success-surface);
+  --color-app-status-success-text: var(--app-status-success-text);
+  --color-app-status-warning-border: var(--app-status-warning-border);
+  --color-app-status-warning-surface: var(--app-status-warning-surface);
+  --color-app-status-warning-text: var(--app-status-warning-text);
+  --color-app-status-danger-border: var(--app-status-danger-border);
+  --color-app-status-danger-surface: var(--app-status-danger-surface);
+  --color-app-status-danger-text: var(--app-status-danger-text);
+  --color-app-status-info-border: var(--app-status-info-border);
+  --color-app-status-info-surface: var(--app-status-info-surface);
+  --color-app-status-info-text: var(--app-status-info-text);
+  --color-app-status-muted-border: var(--app-status-muted-border);
+  --color-app-status-muted-surface: var(--app-status-muted-surface);
+  --color-app-status-muted-text: var(--app-status-muted-text);
+  --color-app-disabled-surface: var(--app-disabled-surface);
+  --color-app-disabled-border: var(--app-disabled-border);
+  --color-app-disabled-text: var(--app-disabled-text);
+  --background-image-app-hero-default: var(--app-hero-default);
 }
 
 * {

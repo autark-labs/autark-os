@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -344,7 +344,7 @@ function SettingsSectionHeader({ icon: Icon, status, title }: { icon: LucideIcon
         <Icon className="size-4 text-cyan-200" />
         <span className="truncate text-sm font-semibold text-white">{title}</span>
       </div>
-      <Badge className="bg-slate-900 text-sky-50">{status}</Badge>
+      <MetadataBadge>{status}</MetadataBadge>
     </div>
   );
 }

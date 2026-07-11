@@ -3,7 +3,7 @@ import { Loader2, Search, ShieldAlert, XCircle } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,9 +60,9 @@ export function ObservedServiceCatalogMatchSection({
           </p>
         </div>
         {item.catalogMatchConfidence && (
-          <Badge className="border-sky-300/25 bg-slate-950 text-sky-100" variant="outline">
+          <MetadataBadge>
             {item.catalogMatchConfidence}
-          </Badge>
+          </MetadataBadge>
         )}
       </div>
 

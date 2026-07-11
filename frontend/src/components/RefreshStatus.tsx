@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Button } from '@/components/ui/button';
+import { semanticStatusVariants } from '@/components/primitives/SemanticVariants';
 import { cn } from '@/lib/utils';
 
 type RefreshStatusProps = {
@@ -11,11 +12,11 @@ type RefreshStatusProps = {
   onRefresh?: () => void;
   refreshing?: boolean;
   showButton?: boolean;
-  tone?: 'slate' | 'violet' | 'cyan' | 'emerald' | 'sky';
+  tone?: 'muted' | 'info' | 'success';
   updatedAt: Date | null;
 };
 
-export function RefreshStatus({ className, disabled, intervalLabel, onRefresh, refreshing = false, showButton = true, tone = 'slate', updatedAt }: RefreshStatusProps) {
+export function RefreshStatus({ className, disabled, intervalLabel, onRefresh, refreshing = false, showButton = true, tone = 'muted', updatedAt }: RefreshStatusProps) {
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -26,23 +27,15 @@ export function RefreshStatus({ className, disabled, intervalLabel, onRefresh, r
   const label = useMemo(() => formatUpdatedAt(updatedAt), [updatedAt]);
   const refreshDisabled = Boolean(disabled || refreshing);
   const refreshDisabledReason = refreshing ? 'Refresh is already running.' : 'Refresh is not available right now.';
-  const tones = {
-    slate: 'border-slate-700/50 bg-slate-950/50 text-slate-200 hover:bg-slate-800',
-    violet: 'border-violet-300/20 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25',
-    cyan: 'border-cyan-300/20 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25',
-    emerald: 'border-emerald-300/20 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25',
-    sky: 'border-sky-300/20 bg-sky-500/15 text-sky-100 hover:bg-sky-500/25',
-  };
-
   return (
     <div className={cn('flex flex-wrap items-center justify-end gap-2', className)}>
-      <div className="text-right text-xs leading-5 text-slate-500">
-        <p className="font-semibold text-slate-300">{refreshing ? 'Updating now' : label}</p>
+      <div className="text-right text-xs leading-5 text-app-text-muted">
+        <p className="font-semibold text-app-text-secondary">{refreshing ? 'Updating now' : label}</p>
         {intervalLabel && <p>{intervalLabel}</p>}
       </div>
       {showButton && onRefresh && (
         <DisabledAction disabled={refreshDisabled} reason={refreshDisabledReason}>
-          <Button className={cn('gap-2 border', tones[tone])} disabled={refreshDisabled} onClick={onRefresh} type="button" variant="outline">
+          <Button className={cn('gap-2 hover:bg-app-panel-hover', semanticStatusVariants({ tone: refreshDisabled ? 'muted' : tone }))} disabled={refreshDisabled} onClick={onRefresh} type="button" variant="outline">
             <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
             Refresh
           </Button>

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -104,9 +104,9 @@ export function ObservedServiceManagementSection({ actions, item }: ObservedServ
           <p className="text-sm font-semibold text-amber-100">{serviceCopy.title}</p>
           <p className="mt-1 text-xs leading-5 text-amber-100/75">{serviceCopy.description}</p>
         </div>
-        <Badge className="shrink-0 border-amber-300/30 bg-slate-900 text-amber-100" variant="outline">
+        <StatusBadge className="shrink-0" tone="warning">
           {item.userStatusLabel || (isLinked ? 'Linked' : 'Not managed')}
-        </Badge>
+        </StatusBadge>
       </div>
 
       {localError && (

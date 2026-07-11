@@ -6,7 +6,8 @@ import { Link } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
-import { StatusBadge } from '@/components/autark-os/StatusBadge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
@@ -14,7 +15,6 @@ import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/pri
 import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { copyText } from '@/lib/copyText';
-import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
@@ -382,7 +382,7 @@ function ResourceLine({ resource, technical = false }: { resource: ObservedServi
           <p className="font-bold text-white">{resource.displayName}</p>
           <p className="mt-1 text-sm text-slate-400">{resource.userStatusDescription}</p>
         </div>
-        <Badge className="border-slate-600/60 bg-slate-950/60 text-slate-300" variant="outline">{resource.userStatusLabel || labelForOwnership(resource.ownershipState)}</Badge>
+        <MetadataBadge>{resource.userStatusLabel || labelForOwnership(resource.ownershipState)}</MetadataBadge>
       </div>
       {technical && (
         <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
@@ -405,9 +405,9 @@ function RepairLine({ app }: { app: AppRuntimeView }) {
           <p className="font-bold text-white">{app.appName}</p>
           <p className="mt-1 text-sm text-slate-400">{app.remediation?.summary || app.healthSnapshot?.detail || 'Autark-OS has not recorded repair detail for this app.'}</p>
         </div>
-        <Badge className={cn('border-slate-600/60 bg-slate-950/60 text-slate-300', app.remediation?.tone === 'critical' && 'border-red-400/40 bg-red-500/10 text-red-200', app.remediation?.tone === 'warning' && 'border-orange-400/45 bg-orange-500/10 text-orange-200', app.remediation?.tone === 'success' && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')} variant="outline">
+        <StatusBadge tone={repairTone(app.remediation?.tone)}>
           {app.remediation?.label || app.friendlyStatus}
-        </Badge>
+        </StatusBadge>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
         <span>Health: {app.healthSnapshot?.status || app.friendlyStatus}</span>
@@ -449,6 +449,13 @@ function labelForOwnership(value: string) {
   if (value === 'legacy_autark_os') return 'Recoverable Autark-OS app';
   if (value === 'external_docker') return 'Existing Docker app';
   return humanize(value || 'unknown');
+}
+
+function repairTone(tone?: string): StatusBadgeTone {
+  if (tone === 'critical') return 'danger';
+  if (tone === 'warning') return 'warning';
+  if (tone === 'success') return 'success';
+  return 'neutral';
 }
 
 export default SupportPage;

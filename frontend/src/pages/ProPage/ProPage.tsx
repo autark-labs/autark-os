@@ -1,7 +1,7 @@
 import { ArrowRight, Layers3, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageShell } from '@/components/layout/PageShell';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 
@@ -9,8 +9,8 @@ function ProPage() {
   return (
     <PageShell>
       <ProjectPanel className="overflow-hidden p-0">
-        <div className="border-b border-cyan-300/20 bg-[linear-gradient(135deg,rgb(34_211_238_/_0.16),rgb(15_23_42_/_0.94)_55%)] p-6 md:p-8">
-          <Badge className="border-cyan-300/30 bg-cyan-400/10 text-cyan-100">Separate paid app</Badge>
+        <div className="border-b border-cyan-300/20 bg-app-hero-default p-6 md:p-8">
+          <MetadataBadge tone="info">Separate paid app</MetadataBadge>
           <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-2xl">
               <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl">Autark Pro is being built as a standalone app.</h1>

@@ -8,7 +8,8 @@ import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -195,7 +196,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
     <main className="min-h-screen bg-slate-950 p-4 text-slate-100 md:p-8">
       <section className="mx-auto grid max-w-4xl gap-5">
         <header className="rounded-2xl border border-sky-400/30 bg-slate-900 p-6 shadow-xl shadow-slate-950/30 md:p-8">
-          <Badge className="border-cyan-300/30 bg-cyan-400/10 text-cyan-100">First boot</Badge>
+          <MetadataBadge tone="info">First boot</MetadataBadge>
           <h1 className="mt-4 text-3xl font-black tracking-normal text-white md:text-5xl">Set up Autark-OS</h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-slate-300">A few guided choices will prepare this device for your first apps. You can revisit optional choices later.</p>
           <ol className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-6" aria-label="Setup progress">
@@ -268,7 +269,7 @@ function ReadinessStep({ existingInstall, setupStatus, state, showExistingInstal
       <div className="grid gap-3 md:grid-cols-2">
         {readiness.groups.map((group) => (
           <div className="rounded-xl border border-sky-400/25 bg-slate-800 p-4" key={group.id}>
-            <div className="flex items-center justify-between gap-3"><span className="font-semibold text-white">{group.label}</span><Badge className={group.status === 'ok' ? 'bg-emerald-500/15 text-emerald-100' : 'bg-amber-500/15 text-amber-100'}>{group.status === 'ok' ? 'Ready' : 'Needs attention'}</Badge></div>
+            <div className="flex items-center justify-between gap-3"><span className="font-semibold text-white">{group.label}</span><StatusBadge tone={group.status === 'ok' ? 'success' : 'warning'}>{group.status === 'ok' ? 'Ready' : 'Needs attention'}</StatusBadge></div>
             <p className="mt-2 text-sm leading-6 text-slate-400">{group.message}</p>
           </div>
         ))}

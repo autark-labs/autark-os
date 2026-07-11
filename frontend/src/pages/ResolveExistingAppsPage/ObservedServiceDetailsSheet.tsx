@@ -5,14 +5,13 @@ import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
+import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { showActionErrorNotification } from '@/lib/actionNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
 import {
   catalogAppIsManaged,
   useApplicationStateRepository,
@@ -107,7 +106,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
     <ResponsiveDetailsSheet
       className="sm:max-w-xl"
       footer={<Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" onClick={() => onOpenChange(false)} type="button" variant="outline">Close</Button>}
-      headerAccessory={<Badge className={stateBadgeClass(service)} variant="outline">{service.userStatusLabel || (service.pinned ? 'Pinned' : 'Found')}</Badge>}
+      headerAccessory={<StatusBadge tone={stateBadgeTone(service)}>{service.userStatusLabel || (service.pinned ? 'Pinned' : 'Found')}</StatusBadge>}
       model={{ description: service.userStatusDescription || 'Autark-OS observes this service but does not manage it.', title: service.displayName }}
       onOpenChange={onOpenChange}
       open={open}
@@ -271,11 +270,9 @@ function planList(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-function stateBadgeClass(service: ObservedServiceView) {
-  return cn(
-    service.userStatus === 'pinned_external' && 'border-sky-300/25 bg-sky-500/10 text-sky-100',
-    (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') && 'border-amber-300/25 bg-amber-500/10 text-amber-100',
-    (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') && 'border-red-300/25 bg-red-500/10 text-red-100',
-    !['pinned_external', 'recoverable', 'failed_install', 'managed_elsewhere', 'blocked'].includes(service.userStatus) && 'border-slate-600 bg-slate-800/60 text-slate-300',
-  );
+function stateBadgeTone(service: ObservedServiceView): StatusBadgeTone {
+  if (service.userStatus === 'pinned_external') return 'info';
+  if (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') return 'warning';
+  if (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') return 'danger';
+  return 'neutral';
 }

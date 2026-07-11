@@ -6,6 +6,7 @@ import { test } from 'vitest';
 const page = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/ApplicationsPage.tsx'), 'utf8');
 const advancedView = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/AdvancedApplicationsView.tsx'), 'utf8');
 const card = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/ApplicationCard.tsx'), 'utf8');
+const stateBadges = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppStateBadges.tsx'), 'utf8');
 
 test('My Apps renders canonical managed and linked collections without mixing in found services', () => {
   assert.match(page, /const managedItems = useMemo\(\(\) => items\.filter\(\(item\) => item\.managementState === 'managed'\)/);
@@ -20,6 +21,12 @@ test('My Apps renders canonical managed and linked collections without mixing in
   assert.match(card, /title=\{item\.name\}/);
   assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
   assert.match(page, /title="My Apps"/);
+});
+
+test('My Apps uses solid high-contrast state badges on its light app cards', () => {
+  assert.match(stateBadges, /<StatusBadge\s+appearance="solid"/);
+  assert.match(stateBadges, /<MetadataBadge appearance="solid" tone="neutral">/);
+  assert.match(card, /<AttentionIndicator item=\{item\} className="absolute right-3 top-11" \/>/);
 });
 
 test('My Apps sends non-managed services to the dedicated existing-app review flow', () => {

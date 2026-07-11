@@ -1,8 +1,8 @@
 import { Activity, Archive, Clock3, Cpu, Network } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Progress } from '@/components/ui/progress';
 import { useAppTelemetryQuery } from '@/repositories/appManagementRepository';
-import { labelForReadiness } from '../components/AppStateBadges';
+import { labelForReadiness, readinessTone } from '../components/AppStateBadges';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function ApplicationTelemetryTab({ item }: { item: ApplicationSurfaceItem }) {
@@ -28,7 +28,7 @@ export function ApplicationTelemetryTab({ item }: { item: ApplicationSurfaceItem
       <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
         <div className="flex items-center justify-between gap-3">
           <span className="text-sm font-semibold text-white">Health</span>
-          <Badge className="bg-slate-900 text-sky-50">{labelForReadiness(item.readinessState)}</Badge>
+          <StatusBadge tone={readinessTone(item.readinessState)}>{labelForReadiness(item.readinessState)}</StatusBadge>
         </div>
         <Detail label="Status" value={health?.status || item.status} />
         {(health?.message || health?.detail) && (

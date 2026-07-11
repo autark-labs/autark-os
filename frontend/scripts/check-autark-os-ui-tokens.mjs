@@ -23,6 +23,8 @@ const ignoredPathParts = [
 
 const failures = [];
 
+const pageBadgeImports = [];
+
 function walk(directory) {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
   return entries.flatMap((entry) => {
@@ -48,6 +50,14 @@ for (const relativeFile of tokenizedFiles) {
       failures.push(`${relativeFile} still contains ${pattern}`);
     }
   }
+
+  if (relativeFile.startsWith('src/pages/') && /from ['"]@\/components\/ui\/badge['"]/.test(content)) {
+    pageBadgeImports.push(relativeFile);
+  }
+}
+
+if (pageBadgeImports.length) {
+  failures.push(`Page-level status and metadata pills must use shared semantic badge primitives: ${pageBadgeImports.join(', ')}`);
 }
 
 if (failures.length) {

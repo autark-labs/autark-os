@@ -19,7 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
@@ -324,9 +324,9 @@ function SettingsPage() {
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, managed-app defaults, backups, and advanced host details. Changes apply when you save them.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className={cn('border', dirty ? 'border-orange-300/35 bg-orange-500/10 text-orange-100' : 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100')}>
+            <StatusBadge tone={dirty ? 'warning' : 'success'}>
               {dirty ? 'Unsaved changes' : 'Saved'}
-            </Badge>
+            </StatusBadge>
             <DisabledAction disabled={refreshing || saving} reason={saving ? 'Wait for the current save to finish.' : 'Settings are already refreshing.'}>
               <ProjectDarkControlButton disabled={refreshing || saving} onClick={requestRefresh} type="button">
                 <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />

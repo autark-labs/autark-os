@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { cn } from '@/lib/utils';
 import { statusTone } from './extensions/NetworkPage.theme';
 import type { NetworkIssueView } from './extensions/NetworkPage.types';
@@ -24,7 +24,7 @@ export function NetworkIssuesPanel({ issues, onReviewPrivateLinks }: { issues: N
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-slate-50">{issue.label}</span>
-                  <Badge className="border-sky-400/25 bg-slate-900 text-sky-100/80" variant="outline">{issue.source === 'app' ? 'App link' : 'Network'}</Badge>
+                  <MetadataBadge>{issue.source === 'app' ? 'App link' : 'Network'}</MetadataBadge>
                 </div>
                 <span className="mt-1 block text-sm text-sky-100/75">{issue.message}</span>
                 {issue.detail && <span className="mt-1 block text-xs text-sky-100/50">{issue.detail}</span>}

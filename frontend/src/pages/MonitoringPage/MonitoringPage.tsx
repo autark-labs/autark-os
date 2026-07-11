@@ -94,7 +94,7 @@ function MonitoringPage() {
                   </ProjectDarkControlButton>
                 </DisabledAction>
               )}
-              <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])} refreshing={monitoring.isFetching || appState.isFetching} tone="cyan" updatedAt={appState.updatedAt ?? monitoring.updatedAt} />
+              <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])} refreshing={monitoring.isFetching || appState.isFetching} tone="info" updatedAt={appState.updatedAt ?? monitoring.updatedAt} />
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { ExternalLink, KeyRound, ListChecks, QrCode, Sparkles } from 'lucide-react';
 import { CopyField } from '@/components/autark-os/CopyField';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { Button } from '@/components/ui/button';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
@@ -34,7 +34,7 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
               {usageGuide?.summary || item.description}
             </p>
           </div>
-          <Badge className="w-fit bg-slate-900 text-sky-50">{setupGuide?.automation || usageGuide?.kind || item.managementState}</Badge>
+          <MetadataBadge className="w-fit">{setupGuide?.automation || usageGuide?.kind || item.managementState}</MetadataBadge>
         </div>
 
         {item.href && (

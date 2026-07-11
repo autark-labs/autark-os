@@ -1,5 +1,5 @@
 import { ExternalLink, Settings2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import type { NetworkDiagnosticsReport, TailscaleConnectGuide, TailscaleStatus } from '@/types/network';
 import { DiagnosticRow, InfoLine, NetworkInset, NetworkPanel } from './NetworkPage.shared';
@@ -37,9 +37,9 @@ export function NetworkAdvancedPanel({
 
       <NetworkPanel
         action={
-            <Badge className={connected ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200' : 'border-orange-400/45 bg-orange-500/10 text-orange-200'} variant="outline">
+            <StatusBadge tone={connected ? 'success' : 'warning'}>
               {connected ? 'Connected' : 'Setup needed'}
-            </Badge>
+            </StatusBadge>
         }
         description={tailscale?.message || 'Checking Tailscale status.'}
         title="Tailscale setup"

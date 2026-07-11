@@ -2,12 +2,14 @@ import { CheckCircle2, CircleAlert, Copy, ExternalLink, GripVertical, Lock, Rout
 import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ProjectDarkControlButton, ProjectOpenButton } from '@/components/primitives/ProjectButtons';
+import { semanticStatusVariants } from '@/components/primitives/SemanticVariants';
 import { cn } from '@/lib/utils';
 import type { ReachabilityService, ReachabilityZoneId } from './extensions/NetworkPage.types';
 import { NetworkInset, NetworkPanel } from './NetworkPage.shared';
@@ -158,7 +160,7 @@ export function ReachabilityMatrix({
 
   return (
     <NetworkPanel
-      action={<Badge className="border-sky-400/25 bg-slate-900 text-sky-100/80" variant="outline">{items.length} services</Badge>}
+      action={<MetadataBadge>{items.length} services</MetadataBadge>}
       className="overflow-hidden xl:max-h-[calc(100vh-17rem)]"
       description="On a phone, choose an access zone and use Details and actions to change a managed app. On desktop, you can also drag managed apps between zones."
       title="Reachability matrix"
@@ -214,9 +216,9 @@ export function ReachabilityMatrix({
                     <p className="mt-0.5 text-xs leading-5 text-sky-100/60">{zone.summary}</p>
                   </div>
                 </div>
-                <Badge className={cn('shrink-0 border', zone.warning && counts.get(zone.id) ? 'border-red-400/40 bg-red-500/10 text-red-200' : 'border-sky-400/25 bg-slate-900 text-sky-100/80')} variant="outline">
+                <StatusBadge className="shrink-0" tone={zone.warning && counts.get(zone.id) ? 'danger' : 'neutral'}>
                   {zone.warning && !counts.get(zone.id) ? 'Off' : counts.get(zone.id)}
-                </Badge>
+                </StatusBadge>
               </div>
 
               <div className="grid gap-2 xl:min-h-0 xl:flex-1 xl:auto-rows-max xl:content-start xl:items-start xl:overflow-y-auto xl:overscroll-contain xl:pr-1 xl:[contain:layout_paint]">
@@ -271,11 +273,8 @@ function ReachabilityCard({
   onMoveService: (service: ReachabilityService, zone: ReachabilityZoneId) => void;
   service: ReachabilityService;
 }) {
-  const statusClass = service.status === 'connected'
-    ? 'border-emerald-400/35 bg-emerald-500/10 text-emerald-200'
-    : service.status === 'warning'
-      ? 'border-orange-400/35 bg-orange-500/10 text-orange-200'
-      : 'border-sky-400/25 bg-slate-900 text-sky-100/75';
+  const statusTone = reachabilityStatusTone(service.status);
+  const statusClass = semanticStatusVariants({ tone: statusTone });
 
   function handleCardClick(event: MouseEvent<HTMLElement>) {
     if (isInteractiveClick(event.target)) {
@@ -318,7 +317,7 @@ function ReachabilityCard({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               <h4 className="truncate text-sm font-bold text-slate-50">{service.label}</h4>
-              {service.type === 'external-service' && <Badge className="border-sky-400/20 bg-slate-900 text-[0.65rem] text-sky-100/65" variant="outline">Pinned</Badge>}
+              {service.type === 'external-service' && <MetadataBadge className="px-2 py-0.5 text-[0.65rem]">Pinned</MetadataBadge>}
             </div>
             <p className="truncate text-xs text-cyan-50/65">{service.issue || service.detail}</p>
           </div>
@@ -326,7 +325,7 @@ function ReachabilityCard({
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge className={cn('border text-[0.68rem]', statusClass)} variant="outline">{loading ? 'Processing' : service.statusLabel}</Badge>
+          <StatusBadge className="text-[0.68rem]" tone={loading ? 'info' : statusTone}>{loading ? 'Processing' : service.statusLabel}</StatusBadge>
           {service.openUrl ? (
             <ProjectOpenButton asChild className="ml-auto" size="icon-sm" title={`Open ${service.label}`}>
               <a href={service.openUrl} rel="noreferrer" target="_blank">
@@ -407,7 +406,7 @@ function MobileReachabilityZone({
             <p className="mt-0.5 text-xs leading-5 text-sky-100/60">{zone.summary}</p>
           </div>
         </div>
-        <Badge className="shrink-0 border border-sky-400/25 bg-slate-900 text-sky-100/80" variant="outline">{zone.warning && !serviceCount ? 'Off' : serviceCount}</Badge>
+        <StatusBadge className="shrink-0" tone={zone.warning && serviceCount ? 'danger' : 'neutral'}>{zone.warning && !serviceCount ? 'Off' : serviceCount}</StatusBadge>
       </div>
       {services.length ? (
         <div className="grid gap-2">
@@ -561,9 +560,7 @@ function PrivateLinkStatus({ service }: { service: ReachabilityService }) {
             aria-label={status.label}
             className={cn(
               'inline-flex size-4 shrink-0 items-center justify-center rounded-full border',
-              status.tone === 'stable' && 'border-emerald-300/45 bg-emerald-400/15 text-emerald-200',
-              status.tone === 'warning' && 'border-orange-300/50 bg-orange-400/15 text-orange-200',
-              status.tone === 'neutral' && 'border-sky-300/35 bg-sky-300/10 text-sky-100/70',
+              semanticStatusVariants({ tone: status.tone === 'stable' ? 'success' : status.tone === 'warning' ? 'warning' : 'neutral' }),
             )}
             role="img"
             tabIndex={0}
@@ -577,6 +574,12 @@ function PrivateLinkStatus({ service }: { service: ReachabilityService }) {
       </Tooltip>
     </TooltipProvider>
   );
+}
+
+function reachabilityStatusTone(status: ReachabilityService['status']): StatusBadgeTone {
+  if (status === 'connected') return 'success';
+  if (status === 'warning') return 'warning';
+  return 'neutral';
 }
 
 function privateLinkStatus(service: ReachabilityService) {

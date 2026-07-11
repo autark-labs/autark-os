@@ -5,14 +5,16 @@ import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel, Surface } from '@/components/primitives/Surface';
+import { semanticStatusVariants, type SemanticStatusTone } from '@/components/primitives/SemanticVariants';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
@@ -105,7 +107,7 @@ function StoragePage() {
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 md:text-base">{storageHero.summary}</p>
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-3">
-              <Badge className={cn('border', usageBadgeTone(report?.hostDisk.usedPercent ?? -1))}>{percentLabel(report?.hostDisk.usedPercent)} used</Badge>
+              <StatusBadge tone={usageBadgeTone(report?.hostDisk.usedPercent ?? -1)}>{percentLabel(report?.hostDisk.usedPercent)} used</StatusBadge>
               <span className="text-sm text-slate-400">{report ? `${formatBytes(report.hostDisk.usableBytes)} free on this computer` : 'Storage totals unavailable'}</span>
             </div>
           </div>
@@ -115,7 +117,7 @@ function StoragePage() {
                 <p className="text-sm font-bold text-white">Space at a glance</p>
                 <p className="mt-1 text-xs text-slate-400">Apps, backups, and free space in one view.</p>
               </div>
-              <RefreshStatus intervalLabel="Auto-updates every 30s" onRefresh={() => void storage.refresh()} refreshing={storage.isFetching} tone="cyan" updatedAt={storage.updatedAt} />
+              <RefreshStatus intervalLabel="Auto-updates every 30s" onRefresh={() => void storage.refresh()} refreshing={storage.isFetching} tone="info" updatedAt={storage.updatedAt} />
             </div>
             <DiskCapacityGauge usage={report?.hostDisk ?? null} />
           </StorageInset>
@@ -126,8 +128,8 @@ function StoragePage() {
         <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
           <SignalCard icon={statusIcon(report?.status)} label="Health" value={report?.headline || 'Unknown'} detail={storageHero.action} tone={statusTone(report?.status)} />
           <SignalCard icon={HardDrive} label="Free space" value={report ? formatBytes(report.hostDisk.usableBytes) : 'Unknown'} detail={report ? `${percentLabel(report.hostDisk.usedPercent)} used overall` : 'Not reported'} tone={usageTone(report?.hostDisk.usedPercent)} />
-          <SignalCard icon={Database} label="App data" value={formatBytes(appDataBytes)} detail={`${report?.apps.length ?? 0} installed apps tracked`} tone="cyan" />
-          <SignalCard icon={Archive} label="Backup data" value={report ? formatBytes(report.backupStorage.usedBytes) : 'Unknown'} detail={`${appsWithBackupsOn}/${report?.apps.length ?? 0} apps with backups on`} tone="green" />
+          <SignalCard icon={Database} label="App data" value={formatBytes(appDataBytes)} detail={`${report?.apps.length ?? 0} installed apps tracked`} tone="info" />
+          <SignalCard icon={Archive} label="Backup data" value={report ? formatBytes(report.backupStorage.usedBytes) : 'Unknown'} detail={`${appsWithBackupsOn}/${report?.apps.length ?? 0} apps with backups on`} tone="success" />
         </div>
       </Surface>
 
@@ -276,7 +278,7 @@ function UsagePanel({ title, usage }: { title: string; usage: StorageUsage }) {
           <p className="font-bold text-white">{title}</p>
           <p className="mt-1 text-xs text-slate-500">{locationLabel(title)}</p>
         </div>
-        <Badge className={cn('border', usageBadgeTone(usage.usedPercent))}>{percentLabel(usage.usedPercent)}</Badge>
+        <StatusBadge tone={usageBadgeTone(usage.usedPercent)}>{percentLabel(usage.usedPercent)}</StatusBadge>
       </div>
       <Progress className="mt-4 h-2 bg-slate-950" value={safePercent(usage.usedPercent)} />
       <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
@@ -294,10 +296,10 @@ function AppStorageRow({ app, copied, onCopy, showAdvancedMetrics }: { app: AppS
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-bold text-white">{app.appName}</p>
-          <Badge className="border-slate-700 bg-slate-950 text-slate-300">{app.status}</Badge>
-          <Badge className={cn('border', app.backupEnabled ? 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100' : 'border-orange-400/45 bg-orange-500/10 text-orange-200')}>
+          <MetadataBadge>{app.status}</MetadataBadge>
+          <StatusBadge tone={app.backupEnabled ? 'success' : 'warning'}>
             {app.backupEnabled ? `${app.backupFrequency} backup` : 'Backup off'}
-          </Badge>
+          </StatusBadge>
         </div>
         <p className="mt-1 text-xs text-slate-500">Managed app data</p>
         {showAdvancedMetrics && <p className="mt-1 select-text truncate font-mono text-xs text-slate-300">{app.path}</p>}
@@ -328,7 +330,7 @@ function AppStorageRow({ app, copied, onCopy, showAdvancedMetrics }: { app: AppS
 function RecommendationCard({ recommendation }: { recommendation: StorageRecommendation }) {
   const Icon = recommendation.tone === 'success' ? CheckCircle2 : recommendation.tone === 'danger' ? AlertTriangle : Info;
   return (
-    <div className={cn('rounded-lg border p-4', recommendationTone(recommendation.tone))}>
+    <div className={cn('rounded-lg p-4', semanticStatusVariants({ tone: recommendationTone(recommendation.tone) }))}>
       <div className="flex gap-3">
         <Icon className="mt-0.5 size-5 shrink-0" />
         <div>
@@ -443,16 +445,9 @@ function SectionHeader({ compact = false, description, icon: Icon, title }: { co
   );
 }
 
-function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'red' | 'slate' | 'cyan'; value: string }) {
-  const tones = {
-    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-200',
-    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
-    red: 'border-red-400/40 bg-red-500/10 text-red-200',
-    slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
-    cyan: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
-  };
+function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: SemanticStatusTone; value: string }) {
   return (
-    <div className={cn('rounded-lg border p-4', tones[tone])}>
+    <div className={cn('rounded-lg p-4', semanticStatusVariants({ tone }))}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-bold uppercase text-current/70">{label}</p>
         <Icon className="size-4" />
@@ -510,31 +505,31 @@ function statusIcon(status?: string) {
   return Info;
 }
 
-function statusTone(status?: string): 'green' | 'orange' | 'red' | 'slate' | 'cyan' {
-  if (status === 'healthy') return 'green';
-  if (status === 'critical') return 'red';
-  if (status === 'warning') return 'orange';
-  return 'cyan';
+function statusTone(status?: string): SemanticStatusTone {
+  if (status === 'healthy') return 'success';
+  if (status === 'critical') return 'danger';
+  if (status === 'warning') return 'warning';
+  return 'info';
 }
 
-function usageTone(value?: number): 'green' | 'orange' | 'red' | 'slate' | 'cyan' {
-  if (value == null || value < 0) return 'slate';
-  if (value >= 90) return 'red';
-  if (value >= 75) return 'orange';
-  return 'green';
+function usageTone(value?: number): SemanticStatusTone {
+  if (value == null || value < 0) return 'muted';
+  if (value >= 90) return 'danger';
+  if (value >= 75) return 'warning';
+  return 'success';
 }
 
-function usageBadgeTone(value: number) {
-  if (value >= 90) return 'border-red-400/40 bg-red-500/10 text-red-200';
-  if (value >= 75) return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
-  return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
+function usageBadgeTone(value: number): SemanticStatusTone {
+  if (value >= 90) return 'danger';
+  if (value >= 75) return 'warning';
+  return 'success';
 }
 
-function recommendationTone(tone: string) {
-  if (tone === 'success') return 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100';
-  if (tone === 'danger') return 'border-red-400/40 bg-red-500/10 text-red-200';
-  if (tone === 'warning') return 'border-orange-400/45 bg-orange-500/10 text-orange-200';
-  return 'border-sky-400/25 bg-slate-800 text-slate-300';
+function recommendationTone(tone: string): SemanticStatusTone {
+  if (tone === 'success') return 'success';
+  if (tone === 'danger') return 'danger';
+  if (tone === 'warning') return 'warning';
+  return 'neutral';
 }
 
 function shortRecommendation(recommendation: StorageRecommendation) {

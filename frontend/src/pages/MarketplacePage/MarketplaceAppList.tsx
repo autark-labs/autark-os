@@ -1,6 +1,6 @@
 import { CheckCircle2, ChevronDown, Clock3, Info, Loader2, MoreHorizontal, SlidersHorizontal, Sparkles, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import type { DiscoverAppView } from '@/types/discover';
 import type { MarketplaceApp } from '@/types/marketplace';
 import { sortOptions } from './extensions/MarketplacePage.constants';
 import { marketplaceCardToneClass, marketplacePrimaryRoute } from './extensions/MarketplacePage.logic';
-import { AppImage } from './MarketplacePage.shared';
+import { AppImage, marketplaceStatusTone } from './MarketplacePage.shared';
 
 type MarketplaceAppListProps = {
   apps: DiscoverAppView[];
@@ -99,8 +99,8 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-center gap-2">
               <strong className="line-clamp-2 min-w-0 break-words text-base text-slate-50" title={app.name}>{app.name}</strong>
-              <Badge className={stateBadgeClass(app.statusTone)} variant="outline">{app.stateLabel}</Badge>
-              {installing && <Badge className="gap-1 border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline"><Loader2 className="size-3 animate-spin" />Installing</Badge>}
+              <StatusBadge tone={marketplaceStatusTone(app.statusTone)}>{app.stateLabel}</StatusBadge>
+              {installing && <StatusBadge icon={Loader2} iconClassName="animate-spin" tone="info">Installing</StatusBadge>}
             </span>
             <span className="mt-1 block text-xs text-slate-400">{app.categoryLabel} · {app.estimatedInstallTime} · {app.difficulty}</span>
           </span>
@@ -164,14 +164,11 @@ function BasicAppStoreCard({ app, installing, isSelected, onSelect }: { app: Dis
           <span className="min-w-0 flex-1">
             <span className="line-clamp-2 min-h-10 break-words text-base font-bold text-slate-50" title={app.name}>{app.name}</span>
             <span className="mt-1 block truncate text-xs font-medium text-slate-400">{app.categoryLabel}</span>
-            <Badge className={cn('mt-2 rounded-full px-2 py-0.5 text-[0.7rem]', stateBadgeClass(app.statusTone))} variant="outline">
+            <StatusBadge className="mt-2 px-2 py-0.5 text-[0.7rem]" tone={marketplaceStatusTone(app.statusTone)}>
               {app.stateLabel}
-            </Badge>
+            </StatusBadge>
             {installing && (
-              <Badge className="mt-2 gap-1 rounded-full border-cyan-300/35 bg-cyan-400/10 px-2 py-0.5 text-[0.7rem] text-cyan-200" variant="outline">
-                <Loader2 className="size-3 animate-spin" />
-                Installing
-              </Badge>
+              <StatusBadge className="mt-2 px-2 py-0.5 text-[0.7rem]" icon={Loader2} iconClassName="animate-spin" tone="info">Installing</StatusBadge>
             )}
           </span>
         </span>
@@ -218,25 +215,6 @@ function BasicAppStoreCard({ app, installing, isSelected, onSelect }: { app: Dis
 
 function marketplaceActionLabel(app: DiscoverAppView) {
   return app.primaryAction.id === 'review_setup' ? 'Install' : app.primaryAction.label;
-}
-
-function stateBadgeClass(tone: string) {
-  if (tone === 'success') {
-    return 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200';
-  }
-  if (tone === 'warning') {
-    return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
-  }
-  if (tone === 'observed') {
-    return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
-  }
-  if (tone === 'danger') {
-    return 'border-red-400/35 bg-red-500/10 text-red-200';
-  }
-  if (tone === 'neutral') {
-    return 'border-sky-400/25 bg-slate-800 text-slate-300';
-  }
-  return 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200';
 }
 
 function outcomeCopy(app: MarketplaceApp) {

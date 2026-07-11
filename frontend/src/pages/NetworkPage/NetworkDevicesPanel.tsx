@@ -1,6 +1,6 @@
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { cn } from '@/lib/utils';
-import { statusTone } from './extensions/NetworkPage.theme';
+import { networkStatusTone, statusTone } from './extensions/NetworkPage.theme';
 import type { NetworkDeviceView } from './extensions/NetworkPage.types';
 import { NetworkInset, NetworkPanel } from './NetworkPage.shared';
 
@@ -25,7 +25,7 @@ export function NetworkDevicesPanel({ devices }: { devices: NetworkDeviceView[] 
               <span className="mt-1 block truncate text-xs text-sky-100/50">{device.ipAddress || device.dnsName || device.lastSeen}</span>
             </span>
             <span className="ml-auto grid shrink-0 justify-items-end gap-1">
-              <Badge className={cn('border', statusTone(device.status, 'badge'))} variant="outline">{device.statusLabel}</Badge>
+              <StatusBadge tone={networkStatusTone(device.status)}>{device.statusLabel}</StatusBadge>
               <span className="text-xs capitalize text-sky-100/50">{device.connectionType}</span>
             </span>
           </NetworkInset>

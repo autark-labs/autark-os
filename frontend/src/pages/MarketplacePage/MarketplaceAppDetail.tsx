@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
@@ -29,7 +30,7 @@ import {
   applicationRouteWithManagementPanel,
 } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { InstallWizard } from './MarketplaceInstallWizard';
-import { AppImage, InfoCard, Stat, SupportBadge } from './MarketplacePage.shared';
+import { AppImage, InfoCard, marketplaceStatusTone, Stat, SupportBadge } from './MarketplacePage.shared';
 import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
 
 type AppDetailProps = {
@@ -102,7 +103,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
               <h3 className="text-2xl font-bold text-slate-50">{app.name}</h3>
-              <Badge className={stateBadgeClass(appView.statusTone)} variant="outline">{appView.stateLabel}</Badge>
+              <StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
               <SupportBadge level={app.supportLevel} />
             </div>
             <p className="mt-2 text-sm text-slate-300">{app.description}</p>
@@ -115,7 +116,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {app.tags.map((tag) => <Badge className="border-sky-400/25 bg-slate-800 text-slate-300" key={tag} variant="outline">{tag}</Badge>)}
+          {app.tags.map((tag) => <MetadataBadge key={tag}>{tag}</MetadataBadge>)}
         </div>
 
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -312,15 +313,6 @@ function ExistingServiceNotice({ appView, reviewHref }: { appView: DiscoverAppVi
       </div>
     </section>
   );
-}
-
-function stateBadgeClass(tone: string) {
-  if (tone === 'success') return 'border-emerald-300/35 bg-emerald-500/10 text-emerald-200';
-  if (tone === 'warning') return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
-  if (tone === 'danger') return 'border-red-400/35 bg-red-500/10 text-red-200';
-  if (tone === 'info') return 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200';
-  if (tone === 'observed') return 'border-orange-400/40 bg-orange-500/10 text-orange-200';
-  return 'border-sky-400/25 bg-slate-800 text-slate-300';
 }
 
 function InstallBlockedNotice({ message }: { message: string }) {
