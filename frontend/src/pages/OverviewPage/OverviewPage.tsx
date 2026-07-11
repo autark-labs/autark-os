@@ -30,10 +30,9 @@ function OverviewPage() {
   const home = useHomeRepository();
 
   const apps = appState.applicationState?.managedApps ?? [];
-  const observedServices = appState.observedServices;
   const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
-  const pinnedServices = useMemo(() => observedServices.filter((service) => service.userStatus === 'pinned_external'), [observedServices]);
-  const observedNeedingReview = useMemo(() => observedServices.filter((service) => !service.managedByThisAutarkOs && service.userStatus !== 'pinned_external'), [observedServices]);
+  const pinnedServices = appState.pinnedExternalServices;
+  const observedNeedingReview = appState.foundServices;
   const majorActivity = useMemo(() => homeMajorActivity(home.activity, 5) as ActivityLog[], [home.activity]);
   const showActivityLogLink = shouldShowActivityLogLink(viewMode, majorActivity);
   const primaryAction = home.recommendedAction?.id === 'no-action-needed' ? null : home.recommendedAction;
@@ -89,7 +88,7 @@ function OverviewPage() {
                   </div>
                 </div>
                 <ProjectWarningButton asChild className="shrink-0" size="sm">
-                  <Link to="/apps/found">Review</Link>
+                  <Link to="/apps/found">Review existing apps</Link>
                 </ProjectWarningButton>
               </div>
             </HomeSoftCard>

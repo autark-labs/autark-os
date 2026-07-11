@@ -191,18 +191,13 @@ test('applications page only exposes concrete next actions from the rail', () =>
   assert.doesNotMatch(rail, />\s*Run\s*</);
 });
 
-test('applications page review-next opens the review panel and has an all-clear state', () => {
+test('applications page sends found-service review to the dedicated existing-app flow', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
-  assert.match(page, /const reviewableItems = items\.filter\(isReviewableItem\)/);
-  assert.match(page, /const visibleReviewableItems = visibleItems\.filter\(isReviewableItem\)/);
-  assert.match(page, /nextAction\.id === 'review_issue' \|\| nextAction\.id === 'review_found_service'/);
-  assert.doesNotMatch(page, /const nextReviewItem = visibleItems\.find\(\(item\) => item\.nextAction\)/);
-  assert.match(page, /reviewNextButtonLabel/);
-  assert.match(page, /nextReviewItem \? 'Review next' : 'All clear'/);
-  assert.match(page, /title=\{nextReviewItem \? 'Open the next app or service that needs review\.' : 'No apps or services need review\.'\}/);
-  assert.match(page, /focusApplicationItem\(nextReviewItem, true\)/);
-  assert.match(page, /setFilter\('needs_review'\)/);
+  assert.match(page, /const foundServices = appState\.foundServices/);
+  assert.match(page, /Review existing apps/);
+  assert.match(page, /navigate\(`\/apps\/found\$\{serviceQuery\}`, \{ replace: true \}\)/);
+  assert.doesNotMatch(page, /reviewNextButtonLabel|setFilter\('needs_review'\)/);
 });
 
 test('applications page removes placeholder overflow controls until real actions are chosen', () => {
@@ -277,17 +272,16 @@ test('applications page finish pass removes placeholders and explains disabled r
   assert.match(advanced, /reason=\{runtimeDisabledReason\}/);
 });
 
-test('applications page has filter-specific empty states and compact recent activity', () => {
+test('applications page has managed-app empty states and compact recent activity', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
   const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
   const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
   const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
 
-  assert.match(page, /emptyStateForFilter\(filter, query\)/);
+  assert.match(page, /emptyStateForManagedApps\(query\)/);
   assert.match(page, /emptyState=\{emptyState\}/);
   assert.match(page, /No managed apps installed/);
-  assert.match(page, /No unmanaged services found/);
-  assert.match(page, /No apps need review/);
+  assert.match(page, /No matching managed apps/);
   assert.match(basic, /emptyState: ApplicationEmptyState/);
   assert.match(advanced, /emptyState: ApplicationEmptyState/);
 

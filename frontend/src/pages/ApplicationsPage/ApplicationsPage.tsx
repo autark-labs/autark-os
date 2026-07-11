@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { MetricCard } from '@/components/primitives/MetricCard';
+import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -28,11 +28,9 @@ import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan } from '@
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
-import { ApplicationWarningButton } from './components/ApplicationButtons';
 import { mapUninstallPlanToDestructiveActionPlan } from './extensions/ApplicationsPage.destructiveActions';
 import {
   applicationDeepLinkForSurfaceItem,
-  filterForApplicationDeepLinkTarget,
   findApplicationDeepLinkTarget,
   parseApplicationsDeepLink,
 } from './extensions/ApplicationsPage.deepLinks';
@@ -46,7 +44,6 @@ import type {
   ApplicationSurfaceItem,
 } from './extensions/ApplicationsPage.types';
 
-type ApplicationFilter = 'all' | 'managed' | 'pinned' | 'found' | 'needs_review';
 type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'backup'>;
 
 export const ApplicationsPage = () => {
@@ -57,7 +54,6 @@ export const ApplicationsPage = () => {
   const appState = useApplicationStateRepository();
   const jobsQuery = useAutarkOsJobsQuery();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<ApplicationFilter>('all');
   const [managementOpen, setManagementOpen] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
@@ -102,20 +98,11 @@ export const ApplicationsPage = () => {
     settingsLoadingByAppId,
   ]);
 
+  const managedItems = useMemo(() => items.filter((item) => item.managementState === 'managed'), [items]);
+  const foundServices = appState.foundServices;
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return items.filter((item) => {
-      const matchesFilter =
-        filter === 'all'
-        || (filter === 'managed' && item.managementState === 'managed')
-        || (filter === 'pinned' && item.managementState === 'linked')
-        || (filter === 'found' && item.managementState === 'found')
-        || (filter === 'needs_review' && item.attentionState !== 'none');
-
-      if (!matchesFilter) {
-        return false;
-      }
-
+    return managedItems.filter((item) => {
       if (!normalizedQuery) {
         return true;
       }
@@ -123,18 +110,13 @@ export const ApplicationsPage = () => {
       return [item.name, item.managementState, item.readinessState, item.attentionState, item.access, item.backup, item.nextAction?.label ?? '', item.description]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
-  }, [filter, items, query]);
+  }, [managedItems, query]);
 
-  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
+  const selectedItem = managedItems.find((item) => item.id === selectedId) ?? null;
   const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
-  const managedCount = items.filter((item) => item.managementState === 'managed').length;
-  const pinnedCount = items.filter((item) => item.managementState === 'linked').length;
-  const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
-  const reviewableItems = items.filter(isReviewableItem);
-  const visibleReviewableItems = visibleItems.filter(isReviewableItem);
-  const nextReviewItem = visibleReviewableItems[0] ?? reviewableItems[0] ?? null;
-  const reviewNextButtonLabel = nextReviewItem ? 'Review next' : 'All clear';
-  const emptyState = emptyStateForFilter(filter, query);
+  const managedCount = managedItems.length;
+  const attentionCount = managedItems.filter((item) => item.attentionState !== 'none').length;
+  const emptyState = emptyStateForManagedApps(query);
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
@@ -146,11 +128,11 @@ export const ApplicationsPage = () => {
   }, [navigate]);
 
   const handleSelectItem = useCallback((id: string) => {
-    const item = items.find((candidate) => candidate.id === id);
+    const item = managedItems.find((candidate) => candidate.id === id);
     if (item) {
       focusApplicationItem(item);
     }
-  }, [focusApplicationItem, items]);
+  }, [focusApplicationItem, managedItems]);
 
   const clearApplicationFocus = useCallback(() => {
     appliedDeepLinkKeyRef.current = '';
@@ -177,36 +159,41 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    if (!items.length || appliedDeepLinkKeyRef.current === deepLinkTarget.key) {
+    if (deepLinkTarget.kind === 'service' || deepLinkTarget.kind === 'catalog') {
+      const serviceQuery = deepLinkTarget.kind === 'service' ? `?service=${encodeURIComponent(deepLinkTarget.id)}` : '';
+      navigate(`/apps/found${serviceQuery}`, { replace: true });
       return;
     }
 
-    const targetItem = findApplicationDeepLinkTarget(items, deepLinkTarget);
+    if (!managedItems.length || appliedDeepLinkKeyRef.current === deepLinkTarget.key) {
+      return;
+    }
+
+    const targetItem = findApplicationDeepLinkTarget(managedItems, deepLinkTarget);
     if (!targetItem || !canCloseManagement()) {
       return;
     }
 
     setQuery('');
-    setFilter(filterForApplicationDeepLinkTarget(targetItem) as ApplicationFilter);
     setSelectedId(targetItem.id);
     setManagementOpen(deepLinkTarget.panel === 'manage');
     appliedDeepLinkKeyRef.current = deepLinkTarget.key;
-  }, [canCloseManagement, deepLinkTarget, items]);
+  }, [canCloseManagement, deepLinkTarget, managedItems, navigate]);
 
   useEffect(() => {
     if (!selectedId) {
       return;
     }
 
-    if (!items.length) {
+    if (!managedItems.length) {
       clearApplicationFocus();
       return;
     }
 
-    if (!items.some((item) => item.id === selectedId)) {
+    if (!managedItems.some((item) => item.id === selectedId)) {
       clearApplicationFocus();
     }
-  }, [clearApplicationFocus, items, selectedId]);
+  }, [clearApplicationFocus, managedItems, selectedId]);
 
   useEffect(() => {
     if (!managementOpen) {
@@ -274,14 +261,6 @@ export const ApplicationsPage = () => {
     void invalidateApplicationState(queryClient);
     setTrackedAppJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
   }, [jobsQuery.data, queryClient, trackedAppJobIds]);
-
-  const handleFilterChange = (nextFilter: string) => {
-    if (!nextFilter || nextFilter === filter) {
-      return;
-    }
-
-    setFilter(nextFilter as ApplicationFilter);
-  };
 
   const setAppActionLoading = (appId: string, action: ApplicationRuntimeAction | null) => {
     setActionLoadingByAppId((current) => ({ ...current, [appId]: action }));
@@ -521,7 +500,7 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    if (item) {
+    if (item?.managementState === 'managed') {
       focusApplicationItem(item, true);
     }
     void invalidateApplicationState(queryClient);
@@ -550,54 +529,39 @@ export const ApplicationsPage = () => {
   return (
     <PageShell>
       <PageHeader
-        description="Open apps, review found services, and recover anything that needs attention from one focused control surface."
-        title="Your apps and services"
+        description="Open and manage the apps owned by this Autark-OS installation."
+        title="My Apps"
       >
-        <div className="grid gap-3 p-4 sm:grid-cols-3">
+        <div className="grid gap-3 p-4 sm:grid-cols-2">
           <MetricCard label="Managed" value={managedCount} />
-          <MetricCard label="Pinned" value={pinnedCount} />
           <MetricCard label="Needs review" tone={attentionCount > 0 ? 'attention' : 'default'} value={attentionCount} />
         </div>
       </PageHeader>
 
+      {foundServices.length > 0 && (
+        <Surface className="flex flex-col gap-4 border-orange-400/35 bg-orange-500/10 p-4 sm:flex-row sm:items-center sm:justify-between" tone="panel">
+          <div>
+            <h2 className="text-sm font-black text-white">Found on this server</h2>
+            <p className="mt-1 text-sm leading-6 text-orange-100/80">Autark-OS found {foundServices.length} service{foundServices.length === 1 ? '' : 's'} that this installation does not manage.</p>
+          </div>
+          <ProjectDarkControlButton asChild className="shrink-0">
+            <Link to="/apps/found">Review existing apps</Link>
+          </ProjectDarkControlButton>
+        </Surface>
+      )}
+
       <div className="grid gap-3">
         <SearchFilterBar
-          actions={(
-            <ApplicationWarningButton
-              disabled={!nextReviewItem}
-              onClick={() => {
-                  if (nextReviewItem) {
-                    setQuery('');
-                    setFilter('needs_review');
-                    focusApplicationItem(nextReviewItem, true);
-                  }
-                }}
-              title={nextReviewItem ? 'Open the next app or service that needs review.' : 'No apps or services need review.'}
-              type="button"
-            >
-              {nextReviewItem ? <AlertTriangle data-icon="inline-start" /> : <CheckCircle2 data-icon="inline-start" />}
-              {reviewNextButtonLabel}
-            </ApplicationWarningButton>
-          )}
-          filterAriaLabel="Filter apps and services"
-          filterValue={filter}
-          filters={[
-            { label: 'All', value: 'all' },
-            { label: 'Managed', value: 'managed' },
-            { label: 'Pinned', value: 'pinned' },
-            { label: 'Found', value: 'found' },
-            { label: 'Needs review', value: 'needs_review' },
-          ]}
-          onFilterChange={handleFilterChange}
+          filterAriaLabel="Managed app filters"
           onSearchChange={setQuery}
-          searchAriaLabel="Search apps and services"
-          searchPlaceholder="Search apps and services"
+          searchAriaLabel="Search managed apps"
+          searchPlaceholder="Search managed apps"
           searchValue={query}
         />
 
         {(appState.isLoading || Boolean(appState.error)) && (
           <Surface className="px-3 py-2 text-sm text-sky-100/80" tone="muted">
-            {appState.isLoading ? 'Loading apps and found services.' : 'Could not load the current apps list.'}
+            {appState.isLoading ? 'Loading managed apps.' : 'Could not load the current managed apps list.'}
           </Surface>
         )}
       </div>
@@ -719,49 +683,16 @@ function appActionLabel(action: ApplicationRuntimeAction) {
   return 'App action';
 }
 
-function isReviewableItem(item: { nextAction?: { id: string } }) {
-  const nextAction = item.nextAction;
-  return Boolean(nextAction && (nextAction.id === 'review_issue' || nextAction.id === 'review_found_service'));
-}
-
-function emptyStateForFilter(filter: ApplicationFilter, query: string) {
+function emptyStateForManagedApps(query: string) {
   if (query.trim()) {
     return {
-      title: 'No matching apps or services',
-      description: 'Adjust the search or clear filters to see the full app list.',
-    };
-  }
-
-  if (filter === 'managed') {
-    return {
-      title: 'No managed apps installed',
-      description: 'Install an app from Discover to have Autark-OS manage its runtime, access, and backups.',
-    };
-  }
-
-  if (filter === 'pinned') {
-    return {
-      title: 'No pinned services',
-      description: 'Pin a found service when you want it to stay visible in My Apps.',
-    };
-  }
-
-  if (filter === 'found') {
-    return {
-      title: 'No unmanaged services found',
-      description: 'Autark-OS is not seeing any external services that need review on this server.',
-    };
-  }
-
-  if (filter === 'needs_review') {
-    return {
-      title: 'No apps need review',
-      description: 'Managed apps and visible services are not asking for user action right now.',
+      title: 'No matching managed apps',
+      description: 'Adjust the search or clear it to see the apps managed by this Autark-OS installation.',
     };
   }
 
   return {
-    title: 'No apps or services yet',
-    description: 'Install an app from Discover or pin an existing service when Autark-OS finds one.',
+    title: 'No managed apps installed',
+    description: 'Install an app from Discover to have Autark-OS manage its runtime, access, and backups.',
   };
 }

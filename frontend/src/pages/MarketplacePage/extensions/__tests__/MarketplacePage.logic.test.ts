@@ -75,7 +75,7 @@ test('marketplacePrimaryRoute follows My Apps management and existing-service ac
   }), '/apps?focus=managed%3Avaultwarden&panel=manage');
   assert.equal(marketplacePrimaryRoute({
     primaryAction: { id: 'review_existing', kind: 'route', href: '/apps?focus=service%3Adocker%3Avaultwarden', disabled: false },
-  }), '/apps?focus=service%3Adocker%3Avaultwarden&panel=manage');
+  }), '/apps/found?service=docker%3Avaultwarden');
   assert.equal(marketplacePrimaryRoute({
     primaryAction: { id: 'review_setup', kind: 'route', href: '/discover?app=vaultwarden', disabled: false },
   }), null);

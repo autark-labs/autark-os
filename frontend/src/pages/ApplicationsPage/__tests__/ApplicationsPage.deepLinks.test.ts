@@ -10,7 +10,7 @@ import {
   parseApplicationsDeepLink,
 } from '../extensions/ApplicationsPage.deepLinks';
 
-test('builds durable My Apps links for managed apps and observed services', () => {
+test('builds managed-app links separately from observed-service review links', () => {
   assert.equal(
     applicationDeepLinkForManagedApp('syncthing', { tab: 'settings' }),
     '/apps?focus=managed%3Asyncthing&tab=settings',
@@ -21,11 +21,11 @@ test('builds durable My Apps links for managed apps and observed services', () =
   );
   assert.equal(
     applicationDeepLinkForObservedService({ id: 'docker:homepage', catalogAppId: 'homepage' }),
-    '/apps?focus=service%3Adocker%3Ahomepage',
+    '/apps/found?service=docker%3Ahomepage',
   );
   assert.equal(
     applicationDeepLinkForObservedService({ id: '', catalogAppId: 'homepage' }),
-    '/apps?focus=catalog%3Ahomepage',
+    '/apps/found',
   );
 });
 
@@ -73,6 +73,10 @@ test('adds the management panel to app focus routes without changing other links
     applicationRouteWithManagementPanel('/apps?focus=managed%3Avaultwarden&tab=settings'),
     '/apps?focus=managed%3Avaultwarden&tab=settings&panel=manage',
   );
+  assert.equal(
+    applicationRouteWithManagementPanel('/apps?focus=service%3Adocker%3Ahomepage'),
+    '/apps/found?service=docker%3Ahomepage',
+  );
   assert.equal(applicationRouteWithManagementPanel('/discover?app=vaultwarden'), '/discover?app=vaultwarden');
 });
 
@@ -83,11 +87,11 @@ test('builds focus routes from application surface items', () => {
   );
   assert.equal(
     applicationDeepLinkForSurfaceItem({ id: 'observed:docker:homepage', sourceId: 'docker:homepage', managementState: 'found' }),
-    '/apps?focus=service%3Adocker%3Ahomepage',
+    '/apps/found?service=docker%3Ahomepage',
   );
   assert.equal(
     applicationDeepLinkForSurfaceItem({ id: 'observed:homepage', catalogAppId: 'homepage', managementState: 'found' }),
-    '/apps?focus=catalog%3Ahomepage',
+    '/apps/found',
   );
 });
 

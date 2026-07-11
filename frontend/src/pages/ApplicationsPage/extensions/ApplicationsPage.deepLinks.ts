@@ -26,10 +26,10 @@ export function applicationDeepLinkForManagedApp(appId: string, options: Applica
 
 export function applicationDeepLinkForObservedService(service: Pick<ObservedServiceView, 'catalogAppId' | 'id'> | null | undefined, options: ApplicationDeepLinkOptions = {}) {
   if (service?.id) {
-    return applicationDeepLink('service', service.id, options);
+    return `/apps/found?service=${encodeURIComponent(service.id)}`;
   }
   if (service?.catalogAppId) {
-    return applicationDeepLink('catalog', service.catalogAppId, options);
+    return '/apps/found';
   }
   return APPLICATIONS_PATH;
 }
@@ -44,10 +44,10 @@ export function applicationDeepLinkForSurfaceItem(item: ApplicationSurfaceItem |
     return applicationDeepLink('managed', itemId, options);
   }
   if ((item.managementState === 'found' || item.managementState === 'linked') && item.sourceId) {
-    return applicationDeepLink('service', item.sourceId, options);
+    return `/apps/found?service=${encodeURIComponent(item.sourceId)}`;
   }
   if (item.catalogAppId) {
-    return applicationDeepLink('catalog', item.catalogAppId, options);
+    return '/apps/found';
   }
   return APPLICATIONS_PATH;
 }
@@ -58,8 +58,19 @@ export function applicationRouteWithManagementPanel(href: string | null | undefi
   }
 
   const parsed = parseAppRelativeUrl(href);
-  if (!parsed || parsed.pathname !== APPLICATIONS_PATH || !parsed.searchParams.get('focus')) {
+  const focus = parsed?.searchParams.get('focus');
+  if (!parsed || parsed.pathname !== APPLICATIONS_PATH || !focus) {
     return href;
+  }
+
+  const separatorIndex = focus.indexOf(':');
+  const kind = separatorIndex >= 0 ? normalizeKind(focus.slice(0, separatorIndex)) : null;
+  const id = separatorIndex >= 0 ? focus.slice(separatorIndex + 1).trim() : '';
+  if (kind === 'service' && id) {
+    return `/apps/found?service=${encodeURIComponent(id)}`;
+  }
+  if (kind === 'catalog') {
+    return '/apps/found';
   }
 
   parsed.searchParams.set('panel', MANAGEMENT_PANEL);

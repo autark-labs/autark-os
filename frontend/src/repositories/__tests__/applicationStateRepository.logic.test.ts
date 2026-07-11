@@ -6,8 +6,10 @@ import {
   applicationStateUpdatedAt,
   catalogAppIsManaged,
   displayStatusFromCanonicalState,
+  foundServices,
   healthByAppId,
   managedRuntimeApps,
+  pinnedExternalServices,
   removeManagedAppFromState,
   setAutarkOsJobInState,
   setRuntimeAppInState,
@@ -25,12 +27,16 @@ test('repository selectors expose canonical app-state slices', () => {
   const state = {
     runtimeApps: [runtimeApp('vaultwarden', 'Ready')],
     observedServices: [{ id: 'docker:found', userStatus: 'found_on_server' }],
+    pinnedExternalServices: [{ id: 'docker:linked', userStatus: 'pinned_external' }],
+    foundServices: [{ id: 'docker:found', userStatus: 'found_on_server' }],
     ownershipViews: [{ catalogAppId: 'vaultwarden', state: 'installed_managed' }],
     updatedAt,
   };
 
   assert.deepEqual(managedRuntimeApps(state).map((app) => app.appId), ['vaultwarden']);
   assert.deepEqual(observedServices(state).map((service) => service.id), ['docker:found']);
+  assert.deepEqual(pinnedExternalServices(state).map((service) => service.id), ['docker:linked']);
+  assert.deepEqual(foundServices(state).map((service) => service.id), ['docker:found']);
   assert.deepEqual(ownershipViews(state).map((view) => view.catalogAppId), ['vaultwarden']);
   assert.equal(applicationStateUpdatedAt(state)?.getTime(), new Date(updatedAt).getTime());
 });

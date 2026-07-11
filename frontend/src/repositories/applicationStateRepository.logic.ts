@@ -36,6 +36,14 @@ export function observedServices(state?: ApplicationState | null): ObservedServi
   return state?.observedServices ?? [];
 }
 
+export function pinnedExternalServices(state?: ApplicationState | null): ObservedServiceView[] {
+  return state?.pinnedExternalServices ?? [];
+}
+
+export function foundServices(state?: ApplicationState | null): ObservedServiceView[] {
+  return state?.foundServices ?? [];
+}
+
 export function ownershipViews(state?: ApplicationState | null): AppOwnershipView[] {
   return state?.ownershipViews ?? [];
 }

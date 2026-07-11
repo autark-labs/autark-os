@@ -14,7 +14,7 @@ test('applications page does not silently fall back to the first visible item', 
 
   assert.doesNotMatch(page, /visibleItems\.find\(\(item\) => item\.id === selectedId\) \?\? visibleItems\[0\]/);
   assert.doesNotMatch(page, /setSelectedId\(items\[0\]\.id\)/);
-  assert.match(page, /selectedItem = items\.find\(\(item\) => item\.id === selectedId\) \?\? null/);
+  assert.match(page, /selectedItem = managedItems\.find\(\(item\) => item\.id === selectedId\) \?\? null/);
   assert.match(page, /selectedItemIsVisible/);
 });
 
@@ -34,7 +34,7 @@ test('deep-link selection can reapply after selected item temporarily disappears
 test('stale selected apps collapse management instead of leaving an empty expanded rail', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
-  assert.match(page, /if \(!items\.some\(\(item\) => item\.id === selectedId\)\) \{\s+clearApplicationFocus\(\);\s+\}/);
+  assert.match(page, /if \(!managedItems\.some\(\(item\) => item\.id === selectedId\)\) \{\s+clearApplicationFocus\(\);\s+\}/);
 });
 
 test('management outside click listener runs in capture phase before child stopPropagation', () => {

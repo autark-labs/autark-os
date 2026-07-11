@@ -9,11 +9,13 @@ import {
   applicationStateUpdatedAt,
   catalogAppIsManaged,
   displayStatusFromCanonicalState,
+  foundServices,
   healthByAppId,
   managedRuntimeApps,
   removeManagedAppFromState,
   observedServices,
   ownershipViews,
+  pinnedExternalServices,
   setAutarkOsJobInState,
   setObservedServicePinnedInState,
   setRuntimeAppInState,
@@ -33,11 +35,13 @@ export {
   applicationStateUpdatedAt,
   catalogAppIsManaged,
   displayStatusFromCanonicalState,
+  foundServices,
   healthByAppId,
   managedRuntimeApps,
   removeManagedAppFromState,
   observedServices,
   ownershipViews,
+  pinnedExternalServices,
   setAutarkOsJobInState,
   setObservedServicePinnedInState,
   setRuntimeAppInState,
@@ -51,9 +55,11 @@ export const appUpdatesQueryKey = ['app-updates'];
 export type ApplicationStateRepositoryView = {
   accessByAppId: Record<string, AppAccessCheck>;
   apps: AppRuntimeView[];
+  foundServices: ObservedServiceView[];
   healthByAppId: Record<string, AppHealthSnapshot>;
   observedServices: ObservedServiceView[];
   ownershipViews: AppOwnershipView[];
+  pinnedExternalServices: ObservedServiceView[];
   telemetryByAppId: Record<string, AppTelemetry>;
   updatedAt: Date | null;
 };
@@ -99,11 +105,13 @@ export function useApplicationStateRepository(): ApplicationStateRepositoryView 
     applicationState: state,
     apps: managedRuntimeApps(state),
     error: query.error,
+    foundServices: foundServices(state),
     healthByAppId: healthByAppId(state),
     isFetching: query.isFetching || refreshMutation.isPending,
     isLoading: query.isLoading,
     observedServices: observedServices(state),
     ownershipViews: ownershipViews(state),
+    pinnedExternalServices: pinnedExternalServices(state),
     refresh: async () => refreshMutation.mutateAsync(),
     telemetryByAppId: telemetryByAppId(state),
     updatedAt: applicationStateUpdatedAt(state),
