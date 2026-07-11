@@ -135,6 +135,16 @@ find_backend_jar() {
   find "${REPO_ROOT}/backend/build/libs" -maxdepth 1 -type f -name 'autark-os-backend*.jar' ! -name '*plain*.jar' | sort | head -n 1
 }
 
+build_runtime() {
+  local runtime_dir="${OUTPUT_DIR}/runtime"
+  if [[ "${SKIP_BUILD}" -eq 1 && -d "${AUTARK_OS_RUNTIME_DIR:-}" ]]; then
+    run_cmd cp -a "${AUTARK_OS_RUNTIME_DIR}" "${runtime_dir}"
+    return 0
+  fi
+  command -v jlink >/dev/null 2>&1 || die "jlink from a Java 21 JDK is required to build the bundled runtime."
+  run_cmd jlink --add-modules java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.security.jgss,java.sql,java.transaction.xa,java.xml,jdk.unsupported --strip-debug --no-header-files --no-man-pages --output "${runtime_dir}"
+}
+
 build_project() {
   if [[ "${SKIP_BUILD}" -eq 1 ]]; then
     log "Skipping build and using existing backend jar."
@@ -209,6 +219,7 @@ write_release_json() {
   "supportedArchitectures": $(json_architectures),
   "artifacts": [
     "backend/autark-os-backend.jar",
+    "runtime/bin/java",
     "scripts/bootstrap-autark-os.sh",
     "scripts/install-autark-os-service.sh",
     "scripts/install-autark-os.sh",
@@ -244,6 +255,7 @@ create_bundle() {
   log "Creating release bundle at ${OUTPUT_DIR}."
   run_cmd rm -rf "${OUTPUT_DIR}"
   run_cmd mkdir -p "${OUTPUT_DIR}/backend" "${OUTPUT_DIR}/scripts"
+  build_runtime
   run_cmd cp "${jar}" "${OUTPUT_DIR}/backend/autark-os-backend.jar"
   run_cmd cp "${SCRIPT_DIR}/bootstrap-autark-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh"
   run_cmd cp "${SCRIPT_DIR}/supported-host-matrix.env" "${OUTPUT_DIR}/scripts/supported-host-matrix.env"
@@ -262,9 +274,9 @@ create_bundle() {
   write_metadata
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '+ cd %q && sha256sum backend/autark-os-backend.jar scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
+    printf '+ cd %q && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
   else
-    (cd "${OUTPUT_DIR}" && sha256sum backend/autark-os-backend.jar scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS)
+    (cd "${OUTPUT_DIR}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS)
   fi
 }
 

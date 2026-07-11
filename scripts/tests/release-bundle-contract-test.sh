@@ -25,6 +25,7 @@ bundle_dir="${tmp_dir}/autark-os-1.2.3"
 [[ -x "${bundle_dir}/scripts/install-autark-os.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-fileops" ]]
+[[ -x "${bundle_dir}/runtime/bin/java" ]]
 
 grep -q '^AUTARK_OS_VERSION=1.2.3$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_UPDATE_CHANNEL=beta$' "${bundle_dir}/autark-os-release.env"
@@ -35,6 +36,7 @@ grep -q 'autark-os-provenance.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/install-autark-os.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-gui-installer.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-fileops' "${bundle_dir}/SHA256SUMS"
+grep -q 'runtime/bin/java' "${bundle_dir}/SHA256SUMS"
 
 python3 - "${bundle_dir}/autark-os-release.json" "${bundle_dir}/autark-os-provenance.json" <<'PY'
 import json
@@ -49,6 +51,7 @@ assert release["channel"] == "beta"
 assert release["releaseNotesUrl"] == "https://example.invalid/autark-os/1.2.3"
 assert "x86_64" in release["supportedArchitectures"]
 assert "backend/autark-os-backend.jar" in release["artifacts"]
+assert "runtime/bin/java" in release["artifacts"]
 assert "scripts/autark-os-gui-installer.sh" in release["artifacts"]
 assert "scripts/autark-os-fileops" in release["artifacts"]
 assert provenance["schemaVersion"] == 1

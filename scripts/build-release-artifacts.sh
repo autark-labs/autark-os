@@ -221,7 +221,7 @@ Section: admin
 Priority: optional
 Architecture: ${ARCHITECTURE}
 Maintainer: Autark Labs <support@autarklabs.local>
-Depends: bash, sudo, systemd, curl, ca-certificates, openjdk-21-jre-headless | java-runtime
+Depends: bash, sudo, systemd, curl, ca-certificates
 Installed-Size: ${size_kb}
 Homepage: https://github.com/autark-labs/autark-os
 Description: Calm local control center for self-hosted apps
@@ -266,6 +266,7 @@ if [[ "\${1:-configure}" == "configure" ]]; then
   AUTARK_OS_VERSION=${VERSION} \\
   AUTARK_OS_BUILD_SHA=$(build_sha) \\
   AUTARK_OS_BUILD_DATE=$(build_date) \\
+  AUTARK_OS_JAVA_BIN=/usr/lib/autark-os/release/runtime/bin/java \\
     /usr/lib/autark-os/release/scripts/install-autark-os-service.sh
   echo "Autark-OS service installed."
   echo "Next: open http://localhost:8082 to complete setup."

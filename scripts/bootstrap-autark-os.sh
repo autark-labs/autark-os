@@ -1177,7 +1177,9 @@ install_dependencies_apt() {
   for package in ca-certificates curl gnupg git; do
     apt_package_installed "${package}" || packages+=("${package}")
   done
-  java_21_available || packages+=(openjdk-21-jre-headless)
+  if [[ ! -x "${RELEASE_BUNDLE_DIR:+${RELEASE_BUNDLE_DIR}/runtime/bin/java}" ]]; then
+    java_21_available || packages+=(openjdk-21-jre-headless)
+  fi
   if [[ -z "${RELEASE_JAR}" ]]; then
     has_command node || packages+=(nodejs)
     has_command npm || packages+=(npm)
@@ -1309,6 +1311,10 @@ preflight() {
   if [[ "${AUTO_INSTALL_DEPS}" -eq 1 ]]; then
     install_dependencies_apt
   fi
+  local bundled_java="${RELEASE_BUNDLE_DIR:+${RELEASE_BUNDLE_DIR}/runtime/bin/java}"
+  if [[ -x "${bundled_java:-}" ]]; then
+    log "Using bundled Java runtime at ${bundled_java}."
+  else
   has_command java || {
     if [[ "${DRY_RUN}" -eq 1 && "${AUTO_INSTALL_DEPS}" -eq 1 && "$(package_manager_status)" == "apt-supported" ]]; then
       log "Dry run: Java 21 would be installed before service setup."
@@ -1324,6 +1330,7 @@ preflight() {
     else
       die "Java 21 or newer is required. Detected Java major version: ${java_major:-unknown}"
     fi
+  fi
   fi
   if [[ -z "${RELEASE_JAR}" ]]; then
     has_command node || die "Node.js is required to build the frontend. Use --release-bundle or --release-jar to install a packaged release without Node."
@@ -1420,6 +1427,9 @@ install_service() {
   done
   if [[ -n "${RELEASE_JAR}" ]]; then
     env_args+=("AUTARK_OS_BACKEND_JAR=${RELEASE_JAR}")
+    if [[ -n "${RELEASE_BUNDLE_DIR}" && -x "${RELEASE_BUNDLE_DIR}/runtime/bin/java" ]]; then
+      env_args+=("AUTARK_OS_JAVA_BIN=${RELEASE_BUNDLE_DIR}/runtime/bin/java")
+    fi
     local release_version release_sha release_date
     release_version="$(release_metadata_value AUTARK_OS_VERSION)"
     release_sha="$(release_metadata_value AUTARK_OS_BUILD_SHA)"

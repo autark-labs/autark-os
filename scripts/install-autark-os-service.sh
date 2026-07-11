@@ -9,7 +9,7 @@ LOG_DIR="${AUTARK_OS_LOG_DIR:-/var/log/autark-os}"
 INSTALL_DIR="${AUTARK_OS_INSTALL_DIR:-/opt/autark-os}"
 SERVICE_NAME="${AUTARK_OS_SERVICE_NAME:-autark-os}"
 SERVICE_FILE="${AUTARK_OS_SERVICE_FILE:-/etc/systemd/system/${SERVICE_NAME}.service}"
-JAVA_BIN="${AUTARK_OS_JAVA_BIN:-/usr/bin/java}"
+JAVA_BIN="${AUTARK_OS_JAVA_BIN:-${INSTALL_DIR}/runtime/bin/java}"
 SERVER_PORT="${AUTARK_OS_SERVER_PORT:-8082}"
 BACKEND_JAR="${AUTARK_OS_BACKEND_JAR:-}"
 CLI_LINK="${AUTARK_OS_CLI_LINK:-/usr/local/bin/autark-os}"
@@ -28,7 +28,9 @@ BACKEND_JAR_READY=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+RUNTIME_IMAGE_SOURCE="${AUTARK_OS_RUNTIME_IMAGE:-${REPO_ROOT}/runtime}"
 TARGET_BACKEND_JAR="${INSTALL_DIR}/backend/autark-os-backend.jar"
+TARGET_RUNTIME_DIR="${INSTALL_DIR}/runtime"
 INSTALLED_SETUP_SCRIPT="${INSTALL_DIR}/bin/install-autark-os-service.sh"
 INSTALLED_CLI="${INSTALL_DIR}/bin/autark-os"
 INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
@@ -317,6 +319,9 @@ check_state() {
 }
 
 preflight_host() {
+  if [[ -x "${RUNTIME_IMAGE_SOURCE}/bin/java" && -z "${AUTARK_OS_JAVA_BIN:-}" ]]; then
+    JAVA_BIN="${RUNTIME_IMAGE_SOURCE}/bin/java"
+  fi
   if [[ ! -x "${JAVA_BIN}" ]]; then
     if [[ "${DRY_RUN}" -eq 1 && "${AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED:-0}" == "1" ]]; then
       log "Dry run: service setup assumes Java 21 will be available after dependency installation."
@@ -570,6 +575,17 @@ install_backend_jar() {
   fi
 }
 
+install_runtime_image() {
+  [[ -x "${RUNTIME_IMAGE_SOURCE}/bin/java" ]] || return 0
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    log "Would install bundled Java runtime to ${TARGET_RUNTIME_DIR}."
+  else
+    rm -rf "${TARGET_RUNTIME_DIR}"
+    cp -a "${RUNTIME_IMAGE_SOURCE}" "${TARGET_RUNTIME_DIR}"
+  fi
+  JAVA_BIN="${TARGET_RUNTIME_DIR}/bin/java"
+}
+
 write_env_file() {
   local env_file="${CONFIG_DIR}/autark-os.env"
   local setup_command="sudo ${INSTALLED_SETUP_SCRIPT}"
@@ -682,6 +698,7 @@ main() {
   configure_fileops_privilege
   configure_docker_access
   configure_tailscale_operator
+  install_runtime_image
   install_backend_jar || true
   write_env_file
   write_systemd_unit
