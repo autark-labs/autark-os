@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Bell, CheckCircle2, Info, RefreshCw, Sparkles, X } from 'lucide-react';
+import { Bell, Info, RefreshCw, Sparkles, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageShell } from '@/components/layout/PageShell';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
@@ -389,7 +389,7 @@ function MarketplacePage() {
         onRefresh={refreshDiscover}
       />
 
-      <CanonicalRecommendedAction />
+      {!showStartHere && <CanonicalRecommendedAction className="mb-4" />}
 
       {discoverError && <DiscoverErrorState className="mb-5" message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
       <InstallJobBanner apps={apps} installJob={installJob} selectedAppId={selectedApp.id} />
@@ -419,7 +419,7 @@ function MarketplacePage() {
             )}
           </>
         )}
-        className="mb-6"
+        className="mb-4"
         filterAriaLabel="Discover filters"
         filterValue={discoverFilterValue}
         filters={discoverFilters}
@@ -476,22 +476,22 @@ function DiscoverGuidedHeader({
   onRefresh: () => void;
 }) {
   return (
-    <header className="mb-5 overflow-hidden rounded-2xl border border-sky-400/25 bg-slate-900 p-5 text-slate-50 shadow-xl shadow-slate-950/30">
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div className="flex max-w-3xl gap-4">
-          <span className="hidden size-12 shrink-0 place-items-center rounded-2xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
-            <Sparkles className="size-6" />
+    <header className="mb-4 rounded-2xl border border-sky-400/25 bg-slate-900 p-4 text-slate-50 shadow-lg shadow-slate-950/20">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex max-w-3xl gap-3">
+          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
+            <Sparkles className="size-5" />
           </span>
           <div>
             <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline">Discover</Badge>
-            <h2 className="mt-3 text-3xl font-bold leading-none text-slate-50 md:text-4xl">Discover Apps</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+            <h2 className="mt-2 text-2xl font-bold leading-none text-slate-50 md:text-3xl">Discover Apps</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-5 text-slate-400">
               Install useful self-hosted apps without managing Docker by hand.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 xl:justify-end">
+        <div className="flex flex-wrap gap-2 md:justify-end">
           <Dialog>
             <DialogTrigger asChild>
               <ProjectDarkControlButton type="button">
@@ -555,69 +555,40 @@ function DiscoverGuidedHeader({
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-cyan-300/35 bg-cyan-400/10 p-4">
-        <p className="text-xs font-semibold uppercase tracking-normal text-cyan-200">Recommended path</p>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
-          Pick an app, review the setup, and Autark-OS will prepare storage, networking, health checks, and backups.
-        </p>
-      </div>
     </header>
   );
 }
 
 function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss: () => void; onSelect: (appId: string) => void; recommendations: StarterRecommendation[] }) {
-  const blocked = recommendations.some((recommendation) => recommendation.readiness === 'blocked');
+  const recommendation = recommendations.find((item) => !item.installed) ?? recommendations[0];
+  if (!recommendation) {
+    return null;
+  }
+
   return (
-    <section className="mb-5 rounded-2xl border border-cyan-300/35 bg-cyan-400/10 p-5 shadow-xl shadow-slate-950/30">
+    <section className="mb-4 rounded-2xl border border-cyan-300/35 bg-cyan-400/10 p-4 shadow-lg shadow-slate-950/20">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Start here</p>
-          <h3 className="mt-2 text-2xl font-black text-slate-50">Start with these apps</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Reliable first installs based on your onboarding choices, with a few safe defaults when you have not picked starter apps yet.
+          <h3 className="mt-1 text-lg font-bold text-slate-50">Start with {recommendation.app.name}</h3>
+          <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-300">
+            {recommendation.notes[0] || 'A safe first app to review before installing.'}
           </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge className={blocked ? 'border-orange-400/40 bg-orange-500/10 text-orange-200' : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200'} variant="outline">
-            {blocked ? 'Readiness review needed' : 'Ready to review'}
-          </Badge>
-          <ProjectDarkControlButton aria-label="Hide Start here" onClick={onDismiss} size="icon" type="button">
-            <X className="size-4" />
-          </ProjectDarkControlButton>
-        </div>
-      </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {recommendations.map((recommendation) => (
-          <article className="rounded-xl border border-sky-400/25 bg-slate-900 p-4 text-slate-50 shadow-lg shadow-slate-950/20" key={recommendation.app.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="font-bold text-slate-50">{recommendation.app.name}</h4>
-                <p className="mt-1 text-sm text-slate-400">{recommendation.app.shortValue || recommendation.app.plainLanguage}</p>
-              </div>
-              {recommendation.installed ? (
-                <Badge className="border-cyan-300/35 bg-cyan-400/10 text-cyan-200" variant="outline">Installed</Badge>
-              ) : (
-                <Badge className={recommendation.readiness === 'ready' ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200' : recommendation.readiness === 'blocked' ? 'border-orange-400/40 bg-orange-500/10 text-orange-200' : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200'} variant="outline">
-                  {recommendation.readiness === 'ready' ? 'Ready' : recommendation.readiness === 'blocked' ? 'Needs setup' : 'Review'}
-                </Badge>
-              )}
-            </div>
-            <div className="mt-3 grid gap-2 text-sm text-slate-300">
-              {recommendation.notes.map((note) => (
-                <div className="flex gap-2" key={note}>
-                  {recommendation.readiness === 'ready' ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-cyan-200" /> : <AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-200" />}
-                  <span>{note}</span>
-                </div>
-              ))}
-            </div>
-            <DisabledAction className="mt-4 w-full" disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
-              <ProjectPrimaryButton className="w-full" disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} type="button">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Badge className={recommendation.readiness === 'blocked' ? 'border-orange-400/40 bg-orange-500/10 text-orange-200' : 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200'} variant="outline">
+              {recommendation.readiness === 'blocked' ? 'Readiness review needed' : recommendation.readiness === 'review' ? 'Review first' : 'Ready to review'}
+            </Badge>
+            <DisabledAction disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
+              <ProjectPrimaryButton disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} size="sm" type="button">
                 <Sparkles className="size-4" />
                 {recommendation.installed ? 'Already installed' : 'Review install'}
               </ProjectPrimaryButton>
             </DisabledAction>
-          </article>
-        ))}
+          </div>
+        </div>
+        <ProjectDarkControlButton aria-label="Hide Start here" onClick={onDismiss} size="icon" type="button">
+            <X className="size-4" />
+        </ProjectDarkControlButton>
       </div>
     </section>
   );
