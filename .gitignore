@@ -22,6 +22,9 @@ frontend/dist/
 frontend/.vite/
 frontend/.env.local
 frontend/.env.*.local
+frontend/playwright-report/
+frontend/test-results/
+frontend/e2e/*
 
 # Release bundles and generated installers
 release/

@@ -156,11 +156,25 @@ Build and test from source:
 cd frontend
 yarn typecheck
 yarn build
+yarn test:e2e
 
 cd ../backend
 ./gradlew test
 ./gradlew bootJar
 ```
+
+### Browser visual regression checks
+
+`yarn test:e2e` starts the frontend with deterministic browser fixtures. It checks the supported application routes at mobile and desktop sizes, verifies that the document never overflows horizontally, exercises key dialogs and popovers, and compares reviewed screenshots.
+
+When an intentional UI change updates a reviewed state, refresh the baselines explicitly and include the resulting image changes in the review:
+
+```bash
+cd frontend
+yarn test:e2e:update
+```
+
+The suite does not require a running backend, Docker, or Tailscale service.
 
 Build release artifacts for GitHub Releases:
 

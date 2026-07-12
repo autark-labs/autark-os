@@ -8,6 +8,8 @@
     "build": "vite build",
     "check:ui-tokens": "node scripts/check-autark-os-ui-tokens.mjs",
     "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:update": "playwright test --update-snapshots",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "eslint ."

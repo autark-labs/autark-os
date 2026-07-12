@@ -312,11 +312,11 @@ function ReachabilityCard({
       tabIndex={0}
     >
       <div className="grid gap-2 p-2.5">
-        <div className="flex w-full items-center gap-2 text-left">
+        <div className="flex w-full min-w-0 items-center gap-2 text-left">
           <ServiceIcon loading={loading} service={service} statusClass={statusClass} />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
-              <h4 className="truncate text-sm font-bold text-slate-50">{service.label}</h4>
+              <h4 className="min-w-0 flex-1 truncate text-sm font-bold text-slate-50">{service.label}</h4>
               {service.type === 'external-service' && <MetadataBadge className="px-2 py-0.5 text-[0.65rem]">Pinned</MetadataBadge>}
             </div>
             <p className="truncate text-xs text-cyan-50/65">{service.issue || service.detail}</p>

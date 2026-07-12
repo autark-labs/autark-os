@@ -298,7 +298,7 @@ function NetworkPage() {
             searchValue={query}
           />
           <Tabs className="gap-5" onValueChange={handleTabChange} value={selectedTab}>
-            <TabsList className="w-full justify-start overflow-x-auto border-b border-sky-400/20 bg-slate-900/95 p-0 py-2 backdrop-blur" variant="line">
+            <TabsList className="w-full min-w-0 max-w-full justify-start overflow-x-auto border-b border-sky-400/20 bg-slate-900/95 p-0 py-2 backdrop-blur" variant="line">
               <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="matrix">Matrix</TabsTrigger>
               <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="issues">Issues</TabsTrigger>
               {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="devices">Trusted devices</TabsTrigger>}
