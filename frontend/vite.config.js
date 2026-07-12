@@ -40,6 +40,9 @@ function manualChunks(id) {
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  test: {
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+  },
   build: {
     rollupOptions: {
       output: {

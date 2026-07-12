@@ -195,7 +195,8 @@ test('applications page sends found-service review to the dedicated existing-app
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
   assert.match(page, /const foundServices = appState\.foundServices/);
-  assert.match(page, /Review existing apps/);
+  assert.match(page, /<FoundAppsPrompt/);
+  assert.match(page, /reviewHref: '\/apps\/found'/);
   assert.match(page, /navigate\(`\/apps\/found\$\{serviceQuery\}`, \{ replace: true \}\)/);
   assert.doesNotMatch(page, /reviewNextButtonLabel|setFilter\('needs_review'\)/);
 });

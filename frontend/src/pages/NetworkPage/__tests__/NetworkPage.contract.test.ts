@@ -57,7 +57,7 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(matrix, /TooltipContent/);
   assert.match(matrix, /arrowClassName="bg-slate-800 fill-slate-800"/);
   assert.match(matrix, /privateLinkStatus/);
-  assert.match(matrix, /onClick=\{handleCardClick\}/);
+  assert.match(matrix, /onClick=\{\(\) => onFocusService\(service\)\}/);
   assert.match(matrix, /SecurityPostureToggleGroup/);
   assert.match(matrix, /ToggleGroup/);
   assert.match(matrix, /data-\[state=on\]:bg-cyan-300\/20/);

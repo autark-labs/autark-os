@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import {
   Card,
   CardFooter,
@@ -25,6 +26,20 @@ export function ApplicationCard({
   onSelect: (id: string) => void;
   selected: boolean;
 }) {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) {
+      return;
+    }
+    if (managementOpen) {
+      card.setAttribute('inert', '');
+      return;
+    }
+    card.removeAttribute('inert');
+  }, [managementOpen]);
+
   return (
     <Card
       aria-hidden={managementOpen}
@@ -41,14 +56,19 @@ export function ApplicationCard({
           !managementOpen && 'hover:-translate-y-2 hover:shadow-cyan-300/60',
         ),
       )}
-      onClick={() => {
-        if (!managementOpen) {
-          onSelect(item.id);
-        }
-      }}
+      ref={cardRef}
       size="sm"
     >
-      <CardHeader className="px-3 pt-4">
+      <button
+        aria-label={`Manage ${item.name}`}
+        className="absolute inset-0 z-0 rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-cyan-300/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+        disabled={managementOpen}
+        onClick={() => onSelect(item.id)}
+        type="button"
+      >
+        <span className="sr-only">Manage {item.name}</span>
+      </button>
+      <CardHeader className="pointer-events-none relative z-10 px-3 pt-4">
         <ReadinessBadge item={item} overlay />
         <div className="flex min-w-0 flex-col items-center gap-2">
           <ApplicationIcon item={item} size="lg" />
@@ -67,13 +87,11 @@ export function ApplicationCard({
         </div>
       </CardHeader>
       <CardFooter
-        className="mt-auto gap-2 p-2"
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
+        className="relative z-10 mt-auto gap-2 p-2"
       >
         {item.href ? (
           <ApplicationOpenButton asChild className="flex-1 shadow-md" size="lg">
-            <a href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank">
+            <a href={item.href} rel="noreferrer" target="_blank">
               <ExternalLink className="size-5" data-icon="inline-start" />
               Open
             </a>

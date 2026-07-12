@@ -33,7 +33,11 @@ export function JobProgress({ className, compact = false, job, subjectLabel }: J
       cancelled && 'border-sky-400/25 bg-slate-800 text-slate-300',
       running && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
       className,
-    )}>
+    )}
+      aria-atomic="true"
+      aria-live={running ? 'polite' : undefined}
+      aria-label={`${jobTypeLabel(job.type)}${subjectLabel ? ` for ${subjectLabel}` : ''}: ${job.status.replaceAll('_', ' ')}`}
+    >
       <div className="flex items-start gap-3">
         <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg border border-current/20 bg-slate-900">
           {failed ? <AlertTriangle className="size-4" /> : succeeded ? <CheckCircle2 className="size-4" /> : running ? <Loader2 className="size-4 animate-spin" /> : <Clock3 className="size-4" />}
@@ -52,7 +56,7 @@ export function JobProgress({ className, compact = false, job, subjectLabel }: J
           </p>
           {!compact && (
             <>
-              <Progress className="mt-3 bg-slate-800 [&_[data-slot=progress-indicator]]:bg-cyan-300" value={progress} />
+              <Progress aria-label={`${jobTypeLabel(job.type)} progress`} className="mt-3 bg-slate-800 [&_[data-slot=progress-indicator]]:bg-cyan-300" value={progress} />
               {currentStep?.label && (
                 <p className="m-0 mt-2 text-xs text-current/65">
                   Current step: {currentStep.label}

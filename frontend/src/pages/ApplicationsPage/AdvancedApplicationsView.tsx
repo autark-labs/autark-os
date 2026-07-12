@@ -1,4 +1,5 @@
 import { ExternalLink, Loader2, Pause, Play, RotateCw, Search, ShieldCheck } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import {
   Card,
@@ -38,6 +39,20 @@ const tableHeadClass = 'text-sky-100/70';
 const tableCellMutedClass = 'text-slate-700';
 
 export function AdvancedApplicationsView({ actions, actionLoadingByItemId, emptyState, items, managementOpen, onSelect, selectedId }: AdvancedApplicationsViewProps) {
+  const tableRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const tableContainer = tableRef.current;
+    if (!tableContainer) {
+      return;
+    }
+    if (managementOpen) {
+      tableContainer.setAttribute('inert', '');
+      return;
+    }
+    tableContainer.removeAttribute('inert');
+  }, [managementOpen]);
+
   return (
     <Card className="min-h-[44rem] overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
       <CardHeader>
@@ -51,7 +66,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
           <AdvancedEmptyState emptyState={emptyState} />
         ) : (
         <div className="rounded-xl border border-sky-400/25 bg-slate-800 px-2 pb-2">
-          <Table className="border-separate border-spacing-y-2">
+          <Table aria-hidden={managementOpen} className="border-separate border-spacing-y-2" ref={tableRef}>
               <TableHeader>
                 <TableRow className="border-transparent hover:bg-transparent">
                 <TableHead className={tableHeadClass}>Name</TableHead>
@@ -71,11 +86,9 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
 
                 return (
                   <TableRow
-                    aria-hidden={managementOpen}
                     className={cn(
                       'border-transparent bg-sky-100 text-slate-950 shadow-md shadow-slate-950/20 transition-all duration-200',
-                      !managementOpen && 'cursor-pointer hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-lg',
-                      managementOpen && 'pointer-events-none cursor-default',
+                      !managementOpen && 'hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-lg',
                       item.attentionState !== 'none' && cn('bg-orange-200', !managementOpen && 'hover:bg-orange-100'),
                       item.readinessState === 'paused' && cn('bg-slate-200', !managementOpen && 'hover:bg-slate-100'),
                       managementOpen && selectedId && selectedId !== item.id && 'opacity-35 blur-[1px]',
@@ -85,19 +98,20 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                       ),
                     )}
                     key={item.id}
-                    onClick={() => {
-                      if (!managementOpen) {
-                        onSelect(item.id);
-                      }
-                    }}
                   >
                     <TableCell className="rounded-l-xl">
-                      <div className="flex items-center gap-3">
+                      <button
+                        aria-label={`Manage ${item.name}`}
+                        className="flex w-full items-center gap-3 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2 focus-visible:ring-offset-sky-100"
+                        disabled={managementOpen}
+                        onClick={() => onSelect(item.id)}
+                        type="button"
+                      >
                         <ApplicationIcon item={item} size="sm" />
                         <div className="min-w-0">
                           <div className="break-words font-medium text-slate-950" title={item.name}>{item.name}</div>
                         </div>
-                      </div>
+                      </button>
                     </TableCell>
                     <TableCell>
                       <ManagementBadge item={item} />

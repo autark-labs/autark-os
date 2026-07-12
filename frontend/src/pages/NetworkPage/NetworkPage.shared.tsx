@@ -114,7 +114,7 @@ export function DiagnosticRow({ item }: { item: NetworkDiagnosticsReport['checks
           {item.actionLabel && <span className="text-xs text-cyan-200">{item.actionLabel}</span>}
         </span>
         <span className="mt-1 block text-sm text-sky-100/75">{item.message}</span>
-        {item.detail && <span className="mt-1 block text-xs text-sky-100/50">{item.detail}</span>}
+        {item.detail && <span className="mt-1 block text-xs text-sky-100/70">{item.detail}</span>}
       </span>
     </NetworkInset>
   );

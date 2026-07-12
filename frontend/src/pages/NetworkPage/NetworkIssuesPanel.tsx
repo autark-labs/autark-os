@@ -27,7 +27,7 @@ export function NetworkIssuesPanel({ issues, onReviewPrivateLinks }: { issues: N
                   <MetadataBadge>{issue.source === 'app' ? 'App link' : 'Network'}</MetadataBadge>
                 </div>
                 <span className="mt-1 block text-sm text-sky-100/75">{issue.message}</span>
-                {issue.detail && <span className="mt-1 block text-xs text-sky-100/50">{issue.detail}</span>}
+                {issue.detail && <span className="mt-1 block text-xs text-sky-100/70">{issue.detail}</span>}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {issue.source === 'app' || issue.id.startsWith('stale-') ? (
                     <ProjectPrimaryButton onClick={onReviewPrivateLinks} size="sm" type="button">

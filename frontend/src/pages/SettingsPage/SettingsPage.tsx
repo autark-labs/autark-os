@@ -455,11 +455,11 @@ function SettingsPage() {
 function GeneralPanel({ draft, onUpdate }: PanelProps) {
   return (
     <SettingsGroup description="Name this appliance and set the local time used for routine backups." title="General">
-      <SettingRow helpId="deviceName" label="Device name" note="This name is used to identify your device on the network.">
-        <Input className="max-w-md border-sky-400/30 bg-slate-950 text-slate-100" onChange={(event) => onUpdate({ deviceName: event.target.value })} value={draft.deviceName} />
+      <SettingRow controlId="settings-device-name" helpId="deviceName" label="Device name" note="This name is used to identify your device on the network.">
+        <Input className="max-w-md border-sky-400/30 bg-slate-950 text-slate-100" id="settings-device-name" onChange={(event) => onUpdate({ deviceName: event.target.value })} value={draft.deviceName} />
       </SettingRow>
-      <SettingRow helpId="timeZone" label="Time zone" note="Used to calculate and show routine backup schedules.">
-        <SettingsSelect value={draft.timeZone} onChange={(value) => onUpdate({ timeZone: value })} options={[['America/Chicago', '(UTC-06:00) Central Time'], ['America/New_York', '(UTC-05:00) Eastern Time'], ['America/Denver', '(UTC-07:00) Mountain Time'], ['America/Los_Angeles', '(UTC-08:00) Pacific Time'], ['UTC', 'UTC']]} />
+      <SettingRow controlId="settings-time-zone" helpId="timeZone" label="Time zone" note="Used to calculate and show routine backup schedules.">
+        <SettingsSelect id="settings-time-zone" value={draft.timeZone} onChange={(value) => onUpdate({ timeZone: value })} options={[['America/Chicago', '(UTC-06:00) Central Time'], ['America/New_York', '(UTC-05:00) Eastern Time'], ['America/Denver', '(UTC-07:00) Mountain Time'], ['America/Los_Angeles', '(UTC-08:00) Pacific Time'], ['UTC', 'UTC']]} />
       </SettingRow>
     </SettingsGroup>
   );
@@ -503,17 +503,17 @@ function BackupsPanel({ apps, backupRoot, backupSchedule, draft, onUpdate }: Pan
   const protectedApps = apps.filter((app) => app.canonicalBackupState === 'protected_by_restore_point').length;
   return (
     <SettingsGroup description="Control automatic backup behavior for all app data." title="Backups">
-      <SettingRow helpId="automaticBackupsEnabled" label="Automatic backups" note="Back up all supported app data on a schedule.">
-        <Switch checked={draft.automaticBackupsEnabled} onCheckedChange={(checked) => onUpdate({ automaticBackupsEnabled: checked })} />
+      <SettingRow controlId="settings-automatic-backups" helpId="automaticBackupsEnabled" label="Automatic backups" note="Back up all supported app data on a schedule.">
+        <Switch checked={draft.automaticBackupsEnabled} id="settings-automatic-backups" onCheckedChange={(checked) => onUpdate({ automaticBackupsEnabled: checked })} />
       </SettingRow>
-      <SettingRow helpId="automaticBackupsEnabled" label="Backup frequency" note="How often Autark-OS should create automatic backups.">
-        <SettingsSelect value={draft.backupFrequency} onChange={(value) => onUpdate({ backupFrequency: value })} options={[['hourly', 'Hourly'], ['daily', 'Daily'], ['weekly', 'Weekly']]} />
+      <SettingRow controlId="settings-backup-frequency" helpId="automaticBackupsEnabled" label="Backup frequency" note="How often Autark-OS should create automatic backups.">
+        <SettingsSelect id="settings-backup-frequency" value={draft.backupFrequency} onChange={(value) => onUpdate({ backupFrequency: value })} options={[['hourly', 'Hourly'], ['daily', 'Daily'], ['weekly', 'Weekly']]} />
       </SettingRow>
-      <SettingRow helpId="automaticBackupsEnabled" label="Backup time" note="Preferred time for scheduled backups.">
-        <Input className="max-w-40 border-sky-400/30 bg-slate-950 text-slate-100" onChange={(event) => onUpdate({ backupTime: event.target.value })} type="time" value={draft.backupTime} />
+      <SettingRow controlId="settings-backup-time" helpId="automaticBackupsEnabled" label="Backup time" note="Preferred time for scheduled backups.">
+        <Input className="max-w-40 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-time" onChange={(event) => onUpdate({ backupTime: event.target.value })} type="time" value={draft.backupTime} />
       </SettingRow>
-      <SettingRow helpId="automaticBackupsEnabled" label="Retention" note="How many days automatic backups should be kept.">
-        <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
+      <SettingRow controlId="settings-backup-retention" helpId="automaticBackupsEnabled" label="Retention" note="How many days automatic backups should be kept.">
+        <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-retention" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
       <ReadOnlyRow label="Backup folder" note="Current destination used by routine and manual restore points." value={backupRoot || 'Unavailable'} />
       <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={<LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule?.nextRoutineRun }} />} />
@@ -526,8 +526,8 @@ function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRu
   const autoRepairApps = apps.filter((app) => settingsForApp(app).autoRepairEnabled ?? true).length;
   return (
     <SettingsGroup description="Configure app defaults and automatic management." title="Applications">
-      <SettingRow helpId="automaticRepairEnabled" label="Automatic fixes" note="Allow Autark-OS to try safe repairs when apps become unhealthy.">
-        <Switch checked={draft.automaticRepairEnabled} onCheckedChange={(checked) => onUpdate({ automaticRepairEnabled: checked })} />
+      <SettingRow controlId="settings-automatic-repair" helpId="automaticRepairEnabled" label="Automatic fixes" note="Allow Autark-OS to try safe repairs when apps become unhealthy.">
+        <Switch checked={draft.automaticRepairEnabled} id="settings-automatic-repair" onCheckedChange={(checked) => onUpdate({ automaticRepairEnabled: checked })} />
       </SettingRow>
       <ReadOnlyRow label="Repair coverage" note="Installed apps currently allowing automatic fixes." value={`${autoRepairApps}/${apps.length}`} />
       <ReadOnlyRow label="Startup grace" note="Newly started apps get time to boot before warnings appear." value="Enabled" />
@@ -663,14 +663,14 @@ function SettingsGroup({ children, description, title }: { children: ReactNode; 
   );
 }
 
-function SettingRow({ children, helpId, label, note }: { children: ReactNode; helpId: string; label: string; note: string }) {
+function SettingRow({ children, controlId, helpId, label, note }: { children: ReactNode; controlId: string; helpId: string; label: string; note: string }) {
   const help = settingHelp[helpId] || settingHelp.deviceName;
   return (
     <div className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,360px)_32px] md:items-center">
-      <div>
-        <p className="text-sm font-bold text-white">{label}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">{note}</p>
-      </div>
+      <label htmlFor={controlId}>
+        <span className="block text-sm font-bold text-white">{label}</span>
+        <span className="mt-1 block text-xs leading-5 text-slate-400">{note}</span>
+      </label>
       <div>{children}</div>
       <Popover>
         <PopoverTrigger asChild>
@@ -713,10 +713,10 @@ function ReadOnlyRow({ label, note, value }: { label: string; note: string; valu
   );
 }
 
-function SettingsSelect({ onChange, options, value }: { onChange: (value: string) => void; options: Array<[string, string]>; value: string }) {
+function SettingsSelect({ id, onChange, options, value }: { id: string; onChange: (value: string) => void; options: Array<[string, string]>; value: string }) {
   return (
     <UiSelect onValueChange={onChange} value={value}>
-      <SelectTrigger className="h-10 w-full border-sky-400/30 bg-slate-950 text-slate-100">
+      <SelectTrigger className="h-10 w-full border-sky-400/30 bg-slate-950 text-slate-100" id={id}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent className="border-sky-400/30 bg-slate-950 text-slate-100 shadow-xl shadow-slate-950/30">

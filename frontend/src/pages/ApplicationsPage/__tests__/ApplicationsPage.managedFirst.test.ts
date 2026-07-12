@@ -17,7 +17,8 @@ test('My Apps renders canonical managed and linked collections without mixing in
   assert.match(page, /<BasicApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(page, /<AdvancedApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(card, /<ManagementBadge item=\{item\} \/>/);
-  assert.match(card, /line-clamp-2 min-h-11 max-w-full/);
+  assert.match(card, /line-clamp-1 min-h-5 max-w-40/);
+  assert.match(card, /card\.setAttribute\('inert', ''\)/);
   assert.match(card, /title=\{item\.name\}/);
   assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
   assert.match(page, /title="My Apps"/);

@@ -96,7 +96,7 @@ function OnboardingGuide({ guide, installed }: { guide: TailscaleConnectGuide | 
           Open Tailscale setup
         </a>
       </ProjectPrimaryButton>
-      <p className="text-xs text-sky-100/50">{guide?.advancedNote}</p>
+      <p className="text-xs text-sky-100/70">{guide?.advancedNote}</p>
     </div>
   );
 }

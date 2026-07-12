@@ -2,9 +2,10 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+const Table = React.forwardRef<HTMLDivElement, React.ComponentProps<"table">>(function Table({ className, ...props }, ref) {
   return (
     <div
+      ref={ref}
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
@@ -15,7 +16,8 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
       />
     </div>
   )
-}
+})
+Table.displayName = 'Table'
 
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
@@ -27,15 +29,17 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   )
 }
 
-function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
+const TableBody = React.forwardRef<HTMLTableSectionElement, React.ComponentProps<"tbody">>(function TableBody({ className, ...props }, ref) {
   return (
     <tbody
+      ref={ref}
       data-slot="table-body"
       className={cn("[&_tr:last-child]:border-0", className)}
       {...props}
     />
   )
-}
+})
+TableBody.displayName = 'TableBody'
 
 function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (

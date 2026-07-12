@@ -26,9 +26,10 @@ test('Access renders a compact, tabbed zone view below desktop widths', () => {
 test('reachability cards support keyboard details and non-drag access changes', () => {
   const matrix = source('src/pages/NetworkPage/ReachabilityMatrix.tsx');
 
-  assert.match(matrix, /function handleCardKeyDown/);
-  assert.match(matrix, /event\.key === 'Enter' \|\| event\.key === ' '/);
-  assert.match(matrix, /tabIndex=\{0\}/);
+  assert.match(matrix, /aria-label=\{`Review \$\{service\.label\}\. \$\{service\.statusLabel\}\.\`\}/);
+  assert.match(matrix, /onClick=\{\(\) => onFocusService\(service\)\}/);
+  assert.match(matrix, /focus-visible:ring-2 focus-visible:ring-cyan-200/);
+  assert.doesNotMatch(matrix, /function handleCardKeyDown/);
   assert.match(matrix, /SecurityPostureToggleGroup/);
   assert.match(matrix, /dragEnabled/);
 });

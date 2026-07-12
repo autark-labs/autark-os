@@ -271,7 +271,7 @@ function RecentActivitySummary({ item }: { item: ApplicationSurfaceItem }) {
         <span className="text-sky-100/70">Last action</span>
         <span className="min-w-0 truncate font-medium text-white">{lastAction}</span>
       </div>
-      <p className="text-xs text-sky-100/50">{timestamp ? formatRuntimeTimestamp(timestamp) : 'Autark-OS will show the latest app event here when one is reported.'}</p>
+      <p className="text-xs text-sky-100/70">{timestamp ? formatRuntimeTimestamp(timestamp) : 'Autark-OS will show the latest app event here when one is reported.'}</p>
     </div>
   );
 }

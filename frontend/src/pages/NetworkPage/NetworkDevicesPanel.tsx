@@ -19,14 +19,14 @@ export function NetworkDevicesPanel({ devices }: { devices: NetworkDeviceView[] 
             <span className="min-w-0">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="block truncate text-sm font-semibold text-slate-50">{device.label}</span>
-                {device.operatingSystem && <span className="shrink-0 text-xs text-sky-100/50">{device.operatingSystem}</span>}
+                {device.operatingSystem && <span className="shrink-0 text-xs text-sky-100/70">{device.operatingSystem}</span>}
               </span>
               <span className="block truncate text-xs text-sky-100/65">{device.detail}</span>
-              <span className="mt-1 block truncate text-xs text-sky-100/50">{device.ipAddress || device.dnsName || device.lastSeen}</span>
+              <span className="mt-1 block truncate text-xs text-sky-100/70">{device.ipAddress || device.dnsName || device.lastSeen}</span>
             </span>
             <span className="ml-auto grid shrink-0 justify-items-end gap-1">
               <StatusBadge tone={networkStatusTone(device.status)}>{device.statusLabel}</StatusBadge>
-              <span className="text-xs capitalize text-sky-100/50">{device.connectionType}</span>
+              <span className="text-xs capitalize text-sky-100/70">{device.connectionType}</span>
             </span>
           </NetworkInset>
         ))}

@@ -18,13 +18,13 @@ test('Home metrics do not advertise clickability unless an action exists', () =>
 
 test('Home dismisses canonical recommendations through the shared persisted mutation', () => {
   const page = source('pages/OverviewPage/OverviewPage.tsx');
-  const cards = source('pages/OverviewPage/components/HomeCards.tsx');
+  const recommendationCard = source('components/autark-os/RecommendedActionCard.tsx');
   const repository = source('repositories/recommendedActionRepository.ts');
   const client = source('api/SystemAPIClient.ts');
 
   assert.match(page, /useDismissRecommendedActionMutation/);
   assert.match(page, /dismissRecommendedAction\.mutate\(primaryAction\.id\)/);
-  assert.match(cards, /aria-label="Dismiss recommendation"/);
+  assert.match(recommendationCard, /aria-label="Dismiss recommendation"/);
   assert.match(repository, /invalidateQueries\(\{ queryKey: recommendedActionQueryKeys\.all \}\)/);
   assert.match(client, /recommended-action\/\$\{encodeURIComponent\(actionId\)\}\/dismiss/);
 });

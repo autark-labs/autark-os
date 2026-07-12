@@ -70,4 +70,4 @@ export const semanticPrimaryActionClass = 'bg-app-accent text-slate-950 shadow-l
 export const semanticOpenActionClass = 'bg-app-accent text-slate-950 shadow-sm shadow-cyan-700/20 hover:bg-app-accent-strong';
 export const semanticLightControlClass = 'border-app-border bg-background text-foreground hover:bg-muted';
 export const semanticDarkControlClass = 'border-app-border-muted bg-app-panel text-app-text hover:bg-app-panel-hover hover:text-white';
-export const semanticWarningActionClass = 'bg-app-warning text-white shadow-md shadow-orange-700/20 hover:bg-orange-400';
+export const semanticWarningActionClass = 'bg-app-warning text-white shadow-md shadow-orange-950/30 hover:bg-orange-700';

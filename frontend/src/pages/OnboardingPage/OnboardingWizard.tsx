@@ -203,7 +203,7 @@ function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
             {onboardingSteps.map((item, index) => (
               <li className="min-w-0" key={item.id}>
                 <div className={cn('h-1 rounded-full', index < step ? 'bg-emerald-400' : index === step ? 'bg-cyan-300' : 'bg-slate-700')} />
-                <span aria-current={index === step ? 'step' : undefined} className={cn('mt-2 block truncate text-xs font-semibold', index === step ? 'text-cyan-100' : index < step ? 'text-emerald-200' : 'text-slate-500')}>{item.label}</span>
+                <span aria-current={index === step ? 'step' : undefined} className={cn('mt-2 block truncate text-xs font-semibold', index === step ? 'text-cyan-100' : index < step ? 'text-emerald-200' : 'text-slate-400')}>{item.label}</span>
               </li>
             ))}
           </ol>
@@ -331,7 +331,7 @@ function ReviewStep({ advancedFinish, draft, onAdvancedFinishChange, readiness, 
 }
 
 function ChoiceCard({ active, detail, label, onClick }: { active: boolean; detail: string; label: string; onClick: () => void }) {
-  return <button aria-pressed={active} className={cn('rounded-xl border p-4 text-left transition', active ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} onClick={onClick} type="button"><span className="font-semibold text-white">{label}</span><span className="mt-1 block text-sm leading-6 text-slate-400">{detail}</span></button>;
+  return <button aria-pressed={active} className={cn('rounded-xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950', active ? 'border-cyan-300/50 bg-cyan-400/10' : 'border-sky-400/25 bg-slate-800 hover:bg-slate-700')} onClick={onClick} type="button"><span className="font-semibold text-white">{label}</span><span className="mt-1 block text-sm leading-6 text-slate-400">{detail}</span></button>;
 }
 
 function WizardCard({ children, icon: Icon, text, title }: { children: ReactNode; icon: LucideIcon; text: string; title: string }) {

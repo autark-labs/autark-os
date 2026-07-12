@@ -93,7 +93,11 @@ function AppStoreCard({ app, density, installing, isSelected, onSelect }: { app:
   return (
     <div className={cn('group relative grid min-h-[258px] overflow-hidden rounded-xl border p-4 text-slate-50 shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5 hover:border-cyan-300/35', marketplaceCardToneClass(app), isSelected && 'border-cyan-300/35 outline outline-1 outline-cyan-300/40 shadow-lg shadow-cyan-950/30')}>
       <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
-      <button className="relative z-10 grid w-full gap-4 text-left" onClick={onSelect} type="button">
+      <button
+        className="relative z-10 grid w-full gap-4 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+        onClick={onSelect}
+        type="button"
+      >
         <span className="flex items-start gap-3">
           <AppImage app={app.app} />
           <span className="min-w-0 flex-1">
@@ -151,6 +155,7 @@ function BasicAppStoreCard({ app, installing, isSelected, onSelect }: { app: Dis
   const cardClassName = cn(
     'group grid min-h-[190px] w-full content-between rounded-xl border border-sky-400/25 bg-slate-900 p-4 text-left text-slate-50 shadow-lg shadow-slate-950/20 transition',
     'hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-slate-700 hover:shadow-lg hover:shadow-cyan-950/30',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950',
     isSelected && 'border-cyan-300/35 outline outline-1 outline-cyan-300/40 shadow-lg shadow-cyan-950/30',
   );
   const ctaClassName = 'mt-4 grid h-10 place-items-center rounded-lg bg-cyan-300 px-4 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-950/30 transition group-hover:bg-cyan-200';

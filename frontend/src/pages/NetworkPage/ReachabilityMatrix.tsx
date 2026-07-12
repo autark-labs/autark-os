@@ -1,5 +1,5 @@
 import { CheckCircle2, CircleAlert, Copy, ExternalLink, GripVertical, Lock, Router, Server, ShieldAlert, ShieldCheck } from 'lucide-react';
-import type { DragEvent, KeyboardEvent, MouseEvent } from 'react';
+import type { DragEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
@@ -224,7 +224,7 @@ export function ReachabilityMatrix({
               <div className="grid gap-2 xl:min-h-0 xl:flex-1 xl:auto-rows-max xl:content-start xl:items-start xl:overflow-y-auto xl:overscroll-contain xl:pr-1 xl:[contain:layout_paint]">
                 {showGhost && draggedService && <GhostReachabilityCard service={draggedService} />}
                 {zoneItems.length === 0 && !showGhost ? (
-                  <div className="rounded-lg border border-dashed border-sky-400/20 px-3 py-4 text-center text-sm text-sky-100/45">
+                  <div className="rounded-lg border border-dashed border-sky-400/20 px-3 py-4 text-center text-sm text-sky-100/70">
                     {zone.emptyText}
                   </div>
                 ) : (
@@ -276,20 +276,6 @@ function ReachabilityCard({
   const statusTone = reachabilityStatusTone(service.status);
   const statusClass = semanticStatusVariants({ tone: statusTone });
 
-  function handleCardClick(event: MouseEvent<HTMLElement>) {
-    if (isInteractiveClick(event.target)) {
-      return;
-    }
-    onFocusService(service);
-  }
-
-  function handleCardKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if ((event.key === 'Enter' || event.key === ' ') && !isInteractiveClick(event.target)) {
-      event.preventDefault();
-      onFocusService(service);
-    }
-  }
-
   const dragEnabled = service.draggable && !loading && Boolean(onDragStart && onDragEnd);
 
   return (
@@ -301,18 +287,18 @@ function ReachabilityCard({
         dragEnabled && 'cursor-grab active:cursor-grabbing',
         loading && 'animate-pulse opacity-80 ring-1 ring-cyan-300/40',
       )}
-      aria-label={`${service.label}. ${service.statusLabel}. Press Enter for details and actions.`}
       draggable={dragEnabled}
       id={reachabilityServiceElementId(service.id)}
-      onClick={handleCardClick}
       onDragEnd={dragEnabled ? onDragEnd : undefined}
       onDragStart={dragEnabled ? (event) => onDragStart?.(event, service) : undefined}
-      onKeyDown={handleCardKeyDown}
-      role="group"
-      tabIndex={0}
     >
       <div className="grid gap-2 p-2.5">
-        <div className="flex w-full min-w-0 items-center gap-2 text-left">
+        <button
+          aria-label={`Review ${service.label}. ${service.statusLabel}.`}
+          className="flex w-full min-w-0 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200 focus-visible:ring-offset-2 focus-visible:ring-offset-cyan-950"
+          onClick={() => onFocusService(service)}
+          type="button"
+        >
           <ServiceIcon loading={loading} service={service} statusClass={statusClass} />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
@@ -322,7 +308,7 @@ function ReachabilityCard({
             <p className="truncate text-xs text-cyan-50/65">{service.issue || service.detail}</p>
           </div>
           {dragEnabled && <GripVertical className="size-4 shrink-0 text-cyan-100/45" />}
-        </div>
+        </button>
 
         <div className="flex items-center gap-2">
           <StatusBadge className="text-[0.68rem]" tone={loading ? 'info' : statusTone}>{loading ? 'Processing' : service.statusLabel}</StatusBadge>
@@ -424,7 +410,7 @@ function MobileReachabilityZone({
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-sky-400/20 px-3 py-3 text-center text-sm text-sky-100/45">{zone.emptyText}</div>
+        <div className="rounded-lg border border-dashed border-sky-400/20 px-3 py-3 text-center text-sm text-sky-100/70">{zone.emptyText}</div>
       )}
     </section>
   );
@@ -556,17 +542,16 @@ function PrivateLinkStatus({ service }: { service: ReachabilityService }) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span
+          <button
             aria-label={status.label}
             className={cn(
               'inline-flex size-4 shrink-0 items-center justify-center rounded-full border',
               semanticStatusVariants({ tone: status.tone === 'stable' ? 'success' : status.tone === 'warning' ? 'warning' : 'neutral' }),
             )}
-            role="img"
-            tabIndex={0}
+            type="button"
           >
             <Icon className="size-3" />
-          </span>
+          </button>
         </TooltipTrigger>
         <TooltipContent arrowClassName="bg-slate-800 fill-slate-800" className="border-sky-400/25 bg-slate-800 text-slate-50 shadow-xl shadow-slate-950/35">
           {status.description}
@@ -609,10 +594,6 @@ function privateLinkStatus(service: ReachabilityService) {
     label: 'No private link configured',
     tone: 'neutral' as const,
   };
-}
-
-function isInteractiveClick(target: EventTarget | null) {
-  return target instanceof Element && Boolean(target.closest('button, a, input, select, textarea, [role="button"], [data-radix-collection-item]'));
 }
 
 function reachabilityServiceElementId(serviceId: string) {
