@@ -54,7 +54,7 @@ export function ApplicationCard({
           <ApplicationIcon item={item} size="lg" />
           <div className="flex min-w-0 flex-col items-center gap-1 text-center">
             <CardTitle
-              className="line-clamp-2 min-h-11 max-w-full rounded-md border border-sky-300 bg-slate-300 px-2 text-center text-lg leading-tight text-slate-950"
+              className="absolute top-30 line-clamp-1 min-h-5 max-w-40 rounded-md border border-sky-300 bg-slate-300 px-2 text-center text-lg leading-tight text-slate-950"
               title={item.name}
             >
               {item.name}
