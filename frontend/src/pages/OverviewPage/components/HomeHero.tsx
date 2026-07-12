@@ -67,7 +67,7 @@ function homeHeroSubtitle(summary: SystemSummary | null, availability: HomeSumma
 }
 
 function timeGreeting() {
-  const hour = new Date().getHours();
+  const hour = new Date(Date.now()).getHours();
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';

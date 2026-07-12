@@ -33,7 +33,7 @@ function OverviewPage() {
   const home = useHomeRepository();
   const dismissRecommendedAction = useDismissRecommendedActionMutation();
 
-  const apps = appState.applicationState?.managedApps ?? [];
+  const apps = useMemo(() => appState.applicationState?.managedApps ?? [], [appState.applicationState]);
   const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
   const pinnedServices = appState.pinnedExternalServices;
   const observedNeedingReview = appState.foundServices;

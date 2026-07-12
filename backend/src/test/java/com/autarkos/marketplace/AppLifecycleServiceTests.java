@@ -22,6 +22,7 @@ import com.autarkos.marketplace.install.AppActionResult;
 import com.autarkos.marketplace.install.AppGuardianService;
 import com.autarkos.marketplace.install.AppHealthSnapshot;
 import com.autarkos.marketplace.install.AppLifecycleService;
+import com.autarkos.marketplace.install.AppReliabilityService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -431,6 +432,16 @@ class AppLifecycleServiceTests {
         assertThat(summary.recentActivity())
                 .extracting(activity -> activity.type())
                 .contains("guardian_repair_failed");
+    }
+
+    @Test
+    void reliabilityAggregatorReportsAHealthyEmptyManagedAppSet() {
+        ReliabilityModels.AppReliabilitySummary summary = new AppReliabilityService(repository).summarize(List.of());
+
+        assertThat(summary.posture()).isEqualTo("healthy");
+        assertThat(summary.totalApps()).isZero();
+        assertThat(summary.issues()).isEmpty();
+        assertThat(summary.recentActivity()).isEmpty();
     }
 
     @Test

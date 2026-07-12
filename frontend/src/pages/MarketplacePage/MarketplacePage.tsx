@@ -108,7 +108,10 @@ function MarketplacePage() {
   const readinessQuery = useDiscoverReadinessQuery();
   const installMutation = useDiscoverInstallMutation();
   const backupMutation = useDiscoverBackupMutation();
-  const apps: DiscoverAppView[] = appsQuery.data ?? [];
+  const { refetch: refetchApps } = appsQuery;
+  const { refetch: refetchMarketplaceActivity } = activityQuery;
+  const { refetch: refetchReadiness } = readinessQuery;
+  const apps = useMemo<DiscoverAppView[]>(() => appsQuery.data ?? [], [appsQuery.data]);
   const marketplaceActivity = activityQuery.data ?? [];
   const onboarding = readinessQuery.data?.onboarding ?? null;
   const doctor = readinessQuery.data?.doctor ?? null;
@@ -150,11 +153,11 @@ function MarketplacePage() {
 
   const refreshDiscover = useCallback(async () => {
     await Promise.all([
-      appsQuery.refetch(),
-      activityQuery.refetch(),
-      readinessQuery.refetch(),
+      refetchApps(),
+      refetchMarketplaceActivity(),
+      refetchReadiness(),
     ]);
-  }, [activityQuery.refetch, appsQuery.refetch, readinessQuery.refetch]);
+  }, [refetchApps, refetchMarketplaceActivity, refetchReadiness]);
   const handleJobError = useCallback((message: string) => setMarketplaceError(message), []);
   const {
     backupJob,

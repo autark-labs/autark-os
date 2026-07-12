@@ -55,15 +55,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   const editable = item.managementState === 'managed' && item.settings.canEdit;
   const initialValues = useMemo(
     () => settingsFormValues(item),
-    [
-      item.id,
-      item.settings.autoRepairEnabled,
-      item.settings.backupEnabled,
-      item.settings.backupFrequency,
-      item.settings.backupRetention,
-      item.settings.expectedLocalPort,
-      item.settings.expectedProtocol,
-    ],
+    [item],
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingImpact, setPendingImpact] = useState<ApplicationSettingsImpact | null>(null);

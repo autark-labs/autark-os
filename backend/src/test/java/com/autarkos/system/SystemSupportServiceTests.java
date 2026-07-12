@@ -15,9 +15,9 @@ class SystemSupportServiceTests {
 
     @Test
     void redactsSecretsAndTailnetUrls() {
-        SystemSupportService service = new SystemSupportService(null, null, null, command -> new SystemSupportService.CommandResult(0, ""));
+        SupportDataRedactor redactor = new SupportDataRedactor();
 
-        String redacted = service.redact("COUCHDB_PASSWORD=secret123 token: abc https://project.tail123.ts.net:5984 100.90.12.8 Authorization: Bearer abcdefghijklmnop {\"api_key\":\"json-secret\"}");
+        String redacted = redactor.redact("COUCHDB_PASSWORD=secret123 token: abc https://project.tail123.ts.net:5984 100.90.12.8 Authorization: Bearer abcdefghijklmnop {\"api_key\":\"json-secret\"}");
 
         assertThat(redacted)
                 .doesNotContain("secret123")
@@ -32,6 +32,17 @@ class SystemSupportServiceTests {
                 .contains("[tailnet-ip-redacted]")
                 .contains("Bearer [redacted]")
                 .contains("\"api_key\":\"[redacted]\"");
+    }
+
+    @Test
+    void redactsSupportLogLinesAndKeepsTheirActionableSeverity() {
+        SupportDataRedactor redactor = new SupportDataRedactor();
+
+        SupportModels.SupportLogLine line = redactor.redactLogLine("ERROR: backup failed with token=private-token");
+
+        assertThat(line.line()).contains("ERROR: backup failed with token=[redacted]");
+        assertThat(line.level()).isEqualTo("error");
+        assertThat(line.redacted()).isTrue();
     }
 
     @Test

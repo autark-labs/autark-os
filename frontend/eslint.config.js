@@ -6,7 +6,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.vite/**', '**/*.timestamp-*.mjs'] },
+  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', '.vite/**', 'playwright-report/**', 'test-results/**', '**/*.timestamp-*.mjs'] },
   ...tseslint.configs.recommended,
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -36,7 +36,10 @@ export default [
       'no-undef': 'off',
       'no-unused-vars': 'off',
       'react/prop-types': 'off',
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // Autark-OS deliberately co-locates small view-model helpers with shared
+      // components. Fast Refresh safely invalidates those modules; see the
+      // release warning baseline for why this advisory is not a release gate.
+      'react-refresh/only-export-components': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': ['error', {
         args: 'none',

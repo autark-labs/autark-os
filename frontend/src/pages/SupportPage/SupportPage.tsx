@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ClipboardList, Copy, Download, FileText, LifeBuoy, ListChecks, LockKeyhole, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -55,7 +55,7 @@ function SupportPage() {
   const [error, setError] = useState<string | null>(null);
   const logsContentRef = useRef<HTMLDivElement | null>(null);
 
-  async function load(background = false) {
+  const load = useCallback(async (background = false) => {
     if (background) {
       setRefreshing(true);
     } else {
@@ -86,11 +86,11 @@ function SupportPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }
+  }, [showAdvancedMetrics]);
 
   useEffect(() => {
     void load();
-  }, [showAdvancedMetrics]);
+  }, [load]);
 
   async function generateBundle() {
     setBundleBusy(true);

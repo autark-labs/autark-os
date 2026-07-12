@@ -33,6 +33,7 @@ Start with the [development notes index](./development/README.md), then use thes
 - [Application page rebuild final stories](./development/appPageRebuildFinalized.md)
 - [Database migration discipline](./development/database-migrations.md)
 - [Stability overhaul](./development/stabilityOverhaul.md)
+- [Release warning baseline](./release-warning-baseline.md): approved warning policy and route-bundle review baseline.
 
 Historical planning records live under:
 

@@ -19,7 +19,6 @@ import com.autarkos.marketplace.install.models.GuideModels;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
-import com.autarkos.marketplace.model.HealthManifest;
 import com.autarkos.marketplace.plan.InstallPlan;
 import com.autarkos.marketplace.plan.InstallPlanService;
 import com.autarkos.network.tailscale.TailscaleServeResult;
@@ -42,6 +41,7 @@ public class MarketplaceInstallService {
     private final DockerOwnershipService dockerOwnershipService;
     private final AppRuntimeMetadataWriter appRuntimeMetadataWriter;
     private final ObservedServiceService observedServiceService;
+    private final InstallStartupChecker startupChecker;
 
     @Autowired
     public MarketplaceInstallService(
@@ -73,6 +73,7 @@ public class MarketplaceInstallService {
         this.dockerOwnershipService = dockerOwnershipService;
         this.appRuntimeMetadataWriter = appRuntimeMetadataWriter;
         this.observedServiceService = observedServiceService;
+        this.startupChecker = new InstallStartupChecker(dockerComposeExecutor);
     }
 
     public MarketplaceInstallService(
@@ -173,7 +174,7 @@ public class MarketplaceInstallService {
                 return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
             }
             recordStep(steps, sink, InstallModels.InstallStep.completed("Starting services", "Docker Compose started the managed services."));
-            StartupCheck startupCheck = waitForStartup(composeFile, composeProject, manifest.health());
+            InstallStartupChecker.StartupCheck startupCheck = startupChecker.waitForStartup(composeFile, composeProject, manifest.health());
             logs.addAll(startupCheck.logs());
             if (!startupCheck.ready()) {
                 recordStep(steps, sink, InstallModels.InstallStep.failed("Checking app health", startupCheck.detail()));
@@ -441,61 +442,6 @@ public class MarketplaceInstallService {
         }
     }
 
-    private StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health) {
-        List<String> lastStatus = List.of();
-        List<RuntimeModels.DockerContainerStatus> lastContainers = List.of();
-        for (int attempt = 1; attempt <= 20; attempt++) {
-            List<RuntimeModels.DockerContainerStatus> containers = dockerComposeExecutor.containers(composeFile, composeProject);
-            lastContainers = containers;
-            StartupCheck check = evaluateStartup(containers, health);
-            lastStatus = check.logs();
-            if (check.ready() || check.failed()) {
-                return check;
-            }
-            sleep();
-        }
-        if (lastContainers.stream().anyMatch(this::running) && lastContainers.stream().noneMatch(this::failed)) {
-            return StartupCheck.warmingUp("The service is running and still finishing startup checks. Autark-OS will keep watching it from Applications.", lastStatus);
-        }
-        String detail = "The app did not report ready within 20 seconds. Last container state: " + String.join("; ", lastStatus);
-        return StartupCheck.failed(detail, lastStatus);
-    }
-
-    private StartupCheck evaluateStartup(List<RuntimeModels.DockerContainerStatus> containers, HealthManifest health) {
-        if (containers.isEmpty()) {
-            return StartupCheck.pending("Waiting for Docker to report the app container.", List.of("No containers reported yet."));
-        }
-        List<String> statusLines = containers.stream()
-                .map(this::statusLine)
-                .toList();
-        List<String> failedContainers = containers.stream()
-                .filter(this::failed)
-                .map(this::statusLine)
-                .toList();
-        if (!failedContainers.isEmpty()) {
-            return StartupCheck.failed("The app container stopped or reported unhealthy: " + String.join("; ", failedContainers), statusLines);
-        }
-        boolean starting = containers.stream().anyMatch(this::starting);
-        boolean running = containers.stream().anyMatch(this::running);
-        if (running && !starting) {
-            return StartupCheck.ready(readinessDetail(health), statusLines);
-        }
-        return StartupCheck.pending(health.startingLabel(), statusLines);
-    }
-
-    private String readinessDetail(HealthManifest health) {
-        if (health == null) {
-            return "The app container is running.";
-        }
-        if (List.of("container", "no-web-ui", "none").contains(health.type())) {
-            return health.description();
-        }
-        if ("tcp".equals(health.type())) {
-            return "The service container is running. Autark-OS will keep checking the service port from Applications.";
-        }
-        return "The app container is running. Autark-OS will keep checking the app link from Applications.";
-    }
-
     private String readyDetail(ApplicationManifest manifest, String accessUrl, String privateAccessUrl) {
         if (manifest.usage().privateHttpsRequired() && privateAccessUrl != null && !privateAccessUrl.isBlank()) {
             return privateAccessUrl;
@@ -506,69 +452,4 @@ public class MarketplaceInstallService {
         return accessUrl == null || accessUrl.isBlank() ? "Ready." : accessUrl;
     }
 
-    private boolean running(RuntimeModels.DockerContainerStatus container) {
-        String state = lower(container.state());
-        String status = lower(container.status());
-        return state.equals("running") || status.startsWith("up ");
-    }
-
-    private boolean starting(RuntimeModels.DockerContainerStatus container) {
-        String state = lower(container.state());
-        String health = lower(container.health());
-        String status = lower(container.status());
-        return state.equals("created")
-                || state.equals("restarting")
-                || health.equals("starting")
-                || status.contains("starting");
-    }
-
-    private boolean failed(RuntimeModels.DockerContainerStatus container) {
-        String state = lower(container.state());
-        String health = lower(container.health());
-        String status = lower(container.status());
-        return state.equals("exited")
-                || state.equals("dead")
-                || health.equals("unhealthy")
-                || status.contains("exited")
-                || status.contains("unhealthy");
-    }
-
-    private String statusLine(RuntimeModels.DockerContainerStatus container) {
-        return "%s state=%s health=%s status=%s".formatted(
-                container.name(),
-                container.state(),
-                container.health(),
-                container.status());
-    }
-
-    private String lower(String value) {
-        return value == null ? "" : value.toLowerCase();
-    }
-
-    private void sleep() {
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new InstallationException("Interrupted while waiting for the app to start.", exception);
-        }
-    }
-
-    private record StartupCheck(boolean ready, boolean failed, boolean warmingUp, String detail, List<String> logs) {
-        private static StartupCheck ready(String detail, List<String> logs) {
-            return new StartupCheck(true, false, false, detail, logs);
-        }
-
-        private static StartupCheck warmingUp(String detail, List<String> logs) {
-            return new StartupCheck(true, false, true, detail, logs);
-        }
-
-        private static StartupCheck pending(String detail, List<String> logs) {
-            return new StartupCheck(false, false, false, detail, logs);
-        }
-
-        private static StartupCheck failed(String detail, List<String> logs) {
-            return new StartupCheck(false, true, false, detail, logs);
-        }
-    }
 }

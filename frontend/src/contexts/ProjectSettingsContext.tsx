@@ -46,7 +46,7 @@ export function ProjectSettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshSettings();
-  }, []);
+  }, [refreshSettings]);
 
   const setProjectSettings = useCallback((nextSettings: ProjectSettings) => {
     setSettings(nextSettings);

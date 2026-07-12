@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,11 +26,6 @@ public class SystemSupportService {
 
     private static final int DEFAULT_LOG_LIMIT = 120;
     private static final int MAX_LOG_LIMIT = 400;
-    private static final Pattern SECRET_ASSIGNMENT = Pattern.compile("(?i)(password|passwd|token|secret|api[_-]?key|auth|credential)(\\s*[=:]\\s*)([^\\s,;]+)");
-    private static final Pattern JSON_SECRET = Pattern.compile("(?i)(\"(?:password|passwd|token|secret|api[_-]?key|auth|credential)\"\\s*:\\s*\")([^\"]+)(\")");
-    private static final Pattern BEARER_TOKEN = Pattern.compile("(?i)(bearer\\s+)([a-z0-9._~+/=-]{12,})");
-    private static final Pattern TAILSCALE_DNS = Pattern.compile("(?i)(https?://)?[a-z0-9-]+\\.[a-z0-9-]+\\.ts\\.net(:\\d+)?");
-    private static final Pattern TAILSCALE_IP = Pattern.compile("\\b100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d{1,3}\\.\\d{1,3}\\b");
 
     private final ActivityLogService activityLogService;
     private final SystemMetricsService metricsService;
@@ -43,6 +37,7 @@ public class SystemSupportService {
     private final ProjectVersionService versionService;
     private final SystemSummaryProvider systemSummaryProvider;
     private final Function<List<String>, CommandResult> commandRunner;
+    private final SupportDataRedactor dataRedactor = new SupportDataRedactor();
 
     @Autowired
     public SystemSupportService(
@@ -410,47 +405,15 @@ public class SystemSupportService {
     }
 
     private List<ActivityLog> redactedActivity(List<ActivityLog> logs) {
-        return logs.stream()
-                .map(log -> new ActivityLog(
-                        log.id(),
-                        log.level(),
-                        log.category(),
-                        log.action(),
-                        redact(log.title()),
-                        redact(log.message()),
-                        log.appId(),
-                        log.outcome(),
-                        redact(log.details()),
-                        log.createdAt()))
-                .toList();
+        return dataRedactor.redactActivity(logs);
     }
 
     private SupportModels.SupportLogLine logLine(String line) {
-        String redacted = redact(line);
-        return new SupportModels.SupportLogLine(redacted, logLevel(redacted), !redacted.equals(line));
-    }
-
-    private String logLevel(String line) {
-        String lower = line.toLowerCase(Locale.ROOT);
-        if (lower.contains(" error ") || lower.contains("failed") || lower.contains("exception")) {
-            return "error";
-        }
-        if (lower.contains(" warn") || lower.contains("warning") || lower.contains("needs_attention")) {
-            return "warning";
-        }
-        return "info";
+        return dataRedactor.redactLogLine(line);
     }
 
     String redact(String value) {
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        String redacted = SECRET_ASSIGNMENT.matcher(value).replaceAll("$1$2[redacted]");
-        redacted = JSON_SECRET.matcher(redacted).replaceAll("$1[redacted]$3");
-        redacted = BEARER_TOKEN.matcher(redacted).replaceAll("$1[redacted]");
-        redacted = TAILSCALE_DNS.matcher(redacted).replaceAll("[tailnet-url-redacted]");
-        redacted = TAILSCALE_IP.matcher(redacted).replaceAll("[tailnet-ip-redacted]");
-        return redacted;
+        return dataRedactor.redact(value);
     }
 
     private String checkStatus(SystemSetupModels.SystemSetupStatus setup, String id) {

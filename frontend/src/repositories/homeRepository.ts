@@ -51,13 +51,16 @@ export function useHomeRepository(): HomeRepositoryView {
   const summaryQuery = useHomeSummaryQuery();
   const recommendedActionQuery = useHomeRecommendedActionQuery();
   const activityQuery = useHomeActivityQuery();
+  const { refetch: refetchSummary } = summaryQuery;
+  const { refetch: refetchRecommendedAction } = recommendedActionQuery;
+  const { refetch: refetchActivity } = activityQuery;
   const refresh = useCallback(async () => {
     await Promise.all([
-      summaryQuery.refetch(),
-      recommendedActionQuery.refetch(),
-      activityQuery.refetch(),
+      refetchSummary(),
+      refetchRecommendedAction(),
+      refetchActivity(),
     ]);
-  }, [activityQuery.refetch, recommendedActionQuery.refetch, summaryQuery.refetch]);
+  }, [refetchActivity, refetchRecommendedAction, refetchSummary]);
 
   return {
     activity: activityQuery.data ?? [],
