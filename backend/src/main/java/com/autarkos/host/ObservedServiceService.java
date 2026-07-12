@@ -157,7 +157,7 @@ public class ObservedServiceService {
         }
         String message = catalogAppId == null || catalogAppId.isBlank()
                 ? "The service no longer has a catalog app match."
-                : "The service now affects Marketplace state for " + catalogAppId + ".";
+                : "The service now affects Discover status for " + catalogAppId + ".";
         return new HostModels.ActionResult(true, "success", "App match saved", message, id, "refresh_observed_services");
     }
 
@@ -232,7 +232,7 @@ public class ObservedServiceService {
                 List.of(
                         "Add " + displayName + " to My Apps as a managed app.",
                         "Keep the existing Docker container and access URL.",
-                        "Record this Autark-OS installation as the owner for app recovery and marketplace state."),
+                        "Record this Autark-OS installation as the owner for app recovery and Discover status."),
                 List.of());
     }
 

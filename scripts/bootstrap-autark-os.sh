@@ -478,7 +478,7 @@ plan_dependencies() {
   printf ','
   json_dependency "sudo" "${sudo_status}" true "Required to install Autark-OS as a system service."
   printf ','
-  json_dependency "Docker" "${docker_status}" true "Required for Marketplace app installs."
+  json_dependency "Docker" "${docker_status}" true "Required for Discover app installs."
   printf ','
   json_dependency "Docker Compose" "${compose_status}" true "Required to run managed app stacks."
   printf ','
@@ -884,7 +884,7 @@ doctor_checks_json() {
   elif supported_apt_host; then
     emit_check "docker" "Docker" "warning" "Docker is missing, but this host can install it through the guided dependency path." "Run with --auto-install-deps or install Docker."
   else
-    emit_check "docker" "Docker" "warning" "Docker is missing." "Install Docker before installing Marketplace apps."
+    emit_check "docker" "Docker" "warning" "Install Docker before installing Discover apps."
   fi
   if docker compose version >/dev/null 2>&1; then
     emit_check "docker-compose" "Docker Compose" "ok" "Docker Compose v2 is available." ""
@@ -1024,7 +1024,7 @@ plan_warnings_json() {
   printf '['
   for warning in \
     "confirm-host-mutation|Review and confirm the install plan before changing this host." \
-    "docker-required-for-apps|Autark-OS can start without Docker, but Marketplace app installs need Docker." \
+    "docker-required-for-apps|Autark-OS can start without Docker, but Discover app installs need Docker." \
     "tailscale-optional|Tailscale can be skipped for local-only use and configured later."; do
     if [[ "${first}" -eq 0 ]]; then
       printf ','
@@ -1138,7 +1138,7 @@ Actions:
 
 Warnings:
   - Review and confirm the install plan before changing this host.
-  - Autark-OS can start without Docker, but Marketplace app installs need Docker.
+  - Autark-OS can start without Docker, but Discover app installs need Docker.
   - Tailscale can be skipped for local-only use and configured later.
 PLAN
 }
@@ -1352,10 +1352,10 @@ preflight() {
       if grep -qiE 'permission denied|denied while trying to connect|Got permission denied' <<<"${docker_output}"; then
         log "Docker is installed, but this shell cannot access the Docker socket yet. Autark-OS will use service-user docker-group access after install."
       else
-        log "Docker is installed, but the daemon is not reachable yet. Marketplace installs need Docker running."
+        log "Docker is installed, but the daemon is not reachable yet. Discover installs need Docker running."
       fi
     fi
-    docker compose version >/dev/null 2>&1 || log "Docker Compose v2 was not found. Marketplace installs need the Docker Compose plugin."
+    docker compose version >/dev/null 2>&1 || log "Docker Compose v2 was not found. Discover installs need the Docker Compose plugin."
   else
     log "Docker is not installed yet. The service installer will warn and continue, but app installs need Docker."
   fi

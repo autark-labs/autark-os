@@ -1,4 +1,4 @@
-# Marketplace And Runtime Architecture
+# Discover And Runtime Architecture
 
 Autark-OS is not a Docker Compose launcher. It is a guided local runtime for discovering, installing, operating, backing up, and recovering self-hosted apps.
 

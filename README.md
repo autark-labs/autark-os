@@ -123,7 +123,7 @@ Tested beta target:
 - Node.js and Yarn 1.x for source installs
 - Tailscale for private links and remote access workflows
 
-Docker is required for Marketplace app installs. Tailscale is optional for local-only usage, but strongly recommended because private access is a core Autark-OS workflow.
+Docker is required for Discover app installs. Tailscale is optional for local-only usage, but strongly recommended because private access is a core Autark-OS workflow.
 
 ## Common Commands
 
@@ -205,7 +205,7 @@ docs/          User guides, runtime architecture, development plans
 - [Non-technical install guide](docs/non-technical-install-guide.md)
 - [Beta testing repository](https://github.com/autark-labs/autark-os/)
 - [Local development](docs/local-development.md)
-- [Marketplace runtime architecture](docs/marketplace-runtime.md)
+- [Discover and runtime architecture](docs/marketplace-runtime.md)
 - [Manifest authoring checklist](docs/manifest-authoring-checklist.md)
 - [Service user installation](docs/service-user-installation.md)
 

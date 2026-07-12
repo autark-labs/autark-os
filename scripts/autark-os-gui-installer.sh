@@ -188,8 +188,8 @@ issue_messages = {
     "runtime-storage": "The selected storage location may not have enough free space for apps and backups.",
     "port": "The selected Autark-OS web address is already in use. Choose another port before continuing.",
     "java": "This device needs Java before Autark-OS can run.",
-    "docker": "Docker is needed before Marketplace apps can be installed.",
-    "docker-compose": "Docker Compose is needed before Marketplace apps can be installed.",
+    "docker": "Docker is needed before Discover apps can be installed.",
+    "docker-compose": "Docker Compose is needed before Discover apps can be installed.",
     "tailscale": "Private access can be set up later if Tailscale is not installed now.",
 }
 
@@ -381,9 +381,9 @@ contract = {
             {
                 "id": "install-and-run-apps",
                 "label": "Install and run apps",
-                "summary": "Autark-OS needs Docker and Docker Compose before it can install Marketplace apps.",
+                "summary": "Autark-OS needs Docker and Docker Compose before it can install Discover apps.",
                 "requires": ["Docker", "Docker Compose"],
-                "requiredFor": "Marketplace app installs",
+                "requiredFor": "Discover app installs",
                 "optional": False,
                 "enabled": True,
                 "dependencies": [dependency_payload("Docker"), dependency_payload("Docker Compose")],

@@ -172,7 +172,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
             <section className="grid gap-3 rounded-lg border border-slate-800 bg-slate-900/45 p-4">
               <div>
                 <h3 className="font-bold text-white">Change app match</h3>
-                <p className="mt-1 text-sm leading-6 text-slate-400">Use a catalog app id when this service should affect Marketplace warnings for a specific app.</p>
+                <p className="mt-1 text-sm leading-6 text-slate-400">Use a catalog app ID when this service should affect Discover warnings for a specific app.</p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="observed-service-match">Catalog app id</Label>

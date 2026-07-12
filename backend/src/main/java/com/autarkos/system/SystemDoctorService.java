@@ -74,7 +74,7 @@ public class SystemDoctorService {
 
     private SystemSetupModels.SystemReadinessStatus readiness(List<SystemSetupModels.SystemSetupCheck> checks) {
         SystemSetupModels.SystemReadinessGroup core = group("core", "Autark-OS", "Autark-OS can open and save settings.", checks, SystemCapabilityCatalog.CORE_CHECKS);
-        SystemSetupModels.SystemReadinessGroup appInstalls = group("app-installs", "App installs", "Docker is ready for Marketplace apps.", checks, SystemCapabilityCatalog.APP_INSTALL_CHECKS);
+        SystemSetupModels.SystemReadinessGroup appInstalls = group("app-installs", "App installs", "Docker is ready for Discover apps.", checks, SystemCapabilityCatalog.APP_INSTALL_CHECKS);
         SystemSetupModels.SystemReadinessGroup privateAccess = group("private-access", "Private access", "Tailscale is ready for private app links.", checks, SystemCapabilityCatalog.PRIVATE_ACCESS_CHECKS);
         SystemSetupModels.SystemReadinessGroup storage = group("storage", "Storage", "Storage and backup locations are ready.", checks, SystemCapabilityCatalog.STORAGE_CHECKS);
         SystemSetupModels.SystemReadinessGroup warnings = group("warnings", "Other checks", "Network and service notes are ready.", checks, SystemCapabilityCatalog.WARNING_CHECKS);
@@ -102,7 +102,7 @@ public class SystemDoctorService {
             return new SystemSetupModels.SystemReadinessStatus(
                     "apps_need_docker",
                     "Apps need Docker setup",
-                    "Autark-OS can finish setup, but Marketplace app installs need Docker access first.",
+                    "Autark-OS can finish setup, but Discover app installs need Docker access first.",
                     true,
                     true,
                     groups);

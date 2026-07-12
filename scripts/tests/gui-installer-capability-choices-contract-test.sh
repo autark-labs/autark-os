@@ -40,7 +40,7 @@ assert set(choices) == {"install-and-run-apps", "reach-apps-from-my-devices", "l
 apps = choices["install-and-run-apps"]
 assert apps["label"] == "Install and run apps"
 assert apps["requires"] == ["Docker", "Docker Compose"]
-assert apps["requiredFor"] == "Marketplace app installs"
+assert apps["requiredFor"] == "Discover app installs"
 assert apps["enabled"] is True
 assert apps["dependencies"][0]["name"] == "Docker"
 assert apps["dependencies"][0]["status"] == plan_dependencies["Docker"]["status"]

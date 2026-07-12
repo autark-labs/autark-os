@@ -136,7 +136,7 @@ public class SystemSetupService {
     private SystemSetupModels.SystemSetupCheck dockerCheck() {
         CommandResult docker = run("docker", "version", "--format", "{{.Server.Version}}");
         if (docker.exitCode() == 127) {
-            return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is not installed.", "Marketplace app installs need Docker.", "Install Docker", null);
+            return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is not installed.", "Discover app installs need Docker.", "Install Docker", null);
         }
         if (docker.successful()) {
             return ok(SystemCapabilityCatalog.DOCKER, "Docker", "Autark-OS can talk to Docker.", firstLine(docker), null, null);

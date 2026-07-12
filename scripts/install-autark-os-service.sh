@@ -339,7 +339,7 @@ preflight_host() {
   [[ "${java_major}" =~ ^[0-9]+$ && "${java_major}" -ge 21 ]] || die "Java 21 or newer is required. ${JAVA_BIN} reports Java major version: ${java_major:-unknown}"
 
   if command_exists docker; then
-    docker compose version >/dev/null 2>&1 || warn "Docker Compose v2 was not found. Marketplace installs need the Docker Compose plugin."
+    docker compose version >/dev/null 2>&1 || warn "Docker Compose v2 was not found. Discover installs need the Docker Compose plugin."
   fi
 
   if command_exists findmnt; then
@@ -505,7 +505,7 @@ configure_docker_access() {
     return 0
   fi
   if ! command_exists docker; then
-    warn "Docker was not found. Install Docker before using marketplace app installs."
+    warn "Docker was not found. Install Docker before using Discover app installs."
     return 0
   fi
   if ! getent group docker >/dev/null; then

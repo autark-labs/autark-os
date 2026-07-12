@@ -26,7 +26,7 @@ Tested beta target:
 - Tailscale for private links and remote access workflows
 - Node.js and Yarn 1.x when installing from source
 
-Docker is required for Marketplace app installs. Autark-OS can run without Tailscale, but private HTTPS links will not work until Tailscale is installed, connected, and configured for the `autarkos` operator.
+Docker is required for Discover app installs. Autark-OS can run without Tailscale, but private HTTPS links will not work until Tailscale is installed, connected, and configured for the `autarkos` operator.
 
 ## Install From GitHub Release Artifacts
 
