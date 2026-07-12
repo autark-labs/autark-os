@@ -4,19 +4,22 @@ This guide is for installing Autark-OS on a home server, mini PC, or Raspberry P
 
 ## Choose Your Install Option
 
-**Recommended path: GUI installer**
+**Recommended path: the Debian package**
 
-Use this when you are sitting near the device or can open its desktop. The GUI installer checks the device, asks where Autark-OS should store apps and backups, lets you choose private access, installs Autark-OS, and opens it in the browser. This is the intended normal-user experience and will be the primary path when the packaged installer is published.
-
-**Second choice: One-command installer**
-
-Use this when you are following guided instructions in a terminal or a support person is helping remotely. The public command is planned to be:
+Use the `.deb` file from the Autark-OS GitHub Release page on Debian, Ubuntu, or Raspberry Pi OS. It installs the service and prints the address to open in your browser:
 
 ```bash
-curl -fsSL https://install.autark-os.dev | bash
+sudo apt install ./autark-os_<version>_amd64.deb
 ```
 
-The beta repository can preview this path from a local release bundle, but public download and signing are not finished yet.
+**Portable installer**
+
+Use the `.run` file when a package is not suitable or when a support person asks you to use it:
+
+```bash
+chmod +x Autark-OS-Installer-<version>-amd64.run
+./Autark-OS-Installer-<version>-amd64.run
+```
 
 **Advanced CLI**
 
@@ -38,17 +41,7 @@ For best results, avoid removable storage paths that appear only after someone s
 
 ## Run The Installer
 
-When the GUI installer is available, download it from the Autark-OS release page, open it, and choose **Install Autark-OS**. The installer should show:
-
-1. Device check
-2. Storage choice
-3. Private access choice
-4. Install progress
-5. Open Autark-OS
-
-For the one-command installer path, paste the install command from the release page into the terminal. The command should check the device before making changes and ask before installing supported dependencies.
-
-During the current beta, a support person may give you a local release bundle instead. From inside that bundle, the closest command is:
+The package or portable installer checks the device before it changes the host. It then prints the local address to open in a browser. During beta, a support person may instead give you a local release bundle. From inside that bundle, run:
 
 ```bash
 ./scripts/autark-os install --guided
@@ -66,9 +59,9 @@ Avoid temporary desktop mount paths when possible. If the installer warns that a
 
 ## Choose Private Access
 
-Choose **Reach apps from my devices** if you want to open Autark-OS apps from trusted phones, laptops, or remote locations. This path uses Tailscale and may ask you to sign in to Tailscale.
+Choose **Set up private access now** if you want to open apps from trusted phones, laptops, or remote locations. This path uses Tailscale and may ask you to sign in.
 
-Choose **Keep access local for now** if you only want to use Autark-OS on the device or home network. You can turn on private access later from the Network page.
+Choose **Use local-only for now** if you only want to use Autark-OS on the device or home network. You can turn on private access later from **Access**.
 
 Do not enable public internet access unless you understand the risks. Autark-OS is designed around private access first.
 
@@ -88,11 +81,13 @@ http://<device-address>:8082
 
 When Autark-OS opens, finish the first setup screen. Confirm the device name, storage location, backup choice, and private access state.
 
+For a step-by-step walkthrough, see [First run](./first-run.md).
+
 ## Install Your First App
 
-Open **Marketplace** and choose a simple first app. The app card should show what the app is for, how difficult it is to run, and whether the device is ready.
+Open **Discover** and choose a simple first app. The app card shows what the app is for, how difficult it is to run, and whether the device is ready.
 
-Choose **Install**, review the short plan, and continue. After the app is installed, open **Applications** to see its status, access link, storage use, and any next steps.
+Choose **Install**, review the plan, and continue. After the app is ready, open **My Apps** to see its status, access link, storage use, and next steps.
 
 If the app needs attention, Autark-OS should show a plain-language message and a safe next action. Advanced details remain available for support.
 
@@ -105,13 +100,13 @@ If the installer says the device needs attention, start with the message on scre
 - The selected storage path is unstable or low on space.
 - The Autark-OS service did not start.
 
-To save a support report, use the installer’s **Save support report** action. If you are in a terminal, run:
+To save a support report, open **Diagnostics** and choose **Generate support report**. If you are in a terminal, run:
 
 ```bash
 autark-os support-bundle --output ./autark-os-support.tar.gz
 ```
 
-When the Autark-OS Diagnostics page is available, select **Generate support bundle**, then choose **Download report** to save the redacted `.txt` report. **Copy report** is optional, and **View technical logs** opens the recent redacted logs.
+Then choose **Download report** to save the redacted `.txt` report. **Copy report** is optional, and **View technical logs** opens the recent redacted logs.
 
 If Autark-OS is installed but the page will not open, these commands are useful for support:
 
@@ -121,14 +116,13 @@ autark-os status
 autark-os logs
 ```
 
-Do not paste long terminal logs into chat unless support asks. The support bundle is designed to include the useful details with secrets masked.
+Do not paste long terminal logs into chat unless support asks. The support report is designed to include useful details with secrets masked.
 
 ## Advanced Install Docs
 
 Use these only when you need the technical details:
 
-- [Beta testing repository](https://github.com/autark-labs/autark-os/): source install, release bundle, update, uninstall, and support bundle commands.
+- [Beta testing repository](https://github.com/autark-labs/autark-os/): source install, release bundle, update, uninstall, and support-archive commands.
+- [Portable and offline installation](./offline-install.md): install copied release files without downloading during setup.
 - [Service user installation](./service-user-installation.md): system user, systemd service, Docker access, and Tailscale operator setup.
 - [Local development](./local-development.md): source checkout and developer workflow.
-
-Screenshots should be added here when the GUI installer is rendered rather than only described by its current contract.

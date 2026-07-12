@@ -10,10 +10,6 @@
   </p>
 </div>
 
-<p align="center">
-  <img src="docs/current-app-state/homePage.png" alt="Autark-OS home page screenshot" width="900">
-</p>
-
 Autark-OS is a local homelab management app for people who want the value of self-hosting without turning every app into a terminal project. It runs on a Linux host, manages apps with Docker Compose, stores state locally in SQLite, and uses Tailscale for private access when available.
 
 Autark-OS should help users answer four questions quickly:
@@ -29,7 +25,7 @@ Autark-OS is ready for controlled beta testing on Linux homelab hosts. It is not
 
 Supported initial hosts: Debian 12, Ubuntu 22.04/24.04, and Raspberry Pi OS 12 on x86-64 or ARM64 with systemd, 2 GB memory, and 10 GB free disk. Run `./scripts/autark-os install --doctor --json` before installing.
 
-The current beta path supports source installs and local release-bundle installs. The planned normal-user path is a GUI installer that checks the device, asks where app data should live, configures private access, and opens Autark-OS in the browser.
+The current beta path supports Debian packages, portable installers, source installs, and local release bundles. After installation, open the printed local address to complete setup in your browser.
 
 ## What Autark-OS Does
 
@@ -148,7 +144,7 @@ Create a redacted support bundle:
 autark-os support-bundle --output ./autark-os-support.tar.gz
 ```
 
-In the Autark-OS Diagnostics page, choose **Generate support bundle** to prepare a redacted plain-text support report. Use **Download report** to save a `.txt` file, **Copy report** to place it on the clipboard, or **View technical logs** to expand the recent redacted logs.
+In **Diagnostics**, choose **Generate support report** to prepare a redacted plain-text report. Use **Download report** to save a `.txt` file, **Copy report** to place it on the clipboard, or **View technical logs** to expand recent redacted logs.
 
 Build and test from source:
 
@@ -203,6 +199,11 @@ docs/          User guides, runtime architecture, development plans
 - [Docs index](docs/README.md)
 - [Contributing](CONTRIBUTING.md)
 - [Non-technical install guide](docs/non-technical-install-guide.md)
+- [First run](docs/first-run.md)
+- [Portable and offline installation](docs/offline-install.md)
+- [Backups and recovery](docs/backups-and-recovery.md)
+- [Maintenance](docs/maintenance.md)
+- [Troubleshooting](docs/troubleshooting.md)
 - [Beta testing repository](https://github.com/autark-labs/autark-os/)
 - [Local development](docs/local-development.md)
 - [Discover and runtime architecture](docs/marketplace-runtime.md)

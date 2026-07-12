@@ -2,7 +2,7 @@
 
 This guide is for beta testers and developers installing Autark-OS from GitHub Release artifacts, this repository, or a locally built release bundle.
 
-For the intended normal-user path, start with [Install Autark-OS](./non-technical-install-guide.md). That guide describes the GUI and one-command installer flow Autark-OS is moving toward.
+For everyday installation, start with [Install Autark-OS](./non-technical-install-guide.md). This document is the advanced beta reference for release artifacts, local bundles, source builds, updates, and uninstalling.
 
 ## Install Options
 
@@ -295,9 +295,9 @@ autark-os port
 autark-os url
 ```
 
-## Support Bundle
+## Support archive for advanced support
 
-Export a redacted support bundle when an install fails or support asks for a setup summary:
+Export a redacted support archive when an install fails or support asks for a setup summary:
 
 ```bash
 autark-os support-bundle --output ./autark-os-support.tar.gz
@@ -313,13 +313,13 @@ autark-os support-bundle \
   --output ./autark-os-support.tar.gz
 ```
 
-The bundle includes doctor results, the shared install plan, OS and disk summaries, dependency states, service status, selected installer options, and redacted config/log snippets. Tokens, auth keys, passwords, bearer tokens, and common secret values are masked before the archive is written.
+The archive includes doctor results, the shared install plan, OS and disk summaries, dependency states, service status, selected installer options, and redacted config/log snippets. Tokens, auth keys, passwords, bearer tokens, and common secret values are masked before the archive is written.
 
 ## Missing Docker Or Tailscale
 
 The installer checks for Docker and Tailscale and prints warnings when they are missing. On Debian, Ubuntu, and Raspberry Pi OS, `--auto-install-deps` can attempt supported dependency installation.
 
-If Docker is missing, Autark-OS can still start, but Marketplace installs will fail until Docker is installed and available to the `autarkos` service user.
+If Docker is missing, Autark-OS can still start, but Discover installs will fail until Docker is installed and available to the `autarkos` service user.
 
 If Tailscale is missing or not connected, Autark-OS can still manage local apps, but private HTTPS links will not work.
 

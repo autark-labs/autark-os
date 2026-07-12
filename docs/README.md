@@ -7,19 +7,20 @@ Use this page as the map. The README at the repository root is the public landin
 ## Start Here
 
 - [Install Autark-OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
-- [Beta testing repository](https://github.com/autark-labs/autark-os/): source install, release-bundle install, update, uninstall, and support commands.
+- [First run](./first-run.md): finish setup, install a first app, and understand app ownership labels.
+- [Portable and offline installation](./offline-install.md): verify and install copied release artifacts.
+- [Backups and recovery](./backups-and-recovery.md): create, verify, and restore restore points.
+- [Maintenance](./maintenance.md): repair apps, apply beta updates, and uninstall safely.
+- [Troubleshooting](./troubleshooting.md): solve common problems and collect a support report.
+- [Beta installation reference](./beta-installation.md): portable, offline, release-bundle, and source-install details.
 - [Local development](./local-development.md): run the backend and frontend separately during development.
 
 ## Runtime And Operations
 
-- [Marketplace runtime architecture](./marketplace-runtime.md): how catalog manifests become managed local apps.
+- [Discover and runtime architecture](./marketplace-runtime.md): how catalog manifests become managed local apps.
 - [Manifest authoring checklist](./manifest-authoring-checklist.md): required fields and review checks before adding or updating a catalog app.
 - [Service user installation](./service-user-installation.md): `autarkos` service user, durable host paths, systemd, Docker, and Tailscale operator setup.
 - [Application state prune list](./application-state-prune-list.md): active cleanup list for legacy app-state surfaces.
-
-## Current UI Reference Screenshots
-
-Screenshots in [current-app-state](./current-app-state/) capture the present UI during active development. They are useful for visual QA, but they are not product documentation.
 
 ## Development Notes
 
