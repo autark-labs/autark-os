@@ -26,8 +26,8 @@ test('active product copy distinguishes Discover, managed apps, found services, 
 
 test('the product only describes backup protection after a restore point exists', () => {
   const terminology = source('../docs/product-terminology.md');
-  const settings = source('src/pages/SettingsPage/SettingsPage.tsx');
+  const settingsPanels = source('src/pages/SettingsPage/SettingsPage.panels.tsx');
 
   assert.match(terminology, /Protected by a restore point/);
-  assert.match(settings, /Installed apps with at least one completed restore point\./);
+  assert.match(settingsPanels, /Installed apps with at least one completed restore point\./);
 });

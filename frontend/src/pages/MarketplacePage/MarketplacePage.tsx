@@ -34,11 +34,8 @@ import {
   useDiscoverBackupMutation,
   useDiscoverInstallMutation,
   useDiscoverInstallPreviewQuery,
-  useDiscoverJobQuery,
-  useDiscoverJobsQuery,
   useDiscoverReadinessQuery,
   useMarketplaceActivityQuery,
-  latestActiveDiscoverJob,
 } from '@/repositories/discoverRepository';
 import { terminalJob } from '@/repositories/jobRepository';
 import type { ActivityLog } from '@/types/activity';
@@ -64,6 +61,7 @@ import {
   marketplaceSearchWithDetail,
   marketplaceSearchWithoutDetail,
 } from './extensions/MarketplacePage.detailRoute';
+import { useDiscoverJobTracking } from './useDiscoverJobTracking';
 
 type StarterRecommendation = {
   app: MarketplaceApp;
@@ -96,8 +94,6 @@ function MarketplacePage() {
   const [marketplaceError, setMarketplaceError] = useState('');
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
-  const [installJob, setInstallJob] = useState<AutarkOsJob | null>(null);
-  const [backupJob, setBackupJob] = useState<AutarkOsJob | null>(null);
   const [duplicateAcknowledgedAppId, setDuplicateAcknowledgedAppId] = useState<string | null>(null);
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
   const detailTriggerRef = useRef<HTMLElement | null>(null);
@@ -110,7 +106,6 @@ function MarketplacePage() {
   const appsQuery = useDiscoverAppsQuery();
   const activityQuery = useMarketplaceActivityQuery();
   const readinessQuery = useDiscoverReadinessQuery();
-  const jobsQuery = useDiscoverJobsQuery();
   const installMutation = useDiscoverInstallMutation();
   const backupMutation = useDiscoverBackupMutation();
   const apps: DiscoverAppView[] = appsQuery.data ?? [];
@@ -146,14 +141,6 @@ function MarketplacePage() {
   };
   const previewEnabled = Boolean(selectedApp?.id && setupAnswersAppId === selectedApp.id);
   const installPreviewQuery = useDiscoverInstallPreviewQuery(selectedApp?.id ?? null, setupAnswers, previewEnabled);
-  const recoveredInstallJob = useMemo(() => latestActiveDiscoverJob(jobsQuery.data ?? [], ['install_app']), [jobsQuery.data]);
-  const recoveredBackupJob = useMemo(() => latestActiveDiscoverJob(jobsQuery.data ?? [], ['backup']), [jobsQuery.data]);
-  const trackedInstallJob = installJob && !terminalJob(installJob) ? installJob : recoveredInstallJob ?? installJob;
-  const trackedBackupJob = backupJob && !terminalJob(backupJob) ? backupJob : recoveredBackupJob ?? backupJob;
-  const activeInstallJobId = trackedInstallJob && !terminalJob(trackedInstallJob) ? trackedInstallJob.jobId : null;
-  const activeBackupJobId = trackedBackupJob && !terminalJob(trackedBackupJob) ? trackedBackupJob.jobId : null;
-  const installJobQuery = useDiscoverJobQuery(activeInstallJobId);
-  const backupJobQuery = useDiscoverJobQuery(activeBackupJobId);
   const installPreview = installPreviewQuery.data ?? null;
   const installPlan = installPreview?.technicalDetails ?? null;
   const installOptions = installPreview?.installOptions ?? null;
@@ -168,6 +155,17 @@ function MarketplacePage() {
       readinessQuery.refetch(),
     ]);
   }, [activityQuery.refetch, appsQuery.refetch, readinessQuery.refetch]);
+  const handleJobError = useCallback((message: string) => setMarketplaceError(message), []);
+  const {
+    backupJob,
+    installJob,
+    setBackupJob,
+    setInstallJob,
+  } = useDiscoverJobTracking({
+    onError: handleJobError,
+    onInstallSubjectRecovered: setSelectedAppId,
+    refreshDiscover,
+  });
 
   async function requestPlan(appId = selectedApp?.id, _options: InstallOptions | null = null) {
     if (!appId) {
@@ -219,57 +217,6 @@ function MarketplacePage() {
       setSetupAnswersAppId(selectedAppId);
     }
   }, [apps, selectedAppId]);
-
-  useEffect(() => {
-    if (!recoveredInstallJob || (installJob && !terminalJob(installJob))) {
-      return;
-    }
-    setInstallJob(recoveredInstallJob);
-    if (recoveredInstallJob.subjectId) {
-      setSelectedAppId(recoveredInstallJob.subjectId);
-    }
-  }, [installJob, recoveredInstallJob]);
-
-  useEffect(() => {
-    if (!recoveredBackupJob || (backupJob && !terminalJob(backupJob))) {
-      return;
-    }
-    setBackupJob(recoveredBackupJob);
-  }, [backupJob, recoveredBackupJob]);
-
-  useEffect(() => {
-    if (!installJobQuery.data) {
-      return;
-    }
-    setInstallJob(installJobQuery.data);
-    if (terminalJob(installJobQuery.data)) {
-      void refreshDiscover();
-    }
-  }, [installJobQuery.data, refreshDiscover]);
-
-  useEffect(() => {
-    if (!installJobQuery.error) {
-      return;
-    }
-    setMarketplaceError(apiErrorMessage(installJobQuery.error, 'Install progress could not be refreshed.'));
-  }, [installJobQuery.error]);
-
-  useEffect(() => {
-    if (!backupJobQuery.data) {
-      return;
-    }
-    setBackupJob(backupJobQuery.data);
-    if (terminalJob(backupJobQuery.data)) {
-      void refreshDiscover();
-    }
-  }, [backupJobQuery.data, refreshDiscover]);
-
-  useEffect(() => {
-    if (!backupJobQuery.error) {
-      return;
-    }
-    setMarketplaceError(apiErrorMessage(backupJobQuery.error, 'Backup progress could not be refreshed.'));
-  }, [backupJobQuery.error]);
 
   async function installApp(appId = selectedApp?.id, _options = installOptions, mode: 'install' | 'reinstall' = 'install') {
     if (!appId) {

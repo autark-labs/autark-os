@@ -8,8 +8,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 test('settings preserves a dirty draft until the user confirms refresh or navigation', () => {
   const page = readFileSync(resolve(here, '../SettingsPage.tsx'), 'utf8');
+  const controller = readFileSync(resolve(here, '../useSettingsPageController.ts'), 'utf8');
 
-  assert.match(page, /beforeunload/);
+  assert.match(controller, /beforeunload/);
+  assert.match(controller, /guardNavigation/);
   assert.match(page, /Discard unsaved changes\?/);
   assert.match(page, /Leave without saving\?/);
   assert.match(page, /Discard and refresh/);
@@ -17,12 +19,12 @@ test('settings preserves a dirty draft until the user confirms refresh or naviga
 });
 
 test('settings uses one save result instead of a second app-defaults mutation', () => {
-  const page = readFileSync(resolve(here, '../SettingsPage.tsx'), 'utf8');
+  const controller = readFileSync(resolve(here, '../useSettingsPageController.ts'), 'utf8');
   const client = readFileSync(resolve(here, '../../../api/SystemAPIClient.ts'), 'utf8');
 
-  assert.match(page, /const result = await SystemAPIClient\.updateSettings\(draft\)/);
-  assert.match(page, /result\.appDefaults\.message/);
-  assert.doesNotMatch(page, /applyAppDefaults/);
+  assert.match(controller, /const result = await SystemAPIClient\.updateSettings\(draft\)/);
+  assert.match(controller, /result\.appDefaults\.message/);
+  assert.doesNotMatch(controller, /applyAppDefaults/);
   assert.doesNotMatch(client, /settings\/app-defaults\/apply/);
 });
 

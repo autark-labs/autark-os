@@ -12,13 +12,13 @@ function source(relativePath) {
 test('shell doctor status uses a shared system repository query', () => {
   assert.equal(existsSync(resolve(root, 'src/repositories/systemRepository.ts')), true);
   const header = source('src/layout/SystemStatusHeader.tsx');
-  const settings = source('src/pages/SettingsPage/SettingsPage.tsx');
+  const settingsController = source('src/pages/SettingsPage/useSettingsPageController.ts');
   const discoverRepository = source('src/repositories/discoverRepository.ts');
   const systemRepository = source('src/repositories/systemRepository.ts');
 
   assert.doesNotMatch(header, /SystemAPIClient|setInterval|clearInterval|useEffect/);
   assert.match(header, /useSystemDoctorQuery/);
-  assert.match(settings, /useSystemDoctorQuery/);
+  assert.match(settingsController, /useSystemDoctorQuery/);
   assert.match(discoverRepository, /useSystemDoctorQuery/);
   assert.match(systemRepository, /systemQueryKeys/);
   assert.match(systemRepository, /doctor:\s*\['system', 'doctor'\]/);

@@ -26,7 +26,7 @@ test('Access renders a compact, tabbed zone view below desktop widths', () => {
 test('reachability cards support keyboard details and non-drag access changes', () => {
   const matrix = source('src/pages/NetworkPage/ReachabilityMatrix.tsx');
 
-  assert.match(matrix, /aria-label=\{`Review \$\{service\.label\}\. \$\{service\.statusLabel\}\.\`\}/);
+  assert.match(matrix, /aria-label=\{`Review \$\{service\.label\}\. \$\{service\.statusLabel\}\.`}/);
   assert.match(matrix, /onClick=\{\(\) => onFocusService\(service\)\}/);
   assert.match(matrix, /focus-visible:ring-2 focus-visible:ring-cyan-200/);
   assert.doesNotMatch(matrix, /function handleCardKeyDown/);
@@ -36,11 +36,12 @@ test('reachability cards support keyboard details and non-drag access changes', 
 
 test('new reachability operations cannot be cleared by an older timeout', () => {
   const page = source('src/pages/NetworkPage/NetworkPage.tsx');
+  const reachability = source('src/pages/NetworkPage/extensions/NetworkPage.reachability.ts');
 
   assert.match(page, /processingServiceTokens/);
-  assert.match(page, /setServiceProcessingToken\(service\.id, pendingToken/);
+  assert.match(page, /setServiceProcessingToken\(current, service\.id, pendingToken\)/);
   assert.match(page, /removeServiceProcessingForToken\(current, service\.id, pendingToken\)/);
-  assert.match(page, /if \(current\[serviceId\] !== token\) \{\s+return current;/);
+  assert.match(reachability, /if \(current\[serviceId\] !== token\) return current;/);
   assert.match(page, /loadingServiceIds/);
 });
 

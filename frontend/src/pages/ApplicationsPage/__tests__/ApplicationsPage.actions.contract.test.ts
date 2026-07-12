@@ -278,11 +278,12 @@ test('applications page has managed-app empty states and compact recent activity
   const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
   const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
   const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const presentation = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.presentation.ts');
 
   assert.match(page, /emptyStateForApplicationCollection\(collectionFilters, query\)/);
   assert.match(page, /emptyState=\{emptyState\}/);
-  assert.match(page, /No managed apps or linked services/);
-  assert.match(page, /No matching apps or linked services/);
+  assert.match(presentation, /No managed apps or linked services/);
+  assert.match(presentation, /No matching apps or linked services/);
   assert.match(basic, /emptyState: ApplicationEmptyState/);
   assert.match(advanced, /emptyState: ApplicationEmptyState/);
 

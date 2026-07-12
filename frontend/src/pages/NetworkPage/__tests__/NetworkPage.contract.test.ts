@@ -12,6 +12,7 @@ function source(relativePath: string) {
 test('Access page avoids duplicate Tailscale status and progressively discloses private link details', () => {
   const page = source('src/pages/NetworkPage/NetworkPage.tsx');
   const matrix = source('src/pages/NetworkPage/ReachabilityMatrix.tsx');
+  const reachability = source('src/pages/NetworkPage/extensions/NetworkPage.reachability.ts');
   const deepLinks = source('src/pages/NetworkPage/extensions/NetworkPage.deepLinks.ts');
   const issues = source('src/pages/NetworkPage/NetworkIssuesPanel.tsx');
   const shell = source('src/layout/AppShell.tsx');
@@ -37,6 +38,9 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(page, /pending\.acknowledged && reachabilityServices\.find\(\(service\) => service\.id === serviceId\)\?\.zone === pending\.zone/);
   assert.match(page, /removePendingReachabilityIds\(current, settledServiceIds\)/);
   assert.match(page, /void invalidateNetworkQueries\(queryClient\)/);
+  assert.match(reachability, /export function filterReachabilityServices/);
+  assert.match(reachability, /export function applyPendingReachability/);
+  assert.match(reachability, /export function settingsForReachabilityZone/);
   assert.match(deepLinks, /tab.*matrix/);
   assert.match(deepLinks, /focus/);
   assert.match(matrix, /onDrop/);

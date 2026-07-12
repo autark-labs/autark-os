@@ -10,16 +10,16 @@ function source(relativePath) {
 }
 
 test('story 9 pages route mutation feedback through shared action notification helper', () => {
-  const mutationPages = [
+  const mutationSurfaces = [
     'src/pages/ApplicationsPage/ApplicationsPage.tsx',
     'src/pages/NetworkPage/NetworkPage.tsx',
-    'src/pages/SettingsPage/SettingsPage.tsx',
+    'src/pages/SettingsPage/useSettingsPageController.ts',
     'src/pages/StoragePage/StoragePage.tsx',
     'src/pages/SupportPage/SupportPage.tsx',
     'src/pages/ResolveExistingAppsPage/ResolveExistingAppsPage.tsx',
   ];
 
-  for (const relativePath of mutationPages) {
+  for (const relativePath of mutationSurfaces) {
     const fileSource = source(relativePath);
     assert.match(fileSource, /showActionNotification/, `${relativePath} should use showActionNotification`);
     assert.doesNotMatch(fileSource, /from 'sonner'/, `${relativePath} should not directly import sonner`);
