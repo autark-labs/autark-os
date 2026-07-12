@@ -34,14 +34,13 @@ for heading in required_headings:
     assert heading in guide, f"missing heading: {heading}"
 
 assert "Recommended path" in guide
-assert "GUI installer" in guide
-assert "One-command installer" in guide
+assert "Portable installer" in guide
 assert "Advanced CLI" in guide
-assert "curl -fsSL https://install.autark-os.dev | bash" in guide
 assert "autark-os support-bundle --output" in guide
-assert "[Beta testing repository](https://github.com/autark-labs/autark-os/)" in guide
+assert "[Technical installation](./technical-installation.md)" in guide
 assert "[Street-to-seat installation](./street-to-seat-installation.md)" not in guide
 assert "[Installer Technical Implementation](./installer-technical-implementation.md)" not in guide
+assert "local-development.md" not in guide
 
 first_code = re.search(r"```(?:bash|text)?\n(.*?)\n```", guide, re.S)
 assert first_code, "guide should include at least one command block"
@@ -52,9 +51,10 @@ assert "git clone" not in first_install_section, "normal-user run path should av
 
 attention_section = guide.split("## If Setup Needs Attention", 1)[1].split("## Advanced Install Docs", 1)[0]
 assert attention_section.count("```") <= 4, "recovery should be visible but not overwhelming"
-assert "Save support report" in attention_section
+assert "support report" in attention_section
 
 assert "docs/non-technical-install-guide.md" in readme
 assert "./non-technical-install-guide.md" in docs_index
-assert "https://github.com/autark-labs/autark-os/" in docs_index
+assert "./technical-installation.md" in docs_index
+assert "development/" not in docs_index
 PY

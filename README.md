@@ -25,7 +25,7 @@ Autark-OS is ready for controlled beta testing on Linux homelab hosts. It is not
 
 Supported initial hosts: Debian 12, Ubuntu 22.04/24.04, and Raspberry Pi OS 12 on x86-64 or ARM64 with systemd, 2 GB memory, and 10 GB free disk. Run `./scripts/autark-os install --doctor --json` before installing.
 
-The current beta path supports Debian packages, portable installers, source installs, and local release bundles. After installation, open the printed local address to complete setup in your browser.
+The current beta path supports Debian packages, portable installers, and local release bundles. After installation, open the printed local address to complete setup in your browser.
 
 ## What Autark-OS Does
 
@@ -90,33 +90,13 @@ From another device on the same network:
 http://<host-ip>:8082
 ```
 
-### Developers
-
-Use the [local development guide](docs/local-development.md) for separate frontend/backend development.
-
-Quick start:
-
-```bash
-./scripts/dev-backend.sh --auto-port
-cd frontend
-yarn dev
-```
-
-If the backend is not on `8082`, point the frontend at it:
-
-```bash
-AUTARK_OS_BACKEND_URL=http://localhost:8092 yarn dev
-```
-
 ## Requirements
 
 Tested beta target:
 
 - Linux host with `systemd`
 - `sudo`
-- Java 21
 - Docker Engine and Docker Compose v2
-- Node.js and Yarn 1.x for source installs
 - Tailscale for private links and remote access workflows
 
 Docker is required for Discover app installs. Tailscale is optional for local-only usage, but strongly recommended because private access is a core Autark-OS workflow.
@@ -146,52 +126,14 @@ autark-os support-bundle --output ./autark-os-support.tar.gz
 
 In **Diagnostics**, choose **Generate support report** to prepare a redacted plain-text report. Use **Download report** to save a `.txt` file, **Copy report** to place it on the clipboard, or **View technical logs** to expand recent redacted logs.
 
-Build and test from source:
-
-```bash
-cd frontend
-yarn typecheck
-yarn build
-yarn test:e2e
-
-cd ../backend
-./gradlew test
-./gradlew bootJar
-```
-
-### Browser visual regression checks
-
-`yarn test:e2e` starts the frontend with deterministic browser fixtures. It checks the supported application routes at mobile and desktop sizes, verifies that the document never overflows horizontally, exercises key dialogs and popovers, and compares reviewed screenshots.
-
-When an intentional UI change updates a reviewed state, refresh the baselines explicitly and include the resulting image changes in the review:
-
-```bash
-cd frontend
-yarn test:e2e:update
-```
-
-The suite does not require a running backend, Docker, or Tailscale service.
-
-Build release artifacts for GitHub Releases:
-
-```bash
-VERSION=0.1.0-beta.2
-
-scripts/build-release-artifacts.sh \
-  --version "$VERSION" \
-  --channel beta \
-  --release-notes-url "https://github.com/autark-labs/autark-os/releases/tag/v$VERSION" \
-  --output-dir "release/artifacts-$VERSION"
-```
-
 ## Project Shape
 
 ```text
 backend/       Spring Boot API, runtime services, jobs, SQLite persistence
-frontend/      React, shadcn/Radix UI, app pages, repositories
-catalog/       Supported app manifests, compose templates, icons
-scripts/       Installer, service helper, release bundle, dev backend scripts
-docs/          User guides, runtime architecture, development plans
+frontend/      React user interface
+catalog/       Supported app definitions, install templates, and icons
+scripts/       Installer, service helper, and release bundle tools
+docs/          Installation, operation, recovery, and technical-admin guides
 ```
 
 ## Documentation
@@ -204,11 +146,8 @@ docs/          User guides, runtime architecture, development plans
 - [Backups and recovery](docs/backups-and-recovery.md)
 - [Maintenance](docs/maintenance.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [Beta testing repository](https://github.com/autark-labs/autark-os/)
-- [Local development](docs/local-development.md)
-- [Discover and runtime architecture](docs/marketplace-runtime.md)
-- [Manifest authoring checklist](docs/manifest-authoring-checklist.md)
-- [Service user installation](docs/service-user-installation.md)
+- [Technical installation](docs/technical-installation.md)
+- [Service and storage reference](docs/service-user-installation.md)
 
 ## Known Beta Gaps
 

@@ -67,12 +67,6 @@ Please keep these principles in mind:
 
 ## Development Setup
 
-Use the local development guide for the full setup:
-
-- [Local development](docs/local-development.md)
-- [Beta installation](docs/beta-installation.md)
-- [Manifest authoring checklist](docs/manifest-authoring-checklist.md)
-
 Common development loop:
 
 ```bash
@@ -177,7 +171,7 @@ Manifest PRs should include:
 - icon and display metadata
 - testing notes for install, open, start, stop, restart, backup, restore, and uninstall where applicable
 
-Use the [manifest authoring checklist](docs/manifest-authoring-checklist.md).
+Validate catalog changes with the full backend test suite before opening a pull request.
 
 ## Security And Safety
 

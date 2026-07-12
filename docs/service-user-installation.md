@@ -1,55 +1,29 @@
-# Autark-OS Service User Installation
+# Autark-OS Service And Storage Reference
 
-Autark-OS should run as a stable system service user on homelab hosts. The bootstrap script creates that user, prepares durable host directories, grants Docker/Tailscale access when available, and installs a systemd unit.
+This reference is for people who administer the host running Autark-OS. Normal installations create the service user, durable folders, Docker access, and systemd unit automatically. You do not need to run these commands for ordinary app use.
 
-## Script
+## Check Or Repair The Installed Service
 
-From the repository root:
-
-```bash
-sudo ./scripts/install-autark-os-service.sh
-```
-
-The script is idempotent and safe to rerun. It preserves `/var/lib/autark-os`.
-After the first successful run, the setup script is also installed at `/opt/autark-os/bin/install-autark-os-service.sh`, so Autark-OS can show a stable repair command later:
-
-```bash
-sudo /opt/autark-os/bin/install-autark-os-service.sh
-```
-
-The installer also installs a helper command:
+Use the installed helper first:
 
 ```bash
 autark-os doctor
 autark-os status
 autark-os logs
-autark-os version
+autark-os repair --plan
 ```
 
-Useful modes:
+Apply the reviewed repair plan only when it addresses the problem you found:
 
 ```bash
-sudo ./scripts/install-autark-os-service.sh --dry-run
-sudo ./scripts/install-autark-os-service.sh --check
-sudo ./scripts/install-autark-os-service.sh --no-start
+autark-os repair --apply
 ```
 
-Install runtime data on a specific disk or mount:
+If support directs you to rerun the underlying service installer, it is installed with Autark-OS:
 
 ```bash
-sudo ./scripts/install-autark-os-service.sh \
-  --runtime-dir /mnt/autark-os-ssd/autark-os
-```
-
-The runtime directory contains the SQLite database, app runtime files, generated Docker Compose projects, backups, and service state. Use an absolute path on a stable mount. For Raspberry Pi installs, prefer an SSD mounted by UUID in `/etc/fstab` rather than a removable desktop auto-mount path.
-
-Additional path overrides:
-
-```bash
-sudo ./scripts/install-autark-os-service.sh \
-  --runtime-dir /mnt/autark-os-ssd/autark-os \
-  --install-dir /mnt/autark-os-ssd/autark-os-bin \
-  --log-dir /mnt/autark-os-ssd/autark-os-logs
+sudo /opt/autark-os/bin/install-autark-os-service.sh --check
+sudo /opt/autark-os/bin/install-autark-os-service.sh --dry-run
 ```
 
 ## What It Creates
@@ -68,7 +42,7 @@ The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `
 
 ## Tailscale
 
-When Tailscale is installed, the script runs:
+When Tailscale is installed, the service setup runs:
 
 ```bash
 tailscale set --operator=autarkos
@@ -76,20 +50,4 @@ tailscale set --operator=autarkos
 
 That one-time grant lets Autark-OS create Tailscale Serve HTTPS links without running the whole backend as root.
 
-If Tailscale is missing or not connected, the script prints a warning and continues. Install/connect Tailscale, then rerun the script.
-
-## Backend Artifact
-
-The script looks for a built backend jar in:
-
-```bash
-backend/build/libs/*.jar
-```
-
-You can also pass one explicitly:
-
-```bash
-sudo AUTARK_OS_BACKEND_JAR=/path/to/autark-os.jar ./scripts/install-autark-os-service.sh
-```
-
-If no jar exists, the service unit is installed but not started.
+If Tailscale is missing or not connected, Autark-OS continues with local access. Install and connect Tailscale, then run `autark-os repair --plan` to review the next step.

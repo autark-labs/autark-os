@@ -23,7 +23,7 @@ chmod +x Autark-OS-Installer-<version>-amd64.run
 
 **Advanced CLI**
 
-Use this only for beta testing, development, or scripted installs. It may ask you to read terminal output and fix host dependencies. Advanced setup details live in the docs linked at the end of this guide.
+Use this only for scripted beta or support-assisted installs. It may ask you to read terminal output and fix host dependencies. Advanced setup details live in the docs linked at the end of this guide.
 
 ## Prepare The Device
 
@@ -122,7 +122,6 @@ Do not paste long terminal logs into chat unless support asks. The support repor
 
 Use these only when you need the technical details:
 
-- [Beta testing repository](https://github.com/autark-labs/autark-os/): source install, release bundle, update, uninstall, and support-archive commands.
+- [Technical installation](./technical-installation.md): supported hosts, release artifacts, preflight checks, storage locations, and installed paths.
 - [Portable and offline installation](./offline-install.md): install copied release files without downloading during setup.
-- [Service user installation](./service-user-installation.md): system user, systemd service, Docker access, and Tailscale operator setup.
-- [Local development](./local-development.md): source checkout and developer workflow.
+- [Service and storage reference](./service-user-installation.md): system user, systemd service, Docker access, and Tailscale operator setup.

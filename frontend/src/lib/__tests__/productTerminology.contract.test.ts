@@ -10,14 +10,14 @@ function source(relativePath: string) {
 }
 
 test('active product copy distinguishes Discover, managed apps, found services, and linked services', () => {
-  const terminology = source('../docs/product-terminology.md');
+  const firstRunGuide = source('../docs/first-run.md');
   const applications = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
   const foundServiceDetails = source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx');
   const installer = source('../scripts/autark-os-gui-installer.sh');
 
-  assert.match(terminology, /\| App catalog \| Discover \|/);
-  assert.match(terminology, /\| Host-detected resource \| Found on this server \|/);
-  assert.match(terminology, /\| External shortcut \| Linked service \|/);
+  assert.match(firstRunGuide, /\*\*Managed app\*\*/);
+  assert.match(firstRunGuide, /\*\*Found on this server\*\*/);
+  assert.match(firstRunGuide, /\*\*Linked service\*\*/);
   assert.match(applications, /Open managed apps and keep the linked services on this server in view\./);
   assert.match(foundServiceDetails, /Discover warnings/);
   assert.match(installer, /Discover app installs/);
@@ -25,9 +25,9 @@ test('active product copy distinguishes Discover, managed apps, found services, 
 });
 
 test('the product only describes backup protection after a restore point exists', () => {
-  const terminology = source('../docs/product-terminology.md');
+  const firstRunGuide = source('../docs/first-run.md');
   const settingsPanels = source('src/pages/SettingsPage/SettingsPage.panels.tsx');
 
-  assert.match(terminology, /Protected by a restore point/);
+  assert.match(firstRunGuide, /\*\*Protected by a restore point\*\*/);
   assert.match(settingsPanels, /Installed apps with at least one completed restore point\./);
 });
