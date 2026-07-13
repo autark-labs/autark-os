@@ -1,0 +1,329 @@
+name: Build Autark-OS release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version without the leading v, for example 0.9.0-beta.1
+        required: true
+        type: string
+      channel:
+        description: Release channel
+        required: true
+        default: beta
+        type: choice
+        options:
+          - beta
+          - stable
+      mode:
+        description: Rehearse only or create a draft GitHub Release
+        required: true
+        default: rehearsal
+        type: choice
+        options:
+          - rehearsal
+          - draft
+      release_notes_url:
+        description: Optional public release notes URL
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: autark-os-release-${{ github.ref_name || inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Resolve release inputs
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      channel: ${{ steps.release.outputs.channel }}
+      mode: ${{ steps.release.outputs.mode }}
+      release_notes_url: ${{ steps.release.outputs.release_notes_url }}
+      published_at: ${{ steps.release.outputs.published_at }}
+    steps:
+      - name: Resolve and validate release identity
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_RELEASE_NOTES_URL: ${{ inputs.release_notes_url }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" == "push" ]]; then
+            tag="${REF_NAME}"
+            version="${tag#v}"
+            mode="draft"
+            if [[ "${version}" == *-* ]]; then
+              channel="beta"
+            else
+              channel="stable"
+            fi
+            release_notes_url=""
+          else
+            version="${INPUT_VERSION#v}"
+            tag="v${version}"
+            channel="${INPUT_CHANNEL}"
+            mode="${INPUT_MODE}"
+            release_notes_url="${INPUT_RELEASE_NOTES_URL}"
+          fi
+          [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
+            printf 'Invalid release version: %s\n' "${version}" >&2
+            exit 1
+          }
+          if [[ "${channel}" == "stable" && "${version}" == *-* ]]; then
+            printf 'Stable releases cannot use a prerelease version: %s\n' "${version}" >&2
+            exit 1
+          fi
+          if [[ "${channel}" == "beta" && "${version}" != *-* ]]; then
+            printf 'Beta releases require a prerelease version such as 0.9.0-beta.1: %s\n' "${version}" >&2
+            exit 1
+          fi
+          if [[ -z "${release_notes_url}" ]]; then
+            release_notes_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
+          fi
+          {
+            printf 'version=%s\n' "${version}"
+            printf 'tag=%s\n' "${tag}"
+            printf 'channel=%s\n' "${channel}"
+            printf 'mode=%s\n' "${mode}"
+            printf 'release_notes_url=%s\n' "${release_notes_url}"
+            printf 'published_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >>"${GITHUB_OUTPUT}"
+
+  build:
+    name: Build ${{ matrix.architecture }} artifacts
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install Yarn 1
+        run: npm install --global yarn@1.22.22
+
+      - name: Verify native runner architecture
+        env:
+          EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          detected="$(dpkg --print-architecture)"
+          [[ "${detected}" == "${EXPECTED_ARCHITECTURE}" ]] || {
+            printf 'Runner is %s; expected %s.\n' "${detected}" "${EXPECTED_ARCHITECTURE}" >&2
+            exit 1
+          }
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Validate frontend
+        working-directory: frontend
+        run: yarn typecheck && yarn lint && yarn test && yarn check:ui-tokens
+
+      - name: Test and build application
+        working-directory: backend
+        run: ./gradlew test bootJar --console=plain
+
+      - name: Run installer and release contracts
+        run: |
+          set -euo pipefail
+          bash scripts/tests/release-architecture-integrity-test.sh
+          bash scripts/tests/release-bundle-contract-test.sh
+          bash scripts/tests/release-artifacts-dry-run-test.sh
+          bash scripts/tests/supported-host-matrix-contract-test.sh
+
+      - name: Build architecture-specific artifacts
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          RELEASE_NOTES_URL: ${{ needs.prepare.outputs.release_notes_url }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          scripts/build-release-artifacts.sh \
+            --skip-build \
+            --version "${VERSION}" \
+            --channel "${CHANNEL}" \
+            --architecture "${ARCHITECTURE}" \
+            --release-notes-url "${RELEASE_NOTES_URL}" \
+            --output-dir "release/ci-${VERSION}-${ARCHITECTURE}"
+
+      - name: Verify architecture-specific artifact set
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          artifact_dir="release/ci-${VERSION}-${ARCHITECTURE}"
+          (cd "${artifact_dir}" && sha256sum -c SHA256SUMS --ignore-missing)
+          python3 - "${artifact_dir}/autark-os-artifacts.json" "${ARCHITECTURE}" <<'PY'
+          import json
+          import sys
+
+          manifest = json.load(open(sys.argv[1], encoding="utf-8"))
+          architecture = sys.argv[2]
+          assert manifest["schemaVersion"] == 2
+          assert manifest["artifactArchitecture"] == architecture
+          assert manifest["runtimeArchitecture"] == architecture
+          PY
+
+      - name: Retain architecture build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: autark-os-release-${{ matrix.architecture }}
+          path: release/ci-${{ needs.prepare.outputs.version }}-${{ matrix.architecture }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  compose:
+    name: Compose and validate release set
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Download amd64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: autark-os-release-amd64
+          path: release-input/amd64
+
+      - name: Download arm64 build
+        uses: actions/download-artifact@v4
+        with:
+          name: autark-os-release-arm64
+          path: release-input/arm64
+
+      - name: Compose public release files
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          RELEASE_NOTES_URL: ${{ needs.prepare.outputs.release_notes_url }}
+          PUBLISHED_AT: ${{ needs.prepare.outputs.published_at }}
+        run: |
+          set -euo pipefail
+          scripts/compose-release-manifest.py compose \
+            --input-root release-input \
+            --output-dir release-ready \
+            --host-policy scripts/supported-host-matrix.env \
+            --version "${VERSION}" \
+            --tag "${TAG}" \
+            --channel "${CHANNEL}" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --build-sha "${GITHUB_SHA}" \
+            --release-notes-url "${RELEASE_NOTES_URL}" \
+            --published-at "${PUBLISHED_AT}"
+
+      - name: Validate public release files
+        run: |
+          set -euo pipefail
+          scripts/compose-release-manifest.py validate --release-dir release-ready
+          (cd release-ready && sha256sum -c SHA256SUMS)
+          find release-ready -maxdepth 1 -type f -printf '%f\n' | sort
+
+      - name: Retain complete release rehearsal
+        uses: actions/upload-artifact@v4
+        with:
+          name: autark-os-release-${{ needs.prepare.outputs.version }}
+          path: release-ready/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-draft:
+    name: Create draft GitHub Release
+    if: needs.prepare.outputs.mode == 'draft'
+    needs:
+      - prepare
+      - compose
+    runs-on: ubuntu-24.04
+    environment: ${{ needs.prepare.outputs.channel == 'stable' && 'installer-stable' || 'installer-beta' }}
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+
+      - name: Download validated release set
+        uses: actions/download-artifact@v4
+        with:
+          name: autark-os-release-${{ needs.prepare.outputs.version }}
+          path: release-ready
+
+      - name: Revalidate immediately before publication
+        run: scripts/compose-release-manifest.py validate --release-dir release-ready
+
+      - name: Refuse an existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            printf 'Release %s already exists. Published versions are immutable; choose a new version.\n' "${TAG}" >&2
+            exit 1
+          fi
+
+      - name: Create complete draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+        run: |
+          set -euo pipefail
+          prerelease_args=()
+          if [[ "${CHANNEL}" != "stable" ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "Autark-OS ${VERSION}" \
+            --notes-file release-ready/RELEASE_NOTES.md \
+            --draft \
+            "${prerelease_args[@]}" \
+            release-ready/*
+
+      - name: Confirm draft asset inventory
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json isDraft,isPrerelease,tagName,name,assets
