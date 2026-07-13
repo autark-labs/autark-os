@@ -6,11 +6,14 @@ This guide is for a technically comfortable home-server administrator. It explai
 
 The current beta supports these Linux hosts:
 
-- Debian 12
-- Ubuntu 22.04 or 24.04
-- Raspberry Pi OS 12
+- Debian 12 or 13 on amd64 or ARM64
+- Ubuntu 24.04 or 26.04 LTS on amd64 or ARM64
+- Raspberry Pi OS 13 Trixie or 12 Bookworm, 64-bit, on a Raspberry Pi 5 or compatible Pi
+- Raspberry Pi OS 11 Bullseye, 64-bit, on compatible older Pi hardware
 
-The host needs systemd, `sudo`, 2 GB of memory, 10 GB of free disk space, and a supported x86-64 or ARM64 processor. Docker Engine and Docker Compose v2 are required before installing apps from **Discover**. Tailscale is optional; it enables private access from trusted devices.
+Raspberry Pi OS 11 is not a Pi 5 target. Raspberry Pi OS 13 is the recommended Pi 5 release, with Pi OS 12 retained for existing installations.
+
+The host needs systemd, `sudo`, 2 GB of memory, 10 GB of free disk space, and a supported 64-bit amd64 or ARM64 userspace. Docker Engine and Docker Compose v2 are required before installing apps from **Discover**. Tailscale is optional; it enables private access from trusted devices.
 
 Before installation, run the preflight from an extracted release bundle when one is available:
 
@@ -26,7 +29,7 @@ The result identifies the host as supported, untested, or unsupported before the
 | --- | --- |
 | `autark-os_<version>_<arch>.deb` | Debian-family systems using the package manager. |
 | `Autark-OS-Installer-<version>-<arch>.run` | Guided terminal installation, support-assisted installs, or portable media. |
-| `autark-os-<version>.tar.gz` | Manual inspection or environments where a package is not appropriate. |
+| `autark-os-<version>-<arch>.tar.gz` | Manual inspection or environments where a package is not appropriate. |
 
 Download the artifact and `SHA256SUMS` from the Autark-OS release page. Verify the files before running them:
 
@@ -44,6 +47,8 @@ Do not continue if a checksum fails.
 sudo apt install ./autark-os_<version>_amd64.deb
 ```
 
+Use `arm64` instead of `amd64` for a 64-bit Raspberry Pi or ARM server. The package, portable installer, tarball, bundled Java runtime, and release metadata are built separately for each architecture. Installation stops before host changes if they do not match.
+
 ### Portable Installer
 
 ```bash
@@ -60,8 +65,8 @@ Preview the host changes first when you want to review them:
 ### Tarball
 
 ```bash
-tar -xzf autark-os-<version>.tar.gz
-cd autark-os-<version>
+tar -xzf autark-os-<version>-<arch>.tar.gz
+cd autark-os-<version>-<arch>
 ./scripts/autark-os install
 ```
 

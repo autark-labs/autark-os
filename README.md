@@ -23,7 +23,7 @@ Autark-OS should help users answer four questions quickly:
 
 Autark-OS is ready for controlled beta testing on Linux homelab hosts. It is not yet a polished public installer.
 
-Supported initial hosts: Debian 12, Ubuntu 22.04/24.04, and Raspberry Pi OS 12 on x86-64 or ARM64 with systemd, 2 GB memory, and 10 GB free disk. Run `./scripts/autark-os install --doctor --json` before installing.
+Supported initial hosts are Debian 12/13 and Ubuntu 24.04/26.04 LTS on amd64 or ARM64, plus 64-bit Raspberry Pi OS 11/12/13 on ARM64. Raspberry Pi OS 13 is the primary Pi 5 target; Pi OS 12 is also supported on Pi 5, while Pi OS 11 is retained for compatible older Pi hardware. All hosts require systemd, 2 GB memory, and 10 GB free disk. Run `./scripts/autark-os install --doctor --json` before installing.
 
 The current beta path supports Debian packages, portable installers, and local release bundles. After installation, open the printed local address to complete setup in your browser.
 
@@ -53,6 +53,8 @@ Primary package install on a supported Debian-family host:
 sudo apt install ./autark-os_<version>_amd64.deb
 ```
 
+Use the `_arm64.deb` artifact on a 64-bit Raspberry Pi or ARM server. Release artifacts are architecture-specific and the installer refuses a package whose bundled runtime does not match the host.
+
 The package runs the host preflight before service setup. After it completes, open the printed local URL and finish first-run setup. Docker Engine and Docker Compose v2 must be ready before you can install catalog apps.
 
 Direct download alternative:
@@ -67,8 +69,8 @@ On Linux desktops, the `.run` installer can show a graphical confirmation before
 General tarball install:
 
 ```bash
-tar -xzf autark-os-<version>.tar.gz
-cd autark-os-<version>
+tar -xzf autark-os-<version>-<arch>.tar.gz
+cd autark-os-<version>-<arch>
 ./scripts/autark-os install
 ```
 

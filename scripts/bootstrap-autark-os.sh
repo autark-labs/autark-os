@@ -98,16 +98,36 @@ supported_apt_host() {
 
 host_matrix_contains() { [[ " $1 " == *" $2 "* ]]; }
 
+normalize_architecture() {
+  case "$1" in
+    x86_64|amd64) printf 'amd64\n' ;;
+    aarch64|arm64) printf 'arm64\n' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+host_architecture() {
+  if [[ -n "${AUTARK_OS_ARCHITECTURE_FIXTURE:-}" && -n "${AUTARK_OS_OS_RELEASE_FIXTURE:-}" ]]; then
+    normalize_architecture "${AUTARK_OS_ARCHITECTURE_FIXTURE}"
+  elif has_command dpkg; then
+    normalize_architecture "$(dpkg --print-architecture)"
+  else
+    normalize_architecture "$(uname -m)"
+  fi
+}
+
 host_support_status() {
-  local os_id version arch
-  os_id="$(os_field ID || true)"; version="$(os_field VERSION_ID || true)"; arch="$(uname -m)"
+  local os_id version arch versions architectures
+  os_id="$(os_field ID || true)"; version="$(os_field VERSION_ID || true)"; arch="$(host_architecture)"
   host_matrix_contains "${AUTARK_OS_SUPPORTED_ARCHITECTURES}" "${arch}" || { printf 'unsupported'; return; }
   case "${os_id}" in
-    debian) host_matrix_contains "${AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS}" "${version}" ;;
-    ubuntu) host_matrix_contains "${AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS}" "${version}" ;;
-    raspbian) host_matrix_contains "${AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS}" "${version}" ;;
+    debian) versions="${AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS}"; architectures="${AUTARK_OS_SUPPORTED_DEBIAN_ARCHITECTURES}" ;;
+    ubuntu) versions="${AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS}"; architectures="${AUTARK_OS_SUPPORTED_UBUNTU_ARCHITECTURES}" ;;
+    raspbian) versions="${AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS}"; architectures="${AUTARK_OS_SUPPORTED_RASPBIAN_ARCHITECTURES}" ;;
     *) return 1 ;;
-  esac && printf 'supported' || printf 'untested'
+  esac
+  host_matrix_contains "${architectures}" "${arch}" || { printf 'unsupported'; return; }
+  host_matrix_contains "${versions}" "${version}" && printf 'supported' || printf 'untested'
 }
 
 enforce_supported_host() {
@@ -319,6 +339,32 @@ release_metadata_value() {
   awk -F= -v key="${key}" '$1 == key {print $2; exit}' "${RELEASE_METADATA}"
 }
 
+verify_release_architecture() {
+  [[ -n "${RELEASE_BUNDLE_DIR}" ]] || return 0
+  [[ -r "${RELEASE_METADATA}" ]] || die "Release bundle is missing architecture metadata: ${RELEASE_METADATA}"
+  local artifact_architecture runtime_architecture detected_architecture bundled_java description binary_architecture
+  artifact_architecture="$(release_metadata_value AUTARK_OS_ARTIFACT_ARCHITECTURE)"
+  runtime_architecture="$(release_metadata_value AUTARK_OS_RUNTIME_ARCHITECTURE)"
+  detected_architecture="$(host_architecture)"
+  [[ -n "${artifact_architecture}" ]] || die "Release bundle does not declare AUTARK_OS_ARTIFACT_ARCHITECTURE."
+  [[ -n "${runtime_architecture}" ]] || die "Release bundle does not declare AUTARK_OS_RUNTIME_ARCHITECTURE."
+  artifact_architecture="$(normalize_architecture "${artifact_architecture}")"
+  runtime_architecture="$(normalize_architecture "${runtime_architecture}")"
+  [[ "${artifact_architecture}" == "${runtime_architecture}" ]] || die "Release metadata disagrees: artifact is ${artifact_architecture}, bundled runtime is ${runtime_architecture}."
+  [[ "${artifact_architecture}" == "${detected_architecture}" ]] || die "This release is built for ${artifact_architecture}, but this host is ${detected_architecture}. Download the matching Autark-OS installer."
+  bundled_java="${RELEASE_BUNDLE_DIR}/runtime/bin/java"
+  [[ -x "${bundled_java}" ]] || die "Release bundle is missing its executable Java runtime: ${bundled_java}"
+  if has_command file; then
+    description="$(file -Lb "${bundled_java}")"
+    case "${description}" in
+      *x86-64*|*x86_64*) binary_architecture="amd64" ;;
+      *aarch64*|*AArch64*|*ARM64*) binary_architecture="arm64" ;;
+      *) die "The bundled Java runtime architecture could not be identified: ${description}" ;;
+    esac
+    [[ "${binary_architecture}" == "${runtime_architecture}" ]] || die "The bundled Java runtime is ${binary_architecture}, but release metadata declares ${runtime_architecture}."
+  fi
+}
+
 verify_release_checksum() {
   [[ -n "${RELEASE_BUNDLE_DIR}" && -n "${RELEASE_JAR}" ]] || return 0
   [[ "${AUTARK_OS_RELEASE_VERIFIED:-0}" == "1" ]] && return 0
@@ -369,7 +415,7 @@ apt_support_label() {
   version_id="$(os_field VERSION_ID || true)"
   if [[ "${os_id}" == "ubuntu" ]]; then
     case "${version_id}" in
-      20.04|22.04|24.04) printf 'apt (supported)' ;;
+      24.04|26.04) printf 'apt (supported)' ;;
       *) printf 'apt (compatible, not fully tested on this OS release)' ;;
     esac
     return 0
@@ -937,7 +983,9 @@ print_doctor_json() {
   printf ',"host":{"os":'
   json_string "$(os_field PRETTY_NAME || true)"
   printf ',"architecture":'
-  json_string "$(uname -m)"
+  json_string "$(host_architecture)"
+  printf ',"supportedHostPolicyVersion":'
+  json_string "${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}"
   printf ',"supportStatus":'
   json_string "$(host_support_status)"
   printf ',"packageManager":'
@@ -960,7 +1008,7 @@ print_doctor_text() {
 Autark-OS pre-install doctor
 
 Status: ${status}
-Host: $(os_field PRETTY_NAME || true) ($(uname -m))
+Host: $(os_field PRETTY_NAME || true) ($(host_architecture))
 Package manager: $(package_manager_status)
 Runtime data: $(runtime_dir)
 Service port: $(server_port)
@@ -1046,7 +1094,7 @@ print_plan_json() {
   mode="$(install_mode)"
   audience="$(install_audience)"
   os_name="$(os_field PRETTY_NAME || true)"
-  arch="$(uname -m)"
+  arch="$(host_architecture)"
   package_manager="$(package_manager_status)"
   runtime_dir="$(runtime_dir)"
   install_dir="$(install_dir)"
@@ -1065,6 +1113,8 @@ print_plan_json() {
   json_string "${os_name:-unknown}"
   printf ',"architecture":'
   json_string "${arch}"
+  printf ',"supportedHostPolicyVersion":'
+  json_string "${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}"
   printf ',"packageManager":'
   json_string "${package_manager}"
   printf '}'
@@ -1084,6 +1134,10 @@ print_plan_json() {
   json_string "${RELEASE_BUNDLE_DIR}"
   printf ',"backendJar":'
   json_string "${RELEASE_JAR}"
+  printf ',"artifactArchitecture":'
+  json_string "$(release_metadata_value AUTARK_OS_ARTIFACT_ARCHITECTURE)"
+  printf ',"runtimeArchitecture":'
+  json_string "$(release_metadata_value AUTARK_OS_RUNTIME_ARCHITECTURE)"
   printf '}'
   printf ',"dependencies":['
   plan_dependencies "${include_node}"
@@ -1110,7 +1164,7 @@ Autark-OS install plan
 
 Mode: ${mode}
 Audience: ${audience}
-Host: $(os_field PRETTY_NAME || true) ($(uname -m))
+Host: $(os_field PRETTY_NAME || true) ($(host_architecture))
 Package manager: $(package_manager_status)
 
 Paths:
@@ -1152,7 +1206,7 @@ print_install_plan() {
 }
 
 print_dependency_plan() {
-  log "Host: $(os_field PRETTY_NAME || true) ($(uname -m))"
+  log "Host: $(os_field PRETTY_NAME || true) ($(host_architecture))"
   log "Package manager: $(apt_support_label)"
   log "Java: $(dependency_state java 'java -version')"
   if [[ -n "${RELEASE_JAR}" ]]; then
@@ -1311,6 +1365,7 @@ TAILSCALE_SETUP
 
 preflight() {
   log "Running preflight checks."
+  verify_release_checksum
   if [[ "${AUTO_INSTALL_DEPS}" -eq 0 ]]; then
     print_dependency_plan
   fi
@@ -1366,7 +1421,6 @@ preflight() {
     log "Tailscale is not installed yet. Private app links can be enabled after Tailscale setup."
   fi
   print_storage_targets
-  verify_release_checksum
 }
 
 print_path_target() {
@@ -1540,6 +1594,7 @@ open_browser_when_available() {
 
 main() {
   parse_args "$@"
+  verify_release_architecture
   if [[ "${DOCTOR_ONLY}" -eq 1 ]]; then
     print_preinstall_doctor
     exit 0

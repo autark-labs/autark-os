@@ -37,8 +37,8 @@ output="$(PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-autar
   --port 19091)"
 
 grep -q 'openjdk-21-jre-headless' <<<"${output}"
-grep -q 'Installing or repairing Docker using Docker' <<<"${output}"
-grep -q '+ curl -fsSL https://get.docker.com | sh' <<<"${output}"
+grep -q 'Installing Docker Engine, Buildx, and Compose v2 from apt packages.' <<<"${output}"
+grep -q 'apt-get install -y docker.io docker-buildx-plugin docker-compose-plugin' <<<"${output}"
 
 missing_java_bin="${tmp_dir}/missing-java-bin"
 mkdir -p "${missing_java_bin}"
@@ -79,7 +79,7 @@ missing_java_output="$(AUTARK_OS_OS_RELEASE_FIXTURE="${os_release_fixture}" AUTA
   --log-dir "${tmp_dir}/missing-java-logs" \
   --port 19092)"
 
-grep -q 'Package manager: apt (compatible, not fully tested on this OS release)' <<<"${missing_java_output}"
+grep -q 'Package manager: apt (supported)' <<<"${missing_java_output}"
 grep -q 'Dry run: service setup assumes Java 21 will be available after dependency installation.' <<<"${missing_java_output}"
 grep -q 'Autark-OS installation preview completed.' <<<"${missing_java_output}"
 grep -q 'LAN URL:' <<<"${missing_java_output}"

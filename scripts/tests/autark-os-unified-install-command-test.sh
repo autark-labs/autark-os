@@ -65,12 +65,19 @@ grep -q 'Routes to bootstrap-autark-os.sh' <<<"${install_help}"
 "${repo_root}/scripts/autark-os" uninstall --help >/dev/null
 
 bundle_dir="${tmp_dir}/bundle"
-mkdir -p "${bundle_dir}/scripts" "${bundle_dir}/backend"
+architecture="$(dpkg --print-architecture)"
+mkdir -p "${bundle_dir}/scripts" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin"
 cp "${repo_root}/scripts/autark-os" "${bundle_dir}/scripts/autark-os"
 cp "${repo_root}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cp "${repo_root}/scripts/install-autark-os-service.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
+cp "${repo_root}/scripts/supported-host-matrix.env" "${bundle_dir}/scripts/supported-host-matrix.env"
 cp "${fake_jar}" "${bundle_dir}/backend/autark-os-backend.jar"
-printf '{"schemaVersion":1}\n' >"${bundle_dir}/autark-os-release.json"
+ln -s "$(readlink -f "$(command -v java)")" "${bundle_dir}/runtime/bin/java"
+cat >"${bundle_dir}/autark-os-release.env" <<ENV
+AUTARK_OS_ARTIFACT_ARCHITECTURE=${architecture}
+AUTARK_OS_RUNTIME_ARCHITECTURE=${architecture}
+ENV
+printf '{"schemaVersion":2}\n' >"${bundle_dir}/autark-os-release.json"
 chmod +x "${bundle_dir}/scripts/autark-os" "${bundle_dir}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
 
 bundle_output="$("${bundle_dir}/scripts/autark-os" install \
@@ -94,7 +101,7 @@ assert plan["artifact"]["backendJar"].endswith("/backend/autark-os-backend.jar")
 PY
 
 printf 'autark-os-release.env\n' >"${bundle_dir}/SHA256SUMS"
-(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar scripts/autark-os scripts/bootstrap-autark-os.sh autark-os-release.json > SHA256SUMS)
+(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/bootstrap-autark-os.sh scripts/supported-host-matrix.env autark-os-release.env autark-os-release.json > SHA256SUMS)
 
 single_command_output="$("${bundle_dir}/scripts/autark-os" install \
   --dry-run \

@@ -5,12 +5,16 @@ OUTPUT_DIR=""
 VERSION="${AUTARK_OS_VERSION:-0.0.1-SNAPSHOT}"
 CHANNEL="${AUTARK_OS_UPDATE_CHANNEL:-beta}"
 RELEASE_NOTES_URL="${AUTARK_OS_RELEASE_NOTES_URL:-}"
-SUPPORTED_ARCHITECTURES="${AUTARK_OS_SUPPORTED_ARCHITECTURES:-x86_64,aarch64,arm64}"
+ARTIFACT_ARCHITECTURE="${AUTARK_OS_ARTIFACT_ARCHITECTURE:-}"
 SKIP_BUILD=0
 DRY_RUN=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+HOST_MATRIX_FILE="${SCRIPT_DIR}/supported-host-matrix.env"
+[[ -r "${HOST_MATRIX_FILE}" ]] || { printf '[autark-os release] error: supported host policy is missing: %s\n' "${HOST_MATRIX_FILE}" >&2; exit 1; }
+# shellcheck source=supported-host-matrix.env
+source "${HOST_MATRIX_FILE}"
 
 usage() {
   cat <<USAGE
@@ -20,11 +24,11 @@ Build a local Autark-OS release bundle that can be installed without Node.js
 or Yarn on the target host.
 
 Options:
-  --output-dir DIR  Directory where the bundle should be created. Default: release/autark-os-VERSION.
+  --output-dir DIR  Directory where the bundle should be created. Default: release/autark-os-VERSION-ARCH.
   --version VALUE   Release version metadata. Default: ${VERSION}.
   --channel VALUE   Release channel metadata. Default: ${CHANNEL}.
+  --architecture VALUE Artifact architecture: amd64 or arm64. Default: build host architecture.
   --release-notes-url URL Release notes URL metadata.
-  --supported-architectures LIST Comma-separated supported architectures.
   --skip-build      Use the existing backend boot jar.
   --dry-run         Print actions without creating files.
   -h, --help        Show this help.
@@ -54,6 +58,52 @@ die() {
 
 has_command() {
   command -v "$1" >/dev/null 2>&1
+}
+
+normalize_architecture() {
+  case "$1" in
+    x86_64|amd64) printf 'amd64\n' ;;
+    aarch64|arm64) printf 'arm64\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+build_host_architecture() {
+  local detected
+  if has_command dpkg; then
+    detected="$(dpkg --print-architecture)"
+  else
+    detected="$(uname -m)"
+  fi
+  normalize_architecture "${detected}" || die "Unsupported build host architecture: ${detected}. Autark-OS release artifacts require amd64 or arm64."
+}
+
+validate_build_architecture() {
+  local host_architecture
+  ARTIFACT_ARCHITECTURE="$(normalize_architecture "${ARTIFACT_ARCHITECTURE}")" || die "--architecture must be amd64 or arm64: ${ARTIFACT_ARCHITECTURE}"
+  host_architecture="$(build_host_architecture)"
+  [[ "${ARTIFACT_ARCHITECTURE}" == "${host_architecture}" ]] || die "Cannot build ${ARTIFACT_ARCHITECTURE} release artifacts on ${host_architecture}. Use a native ${ARTIFACT_ARCHITECTURE} builder."
+}
+
+runtime_architecture() {
+  local java_binary="$1"
+  local description
+  has_command file || die "file is required to verify the bundled Java runtime architecture."
+  description="$(file -Lb "${java_binary}")"
+  case "${description}" in
+    *x86-64*|*x86_64*) printf 'amd64\n' ;;
+    *aarch64*|*AArch64*|*ARM64*) printf 'arm64\n' ;;
+    *) die "Could not identify bundled Java runtime architecture: ${description}" ;;
+  esac
+}
+
+verify_runtime_architecture() {
+  [[ "${DRY_RUN}" -eq 0 ]] || return 0
+  local java_binary="${OUTPUT_DIR}/runtime/bin/java"
+  [[ -x "${java_binary}" ]] || die "Bundled Java runtime is missing or not executable: ${java_binary}"
+  local detected
+  detected="$(runtime_architecture "${java_binary}")"
+  [[ "${detected}" == "${ARTIFACT_ARCHITECTURE}" ]] || die "Bundled Java runtime is ${detected}, but this artifact is declared ${ARTIFACT_ARCHITECTURE}."
 }
 
 run_cmd() {
@@ -93,6 +143,14 @@ parse_args() {
       --channel=*)
         CHANNEL="${1#*=}"
         ;;
+      --architecture)
+        shift
+        [[ $# -gt 0 ]] || die "--architecture requires a value."
+        ARTIFACT_ARCHITECTURE="$1"
+        ;;
+      --architecture=*)
+        ARTIFACT_ARCHITECTURE="${1#*=}"
+        ;;
       --release-notes-url)
         shift
         [[ $# -gt 0 ]] || die "--release-notes-url requires a URL."
@@ -101,13 +159,8 @@ parse_args() {
       --release-notes-url=*)
         RELEASE_NOTES_URL="${1#*=}"
         ;;
-      --supported-architectures)
-        shift
-        [[ $# -gt 0 ]] || die "--supported-architectures requires a comma-separated list."
-        SUPPORTED_ARCHITECTURES="$1"
-        ;;
-      --supported-architectures=*)
-        SUPPORTED_ARCHITECTURES="${1#*=}"
+      --supported-architectures|--supported-architectures=*)
+        die "--supported-architectures has been replaced by one --architecture per artifact build."
         ;;
       --skip-build)
         SKIP_BUILD=1
@@ -125,7 +178,9 @@ parse_args() {
     esac
     shift
   done
-  [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${REPO_ROOT}/release/autark-os-${VERSION}"
+  [[ -n "${ARTIFACT_ARCHITECTURE}" ]] || ARTIFACT_ARCHITECTURE="$(build_host_architecture)"
+  validate_build_architecture
+  [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${REPO_ROOT}/release/autark-os-${VERSION}-${ARTIFACT_ARCHITECTURE}"
   if [[ "${OUTPUT_DIR}" != /* ]]; then
     OUTPUT_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
   fi
@@ -172,7 +227,11 @@ AUTARK_OS_BUILD_SHA=${build_sha}
 AUTARK_OS_BUILD_DATE=${build_date}
 AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
 AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
-AUTARK_OS_SUPPORTED_ARCHITECTURES=${SUPPORTED_ARCHITECTURES}
+AUTARK_OS_ARTIFACT_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
+AUTARK_OS_RUNTIME_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
+AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}
+AUTARK_OS_MIN_MEMORY_MB=${AUTARK_OS_MIN_MEMORY_MB}
+AUTARK_OS_MIN_DISK_KB=${AUTARK_OS_MIN_DISK_KB}
 META
     return 0
   fi
@@ -182,24 +241,27 @@ AUTARK_OS_BUILD_SHA=${build_sha}
 AUTARK_OS_BUILD_DATE=${build_date}
 AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
 AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
-AUTARK_OS_SUPPORTED_ARCHITECTURES=${SUPPORTED_ARCHITECTURES}
+AUTARK_OS_ARTIFACT_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
+AUTARK_OS_RUNTIME_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
+AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}
+AUTARK_OS_MIN_MEMORY_MB=${AUTARK_OS_MIN_MEMORY_MB}
+AUTARK_OS_MIN_DISK_KB=${AUTARK_OS_MIN_DISK_KB}
 META
   write_release_json "${build_sha}" "${build_date}"
   write_provenance_json "${build_sha}" "${build_date}"
 }
 
-json_architectures() {
+json_space_list() {
+  local values="$1"
   local first=1
   printf '['
-  IFS=',' read -ra architectures <<<"${SUPPORTED_ARCHITECTURES}"
-  for architecture in "${architectures[@]}"; do
-    architecture="$(printf '%s' "${architecture}" | xargs)"
-    [[ -n "${architecture}" ]] || continue
+  local value
+  for value in ${values}; do
     if [[ "${first}" -eq 0 ]]; then
       printf ','
     fi
     first=0
-    printf '"%s"' "${architecture}"
+    printf '"%s"' "${value}"
   done
   printf ']'
 }
@@ -209,14 +271,35 @@ write_release_json() {
   local build_date="$2"
   cat >"${OUTPUT_DIR}/autark-os-release.json" <<JSON
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "autark-os",
   "version": "${VERSION}",
   "channel": "${CHANNEL}",
   "buildSha": "${build_sha}",
   "buildDate": "${build_date}",
   "releaseNotesUrl": "${RELEASE_NOTES_URL}",
-  "supportedArchitectures": $(json_architectures),
+  "artifactArchitecture": "${ARTIFACT_ARCHITECTURE}",
+  "runtimeArchitecture": "${ARTIFACT_ARCHITECTURE}",
+  "supportedHostPolicyVersion": "${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}",
+  "requirements": {
+    "minimumMemoryMb": ${AUTARK_OS_MIN_MEMORY_MB},
+    "minimumDiskKb": ${AUTARK_OS_MIN_DISK_KB},
+    "init": "${AUTARK_OS_REQUIRED_INIT}"
+  },
+  "supportedHosts": {
+    "debian": {
+      "versions": $(json_space_list "${AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS}"),
+      "architectures": $(json_space_list "${AUTARK_OS_SUPPORTED_DEBIAN_ARCHITECTURES}")
+    },
+    "ubuntu": {
+      "versions": $(json_space_list "${AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS}"),
+      "architectures": $(json_space_list "${AUTARK_OS_SUPPORTED_UBUNTU_ARCHITECTURES}")
+    },
+    "raspbian": {
+      "versions": $(json_space_list "${AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS}"),
+      "architectures": $(json_space_list "${AUTARK_OS_SUPPORTED_RASPBIAN_ARCHITECTURES}")
+    }
+  },
   "artifacts": [
     "backend/autark-os-backend.jar",
     "runtime/bin/java",
@@ -237,10 +320,13 @@ write_provenance_json() {
   local build_date="$2"
   cat >"${OUTPUT_DIR}/autark-os-provenance.json" <<JSON
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "buildSha": "${build_sha}",
   "buildDate": "${build_date}",
   "builder": "scripts/build-release-bundle.sh",
+  "builderArchitecture": "$(build_host_architecture)",
+  "artifactArchitecture": "${ARTIFACT_ARCHITECTURE}",
+  "runtimeArchitecture": "${ARTIFACT_ARCHITECTURE}",
   "source": "local-worktree",
   "signatureStatus": "unsigned-reserved"
 }
@@ -256,6 +342,7 @@ create_bundle() {
   run_cmd rm -rf "${OUTPUT_DIR}"
   run_cmd mkdir -p "${OUTPUT_DIR}/backend" "${OUTPUT_DIR}/scripts"
   build_runtime
+  verify_runtime_architecture
   run_cmd cp "${jar}" "${OUTPUT_DIR}/backend/autark-os-backend.jar"
   run_cmd cp "${SCRIPT_DIR}/bootstrap-autark-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh"
   run_cmd cp "${SCRIPT_DIR}/supported-host-matrix.env" "${OUTPUT_DIR}/scripts/supported-host-matrix.env"

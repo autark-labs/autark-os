@@ -4,7 +4,6 @@ set -Eeuo pipefail
 VERSION="${AUTARK_OS_VERSION:-0.0.1-SNAPSHOT}"
 CHANNEL="${AUTARK_OS_UPDATE_CHANNEL:-beta}"
 RELEASE_NOTES_URL="${AUTARK_OS_RELEASE_NOTES_URL:-}"
-SUPPORTED_ARCHITECTURES="${AUTARK_OS_SUPPORTED_ARCHITECTURES:-x86_64,aarch64,arm64}"
 ARCHITECTURE="${AUTARK_OS_PACKAGE_ARCHITECTURE:-}"
 OUTPUT_DIR=""
 SKIP_BUILD=0
@@ -12,6 +11,10 @@ DRY_RUN=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+HOST_MATRIX_FILE="${SCRIPT_DIR}/supported-host-matrix.env"
+[[ -r "${HOST_MATRIX_FILE}" ]] || { printf '[autark-os artifacts] error: supported host policy is missing: %s\n' "${HOST_MATRIX_FILE}" >&2; exit 1; }
+# shellcheck source=supported-host-matrix.env
+source "${HOST_MATRIX_FILE}"
 
 usage() {
   cat <<USAGE
@@ -26,7 +29,6 @@ Options:
   --channel VALUE   Release channel metadata. Default: ${CHANNEL}.
   --architecture VALUE Debian/package architecture. Default: host architecture.
   --release-notes-url URL Release notes URL metadata.
-  --supported-architectures LIST Comma-separated supported runtime architectures.
   --skip-build      Use the existing backend boot jar.
   --dry-run         Print actions without creating files.
   -h, --help        Show this help.
@@ -79,6 +81,21 @@ default_architecture() {
   esac
 }
 
+normalize_architecture() {
+  case "$1" in
+    x86_64|amd64) printf 'amd64\n' ;;
+    aarch64|arm64) printf 'arm64\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_build_architecture() {
+  local host_architecture
+  ARCHITECTURE="$(normalize_architecture "${ARCHITECTURE}")" || die "--architecture must be amd64 or arm64: ${ARCHITECTURE}"
+  host_architecture="$(normalize_architecture "$(default_architecture)")" || die "Unsupported build host architecture: $(default_architecture)"
+  [[ "${ARCHITECTURE}" == "${host_architecture}" ]] || die "Cannot build ${ARCHITECTURE} release artifacts on ${host_architecture}. Use a native ${ARCHITECTURE} builder."
+}
+
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -122,13 +139,8 @@ parse_args() {
       --release-notes-url=*)
         RELEASE_NOTES_URL="${1#*=}"
         ;;
-      --supported-architectures)
-        shift
-        [[ $# -gt 0 ]] || die "--supported-architectures requires a comma-separated list."
-        SUPPORTED_ARCHITECTURES="$1"
-        ;;
-      --supported-architectures=*)
-        SUPPORTED_ARCHITECTURES="${1#*=}"
+      --supported-architectures|--supported-architectures=*)
+        die "--supported-architectures has been replaced by one --architecture per artifact build."
         ;;
       --skip-build)
         SKIP_BUILD=1
@@ -148,6 +160,7 @@ parse_args() {
   done
 
   [[ -n "${ARCHITECTURE}" ]] || ARCHITECTURE="$(default_architecture)"
+  validate_build_architecture
   [[ -n "${OUTPUT_DIR}" ]] || OUTPUT_DIR="${REPO_ROOT}/release/artifacts-${VERSION}"
   if [[ "${OUTPUT_DIR}" != /* ]]; then
     OUTPUT_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
@@ -155,7 +168,7 @@ parse_args() {
 }
 
 artifact_names() {
-  BUNDLE_NAME="autark-os-${VERSION}"
+  BUNDLE_NAME="autark-os-${VERSION}-${ARCHITECTURE}"
   BUNDLE_DIR="${OUTPUT_DIR}/${BUNDLE_NAME}"
   TARBALL="${OUTPUT_DIR}/${BUNDLE_NAME}.tar.gz"
   DEB="${OUTPUT_DIR}/autark-os_${VERSION}_${ARCHITECTURE}.deb"
@@ -167,7 +180,7 @@ artifact_names() {
 print_dry_run() {
   cat <<DRYRUN
 [autark-os artifacts] Would build release artifacts.
-+ ${SCRIPT_DIR}/build-release-bundle.sh --version ${VERSION} --channel ${CHANNEL} --release-notes-url ${RELEASE_NOTES_URL} --supported-architectures ${SUPPORTED_ARCHITECTURES} --output-dir ${BUNDLE_DIR}$([[ "${SKIP_BUILD}" -eq 1 ]] && printf ' --skip-build')
++ ${SCRIPT_DIR}/build-release-bundle.sh --version ${VERSION} --channel ${CHANNEL} --architecture ${ARCHITECTURE} --release-notes-url ${RELEASE_NOTES_URL} --output-dir ${BUNDLE_DIR}$([[ "${SKIP_BUILD}" -eq 1 ]] && printf ' --skip-build')
 + tar -czf ${TARBALL} -C ${OUTPUT_DIR} ${BUNDLE_NAME}
 + dpkg-deb --root-owner-group --build <deb-root> ${DEB}
 + create self-extracting installer ${RUN_INSTALLER}
@@ -186,8 +199,8 @@ build_bundle() {
   local args=(
     --version "${VERSION}"
     --channel "${CHANNEL}"
+    --architecture "${ARCHITECTURE}"
     --release-notes-url "${RELEASE_NOTES_URL}"
-    --supported-architectures "${SUPPORTED_ARCHITECTURES}"
     --output-dir "${BUNDLE_DIR}"
   )
   [[ "${SKIP_BUILD}" -eq 1 ]] && args+=(--skip-build)
@@ -235,19 +248,35 @@ write_deb_scripts() {
   cat >"${deb_root}/DEBIAN/preinst" <<'PREINST'
 #!/usr/bin/env bash
 set -euo pipefail
-matrix=/usr/lib/autark-os/release/scripts/supported-host-matrix.env
-[[ -r "${matrix}" ]] || exit 1
-source "${matrix}"
+expected_architecture="__AUTARK_OS_ARTIFACT_ARCHITECTURE__"
+supported_debian_versions="__AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS__"
+supported_ubuntu_versions="__AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS__"
+supported_raspbian_versions="__AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS__"
+supported_debian_architectures="__AUTARK_OS_SUPPORTED_DEBIAN_ARCHITECTURES__"
+supported_ubuntu_architectures="__AUTARK_OS_SUPPORTED_UBUNTU_ARCHITECTURES__"
+supported_raspbian_architectures="__AUTARK_OS_SUPPORTED_RASPBIAN_ARCHITECTURES__"
 . /etc/os-release
-arch="$(uname -m)"
+normalize_architecture() {
+  case "$1" in
+    x86_64|amd64) printf 'amd64\n' ;;
+    aarch64|arm64) printf 'arm64\n' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+if command -v dpkg >/dev/null 2>&1; then
+  arch="$(normalize_architecture "$(dpkg --print-architecture)")"
+else
+  arch="$(normalize_architecture "$(uname -m)")"
+fi
 contains() { [[ " $1 " == *" $2 "* ]]; }
 case "${ID}" in
-  debian) versions="${AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS}" ;;
-  ubuntu) versions="${AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS}" ;;
-  raspbian) versions="${AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS}" ;;
-  *) echo "Autark-OS: unsupported host. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}" >&2; exit 1 ;;
+  debian) versions="${supported_debian_versions}"; architectures="${supported_debian_architectures}" ;;
+  ubuntu) versions="${supported_ubuntu_versions}"; architectures="${supported_ubuntu_architectures}" ;;
+  raspbian) versions="${supported_raspbian_versions}"; architectures="${supported_raspbian_architectures}" ;;
+  *) echo "Autark-OS: unsupported Linux distribution." >&2; exit 1 ;;
 esac
-contains "${versions}" "${VERSION_ID}" && contains "${AUTARK_OS_SUPPORTED_ARCHITECTURES}" "${arch}" || { echo "Autark-OS: unsupported OS version or architecture. See ${AUTARK_OS_SUPPORTED_HOST_GUIDE}" >&2; exit 1; }
+[[ "${arch}" == "${expected_architecture}" ]] || { echo "Autark-OS: this package is ${expected_architecture}, but this host is ${arch}." >&2; exit 1; }
+contains "${versions}" "${VERSION_ID}" && contains "${architectures}" "${arch}" || { echo "Autark-OS: unsupported OS version or architecture. See https://github.com/autark-labs/autark-os/blob/main/docs/technical-installation.md" >&2; exit 1; }
 command -v systemctl >/dev/null || { echo "Autark-OS: systemd is required." >&2; exit 1; }
 if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system/autark-os.service ]]; then
   checkpoint_dir=/var/lib/autark-os/backups/package-upgrades
@@ -257,11 +286,24 @@ if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system
   echo "Autark-OS: saved package configuration checkpoint at ${checkpoint}." >&2
 fi
 PREINST
+  sed -i \
+    -e "s/__AUTARK_OS_ARTIFACT_ARCHITECTURE__/${ARCHITECTURE}/g" \
+    -e "s/__AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS__/${AUTARK_OS_SUPPORTED_DEBIAN_VERSIONS}/g" \
+    -e "s/__AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS__/${AUTARK_OS_SUPPORTED_UBUNTU_VERSIONS}/g" \
+    -e "s/__AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS__/${AUTARK_OS_SUPPORTED_RASPBIAN_VERSIONS}/g" \
+    -e "s/__AUTARK_OS_SUPPORTED_DEBIAN_ARCHITECTURES__/${AUTARK_OS_SUPPORTED_DEBIAN_ARCHITECTURES}/g" \
+    -e "s/__AUTARK_OS_SUPPORTED_UBUNTU_ARCHITECTURES__/${AUTARK_OS_SUPPORTED_UBUNTU_ARCHITECTURES}/g" \
+    -e "s/__AUTARK_OS_SUPPORTED_RASPBIAN_ARCHITECTURES__/${AUTARK_OS_SUPPORTED_RASPBIAN_ARCHITECTURES}/g" \
+    "${deb_root}/DEBIAN/preinst"
   cat >"${deb_root}/DEBIAN/postinst" <<POSTINST
 #!/usr/bin/env bash
 set -euo pipefail
 
 if [[ "\${1:-configure}" == "configure" ]]; then
+  if ! /usr/lib/autark-os/release/runtime/bin/java -version >/dev/null 2>&1; then
+    echo "Autark-OS: the bundled ${ARCHITECTURE} Java runtime cannot execute on this host." >&2
+    exit 1
+  fi
   AUTARK_OS_BACKEND_JAR=/usr/lib/autark-os/release/backend/autark-os-backend.jar \\
   AUTARK_OS_VERSION=${VERSION} \\
   AUTARK_OS_BUILD_SHA=$(build_sha) \\
@@ -327,6 +369,7 @@ set -Eeuo pipefail
 AUTARK_OS_INSTALLER_VERSION="__AUTARK_OS_VERSION__"
 AUTARK_OS_INSTALLER_ARCHITECTURE="__AUTARK_OS_ARCHITECTURE__"
 PAYLOAD_MARKER="__AUTARK_OS_PAYLOAD_BELOW__"
+INSTALLER_TEMP_DIR=""
 
 usage() {
   cat <<USAGE
@@ -349,6 +392,36 @@ USAGE
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+cleanup_installer_temp_dir() {
+  [[ -n "${INSTALLER_TEMP_DIR}" ]] || return 0
+  rm -rf "${INSTALLER_TEMP_DIR}"
+}
+
+normalize_architecture() {
+  case "$1" in
+    x86_64|amd64) printf 'amd64\n' ;;
+    aarch64|arm64) printf 'arm64\n' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+host_architecture() {
+  if command_exists dpkg; then
+    normalize_architecture "$(dpkg --print-architecture)"
+  else
+    normalize_architecture "$(uname -m)"
+  fi
+}
+
+verify_installer_architecture() {
+  local detected
+  detected="$(host_architecture)"
+  [[ "${detected}" == "${AUTARK_OS_INSTALLER_ARCHITECTURE}" ]] || {
+    printf 'Autark-OS Portable Installer error: this installer is %s, but this host is %s.\n' "${AUTARK_OS_INSTALLER_ARCHITECTURE}" "${detected}" >&2
+    exit 1
+  }
 }
 
 payload_line() {
@@ -395,6 +468,7 @@ launch_terminal_for_desktop() {
 }
 
 main() {
+  verify_installer_architecture
   launch_terminal_for_desktop "$@" || true
 
   local extract_only=""
@@ -428,7 +502,8 @@ main() {
 
   local temp_dir
   temp_dir="$(mktemp -d)"
-  trap 'rm -rf "${temp_dir}"' EXIT
+  INSTALLER_TEMP_DIR="${temp_dir}"
+  trap cleanup_installer_temp_dir EXIT
   extract_payload "${temp_dir}"
   [[ -f "${temp_dir}/SHA256SUMS" ]] || { printf 'Autark-OS Portable Installer error: release checksums are missing.\n' >&2; exit 1; }
   (cd "${temp_dir}" && sha256sum -c SHA256SUMS --ignore-missing) || { printf 'Autark-OS Portable Installer error: release checksum verification failed.\n' >&2; exit 1; }
@@ -466,11 +541,13 @@ write_artifact_manifest() {
   run_name="$(basename "${RUN_INSTALLER}")"
   cat >"${ARTIFACT_MANIFEST}" <<JSON
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "autark-os",
   "version": "$(json_escape "${VERSION}")",
   "channel": "$(json_escape "${CHANNEL}")",
-  "architecture": "$(json_escape "${ARCHITECTURE}")",
+  "artifactArchitecture": "$(json_escape "${ARCHITECTURE}")",
+  "runtimeArchitecture": "$(json_escape "${ARCHITECTURE}")",
+  "supportedHostPolicyVersion": "$(json_escape "${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}")",
   "releaseNotesUrl": "$(json_escape "${RELEASE_NOTES_URL}")",
   "bundleDirectory": "$(json_escape "${BUNDLE_NAME}")",
   "artifacts": [

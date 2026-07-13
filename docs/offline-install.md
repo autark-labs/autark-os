@@ -6,7 +6,7 @@ Use this guide when the target server cannot download packages during installati
 
 Copy these files from one Autark-OS release to the same folder:
 
-- `Autark-OS-Installer-<version>-<arch>.run`, or `autark-os-<version>.tar.gz`
+- `Autark-OS-Installer-<version>-<arch>.run`, or `autark-os-<version>-<arch>.tar.gz`
 - `SHA256SUMS`
 
 Use the architecture that matches the server: `amd64` for most Intel/AMD systems and `arm64` for supported Raspberry Pi-style systems.
@@ -33,8 +33,8 @@ The server still needs its required host dependencies, including Docker and Dock
 ## Tarball alternative
 
 ```bash
-tar -xzf autark-os-<version>.tar.gz
-cd autark-os-<version>
+tar -xzf autark-os-<version>-<arch>.tar.gz
+cd autark-os-<version>-<arch>
 ./scripts/autark-os install
 ```
 

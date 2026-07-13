@@ -16,13 +16,20 @@ config_file="${config_dir}/autark-os.env"
 service_file="${tmp_dir}/autark-os.service"
 cli_link="${tmp_dir}/autark-os"
 
-mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/scripts" "${state_dir}"
+architecture="$(dpkg --print-architecture)"
+mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin" "${bundle_dir}/scripts" "${state_dir}"
 printf 'backend jar\n' >"${bundle_dir}/backend/autark-os-backend.jar"
 cp "${repo_root}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cp "${repo_root}/scripts/autark-os" "${bundle_dir}/scripts/autark-os"
+cp "${repo_root}/scripts/supported-host-matrix.env" "${bundle_dir}/scripts/supported-host-matrix.env"
+cp "$(readlink -f "$(command -v java)")" "${bundle_dir}/runtime/bin/java"
+cat >"${bundle_dir}/autark-os-release.env" <<ENV
+AUTARK_OS_ARTIFACT_ARCHITECTURE=${architecture}
+AUTARK_OS_RUNTIME_ARCHITECTURE=${architecture}
+ENV
 cat >"${bundle_dir}/autark-os-release.json" <<JSON
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "autark-os",
   "version": "2.4.0",
   "channel": "stable",

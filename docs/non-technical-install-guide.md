@@ -6,7 +6,7 @@ This guide is for installing Autark-OS on a home server, mini PC, or Raspberry P
 
 **Recommended path: the Debian package**
 
-Use the `.deb` file from the Autark-OS GitHub Release page on Debian, Ubuntu, or Raspberry Pi OS. It installs the service and prints the address to open in your browser:
+Use the `.deb` file from the Autark-OS GitHub Release page on Debian, Ubuntu, or Raspberry Pi OS. Choose `amd64` for most Intel/AMD computers and `arm64` for a 64-bit Raspberry Pi or ARM server. It installs the service and prints the address to open in your browser:
 
 ```bash
 sudo apt install ./autark-os_<version>_amd64.deb
@@ -31,7 +31,7 @@ Use a device that can stay powered on, connected to your home network, and attac
 
 Before you start:
 
-- Install one of the supported releases: Debian 12, Ubuntu 22.04 or 24.04, or Raspberry Pi OS 12, on x86-64 or ARM64 hardware with at least 2 GB memory and 10 GB free disk space.
+- Install one of the supported 64-bit releases: Debian 12/13, Ubuntu 24.04/26.04 LTS, or Raspberry Pi OS 12/13. Raspberry Pi OS 13 is recommended for Pi 5. Pi OS 11 is supported only on compatible older Pi hardware.
 - Connect the device to the internet.
 - Sign in with an account that can approve administrator prompts.
 - Attach an SSD if you want app data and backups stored away from the system drive.
