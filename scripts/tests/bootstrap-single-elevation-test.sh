@@ -64,6 +64,9 @@ grep -q 'Requesting administrator approval once' "${tmp_dir}/output.log"
 grep -q 'Autark-OS installation did not complete.' "${tmp_dir}/output.log"
 grep -q 'Failed stage: preflight' "${tmp_dir}/output.log"
 grep -q "Installer log: ${tmp_dir}/state/installer.log" "${tmp_dir}/output.log"
+[[ -s "${tmp_dir}/state/installer.log" ]]
+grep -q 'Starting stage: preflight' "${tmp_dir}/state/installer.log"
+grep -q 'Autark-OS installation did not complete.' "${tmp_dir}/state/installer.log"
 
 python3 - "${tmp_dir}/state/installer-state.json" <<'PY'
 import json

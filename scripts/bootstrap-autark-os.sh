@@ -23,6 +23,7 @@ INSTALL_FAILURE_REPORTED=0
 CURRENT_INSTALL_STAGE="initialization"
 LAST_COMPLETED_STAGE=""
 INSTALLER_LOG_FILE=""
+INSTALLER_LOGGER_PID=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -94,6 +95,15 @@ Installer log: ${INSTALLER_LOG_FILE:-$(state_dir)/installer.log}
 FAILURE
 }
 
+finish_installer_logging() {
+  [[ -n "${INSTALLER_LOGGER_PID}" ]] || return 0
+  local logger_pid="${INSTALLER_LOGGER_PID}"
+  INSTALLER_LOGGER_PID=""
+  exec 1>&7 2>&8
+  exec 7>&- 8>&-
+  wait "${logger_pid}" 2>/dev/null || true
+}
+
 handle_unexpected_install_error() {
   local status="$1"
   local line="$2"
@@ -103,6 +113,7 @@ handle_unexpected_install_error() {
 }
 
 trap 'handle_unexpected_install_error "$?" "$LINENO"' ERR
+trap finish_installer_logging EXIT
 
 has_command() {
   command -v "$1" >/dev/null 2>&1
@@ -1144,6 +1155,7 @@ write_installer_state() {
     json_string "Rerun this installer with the same options to resume safely."
     printf '}\n'
   } >"${state_file}"
+  chmod 0644 "${state_file}"
 }
 
 initialize_install_session() {
@@ -1158,7 +1170,10 @@ initialize_install_session() {
   mkdir -p "${state_directory}"
   INSTALLER_LOG_FILE="${state_directory}/installer.log"
   touch "${INSTALLER_LOG_FILE}"
-  exec > >(tee -a "${INSTALLER_LOG_FILE}") 2>&1
+  chmod 0644 "${INSTALLER_LOG_FILE}"
+  exec 7>&1 8>&2
+  exec > >(tee -a "${INSTALLER_LOG_FILE}" >&7) 2>&1
+  INSTALLER_LOGGER_PID=$!
   write_installer_state "running" "${LAST_COMPLETED_STAGE}"
   log "Installer log: ${INSTALLER_LOG_FILE}"
 }
@@ -1770,6 +1785,25 @@ service_url() {
   printf 'http://localhost:%s' "${SERVER_PORT_OVERRIDE:-8082}"
 }
 
+print_service_startup_diagnostics() {
+  local service_name="${AUTARK_OS_SERVICE_NAME:-autark-os}"
+  log "Autark-OS service startup diagnostics follow. These details are also saved in ${INSTALLER_LOG_FILE}."
+  if has_command systemctl; then
+    systemctl show "${service_name}.service" \
+      --property=ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,NRestarts \
+      --no-pager 2>&1 || true
+    systemctl status "${service_name}.service" --no-pager --full 2>&1 || true
+  else
+    log "systemctl is unavailable, so service state could not be collected."
+  fi
+  if has_command journalctl; then
+    printf '\nRecent %s.service logs:\n' "${service_name}"
+    journalctl -u "${service_name}.service" --no-pager -n 120 2>&1 || true
+  else
+    log "journalctl is unavailable, so recent service logs could not be collected."
+  fi
+}
+
 verify_service_health() {
   [[ "${DRY_RUN}" -eq 0 ]] || return 0
   if [[ "${NO_START}" -eq 1 ]]; then
@@ -1784,6 +1818,7 @@ verify_service_health() {
     fi
     sleep 1
   done
+  print_service_startup_diagnostics
   die "Autark-OS did not become ready. Check 'autark-os logs', then rerun this installer to resume. Create a support report with 'autark-os support-bundle --output ./autark-os-support.tar.gz'."
 }
 

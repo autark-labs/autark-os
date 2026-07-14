@@ -29,7 +29,7 @@ Commands:
              Export redacted installer/setup diagnostics for support.
   where      Show install, runtime, config, log, service, and helper paths.
   status     Show systemd status for ${SERVICE_NAME}.service.
-  logs       Follow backend logs.
+  logs       Show recent backend logs. Add --follow to keep watching.
   start      Start ${SERVICE_NAME}.service.
   stop       Stop ${SERVICE_NAME}.service.
   restart    Restart ${SERVICE_NAME}.service.
@@ -57,6 +57,53 @@ die() {
 
 has_command() {
   command -v "$1" >/dev/null 2>&1
+}
+
+logs_command() {
+  local lines=200
+  local follow=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --follow|-f)
+        follow=1
+        ;;
+      --lines)
+        shift
+        [[ $# -gt 0 ]] || die "--lines requires a number."
+        lines="$1"
+        ;;
+      --lines=*)
+        lines="${1#*=}"
+        ;;
+      -h|--help)
+        cat <<LOGS_USAGE
+Usage: autark-os logs [options]
+
+Show recent Autark-OS backend service messages.
+
+Options:
+  --lines NUMBER  Number of recent messages to show. Default: 200.
+  --follow, -f    Continue watching for new messages. Press Ctrl+C to stop.
+  -h, --help      Show this help.
+LOGS_USAGE
+        return 0
+        ;;
+      *)
+        die "Unknown logs option: $1"
+        ;;
+    esac
+    shift
+  done
+  [[ "${lines}" =~ ^[1-9][0-9]*$ ]] || die "--lines must be a positive number: ${lines}"
+
+  local journal_args=(-u "${SERVICE_NAME}.service" --no-pager -n "${lines}")
+  [[ "${follow}" -eq 0 ]] || journal_args+=(-f)
+  if [[ "$(id -u)" -eq 0 ]]; then
+    journalctl "${journal_args[@]}"
+  else
+    has_command sudo || die "Reading system service logs requires administrator access. Install sudo or run this command as root."
+    sudo journalctl "${journal_args[@]}"
+  fi
 }
 
 configured_value() {
@@ -1568,7 +1615,8 @@ case "${1:-help}" in
     systemctl status "${SERVICE_NAME}.service" --no-pager
     ;;
   logs)
-    journalctl -u "${SERVICE_NAME}.service" -f
+    shift || true
+    logs_command "$@"
     ;;
   start)
     sudo systemctl start "${SERVICE_NAME}.service"

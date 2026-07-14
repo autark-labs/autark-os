@@ -197,7 +197,7 @@ build_runtime() {
     return 0
   fi
   command -v jlink >/dev/null 2>&1 || die "jlink from a Java 21 JDK is required to build the bundled runtime."
-  run_cmd jlink --add-modules java.base,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.security.jgss,java.sql,java.transaction.xa,java.xml,jdk.unsupported --strip-debug --no-header-files --no-man-pages --output "${runtime_dir}"
+  run_cmd jlink --add-modules java.base,java.compiler,java.desktop,java.instrument,java.logging,java.management,java.naming,java.net.http,java.security.jgss,java.sql,java.transaction.xa,java.xml,jdk.management,jdk.unsupported --strip-debug --no-header-files --no-man-pages --output "${runtime_dir}"
 }
 
 build_project() {

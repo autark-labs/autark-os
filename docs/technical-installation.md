@@ -103,7 +103,7 @@ autark-os url
 autark-os version
 ```
 
-The success handoff prints both `http://localhost:<port>` and a LAN address. A real installation also writes resumable state to `/var/lib/autark-os/installer/installer-state.json` and an append-only terminal log to `/var/lib/autark-os/installer/installer.log`. A failed install names its stage and can be retried with the same installer and options.
+The success handoff prints both `http://localhost:<port>` and a LAN address. A real installation also writes resumable state to `/var/lib/autark-os/installer/installer-state.json` and an append-only terminal log to `/var/lib/autark-os/installer/installer.log`. Backend output is retained at `/var/log/autark-os/autark-os.log` as well as in the system journal. A failed install names its stage, prints startup diagnostics when service readiness fails, and can be retried with the same installer and options.
 
 Open the URL printed by `autark-os url`, complete [First run](./first-run.md), and use **Discover** to install supported apps.
 

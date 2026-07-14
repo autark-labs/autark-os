@@ -28,6 +28,8 @@ architecture="$(dpkg --print-architecture)"
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-fileops" ]]
 [[ -x "${bundle_dir}/runtime/bin/java" ]]
+"${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^java.compiler@'
+"${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
 
 grep -q '^AUTARK_OS_VERSION=1.2.3$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_UPDATE_CHANNEL=beta$' "${bundle_dir}/autark-os-release.env"

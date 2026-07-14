@@ -4,6 +4,8 @@
 
 Read the final **Failed stage** and **Reason** lines. The portable installer also prints the paths to `installer-state.json` and `installer.log`. Fix the named problem, then rerun the same `.run` file; completed stages are safe to repeat.
 
+If the failed stage is **service-health**, the installer now prints the service state and recent startup messages before it exits. Those details are also saved in the installer log. You do not need to find a separate log before retrying.
+
 If Docker is mentioned, check both the service and Compose v2:
 
 ```bash
@@ -31,6 +33,8 @@ If the service is not healthy, inspect recent logs:
 ```bash
 autark-os logs
 ```
+
+This command asks for administrator approval when system service logs are protected by Linux, shows the latest 200 messages, and then exits. To keep watching for new messages, run `autark-os logs --follow` and press `Ctrl+C` when you are done.
 
 ## An app needs attention
 

@@ -163,6 +163,7 @@ jobs:
           set -euo pipefail
           bash scripts/tests/release-architecture-integrity-test.sh
           bash scripts/tests/release-bundle-contract-test.sh
+          bash scripts/tests/release-runtime-smoke-test.sh
           bash scripts/tests/release-artifacts-dry-run-test.sh
           bash scripts/tests/supported-host-matrix-contract-test.sh
 
