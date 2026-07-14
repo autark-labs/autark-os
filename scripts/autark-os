@@ -5,7 +5,12 @@ SERVICE_NAME="${AUTARK_OS_SERVICE_NAME:-autark-os}"
 BASE_URL_OVERRIDE="${AUTARK_OS_BASE_URL:-}"
 CONFIG_FILE="${AUTARK_OS_CONFIG_FILE:-/etc/autark-os/autark-os.env}"
 DEFAULT_PORT="${AUTARK_OS_DEFAULT_PORT:-8082}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+has_readlink_path="$(command -v readlink 2>/dev/null || true)"
+if [[ -n "${has_readlink_path}" ]]; then
+  SCRIPT_PATH="$("${has_readlink_path}" -f "${SCRIPT_PATH}" 2>/dev/null || printf '%s' "${SCRIPT_PATH}")"
+fi
+SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_PATH}")" && pwd)"
 SERVICE_FILE="${AUTARK_OS_SERVICE_FILE:-/etc/systemd/system/${SERVICE_NAME}.service}"
 CLI_LINK="${AUTARK_OS_CLI_LINK:-/usr/local/bin/autark-os}"
 
@@ -379,7 +384,7 @@ INSTALL_USAGE
     fi
     if [[ "${machine_output}" -eq 0 ]]; then
       log "Unified guided install"
-      log "This command will check this host, install supported dependencies when needed, install Autark-OS, and start the service."
+      log "This command will check this host, request administrator approval once, install supported dependencies when needed, install Autark-OS, and start the service."
       log "Use 'autark-os install --plan' or 'autark-os install --dry-run' to preview without installing."
     fi
   elif [[ "${guided}" -eq 1 && "${machine_output}" -eq 0 ]]; then
@@ -404,9 +409,6 @@ INSTALL_USAGE
   local env_args=()
   if [[ -n "${bundle_dir}" && "${machine_output}" -eq 0 ]]; then
     env_args+=("AUTARK_OS_RELEASE_VERIFIED=1")
-  fi
-  if [[ "${guided}" -eq 1 && "${metadata_only}" -eq 0 && "${machine_output}" -eq 0 && "${dry_run_install}" -eq 0 && "${yes}" -eq 0 ]]; then
-    env_args+=("AUTARK_OS_TAILSCALE_ONBOARDING=1")
   fi
   env "${env_args[@]}" "${installer}" "${args[@]}"
 }
@@ -627,10 +629,14 @@ apply_release_bundle_update() {
   trap rollback_update ERR
 
   copy_update_file "${bundle_dir}/backend/autark-os-backend.jar" "${backend_jar}" 0
-  for script_name in autark-os autark-os-fileops bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh; do
+  for script_name in autark-os autark-os-fileops bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh supported-host-matrix.env; do
     if [[ -f "${bundle_dir}/scripts/${script_name}" ]]; then
       copy_update_file "${bundle_dir}/scripts/${script_name}" "${install_dir}/bin/${script_name}" 0
-      chmod +x "${install_dir}/bin/${script_name}"
+      if [[ "${script_name}" == "supported-host-matrix.env" ]]; then
+        chmod 0644 "${install_dir}/bin/${script_name}"
+      else
+        chmod 0755 "${install_dir}/bin/${script_name}"
+      fi
     fi
   done
 

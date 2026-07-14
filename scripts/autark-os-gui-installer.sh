@@ -404,8 +404,8 @@ contract = {
                 "skipChoice": "local-only",
                 "dependencies": [dependency_payload("Tailscale")],
                 "willInstallOrConfigure": [
-                    "Tailscale when you explicitly choose private device access",
-                    "Tailscale operator permission for the Autark-OS service user when Tailscale is connected",
+                    "Private access is configured later from the Autark-OS Access page",
+                    "The base installer does not install, sign in, or reconfigure Tailscale",
                 ],
             },
             {
@@ -423,15 +423,14 @@ contract = {
             },
         ],
         "externalInstallerConsent": {
-            "required": True,
-            "summary": "Docker and Tailscale use external installer scripts only after explicit confirmation.",
-            "scripts": [
-                "https://get.docker.com",
-                "https://tailscale.com/install.sh",
-            ],
+            "required": False,
+            "summary": "Docker uses its official apt repository on a clean supported host. The base installer does not run Docker or Tailscale convenience scripts.",
+            "scripts": [],
         },
         "advancedDetails": {
-            "packages": ["ca-certificates", "curl", "gnupg", "git", "Java 21", "Docker", "Docker Compose", "Tailscale"],
+            "packages": ["ca-certificates", "curl", "gnupg", "git", "Java 21", "Docker Engine", "Docker Compose v2"],
+            "packageSource": "https://download.docker.com",
+            "tailscaleSetup": "Deferred to the Access page",
             "commands": [
                 "bootstrap-autark-os.sh --auto-install-deps",
                 "bootstrap-autark-os.sh --plan --json",
@@ -454,7 +453,7 @@ contract = {
         "stages": [
             stage("download-release", 1, "Download release", "release-download", "Getting the selected Autark-OS release."),
             stage("verify-release", 2, "Verify release", "release-verify", "Checking release files before anything is installed."),
-            stage("prepare-dependencies", 3, "Prepare dependencies", "dependency-install", "Preparing app and private-access requirements."),
+            stage("prepare-dependencies", 3, "Prepare dependencies", "dependency-install", "Preparing the local app runtime. Private access stays optional for later."),
             stage("create-service-user", 4, "Create service user", "service-install", "Creating the Autark-OS background service account when needed."),
             stage("install-autark-os", 5, "Install Autark-OS", "service-install", "Installing Autark-OS files and helper commands."),
             stage("start-autark-os", 6, "Start Autark-OS", "service-install", "Starting the Autark-OS background service."),

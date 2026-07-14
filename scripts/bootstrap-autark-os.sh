@@ -18,6 +18,11 @@ CONFIG_DIR_OVERRIDE=""
 LOG_DIR_OVERRIDE=""
 SERVER_PORT_OVERRIDE=""
 STATE_DIR_OVERRIDE=""
+INSTALL_SESSION_ACTIVE=0
+INSTALL_FAILURE_REPORTED=0
+CURRENT_INSTALL_STAGE="initialization"
+LAST_COMPLETED_STAGE=""
+INSTALLER_LOG_FILE=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -62,9 +67,42 @@ log() {
 }
 
 die() {
-  printf '[autark-os bootstrap] error: %s\n' "$*" >&2
+  local message="$*"
+  printf '[autark-os bootstrap] error: %s\n' "${message}" >&2
+  report_install_failure "${message}"
   exit 1
 }
+
+report_install_failure() {
+  local message="$1"
+  [[ "${INSTALL_SESSION_ACTIVE}" -eq 1 ]] || return 0
+  [[ "${INSTALL_FAILURE_REPORTED}" -eq 0 ]] || return 0
+  INSTALL_FAILURE_REPORTED=1
+  if declare -F write_installer_state >/dev/null 2>&1; then
+    write_installer_state "failed" "${LAST_COMPLETED_STAGE}" >/dev/null 2>&1 || true
+  fi
+  cat >&2 <<FAILURE
+
+Autark-OS installation did not complete.
+
+Failed stage: ${CURRENT_INSTALL_STAGE}
+Reason: ${message}
+Safe next action: fix the issue above, then rerun the same installer. Completed stages are safe to repeat.
+Installer state: $(state_dir)/installer-state.json
+Installer log: ${INSTALLER_LOG_FILE:-$(state_dir)/installer.log}
+
+FAILURE
+}
+
+handle_unexpected_install_error() {
+  local status="$1"
+  local line="$2"
+  trap - ERR
+  report_install_failure "An unexpected command failure occurred near installer line ${line} (exit ${status})."
+  exit "${status}"
+}
+
+trap 'handle_unexpected_install_error "$?" "$LINENO"' ERR
 
 has_command() {
   command -v "$1" >/dev/null 2>&1
@@ -153,6 +191,31 @@ run_root() {
   fi
 }
 
+request_administrator_privileges() {
+  [[ "${DRY_RUN}" -eq 0 && "${PLAN_ONLY}" -eq 0 && "${DOCTOR_ONLY}" -eq 0 ]] || return 0
+  [[ "$(id -u)" -ne 0 ]] || return 0
+  [[ "${AUTARK_OS_ADMIN_PHASE:-0}" != "1" ]] || die "Administrator privileges were requested, but the elevated installer is still not running as root."
+  has_command sudo || die "Administrator privileges are required. Install sudo, or rerun this installer as root."
+  log "Requesting administrator approval once for dependency, service, and system-directory changes."
+  local admin_env=(
+    "AUTARK_OS_ADMIN_PHASE=1"
+    "AUTARK_OS_RELEASE_VERIFIED=1"
+    "AUTARK_OS_SOURCE_PREPARED=${AUTARK_OS_SOURCE_PREPARED:-0}"
+    "AUTARK_OS_INVOKING_UID=$(id -u)"
+    "AUTARK_OS_INVOKING_GID=$(id -g)"
+    "AUTARK_OS_INVOKING_HOME=${HOME:-}"
+  )
+  local name
+  for name in \
+    AUTARK_OS_USER AUTARK_OS_GROUP AUTARK_OS_JAVA_BIN AUTARK_OS_RUNTIME_IMAGE \
+    AUTARK_OS_SERVICE_NAME AUTARK_OS_SERVICE_FILE AUTARK_OS_CLI_LINK \
+    AUTARK_OS_FILEOPS_HELPER AUTARK_OS_SUDOERS_FILE AUTARK_OS_ALLOW_INSTALL_COLLISION \
+    HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
+    [[ -z "${!name:-}" ]] || admin_env+=("${name}=${!name}")
+  done
+  exec sudo env "${admin_env[@]}" bash "${BASH_SOURCE[0]}" "$@"
+}
+
 require_absolute_path() {
   local label="$1"
   local value="$2"
@@ -187,6 +250,10 @@ java_21_available() {
   local major
   major="$(java_major_version java)"
   [[ "${major}" =~ ^[0-9]+$ && "${major}" -ge 21 ]]
+}
+
+bundled_java_available() {
+  [[ -n "${RELEASE_BUNDLE_DIR}" && -x "${RELEASE_BUNDLE_DIR}/runtime/bin/java" ]]
 }
 
 yarn_1_available() {
@@ -515,8 +582,16 @@ json_check() {
 plan_dependencies() {
   local include_node="$1"
   local java_status docker_status compose_status tailscale_status node_status yarn_status sudo_status
-  java_status="$(dependency_status 'java -version')"
-  docker_status="$(dependency_status 'docker version')"
+  if bundled_java_available; then
+    java_status="present"
+  else
+    java_status="$(dependency_status 'java -version')"
+  fi
+  if has_command docker; then
+    docker_status="present"
+  else
+    docker_status="missing"
+  fi
   compose_status="$(dependency_status 'docker compose version')"
   tailscale_status="$(dependency_status 'tailscale version')"
   sudo_status="$(dependency_status 'sudo --version')"
@@ -861,7 +936,7 @@ port_status() {
 
 internet_status() {
   if has_command timeout; then
-    timeout 2 bash -c '</dev/tcp/tailscale.com/443' >/dev/null 2>&1 && {
+    timeout 2 bash -c '</dev/tcp/download.docker.com/443' >/dev/null 2>&1 && {
       printf 'ok'
       return 0
     }
@@ -918,7 +993,9 @@ doctor_checks_json() {
     busy) emit_check "port" "Service port" "warning" "Port ${port} appears to be in use." "Choose another port with --port." ;;
     *) emit_check "port" "Service port" "ok" "Port ${port} appears available." "" ;;
   esac
-  if has_command java; then
+  if bundled_java_available; then
+    emit_check "java" "Java" "ok" "A compatible Java runtime is included in this Autark-OS release." ""
+  elif has_command java; then
     emit_check "java" "Java" "ok" "Java is installed." ""
   elif supported_apt_host; then
     emit_check "java" "Java" "warning" "Java is missing, but this host can install it through apt." "Run with --auto-install-deps or install Java 21."
@@ -1045,6 +1122,8 @@ write_installer_state() {
     json_string "${status}"
     printf ',"lastCompletedStage":'
     json_string "${stage}"
+    printf ',"currentStage":'
+    json_string "${CURRENT_INSTALL_STAGE}"
     printf ',"stateDir":'
     json_string "${state_directory}"
     printf ',"selectedOptions":{"runtimeDir":'
@@ -1065,6 +1144,35 @@ write_installer_state() {
     json_string "Rerun this installer with the same options to resume safely."
     printf '}\n'
   } >"${state_file}"
+}
+
+initialize_install_session() {
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    log "Dry run: installer state and logs will be created only during a real installation."
+    return 0
+  fi
+  INSTALL_SESSION_ACTIVE=1
+  CURRENT_INSTALL_STAGE="preflight"
+  local state_directory
+  state_directory="$(state_dir)"
+  mkdir -p "${state_directory}"
+  INSTALLER_LOG_FILE="${state_directory}/installer.log"
+  touch "${INSTALLER_LOG_FILE}"
+  exec > >(tee -a "${INSTALLER_LOG_FILE}") 2>&1
+  write_installer_state "running" "${LAST_COMPLETED_STAGE}"
+  log "Installer log: ${INSTALLER_LOG_FILE}"
+}
+
+begin_install_stage() {
+  CURRENT_INSTALL_STAGE="$1"
+  log "Starting stage: ${CURRENT_INSTALL_STAGE}."
+  [[ "${INSTALL_SESSION_ACTIVE}" -eq 0 ]] || write_installer_state "running" "${LAST_COMPLETED_STAGE}"
+}
+
+complete_install_stage() {
+  LAST_COMPLETED_STAGE="$1"
+  log "Completed stage: ${LAST_COMPLETED_STAGE}."
+  [[ "${INSTALL_SESSION_ACTIVE}" -eq 0 ]] || write_installer_state "running" "${LAST_COMPLETED_STAGE}"
 }
 
 plan_warnings_json() {
@@ -1090,7 +1198,7 @@ plan_warnings_json() {
 }
 
 print_plan_json() {
-  local mode audience os_name arch package_manager runtime_dir install_dir config_dir log_dir port include_node
+  local mode audience os_name arch package_manager runtime_dir install_dir config_dir log_dir port include_node docker_family docker_codename
   mode="$(install_mode)"
   audience="$(install_audience)"
   os_name="$(os_field PRETTY_NAME || true)"
@@ -1101,6 +1209,8 @@ print_plan_json() {
   config_dir="$(config_dir)"
   log_dir="$(log_dir)"
   port="$(server_port)"
+  docker_family="$(docker_repository_family 2>/dev/null || true)"
+  docker_codename="$(docker_repository_codename 2>/dev/null || true)"
   include_node=1
   [[ -n "${RELEASE_JAR}" ]] && include_node=0
   printf '{'
@@ -1142,8 +1252,13 @@ print_plan_json() {
   printf ',"dependencies":['
   plan_dependencies "${include_node}"
   printf ']'
+  printf ',"dependencyPolicy":{"docker":{"preserveCompatibleExistingInstall":true,"removeConflictsAutomatically":false,"repositoryBaseUrl":"https://download.docker.com","repositoryFamily":'
+  json_string "${docker_family}"
+  printf ',"repositoryCodename":'
+  json_string "${docker_codename}"
+  printf '},"tailscale":{"optional":true,"configuredDuringBaseInstall":false}}'
   printf ',"actions":'
-  json_string_array "prepare Autark-OS runtime, config, log, and install directories" "install Autark-OS system service" "install autark-os helper command" "configure Docker access when available" "configure Tailscale operator when connected" "start autark-os service unless disabled"
+  json_string_array "prepare Autark-OS runtime, config, log, and install directories" "install Autark-OS system service" "install autark-os helper command" "configure Docker access when available" "leave optional private access for browser setup" "start autark-os service unless disabled"
   printf ',"warnings":'
   plan_warnings_json
   printf ',"blockers":[]'
@@ -1187,7 +1302,7 @@ Actions:
   - install Autark-OS system service
   - install autark-os helper command
   - configure Docker access when available
-  - configure Tailscale operator when connected
+  - leave optional private access for browser setup
   - start autark-os service unless disabled
 
 Warnings:
@@ -1208,7 +1323,11 @@ print_install_plan() {
 print_dependency_plan() {
   log "Host: $(os_field PRETTY_NAME || true) ($(host_architecture))"
   log "Package manager: $(apt_support_label)"
-  log "Java: $(dependency_state java 'java -version')"
+  if bundled_java_available; then
+    log "Java: bundled with this Autark-OS release"
+  else
+    log "Java: $(dependency_state java 'java -version')"
+  fi
   if [[ -n "${RELEASE_JAR}" ]]; then
     log "Node.js: not required for release-bundle install"
     log "Yarn: not required for release-bundle install"
@@ -1216,9 +1335,148 @@ print_dependency_plan() {
     log "Node.js: $(dependency_state node 'node --version')"
     log "Yarn: $(dependency_state yarn 'yarn --version')"
   fi
-  log "Docker: $(dependency_state docker 'docker version')"
+  if has_command docker; then
+    log "Docker: present"
+  else
+    log "Docker: missing"
+  fi
   log "Docker Compose: $(dependency_state docker-compose 'docker compose version')"
   log "Tailscale: $(dependency_state tailscale 'tailscale version')"
+}
+
+docker_compose_v2_available() {
+  has_command docker && docker compose version >/dev/null 2>&1
+}
+
+docker_daemon_reachable() {
+  has_command docker || return 1
+  if [[ "$(id -u)" -eq 0 ]]; then
+    docker info >/dev/null 2>&1
+  else
+    sudo docker info >/dev/null 2>&1
+  fi
+}
+
+docker_repository_family() {
+  case "$(os_field ID || true)" in
+    ubuntu) printf 'ubuntu\n' ;;
+    debian|raspbian) printf 'debian\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+docker_repository_codename() {
+  local os_id version codename
+  os_id="$(os_field ID || true)"
+  version="$(os_field VERSION_ID || true)"
+  codename="$(os_field UBUNTU_CODENAME || true)"
+  [[ -n "${codename}" ]] || codename="$(os_field VERSION_CODENAME || true)"
+  if [[ -n "${codename}" ]]; then
+    printf '%s\n' "${codename}"
+    return 0
+  fi
+  case "${os_id}:${version}" in
+    debian:12|raspbian:12) printf 'bookworm\n' ;;
+    debian:13|raspbian:13) printf 'trixie\n' ;;
+    raspbian:11) printf 'bullseye\n' ;;
+    ubuntu:24.04) printf 'noble\n' ;;
+    ubuntu:26.04) printf 'resolute\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+installed_docker_conflicts() {
+  local package
+  for package in docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc; do
+    apt_package_installed "${package}" && printf '%s\n' "${package}"
+  done
+}
+
+configure_official_docker_repository() {
+  local family codename architecture key_url repository_url source_file key_file temp_key temp_source
+  family="$(docker_repository_family)" || die "Could not map this host to Docker's Debian or Ubuntu package repository."
+  codename="$(docker_repository_codename)" || die "Could not determine the Docker repository codename for this host."
+  architecture="$(host_architecture)"
+  key_url="https://download.docker.com/linux/${family}/gpg"
+  repository_url="https://download.docker.com/linux/${family}"
+  key_file="/etc/apt/keyrings/docker.asc"
+  source_file="/etc/apt/sources.list.d/docker.sources"
+
+  log "Configuring Docker's official ${family} apt repository (${codename}, ${architecture})."
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    printf '+ install -m 0755 -d /etc/apt/keyrings\n'
+    printf '+ curl -fsSL %q -o %q\n' "${key_url}" "${key_file}"
+    printf '+ write %q for %s %s stable packages\n' "${source_file}" "${repository_url}" "${codename}"
+    printf '+ apt-get update\n'
+    return 0
+  fi
+
+  run_root install -m 0755 -d /etc/apt/keyrings
+  temp_key="$(mktemp)"
+  temp_source="$(mktemp)"
+  if ! curl -fsSL "${key_url}" -o "${temp_key}"; then
+    rm -f "${temp_key}" "${temp_source}"
+    die "Docker's repository signing key could not be downloaded. Check internet access to download.docker.com, then retry."
+  fi
+  cat >"${temp_source}" <<SOURCE
+Types: deb
+URIs: ${repository_url}
+Suites: ${codename}
+Components: stable
+Architectures: ${architecture}
+Signed-By: ${key_file}
+SOURCE
+  run_root install -m 0644 "${temp_key}" "${key_file}"
+  run_root install -m 0644 "${temp_source}" "${source_file}"
+  rm -f "${temp_key}" "${temp_source}"
+  run_root apt-get update
+}
+
+install_official_docker_engine() {
+  local conflicts=()
+  mapfile -t conflicts < <(installed_docker_conflicts)
+  if [[ "${#conflicts[@]}" -gt 0 ]]; then
+    die "Docker is incomplete, but conflicting system packages are installed: ${conflicts[*]}. Autark-OS will not remove or replace an existing container runtime automatically. Remove the conflicts intentionally or restore a working 'docker compose' installation, then retry."
+  fi
+  configure_official_docker_repository
+  log "Installing Docker Engine and Compose v2 from Docker's official apt repository."
+  run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  run_root systemctl enable --now docker
+}
+
+install_native_compose_for_existing_engine() {
+  local os_id version package=""
+  os_id="$(os_field ID || true)"
+  version="$(os_field VERSION_ID || true)"
+  case "${os_id}:${version}" in
+    ubuntu:24.04|ubuntu:26.04) package="docker-compose-v2" ;;
+    debian:13|raspbian:13) package="docker-compose" ;;
+  esac
+  [[ -n "${package}" ]] || die "Docker is installed, but Compose v2 is missing. This existing Docker package family cannot be upgraded safely by Autark-OS. Install Compose v2 for the existing engine, then retry."
+  log "Installing ${package} for the existing distribution-managed Docker engine."
+  run_root apt-get update
+  run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${package}"
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    log "Dry run: Docker Compose v2 would be verified after package installation."
+    return 0
+  fi
+  docker_compose_v2_available || die "${package} installed, but 'docker compose' is still unavailable. Repair the existing Docker installation, then retry."
+}
+
+ensure_docker_dependencies() {
+  if ! has_command docker; then
+    install_official_docker_engine
+  elif ! docker_compose_v2_available; then
+    install_native_compose_for_existing_engine
+  else
+    log "Existing Docker Engine and Compose v2 installation is compatible; preserving it."
+  fi
+
+  if ! docker_daemon_reachable; then
+    log "Docker is installed, but its daemon is not reachable. Starting Docker."
+    run_root systemctl enable --now docker
+  fi
 }
 
 install_dependencies_apt() {
@@ -1240,7 +1498,7 @@ install_dependencies_apt() {
   fi
   if [[ "${#packages[@]}" -gt 0 ]]; then
     run_root apt-get update
-    run_root apt-get install -y "${packages[@]}"
+    run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
   else
     log "Required apt packages are already installed."
   fi
@@ -1249,123 +1507,25 @@ install_dependencies_apt() {
       run_root npm install -g yarn@1.22.22
     fi
   fi
-  if ! has_command docker || ! docker compose version >/dev/null 2>&1; then
-    log "Installing Docker Engine, Buildx, and Compose v2 from apt packages."
-    run_root apt-get install -y docker.io docker-buildx-plugin docker-compose-plugin
-    run_root systemctl enable --now docker
-  else
-    log "Existing Docker Engine and Compose v2 installation is compatible; preserving it."
-  fi
-  if ! has_command tailscale; then
-    log "Installing Tailscale using Tailscale's official install script."
-    if [[ "${DRY_RUN}" -eq 1 ]]; then
-      printf '+ curl -fsSL https://tailscale.com/install.sh | sh\n'
-    else
-      run_external_installer "Tailscale" "https://tailscale.com/install.sh"
-    fi
-  else
-    log "Tailscale is already installed."
-  fi
+  ensure_docker_dependencies
+  log "Tailscale is optional and is not installed or signed in during base installation. Configure private access later from Autark-OS Access."
 }
 
 verify_docker_runtime() {
   [[ "${DRY_RUN}" -eq 0 ]] || { log "Dry run: Docker daemon and disposable-container verification would run after package installation."; return 0; }
-  docker version >/dev/null 2>&1 || die "Docker is installed but its daemon is not reachable. Start Docker, then rerun this installer."
-  docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required before Autark-OS can install apps. Install docker-compose-plugin, then rerun this installer."
+  docker_daemon_reachable || die "Docker is installed but its daemon is not reachable even with administrator privileges. Run 'sudo systemctl status docker', fix the reported service error, then retry."
+  docker_compose_v2_available || die "Docker Compose v2 is required before Autark-OS can install apps. Repair the Docker installation so 'docker compose version' succeeds, then retry."
   if has_command timeout; then
-    timeout 30 docker run --rm --pull=never hello-world >/dev/null 2>&1 || die "Docker could not run a disposable verification container. Check Docker daemon access and retry."
+    if [[ "$(id -u)" -eq 0 ]]; then
+      timeout 90 docker run --rm --pull=missing hello-world >/dev/null 2>&1 || die "Docker could not download and run its hello-world verification container. Check Docker service and registry access, then retry."
+    else
+      timeout 90 sudo docker run --rm --pull=missing hello-world >/dev/null 2>&1 || die "Docker could not download and run its hello-world verification container. Check Docker service and registry access, then retry."
+    fi
   fi
-}
-
-run_external_installer() {
-  local label="$1"
-  local url="$2"
-  local log_file
-  log_file="$(state_dir)/$(printf '%s' "${label}" | tr '[:upper:]' '[:lower:]')-installer.log"
-  mkdir -p "$(dirname "${log_file}")"
-  if curl -fsSL "${url}" | sh >"${log_file}" 2>&1; then
-    log "${label} installer completed. Full log: ${log_file}"
-    return 0
-  fi
-  log "${label} installer failed. Last log lines from ${log_file}:"
-  tail -n 40 "${log_file}" >&2 || true
-  return 1
-}
-
-tailscale_connected() {
-  has_command tailscale || return 1
-  tailscale status >/dev/null 2>&1
-}
-
-run_tailscale_login() {
-  if [[ "$(id -u)" -eq 0 ]]; then
-    tailscale up --qr --qr-format=small
-  else
-    sudo tailscale up --qr --qr-format=small
-  fi
-}
-
-guide_tailscale_connection() {
-  [[ "${AUTARK_OS_TAILSCALE_ONBOARDING:-0}" == "1" ]] || return 0
-  [[ "${DRY_RUN}" -eq 0 || "${AUTARK_OS_TAILSCALE_ONBOARDING_ALLOW_NON_TTY:-0}" == "1" ]] || return 0
-  has_command tailscale || return 0
-
-  if tailscale_connected; then
-    log "Tailscale is already connected."
-    return 0
-  fi
-
-  if [[ ! -t 0 && "${AUTARK_OS_TAILSCALE_ONBOARDING_ALLOW_NON_TTY:-0}" != "1" ]]; then
-    log "Tailscale sign-in needs an interactive terminal. Skipping private access setup for now."
-    log "Finish later with: sudo tailscale up"
-    return 0
-  fi
-
-  cat <<TAILSCALE_SETUP
-
-Private access setup with Tailscale
-
-Autark-OS can use Tailscale so you can reach apps from your trusted phones,
-laptops, and tablets without opening public internet ports.
-
-Choose one:
-  1) Create an account or sign in with Tailscale now
-  2) Skip private access setup for now
-
-TAILSCALE_SETUP
-
-  local choice
-  while true; do
-    read -r -p "Select 1 to sign in, or 2 to skip [1/2]: " choice
-    case "${choice,,}" in
-      1|c|connect|signin|sign-in)
-        log "Create an account or sign in with Tailscale using the QR code or link below."
-        if run_tailscale_login; then
-          if tailscale_connected; then
-            log "Tailscale sign-in detected."
-          else
-            log "Tailscale sign-in was started, but Autark-OS does not see an active connection yet."
-            log "Finish later with: sudo tailscale up"
-          fi
-        else
-          log "Tailscale sign-in did not complete. Finish later with: sudo tailscale up"
-        fi
-        return 0
-        ;;
-      2|s|skip|later|local|local-only)
-        log "Tailscale setup skipped. You can finish private access later with: sudo tailscale up"
-        return 0
-        ;;
-      *)
-        log "Please choose 1 to sign in or 2 to skip."
-        ;;
-    esac
-  done
 }
 
 preflight() {
   log "Running preflight checks."
-  verify_release_checksum
   if [[ "${AUTO_INSTALL_DEPS}" -eq 0 ]]; then
     print_dependency_plan
   fi
@@ -1376,22 +1536,22 @@ preflight() {
   if [[ -x "${bundled_java:-}" ]]; then
     log "Using bundled Java runtime at ${bundled_java}."
   else
-  has_command java || {
-    if [[ "${DRY_RUN}" -eq 1 && "${AUTO_INSTALL_DEPS}" -eq 1 && "$(package_manager_status)" == "apt-supported" ]]; then
-      log "Dry run: Java 21 would be installed before service setup."
-    else
-      die "Java 21 is required. Install Java, then rerun this script."
+    has_command java || {
+      if [[ "${DRY_RUN}" -eq 1 && "${AUTO_INSTALL_DEPS}" -eq 1 && "$(package_manager_status)" == "apt-supported" ]]; then
+        log "Dry run: Java 21 would be installed before service setup."
+      else
+        die "Java 21 is required. Install Java, then rerun this script."
+      fi
+    }
+    local java_major
+    java_major="$(java_major_version java)"
+    if [[ ! "${java_major}" =~ ^[0-9]+$ || "${java_major}" -lt 21 ]]; then
+      if [[ "${DRY_RUN}" -eq 1 && "${AUTO_INSTALL_DEPS}" -eq 1 && "$(package_manager_status)" == "apt-supported" ]]; then
+        log "Dry run: Java 21 would replace detected Java major version ${java_major:-unknown} before service setup."
+      else
+        die "Java 21 or newer is required. Detected Java major version: ${java_major:-unknown}"
+      fi
     fi
-  }
-  local java_major
-  java_major="$(java_major_version java)"
-  if [[ ! "${java_major}" =~ ^[0-9]+$ || "${java_major}" -lt 21 ]]; then
-    if [[ "${DRY_RUN}" -eq 1 && "${AUTO_INSTALL_DEPS}" -eq 1 && "$(package_manager_status)" == "apt-supported" ]]; then
-      log "Dry run: Java 21 would replace detected Java major version ${java_major:-unknown} before service setup."
-    else
-      die "Java 21 or newer is required. Detected Java major version: ${java_major:-unknown}"
-    fi
-  fi
   fi
   if [[ -z "${RELEASE_JAR}" ]]; then
     has_command node || die "Node.js is required to build the frontend. Use --release-bundle or --release-jar to install a packaged release without Node."
@@ -1400,7 +1560,7 @@ preflight() {
     yarn_version="$(yarn --version 2>/dev/null || true)"
     [[ "${yarn_version}" == 1.* ]] || log "Yarn 1.x is expected for this repo. Detected: ${yarn_version:-unknown}."
   fi
-  has_command sudo || die "sudo is required to install Autark-OS as a system service."
+  has_command sudo || [[ "$(id -u)" -eq 0 ]] || die "sudo is required to install Autark-OS as a system service."
   if has_command docker; then
     local docker_output=""
     if ! docker_output="$(docker version 2>&1 >/dev/null)"; then
@@ -1470,7 +1630,7 @@ build_project() {
 }
 
 install_service() {
-  local args=()
+  local args=(--skip-tailscale)
   local env_args=()
   local passthrough_name
   if [[ "${NO_START}" -eq 1 ]]; then
@@ -1481,7 +1641,11 @@ install_service() {
   [[ -n "${CONFIG_DIR_OVERRIDE}" ]] && args+=(--config-dir "${CONFIG_DIR_OVERRIDE}") && env_args+=("AUTARK_OS_CONFIG_DIR=${CONFIG_DIR_OVERRIDE}")
   [[ -n "${LOG_DIR_OVERRIDE}" ]] && args+=(--log-dir "${LOG_DIR_OVERRIDE}") && env_args+=("AUTARK_OS_LOG_DIR=${LOG_DIR_OVERRIDE}")
   [[ -n "${SERVER_PORT_OVERRIDE}" ]] && args+=(--port "${SERVER_PORT_OVERRIDE}") && env_args+=("AUTARK_OS_SERVER_PORT=${SERVER_PORT_OVERRIDE}")
-  for passthrough_name in AUTARK_OS_USER AUTARK_OS_GROUP AUTARK_OS_SERVICE_NAME AUTARK_OS_SERVICE_FILE AUTARK_OS_CLI_LINK AUTARK_OS_JAVA_BIN AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED; do
+  for passthrough_name in \
+    AUTARK_OS_USER AUTARK_OS_GROUP AUTARK_OS_SERVICE_NAME AUTARK_OS_SERVICE_FILE \
+    AUTARK_OS_CLI_LINK AUTARK_OS_JAVA_BIN AUTARK_OS_RUNTIME_IMAGE \
+    AUTARK_OS_FILEOPS_HELPER AUTARK_OS_SUDOERS_FILE AUTARK_OS_ALLOW_INSTALL_COLLISION \
+    AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED; do
     if [[ -n "${!passthrough_name:-}" ]]; then
       env_args+=("${passthrough_name}=${!passthrough_name}")
     fi
@@ -1509,7 +1673,24 @@ install_service() {
     return 0
   fi
   log "Installing Autark-OS system service."
-  sudo env "${env_args[@]}" "${INSTALL_SCRIPT}" "${args[@]}"
+  if [[ "$(id -u)" -eq 0 ]]; then
+    env "${env_args[@]}" "${INSTALL_SCRIPT}" "${args[@]}"
+  else
+    sudo env "${env_args[@]}" "${INSTALL_SCRIPT}" "${args[@]}"
+  fi
+}
+
+verify_service_user_docker_access() {
+  [[ "${DRY_RUN}" -eq 0 ]] || return 0
+  local service_user="${AUTARK_OS_USER:-autarkos}"
+  has_command docker || die "Docker disappeared after service installation. Reinstall Docker, then rerun this installer."
+  id "${service_user}" >/dev/null 2>&1 || die "The Autark-OS service user was not created. Rerun the installer and review the service-install stage."
+  if has_command runuser; then
+    runuser -u "${service_user}" -- docker info >/dev/null 2>&1 || die "Docker is running, but the Autark-OS service user cannot access it. Check the docker group and socket permissions, then retry."
+  else
+    su -s /bin/sh "${service_user}" -c 'docker info >/dev/null 2>&1' || die "Docker is running, but the Autark-OS service user cannot access it. Check the docker group and socket permissions, then retry."
+  fi
+  log "Verified Docker access for the ${service_user} service user."
 }
 
 print_next_steps() {
@@ -1545,6 +1726,24 @@ NEXT
     return 0
   fi
 
+  if [[ "${NO_START}" -eq 1 ]]; then
+    cat <<NEXT
+
+Autark-OS was installed but not started.
+
+Start it when ready:
+  autark-os start
+
+Then open:
+  http://localhost:${port}
+
+LAN URL:
+  $([[ -n "${lan_ip}" ]] && printf 'http://%s:%s' "${lan_ip}" "${port}" || printf 'Run "hostname -I", then open http://<host-ip>:%s' "${port}")
+
+NEXT
+    return 0
+  fi
+
   cat <<NEXT
 
 Autark-OS installation completed.
@@ -1573,20 +1772,23 @@ service_url() {
 
 verify_service_health() {
   [[ "${DRY_RUN}" -eq 0 ]] || return 0
+  if [[ "${NO_START}" -eq 1 ]]; then
+    log "Service start was skipped, so readiness will be checked after 'autark-os start'."
+    return 0
+  fi
   local url attempt
   url="$(service_url)/api/health"
-  for attempt in $(seq 1 30); do
+  for attempt in $(seq 1 60); do
     if curl --fail --silent --show-error --max-time 2 "${url}" >/dev/null 2>&1; then
-      write_installer_state "completed" "service-health"
       return 0
     fi
     sleep 1
   done
-  write_installer_state "failed" "service-health"
   die "Autark-OS did not become ready. Check 'autark-os logs', then rerun this installer to resume. Create a support report with 'autark-os support-bundle --output ./autark-os-support.tar.gz'."
 }
 
 open_browser_when_available() {
+  [[ "${NO_START}" -eq 0 ]] || return 0
   [[ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]] || return 0
   has_command xdg-open || return 0
   xdg-open "$(service_url)" >/dev/null 2>&1 || log "Browser could not be opened automatically. Use $(service_url)."
@@ -1607,14 +1809,40 @@ main() {
     exit 0
   fi
   enforce_supported_host
-  preflight
-  guide_tailscale_connection
-  if [[ "${AUTARK_OS_TAILSCALE_ONBOARDING_ONLY:-0}" == "1" ]]; then
-    exit 0
+  verify_release_checksum
+
+  if [[ -n "${RELEASE_JAR}" ]]; then
+    request_administrator_privileges "$@"
+    initialize_install_session
+    begin_install_stage "preflight"
+    preflight
+    complete_install_stage "preflight"
+    begin_install_stage "prepare-release"
+    build_project
+    complete_install_stage "prepare-release"
+  elif [[ "${AUTARK_OS_SOURCE_PREPARED:-0}" != "1" ]]; then
+    preflight
+    build_project
+    export AUTARK_OS_SOURCE_PREPARED=1
+    request_administrator_privileges "$@"
+    initialize_install_session
+    LAST_COMPLETED_STAGE="build"
+    [[ "${INSTALL_SESSION_ACTIVE}" -eq 0 ]] || write_installer_state "running" "${LAST_COMPLETED_STAGE}"
+  else
+    initialize_install_session
+    LAST_COMPLETED_STAGE="build"
+    [[ "${INSTALL_SESSION_ACTIVE}" -eq 0 ]] || write_installer_state "running" "${LAST_COMPLETED_STAGE}"
   fi
-  build_project
+
+  begin_install_stage "service-install"
   install_service
+  verify_service_user_docker_access
+  complete_install_stage "service-install"
+  begin_install_stage "service-health"
   verify_service_health
+  complete_install_stage "service-health"
+  CURRENT_INSTALL_STAGE="completed"
+  [[ "${INSTALL_SESSION_ACTIVE}" -eq 0 ]] || write_installer_state "completed" "${LAST_COMPLETED_STAGE}"
   print_next_steps
   open_browser_when_available
 }

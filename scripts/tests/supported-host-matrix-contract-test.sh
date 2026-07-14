@@ -57,3 +57,35 @@ assert_support_status raspbian 14 arm64 untested
 assert_support_status raspbian 13 amd64 unsupported
 assert_support_status raspbian 13 armhf unsupported
 assert_support_status ubuntu 26.04 armhf unsupported
+
+fake_jar="${tmp_dir}/autark-os-backend.jar"
+printf 'fake jar for Docker repository mapping\n' >"${fake_jar}"
+
+assert_docker_repository() {
+  local os_id="$1"
+  local version="$2"
+  local architecture="$3"
+  local expected_family="$4"
+  local expected_codename="$5"
+  local fixture="${tmp_dir}/docker-${os_id}-${version}-${architecture}"
+  local output
+  printf 'ID=%s\nVERSION_ID="%s"\nPRETTY_NAME="%s %s"\n' "${os_id}" "${version}" "${os_id}" "${version}" >"${fixture}"
+  output="$(AUTARK_OS_OS_RELEASE_FIXTURE="${fixture}" AUTARK_OS_ARCHITECTURE_FIXTURE="${architecture}" "${repo_root}/scripts/bootstrap-autark-os.sh" --plan --json --release-jar "${fake_jar}")"
+  PLAN_JSON="${output}" EXPECTED_FAMILY="${expected_family}" EXPECTED_CODENAME="${expected_codename}" python3 - <<'PY'
+import json
+import os
+
+policy = json.loads(os.environ["PLAN_JSON"])["dependencyPolicy"]["docker"]
+assert policy["repositoryBaseUrl"] == "https://download.docker.com"
+assert policy["repositoryFamily"] == os.environ["EXPECTED_FAMILY"], policy
+assert policy["repositoryCodename"] == os.environ["EXPECTED_CODENAME"], policy
+PY
+}
+
+assert_docker_repository debian 12 amd64 debian bookworm
+assert_docker_repository debian 13 arm64 debian trixie
+assert_docker_repository ubuntu 24.04 amd64 ubuntu noble
+assert_docker_repository ubuntu 26.04 arm64 ubuntu resolute
+assert_docker_repository raspbian 11 arm64 debian bullseye
+assert_docker_repository raspbian 12 arm64 debian bookworm
+assert_docker_repository raspbian 13 arm64 debian trixie

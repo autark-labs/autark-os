@@ -27,9 +27,10 @@ output="$("${repo_root}/scripts/install-autark-os.sh" \
 
 grep -q 'Dependency and host-change disclosure' <<<"${output}"
 grep -q 'Safe package-manager installs' <<<"${output}"
-grep -q 'External installer scripts' <<<"${output}"
-grep -q 'Docker convenience script' <<<"${output}"
-grep -q 'Tailscale install script' <<<"${output}"
+grep -q 'Trusted package source' <<<"${output}"
+grep -q "Docker's official apt repository" <<<"${output}"
+grep -q 'never removed or replaced automatically' <<<"${output}"
+grep -q 'Tailscale is not installed, signed in, or reconfigured' <<<"${output}"
 grep -q 'Services and permissions that may change' <<<"${output}"
 grep -q 'Recovery and rollback notes' <<<"${output}"
 grep -q 'Inspect service status: autark-os status' <<<"${output}"

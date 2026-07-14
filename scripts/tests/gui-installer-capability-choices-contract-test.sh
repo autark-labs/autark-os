@@ -30,9 +30,10 @@ assert capabilities["id"] == "capability-choices"
 assert capabilities["mutatesHostBeforeConfirmation"] is False
 assert capabilities["supportDetails"]["planJsonIncluded"] is True
 assert capabilities["supportDetails"]["exactCommand"].endswith("--plan --json")
-assert capabilities["externalInstallerConsent"]["required"] is True
-assert "https://get.docker.com" in capabilities["externalInstallerConsent"]["scripts"]
-assert "https://tailscale.com/install.sh" in capabilities["externalInstallerConsent"]["scripts"]
+assert capabilities["externalInstallerConsent"]["required"] is False
+assert capabilities["externalInstallerConsent"]["scripts"] == []
+assert capabilities["advancedDetails"]["packageSource"] == "https://download.docker.com"
+assert capabilities["advancedDetails"]["tailscaleSetup"] == "Deferred to the Access page"
 
 choices = {choice["id"]: choice for choice in capabilities["choices"]}
 assert set(choices) == {"install-and-run-apps", "reach-apps-from-my-devices", "local-only"}
@@ -52,6 +53,7 @@ assert private["optional"] is True
 assert "local-only" in private["skipChoice"]
 assert private["dependencies"][0]["name"] == "Tailscale"
 assert private["dependencies"][0]["status"] == plan_dependencies["Tailscale"]["status"]
+assert any("base installer does not install" in item for item in private["willInstallOrConfigure"])
 
 local_only = choices["local-only"]
 assert local_only["selectedByDefault"] is True

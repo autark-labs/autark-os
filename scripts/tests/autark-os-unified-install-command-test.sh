@@ -60,6 +60,19 @@ grep -q 'autark-os install --guided' <<<"${install_help}"
 grep -q 'autark-os install --plan --json' <<<"${install_help}"
 grep -q 'Routes to bootstrap-autark-os.sh' <<<"${install_help}"
 
+installed_dir="${tmp_dir}/installed/bin"
+link_dir="${tmp_dir}/path-bin"
+mkdir -p "${installed_dir}" "${link_dir}"
+cp "${repo_root}/scripts/autark-os" "${installed_dir}/autark-os"
+cat >"${installed_dir}/bootstrap-autark-os.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'resolved-bootstrap %s\n' "$*"
+SH
+chmod +x "${installed_dir}/autark-os" "${installed_dir}/bootstrap-autark-os.sh"
+ln -s "${installed_dir}/autark-os" "${link_dir}/autark-os"
+symlink_output="$(cd "${tmp_dir}" && "${link_dir}/autark-os" install --plan --release-jar "${fake_jar}")"
+grep -q 'resolved-bootstrap --plan --release-jar' <<<"${symlink_output}"
+
 "${repo_root}/scripts/autark-os" repair --help >/dev/null
 "${repo_root}/scripts/autark-os" update --help >/dev/null
 "${repo_root}/scripts/autark-os" uninstall --help >/dev/null
@@ -115,6 +128,7 @@ grep -q 'Unified guided install' <<<"${single_command_output}"
 grep -q 'Verifying release bundle checksums' <<<"${single_command_output}"
 grep -q 'Installing missing supported dependencies by default' <<<"${single_command_output}"
 grep -q 'Autark-OS installation preview completed.' <<<"${single_command_output}"
+grep -q 'Installed shared installer helpers beside the Autark-OS command.' <<<"${single_command_output}"
 grep -q 'autark-os install --yes' <<<"${single_command_output}"
 [[ "$(grep -c 'Verifying release bundle checksum' <<<"${single_command_output}")" -eq 1 ]]
 grep -q 'LAN URL:' <<<"${single_command_output}"

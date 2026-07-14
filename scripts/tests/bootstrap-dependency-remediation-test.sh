@@ -37,8 +37,39 @@ output="$(PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-autar
   --port 19091)"
 
 grep -q 'openjdk-21-jre-headless' <<<"${output}"
-grep -q 'Installing Docker Engine, Buildx, and Compose v2 from apt packages.' <<<"${output}"
-grep -q 'apt-get install -y docker.io docker-buildx-plugin docker-compose-plugin' <<<"${output}"
+grep -q 'Installing docker-compose-v2 for the existing distribution-managed Docker engine.' <<<"${output}"
+grep -q 'apt-get install -y docker-compose-v2' <<<"${output}"
+! grep -q 'docker.io docker-buildx-plugin docker-compose-plugin' <<<"${output}"
+grep -Fq 'download.docker.com/linux/${family}/gpg' "${repo_root}/scripts/bootstrap-autark-os.sh"
+grep -Fq 'docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin' "${repo_root}/scripts/bootstrap-autark-os.sh"
+grep -q 'Autark-OS will not remove or replace an existing container runtime automatically' "${repo_root}/scripts/bootstrap-autark-os.sh"
+
+cat >"${fake_bin}/docker" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "compose" && "${2:-}" == "version" ]]; then
+  printf 'Docker Compose version v2.39.0\n'
+  exit 0
+fi
+if [[ "${1:-}" == "version" || "${1:-}" == "info" ]]; then
+  printf 'permission denied while trying to connect to the Docker daemon socket\n' >&2
+  exit 1
+fi
+exit 1
+SH
+chmod +x "${fake_bin}/docker"
+
+permission_output="$(PATH="${fake_bin}:/usr/bin:/bin" "${repo_root}/scripts/bootstrap-autark-os.sh" \
+  --release-jar "${fake_jar}" \
+  --auto-install-deps \
+  --dry-run \
+  --runtime-dir "${tmp_dir}/permission-runtime" \
+  --port 19093)"
+
+grep -q 'Existing Docker Engine and Compose v2 installation is compatible; preserving it.' <<<"${permission_output}"
+grep -q 'Docker is installed, but its daemon is not reachable. Starting Docker.' <<<"${permission_output}"
+! grep -q 'Installing Docker Engine and Compose v2' <<<"${permission_output}"
+! grep -q 'Installing Tailscale' <<<"${permission_output}"
+grep -q 'Tailscale is optional and is not installed or signed in during base installation.' <<<"${permission_output}"
 
 missing_java_bin="${tmp_dir}/missing-java-bin"
 mkdir -p "${missing_java_bin}"

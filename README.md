@@ -47,24 +47,22 @@ Start with the [non-technical install guide](docs/non-technical-install-guide.md
 
 Use the [Autark-OS GitHub Releases page](https://github.com/autark-labs/autark-os/releases) for beta builds.
 
-Primary package install on a supported Debian-family host:
-
-```bash
-sudo apt install ./autark-os_<version>_amd64.deb
-```
-
-Use the `_arm64.deb` artifact on a 64-bit Raspberry Pi or ARM server. Release artifacts are architecture-specific and the installer refuses a package whose bundled runtime does not match the host.
-
-The package runs the host preflight before service setup. After it completes, open the printed local URL and finish first-run setup. Docker Engine and Docker Compose v2 must be ready before you can install catalog apps.
-
-Direct download alternative:
+Recommended guided install on a supported host:
 
 ```bash
 chmod +x Autark-OS-Installer-<version>-amd64.run
 ./Autark-OS-Installer-<version>-amd64.run
 ```
 
-On Linux desktops, the `.run` installer can show a graphical confirmation before opening a terminal for install progress. On servers and SSH sessions, it falls back to the guided terminal installer.
+Use the `arm64.run` artifact on a 64-bit Raspberry Pi or ARM server. Release artifacts are architecture-specific and the installer refuses an artifact whose bundled runtime does not match the host. The portable installer verifies the release, requests administrator approval once, installs a coherent Docker package family on clean supported hosts, starts Autark-OS, and prints local and LAN URLs.
+
+Advanced package alternative when Docker Engine and Docker Compose v2 are already managed on the host:
+
+```bash
+sudo apt install ./autark-os_<version>_amd64.deb
+```
+
+On Linux desktops, the `.run` installer can show a graphical confirmation before opening a terminal for install progress. On servers and SSH sessions, it uses the same guided terminal installer. Tailscale remains optional and is configured later from **Access** rather than during base installation.
 
 General tarball install:
 

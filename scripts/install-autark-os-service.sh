@@ -21,7 +21,7 @@ AUTARK_OS_BUILD_DATE="${AUTARK_OS_BUILD_DATE:-}"
 DRY_RUN=0
 CHECK_ONLY=0
 NO_START=0
-SKIP_TAILSCALE=0
+SKIP_TAILSCALE=1
 SKIP_DOCKER=0
 BACKEND_JAR_READY=0
 
@@ -33,6 +33,8 @@ TARGET_BACKEND_JAR="${INSTALL_DIR}/backend/autark-os-backend.jar"
 TARGET_RUNTIME_DIR="${INSTALL_DIR}/runtime"
 INSTALLED_SETUP_SCRIPT="${INSTALL_DIR}/bin/install-autark-os-service.sh"
 INSTALLED_CLI="${INSTALL_DIR}/bin/autark-os"
+INSTALLED_BOOTSTRAP="${INSTALL_DIR}/bin/bootstrap-autark-os.sh"
+INSTALLED_HOST_MATRIX="${INSTALL_DIR}/bin/supported-host-matrix.env"
 INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
 
 usage() {
@@ -48,7 +50,8 @@ Options:
   --config-dir DIR   Store Autark-OS host config in DIR.
   --log-dir DIR      Store Autark-OS logs in DIR.
   --port PORT        Run the production backend on PORT.
-  --skip-tailscale  Do not attempt tailscale operator setup.
+  --configure-tailscale Configure the autarkos Tailscale operator when Tailscale is already installed.
+  --skip-tailscale  Keep private-access configuration deferred (default).
   --skip-docker     Do not add the autark-os user to the docker group.
   -h, --help        Show this help.
 
@@ -191,6 +194,9 @@ parse_args() {
       --skip-tailscale)
         SKIP_TAILSCALE=1
         ;;
+      --configure-tailscale)
+        SKIP_TAILSCALE=0
+        ;;
       --skip-docker)
         SKIP_DOCKER=1
         ;;
@@ -278,6 +284,12 @@ check_state() {
     status_line "Autark-OS command" "${INSTALLED_CLI}"
   else
     status_line "Autark-OS command" "missing (${INSTALLED_CLI})"
+  fi
+
+  if [[ -x "${INSTALLED_BOOTSTRAP}" && -r "${INSTALLED_HOST_MATRIX}" ]]; then
+    status_line "Installer helpers" "present"
+  else
+    status_line "Installer helpers" "missing (${INSTALLED_BOOTSTRAP}, ${INSTALLED_HOST_MATRIX})"
   fi
 
   if [[ -f "${SERVICE_FILE}" ]]; then
@@ -452,12 +464,21 @@ install_setup_script() {
 
 install_cli() {
   local cli_source="${REPO_ROOT}/scripts/autark-os"
+  local bootstrap_source="${REPO_ROOT}/scripts/bootstrap-autark-os.sh"
+  local host_matrix_source="${REPO_ROOT}/scripts/supported-host-matrix.env"
   if [[ ! -f "${cli_source}" ]]; then
     warn "Autark-OS helper command is missing from ${cli_source}."
     return 0
   fi
   run install -o root -g "${AUTARK_OS_GROUP}" -m 0755 "${cli_source}" "${INSTALLED_CLI}"
   log "Installed Autark-OS helper command to ${INSTALLED_CLI}."
+  if [[ -f "${bootstrap_source}" && -f "${host_matrix_source}" ]]; then
+    run install -o root -g "${AUTARK_OS_GROUP}" -m 0755 "${bootstrap_source}" "${INSTALLED_BOOTSTRAP}"
+    run install -o root -g "${AUTARK_OS_GROUP}" -m 0644 "${host_matrix_source}" "${INSTALLED_HOST_MATRIX}"
+    log "Installed shared installer helpers beside the Autark-OS command."
+  else
+    warn "Shared installer helpers are missing. The installed 'autark-os install' and installer support-report plan may be unavailable."
+  fi
   if [[ -n "${CLI_LINK}" ]]; then
     run ln -sfn "${INSTALLED_CLI}" "${CLI_LINK}"
     log "Linked Autark-OS helper command at ${CLI_LINK}."

@@ -27,8 +27,8 @@ The result identifies the host as supported, untested, or unsupported before the
 
 | Artifact | Best for |
 | --- | --- |
-| `autark-os_<version>_<arch>.deb` | Debian-family systems using the package manager. |
-| `Autark-OS-Installer-<version>-<arch>.run` | Guided terminal installation, support-assisted installs, or portable media. |
+| `Autark-OS-Installer-<version>-<arch>.run` | Recommended guided install with automatic dependency setup. |
+| `autark-os_<version>_<arch>.deb` | Advanced package-managed install when Docker is already managed. |
 | `autark-os-<version>-<arch>.tar.gz` | Manual inspection or environments where a package is not appropriate. |
 
 Download the artifact and `SHA256SUMS` from the Autark-OS release page. Verify the files before running them:
@@ -41,22 +41,28 @@ Do not continue if a checksum fails.
 
 ## Install
 
-### Debian Package
-
-```bash
-sudo apt install ./autark-os_<version>_amd64.deb
-```
-
-Use `arm64` instead of `amd64` for a 64-bit Raspberry Pi or ARM server. The package, portable installer, tarball, bundled Java runtime, and release metadata are built separately for each architecture. Installation stops before host changes if they do not match.
-
-### Portable Installer
+### Portable Installer (Recommended)
 
 ```bash
 chmod +x Autark-OS-Installer-<version>-amd64.run
 ./Autark-OS-Installer-<version>-amd64.run
 ```
 
-Preview the host changes first when you want to review them:
+Use `arm64` instead of `amd64` for a 64-bit Raspberry Pi or ARM server. The package, portable installer, tarball, bundled Java runtime, and release metadata are built separately for each architecture. Installation stops before host changes if they do not match.
+
+The portable installer verifies its embedded release before privilege escalation. After install confirmation, it requests administrator approval once and keeps the dependency and service mutation phase elevated. On a clean host it configures Docker's official Debian or Ubuntu apt repository and installs `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, and `docker-compose-plugin` as one package family. A working existing Docker Engine and Compose v2 installation is preserved.
+
+The installer never removes a conflicting Docker, Podman, `containerd`, or `runc` installation automatically. It stops with the detected package names so an administrator can review the system intentionally.
+
+### Debian Package (Advanced)
+
+```bash
+sudo apt install ./autark-os_<version>_amd64.deb
+```
+
+The `.deb` installs the base service but deliberately does not add a third-party Docker repository from a package maintainer script. Ensure `docker info` and `docker compose version` work before using **Discover**, or use the portable installer for automatic Docker setup.
+
+Preview portable-installer host changes first when you want to review them:
 
 ```bash
 ./Autark-OS-Installer-<version>-amd64.run --dry-run
@@ -96,6 +102,8 @@ autark-os status
 autark-os url
 autark-os version
 ```
+
+The success handoff prints both `http://localhost:<port>` and a LAN address. A real installation also writes resumable state to `/var/lib/autark-os/installer/installer-state.json` and an append-only terminal log to `/var/lib/autark-os/installer/installer.log`. A failed install names its stage and can be retried with the same installer and options.
 
 Open the URL printed by `autark-os url`, complete [First run](./first-run.md), and use **Discover** to install supported apps.
 

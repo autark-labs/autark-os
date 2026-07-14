@@ -309,14 +309,15 @@ if [[ "\${1:-configure}" == "configure" ]]; then
   AUTARK_OS_BUILD_SHA=$(build_sha) \\
   AUTARK_OS_BUILD_DATE=$(build_date) \\
   AUTARK_OS_JAVA_BIN=/usr/lib/autark-os/release/runtime/bin/java \\
-    /usr/lib/autark-os/release/scripts/install-autark-os-service.sh
-  echo "Autark-OS service installed."
+    /usr/lib/autark-os/release/scripts/install-autark-os-service.sh --skip-tailscale
+  echo "Autark-OS base service installed."
   echo "Next: open http://localhost:8082 to complete setup."
   echo "Logs: journalctl -u autark-os.service -f"
   if docker compose version >/dev/null 2>&1; then
     echo "Docker Engine and Docker Compose v2 are ready for catalog apps."
   else
-    echo "Autark-OS is running, but catalog app installs are unavailable until Docker Engine and Docker Compose v2 are installed and running."
+    echo "Catalog app installs are unavailable until Docker Engine and Docker Compose v2 are installed and running."
+    echo "For automatic Docker setup on a supported host, use the Autark-OS portable .run installer instead of the advanced .deb path."
   fi
 fi
 POSTINST
@@ -509,8 +510,23 @@ main() {
   (cd "${temp_dir}" && sha256sum -c SHA256SUMS --ignore-missing) || { printf 'Autark-OS Portable Installer error: release checksum verification failed.\n' >&2; exit 1; }
 
   printf 'Autark-OS Portable Installer %s\n' "${AUTARK_OS_INSTALLER_VERSION}"
-  printf 'This terminal installer will check this device, install Autark-OS, and start the service.\n'
+  printf 'This terminal installer will check this device, request administrator approval once, install Autark-OS, and start the service.\n'
+  set +e
   "${temp_dir}/scripts/autark-os" install --release-bundle "${temp_dir}" --guided "${install_args[@]}"
+  local install_status=$?
+  set -e
+  if [[ "${install_status}" -ne 0 ]]; then
+    cat >&2 <<FAILURE
+
+Autark-OS Portable Installer did not complete.
+No success state was reported, so Autark-OS may not be installed yet.
+Review the failed stage above, then safely rerun this same installer file.
+If an installer log was created, its path is printed above.
+
+FAILURE
+    return "${install_status}"
+  fi
+  printf 'Autark-OS Portable Installer completed successfully.\n'
 }
 
 main "$@"

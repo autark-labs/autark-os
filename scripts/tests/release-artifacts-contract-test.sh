@@ -89,6 +89,8 @@ readelf -h "${extract_dir}/runtime/bin/java" | grep -q 'Advanced Micro Devices X
   --port 19082 >"${tmp_dir}/run-dry-run.out"
 grep -q 'Autark-OS installation preview completed.' "${tmp_dir}/run-dry-run.out"
 grep -q 'LAN URL:' "${tmp_dir}/run-dry-run.out"
+grep -q 'Java: bundled with this Autark-OS release' "${tmp_dir}/run-dry-run.out"
+! grep -q 'Java: missing' "${tmp_dir}/run-dry-run.out"
 
 grep -q 'autark-os-3.4.5-amd64.tar.gz' "${checksums}"
 grep -q 'autark-os_3.4.5_amd64.deb' "${checksums}"

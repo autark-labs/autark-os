@@ -42,12 +42,14 @@ The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `
 
 ## Tailscale
 
-When Tailscale is installed, the service setup runs:
+The base installer does not install Tailscale, start account sign-in, or grant operator access. Finish the base installation, then use **Access** in Autark-OS when you are ready to configure private access.
+
+If support directs a technical administrator to configure an already installed and connected Tailscale client manually, the operator grant is:
 
 ```bash
-tailscale set --operator=autarkos
+sudo tailscale set --operator=autarkos
 ```
 
-That one-time grant lets Autark-OS create Tailscale Serve HTTPS links without running the whole backend as root.
+That grant lets Autark-OS create Tailscale Serve HTTPS links without running the whole backend as root. Review it before applying it; it is not part of unattended base installation.
 
-If Tailscale is missing or not connected, Autark-OS continues with local access. Install and connect Tailscale, then run `autark-os repair --plan` to review the next step.
+If Tailscale is missing or not connected, Autark-OS continues with local access.

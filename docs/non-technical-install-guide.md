@@ -4,21 +4,21 @@ This guide is for installing Autark-OS on a home server, mini PC, or Raspberry P
 
 ## Choose Your Install Option
 
-**Recommended path: the Debian package**
+**Portable installer — Recommended path**
 
-Use the `.deb` file from the Autark-OS GitHub Release page on Debian, Ubuntu, or Raspberry Pi OS. Choose `amd64` for most Intel/AMD computers and `arm64` for a 64-bit Raspberry Pi or ARM server. It installs the service and prints the address to open in your browser:
-
-```bash
-sudo apt install ./autark-os_<version>_amd64.deb
-```
-
-**Portable installer**
-
-Use the `.run` file when a package is not suitable or when a support person asks you to use it:
+Download the `.run` file from the Autark-OS GitHub Release page. Choose `amd64` for most Intel/AMD computers and `arm64` for a 64-bit Raspberry Pi or ARM server. It checks the download, asks for administrator approval once, installs Docker when a clean supported host needs it, starts Autark-OS, and prints the address to open:
 
 ```bash
 chmod +x Autark-OS-Installer-<version>-amd64.run
 ./Autark-OS-Installer-<version>-amd64.run
+```
+
+**Advanced package alternative**
+
+The `.deb` installs the Autark-OS base service, but it does not replace or repair Docker. Use it when Docker Engine and Docker Compose v2 are already working or when a technical administrator manages system dependencies separately:
+
+```bash
+sudo apt install ./autark-os_<version>_amd64.deb
 ```
 
 **Advanced CLI**
@@ -41,7 +41,11 @@ For best results, avoid removable storage paths that appear only after someone s
 
 ## Run The Installer
 
-The package or portable installer checks the device before it changes the host. It then prints the local address to open in a browser. During beta, a support person may instead give you a local release bundle. From inside that bundle, run:
+The portable installer checks its files and your device before it requests administrator access. After you confirm installation, your operating system may ask for your password once. Autark-OS keeps that approved administrator session for dependency, service, and system-folder changes instead of interrupting the install with several separate prompts.
+
+The installer preserves an existing Docker Engine and Compose v2 installation when it works. On a clean supported device, it uses Docker's official package repository. It will stop and explain the conflict instead of silently removing an existing container runtime.
+
+During beta, a support person may instead give you a local release bundle. From inside that bundle, run:
 
 ```bash
 ./scripts/autark-os install --guided
@@ -59,7 +63,7 @@ Avoid temporary desktop mount paths when possible. If the installer warns that a
 
 ## Choose Private Access
 
-Choose **Set up private access now** if you want to open apps from trusted phones, laptops, or remote locations. This path uses Tailscale and may ask you to sign in.
+Finish the base installation first. Then open **Access** and choose the private-access setup if you want to open apps from trusted phones, laptops, or remote locations. This path uses Tailscale and may ask you to sign in.
 
 Choose **Use local-only for now** if you only want to use Autark-OS on the device or home network. You can turn on private access later from **Access**.
 
@@ -99,6 +103,8 @@ If the installer says the device needs attention, start with the message on scre
 - Tailscale is missing or not signed in, so private links are not ready.
 - The selected storage path is unstable or low on space.
 - The Autark-OS service did not start.
+
+The portable installer names the failed stage and prints the installer log and state-file paths. It is safe to fix the named issue and rerun the same installer; completed stages are designed to repeat safely. Do not assume installation succeeded unless the final message says the portable installer completed successfully.
 
 To save a support report, open **Diagnostics** and choose **Generate support report**. If you are in a terminal, run:
 

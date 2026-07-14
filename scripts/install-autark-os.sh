@@ -169,11 +169,7 @@ run_guided_setup() {
     else
       INSTALL_DEPS_CHOICE="no"
     fi
-    if read_yes_no "Set up private access with Tailscale now" "N"; then
-      PRIVATE_ACCESS_CHOICE="set up now"
-    else
-      PRIVATE_ACCESS_CHOICE="configure later"
-    fi
+    PRIVATE_ACCESS_CHOICE="configure later in Autark-OS"
     if read_yes_no "Start Autark-OS after install" "Y"; then
       START_AFTER_INSTALL=1
     else
@@ -241,15 +237,17 @@ Dependency and host-change disclosure
 Safe package-manager installs:
   - ca-certificates, curl, gnupg, git, Java 21, and package tooling may be installed on supported apt-based hosts.
 
-External installer scripts:
-  - Docker convenience script: https://get.docker.com
-  - Tailscale install script: https://tailscale.com/install.sh
+Trusted package source:
+  - A clean host uses Docker's official apt repository at https://download.docker.com.
+  - Existing working Docker Engine and Compose v2 installations are preserved.
+  - Existing container runtimes are never removed or replaced automatically.
 
 Services and permissions that may change:
   - autarkos system user and group may be created.
   - autark-os.service may be installed and enabled.
   - The autarkos user may be added to the docker group.
-  - Tailscale operator permission may be granted to autarkos when Tailscale is connected.
+  - Tailscale is not installed, signed in, or reconfigured by the base installer.
+  - Private access can be configured later from the Autark-OS Access page.
 
 Recovery and rollback notes:
   - Inspect install paths: autark-os where
