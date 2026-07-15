@@ -212,7 +212,8 @@ build_project() {
     run_cmd env bash -lc "cd '${REPO_ROOT}/frontend' && yarn install"
   fi
   log "Building backend boot jar."
-  run_cmd "${REPO_ROOT}/backend/gradlew" -p "${REPO_ROOT}/backend" bootJar
+  run_cmd env AUTARK_OS_BUILD_VERSION="${VERSION}" \
+    "${REPO_ROOT}/backend/gradlew" -p "${REPO_ROOT}/backend" clean bootJar
 }
 
 write_metadata() {

@@ -35,6 +35,7 @@ AUTARK_OS_ALLOW_INSTALL_COLLISION=1 "${repo_root}/scripts/install-autark-os-serv
   --port 8082 >"${tmp_dir}/override.out"
 
 grep -q "Collision preflight override enabled" "${tmp_dir}/override.out"
+grep -Fq "+ install -d -o root -g autarkos -m 0755 ${tmp_dir}/install/bin" "${tmp_dir}/override.out"
 
 stale_config_dir="${tmp_dir}/stale-config"
 stale_runtime_dir="${tmp_dir}/stale-runtime"
@@ -54,3 +55,40 @@ fi
 
 grep -q "Existing Autark-OS runtime data was found" "${tmp_dir}/stale-runtime.out"
 grep -q "Recover existing apps" "${tmp_dir}/stale-runtime.out"
+
+check_runtime="${tmp_dir}/check-runtime"
+check_config="${tmp_dir}/check-config"
+check_install="${tmp_dir}/check-install"
+check_logs="${tmp_dir}/check-logs"
+check_bin="${tmp_dir}/check-bin"
+mkdir -p "${check_runtime}" "${check_config}" "${check_install}/backend" "${check_logs}" "${check_bin}"
+cat >"${check_config}/autark-os.env" <<'ENV'
+AUTARK_OS_VERSION=9.8.7-beta.6
+AUTARK_OS_BUILD_SHA=installed-build-sha
+AUTARK_OS_BUILD_DATE=2026-07-15T03:00:00Z
+ENV
+cat >"${check_bin}/id" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-u" ]]; then
+  printf '0\n'
+  exit 0
+fi
+exit 1
+SH
+cat >"${check_bin}/systemctl" <<'SH'
+#!/usr/bin/env bash
+printf 'inactive\n'
+SH
+chmod +x "${check_bin}"/*
+
+PATH="${check_bin}:/usr/bin:/bin" \
+AUTARK_OS_RUNTIME_DIR="${check_runtime}" \
+AUTARK_OS_CONFIG_DIR="${check_config}" \
+AUTARK_OS_INSTALL_DIR="${check_install}" \
+AUTARK_OS_LOG_DIR="${check_logs}" \
+AUTARK_OS_SERVICE_FILE="${tmp_dir}/check-autark-os.service" \
+  "${repo_root}/scripts/install-autark-os-service.sh" --check >"${tmp_dir}/check.out"
+
+grep -q 'Autark-OS version:.*9.8.7-beta.6' "${tmp_dir}/check.out"
+grep -q 'Build SHA:.*installed-build-sha' "${tmp_dir}/check.out"
+grep -q 'Build date:.*2026-07-15T03:00:00Z' "${tmp_dir}/check.out"

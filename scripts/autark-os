@@ -1056,19 +1056,56 @@ restore_update_snapshot() {
       systemctl start "${SERVICE_NAME}.service"
     fi
   fi
+  ensure_cli_command_access
+}
+
+ensure_cli_command_access() {
+  local installed_cli="${UPDATE_INSTALL_DIR}/bin/autark-os"
+  [[ -d "${UPDATE_INSTALL_DIR}/bin" ]] || return 0
+  chmod 0755 "${UPDATE_INSTALL_DIR}/bin"
+  [[ -x "${installed_cli}" ]] || return 0
+  mkdir -p "$(dirname "${CLI_LINK}")"
+  if [[ ! -x "${CLI_LINK}" ]]; then
+    rm -f "${CLI_LINK}"
+    ln -s "${installed_cli}" "${CLI_LINK}"
+    log "Restored the Autark-OS command link at ${CLI_LINK}."
+  fi
 }
 
 wait_for_update_health() {
   local waited=0
+  local base_url="http://127.0.0.1:$(resolve_port)"
   while (( waited < UPDATE_HEALTH_TIMEOUT )); do
-    if api_get /api/health >/dev/null 2>&1; then
-      doctor >/dev/null 2>&1
-      return $?
+    if curl --fail --silent --show-error --max-time 3 "${base_url}/api/health" >/dev/null 2>&1 \
+      && curl --fail --silent --show-error --max-time 3 "${base_url}/api/system/version" >/dev/null 2>&1; then
+      return 0
     fi
     sleep 2
     waited=$((waited + 2))
   done
   return 1
+}
+
+print_update_health_diagnostics() {
+  local label="$1"
+  local state_dir="${UPDATE_RUNTIME_DIR}/updates"
+  local health_url="http://127.0.0.1:$(resolve_port)/api/health"
+  mkdir -p "${state_dir}"
+  {
+    printf '[autark-os] Health diagnostics for %s.\n' "${label}"
+    printf '[autark-os] Expected health URL: %s\n' "${health_url}"
+    if has_command systemctl; then
+      systemctl show "${SERVICE_NAME}.service" \
+        --property=ActiveState,SubState,Result,ExecMainCode,ExecMainStatus,NRestarts \
+        --no-pager 2>&1 || true
+      systemctl status "${SERVICE_NAME}.service" --no-pager --full 2>&1 || true
+    fi
+    if has_command journalctl; then
+      journalctl -u "${SERVICE_NAME}.service" -n 80 --no-pager 2>&1 || true
+    fi
+    curl --fail --silent --show-error --max-time 3 "${health_url}" 2>&1 || true
+    printf '\n'
+  } | tee -a "${state_dir}/update.log" >&2
 }
 
 write_installed_update_metadata() {
@@ -1217,6 +1254,7 @@ apply_release_bundle_update() {
     write_update_state "rolled_back" "complete" "${target_version}" "${snapshot_dir}" "The update failed and the previous release was restored."
     die "The update could not be installed. Autark-OS restored the previous release."
   fi
+  ensure_cli_command_access
   write_installed_update_metadata "${release_json}" "${previous_version}" "${previous_sha}" "${previous_date}" "${snapshot_dir}"
 
   if [[ "${skip_service_restart}" -eq 1 ]]; then
@@ -1227,12 +1265,14 @@ apply_release_bundle_update() {
 
   write_update_state "running" "verifying-health" "${target_version}" "${snapshot_dir}" "Waiting for Autark-OS health verification."
   if ! wait_for_update_health; then
+    print_update_health_diagnostics "new release ${target_version}"
     write_update_state "rolling_back" "health-failed" "${target_version}" "${snapshot_dir}" "The new release did not become healthy; restoring the previous version."
     restore_update_snapshot "${snapshot_dir}" || true
     if wait_for_update_health; then
       write_update_state "rolled_back" "complete" "${target_version}" "${snapshot_dir}" "The new release failed health verification and the previous release is healthy again."
       die "Autark-OS ${target_version} did not become healthy. The previous release was restored successfully."
     fi
+    print_update_health_diagnostics "restored release"
     write_update_state "rollback_failed" "health-failed" "${target_version}" "${snapshot_dir}" "Neither the new release nor the restored release became healthy."
     die "The update failed and the restored release also needs attention. Run 'autark-os logs' and 'autark-os support-bundle'."
   fi
@@ -1255,6 +1295,7 @@ apply_package_update() {
     die "The package update failed. Review apt output, 'autark-os update status', and 'autark-os logs'."
   fi
   if ! wait_for_update_health; then
+    print_update_health_diagnostics "package release ${target_version}"
     write_update_state "failed" "package-health" "${target_version}" "" "The package transaction completed, but Autark-OS did not become healthy."
     die "The package was installed, but Autark-OS did not become healthy. Run 'autark-os logs'."
   fi
@@ -1378,6 +1419,7 @@ update_rollback() {
   acquire_update_lock
   restore_update_snapshot "${snapshot_dir}"
   if [[ -f "${snapshot_dir}/service-was-active" ]] && ! wait_for_update_health; then
+    print_update_health_diagnostics "manually restored release"
     die "The snapshot was restored, but Autark-OS did not become healthy. Run 'autark-os logs'."
   fi
   write_update_state "rolled_back" "manual-rollback" "" "${snapshot_dir}" "The recorded pre-update snapshot was restored manually."
@@ -2234,7 +2276,7 @@ DOCTOR_USAGE
     return 1
   fi
 
-  if api_get /api/marketplace/apps >/dev/null; then
+  if api_get /api/discover/apps >/dev/null; then
     log "Marketplace catalog: reachable"
   else
     log "Marketplace catalog: unavailable"

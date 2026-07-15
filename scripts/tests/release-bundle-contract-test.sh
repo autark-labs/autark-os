@@ -43,6 +43,7 @@ grep -q 'scripts/install-autark-os.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-gui-installer.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-fileops' "${bundle_dir}/SHA256SUMS"
 grep -q 'runtime/bin/java' "${bundle_dir}/SHA256SUMS"
+grep -q '^SuccessExitStatus=143$' "${bundle_dir}/scripts/install-autark-os-service.sh"
 
 python3 - "${bundle_dir}/autark-os-release.json" "${bundle_dir}/autark-os-provenance.json" <<'PY'
 import json

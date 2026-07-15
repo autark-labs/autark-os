@@ -12,6 +12,7 @@ log_dir="${tmp_dir}/logs"
 bundle_dir="${tmp_dir}/bundle"
 config_file="${config_dir}/autark-os.env"
 current_jar="${install_dir}/backend/autark-os-backend.jar"
+cli_link="${tmp_dir}/bin/autark-os"
 
 mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin" "${bundle_dir}/scripts"
 printf 'old backend jar\n' >"${current_jar}"
@@ -69,7 +70,9 @@ assert check["requiresSourceCheckout"] is False
 assert check["requiresNodeYarnOrGit"] is False
 PY
 
-AUTARK_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/autark-os" update \
+AUTARK_OS_CONFIG_FILE="${config_file}" \
+AUTARK_OS_CLI_LINK="${cli_link}" \
+  "${repo_root}/scripts/autark-os" update \
   --release-bundle "${bundle_dir}" \
   --yes \
   --skip-service-restart >/tmp/autark-os-update-output.txt
@@ -82,6 +85,7 @@ grep -q 'new backend jar' "${current_jar}"
 grep -q 'new autark-os helper' "${install_dir}/bin/autark-os"
 grep -q 'new fileops helper' "${install_dir}/bin/autark-os-fileops"
 grep -q 'new bootstrap' "${install_dir}/bin/bootstrap-autark-os.sh"
+[[ -x "${cli_link}" ]]
 grep -q 'AUTARK_OS_VERSION=1.1.0' "${config_file}"
 grep -q 'AUTARK_OS_BUILD_SHA=new-sha' "${config_file}"
 grep -q 'AUTARK_OS_PREVIOUS_VERSION=1.0.0' "${config_file}"

@@ -255,6 +255,14 @@ path_mount_summary() {
 
 check_state() {
   log "Checking Autark-OS service-user setup."
+  local installed_env="${CONFIG_DIR}/autark-os.env"
+  local installed_version installed_sha installed_date
+  installed_version="$(env_file_value "${installed_env}" AUTARK_OS_VERSION)"
+  installed_sha="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_SHA)"
+  installed_date="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_DATE)"
+  [[ -n "${installed_version}" ]] || installed_version="${AUTARK_OS_VERSION}"
+  [[ -n "${installed_sha}" ]] || installed_sha="$(build_sha)"
+  [[ -n "${installed_date}" ]] || installed_date="$(build_date)"
   if id "${AUTARK_OS_USER}" >/dev/null 2>&1; then
     status_line "User" "present (${AUTARK_OS_USER})"
   else
@@ -275,9 +283,9 @@ check_state() {
     status_line "Backend jar" "missing (${TARGET_BACKEND_JAR})"
   fi
 
-  status_line "Autark-OS version" "${AUTARK_OS_VERSION}"
-  status_line "Build SHA" "$(build_sha)"
-  status_line "Build date" "$(build_date)"
+  status_line "Autark-OS version" "${installed_version}"
+  status_line "Build SHA" "${installed_sha}"
+  status_line "Build date" "${installed_date}"
 
   local runtime_mount
   runtime_mount="$(path_mount_summary "${RUNTIME_DIR}")"
@@ -463,7 +471,9 @@ ensure_directories() {
   run install -d -o "${AUTARK_OS_USER}" -g "${AUTARK_OS_GROUP}" -m 0750 "${LOG_DIR}"
   run install -d -o root -g root -m 0755 "${INSTALL_DIR}"
   run install -d -o root -g "${AUTARK_OS_GROUP}" -m 0750 "${INSTALL_DIR}/backend"
-  run install -d -o root -g "${AUTARK_OS_GROUP}" -m 0750 "${INSTALL_DIR}/bin"
+  # The installed command is intentionally available to the interactive host
+  # user through /usr/local/bin. Runtime and configuration paths remain private.
+  run install -d -o root -g "${AUTARK_OS_GROUP}" -m 0755 "${INSTALL_DIR}/bin"
 }
 
 install_setup_script() {
@@ -705,6 +715,7 @@ WorkingDirectory=${RUNTIME_DIR}
 Environment=AUTARK_OS_RUNTIME_ROOT=${RUNTIME_DIR}
 EnvironmentFile=-${CONFIG_DIR}/autark-os.env
 ExecStart=${JAVA_BIN} -jar ${TARGET_BACKEND_JAR}
+SuccessExitStatus=143
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=false

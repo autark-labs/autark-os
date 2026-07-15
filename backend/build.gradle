@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.autarkos'
-version = '0.0.1-SNAPSHOT'
+version = providers.environmentVariable('AUTARK_OS_BUILD_VERSION').getOrElse('0.0.1-SNAPSHOT')
 description = 'Spring Boot backend for autark-os-v2'
 
 java {

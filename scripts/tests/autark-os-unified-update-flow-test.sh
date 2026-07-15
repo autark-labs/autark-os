@@ -17,6 +17,7 @@ sudoers_file="${tmp_dir}/autark-os-fileops.sudoers"
 config_file="${config_dir}/autark-os.env"
 service_state="${tmp_dir}/service-state"
 health_expected="${tmp_dir}/health-expected"
+curl_calls="${tmp_dir}/curl-calls"
 
 mkdir -p \
   "${install_dir}/backend" "${install_dir}/runtime/bin" "${install_dir}/bin" \
@@ -26,10 +27,10 @@ mkdir -p \
 printf 'old backend\n' >"${install_dir}/backend/autark-os-backend.jar"
 printf 'old runtime\n' >"${install_dir}/runtime/bin/java"
 printf 'old cli\n' >"${install_dir}/bin/autark-os"
+chmod +x "${install_dir}/bin/autark-os"
 printf 'old database\n' >"${runtime_dir}/autark-os.db"
 printf 'old unit\n' >"${service_file}"
 printf 'old sudoers\n' >"${sudoers_file}"
-ln -s "${install_dir}/bin/autark-os" "${cli_link}"
 printf 'active\n' >"${service_state}"
 printf 'old backend\n' >"${health_expected}"
 
@@ -85,9 +86,12 @@ cat >"${fake_bin}/curl" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 url="${!#}"
+printf '%s\n' "${url}" >>"${TEST_CURL_CALLS}"
 cmp -s "${TEST_HEALTH_EXPECTED}" "${TEST_INSTALL_DIR}/backend/autark-os-backend.jar" || exit 22
 case "${url}" in
   */api/system/doctor) printf '{"status":"ready"}\n' ;;
+  */api/marketplace/apps) exit 22 ;;
+  */api/discover/apps) printf '[]\n' ;;
   *) printf '{}\n' ;;
 esac
 SH
@@ -111,6 +115,7 @@ cp "${AUTARK_OS_BACKEND_JAR}" "${AUTARK_OS_INSTALL_DIR}/backend/autark-os-backen
 rm -rf "${AUTARK_OS_INSTALL_DIR}/runtime"
 cp -a "${AUTARK_OS_RUNTIME_IMAGE}" "${AUTARK_OS_INSTALL_DIR}/runtime"
 cp "$(dirname "${AUTARK_OS_BACKEND_JAR}")/../scripts/autark-os" "${AUTARK_OS_INSTALL_DIR}/bin/autark-os"
+chmod +x "${AUTARK_OS_INSTALL_DIR}/bin/autark-os"
 printf 'new unit\n' >"${AUTARK_OS_SERVICE_FILE}"
 printf 'new sudoers\n' >"${AUTARK_OS_SUDOERS_FILE}"
 SH
@@ -140,6 +145,7 @@ rollback_output="${tmp_dir}/rollback.out"
 if PATH="${fake_bin}:/usr/bin:/bin" \
   TEST_INSTALL_DIR="${install_dir}" \
   TEST_HEALTH_EXPECTED="${health_expected}" \
+  TEST_CURL_CALLS="${curl_calls}" \
   TEST_SERVICE_STATE="${service_state}" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
@@ -159,6 +165,20 @@ grep -q '^old sudoers$' "${sudoers_file}"
 grep -q 'AUTARK_OS_VERSION=1.0.0' "${config_file}"
 grep -q '"status":"rolled_back"' "${runtime_dir}/updates/update-state.json"
 grep -q 'previous release was restored successfully' "${rollback_output}"
+[[ -x "${cli_link}" ]]
+
+: >"${curl_calls}"
+PATH="${fake_bin}:/usr/bin:/bin" \
+  TEST_INSTALL_DIR="${install_dir}" \
+  TEST_HEALTH_EXPECTED="${health_expected}" \
+  TEST_CURL_CALLS="${curl_calls}" \
+  TEST_SERVICE_STATE="${service_state}" \
+  AUTARK_OS_CONFIG_FILE="${config_file}" \
+  AUTARK_OS_SERVICE_FILE="${service_file}" \
+  AUTARK_OS_CLI_LINK="${cli_link}" \
+  "${repo_root}/scripts/autark-os" doctor >/dev/null
+grep -q '/api/discover/apps' "${curl_calls}"
+! grep -q '/api/marketplace/apps' "${curl_calls}"
 
 printf 'not covered by the release manifest\n' >"${bundle_dir}/scripts/unlisted-file"
 checksum_failure_output="${tmp_dir}/checksum-failure.out"
@@ -275,6 +295,7 @@ success_output="${tmp_dir}/success.out"
 PATH="${fake_bin}:/usr/bin:/bin" \
   TEST_INSTALL_DIR="${install_dir}" \
   TEST_HEALTH_EXPECTED="${health_expected}" \
+  TEST_CURL_CALLS="${curl_calls}" \
   TEST_SERVICE_STATE="${service_state}" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
