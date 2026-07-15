@@ -166,6 +166,9 @@ jobs:
           bash scripts/tests/release-runtime-smoke-test.sh
           bash scripts/tests/release-artifacts-dry-run-test.sh
           bash scripts/tests/supported-host-matrix-contract-test.sh
+          bash scripts/tests/autark-os-update-delivery-test.sh
+          bash scripts/tests/autark-os-unified-update-flow-test.sh
+          bash scripts/tests/autark-os-safe-uninstall-flow-test.sh
 
       - name: Build architecture-specific artifacts
         env:

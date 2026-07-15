@@ -51,6 +51,16 @@ type SidebarProps = {
   onToggleCollapse: () => void;
 };
 
+export function sidebarUpdateIndicator(updateStatus?: string) {
+  if (updateStatus === 'current') {
+    return { label: 'Up to date', tone: 'current' as const };
+  }
+  if (updateStatus === 'available') {
+    return { label: 'Update available', tone: 'available' as const };
+  }
+  return { label: 'Run autark-os update', tone: 'check' as const };
+}
+
 function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const { setViewMode, settings, viewMode } = useProjectSettings();
@@ -83,7 +93,7 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const setupReady = setup?.status === 'ready' || setup?.status === 'ready_with_notes';
   const deviceName = settings?.deviceName || setup?.runAsUser || 'Autark-OS';
   const versionLabel = version?.version ? `v${version.version}` : 'Version unknown';
-  const updateCurrent = version?.updateStatus === 'current' || !version?.updateStatus;
+  const updateIndicator = sidebarUpdateIndicator(version?.updateStatus);
   const navGroups = navigationGroups(viewMode) as NavGroup[];
 
   return (
@@ -191,8 +201,13 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             <span>{setupReady ? 'Ready for your apps' : 'Setup needs attention'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className={cn('size-2 rounded-full', updateCurrent ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} />
-            <span>{updateCurrent ? 'Up to date' : 'Update available'}</span>
+            <span className={cn(
+              'size-2 rounded-full',
+              updateIndicator.tone === 'current' && 'bg-cyan-300 shadow-lg shadow-cyan-400/30',
+              updateIndicator.tone === 'available' && 'bg-orange-500 shadow-lg shadow-orange-500/30',
+              updateIndicator.tone === 'check' && 'bg-slate-400 shadow-lg shadow-slate-500/20',
+            )} />
+            <span>{updateIndicator.label}</span>
           </div>
         </div>
         <div className="mt-3 grid gap-2">

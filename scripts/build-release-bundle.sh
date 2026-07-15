@@ -361,9 +361,15 @@ create_bundle() {
   write_metadata
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '+ cd %q && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
+    printf '+ cd %q && find backend runtime scripts \\( -type f -o -type l \\) -print0 | sort -z | xargs -0 sha256sum; sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
   else
-    (cd "${OUTPUT_DIR}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/install-autark-os.sh scripts/autark-os-gui-installer.sh scripts/autark-os scripts/autark-os-fileops autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS)
+    (
+      cd "${OUTPUT_DIR}"
+      {
+        find backend runtime scripts \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum
+        sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json
+      } >SHA256SUMS
+    )
   fi
 }
 

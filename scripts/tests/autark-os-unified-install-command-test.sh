@@ -52,7 +52,7 @@ PY
 help_output="$("${repo_root}/scripts/autark-os" --help)"
 grep -q 'install    Install Autark-OS or print a shared install plan.' <<<"${help_output}"
 grep -q 'repair     Check installed Autark-OS and print recovery actions.' <<<"${help_output}"
-grep -q 'update     Check or run Autark-OS update flow.' <<<"${help_output}"
+grep -q 'update     Run the unified Autark-OS update flow or one scoped stage.' <<<"${help_output}"
 grep -q 'uninstall  Remove Autark-OS service paths through the guided uninstall flow.' <<<"${help_output}"
 
 install_help="$("${repo_root}/scripts/autark-os" install --help)"
@@ -74,26 +74,45 @@ symlink_output="$(cd "${tmp_dir}" && "${link_dir}/autark-os" install --plan --re
 grep -q 'resolved-bootstrap --plan --release-jar' <<<"${symlink_output}"
 
 "${repo_root}/scripts/autark-os" repair --help >/dev/null
-"${repo_root}/scripts/autark-os" update --help >/dev/null
+update_help="$("${repo_root}/scripts/autark-os" update --help)"
+grep -q 'runs the complete update chain' <<<"${update_help}"
+grep -q 'check       Check the configured channel' <<<"${update_help}"
+grep -q 'rollback    Restore the most recent pre-update snapshot' <<<"${update_help}"
 "${repo_root}/scripts/autark-os" uninstall --help >/dev/null
 
 bundle_dir="${tmp_dir}/bundle"
 architecture="$(dpkg --print-architecture)"
 mkdir -p "${bundle_dir}/scripts" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin"
 cp "${repo_root}/scripts/autark-os" "${bundle_dir}/scripts/autark-os"
+cp "${repo_root}/scripts/autark-os-fileops" "${bundle_dir}/scripts/autark-os-fileops"
 cp "${repo_root}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cp "${repo_root}/scripts/install-autark-os-service.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
 cp "${repo_root}/scripts/supported-host-matrix.env" "${bundle_dir}/scripts/supported-host-matrix.env"
 cp "${fake_jar}" "${bundle_dir}/backend/autark-os-backend.jar"
-ln -s "$(readlink -f "$(command -v java)")" "${bundle_dir}/runtime/bin/java"
+cat >"${bundle_dir}/runtime/bin/java" <<'SH'
+#!/usr/bin/env bash
+printf 'openjdk version "21.0.0"\n' >&2
+SH
+chmod +x "${bundle_dir}/runtime/bin/java"
 cat >"${bundle_dir}/autark-os-release.env" <<ENV
 AUTARK_OS_ARTIFACT_ARCHITECTURE=${architecture}
 AUTARK_OS_RUNTIME_ARCHITECTURE=${architecture}
 ENV
-printf '{"schemaVersion":2}\n' >"${bundle_dir}/autark-os-release.json"
-chmod +x "${bundle_dir}/scripts/autark-os" "${bundle_dir}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
+printf '{"schemaVersion":2,"artifactArchitecture":"%s"}\n' "${architecture}" >"${bundle_dir}/autark-os-release.json"
+chmod +x "${bundle_dir}/scripts/autark-os" "${bundle_dir}/scripts/autark-os-fileops" "${bundle_dir}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
 
-bundle_output="$("${bundle_dir}/scripts/autark-os" install \
+fake_file_bin="${tmp_dir}/fake-file-bin"
+mkdir -p "${fake_file_bin}"
+cat >"${fake_file_bin}/file" <<SH
+#!/usr/bin/env bash
+case "${architecture}" in
+  amd64) printf '%s\n' 'ELF 64-bit LSB executable, x86-64' ;;
+  arm64) printf '%s\n' 'ELF 64-bit LSB executable, ARM aarch64' ;;
+esac
+SH
+chmod +x "${fake_file_bin}/file"
+
+bundle_output="$(PATH="${fake_file_bin}:${PATH}" "${bundle_dir}/scripts/autark-os" install \
   --plan \
   --json \
   --runtime-dir "${tmp_dir}/bundle-runtime" \
@@ -114,9 +133,9 @@ assert plan["artifact"]["backendJar"].endswith("/backend/autark-os-backend.jar")
 PY
 
 printf 'autark-os-release.env\n' >"${bundle_dir}/SHA256SUMS"
-(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/bootstrap-autark-os.sh scripts/supported-host-matrix.env autark-os-release.env autark-os-release.json > SHA256SUMS)
+(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/supported-host-matrix.env autark-os-release.env autark-os-release.json > SHA256SUMS)
 
-single_command_output="$("${bundle_dir}/scripts/autark-os" install \
+single_command_output="$(PATH="${fake_file_bin}:${PATH}" "${bundle_dir}/scripts/autark-os" install \
   --dry-run \
   --runtime-dir "${tmp_dir}/single-runtime" \
   --install-dir "${tmp_dir}/single-install" \
@@ -134,15 +153,19 @@ grep -q 'autark-os install --yes' <<<"${single_command_output}"
 grep -q 'LAN URL:' <<<"${single_command_output}"
 
 prompt_bundle="${tmp_dir}/prompt-bundle"
-mkdir -p "${prompt_bundle}/scripts" "${prompt_bundle}/backend"
+mkdir -p "${prompt_bundle}/scripts" "${prompt_bundle}/backend" "${prompt_bundle}/runtime/bin"
 cp "${repo_root}/scripts/autark-os" "${prompt_bundle}/scripts/autark-os"
+cp "${repo_root}/scripts/autark-os-fileops" "${prompt_bundle}/scripts/autark-os-fileops"
+cp "${repo_root}/scripts/install-autark-os-service.sh" "${prompt_bundle}/scripts/install-autark-os-service.sh"
 cp "${fake_jar}" "${prompt_bundle}/backend/autark-os-backend.jar"
-printf '{"schemaVersion":1}\n' >"${prompt_bundle}/autark-os-release.json"
+cp "${bundle_dir}/runtime/bin/java" "${prompt_bundle}/runtime/bin/java"
+printf '{"schemaVersion":2,"artifactArchitecture":"%s"}\n' "${architecture}" >"${prompt_bundle}/autark-os-release.json"
 cat >"${prompt_bundle}/scripts/bootstrap-autark-os.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"${AUTARK_OS_BOOTSTRAP_ARGS_FILE}"
 SH
 chmod +x "${prompt_bundle}/scripts/autark-os" "${prompt_bundle}/scripts/bootstrap-autark-os.sh"
+(cd "${prompt_bundle}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json >SHA256SUMS)
 
 args_file="${tmp_dir}/bootstrap-args.txt"
 if AUTARK_OS_BOOTSTRAP_ARGS_FILE="${args_file}" printf 'n\n' | "${prompt_bundle}/scripts/autark-os" install >/tmp/autark-os-prompt-decline.out 2>&1; then

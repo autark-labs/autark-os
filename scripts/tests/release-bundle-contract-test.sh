@@ -73,7 +73,23 @@ assert provenance["runtimeArchitecture"] == release["runtimeArchitecture"]
 assert provenance["signatureStatus"] == "unsigned-reserved"
 PY
 
-(cd "${bundle_dir}" && sha256sum -c SHA256SUMS --ignore-missing >/dev/null)
+python3 - "${bundle_dir}" <<'PY'
+from pathlib import Path
+import sys
+
+bundle = Path(sys.argv[1])
+listed = {
+    line.split(maxsplit=1)[1].removeprefix("*")
+    for line in (bundle / "SHA256SUMS").read_text(encoding="utf-8").splitlines()
+}
+actual = {
+    str(path.relative_to(bundle))
+    for path in bundle.rglob("*")
+    if (path.is_file() or path.is_symlink()) and path.name != "SHA256SUMS"
+}
+assert listed == actual, (sorted(listed - actual), sorted(actual - listed))
+PY
+(cd "${bundle_dir}" && sha256sum -c SHA256SUMS >/dev/null)
 
 plan_json="$("${bundle_dir}/scripts/bootstrap-autark-os.sh" --plan --json --release-bundle "${bundle_dir}")"
 PLAN_JSON="${plan_json}" EXPECTED_ARCHITECTURE="${architecture}" python3 - <<'PY'

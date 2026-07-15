@@ -13,7 +13,7 @@ bundle_dir="${tmp_dir}/bundle"
 config_file="${config_dir}/autark-os.env"
 current_jar="${install_dir}/backend/autark-os-backend.jar"
 
-mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/scripts"
+mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin" "${bundle_dir}/scripts"
 printf 'old backend jar\n' >"${current_jar}"
 printf 'old autark-os helper\n' >"${install_dir}/bin/autark-os"
 printf 'old fileops helper\n' >"${install_dir}/bin/autark-os-fileops"
@@ -34,20 +34,25 @@ printf 'new backend jar\n' >"${bundle_dir}/backend/autark-os-backend.jar"
 printf 'new autark-os helper\n' >"${bundle_dir}/scripts/autark-os"
 printf 'new fileops helper\n' >"${bundle_dir}/scripts/autark-os-fileops"
 printf 'new bootstrap\n' >"${bundle_dir}/scripts/bootstrap-autark-os.sh"
-printf 'new service installer\n' >"${bundle_dir}/scripts/install-autark-os-service.sh"
+cp "${repo_root}/scripts/install-autark-os-service.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
+cp "$(command -v java)" "${bundle_dir}/runtime/bin/java"
+architecture="$(dpkg --print-architecture 2>/dev/null || uname -m)"
+[[ "${architecture}" != "x86_64" ]] || architecture=amd64
+[[ "${architecture}" != "aarch64" ]] || architecture=arm64
 cat >"${bundle_dir}/autark-os-release.json" <<JSON
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "name": "autark-os",
   "version": "1.1.0",
   "channel": "stable",
   "buildSha": "new-sha",
   "buildDate": "2026-06-19T12:00:00Z",
+  "artifactArchitecture": "${architecture}",
   "releaseNotesUrl": "https://example.invalid/autark-os/1.1.0",
   "bundleUrl": "file://${bundle_dir}"
 }
 JSON
-(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json > SHA256SUMS)
+(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json > SHA256SUMS)
 
 check_json="$(AUTARK_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/autark-os" update --check --metadata-url "file://${bundle_dir}/autark-os-release.json" --json)"
 AUTARK_OS_UPDATE_JSON="${check_json}" BUNDLE_DIR="${bundle_dir}" python3 - <<'PY'
@@ -68,6 +73,10 @@ AUTARK_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/autark-os" update \
   --release-bundle "${bundle_dir}" \
   --yes \
   --skip-service-restart >/tmp/autark-os-update-output.txt
+
+grep -q 'Update check' /tmp/autark-os-update-output.txt
+grep -q 'Update plan for Autark-OS 1.1.0' /tmp/autark-os-update-output.txt
+grep -q 'service restart was skipped' /tmp/autark-os-update-output.txt
 
 grep -q 'new backend jar' "${current_jar}"
 grep -q 'new autark-os helper' "${install_dir}/bin/autark-os"

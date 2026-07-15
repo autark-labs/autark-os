@@ -34,8 +34,8 @@ public class ProjectVersionService {
                 identity.runtimeRootHash(),
                 backendJar(),
                 settings.updateChannel(),
-                "unavailable",
-                "Signed release artifacts are not available yet, so Autark-OS can show version metadata but cannot check for or install updates.",
+                "check_required",
+                "Run autark-os update to check, review, and install a verified release with automatic health rollback.",
                 Instant.now());
     }
 

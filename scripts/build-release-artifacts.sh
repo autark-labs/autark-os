@@ -279,10 +279,43 @@ esac
 contains "${versions}" "${VERSION_ID}" && contains "${architectures}" "${arch}" || { echo "Autark-OS: unsupported OS version or architecture. See https://github.com/autark-labs/autark-os/blob/main/docs/technical-installation.md" >&2; exit 1; }
 command -v systemctl >/dev/null || { echo "Autark-OS: systemd is required." >&2; exit 1; }
 if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system/autark-os.service ]]; then
-  checkpoint_dir=/var/lib/autark-os/backups/package-upgrades
+  public_metadata=/opt/autark-os/release-metadata/install.env
+  metadata_value() {
+    local key="$1"
+    [[ -r "${public_metadata}" ]] || return 0
+    awk -F= -v key="${key}" '$1 == key {print $2; exit}' "${public_metadata}"
+  }
+  install_dir="$(metadata_value AUTARK_OS_INSTALL_DIR)"
+  runtime_dir="$(metadata_value AUTARK_OS_RUNTIME_ROOT)"
+  config_dir="$(metadata_value AUTARK_OS_CONFIG_DIR)"
+  [[ -n "${install_dir}" ]] || install_dir=/opt/autark-os
+  [[ -n "${runtime_dir}" ]] || runtime_dir=/var/lib/autark-os
+  [[ -n "${config_dir}" ]] || config_dir=/etc/autark-os
+  env_file="${config_dir}/autark-os.env"
+  if [[ -r "${env_file}" ]]; then
+    configured_runtime="$(awk -F= '$1 == "AUTARK_OS_RUNTIME_ROOT" {print $2; exit}' "${env_file}")"
+    configured_install="$(awk -F= '$1 == "AUTARK_OS_INSTALL_DIR" {print $2; exit}' "${env_file}")"
+    [[ -n "${configured_runtime}" ]] && runtime_dir="${configured_runtime}"
+    [[ -n "${configured_install}" ]] && install_dir="${configured_install}"
+  fi
+  checkpoint_dir="${runtime_dir}/backups/package-upgrades"
   mkdir -p "${checkpoint_dir}"
   checkpoint="${checkpoint_dir}/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
-  tar -czf "${checkpoint}" /etc/autark-os /etc/systemd/system/autark-os.service 2>/dev/null || true
+  checkpoint_paths=()
+  for path in "${install_dir}" "${config_dir}" /etc/systemd/system/autark-os.service /etc/sudoers.d/autark-os-fileops "${runtime_dir}/autark-os.db" "${runtime_dir}/autark-os.db-shm" "${runtime_dir}/autark-os.db-wal"; do
+    [[ -e "${path}" || -L "${path}" ]] && checkpoint_paths+=("${path}")
+  done
+  service_was_active=0
+  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet autark-os.service; then
+    service_was_active=1
+    systemctl stop autark-os.service >/dev/null 2>&1 || true
+  fi
+  if ! tar -czf "${checkpoint}" "${checkpoint_paths[@]}"; then
+    [[ "${service_was_active}" -eq 0 ]] || systemctl start autark-os.service >/dev/null 2>&1 || true
+    exit 1
+  fi
+  printf '%s\n' "${checkpoint}" >"${checkpoint_dir}/latest"
+  printf '%s\n' "${checkpoint}" >/run/autark-os-package-upgrade-checkpoint
   echo "Autark-OS: saved package configuration checkpoint at ${checkpoint}." >&2
 fi
 PREINST
@@ -300,18 +333,85 @@ PREINST
 set -euo pipefail
 
 if [[ "\${1:-configure}" == "configure" ]]; then
+  public_metadata=/opt/autark-os/release-metadata/install.env
+  public_value() {
+    local key="\$1"
+    [[ -r "\${public_metadata}" ]] || return 0
+    awk -F= -v key="\${key}" '\$1 == key {print \$2; exit}' "\${public_metadata}"
+  }
+  config_dir="\$(public_value AUTARK_OS_CONFIG_DIR)"
+  [[ -n "\${config_dir}" ]] || config_dir=/etc/autark-os
+  env_file="\${config_dir}/autark-os.env"
+  existing_value() {
+    local key="\$1"
+    [[ -r "\${env_file}" ]] || return 0
+    awk -F= -v key="\${key}" '\$1 == key {print \$2; exit}' "\${env_file}"
+  }
+  runtime_dir="\$(existing_value AUTARK_OS_RUNTIME_ROOT)"
+  install_dir="\$(existing_value AUTARK_OS_INSTALL_DIR)"
+  configured_config_dir="\$(existing_value AUTARK_OS_CONFIG_DIR)"
+  log_dir="\$(existing_value AUTARK_OS_LOG_DIR)"
+  server_port="\$(existing_value SERVER_PORT)"
+  [[ -n "\${runtime_dir}" ]] || runtime_dir="\$(public_value AUTARK_OS_RUNTIME_ROOT)"
+  [[ -n "\${install_dir}" ]] || install_dir="\$(public_value AUTARK_OS_INSTALL_DIR)"
+  [[ -n "\${configured_config_dir}" ]] || configured_config_dir="\$(public_value AUTARK_OS_CONFIG_DIR)"
+  [[ -n "\${log_dir}" ]] || log_dir="\$(public_value AUTARK_OS_LOG_DIR)"
+  [[ -n "\${runtime_dir}" ]] || runtime_dir=/var/lib/autark-os
+  [[ -n "\${install_dir}" ]] || install_dir=/opt/autark-os
+  [[ -n "\${configured_config_dir}" ]] && config_dir="\${configured_config_dir}"
+  [[ -n "\${config_dir}" ]] || config_dir=/etc/autark-os
+  [[ -n "\${log_dir}" ]] || log_dir=/var/log/autark-os
+  [[ -n "\${server_port}" ]] || server_port=8082
   if ! /usr/lib/autark-os/release/runtime/bin/java -version >/dev/null 2>&1; then
     echo "Autark-OS: the bundled ${ARCHITECTURE} Java runtime cannot execute on this host." >&2
     exit 1
   fi
   AUTARK_OS_BACKEND_JAR=/usr/lib/autark-os/release/backend/autark-os-backend.jar \\
+  AUTARK_OS_RUNTIME_DIR="\${runtime_dir}" \\
+  AUTARK_OS_INSTALL_DIR="\${install_dir}" \\
+  AUTARK_OS_CONFIG_DIR="\${config_dir}" \\
+  AUTARK_OS_LOG_DIR="\${log_dir}" \\
+  AUTARK_OS_SERVER_PORT="\${server_port}" \\
   AUTARK_OS_VERSION=${VERSION} \\
   AUTARK_OS_BUILD_SHA=$(build_sha) \\
   AUTARK_OS_BUILD_DATE=$(build_date) \\
+  AUTARK_OS_UPDATE_CHANNEL=${CHANNEL} \\
+  AUTARK_OS_INSTALL_METHOD=package \\
+  AUTARK_OS_UPDATE_REPOSITORY=autark-labs/autark-os \\
   AUTARK_OS_JAVA_BIN=/usr/lib/autark-os/release/runtime/bin/java \\
     /usr/lib/autark-os/release/scripts/install-autark-os-service.sh --skip-tailscale
+  ready=0
+  for _attempt in \$(seq 1 60); do
+    if curl --fail --silent "http://127.0.0.1:\${server_port}/api/health" >/dev/null 2>&1; then
+      ready=1
+      break
+    fi
+    sleep 2
+  done
+  if [[ "\${ready}" -eq 1 ]] && ! "\${install_dir}/bin/autark-os" doctor >/dev/null 2>&1; then
+    ready=0
+  fi
+  if [[ "\${ready}" -ne 1 ]]; then
+    checkpoint_file=/run/autark-os-package-upgrade-checkpoint
+    if [[ -r "\${checkpoint_file}" ]]; then
+      checkpoint="\$(cat "\${checkpoint_file}")"
+      if [[ -f "\${checkpoint}" ]]; then
+        systemctl stop autark-os.service >/dev/null 2>&1 || true
+        rm -rf "\${install_dir}" "\${config_dir}"
+        rm -f /etc/systemd/system/autark-os.service /etc/sudoers.d/autark-os-fileops
+        rm -f "\${runtime_dir}/autark-os.db" "\${runtime_dir}/autark-os.db-shm" "\${runtime_dir}/autark-os.db-wal"
+        tar -xzf "\${checkpoint}" -C /
+        systemctl daemon-reload
+        systemctl start autark-os.service >/dev/null 2>&1 || true
+        echo "Autark-OS: the package failed health verification; restored the pre-upgrade service snapshot." >&2
+      fi
+    fi
+    rm -f "\${checkpoint_file}"
+    exit 1
+  fi
+  rm -f /run/autark-os-package-upgrade-checkpoint
   echo "Autark-OS base service installed."
-  echo "Next: open http://localhost:8082 to complete setup."
+  echo "Next: open http://localhost:\${server_port} to complete setup."
   echo "Logs: journalctl -u autark-os.service -f"
   if docker compose version >/dev/null 2>&1; then
     echo "Docker Engine and Docker Compose v2 are ready for catalog apps."
@@ -325,7 +425,7 @@ POSTINST
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${1:-}" == "remove" || "${1:-}" == "deconfigure" ]]; then
+if [[ "${1:-}" == "remove" || "${1:-}" == "deconfigure" || "${1:-}" == "upgrade" ]]; then
   if command -v systemctl >/dev/null 2>&1; then
     systemctl stop autark-os.service >/dev/null 2>&1 || true
   fi
@@ -335,9 +435,20 @@ PRERM
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Runtime data, apps, backups, and package-upgrade checkpoints are deliberately
-# preserved on remove and purge. Use `autark-os uninstall --remove-data` only
-# after reviewing its explicit destructive plan.
+if [[ "${1:-}" == "remove" || "${1:-}" == "purge" ]]; then
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl disable --now autark-os.service >/dev/null 2>&1 || true
+  fi
+  rm -f /etc/systemd/system/autark-os.service /usr/local/bin/autark-os /etc/sudoers.d/autark-os-fileops
+  rm -rf /opt/autark-os
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
+fi
+
+# Runtime data, apps, backups, configuration, and package-upgrade checkpoints
+# are deliberately preserved on remove and purge. Use `autark-os uninstall
+# --remove-data` only after reviewing its explicit destructive plan.
 exit 0
 POSTRM
   chmod 0755 "${deb_root}/DEBIAN/preinst" "${deb_root}/DEBIAN/postinst" "${deb_root}/DEBIAN/prerm" "${deb_root}/DEBIAN/postrm"
@@ -387,7 +498,9 @@ Options:
   -h, --help          Show this help.
 
 Run without options to start the terminal-based portable installer. On a Linux
-desktop, zenity may show an optional confirmation before terminal progress.
+desktop, zenity may show an optional confirmation before terminal progress. If
+Autark-OS is already installed, the same file runs the shared update plan and
+automatic rollback flow instead of creating a second installation.
 USAGE
 }
 
@@ -432,6 +545,10 @@ payload_line() {
 extract_payload() {
   local target_dir="$1"
   mkdir -p "${target_dir}"
+  if find "${target_dir}" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    printf 'Autark-OS Installer error: extraction target is not empty: %s\n' "${target_dir}" >&2
+    exit 1
+  fi
   tail -n +"$(payload_line)" "$0" | tar -xzf - -C "${target_dir}" --strip-components=1
 }
 
@@ -507,12 +624,43 @@ main() {
   trap cleanup_installer_temp_dir EXIT
   extract_payload "${temp_dir}"
   [[ -f "${temp_dir}/SHA256SUMS" ]] || { printf 'Autark-OS Portable Installer error: release checksums are missing.\n' >&2; exit 1; }
-  (cd "${temp_dir}" && sha256sum -c SHA256SUMS --ignore-missing) || { printf 'Autark-OS Portable Installer error: release checksum verification failed.\n' >&2; exit 1; }
+  (cd "${temp_dir}" && sha256sum -c SHA256SUMS) || { printf 'Autark-OS Portable Installer error: release checksum verification failed.\n' >&2; exit 1; }
 
   printf 'Autark-OS Portable Installer %s\n' "${AUTARK_OS_INSTALLER_VERSION}"
+  if [[ -f /etc/autark-os/autark-os.env || -f /etc/systemd/system/autark-os.service ]]; then
+    printf 'An existing Autark-OS installation was found. This installer will use the shared update and rollback flow.\n'
+    local update_args=(--release-bundle "${temp_dir}")
+    local install_arg
+    for install_arg in "${install_args[@]}"; do
+      case "${install_arg}" in
+        --yes|--dry-run|--skip-service-restart|--force)
+          update_args+=("${install_arg}")
+          ;;
+        --runtime-dir|--runtime-dir=*|--port|--port=*)
+          printf 'Autark-OS Portable Installer error: storage and port changes are not update operations. Use the installed migration/settings flow first.\n' >&2
+          return 1
+          ;;
+        *)
+          printf 'Autark-OS Portable Installer error: unsupported update option: %s\n' "${install_arg}" >&2
+          return 1
+          ;;
+      esac
+    done
+    set +e
+    AUTARK_OS_INSTALL_METHOD=portable "${temp_dir}/scripts/autark-os" update "${update_args[@]}"
+    local update_status=$?
+    set -e
+    if [[ "${update_status}" -ne 0 ]]; then
+      printf '\nAutark-OS Portable Installer update did not complete. Run autark-os update status and autark-os logs for details.\n' >&2
+      return "${update_status}"
+    fi
+    printf 'Autark-OS Portable Installer update completed successfully.\n'
+    return 0
+  fi
+
   printf 'This terminal installer will check this device, request administrator approval once, install Autark-OS, and start the service.\n'
   set +e
-  "${temp_dir}/scripts/autark-os" install --release-bundle "${temp_dir}" --guided "${install_args[@]}"
+  AUTARK_OS_INSTALL_METHOD=portable "${temp_dir}/scripts/autark-os" install --release-bundle "${temp_dir}" --guided "${install_args[@]}"
   local install_status=$?
   set -e
   if [[ "${install_status}" -ne 0 ]]; then

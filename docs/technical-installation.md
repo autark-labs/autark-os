@@ -54,6 +54,14 @@ The portable installer verifies its embedded release before privilege escalation
 
 The installer never removes a conflicting Docker, Podman, `containerd`, or `runc` installation automatically. It stops with the detected package names so an administrator can review the system intentionally.
 
+When the portable installer finds an existing Autark-OS service or
+configuration, it enters the shared update flow. It does not create a second
+installation. The updater verifies the embedded release, snapshots the current
+program/configuration/database state, updates the bundled runtime and service,
+performs a bounded health check, and restores the snapshot if verification
+fails. Storage-directory and port changes remain separate migration/settings
+operations and are rejected as installer update arguments.
+
 ### Debian Package (Advanced)
 
 ```bash
@@ -61,6 +69,12 @@ sudo apt install ./autark-os_<version>_amd64.deb
 ```
 
 The `.deb` installs the base service but deliberately does not add a third-party Docker repository from a package maintainer script. Ensure `docker info` and `docker compose version` work before using **Discover**, or use the portable installer for automatic Docker setup.
+
+Keep using the same delivery method for updates. A package-managed installation
+is updated through the downloaded `.deb`/apt transaction; a portable
+installation is updated through the Autark-OS release bundle. The unified
+`autark-os update` command selects the correct artifact from the public release
+manifest based on the recorded installation method and host architecture.
 
 Preview portable-installer host changes first when you want to review them:
 
@@ -101,6 +115,7 @@ autark-os doctor
 autark-os status
 autark-os url
 autark-os version
+autark-os update check
 ```
 
 The success handoff prints both `http://localhost:<port>` and a LAN address. A real installation also writes resumable state to `/var/lib/autark-os/installer/installer-state.json` and an append-only terminal log to `/var/lib/autark-os/installer/installer.log`. Backend output is retained at `/var/log/autark-os/autark-os.log` as well as in the system journal. A failed install names its stage, prints startup diagnostics when service readiness fails, and can be retried with the same installer and options.

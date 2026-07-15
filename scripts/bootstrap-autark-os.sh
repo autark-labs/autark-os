@@ -1660,6 +1660,7 @@ install_service() {
     AUTARK_OS_USER AUTARK_OS_GROUP AUTARK_OS_SERVICE_NAME AUTARK_OS_SERVICE_FILE \
     AUTARK_OS_CLI_LINK AUTARK_OS_JAVA_BIN AUTARK_OS_RUNTIME_IMAGE \
     AUTARK_OS_FILEOPS_HELPER AUTARK_OS_SUDOERS_FILE AUTARK_OS_ALLOW_INSTALL_COLLISION \
+    AUTARK_OS_UPDATE_CHANNEL AUTARK_OS_INSTALL_METHOD AUTARK_OS_UPDATE_REPOSITORY \
     AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED; do
     if [[ -n "${!passthrough_name:-}" ]]; then
       env_args+=("${passthrough_name}=${!passthrough_name}")
@@ -1670,13 +1671,15 @@ install_service() {
     if [[ -n "${RELEASE_BUNDLE_DIR}" && -x "${RELEASE_BUNDLE_DIR}/runtime/bin/java" ]]; then
       env_args+=("AUTARK_OS_JAVA_BIN=${RELEASE_BUNDLE_DIR}/runtime/bin/java")
     fi
-    local release_version release_sha release_date
+    local release_version release_sha release_date release_channel
     release_version="$(release_metadata_value AUTARK_OS_VERSION)"
     release_sha="$(release_metadata_value AUTARK_OS_BUILD_SHA)"
     release_date="$(release_metadata_value AUTARK_OS_BUILD_DATE)"
+    release_channel="$(release_metadata_value AUTARK_OS_UPDATE_CHANNEL)"
     [[ -n "${release_version}" ]] && env_args+=("AUTARK_OS_VERSION=${release_version}")
     [[ -n "${release_sha}" ]] && env_args+=("AUTARK_OS_BUILD_SHA=${release_sha}")
     [[ -n "${release_date}" ]] && env_args+=("AUTARK_OS_BUILD_DATE=${release_date}")
+    [[ -n "${release_channel}" ]] && env_args+=("AUTARK_OS_UPDATE_CHANNEL=${release_channel}")
   fi
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     args+=(--dry-run)
