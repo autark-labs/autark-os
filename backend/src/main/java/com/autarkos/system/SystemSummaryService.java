@@ -104,7 +104,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
 
     private SystemSummaryModels.AccessSummary access(List<AppInstanceView> apps) {
         boolean privateReady = apps.stream().anyMatch(app -> "private_ready".equals(app.accessState()));
-        boolean localReady = apps.stream().anyMatch(app -> "local_ready".equals(app.accessState()));
+        boolean localReady = apps.stream().anyMatch(app -> List.of("local_ready", "private_waiting", "private_needs_setup").contains(app.accessState()));
         if (privateReady) {
             return new SystemSummaryModels.AccessSummary("private_ready", "Private access is ready for at least one app.");
         }

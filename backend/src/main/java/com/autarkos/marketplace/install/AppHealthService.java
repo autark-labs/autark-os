@@ -24,6 +24,7 @@ class AppHealthService {
     private final AppSettingsPolicy settingsPolicy;
     private final AppAccessChecker accessChecker;
     private final ActivityLogService activityLogService;
+    private final PrivateAccessStateResolver privateAccessStateResolver;
 
     AppHealthService(
             InstalledAppRepository repository,
@@ -32,7 +33,8 @@ class AppHealthService {
             AppRuntimeStatusResolver runtimeStatusResolver,
             AppSettingsPolicy settingsPolicy,
             AppAccessChecker accessChecker,
-            ActivityLogService activityLogService) {
+            ActivityLogService activityLogService,
+            PrivateAccessStateResolver privateAccessStateResolver) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -40,6 +42,7 @@ class AppHealthService {
         this.settingsPolicy = settingsPolicy;
         this.accessChecker = accessChecker;
         this.activityLogService = activityLogService;
+        this.privateAccessStateResolver = privateAccessStateResolver;
     }
 
     AppHealthSnapshot healthSnapshot(InstalledApp app) {
@@ -51,11 +54,8 @@ class AppHealthService {
         AccessModels.AppAccessCheck localCheck = accessChecker.shouldCheckLocalAccess(manifest, accessUrl)
                 ? accessChecker.localHealthCheck(app.appId(), manifest, accessUrl)
                 : AccessModels.AppAccessCheck.notConfigured(app.appId());
-        AccessModels.AppAccessCheck privateCheck = settings.tailscaleEnabled()
-                ? settingsPolicy.privateAccessPortConflict(settings, accessUrl)
-                        ? AccessModels.AppAccessCheck.unreachable(app.appId(), settings.privateAccessUrl())
-                        : accessChecker.privateAccessCheck(app.appId(), settings.privateAccessUrl())
-                : AccessModels.AppAccessCheck.notConfigured(app.appId());
+        PrivateAccessState privateAccess = privateAccessStateResolver.resolve(app.appId(), settings, accessUrl);
+        AccessModels.AppAccessCheck privateCheck = privateAccessCheck(app.appId(), privateAccess);
         settings = updateAccessCheckTimestamps(app, settings, localCheck);
         AppHealthSnapshot snapshot = buildHealthSnapshot(app, runtime, manifest, settings, localCheck, privateCheck);
         repository.healthFor(app.appId())
@@ -105,14 +105,13 @@ class AppHealthService {
         boolean localBroken = localRequired && "unreachable".equals(localCheck.status());
         boolean privateBroken = settings != null
                 && "required".equals(settings.privateAccessRequirement())
-                && !"reachable".equals(privateCheck.status());
-        boolean privateEnabledBroken = !"not_configured".equals(privateCheck.status()) && "unreachable".equals(privateCheck.status());
+                && !"verified".equals(privateCheck.status());
         boolean containerOnly = Set.of("container", "no-web-ui", "none").contains(health.type());
 
         String status;
         String message;
         String detail;
-        if (AutarkOsStates.AppStatus.READY.equals(runtime.friendlyStatus()) && !localBroken && !privateBroken && !privateEnabledBroken) {
+        if (AutarkOsStates.AppStatus.READY.equals(runtime.friendlyStatus()) && !localBroken && !privateBroken) {
             status = AutarkOsStates.AppStatus.READY;
             message = health.successLabel();
             detail = containerOnly ? health.description() : "Docker is running and expected links are responding.";
@@ -132,10 +131,12 @@ class AppHealthService {
             status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
             message = health.failureLabel();
             detail = "Docker reports the app is running, but the local app link did not answer.";
-        } else if (privateBroken || privateEnabledBroken) {
+        } else if (privateBroken) {
             status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
-            message = "Private link is not responding";
-            detail = "Private access is expected, but the private HTTPS link did not answer.";
+            message = "Private link needs repair";
+            detail = privateCheck.message() == null || privateCheck.message().isBlank()
+                    ? "Private access is required, but the expected Tailscale Serve mapping is not verified."
+                    : privateCheck.message();
         } else if (AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(runtime.friendlyStatus())) {
             status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
             message = "Container health check is failing";
@@ -159,6 +160,18 @@ class AppHealthService {
                 privateCheck.status(),
                 startupGrace,
                 now);
+    }
+
+    private AccessModels.AppAccessCheck privateAccessCheck(String appId, PrivateAccessState state) {
+        if (state == null || "not_enabled".equals(state.status())) {
+            return AccessModels.AppAccessCheck.notConfigured(appId);
+        }
+        return new AccessModels.AppAccessCheck(
+                appId,
+                state.verified() ? state.verifiedPrivateUrl() : state.expectedPrivateUrl(),
+                state.status(),
+                state.message(),
+                Instant.now());
     }
 
     private Path composeFile(InstalledApp app) {

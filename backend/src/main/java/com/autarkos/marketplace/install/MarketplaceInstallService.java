@@ -193,19 +193,20 @@ public class MarketplaceInstallService {
                         "Creating private HTTPS link",
                         "Private access needs setup. " + privateAccess.message()));
             }
+            String verifiedPrivateUrl = privateAccess.configured() ? privateAccess.privateUrl() : null;
             GuideModels.PostInstallProvisioningResult provisioningResult = postInstallProvisioner.provision(manifest, runtimeConfiguration.accessUrl());
             provisioningResult.steps().forEach(step -> recordStep(steps, sink, step));
             logs.addAll(provisioningResult.logs());
-            GuideModels.PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult);
+            GuideModels.PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl, provisioningResult);
 
-            recordStep(steps, sink, InstallModels.InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl())));
+            recordStep(steps, sink, InstallModels.InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl)));
             if (!ownershipReconcilesToManaged(manifest.id())) {
                 String message = "Autark-OS could not confirm that this app is managed by this installation. The install was stopped so we do not show a service as installed when it is not under Autark-OS control.";
                 recordStep(steps, sink, InstallModels.InstallStep.failed("Confirming ownership", message));
                 installedAppRepository.recordEvent(manifest.id(), "install_failed", message);
                 recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, message, logs);
                 activityWarning("install_failed", "Install ownership check failed for " + manifest.name(), message, manifest.id());
-                return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
+                return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl, provisioningResult));
             }
 
             installedAppRepository.save(new InstalledApp(
@@ -222,7 +223,7 @@ public class MarketplaceInstallService {
             clearFailedPartialInstall(manifest.id());
             activitySuccess("install_completed", "Installed " + manifest.name(), manifest.name() + " is installed and managed by Autark-OS.", manifest.id());
 
-            return new InstallModels.InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Autark-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), privateAccess.privateUrl(), provisioningResult));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), "installed", manifest.name() + " is installed and managed by Autark-OS.", runtimeConfiguration.accessUrl(), plan, steps, logs, postInstallGuide, setupGuide(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl, provisioningResult));
         } catch (RuntimeException exception) {
             recordStep(steps, sink, InstallModels.InstallStep.failed("Install failed", exception.getMessage()));
             try {
@@ -383,7 +384,7 @@ public class MarketplaceInstallService {
         boolean privateAccessDesired = privateAccessRequested(manifest, runtimeConfiguration);
         return new InstallModels.InstallSettings(
                 accessUrl,
-                privateAccess.privateUrl(),
+                privateAccess.configured() ? privateAccess.privateUrl() : null,
                 privateAccessDesired,
                 runtimeConfiguration.storageSubfolders(),
                 runtimeConfiguration.backup(),

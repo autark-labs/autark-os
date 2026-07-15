@@ -401,7 +401,7 @@ function appInstanceToRuntimeView(app: AppInstanceView): AppRuntimeView {
       privateUrl: app.privateUrl,
       localPort: null,
       protocol: 'http',
-      privateLinkStatus: app.privateUrl ? 'configured' : 'not_configured',
+      privateLinkStatus: app.privateUrl ? 'verified' : 'not_configured',
       lastAccessCheckAt: null,
       lastSuccessfulAccessAt: null,
       lastRepairAttemptAt: null,
@@ -623,7 +623,7 @@ function isPrivateAccessOnlyWarning(app?: AppRuntimeView | null, health?: AppHea
   const appLooksReady = app?.friendlyStatus === 'Ready';
   const containerLooksReady = health.dockerStatus === 'Ready';
   const localAccessWorks = health.localAccessStatus === 'reachable' || health.localAccessStatus === 'not_configured';
-  const privateAccessProblem = ['missing', 'unreachable', 'not_configured'].includes(health.privateAccessStatus);
+  const privateAccessProblem = !['verified', 'not_enabled'].includes(health.privateAccessStatus);
   return appLooksReady && containerLooksReady && localAccessWorks && privateAccessProblem;
 }
 

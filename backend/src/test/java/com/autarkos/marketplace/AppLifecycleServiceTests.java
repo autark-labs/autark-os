@@ -34,7 +34,11 @@ import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleServeResult;
+import com.autarkos.network.tailscale.TailscaleServeConfig;
+import com.autarkos.network.tailscale.TailscaleServeMapping;
+import com.autarkos.network.tailscale.DevTailscaleService;
 import com.autarkos.network.tailscale.TailscaleService;
+import com.autarkos.network.tailscale.TailscaleStatus;
 import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.testsupport.RestorePointTestRecords;
 
@@ -436,7 +440,7 @@ class AppLifecycleServiceTests {
 
     @Test
     void reliabilityAggregatorReportsAHealthyEmptyManagedAppSet() {
-        ReliabilityModels.AppReliabilitySummary summary = new AppReliabilityService(repository).summarize(List.of());
+        ReliabilityModels.AppReliabilitySummary summary = new AppReliabilityService(repository, new DevTailscaleService()).summarize(List.of());
 
         assertThat(summary.posture()).isEqualTo("healthy");
         assertThat(summary.totalApps()).isZero();
@@ -611,21 +615,30 @@ class AppLifecycleServiceTests {
                 () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
-                new FakeTailscaleService(),
+                new com.autarkos.network.tailscale.DevTailscaleService(),
                 true,
                 null,
                 backupRepository);
         repository.saveSettings("private-worker", new InstallModels.InstallSettings(
                 null,
-                "https://autark-os-dev.tailnet.local:8090",
+                "https://autark-os-dev.tailnet.local:12890",
                 true,
                 java.util.Map.of(),
-                InstallModels.BackupPolicy.defaults()));
+                InstallModels.BackupPolicy.defaults(),
+                "private",
+                "optional",
+                8090,
+                "http",
+                null,
+                null,
+                null,
+                null,
+                true));
 
         AppHealthSnapshot snapshot = devService.healthSnapshot("private-worker");
 
         assertThat(snapshot.status()).isEqualTo("Ready");
-        assertThat(snapshot.privateAccessStatus()).isEqualTo("reachable");
+        assertThat(snapshot.privateAccessStatus()).isEqualTo("verified");
     }
 
     @Test
@@ -655,7 +668,7 @@ class AppLifecycleServiceTests {
 
         assertThat(app.accessRoute().privateLinkStatus()).isEqualTo("port_conflict");
         assertThat(app.accessRoute().primaryOpenUrl()).isEqualTo("http://localhost:8090");
-        assertThat(app.accessRoute().privateUrl()).isEqualTo("https://autark-os.example.ts.net:8090");
+        assertThat(app.accessRoute().privateUrl()).isNull();
     }
 
     @Test
@@ -902,7 +915,7 @@ class AppLifecycleServiceTests {
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().privateAccessUrl()).isEqualTo("https://autark-os.example.ts.net:" + tailscaleService.lastHttpsPort);
         assertThat(result.app().desiredAccess().mode()).isEqualTo("private");
-        assertThat(result.app().observedAccess().privateLinkStatus()).isEqualTo("configured");
+        assertThat(result.app().observedAccess().privateLinkStatus()).isEqualTo("verified");
         assertThat(result.app().accessRoute().primaryOpenUrl()).isEqualTo("https://autark-os.example.ts.net:" + tailscaleService.lastHttpsPort);
         assertThat(result.app().accessRoute().backendTargetUrl()).isEqualTo("http://127.0.0.1:8090");
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().lastRepairStatus()).isEqualTo("private_access_enabled");
@@ -952,6 +965,25 @@ class AppLifecycleServiceTests {
             lastLocalPort = localPort;
             lastHttpsPort = httpsPort;
             return new TailscaleServeResult(true, "https://autark-os.example.ts.net:" + httpsPort, "Private HTTPS link is ready.", List.of("fake tailscale serve " + localPort));
+        }
+
+        @Override
+        public TailscaleStatus status() {
+            return new TailscaleStatus(true, true, "connected", "Connected", "autark-os", "autark-os.example.ts.net", List.of("100.64.0.1"), "example.ts.net", "owner");
+        }
+
+        @Override
+        public TailscaleServeConfig serveConfig() {
+            if (lastLocalPort == 0 || lastHttpsPort == 0) {
+                return new TailscaleServeConfig(true, "available", "No mappings", List.of(), List.of(), Instant.now());
+            }
+            return new TailscaleServeConfig(
+                    true,
+                    "available",
+                    "Fake mapping",
+                    List.of(new TailscaleServeMapping(null, "https://autark-os.example.ts.net:" + lastHttpsPort + "/", lastHttpsPort, "http://127.0.0.1:" + lastLocalPort, lastLocalPort)),
+                    List.of(),
+                    Instant.now());
         }
     }
 

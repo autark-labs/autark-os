@@ -137,7 +137,7 @@ export function buildPrivateAppAccess(privateApps: AppRuntimeView[], tailscale: 
     const portConflict = app.accessRoute?.privateLinkStatus === 'port_conflict';
     const healthy = reconciliationItem?.status === 'healthy';
     const needsRepair = reconciliationItem != null && !['healthy', 'waiting'].includes(reconciliationItem.status);
-    const configured = !portConflict && (healthy || app.observedAccess?.privateLinkStatus === 'configured' || Boolean(privateUrl));
+    const configured = !portConflict && (healthy || app.observedAccess?.privateLinkStatus === 'verified') && Boolean(privateUrl);
     const missing = portConflict || needsRepair || app.observedAccess?.privateLinkStatus === 'missing';
     return {
       app,
@@ -178,7 +178,7 @@ export function buildReachabilityServices({
       issue,
       label: app.appName,
       localUrl,
-      openUrl: app.accessRoute?.primaryOpenUrl || privateUrl || localUrl,
+      openUrl: privateUrl || localUrl,
       privateUrl,
       status,
       statusLabel: issue ? 'Needs attention' : reachabilityStatusLabel(zone),
@@ -362,7 +362,11 @@ function classifyAppExposure(app: AppRuntimeView, tailscale: TailscaleStatus | n
     return 'public';
   }
   if (desiredMode === 'private' || desiredMode === 'local-and-private' || app.settings?.tailscaleEnabled) {
-    return 'tailnet';
+    const routeVerified = app.accessRoute?.privateLinkStatus === 'verified' && Boolean(app.accessRoute.privateUrl);
+    const observedVerified = app.observedAccess?.privateLinkStatus === 'verified' && Boolean(app.observedAccess.privateUrl);
+    if (routeVerified || observedVerified) {
+      return 'tailnet';
+    }
   }
   if (desiredMode === 'network') {
     return 'lan';

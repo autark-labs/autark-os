@@ -50,6 +50,7 @@ public class AppLifecycleService {
     private final AppHealthService healthService;
     private final AppContainerLifecycleService containerLifecycleService;
     private final AppReliabilityService reliabilityService;
+    private final PrivateAccessStateResolver privateAccessStateResolver;
     @Autowired
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService) {
         this.repository = repository;
@@ -58,12 +59,13 @@ public class AppLifecycleService {
         this.runtimeLayout = runtimeLayout;
         this.postInstallGuideBuilder = postInstallGuideBuilder;
         this.tailscaleService = tailscaleService;
-        this.accessChecker = new AppAccessChecker(devMode);
+        this.accessChecker = new AppAccessChecker();
         this.settingsPolicy = new AppSettingsPolicy(repository, runtimeStatusResolver);
-        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, runtimeStatusResolver, activityLogService);
-        this.healthService = new AppHealthService(repository, composeExecutor, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService);
+        this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
+        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService);
+        this.healthService = new AppHealthService(repository, composeExecutor, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
         this.containerLifecycleService = new AppContainerLifecycleService(repository, composeExecutor, activityLogService, this::refresh);
-        this.reliabilityService = new AppReliabilityService(repository);
+        this.reliabilityService = new AppReliabilityService(repository, tailscaleService);
         this.activityLogService = activityLogService;
         this.backupRepository = backupRepository;
         this.appTelemetryService = appTelemetryService;
@@ -150,7 +152,8 @@ public class AppLifecycleService {
         logs.add("Before repair: " + before.status() + " - " + before.message());
         String eventPrefix = automatic ? "guardian_" : "";
 
-        if (AutarkOsStates.AppStatus.READY.equals(before.status())) {
+        boolean repairingPrivateAccess = shouldRepairPrivateAccess(before);
+        if (AutarkOsStates.AppStatus.READY.equals(before.status()) && !repairingPrivateAccess) {
             saveRepairState(app, automatic ? "guardian_skipped_ready" : "manual_skipped_ready");
             repository.recordEvent(app.appId(), eventPrefix + "repair_skipped", app.appName() + " already looked ready.");
             activityInfo(eventPrefix + "repair_skipped", "Repair skipped for " + app.appName(), app.appName() + " already looks ready.", app.appId());
@@ -160,7 +163,6 @@ public class AppLifecycleService {
         saveRepairState(app, automatic ? "guardian_repair_running" : "manual_repair_running");
         repository.recordEvent(app.appId(), eventPrefix + "repair_started", "Autark-OS noticed: " + before.message() + ". " + repairPlanLabel(before));
         activityWarning(eventPrefix + "repair_started", "Repair started for " + app.appName(), before.message() + ". " + repairPlanLabel(before), app.appId());
-        boolean repairingPrivateAccess = shouldRepairPrivateAccess(before);
         if (repairingPrivateAccess) {
             try {
                 AppActionResult result = enablePrivateAccess(appId);
@@ -195,7 +197,7 @@ public class AppLifecycleService {
 
         AppHealthSnapshot after = healthService.healthSnapshot(app);
         logs.add("After repair: " + after.status() + " - " + after.message());
-        boolean privateAccessRepaired = repairingPrivateAccess && "reachable".equals(after.privateAccessStatus());
+        boolean privateAccessRepaired = repairingPrivateAccess && "verified".equals(after.privateAccessStatus());
         String status = AutarkOsStates.AppStatus.READY.equals(after.status()) || AutarkOsStates.AppStatus.STARTING.equals(after.status()) || privateAccessRepaired ? AutarkOsStates.RestorePointStatus.COMPLETED : "needs_attention";
         String message = repairMessage(app, before, after, privateAccessRepaired);
         saveRepairState(app, automatic ? "guardian_repair_" + status : "manual_repair_" + status);
@@ -404,10 +406,8 @@ public class AppLifecycleService {
     }
 
     private TailscaleServeResult disablePrivateAccessMapping(InstalledApp app, InstallModels.InstallSettings settings) {
-        Integer port = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
-        if (port == null) {
-            port = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(firstPresent(settings.accessUrl(), app.accessUrl())) : settings.expectedLocalPort();
-        }
+        String localUrl = firstPresent(settings.accessUrl(), app.accessUrl());
+        Integer port = privateAccessStateResolver.resolve(app.appId(), settings, localUrl).expectedHttpsPort();
         if (port == null) {
             return new TailscaleServeResult(true, settings.privateAccessUrl(), "No private HTTPS port was stored for this app.", List.of("No private HTTPS port was stored for this app."));
         }
@@ -421,9 +421,7 @@ public class AppLifecycleService {
     }
 
     private boolean shouldRepairPrivateAccess(AppHealthSnapshot snapshot) {
-        return "Private link is not responding".equals(snapshot.message())
-                || "unreachable".equals(snapshot.privateAccessStatus())
-                || "missing".equals(snapshot.privateAccessStatus());
+        return List.of("unreachable", "missing", "mismatched", "port_conflict", "unknown").contains(snapshot.privateAccessStatus());
     }
 
     private String repairMessage(InstalledApp app, AppHealthSnapshot before, AppHealthSnapshot after, boolean privateAccessRepaired) {
@@ -510,8 +508,6 @@ public class AppLifecycleService {
         String accessUrl = runtimeStatusResolver.accessUrl(app, manifest, containers);
         InstallModels.InstallSettings settings = settingsPolicy.normalizeSettings(repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(accessUrl)), app, manifest, accessUrl);
         RuntimeModels.AppTelemetry telemetry = includeTelemetry ? telemetry(containers) : RuntimeModels.AppTelemetry.unavailable();
-        GuideModels.PostInstallGuide usageGuide = usageGuide(manifest, accessUrl, settings.privateAccessUrl());
-        GuideModels.AppSetupGuide setupGuide = setupGuide(manifest, accessUrl, settings.privateAccessUrl());
         if (accessUrl != null && !accessUrl.equals(app.accessUrl())) {
             repository.save(new InstalledApp(
                     app.appId(),
@@ -540,9 +536,13 @@ public class AppLifecycleService {
                     settings.autoRepairEnabled()), app, manifest, accessUrl);
             repository.saveSettings(app.appId(), settings);
         }
-        AccessModels.AccessDesiredState desiredAccess = settingsPolicy.desiredAccessState(settings, manifest, accessUrl);
-        AccessModels.AccessObservedState observedAccess = settingsPolicy.observedAccessState(settings, accessUrl);
-        AccessModels.AppAccessRoute accessRoute = settingsPolicy.accessRoute(settings, accessUrl, observedAccess);
+        PrivateAccessState privateAccess = privateAccessStateResolver.resolve(app.appId(), settings, accessUrl);
+        String verifiedPrivateUrl = privateAccess.verifiedPrivateUrl();
+        GuideModels.PostInstallGuide usageGuide = usageGuide(manifest, accessUrl, verifiedPrivateUrl);
+        GuideModels.AppSetupGuide setupGuide = setupGuide(manifest, accessUrl, verifiedPrivateUrl);
+        AccessModels.AccessDesiredState desiredAccess = settingsPolicy.desiredAccessState(settings, manifest, accessUrl, privateAccess);
+        AccessModels.AccessObservedState observedAccess = settingsPolicy.observedAccessState(settings, accessUrl, privateAccess);
+        AccessModels.AppAccessRoute accessRoute = settingsPolicy.accessRoute(settings, accessUrl, observedAccess, privateAccess);
         AppHealthSnapshot healthSnapshot = repository.healthFor(app.appId()).orElse(null);
         String remediationStatus = healthSnapshot == null ? status.friendlyStatus() : healthSnapshot.status();
         String backupState = backupState(app.appId(), settings);

@@ -72,7 +72,7 @@ public class AccessStatusService {
                 app.name(),
                 clean(app.localUrl()),
                 clean(app.privateUrl()),
-                List.of("local_ready", "private_ready").contains(app.accessState()),
+                List.of("local_ready", "private_ready", "private_waiting", "private_needs_setup").contains(app.accessState()),
                 null);
     }
 
@@ -101,9 +101,11 @@ public class AccessStatusService {
                     "Private access is mocked in development",
                     "Autark-OS is using a development Tailscale mock. This confirms UI behavior, not production private access.",
                     AutarkOsAction.route("open-diagnostics", "View diagnostics", "/diagnostics")));
+            appendAppAccessIssues(issues, apps);
             return issues;
         }
         if (!privateAccessRequested(apps)) {
+            appendAppAccessIssues(issues, apps);
             return issues;
         }
         if (!status.installed()) {
@@ -134,6 +136,7 @@ public class AccessStatusService {
                     "Private links need this host to have a Tailscale DNS name.",
                     AutarkOsAction.route("open-tailscale-setup", "Set up Tailscale", "/access")));
         }
+        appendAppAccessIssues(issues, apps);
         return issues;
     }
 
@@ -147,13 +150,23 @@ public class AccessStatusService {
         apps.stream()
                 .filter(app -> hasText(app.localUrl()) || hasText(app.privateUrl()))
                 .limit(3)
-                .map(app -> AutarkOsAction.get("open-" + app.appInstanceId(), "Open " + app.name(), hasText(app.privateUrl()) ? app.privateUrl() : app.localUrl()))
+                .map(app -> AutarkOsAction.get(
+                        "open-" + app.appInstanceId(),
+                        "Open " + app.name(),
+                        "private_ready".equals(app.accessState()) && hasText(app.privateUrl()) ? app.privateUrl() : app.localUrl()))
                 .forEach(actions::add);
         return actions;
     }
 
     private boolean privateAccessRequested(List<AppInstanceView> apps) {
-        return apps.stream().anyMatch(app -> hasText(app.privateUrl()) || "private_ready".equals(app.accessState()));
+        return apps.stream().anyMatch(app -> hasText(app.privateUrl()) || app.accessState().startsWith("private_"));
+    }
+
+    private void appendAppAccessIssues(List<AutarkOsIssue> issues, List<AppInstanceView> apps) {
+        apps.stream()
+                .flatMap(app -> app.issues().stream())
+                .filter(issue -> "access".equals(issue.scope()))
+                .forEach(issues::add);
     }
 
     private String clean(String primary, String fallback) {

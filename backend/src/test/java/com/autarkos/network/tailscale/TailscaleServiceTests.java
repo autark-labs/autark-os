@@ -72,33 +72,42 @@ class TailscaleServiceTests {
     @Test
     void serveHttpsSetsOperatorWhenTailscaleDeniesServeConfig() {
         List<List<String>> commands = new ArrayList<>();
+        int[] serveAttempts = { 0 };
         TailscaleService service = new TailscaleService(command -> {
             commands.add(Arrays.asList(command));
             String joined = String.join(" ", command);
             if (joined.equals("tailscale status --json")) {
                 return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
             }
-            if (joined.equals("tailscale serve --bg --https=5984 http://127.0.0.1:5984") && commands.size() == 2) {
-                return new TailscaleService.CommandResult(1, List.of(
-                        "sending serve config: Access denied: serve config denied",
-                        "Use 'sudo tailscale serve --bg --https=5984 http://127.0.0.1:5984'.",
-                        "To not require root, use 'sudo tailscale set --operator=$USER' once."), false);
-            }
-            if (joined.startsWith("sudo -n tailscale set --operator=")) {
-                return new TailscaleService.CommandResult(0, List.of("operator set"), false);
-            }
             if (joined.equals("tailscale serve --bg --https=5984 http://127.0.0.1:5984")) {
+                serveAttempts[0]++;
+                if (serveAttempts[0] == 1) {
+                    return new TailscaleService.CommandResult(1, List.of(
+                            "changing settings via 'tailscale serve' requires operator permissions",
+                            "Use 'sudo tailscale serve --bg --https=5984 http://127.0.0.1:5984'.",
+                            "To not require root, use 'sudo tailscale set --operator=$USER' once."), false);
+                }
                 return new TailscaleService.CommandResult(0, List.of("available at https://autark-os.tail123.ts.net:5984"), false);
             }
+            if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator")) {
+                return new TailscaleService.CommandResult(0, List.of("operator set"), false);
+            }
+            if (joined.equals("tailscale serve status --json")) {
+                return new TailscaleService.CommandResult(0, List.of(nodeServeStatusJson(5984, 5984)), false);
+            }
+            if (joined.equals("tailscale serve get-config --all")) {
+                return new TailscaleService.CommandResult(0, List.of("{\"version\":\"0.0.1\"}"), false);
+            }
             return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
-        });
+        }, "autarkos");
 
         TailscaleServeResult result = service.serveHttps(5984);
 
         assertThat(result.configured()).isTrue();
         assertThat(result.privateUrl()).isEqualTo("https://autark-os.tail123.ts.net:5984");
         assertThat(commands)
-                .anySatisfy(command -> assertThat(String.join(" ", command)).startsWith("sudo -n tailscale set --operator="));
+                .anySatisfy(command -> assertThat(String.join(" ", command))
+                        .isEqualTo("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator"));
     }
 
     @Test
@@ -111,17 +120,17 @@ class TailscaleServiceTests {
             if (joined.equals("tailscale serve --bg --https=5984 http://127.0.0.1:5984")) {
                 return new TailscaleService.CommandResult(1, List.of("Access denied: serve config denied. To not require root, use 'sudo tailscale set --operator=$USER' once."), false);
             }
-            if (joined.startsWith("sudo -n tailscale")) {
+            if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator")) {
                 return new TailscaleService.CommandResult(1, List.of("sudo: a password is required"), false);
             }
             return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
-        });
+        }, "autarkos");
 
         TailscaleServeResult result = service.serveHttps(5984);
 
         assertThat(result.configured()).isFalse();
-        assertThat(result.message()).contains("sudo tailscale set --operator=");
-        assertThat(result.privateUrl()).isEqualTo("https://autark-os.tail123.ts.net:5984");
+        assertThat(result.message()).contains("cannot manage Serve yet");
+        assertThat(result.privateUrl()).isNull();
     }
 
     @Test
@@ -198,8 +207,56 @@ class TailscaleServiceTests {
     }
 
     @Test
+    void serveConfigParsesCurrentNodeTcpAndWebShapeEvenWhenGetConfigIsEmpty() {
+        TailscaleService service = new TailscaleService(command -> {
+            String joined = String.join(" ", command);
+            if (joined.equals("tailscale serve status --json")) {
+                return new TailscaleService.CommandResult(0, List.of(nodeServeStatusJson(14743, 8090)), false);
+            }
+            if (joined.equals("tailscale serve get-config --all")) {
+                return new TailscaleService.CommandResult(0, List.of("{\"version\":\"0.0.1\"}"), false);
+            }
+            return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
+        });
+
+        TailscaleServeConfig config = service.serveConfig();
+
+        assertThat(config.available()).isTrue();
+        assertThat(config.mappings()).singleElement().satisfies(mapping -> {
+            assertThat(mapping.servePort()).isEqualTo(14743);
+            assertThat(mapping.targetPort()).isEqualTo(8090);
+            assertThat(mapping.target()).isEqualTo("http://127.0.0.1:8090");
+            assertThat(mapping.endpoint()).isEqualTo("https://autark-os.tail123.ts.net:14743/");
+        });
+    }
+
+    @Test
+    void successfulServeCommandDoesNotPublishUrlUntilMappingIsVerified() {
+        TailscaleService service = new TailscaleService(command -> {
+            String joined = String.join(" ", command);
+            if (joined.equals("tailscale status --json")) {
+                return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
+            }
+            if (joined.equals("tailscale serve --bg --https=14743 http://127.0.0.1:8090")) {
+                return new TailscaleService.CommandResult(0, List.of("Serve started"), false);
+            }
+            if (joined.equals("tailscale serve status --json") || joined.equals("tailscale serve get-config --all")) {
+                return new TailscaleService.CommandResult(0, List.of("{}"), false);
+            }
+            return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
+        });
+
+        TailscaleServeResult result = service.serveHttps(8090, 14743);
+
+        assertThat(result.configured()).isFalse();
+        assertThat(result.privateUrl()).isNull();
+        assertThat(result.message()).contains("could not verify the live mapping");
+    }
+
+    @Test
     void disableHttpsRemovesServeEndpointByPort() {
         List<List<String>> commands = new ArrayList<>();
+        boolean[] removed = { false };
         TailscaleService service = new TailscaleService(command -> {
             commands.add(Arrays.asList(command));
             String joined = String.join(" ", command);
@@ -207,7 +264,14 @@ class TailscaleServiceTests {
                 return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
             }
             if (joined.equals("tailscale serve --https=5984 off")) {
+                removed[0] = true;
                 return new TailscaleService.CommandResult(0, List.of("removed"), false);
+            }
+            if (joined.equals("tailscale serve status --json")) {
+                return new TailscaleService.CommandResult(0, List.of(removed[0] ? "{}" : nodeServeStatusJson(5984, 5984)), false);
+            }
+            if (joined.equals("tailscale serve get-config --all")) {
+                return new TailscaleService.CommandResult(0, List.of("{}"), false);
             }
             return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
         });
@@ -221,25 +285,64 @@ class TailscaleServiceTests {
     }
 
     @Test
-    void disableHttpsUsesSudoFallbackWhenOperatorPermissionIsMissing() {
+    void disableHttpsConfiguresOperatorThenRetriesWithoutRunningArbitraryServeAsRoot() {
+        int[] removeAttempts = { 0 };
+        boolean[] removed = { false };
+        List<String> commands = new ArrayList<>();
         TailscaleService service = new TailscaleService(command -> {
             String joined = String.join(" ", command);
+            commands.add(joined);
             if (joined.equals("tailscale status --json")) {
                 return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
             }
-            if (joined.equals("tailscale serve --https=5984 off")) {
-                return new TailscaleService.CommandResult(1, List.of("Access denied: serve config denied. Use sudo tailscale serve."), false);
+            if (joined.equals("tailscale serve status --json")) {
+                return new TailscaleService.CommandResult(0, List.of(removed[0] ? "{}" : nodeServeStatusJson(5984, 5984)), false);
             }
-            if (joined.equals("sudo -n tailscale serve --https=5984 off")) {
-                return new TailscaleService.CommandResult(0, List.of("removed with sudo"), false);
+            if (joined.equals("tailscale serve get-config --all")) {
+                return new TailscaleService.CommandResult(0, List.of("{}"), false);
+            }
+            if (joined.equals("tailscale serve --https=5984 off")) {
+                removeAttempts[0]++;
+                if (removeAttempts[0] == 1) {
+                    return new TailscaleService.CommandResult(1, List.of("Access denied: serve config denied. Use sudo tailscale serve."), false);
+                }
+                removed[0] = true;
+                return new TailscaleService.CommandResult(0, List.of("removed"), false);
+            }
+            if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator")) {
+                return new TailscaleService.CommandResult(0, List.of("operator configured"), false);
             }
             return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
-        });
+        }, "autarkos");
 
         TailscaleServeResult result = service.disableHttps(5984);
 
         assertThat(result.configured()).isTrue();
-        assertThat(result.message()).contains("elevated");
+        assertThat(result.message()).contains("removed");
+        assertThat(commands).contains("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator");
+        assertThat(commands).noneMatch(command -> command.startsWith("sudo -n tailscale serve"));
+    }
+
+    @Test
+    void disableHttpsIsIdempotentWhenHandlerIsAlreadyAbsent() {
+        List<String> commands = new ArrayList<>();
+        TailscaleService service = new TailscaleService(command -> {
+            String joined = String.join(" ", command);
+            commands.add(joined);
+            if (joined.equals("tailscale status --json")) {
+                return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
+            }
+            if (joined.equals("tailscale serve status --json") || joined.equals("tailscale serve get-config --all")) {
+                return new TailscaleService.CommandResult(0, List.of("{}"), false);
+            }
+            return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
+        });
+
+        TailscaleServeResult result = service.disableHttps(14743);
+
+        assertThat(result.configured()).isTrue();
+        assertThat(result.message()).contains("already removed");
+        assertThat(commands).doesNotContain("tailscale serve --https=14743 off");
     }
 
     private String connectedStatusJson() {
@@ -258,5 +361,26 @@ class TailscaleServiceTests {
                   }
                 }
                 """;
+    }
+
+    private String nodeServeStatusJson(int httpsPort, int localPort) {
+        return """
+                {
+                  "TCP": {
+                    "%d": {
+                      "HTTPS": true
+                    }
+                  },
+                  "Web": {
+                    "autark-os.tail123.ts.net:%d": {
+                      "Handlers": {
+                        "/": {
+                          "Proxy": "http://127.0.0.1:%d"
+                        }
+                      }
+                    }
+                  }
+                }
+                """.formatted(httpsPort, httpsPort, localPort);
     }
 }

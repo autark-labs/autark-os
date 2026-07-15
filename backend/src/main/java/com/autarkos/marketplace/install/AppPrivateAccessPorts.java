@@ -15,6 +15,9 @@ final class AppPrivateAccessPorts {
     }
 
     static int selectHttpsPort(String appId, int localPort, InstalledAppRepository repository) {
+        if (repository == null) {
+            return defaultHttpsPort(appId, localPort);
+        }
         Set<Integer> usedPorts = usedPorts(appId, repository);
         Integer existingPrivatePort = repository.settingsFor(appId)
                 .map(InstallModels.InstallSettings::privateAccessUrl)
@@ -33,6 +36,17 @@ final class AppPrivateAccessPorts {
             }
         }
         throw new InstallationException("Autark-OS could not find an available private HTTPS port for this app.");
+    }
+
+    static int defaultHttpsPort(String appId, int localPort) {
+        int startOffset = Math.floorMod(appId.hashCode(), PRIVATE_PORT_COUNT);
+        for (int offset = 0; offset < PRIVATE_PORT_COUNT; offset++) {
+            int candidate = FIRST_PRIVATE_PORT + ((startOffset + offset) % PRIVATE_PORT_COUNT);
+            if (candidate != localPort) {
+                return candidate;
+            }
+        }
+        throw new InstallationException("Autark-OS could not select a private HTTPS port for this app.");
     }
 
     static Integer portFromUrl(String accessUrl) {

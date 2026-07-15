@@ -33,7 +33,7 @@ class AppUninstallService {
     private final RuntimeLayout runtimeLayout;
     private final BackupRepository backupRepository;
     private final TailscaleService tailscaleService;
-    private final AppRuntimeStatusResolver runtimeStatusResolver;
+    private final PrivateAccessStateResolver privateAccessStateResolver;
     private final ActivityLogService activityLogService;
 
     AppUninstallService(
@@ -42,14 +42,13 @@ class AppUninstallService {
             RuntimeLayout runtimeLayout,
             BackupRepository backupRepository,
             TailscaleService tailscaleService,
-            AppRuntimeStatusResolver runtimeStatusResolver,
             ActivityLogService activityLogService) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.runtimeLayout = runtimeLayout;
         this.backupRepository = backupRepository;
         this.tailscaleService = tailscaleService;
-        this.runtimeStatusResolver = runtimeStatusResolver;
+        this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.activityLogService = activityLogService;
     }
 
@@ -91,10 +90,8 @@ class AppUninstallService {
     }
 
     private TailscaleServeResult disablePrivateAccessMapping(InstalledApp app, InstallModels.InstallSettings settings) {
-        Integer port = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
-        if (port == null) {
-            port = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(firstPresent(settings.accessUrl(), app.accessUrl())) : settings.expectedLocalPort();
-        }
+        String localUrl = firstPresent(settings.accessUrl(), app.accessUrl());
+        Integer port = privateAccessStateResolver.resolve(app.appId(), settings, localUrl).expectedHttpsPort();
         if (port == null) {
             return new TailscaleServeResult(true, settings.privateAccessUrl(), "No private HTTPS port was stored for this app.", List.of("No private HTTPS port was stored for this app."));
         }

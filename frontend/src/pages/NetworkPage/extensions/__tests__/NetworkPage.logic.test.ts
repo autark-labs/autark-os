@@ -13,7 +13,8 @@ test('reachability services include app and observed service icon URLs', () => {
       image: '/app-images/vaultwarden.svg',
       desiredAccess: { mode: 'private' },
       settings: { tailscaleEnabled: true },
-      observedAccess: { privateUrl: 'https://vault.tailnet', localUrl: 'http://localhost:8080' },
+      observedAccess: { privateUrl: 'https://vault.tailnet', privateLinkStatus: 'verified', localUrl: 'http://localhost:8080' },
+      accessRoute: { privateUrl: 'https://vault.tailnet', privateLinkStatus: 'verified' },
     } as unknown as AppRuntimeView],
     pinnedExternalServices: [{
       id: 'obs_router',
@@ -33,6 +34,30 @@ test('reachability services include app and observed service icon URLs', () => {
   assert.equal(services[1].iconUrl, '/custom/router.svg');
   assert.equal(services[0].zone, 'tailnet');
   assert.equal(services[1].zone, 'lan');
+});
+
+test('requested but unverified private access keeps the app in its reachable local zone', () => {
+  const services = buildReachabilityServices({
+    apps: [{
+      appId: 'vaultwarden',
+      appName: 'Vaultwarden',
+      accessUrl: 'http://localhost:8090',
+      desiredAccess: { mode: 'private' },
+      settings: { tailscaleEnabled: true },
+      observedAccess: { privateUrl: null, privateLinkStatus: 'missing', localUrl: 'http://localhost:8090' },
+      accessRoute: { primaryOpenUrl: 'http://localhost:8090', privateUrl: null, privateLinkStatus: 'missing' },
+    } as unknown as AppRuntimeView],
+    pinnedExternalServices: [],
+    reconciliation: {
+      apps: [{ appId: 'vaultwarden', status: 'missing', message: 'Private link is missing' }],
+    } as never,
+    tailscale: { connected: true } as unknown as TailscaleStatus,
+  });
+
+  assert.equal(services[0].zone, 'local');
+  assert.equal(services[0].privateUrl, null);
+  assert.equal(services[0].openUrl, 'http://localhost:8090');
+  assert.equal(services[0].status, 'warning');
 });
 
 test('observed reachability services fall back to catalog icons', () => {

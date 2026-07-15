@@ -3,30 +3,40 @@ package com.autarkos.marketplace.install;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.ReliabilityModels;
+import com.autarkos.network.tailscale.TailscaleServeConfig;
+import com.autarkos.network.tailscale.TailscaleService;
+import com.autarkos.network.tailscale.TailscaleStatus;
 
 /** Builds the repository-backed reliability view used by monitoring and support. */
 public final class AppReliabilityService {
 
     private final InstalledAppRepository repository;
+    private final TailscaleService tailscaleService;
+    private final PrivateAccessStateResolver privateAccessStateResolver;
 
-    public AppReliabilityService(InstalledAppRepository repository) {
+    public AppReliabilityService(InstalledAppRepository repository, TailscaleService tailscaleService) {
         this.repository = repository;
+        this.tailscaleService = tailscaleService;
+        this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
     }
 
     public ReliabilityModels.AppReliabilitySummary summarize(List<InstalledApp> apps) {
         Instant checkedAt = Instant.now();
+        Map<String, PrivateAccessState> privateAccessByApp = privateAccessStates(apps);
         int ready = countByStatus(apps, AutarkOsStates.AppStatus.READY);
         int starting = countByStatus(apps, AutarkOsStates.AppStatus.STARTING);
         int paused = countByStatus(apps, AutarkOsStates.AppStatus.PAUSED);
         int needsAttention = countByStatus(apps, AutarkOsStates.AppStatus.NEEDS_ATTENTION);
         int unavailable = countByStatus(apps, AutarkOsStates.AppStatus.UNAVAILABLE);
         List<ReliabilityModels.AppReliabilityIssue> issues = apps.stream()
-                .filter(this::hasReliabilityIssue)
-                .map(this::reliabilityIssue)
+                .filter(app -> hasReliabilityIssue(app, privateAccessByApp.get(app.appId())))
+                .map(app -> reliabilityIssue(app, privateAccessByApp.get(app.appId())))
                 .toList();
         List<ReliabilityModels.AppReliabilityActivity> allActivity = apps.stream()
                 .flatMap(app -> repository.eventsFor(app.appId(), 20).stream()
@@ -49,7 +59,7 @@ public final class AppReliabilityService {
                 paused,
                 needsAttention,
                 unavailable,
-                (int) apps.stream().filter(app -> settingsFor(app).tailscaleEnabled()).count(),
+                (int) privateAccessByApp.values().stream().filter(PrivateAccessState::requested).count(),
                 (int) apps.stream().filter(app -> settingsFor(app).autoRepairEnabled()).count(),
                 successfulRepairs,
                 failedRepairs,
@@ -69,19 +79,19 @@ public final class AppReliabilityService {
                 .count();
     }
 
-    private boolean hasReliabilityIssue(InstalledApp app) {
+    private boolean hasReliabilityIssue(InstalledApp app, PrivateAccessState privateAccess) {
         String status = displayHealthStatus(app);
         return AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(status)
                 || AutarkOsStates.AppStatus.UNAVAILABLE.equals(status)
-                || privateLinkMissing(app);
+                || privateAccess != null && privateAccess.needsAttention();
     }
 
-    private ReliabilityModels.AppReliabilityIssue reliabilityIssue(InstalledApp app) {
+    private ReliabilityModels.AppReliabilityIssue reliabilityIssue(InstalledApp app, PrivateAccessState privateAccess) {
         AppHealthSnapshot health = repository.healthFor(app.appId()).orElse(null);
-        boolean privateMissing = privateLinkMissing(app);
-        String message = privateMissing ? "Private link is missing" : health == null ? "Waiting for health check" : health.message();
-        String detail = privateMissing
-                ? "Autark-OS expects a private link for this app, but Tailscale Serve does not currently have one configured."
+        boolean privateNeedsAttention = privateAccess != null && privateAccess.needsAttention();
+        String message = privateNeedsAttention ? privateAccess.message() : health == null ? "Waiting for health check" : health.message();
+        String detail = privateNeedsAttention
+                ? privateAccess.detail()
                 : health == null ? "Autark-OS has not recorded a health check for this app yet." : health.detail();
         return new ReliabilityModels.AppReliabilityIssue(
                 app.appId(),
@@ -89,7 +99,7 @@ public final class AppReliabilityService {
                 displayHealthStatus(app),
                 message,
                 detail,
-                privateMissing ? "Repair private link" : "Try to fix",
+                privateNeedsAttention ? "Repair private link" : "Try to fix",
                 !AutarkOsStates.AppStatus.PAUSED.equals(displayHealthStatus(app)),
                 health == null ? Instant.now() : health.checkedAt());
     }
@@ -111,13 +121,19 @@ public final class AppReliabilityService {
         };
     }
 
-    private boolean privateLinkMissing(InstalledApp app) {
-        InstallModels.InstallSettings settings = settingsFor(app);
-        return settings.tailscaleEnabled() && (settings.privateAccessUrl() == null || settings.privateAccessUrl().isBlank());
-    }
-
     private InstallModels.InstallSettings settingsFor(InstalledApp app) {
         return repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
+    }
+
+    private Map<String, PrivateAccessState> privateAccessStates(List<InstalledApp> apps) {
+        TailscaleStatus tailscale = tailscaleService.status();
+        TailscaleServeConfig config = tailscale.connected()
+                ? tailscaleService.serveConfig()
+                : TailscaleServeConfig.unavailable("not_connected", "Tailscale is not connected.", List.of());
+        return apps.stream().collect(Collectors.toMap(
+                InstalledApp::appId,
+                app -> privateAccessStateResolver.resolve(app.appId(), settingsFor(app), app.accessUrl(), tailscale, config),
+                (left, right) -> left));
     }
 
     private boolean isReliabilityEvent(AppEvent event) {

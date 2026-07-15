@@ -34,7 +34,7 @@ class AccessStatusServiceTests {
     void requestedPrivateAccessReportsSignedOutTailscale() {
         AccessStatusService service = service(
                 TailscaleStatus.notConnected("Tailscale is waiting for sign in."),
-                List.of(app("appinst_vaultwarden", "Vaultwarden", "not_ready", "http://host:8090", "https://vaultwarden.tailnet.test")));
+                List.of(app("appinst_vaultwarden", "Vaultwarden", "private_waiting", "http://host:8090", "")));
 
         AccessStatus status = service.status();
 
@@ -45,6 +45,26 @@ class AccessStatusServiceTests {
             assertThat(issue.primaryAction()).isPresent();
         });
         assertThat(status.actions()).extracting(action -> action.id()).contains("open-tailscale-setup");
+    }
+
+    @Test
+    void missingPrivateMappingKeepsLocalAppUsableWithoutPublishingExpectedPrivateUrl() {
+        AccessStatusService service = service(
+                new TailscaleStatus(true, true, "connected", "Connected.", "autark-os", "autark-os.tailnet.test", List.of("100.64.0.10"), "tailnet", "user@example.test"),
+                List.of(app("appinst_vaultwarden", "Vaultwarden", "private_needs_setup", "http://host:8090", "")));
+
+        AccessStatus status = service.status();
+
+        assertThat(status.mode()).isEqualTo("private_needs_setup");
+        assertThat(status.apps()).singleElement().satisfies(app -> {
+            assertThat(app.localUrl()).isEqualTo("http://host:8090");
+            assertThat(app.privateUrl()).isEmpty();
+            assertThat(app.serverCanReach()).isTrue();
+        });
+        assertThat(status.actions())
+                .filteredOn(action -> action.id().equals("open-appinst_vaultwarden"))
+                .singleElement()
+                .satisfies(action -> assertThat(action.href()).contains("http://host:8090"));
     }
 
     @Test

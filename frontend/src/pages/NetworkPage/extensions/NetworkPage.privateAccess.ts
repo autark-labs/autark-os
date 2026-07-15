@@ -5,13 +5,12 @@ export function privateAccessUrlForApp(
   app: AppRuntimeView,
   reconciliationItem: PrivateAccessReconciliationItem | null = null,
 ) {
-  if (app.accessRoute?.privateLinkStatus === 'port_conflict') {
-    return reconciliationItem?.expectedPrivateUrl || reconciliationItem?.actualPrivateUrl || null;
+  if (reconciliationItem && reconciliationItem.status !== 'healthy') {
+    return null;
   }
-  return reconciliationItem?.expectedPrivateUrl
-    || reconciliationItem?.actualPrivateUrl
-    || app.accessRoute?.privateUrl
-    || app.settings?.privateAccessUrl
-    || app.observedAccess?.privateUrl
+  return reconciliationItem?.actualPrivateUrl
+    || (reconciliationItem?.status === 'healthy' ? reconciliationItem.expectedPrivateUrl : null)
+    || (app.accessRoute?.privateLinkStatus === 'verified' ? app.accessRoute.privateUrl : null)
+    || (app.observedAccess?.privateLinkStatus === 'verified' ? app.observedAccess.privateUrl : null)
     || null;
 }

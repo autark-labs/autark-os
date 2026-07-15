@@ -68,3 +68,36 @@ grep -q 'must stay under' /tmp/autark-os-fileops-out.txt
   --backup-root "${backup_root}" \
   --path "${safety}" >/dev/null
 [[ ! -e "${safety}" ]]
+
+python3 - "${repo_root}/scripts/autark-os-fileops" "${tmp_dir}" <<'PY'
+import argparse
+import importlib.machinery
+import importlib.util
+from pathlib import Path
+import subprocess
+import sys
+from unittest.mock import patch
+
+sys.dont_write_bytecode = True
+script_path = Path(sys.argv[1])
+fake_tailscale = Path(sys.argv[2]) / "tailscale"
+fake_tailscale.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+fake_tailscale.chmod(0o755)
+
+loader = importlib.machinery.SourceFileLoader("autark_os_fileops", str(script_path))
+spec = importlib.util.spec_from_loader(loader.name, loader)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+completed = subprocess.CompletedProcess([], 0, stdout="", stderr="")
+with patch.object(module, "TRUSTED_TAILSCALE_PATHS", (fake_tailscale,)), patch.object(module.subprocess, "run", return_value=completed) as run:
+    module.configure_tailscale_operator(argparse.Namespace())
+
+run.assert_called_once_with(
+    [str(fake_tailscale), "set", "--operator=autarkos"],
+    check=False,
+    capture_output=True,
+    text=True,
+)
+PY

@@ -18,6 +18,10 @@ import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.network.tailscale.TailscaleServeConfig;
+import com.autarkos.network.tailscale.TailscaleServeMapping;
+import com.autarkos.network.tailscale.TailscaleService;
+import com.autarkos.network.tailscale.TailscaleStatus;
 import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.testsupport.RestorePointTestRecords;
 
@@ -57,6 +61,43 @@ class AppInstanceViewServiceTests {
                 .singleElement()
                 .satisfies(action -> assertThat(action.href()).contains("https://autark-os.example.ts.net:12890"));
         assertThat(view.issues()).isEmpty();
+    }
+
+    @Test
+    void storedPrivateUrlWithoutLiveServeMappingIsNotExposedAsAnOpenLink() {
+        InstalledAppRepository repository = repository();
+        repository.save(installed("vaultwarden", "Ready"));
+        repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:8090", "https://autark-os.example.ts.net:14743", true, java.util.Map.of(), new InstallModels.BackupPolicy(false, "daily", 7)));
+        TailscaleService noMappings = new TailscaleService() {
+            @Override
+            public TailscaleStatus status() {
+                return new TailscaleStatus(true, true, "connected", "Connected", "autark-os", "autark-os.example.ts.net", List.of("100.64.0.1"), "example.ts.net", "owner");
+            }
+
+            @Override
+            public TailscaleServeConfig serveConfig() {
+                return new TailscaleServeConfig(true, "available", "No live mappings", List.of(), List.of(), Instant.now());
+            }
+        };
+        AppInstanceViewService service = service(repository, backupRepository(), List.of(
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes (healthy)", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")), noMappings);
+
+        AppInstanceView view = service.list().getFirst();
+
+        assertThat(view.accessState()).isEqualTo("private_needs_setup");
+        assertThat(view.privateUrl()).isNull();
+        assertThat(view.issues())
+                .filteredOn(issue -> "access".equals(issue.scope()))
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.reasonCode()).isEqualTo("private_access_missing");
+                    assertThat(issue.primaryAction()).isPresent();
+                });
+        assertThat(view.actions())
+                .filteredOn(action -> action.id().equals("open-vaultwarden"))
+                .singleElement()
+                .satisfies(action -> assertThat(action.href()).contains("http://localhost:8090"));
     }
 
     @Test
@@ -227,12 +268,37 @@ class AppInstanceViewServiceTests {
     }
 
     private AppInstanceViewService service(InstalledAppRepository repository, BackupRepository backupRepository, List<RuntimeModels.ManagedContainer> containers) {
+        return service(repository, backupRepository, containers, tailscaleService());
+    }
+
+    private AppInstanceViewService service(InstalledAppRepository repository, BackupRepository backupRepository, List<RuntimeModels.ManagedContainer> containers, TailscaleService tailscaleService) {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         return new AppInstanceViewService(
                 repository,
                 new AppReconciliationService(repository, () -> containers, catalogService),
                 catalogService,
-                backupRepository);
+                backupRepository,
+                tailscaleService);
+    }
+
+    private TailscaleService tailscaleService() {
+        return new TailscaleService() {
+            @Override
+            public TailscaleStatus status() {
+                return new TailscaleStatus(true, true, "connected", "Connected", "autark-os", "autark-os.example.ts.net", List.of("100.64.0.1"), "example.ts.net", "owner");
+            }
+
+            @Override
+            public TailscaleServeConfig serveConfig() {
+                return new TailscaleServeConfig(
+                        true,
+                        "available",
+                        "test config",
+                        List.of(new TailscaleServeMapping(null, "https://autark-os.example.ts.net:12890/", 12890, "http://127.0.0.1:8090", 8090)),
+                        List.of(),
+                        Instant.now());
+            }
+        };
     }
 
     private InstalledAppRepository repository() {

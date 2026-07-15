@@ -18,6 +18,7 @@ import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
+import com.autarkos.network.tailscale.TailscaleService;
 
 @Service
 public class AppInstanceViewService implements AppInstanceViewProvider {
@@ -26,16 +27,19 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
     private final AppReconciliationService reconciliationService;
     private final MarketplaceCatalogService catalogService;
     private final BackupRepository backupRepository;
+    private final PrivateAccessStateResolver privateAccessStateResolver;
 
     public AppInstanceViewService(
             InstalledAppRepository repository,
             AppReconciliationService reconciliationService,
             MarketplaceCatalogService catalogService,
-            BackupRepository backupRepository) {
+            BackupRepository backupRepository,
+            TailscaleService tailscaleService) {
         this.repository = repository;
         this.reconciliationService = reconciliationService;
         this.catalogService = catalogService;
         this.backupRepository = backupRepository;
+        this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
     }
 
     public List<AppInstanceView> list() {
@@ -56,9 +60,11 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         InstallModels.InstallSettings settings = repository.settingsFor(item.appId()).orElse(null);
         ApplicationManifest manifest = catalogService.findById(item.appId()).orElse(null);
         String backupState = backupState(item.appId(), settings);
-        List<AutarkOsIssue> issues = issues(item, app, backupState);
         String localUrl = firstPresent(settings == null ? null : settings.accessUrl(), app == null ? null : app.accessUrl());
-        String privateUrl = settings == null ? null : settings.privateAccessUrl();
+        PrivateAccessState privateAccess = privateAccessStateResolver.resolve(item.appId(), settings, localUrl);
+        String privateUrl = privateAccess.verified() ? privateAccess.verifiedPrivateUrl() : null;
+        List<AutarkOsIssue> issues = issues(item, app, backupState);
+        privateAccessIssue(item, privateAccess).ifPresent(issues::add);
         List<AutarkOsAction> actions = actions(item, app, localUrl, privateUrl);
         return new AppInstanceView(
                 firstPresent(ownership == null ? null : ownership.appInstanceId(), item.appId()),
@@ -70,7 +76,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                 firstPresent(ownership == null ? null : ownership.installState(), app == null ? "unregistered" : app.status()),
                 runtimeState(item.status()),
                 ownershipState(item.ownership()),
-                accessState(item.status(), localUrl, privateUrl),
+                accessState(item.status(), localUrl, privateAccess),
                 backupState,
                 localUrl,
                 privateUrl,
@@ -195,9 +201,27 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         };
     }
 
-    private String accessState(String userStatus, String localUrl, String privateUrl) {
-        if (AutarkOsStates.AppStatus.READY.equals(userStatus) && privateUrl != null && !privateUrl.isBlank()) {
+    private java.util.Optional<AutarkOsIssue> privateAccessIssue(AppReconciliationItem item, PrivateAccessState state) {
+        if (state == null || !state.requested() || state.verified()) {
+            return java.util.Optional.empty();
+        }
+        String severity = "waiting".equals(state.status()) ? "info" : "warning";
+        return java.util.Optional.of(AutarkOsIssueFactory.accessIssue(
+                "private-access-" + item.appId(),
+                item.appId(),
+                severity,
+                "private_access_" + state.status(),
+                item.appName() + " private link needs setup",
+                state.detail(),
+                AutarkOsAction.post("repair-private-" + item.appId(), "Repair private link", "/api/apps/" + item.appId() + "/private-access/repair", false, false)));
+    }
+
+    private String accessState(String userStatus, String localUrl, PrivateAccessState privateAccess) {
+        if (AutarkOsStates.AppStatus.READY.equals(userStatus) && privateAccess != null && privateAccess.verified()) {
             return "private_ready";
+        }
+        if (AutarkOsStates.AppStatus.READY.equals(userStatus) && privateAccess != null && privateAccess.requested()) {
+            return "waiting".equals(privateAccess.status()) ? "private_waiting" : "private_needs_setup";
         }
         if (AutarkOsStates.AppStatus.READY.equals(userStatus) && localUrl != null && !localUrl.isBlank()) {
             return "local_ready";

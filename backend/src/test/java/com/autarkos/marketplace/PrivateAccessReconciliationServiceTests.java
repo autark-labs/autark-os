@@ -1,6 +1,7 @@
 package com.autarkos.marketplace;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +19,7 @@ import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.PostInstallGuideBuilder;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
 import com.autarkos.marketplace.install.models.AccessModels;
@@ -81,15 +83,15 @@ class PrivateAccessReconciliationServiceTests {
 
     @Test
     void verifiesDirectHttpsPortMatch() {
-        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:8090"));
-        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:8090", 8090, "http://127.0.0.1:8090", 8090));
+        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
+        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "https://autark-os.tail123.ts.net:12890/", 12890, "http://127.0.0.1:8090", 8090));
 
         AccessModels.PrivateAccessReconciliationItem item = onlyItem();
 
         assertThat(item.status()).isEqualTo("healthy");
         assertThat(item.expectedLocalPort()).isEqualTo(8090);
-        assertThat(item.expectedHttpsPort()).isEqualTo(8090);
-        assertThat(item.desiredMapping()).isEqualTo("https:8090 -> 127.0.0.1:8090");
+        assertThat(item.expectedHttpsPort()).isEqualTo(12890);
+        assertThat(item.desiredMapping()).isEqualTo("https:12890 -> 127.0.0.1:8090");
         assertThat(item.matchReason()).contains("matches");
         assertThat(item.verifiedAt()).isNotNull();
     }
@@ -116,39 +118,49 @@ class PrivateAccessReconciliationServiceTests {
                 "healthy",
                 "Up 2 minutes (healthy)",
                 "0.0.0.0:19090->80/tcp"));
-        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:19090"));
-        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:19090", 19090, "http://127.0.0.1:19090", 19090));
+        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
+        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:12890", 12890, "http://127.0.0.1:19090", 19090));
 
         AccessModels.PrivateAccessReconciliationItem item = onlyItem();
 
         assertThat(item.status()).isEqualTo("healthy");
         assertThat(item.expectedLocalPort()).isEqualTo(19090);
-        assertThat(item.expectedHttpsPort()).isEqualTo(19090);
+        assertThat(item.expectedHttpsPort()).isEqualTo(12890);
     }
 
     @Test
     void reportsMismatchedTargetPortWithDebugPayload() {
-        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:8090"));
-        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:8090", 8090, "http://127.0.0.1:8080", 8080));
+        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
+        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:12890", 12890, "http://127.0.0.1:8080", 8080));
 
         AccessModels.PrivateAccessReconciliationItem item = onlyItem();
 
         assertThat(item.status()).isEqualTo("mismatched");
         assertThat(item.detail()).contains("Expected local port 8090");
-        assertThat(item.liveMappings()).contains("https:8090 -> http://127.0.0.1:8080");
+        assertThat(item.liveMappings()).contains("https:12890 -> http://127.0.0.1:8080");
         assertThat(item.matchReason()).contains("target local port");
         assertThat(item.verifiedAt()).isNull();
     }
 
     @Test
     void reportsMissingWhenNoLiveMappingTargetsTheAppPort() {
-        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:8090"));
+        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
         tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:other", "tcp:8080", 8080, "http://127.0.0.1:8080", 8080));
 
         AccessModels.PrivateAccessReconciliationItem item = onlyItem();
 
         assertThat(item.status()).isEqualTo("missing");
         assertThat(item.matchReason()).contains("No live mapping targets");
+    }
+
+    @Test
+    void refusesToRemoveHttpsEndpointStillExpectedByInstalledApp() {
+        repository.saveSettings("vaultwarden", privateSettings("http://localhost:8090", "https://autark-os.tail123.ts.net:12890"));
+        tailscaleService.config = serveConfig(new TailscaleServeMapping("svc:vaultwarden", "tcp:12890", 12890, "http://127.0.0.1:8090", 8090));
+
+        assertThatThrownBy(() -> reconciliationService.removeStaleMapping(12890))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("still belongs to an installed app");
     }
 
     private AccessModels.PrivateAccessReconciliationItem onlyItem() {

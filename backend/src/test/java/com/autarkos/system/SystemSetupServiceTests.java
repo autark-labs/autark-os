@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -110,6 +111,29 @@ class SystemSetupServiceTests {
                     assertThat(check.message()).contains("file operations");
                     assertThat(check.actionCommand()).contains("install-autark-os-service.sh");
                 });
+    }
+
+    @Test
+    void cachesPrivilegedHelperReadinessInsteadOfPollingSudoOnEveryStatusRefresh() {
+        AtomicInteger helperChecks = new AtomicInteger();
+        SystemSetupService service = new SystemSetupService(
+                runtimeLayout(),
+                new FakeTailscaleService(TailscaleStatus.notInstalled()),
+                command -> {
+                    String joined = String.join(" ", command);
+                    if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops --help")) {
+                        helperChecks.incrementAndGet();
+                    }
+                    if (joined.equals("systemctl is-active autark-os")) {
+                        return new SystemSetupService.CommandResult(3, "inactive");
+                    }
+                    return new SystemSetupService.CommandResult(0, "ready");
+                });
+
+        service.status();
+        service.status();
+
+        assertThat(helperChecks).hasValue(1);
     }
 
 
@@ -230,6 +254,11 @@ class SystemSetupServiceTests {
         @Override
         public TailscaleStatus status() {
             return status;
+        }
+
+        @Override
+        public String operatorUser() {
+            return "";
         }
     }
 }

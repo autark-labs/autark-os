@@ -104,7 +104,7 @@ export type AccessObservedState = {
   privateUrl: string | null;
   localPort: number | null;
   protocol: 'http' | 'https' | string;
-  privateLinkStatus: 'configured' | 'missing' | 'not_enabled' | string;
+  privateLinkStatus: 'verified' | 'missing' | 'mismatched' | 'waiting' | 'unknown' | 'not_enabled' | string;
   lastAccessCheckAt: string | null;
   lastSuccessfulAccessAt: string | null;
   lastRepairAttemptAt: string | null;
@@ -119,7 +119,7 @@ export type AppAccessRoute = {
   backendProtocol: 'http' | 'https' | string | null;
   localPort: number | null;
   privatePort: number | null;
-  privateLinkStatus: 'configured' | 'missing' | 'not_enabled' | 'port_conflict' | string | null;
+  privateLinkStatus: 'verified' | 'missing' | 'mismatched' | 'waiting' | 'unknown' | 'not_enabled' | 'port_conflict' | string | null;
 };
 
 export type AppTelemetry = {

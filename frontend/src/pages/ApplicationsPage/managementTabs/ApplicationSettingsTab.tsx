@@ -537,7 +537,7 @@ function privateNetworkStatus(item: ApplicationSurfaceItem, accessChanging: bool
     };
   }
 
-  if (item.settings.privateLinkStatus === 'configured' && item.settings.privateAccessUrl) {
+  if (item.settings.privateLinkStatus === 'verified' && item.settings.privateAccessUrl) {
     return {
       description: 'This app is available across your Tailscale private network.',
       status: 'Private network on',

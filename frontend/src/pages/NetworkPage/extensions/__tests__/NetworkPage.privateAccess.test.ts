@@ -22,11 +22,12 @@ test('private access URLs only come from canonical or observed backend state', (
 
 test('private access URLs prefer reconciliation state before app state', () => {
   const privateUrl = privateAccessUrlForApp({
-    accessRoute: { privateUrl: 'https://stored.tailnet:12890' },
-    observedAccess: { privateUrl: 'https://observed.tailnet:5006' },
+    accessRoute: { privateUrl: 'https://stored.tailnet:12890', privateLinkStatus: 'verified' },
+    observedAccess: { privateUrl: 'https://observed.tailnet:5006', privateLinkStatus: 'verified' },
     settings: { privateAccessUrl: 'https://settings.tailnet:12890' },
   }, {
     expectedPrivateUrl: 'https://expected.tailnet:12890',
+    status: 'healthy',
   });
 
   assert.equal(privateUrl, 'https://expected.tailnet:12890');

@@ -577,15 +577,15 @@ function privateLinkStatus(service: ReachabilityService) {
   }
   if (service.privateUrl && service.status === 'connected') {
     return {
-      description: 'Autark-OS checks this private link automatically and it is currently stable.',
-      label: 'Private link stable',
+      description: 'The live Tailscale Serve route points to this app\'s expected local port.',
+      label: 'Private link verified',
       tone: 'stable' as const,
     };
   }
   if (service.privateUrl) {
     return {
-      description: 'Autark-OS is tracking this private link and will verify it during the next refresh.',
-      label: 'Private link tracked',
+      description: 'Autark-OS has a private URL but has not verified its live Serve route yet.',
+      label: 'Private link awaiting verification',
       tone: 'neutral' as const,
     };
   }

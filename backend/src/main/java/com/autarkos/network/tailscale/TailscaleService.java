@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -23,17 +24,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class TailscaleService {
 
     private static final Duration COMMAND_TIMEOUT = Duration.ofSeconds(8);
+    private static final Duration SERVE_CONFIG_CACHE_TTL = Duration.ofSeconds(3);
+    private static final String DEFAULT_PRIVILEGED_HELPER = "/opt/autark-os/bin/autark-os-fileops";
     private static final Pattern TEXT_FIELD = Pattern.compile("\"%s\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
     private static final Pattern ARRAY_FIELD = Pattern.compile("\"%s\"\\s*:\\s*\\[(.*?)\\]", Pattern.DOTALL);
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final CommandRunner commandRunner;
+    private final String runAsUser;
+    private volatile TailscaleServeConfig cachedServeConfig;
 
     public TailscaleService() {
-        this(new ProcessCommandRunner(new SystemCommandRunner()));
+        this(new ProcessCommandRunner(new SystemCommandRunner()), System.getProperty("user.name", ""));
     }
 
     TailscaleService(CommandRunner commandRunner) {
+        this(commandRunner, System.getProperty("user.name", ""));
+    }
+
+    TailscaleService(CommandRunner commandRunner, String runAsUser) {
         this.commandRunner = commandRunner;
+        this.runAsUser = runAsUser == null ? "" : runAsUser;
     }
 
     public TailscaleStatus status() {
@@ -84,59 +94,91 @@ public class TailscaleService {
         }
         String target = "http://127.0.0.1:" + localPort;
         CommandResult result = commandRunner.run("tailscale", "serve", "--bg", "--https=" + httpsPort, target);
-        String privateUrl = privateUrl(status, httpsPort);
         if (result.successful()) {
-            return new TailscaleServeResult(true, privateUrl, "Private HTTPS link is available inside your tailnet.", result.output());
+            return verifiedServeResult(status, localPort, httpsPort, result.output(), "Private HTTPS link is available inside your tailnet.");
         }
         if (needsOperator(result)) {
-            return serveHttpsWithOperatorSetup(httpsPort, target, privateUrl, result);
+            return serveHttpsWithOperatorSetup(status, localPort, httpsPort, target, result);
         }
-        return new TailscaleServeResult(false, privateUrl, "Tailscale Serve could not create the private HTTPS link. " + conciseOutput(result), result.output());
+        return new TailscaleServeResult(false, null, "Tailscale Serve could not create the private HTTPS link. " + conciseOutput(result), result.output());
     }
 
-    public TailscaleServeConfig serveConfig() {
-        CommandResult configResult = commandRunner.run("tailscale", "serve", "get-config", "--all");
-        if (configResult.missingCommand()) {
-            return TailscaleServeConfig.unavailable("not_installed", "Tailscale is not installed.", configResult.output());
-        }
-        if (configResult.successful()) {
-            return parseServeConfig(configResult, "tailscale serve get-config --all");
+    public synchronized TailscaleServeConfig serveConfig() {
+        if (cachedServeConfig != null
+                && cachedServeConfig.checkedAt() != null
+                && cachedServeConfig.checkedAt().plus(SERVE_CONFIG_CACHE_TTL).isAfter(Instant.now())) {
+            return cachedServeConfig;
         }
 
         CommandResult statusResult = commandRunner.run("tailscale", "serve", "status", "--json");
-        if (statusResult.successful()) {
-            return parseServeConfig(statusResult, "tailscale serve status --json");
+        if (statusResult.missingCommand()) {
+            cachedServeConfig = TailscaleServeConfig.unavailable("not_installed", "Tailscale is not installed.", statusResult.output());
+            return cachedServeConfig;
         }
-        List<String> output = new ArrayList<>(configResult.output());
-        output.addAll(statusResult.output());
-        return TailscaleServeConfig.unavailable("unavailable", "Autark-OS could not read Tailscale Serve configuration. " + conciseOutput(configResult), output);
+
+        CommandResult configResult = commandRunner.run("tailscale", "serve", "get-config", "--all");
+        List<TailscaleServeConfig> available = new ArrayList<>();
+        if (statusResult.successful()) {
+            available.add(parseServeConfig(statusResult, "tailscale serve status --json"));
+        }
+        if (configResult.successful()) {
+            available.add(parseServeConfig(configResult, "tailscale serve get-config --all"));
+        }
+        List<TailscaleServeConfig> parsed = available.stream().filter(TailscaleServeConfig::available).toList();
+        if (!parsed.isEmpty()) {
+            Map<String, TailscaleServeMapping> mappings = new LinkedHashMap<>();
+            List<String> output = new ArrayList<>();
+            for (TailscaleServeConfig source : parsed) {
+                output.addAll(source.output());
+                for (TailscaleServeMapping mapping : source.mappings()) {
+                    mappings.putIfAbsent(mappingKey(mapping), mapping);
+                }
+            }
+            cachedServeConfig = new TailscaleServeConfig(
+                    true,
+                    "available",
+                    "Read live Tailscale Serve configuration.",
+                    List.copyOf(mappings.values()),
+                    output,
+                    Instant.now());
+            return cachedServeConfig;
+        }
+
+        List<String> output = new ArrayList<>(statusResult.output());
+        output.addAll(configResult.output());
+        cachedServeConfig = TailscaleServeConfig.unavailable(
+                "unavailable",
+                "Autark-OS could not read Tailscale Serve configuration. " + conciseOutput(statusResult),
+                output);
+        return cachedServeConfig;
     }
 
-    private TailscaleServeResult serveHttpsWithOperatorSetup(int httpsPort, String target, String privateUrl, CommandResult originalResult) {
-        String username = System.getProperty("user.name", "");
+    public synchronized void invalidateServeConfig() {
+        cachedServeConfig = null;
+    }
+
+    private TailscaleServeResult serveHttpsWithOperatorSetup(TailscaleStatus status, int localPort, int httpsPort, String target, CommandResult originalResult) {
+        String username = runAsUser;
         List<String> output = new ArrayList<>(originalResult.output());
-        if (!username.isBlank() && !"root".equals(username)) {
-            CommandResult operatorResult = commandRunner.run("sudo", "-n", "tailscale", "set", "--operator=" + username);
+        if ("autarkos".equals(username)) {
+            CommandResult operatorResult = commandRunner.run("sudo", "-n", privilegedHelper(), "configure-tailscale-operator");
             output.addAll(operatorResult.output());
             if (operatorResult.successful()) {
                 CommandResult retry = commandRunner.run("tailscale", "serve", "--bg", "--https=" + httpsPort, target);
                 output.addAll(retry.output());
                 if (retry.successful()) {
-                    return new TailscaleServeResult(true, privateUrl, "Autark-OS enabled Tailscale Serve permission for this user and created the private HTTPS link.", output);
+                    return verifiedServeResult(status, localPort, httpsPort, output, "Autark-OS enabled Tailscale Serve permission and created the private HTTPS link.");
+                }
+                if (!needsOperator(retry)) {
+                    return new TailscaleServeResult(false, null, "Autark-OS enabled Tailscale Serve permission, but Tailscale still could not create the private HTTPS link. " + conciseOutput(retry), output);
                 }
             }
-        }
-
-        CommandResult sudoServeResult = commandRunner.run("sudo", "-n", "tailscale", "serve", "--bg", "--https=" + httpsPort, target);
-        output.addAll(sudoServeResult.output());
-        if (sudoServeResult.successful()) {
-            return new TailscaleServeResult(true, privateUrl, "Autark-OS created the private HTTPS link with elevated Tailscale permissions.", output);
         }
 
         String fix = username.isBlank() || "root".equals(username)
                 ? "Run Autark-OS with a user allowed to manage Tailscale Serve, then retry."
                 : "Run this once on the Autark-OS host, then retry: sudo tailscale set --operator=" + username;
-        return new TailscaleServeResult(false, privateUrl, "Tailscale is ready, but this user cannot manage Serve yet. " + fix, output);
+        return new TailscaleServeResult(false, null, "Tailscale is ready, but this user cannot manage Serve yet. " + fix, output);
     }
 
     public TailscaleServeResult disableHttps(int httpsPort) {
@@ -150,23 +192,75 @@ public class TailscaleService {
         if (!status.connected()) {
             return new TailscaleServeResult(false, privateUrl, "Sign in to Tailscale on this device before Autark-OS can remove a private HTTPS link.", List.of());
         }
+        // Mutations must inspect fresh state. A cached pre-mutation snapshot could
+        // otherwise make Autark-OS incorrectly report that a newly created link
+        // was already absent.
+        invalidateServeConfig();
+        TailscaleServeConfig before = serveConfig();
+        if (before.available() && before.mappings().stream().noneMatch(mapping -> java.util.Objects.equals(mapping.servePort(), httpsPort))) {
+            return new TailscaleServeResult(true, privateUrl, "Private HTTPS link was already removed.", List.of("No live Tailscale Serve handler exists on HTTPS port " + httpsPort + "."));
+        }
         CommandResult result = commandRunner.run("tailscale", "serve", "--https=" + httpsPort, "off");
         if (result.successful()) {
-            return new TailscaleServeResult(true, privateUrl, "Private HTTPS link was removed.", result.output());
+            return verifiedDisableResult(httpsPort, privateUrl, result.output());
         }
         if (needsOperator(result)) {
             List<String> output = new ArrayList<>(result.output());
-            CommandResult sudoResult = commandRunner.run("sudo", "-n", "tailscale", "serve", "--https=" + httpsPort, "off");
-            output.addAll(sudoResult.output());
-            if (sudoResult.successful()) {
-                return new TailscaleServeResult(true, privateUrl, "Private HTTPS link was removed with elevated Tailscale permissions.", output);
+            if ("autarkos".equals(runAsUser)) {
+                CommandResult operatorResult = commandRunner.run("sudo", "-n", privilegedHelper(), "configure-tailscale-operator");
+                output.addAll(operatorResult.output());
+                if (operatorResult.successful()) {
+                    CommandResult retry = commandRunner.run("tailscale", "serve", "--https=" + httpsPort, "off");
+                    output.addAll(retry.output());
+                    if (retry.successful() || handlerDoesNotExist(retry)) {
+                        return verifiedDisableResult(httpsPort, privateUrl, output);
+                    }
+                    if (!needsOperator(retry)) {
+                        return new TailscaleServeResult(false, privateUrl, "Autark-OS enabled Tailscale Serve permission, but Tailscale still could not remove the private HTTPS link. " + conciseOutput(retry), output);
+                    }
+                }
             }
             return new TailscaleServeResult(false, privateUrl, "Tailscale is ready, but this user cannot remove Serve links yet. Run the Autark-OS setup command, then retry.", output);
+        }
+        if (handlerDoesNotExist(result)) {
+            invalidateServeConfig();
+            TailscaleServeConfig after = serveConfig();
+            if (after.available() && after.mappings().stream().noneMatch(mapping -> java.util.Objects.equals(mapping.servePort(), httpsPort))) {
+                return new TailscaleServeResult(true, privateUrl, "Private HTTPS link was already removed.", result.output());
+            }
         }
         return new TailscaleServeResult(false, privateUrl, "Tailscale Serve could not remove the private HTTPS link. " + conciseOutput(result), result.output());
     }
 
-    private String privateUrl(TailscaleStatus status, int httpsPort) {
+    public String privateUrlForPort(int httpsPort) {
+        TailscaleStatus status = status();
+        return privateUrlForPort(status, httpsPort);
+    }
+
+    public String privateUrlForPort(TailscaleStatus status, int httpsPort) {
+        if (!status.connected() || status.dnsName() == null || status.dnsName().isBlank()) {
+            return null;
+        }
+        return privateUrl(status, httpsPort);
+    }
+
+    public String operatorUser() {
+        if ("root".equals(runAsUser)) {
+            return "root";
+        }
+        CommandResult result = commandRunner.run("tailscale", "debug", "prefs");
+        if (!result.successful()) {
+            return "";
+        }
+        try {
+            JsonNode root = objectMapper.readTree(String.join("\n", result.output()));
+            return root.path("OperatorUser").asText("");
+        } catch (IOException exception) {
+            return "";
+        }
+    }
+
+    protected String privateUrl(TailscaleStatus status, int httpsPort) {
         String host = status.dnsName().replaceAll("\\.$", "");
         if (httpsPort == 443) {
             return "https://" + host;
@@ -176,7 +270,58 @@ public class TailscaleService {
 
     private boolean needsOperator(CommandResult result) {
         String output = String.join("\n", result.output()).toLowerCase();
-        return output.contains("access denied") && (output.contains("operator") || output.contains("sudo tailscale serve"));
+        boolean permissionFailure = output.contains("access denied")
+                || output.contains("permission denied")
+                || output.contains("operator permission")
+                || output.contains("requires operator")
+                || output.contains("requires sudo")
+                || output.contains("must be run as root")
+                || output.contains("not allowed to manage serve");
+        return permissionFailure;
+    }
+
+    private boolean handlerDoesNotExist(CommandResult result) {
+        String output = String.join("\n", result.output()).toLowerCase();
+        return output.contains("handler does not exist") || output.contains("no serve config");
+    }
+
+    private String privilegedHelper() {
+        String configured = System.getenv("AUTARK_OS_FILEOPS_HELPER");
+        return configured == null || configured.isBlank() ? DEFAULT_PRIVILEGED_HELPER : configured;
+    }
+
+    private TailscaleServeResult verifiedServeResult(TailscaleStatus status, int localPort, int httpsPort, List<String> output, String successMessage) {
+        invalidateServeConfig();
+        TailscaleServeConfig config = serveConfig();
+        boolean verified = config.available() && config.mappings().stream().anyMatch(mapping ->
+                java.util.Objects.equals(mapping.servePort(), httpsPort)
+                        && java.util.Objects.equals(mapping.targetPort(), localPort));
+        if (!verified) {
+            List<String> details = new ArrayList<>(output);
+            details.addAll(config.output());
+            return new TailscaleServeResult(
+                    false,
+                    null,
+                    "Tailscale accepted the Serve command, but Autark-OS could not verify the live mapping. Check Tailscale Serve status, then retry.",
+                    details);
+        }
+        return new TailscaleServeResult(true, privateUrl(status, httpsPort), successMessage, output);
+    }
+
+    private TailscaleServeResult verifiedDisableResult(int httpsPort, String privateUrl, List<String> output) {
+        invalidateServeConfig();
+        TailscaleServeConfig config = serveConfig();
+        boolean absent = config.available() && config.mappings().stream().noneMatch(mapping -> java.util.Objects.equals(mapping.servePort(), httpsPort));
+        if (!absent) {
+            List<String> details = new ArrayList<>(output);
+            details.addAll(config.output());
+            return new TailscaleServeResult(false, privateUrl, "Tailscale accepted the removal command, but the Serve handler is still present.", details);
+        }
+        return new TailscaleServeResult(true, privateUrl, "Private HTTPS link was removed.", output);
+    }
+
+    private String mappingKey(TailscaleServeMapping mapping) {
+        return firstPresent(mapping.serviceName(), "node") + "|" + firstPresent(mapping.endpoint(), "") + "|" + mapping.servePort() + "|" + firstPresent(mapping.target(), "");
     }
 
     private String conciseOutput(CommandResult result) {
@@ -191,6 +336,8 @@ public class TailscaleService {
             collectServeMappings(root.path("Services"), mappings);
             collectEndpointMappings(root.path("endpoints"), null, mappings);
             collectEndpointMappings(root.path("Endpoints"), null, mappings);
+            collectNodeWebMappings(root.path("Web"), root.path("TCP"), mappings);
+            collectNodeWebMappings(root.path("web"), root.path("tcp"), mappings);
             return new TailscaleServeConfig(true, "available", "Read Tailscale Serve configuration from " + source + ".", mappings, result.output(), Instant.now());
         } catch (IOException exception) {
             return TailscaleServeConfig.unavailable("parse_failed", "Autark-OS could not parse Tailscale Serve configuration.", result.output());
@@ -227,6 +374,64 @@ public class TailscaleService {
                     target,
                     portFromTarget(target)));
         }
+    }
+
+    private void collectNodeWebMappings(JsonNode webNode, JsonNode tcpNode, List<TailscaleServeMapping> mappings) {
+        if (!webNode.isObject()) {
+            return;
+        }
+        Iterator<Map.Entry<String, JsonNode>> webServers = webNode.fields();
+        while (webServers.hasNext()) {
+            Map.Entry<String, JsonNode> webServer = webServers.next();
+            Integer servePort = portFromEndpoint(webServer.getKey());
+            if (servePort == null) {
+                servePort = httpsPortFromTcp(tcpNode, webServer.getKey());
+            }
+            JsonNode handlers = webServer.getValue().path("Handlers");
+            if (handlers.isMissingNode()) {
+                handlers = webServer.getValue().path("handlers");
+            }
+            if (!handlers.isObject()) {
+                continue;
+            }
+            Iterator<Map.Entry<String, JsonNode>> routes = handlers.fields();
+            while (routes.hasNext()) {
+                Map.Entry<String, JsonNode> route = routes.next();
+                String target = firstPresent(
+                        jsonText(route.getValue(), "Proxy"),
+                        jsonText(route.getValue(), "proxy"));
+                if (target.isBlank()) {
+                    continue;
+                }
+                String endpoint = "https://" + webServer.getKey() + normalizedRoute(route.getKey());
+                mappings.add(new TailscaleServeMapping(null, endpoint, servePort, target, portFromTarget(target)));
+            }
+        }
+    }
+
+    private Integer httpsPortFromTcp(JsonNode tcpNode, String webHost) {
+        if (!tcpNode.isObject()) {
+            return null;
+        }
+        Iterator<Map.Entry<String, JsonNode>> listeners = tcpNode.fields();
+        while (listeners.hasNext()) {
+            Map.Entry<String, JsonNode> listener = listeners.next();
+            if (listener.getValue().path("HTTPS").asBoolean(false)
+                    || listener.getValue().path("https").asBoolean(false)) {
+                Integer port = parsePort(listener.getKey());
+                if (port != null && (webHost.endsWith(":" + port) || port == 443)) {
+                    return port;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String normalizedRoute(String route) {
+        if (route == null || route.isBlank() || "/".equals(route)) {
+            return "/";
+        }
+        return route.startsWith("/") ? route : "/" + route;
     }
 
     private Integer portFromEndpoint(String endpoint) {

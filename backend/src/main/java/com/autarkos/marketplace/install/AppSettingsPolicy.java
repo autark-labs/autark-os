@@ -162,7 +162,7 @@ class AppSettingsPolicy {
         return normalized;
     }
 
-    AccessModels.AccessDesiredState desiredAccessState(InstallModels.InstallSettings settings, ApplicationManifest manifest, String accessUrl) {
+    AccessModels.AccessDesiredState desiredAccessState(InstallModels.InstallSettings settings, ApplicationManifest manifest, String accessUrl, PrivateAccessState privateAccess) {
         String mode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : null);
         String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
         boolean privateRecommended = manifest != null && manifest.access().privateAccessRecommended();
@@ -170,7 +170,7 @@ class AppSettingsPolicy {
                 mode,
                 accessModeLabel(mode),
                 accessUrl,
-                settings.privateAccessUrl(),
+                privateAccess == null ? settings.privateAccessUrl() : privateAccess.expectedPrivateUrl(),
                 settings.expectedLocalPort(),
                 firstPresent(settings.expectedProtocol(), "http"),
                 requirement,
@@ -178,18 +178,13 @@ class AppSettingsPolicy {
                 privateRecommended);
     }
 
-    AccessModels.AccessObservedState observedAccessState(InstallModels.InstallSettings settings, String accessUrl) {
-        String privateStatus;
-        if (!settings.tailscaleEnabled()) {
-            privateStatus = "not_enabled";
-        } else if (settings.privateAccessUrl() == null || settings.privateAccessUrl().isBlank()) {
-            privateStatus = "missing";
-        } else {
-            privateStatus = "configured";
-        }
+    AccessModels.AccessObservedState observedAccessState(InstallModels.InstallSettings settings, String accessUrl, PrivateAccessState privateAccess) {
+        String privateStatus = privateAccess == null
+                ? settings.tailscaleEnabled() ? "unknown" : "not_enabled"
+                : privateAccess.status();
         return new AccessModels.AccessObservedState(
                 accessUrl,
-                settings.privateAccessUrl(),
+                privateAccess != null && privateAccess.verified() ? privateAccess.verifiedPrivateUrl() : null,
                 runtimeStatusResolver.portFromUrl(accessUrl),
                 runtimeStatusResolver.protocolFromUrl(accessUrl),
                 privateStatus,
@@ -199,31 +194,23 @@ class AppSettingsPolicy {
                 settings.lastRepairStatus());
     }
 
-    AccessModels.AppAccessRoute accessRoute(InstallModels.InstallSettings settings, String accessUrl, AccessModels.AccessObservedState observedAccess) {
+    AccessModels.AppAccessRoute accessRoute(InstallModels.InstallSettings settings, String accessUrl, AccessModels.AccessObservedState observedAccess, PrivateAccessState privateAccess) {
         Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
-        Integer privatePort = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
+        String verifiedPrivateUrl = privateAccess != null && privateAccess.verified() ? privateAccess.verifiedPrivateUrl() : null;
+        Integer privatePort = privateAccess == null ? null : privateAccess.expectedHttpsPort();
         String privateStatus = observedAccess == null ? "not_enabled" : observedAccess.privateLinkStatus();
-        boolean privateLinkUsesLocalHttpPort = privateAccessPortConflict(settings, accessUrl);
-        String primaryOpenUrl = !privateLinkUsesLocalHttpPort
-                ? firstPresent(settings.privateAccessUrl(), accessUrl)
-                : firstPresent(accessUrl, settings.privateAccessUrl());
+        String primaryOpenUrl = firstPresent(verifiedPrivateUrl, accessUrl);
         String backendProtocol = firstPresent(settings.expectedProtocol(), runtimeStatusResolver.protocolFromUrl(accessUrl), "http");
         String backendTargetUrl = localPort == null ? null : backendProtocol + "://127.0.0.1:" + localPort;
         return new AccessModels.AppAccessRoute(
                 primaryOpenUrl,
                 accessUrl,
-                settings.privateAccessUrl(),
+                verifiedPrivateUrl,
                 backendTargetUrl,
                 backendProtocol,
                 localPort,
                 privatePort,
-                privateLinkUsesLocalHttpPort ? "port_conflict" : privateStatus);
-    }
-
-    boolean privateAccessPortConflict(InstallModels.InstallSettings settings, String accessUrl) {
-        Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
-        Integer privatePort = runtimeStatusResolver.portFromUrl(settings.privateAccessUrl());
-        return settings.tailscaleEnabled() && localPort != null && privatePort != null && localPort.equals(privatePort);
+                privateStatus);
     }
 
     String sanitizeProtocol(String protocol, String accessUrl) {

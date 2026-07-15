@@ -19,15 +19,10 @@ class AppAccessChecker {
 
     static final Duration ACCESS_CHECK_TIMEOUT = Duration.ofMillis(850);
 
-    private final boolean devMode;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(ACCESS_CHECK_TIMEOUT)
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
-
-    AppAccessChecker(boolean devMode) {
-        this.devMode = devMode;
-    }
 
     boolean shouldCheckLocalAccess(ApplicationManifest manifest, String accessUrl) {
         if (accessUrl == null || accessUrl.isBlank()) {
@@ -76,16 +71,6 @@ class AppAccessChecker {
             Thread.currentThread().interrupt();
             return AccessModels.AppAccessCheck.unreachable(appId, accessUrl);
         }
-    }
-
-    AccessModels.AppAccessCheck privateAccessCheck(String appId, String privateAccessUrl) {
-        if (privateAccessUrl == null || privateAccessUrl.isBlank()) {
-            return AccessModels.AppAccessCheck.notConfigured(appId);
-        }
-        if (devMode) {
-            return AccessModels.AppAccessCheck.reachable(appId, privateAccessUrl);
-        }
-        return accessCheck(appId, privateAccessUrl);
     }
 
     private AccessModels.AppAccessCheck tcpAccessCheck(String appId, String accessUrl) {

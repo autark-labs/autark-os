@@ -57,6 +57,11 @@ public class DevTailscaleService extends TailscaleService {
     }
 
     @Override
+    public String operatorUser() {
+        return "autarkos";
+    }
+
+    @Override
     public TailscaleServeResult disableHttps(int httpsPort) {
         String privateUrl = httpsPort == 443 ? "https://" + DEV_DNS : "https://" + DEV_DNS + ":" + httpsPort;
         return new TailscaleServeResult(

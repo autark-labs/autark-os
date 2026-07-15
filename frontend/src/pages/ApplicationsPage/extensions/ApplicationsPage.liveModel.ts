@@ -359,7 +359,7 @@ function observedNextAction(service: ObservedServiceView): ApplicationNextAction
 }
 
 function accessLabel(app: AppRuntimeView, access?: AppAccessCheck): ApplicationSurfaceItem['access'] {
-  if (app.canonicalAccessState === 'private_ready' || app.accessRoute?.privateUrl || app.observedAccess?.privateLinkStatus === 'configured') {
+  if (app.canonicalAccessState === 'private_ready' || app.accessRoute?.privateLinkStatus === 'verified' || app.observedAccess?.privateLinkStatus === 'verified') {
     return 'Private';
   }
   if (app.canonicalAccessState === 'local_ready' || app.accessRoute?.localUrl || app.observedAccess?.localUrl || app.accessUrl) {
@@ -390,9 +390,14 @@ function backupLabel(app: AppRuntimeView): ApplicationSurfaceItem['backup'] {
 }
 
 function primaryOpenUrl(app: AppRuntimeView): string | undefined {
-  return app.accessRoute?.primaryOpenUrl
-    || app.settings?.privateAccessUrl
-    || app.observedAccess?.privateUrl
+  const routePrivateUrl = app.accessRoute?.privateLinkStatus === 'verified'
+    ? app.accessRoute.privateUrl || app.accessRoute.primaryOpenUrl
+    : undefined;
+  const observedPrivateUrl = app.observedAccess?.privateLinkStatus === 'verified'
+    ? app.observedAccess.privateUrl || undefined
+    : undefined;
+  return routePrivateUrl
+    || observedPrivateUrl
     || app.accessRoute?.localUrl
     || app.observedAccess?.localUrl
     || app.accessUrl
@@ -405,7 +410,9 @@ function appLinks(app: AppRuntimeView): ApplicationSurfaceItem['links'] {
     backendTargetUrl: app.accessRoute?.backendTargetUrl || undefined,
     localUrl: app.accessRoute?.localUrl || app.observedAccess?.localUrl || app.accessUrl || app.settings?.accessUrl || undefined,
     primaryUrl: primaryOpenUrl(app),
-    privateUrl: app.accessRoute?.privateUrl || app.settings?.privateAccessUrl || app.observedAccess?.privateUrl || undefined,
+    privateUrl: app.accessRoute?.privateLinkStatus === 'verified'
+      ? app.accessRoute.privateUrl || undefined
+      : app.observedAccess?.privateLinkStatus === 'verified' ? app.observedAccess.privateUrl || undefined : undefined,
   };
 }
 

@@ -29,7 +29,9 @@ export function zoneAppChip(item: ZoneAppSource) {
   return {
     id: item.appId,
     label: item.appName,
-    url: item.accessRoute?.primaryOpenUrl || item.settings?.privateAccessUrl || item.observedAccess?.privateUrl || item.accessRoute?.localUrl || item.observedAccess?.localUrl || item.accessUrl || item.settings?.accessUrl || '',
+    url: item.accessRoute?.privateLinkStatus === 'verified' && item.accessRoute.privateUrl
+      ? item.accessRoute.privateUrl
+      : item.accessRoute?.localUrl || item.observedAccess?.localUrl || item.accessUrl || item.settings?.accessUrl || '',
     external: false,
     status: item.friendlyStatus || item.canonicalUserStatus || 'Unknown',
   };

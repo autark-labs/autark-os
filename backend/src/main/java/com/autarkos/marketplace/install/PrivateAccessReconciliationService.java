@@ -3,7 +3,6 @@ package com.autarkos.marketplace.install;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -25,20 +24,22 @@ public class PrivateAccessReconciliationService {
     private final Supplier<List<AppRuntimeView>> runtimeApps;
     private final MarketplaceCatalogService catalogService;
     private final TailscaleService tailscaleService;
+    private final PrivateAccessStateResolver stateResolver;
 
     @Autowired
-    public PrivateAccessReconciliationService(ApplicationStateService applicationStateService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService) {
-        this(() -> applicationStateService.snapshot().runtimeApps(), catalogService, tailscaleService);
+    public PrivateAccessReconciliationService(ApplicationStateService applicationStateService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService, InstalledAppRepository repository) {
+        this(() -> applicationStateService.snapshot().runtimeApps(), catalogService, tailscaleService, repository);
     }
 
     public PrivateAccessReconciliationService(AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService) {
-        this(appLifecycleService::listApps, catalogService, tailscaleService);
+        this(appLifecycleService::listApps, catalogService, tailscaleService, null);
     }
 
-    private PrivateAccessReconciliationService(Supplier<List<AppRuntimeView>> runtimeApps, MarketplaceCatalogService catalogService, TailscaleService tailscaleService) {
+    private PrivateAccessReconciliationService(Supplier<List<AppRuntimeView>> runtimeApps, MarketplaceCatalogService catalogService, TailscaleService tailscaleService, InstalledAppRepository repository) {
         this.runtimeApps = runtimeApps;
         this.catalogService = catalogService;
         this.tailscaleService = tailscaleService;
+        this.stateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
     }
 
     public AccessModels.PrivateAccessReconciliationReport report() {
@@ -56,17 +57,17 @@ public class PrivateAccessReconciliationService {
                     Instant.now());
         }
         if (!status.installed()) {
-            return unavailableReport("warning", "Install Tailscale to verify private links", "Autark-OS cannot inspect private app links until Tailscale is installed.", privateApps, "Install Tailscale");
+            return unavailableReport("warning", "Install Tailscale to verify private links", "Autark-OS cannot inspect private app links until Tailscale is installed.", privateApps, status);
         }
         if (!status.connected()) {
-            return unavailableReport("warning", "Connect Tailscale to verify private links", "Autark-OS cannot inspect private app links until this device is connected.", privateApps, "Connect this device");
+            return unavailableReport("warning", "Connect Tailscale to verify private links", "Autark-OS cannot inspect private app links until this device is connected.", privateApps, status);
         }
 
         TailscaleServeConfig config = tailscaleService.serveConfig();
         List<AccessModels.PrivateAccessReconciliationItem> items = privateApps.stream()
-                .map(app -> reconcile(app, config))
+                .map(app -> reconcile(app, status, config))
                 .toList();
-        List<AccessModels.PrivateAccessStaleMapping> staleMappings = staleMappings(privateApps, config);
+        List<AccessModels.PrivateAccessStaleMapping> staleMappings = staleMappings(privateApps, config, status);
         boolean warning = items.stream().anyMatch(item -> !"healthy".equals(item.status())) || !staleMappings.isEmpty();
         long healthy = items.stream().filter(item -> "healthy".equals(item.status())).count();
         return new AccessModels.PrivateAccessReconciliationReport(
@@ -86,9 +87,13 @@ public class PrivateAccessReconciliationService {
         if (!knownAutarkOsPorts().contains(httpsPort)) {
             throw new InstallationException("Autark-OS does not recognize this as one of its managed app ports.");
         }
+        TailscaleStatus tailscale = tailscaleService.status();
+        TailscaleServeConfig config = tailscale.connected()
+                ? tailscaleService.serveConfig()
+                : TailscaleServeConfig.unavailable("not_connected", "Tailscale is not connected.", List.of());
         boolean appStillExpectsPort = runtimeApps.get().stream()
                 .filter(this::wantsPrivateAccess)
-                .map(this::expectedPort)
+                .map(app -> stateResolver.resolve(app.appId(), app.settings(), app.accessUrl(), tailscale, config).expectedHttpsPort())
                 .filter(Objects::nonNull)
                 .anyMatch(port -> port == httpsPort);
         if (appStillExpectsPort) {
@@ -101,90 +106,36 @@ public class PrivateAccessReconciliationService {
         return result;
     }
 
-    private AccessModels.PrivateAccessReconciliationReport unavailableReport(String status, String headline, String summary, List<AppRuntimeView> apps, String actionLabel) {
+    private AccessModels.PrivateAccessReconciliationReport unavailableReport(String status, String headline, String summary, List<AppRuntimeView> apps, TailscaleStatus tailscale) {
+        TailscaleServeConfig config = TailscaleServeConfig.unavailable("not_connected", summary, List.of());
         List<AccessModels.PrivateAccessReconciliationItem> items = apps.stream()
-                .map(app -> new AccessModels.PrivateAccessReconciliationItem(
-                        app.appId(),
-                        app.appName(),
-                        "waiting",
-                        "Waiting for Tailscale",
-                        "Autark-OS will verify this private link after Tailscale is ready.",
-                        actionLabel,
-                        expectedPrivateUrl(app),
-                        null,
-                        expectedPort(app),
-                        null,
-                        null,
-                        expectedPort(app),
-                        expectedHttpsPort(expectedPrivateUrl(app), expectedPort(app)),
-                        storedPrivateUrl(app),
-                        desiredMapping(expectedHttpsPort(expectedPrivateUrl(app), expectedPort(app)), expectedPort(app)),
-                        List.of(),
-                        "Tailscale is not ready, so live Serve mappings were not inspected.",
-                        null))
+                .map(app -> reconcile(app, tailscale, config))
                 .toList();
         return new AccessModels.PrivateAccessReconciliationReport(status, headline, summary, items, List.of(), Instant.now());
     }
 
-    private AccessModels.PrivateAccessReconciliationItem reconcile(AppRuntimeView app, TailscaleServeConfig config) {
-        Integer expectedPort = expectedPort(app);
-        String expectedUrl = expectedPrivateUrl(app);
-        Integer expectedHttpsPort = expectedHttpsPort(expectedUrl, expectedPort);
-        String desiredMapping = desiredMapping(expectedHttpsPort, expectedPort);
-        List<String> liveMappings = liveMappings(config);
-        if (expectedPort == null) {
-            return item(app, "missing", "No local port found", "Start or repair the app so Autark-OS can find the local browser port.", "Repair app link", expectedUrl, null, null, null, expectedHttpsPort, desiredMapping, liveMappings, "No local published port was available for this app.");
-        }
-        if (!config.available()) {
-            return item(app, "unknown", "Private link could not be verified", config.message(), "Retry check", expectedUrl, expectedPort, null, null, expectedHttpsPort, desiredMapping, liveMappings, config.message());
-        }
-        if ("dev_mock".equals(config.status())) {
-            return item(app, "healthy", "Private link verified in dev mode", "Dev mode is treating this private link as reachable without changing Tailscale Serve.", null, expectedUrl, expectedPort, expectedHttpsPort, "http://127.0.0.1:" + expectedPort, expectedHttpsPort, desiredMapping, liveMappings, "Dev mode bypassed live Tailscale Serve inspection.");
-        }
-        Optional<TailscaleServeMapping> endpointMatch = config.mappings().stream()
-                .filter(mapping -> matchesExpectedMapping(mapping, expectedPort, expectedHttpsPort, expectedUrl))
-                .findFirst();
-        if (endpointMatch.isEmpty()) {
-            Optional<TailscaleServeMapping> wrongTargetForEndpoint = config.mappings().stream()
-                    .filter(mapping -> endpointMatches(mapping, expectedHttpsPort, expectedUrl))
-                    .findFirst();
-            if (wrongTargetForEndpoint.isPresent()) {
-                TailscaleServeMapping mapping = wrongTargetForEndpoint.get();
-                return item(app, "mismatched", "Private link points to a different local port", "Expected local port " + expectedPort + ", but Tailscale Serve points to " + friendlyPort(mapping.targetPort()) + ".", "Repair private link", expectedUrl, expectedPort, mapping.servePort(), mapping.target(), expectedHttpsPort, desiredMapping, liveMappings, "HTTPS endpoint matched, but the target local port did not.");
-            }
-            boolean localPortMappedElsewhere = config.mappings().stream().anyMatch(mapping -> Objects.equals(mapping.targetPort(), expectedPort));
-            String detail = localPortMappedElsewhere
-                    ? "Tailscale Serve routes to this app's local port, but not from the expected private HTTPS endpoint."
-                    : "Tailscale Serve does not currently expose this app's expected local port.";
-            return item(app, localPortMappedElsewhere ? "mismatched" : "missing", localPortMappedElsewhere ? "Private link uses a different HTTPS endpoint" : "Private link is missing", detail, "Repair private link", expectedUrl, expectedPort, null, null, expectedHttpsPort, desiredMapping, liveMappings, localPortMappedElsewhere ? "A live mapping targets the app port, but the private URL endpoint does not match." : "No live mapping targets the app port.");
-        }
-        TailscaleServeMapping mapping = endpointMatch.get();
-        if (!Objects.equals(mapping.targetPort(), expectedPort)) {
-            return item(app, "mismatched", "Private link points to a different local port", "Expected local port " + expectedPort + ", but Tailscale Serve points to " + friendlyPort(mapping.targetPort()) + ".", "Repair private link", expectedUrl, expectedPort, mapping.servePort(), mapping.target(), expectedHttpsPort, desiredMapping, liveMappings, "HTTPS endpoint matched, but the target local port did not.");
-        }
-        return item(app, "healthy", "Private link verified", "Tailscale Serve is routing this private link to the expected local app port.", null, expectedUrl, expectedPort, mapping.servePort(), mapping.target(), expectedHttpsPort, desiredMapping, liveMappings, "Live Serve mapping matches the expected local app port and private endpoint.");
-    }
-
-    private AccessModels.PrivateAccessReconciliationItem item(AppRuntimeView app, String status, String message, String detail, String actionLabel, String expectedPrivateUrl, Integer expectedPort, Integer actualPort, String target, Integer expectedHttpsPort, String desiredMapping, List<String> liveMappings, String matchReason) {
+    private AccessModels.PrivateAccessReconciliationItem reconcile(AppRuntimeView app, TailscaleStatus tailscale, TailscaleServeConfig config) {
+        PrivateAccessState state = stateResolver.resolve(app.appId(), app.settings(), app.accessUrl(), tailscale, config);
+        TailscaleServeMapping mapping = state.mapping();
         return new AccessModels.PrivateAccessReconciliationItem(
                 app.appId(),
                 app.appName(),
-                status,
-                message,
-                detail,
-                actionLabel,
-                expectedPrivateUrl,
-                actualPrivateUrl(app),
-                expectedPort,
-                actualPort,
-                target,
-                expectedPort,
-                expectedHttpsPort,
+                state.verified() ? "healthy" : state.status(),
+                state.message(),
+                state.detail(),
+                state.actionLabel(),
+                state.expectedPrivateUrl(),
+                state.verifiedPrivateUrl(),
+                state.expectedLocalPort(),
+                mapping == null ? null : mapping.servePort(),
+                mapping == null ? null : mapping.target(),
+                state.expectedLocalPort(),
+                state.expectedHttpsPort(),
                 storedPrivateUrl(app),
-                desiredMapping,
-                liveMappings,
-                matchReason,
-                "healthy".equals(status) ? Instant.now() : null);
+                desiredMapping(state.expectedHttpsPort(), state.expectedLocalPort()),
+                state.liveMappings(),
+                state.matchReason(),
+                state.verifiedAt());
     }
 
     private boolean wantsPrivateAccess(AppRuntimeView app) {
@@ -195,37 +146,8 @@ public class PrivateAccessReconciliationService {
                 && ("private".equals(app.desiredAccess().mode()) || "local-and-private".equals(app.desiredAccess().mode()) || app.desiredAccess().privateAccessRequired());
     }
 
-    private String expectedPrivateUrl(AppRuntimeView app) {
-        if (app.desiredAccess() != null && app.desiredAccess().privateUrl() != null && !app.desiredAccess().privateUrl().isBlank()) {
-            return app.desiredAccess().privateUrl();
-        }
-        if (app.settings() != null) {
-            return app.settings().privateAccessUrl();
-        }
-        return null;
-    }
-
-    private String actualPrivateUrl(AppRuntimeView app) {
-        return app.observedAccess() == null ? null : app.observedAccess().privateUrl();
-    }
-
     private String storedPrivateUrl(AppRuntimeView app) {
         return app.settings() == null ? null : app.settings().privateAccessUrl();
-    }
-
-    private Integer expectedPort(AppRuntimeView app) {
-        if (app.observedAccess() != null && app.observedAccess().localPort() != null) {
-            return app.observedAccess().localPort();
-        }
-        if (app.desiredAccess() != null && app.desiredAccess().expectedLocalPort() != null) {
-            return app.desiredAccess().expectedLocalPort();
-        }
-        return portFromUrl(app.accessUrl());
-    }
-
-    private Integer expectedHttpsPort(String privateUrl, Integer expectedLocalPort) {
-        Integer privateUrlPort = portFromUrl(privateUrl);
-        return privateUrlPort == null ? expectedLocalPort : privateUrlPort;
     }
 
     private String desiredMapping(Integer expectedHttpsPort, Integer expectedLocalPort) {
@@ -234,70 +156,12 @@ public class PrivateAccessReconciliationService {
         return https + " -> " + local;
     }
 
-    private List<String> liveMappings(TailscaleServeConfig config) {
-        if (!config.available()) {
-            return List.of();
-        }
-        return config.mappings().stream()
-                .map(mapping -> "https:" + friendlyPort(mapping.servePort()) + " -> " + firstPresent(mapping.target(), "unknown target"))
-                .toList();
-    }
-
-    private boolean matchesExpectedMapping(TailscaleServeMapping mapping, Integer expectedLocalPort, Integer expectedHttpsPort, String expectedPrivateUrl) {
-        if (!Objects.equals(mapping.targetPort(), expectedLocalPort)) {
-            return false;
-        }
-        return endpointMatches(mapping, expectedHttpsPort, expectedPrivateUrl);
-    }
-
-    private boolean endpointMatches(TailscaleServeMapping mapping, Integer expectedHttpsPort, String expectedPrivateUrl) {
-        if (expectedHttpsPort == null) {
-            return true;
-        }
-        if (Objects.equals(mapping.servePort(), expectedHttpsPort)) {
-            return true;
-        }
-        return expectedHttpsPort == 443 && mapping.servePort() == null && endpointHostMatches(mapping.endpoint(), expectedPrivateUrl);
-    }
-
-    private boolean endpointHostMatches(String endpoint, String expectedPrivateUrl) {
-        String endpointHost = host(endpoint);
-        String expectedHost = host(expectedPrivateUrl);
-        return endpointHost != null && expectedHost != null && endpointHost.equals(expectedHost);
-    }
-
-    private String host(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            String normalized = value.contains("://") ? value : "https://" + value;
-            String host = java.net.URI.create(normalized).getHost();
-            return host == null ? null : host.toLowerCase().replaceAll("\\.$", "");
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private String friendlyPort(Integer port) {
-        return port == null ? "unknown" : String.valueOf(port);
-    }
-
-    private String firstPresent(String... values) {
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return "";
-    }
-
-    private List<AccessModels.PrivateAccessStaleMapping> staleMappings(List<AppRuntimeView> privateApps, TailscaleServeConfig config) {
+    private List<AccessModels.PrivateAccessStaleMapping> staleMappings(List<AppRuntimeView> privateApps, TailscaleServeConfig config, TailscaleStatus tailscale) {
         if (!config.available() || "dev_mock".equals(config.status())) {
             return List.of();
         }
         Set<Integer> expectedPorts = privateApps.stream()
-                .map(this::expectedPort)
+                .map(app -> stateResolver.resolve(app.appId(), app.settings(), app.accessUrl(), tailscale, config).expectedHttpsPort())
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
         Set<Integer> autarkOsPorts = knownAutarkOsPorts();
@@ -321,14 +185,26 @@ public class PrivateAccessReconciliationService {
     }
 
     private Set<Integer> knownAutarkOsPorts() {
-        Set<Integer> ports = runtimeApps.get().stream()
+        List<AppRuntimeView> apps = runtimeApps.get();
+        Set<Integer> ports = apps.stream()
                 .map(app -> app.observedAccess() == null ? null : app.observedAccess().localPort())
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
+        apps.stream()
+                .map(this::storedPrivateUrl)
+                .map(this::portFromUrl)
+                .filter(Objects::nonNull)
+                .forEach(ports::add);
         catalogService.findAll().stream()
                 .map(manifest -> portFromUrl(manifest.accessUrl()))
                 .filter(Objects::nonNull)
                 .forEach(ports::add);
+        catalogService.findAll().forEach(manifest -> {
+            Integer localPort = portFromUrl(manifest.accessUrl());
+            if (localPort != null) {
+                ports.add(AppPrivateAccessPorts.defaultHttpsPort(manifest.id(), localPort));
+            }
+        });
         return ports;
     }
 
