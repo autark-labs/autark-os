@@ -45,3 +45,14 @@ test('restore flow returns focus to its originating control and retains durable 
   assert.match(page, /useBackupJobsQuery\(\)/);
   assert.match(page, /useAutarkOsJobQuery\(currentActiveJob/);
 });
+
+test('missing app runtime disables focused and batch backups with a visible reason', () => {
+  const page = source('src/pages/BackupsPage/BackupsPage.tsx');
+  const components = source('src/pages/BackupsPage/BackupsPage.components.tsx');
+
+  assert.match(page, /report\?\.apps\.filter\(\(app\) => !app\.backupAvailable\)/);
+  assert.match(page, /batchBackupUnavailableReason/);
+  assert.match(components, /!app\.backupAvailable/);
+  assert.match(components, /app\.backupUnavailableReason/);
+  assert.match(components, /<DisabledAction[^>]*disabled=\{disabled\}[^>]*reason=\{disabledReason\}/);
+});

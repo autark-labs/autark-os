@@ -22,7 +22,7 @@ import { CompactOperationStatus } from './components/AppOperationStatus';
 import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
 import { ApplicationLightControlButton, ApplicationOpenButton } from './components/ApplicationButtons';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
-import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations';
+import { runtimeActionDisabled, runtimeActionDisabledReason } from './extensions/ApplicationsPage.operations';
 import type { ApplicationActionHandlers, ApplicationEmptyState, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type AdvancedApplicationsViewProps = {
@@ -81,8 +81,8 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
               {items.map((item) => {
                 const loadingAction = actionLoadingByItemId[item.id] ?? null;
                 const primaryRuntimeActionLoading = loadingAction === 'start' || loadingAction === 'stop';
-                const runtimeActionDisabled = runtimeControlsDisabled(item.operationState, loadingAction);
-                const runtimeDisabledReason = runtimeControlDisabledReason(item, loadingAction);
+                const actionDisabled = (action: ApplicationRuntimeAction) => runtimeActionDisabled(item, action, loadingAction);
+                const disabledReason = (action: ApplicationRuntimeAction) => runtimeActionDisabledReason(item, action, loadingAction);
 
                 return (
                   <TableRow
@@ -139,15 +139,15 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                         )}
                         {item.managementState === 'managed' && (
                           primaryRuntimeActionLoading ? (
-                            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+                            <DisabledAction disabled reason={disabledReason(loadingAction)}>
                               <ApplicationLightControlButton disabled size="sm" type="button">
                                 <Loader2 className="animate-spin" data-icon="inline-start" />
                                 {runtimeActionLabel(loadingAction)}
                               </ApplicationLightControlButton>
                             </DisabledAction>
                           ) : item.readinessState === 'paused' || item.readinessState === 'stopped' ? (
-                            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
-                              <ApplicationLightControlButton disabled={runtimeActionDisabled} onClick={(event) => {
+                            <DisabledAction disabled={actionDisabled('start')} reason={disabledReason('start')}>
+                              <ApplicationLightControlButton disabled={actionDisabled('start')} onClick={(event) => {
                                 event.stopPropagation();
                                 actions.onStart(item.id);
                               }} size="sm" type="button" variant="outline">
@@ -156,8 +156,8 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                               </ApplicationLightControlButton>
                             </DisabledAction>
                           ) : (
-                            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
-                              <ApplicationLightControlButton disabled={runtimeActionDisabled} onClick={(event) => {
+                            <DisabledAction disabled={actionDisabled('stop')} reason={disabledReason('stop')}>
+                              <ApplicationLightControlButton disabled={actionDisabled('stop')} onClick={(event) => {
                                 event.stopPropagation();
                                 actions.onStop(item.id);
                               }} size="sm" type="button" variant="outline">
@@ -168,8 +168,8 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                           )
                         )}
                         {item.managementState === 'managed' && (
-                          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
-                            <ApplicationLightControlButton disabled={runtimeActionDisabled} onClick={(event) => {
+                          <DisabledAction disabled={actionDisabled('restart')} reason={disabledReason('restart')}>
+                            <ApplicationLightControlButton disabled={actionDisabled('restart')} onClick={(event) => {
                               event.stopPropagation();
                               actions.onRestart(item.id);
                             }} size="sm" type="button" variant="outline">
@@ -179,11 +179,11 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                           </DisabledAction>
                         )}
                         {item.managementState === 'managed' && (
-                          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
+                          <DisabledAction disabled={actionDisabled('backup')} reason={disabledReason('backup')}>
                             <ApplicationLightControlButton onClick={(event) => {
                               event.stopPropagation();
                               actions.onCreateBackup(item.id);
-                            }} disabled={runtimeActionDisabled} size="sm" type="button" variant="outline">
+                            }} disabled={actionDisabled('backup')} size="sm" type="button" variant="outline">
                               {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
                               {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
                             </ApplicationLightControlButton>
@@ -220,14 +220,4 @@ function runtimeActionLabel(action: ApplicationRuntimeAction) {
   if (action === 'backup') return 'Backing up';
   if (action === 'repair') return 'Repairing';
   return 'Restarting';
-}
-
-function runtimeControlDisabledReason(item: ApplicationSurfaceItem, loadingAction: ApplicationRuntimeAction | null) {
-  if (loadingAction) {
-    return `${runtimeActionLabel(loadingAction)} is already running for ${item.name}.`;
-  }
-  if (item.operationState.kind !== 'idle' && item.operationState.kind !== 'failed') {
-    return item.operationState.currentStep || `${item.operationState.label} is currently running for ${item.name}.`;
-  }
-  return 'This runtime control is currently available.';
 }

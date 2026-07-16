@@ -18,6 +18,23 @@ export function runtimeControlsDisabled(
   loadingAction: ApplicationRuntimeAction | null,
 ): boolean;
 
+export function applicationActionRestriction(
+  item: Pick<ApplicationSurfaceItem, 'availableActions'>,
+  actionId: string,
+): { disabled: boolean; reason: string };
+
+export function runtimeActionDisabled(
+  item: Pick<ApplicationSurfaceItem, 'availableActions' | 'operationState'>,
+  action: ApplicationRuntimeAction,
+  loadingAction: ApplicationRuntimeAction | null,
+): boolean;
+
+export function runtimeActionDisabledReason(
+  item: Pick<ApplicationSurfaceItem, 'availableActions' | 'name' | 'operationState'>,
+  action: ApplicationRuntimeAction,
+  loadingAction: ApplicationRuntimeAction | null,
+): string;
+
 export function operationBlocksManagement(
   operationState: AppOperationState,
 ): boolean;

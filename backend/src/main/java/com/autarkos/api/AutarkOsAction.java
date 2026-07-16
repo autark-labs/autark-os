@@ -9,17 +9,23 @@ public record AutarkOsAction(
         Optional<String> href,
         Optional<String> route,
         boolean confirmationRequired,
-        boolean danger) {
+        boolean danger,
+        boolean disabled,
+        Optional<String> reason) {
 
     public static AutarkOsAction post(String id, String label, String href, boolean confirmationRequired, boolean danger) {
-        return new AutarkOsAction(id, label, Optional.of("POST"), Optional.of(href), Optional.empty(), confirmationRequired, danger);
+        return new AutarkOsAction(id, label, Optional.of("POST"), Optional.of(href), Optional.empty(), confirmationRequired, danger, false, Optional.empty());
+    }
+
+    public static AutarkOsAction disabledPost(String id, String label, String href, String reason) {
+        return new AutarkOsAction(id, label, Optional.of("POST"), Optional.of(href), Optional.empty(), false, false, true, Optional.ofNullable(reason));
     }
 
     public static AutarkOsAction get(String id, String label, String href) {
-        return new AutarkOsAction(id, label, Optional.of("GET"), Optional.of(href), Optional.empty(), false, false);
+        return new AutarkOsAction(id, label, Optional.of("GET"), Optional.of(href), Optional.empty(), false, false, false, Optional.empty());
     }
 
     public static AutarkOsAction route(String id, String label, String route) {
-        return new AutarkOsAction(id, label, Optional.empty(), Optional.empty(), Optional.of(route), false, false);
+        return new AutarkOsAction(id, label, Optional.empty(), Optional.empty(), Optional.of(route), false, false, false, Optional.empty());
     }
 }

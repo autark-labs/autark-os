@@ -1,7 +1,9 @@
 import { AlertTriangle, ListChecks, Play, Settings, Square, Wrench } from 'lucide-react';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import type { ApplicationActionHandlers, ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
+import { applicationActionRestriction } from '../extensions/ApplicationsPage.operations';
 
 type ApplicationRecoveryTabProps = {
   actions: Pick<ApplicationActionHandlers, 'onRepair' | 'onStart' | 'onStop' | 'onRestart'>;
@@ -15,6 +17,9 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
   }
 
   const repairAction = item.availableActions.find((action) => action.id === 'repair');
+  const start = applicationActionRestriction(item, 'start');
+  const stop = applicationActionRestriction(item, 'stop');
+  const settings = applicationActionRestriction(item, 'settings');
   const recovery = explainFailure(item.operationState.message);
   const recentEvents = item.runtime.recentEvents.slice(0, 4);
   const backupWarning = backupSafetyMessage(item);
@@ -49,23 +54,31 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
 
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {repairAction && (
-          <Button className="bg-red-100 text-red-950 hover:bg-white" disabled={repairAction.disabled} onClick={() => actions.onRepair(item.id)} title={repairAction.reason || undefined} type="button">
-            <Wrench data-icon="inline-start" />
-            Run repair
-          </Button>
+          <DisabledAction disabled={Boolean(repairAction.disabled)} reason={repairAction.reason || 'Repair is not available for this app right now.'}>
+            <Button className="bg-red-100 text-red-950 hover:bg-white" disabled={repairAction.disabled} onClick={() => actions.onRepair(item.id)} title={repairAction.reason || undefined} type="button">
+              <Wrench data-icon="inline-start" />
+              Run repair
+            </Button>
+          </DisabledAction>
         )}
-        <Button className="bg-red-100 text-red-950 hover:bg-white" onClick={() => actions.onStart(item.id)} type="button">
-          <Play data-icon="inline-start" />
-          Start again
-        </Button>
-        <Button className="border-red-200/40 bg-red-950 text-red-50 hover:bg-red-900" onClick={() => actions.onStop(item.id)} type="button" variant="outline">
-          <Square data-icon="inline-start" />
-          Stop app
-        </Button>
-        <Button className="border-red-200/40 bg-red-950 text-red-50 hover:bg-red-900" onClick={onEditSettings} type="button" variant="outline">
-          <Settings data-icon="inline-start" />
-          Edit settings
-        </Button>
+        <DisabledAction disabled={start.disabled} reason={start.reason || 'Start is not available for this app right now.'}>
+          <Button className="bg-red-100 text-red-950 hover:bg-white" disabled={start.disabled} onClick={() => actions.onStart(item.id)} type="button">
+            <Play data-icon="inline-start" />
+            Start again
+          </Button>
+        </DisabledAction>
+        <DisabledAction disabled={stop.disabled} reason={stop.reason || 'Stop is not available for this app right now.'}>
+          <Button className="border-red-200/40 bg-red-950 text-red-50 hover:bg-red-900" disabled={stop.disabled} onClick={() => actions.onStop(item.id)} type="button" variant="outline">
+            <Square data-icon="inline-start" />
+            Stop app
+          </Button>
+        </DisabledAction>
+        <DisabledAction disabled={settings.disabled} reason={settings.reason || 'Settings are not available for this app right now.'}>
+          <Button className="border-red-200/40 bg-red-950 text-red-50 hover:bg-red-900" disabled={settings.disabled} onClick={onEditSettings} type="button" variant="outline">
+            <Settings data-icon="inline-start" />
+            Edit settings
+          </Button>
+        </DisabledAction>
       </div>
 
       <div className="grid gap-2 rounded-lg border border-red-300/30 bg-red-900/70 p-3">

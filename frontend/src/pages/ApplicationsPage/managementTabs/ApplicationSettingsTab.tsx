@@ -40,7 +40,7 @@ import type {
   ApplicationSettingsImpact,
   ApplicationSurfaceItem,
 } from '../extensions/ApplicationsPage.types';
-import { operationBlocksManagement } from '../extensions/ApplicationsPage.operations';
+import { applicationActionRestriction, operationBlocksManagement } from '../extensions/ApplicationsPage.operations';
 
 type ApplicationSettingsTabProps = {
   actions: Pick<ApplicationActionHandlers, 'onDirtyChange' | 'onSaveSettings' | 'onSettingsPlanRequest' | 'onSetPrivateNetworkAccess'>;
@@ -52,7 +52,8 @@ const backupFrequencies = ['daily', 'weekly', 'monthly'] as const;
 const protocols = ['http', 'https'] as const;
 
 export function ApplicationSettingsTab({ actions, item, loadingAction }: ApplicationSettingsTabProps) {
-  const editable = item.managementState === 'managed' && item.settings.canEdit;
+  const settingsRestriction = applicationActionRestriction(item, 'settings');
+  const editable = item.managementState === 'managed' && item.settings.canEdit && !settingsRestriction.disabled;
   const initialValues = useMemo(
     () => settingsFormValues(item),
     [item],
@@ -147,9 +148,11 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         {!editable && (
           <Alert className="border-sky-400/20 bg-slate-900 text-sky-50">
             <AlertTriangle />
-            <AlertTitle>Read-only service</AlertTitle>
+            <AlertTitle>{settingsRestriction.disabled ? 'Settings unavailable' : 'Read-only service'}</AlertTitle>
             <AlertDescription className="text-sky-100/70">
-              Autark-OS can show settings for found and pinned services, but it cannot change them until the service is managed here.
+              {settingsRestriction.disabled
+                ? settingsRestriction.reason
+                : 'Autark-OS can show settings for found and pinned services, but it cannot change them until the service is managed here.'}
             </AlertDescription>
           </Alert>
         )}

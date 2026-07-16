@@ -35,12 +35,10 @@ public class OnboardingService {
     }
 
     public OnboardingModels.OnboardingState state() {
-        boolean existingSettings = settingsRepository.hasAnySettings();
         Map<String, String> values = settingsRepository.readAll();
         ProjectSettings settings = settingsService.current();
-        String defaultStatus = existingSettings ? "complete" : "not_started";
         return new OnboardingModels.OnboardingState(
-                value(values, "onboardingStatus", defaultStatus),
+                SetupCompletionState.onboardingStatus(values),
                 intValue(values, "onboardingCurrentStep", 0),
                 settings.deviceName(),
                 runtimeLayout.runtimeRoot().toString(),
@@ -57,7 +55,16 @@ public class OnboardingService {
     public OnboardingModels.OnboardingState update(OnboardingModels.OnboardingUpdateRequest request) {
         Map<String, String> updates = new LinkedHashMap<>();
         if (request.status() != null && !request.status().isBlank()) {
-            updates.put("onboardingStatus", cleanStatus(request.status()));
+            String status = cleanStatus(request.status());
+            updates.put(SetupCompletionState.ONBOARDING_STATUS_KEY, status);
+            java.util.Set<String> progress = SetupCompletionState.steps(settingsRepository.readAll().get(SetupCompletionState.PROGRESS_COMPLETED_KEY));
+            if ("complete".equals(status)) {
+                progress.add("done");
+            } else {
+                progress.remove("done");
+            }
+            updates.put(SetupCompletionState.PROGRESS_COMPLETED_KEY, SetupCompletionState.encode(progress));
+            updates.put(SetupCompletionState.PROGRESS_UPDATED_KEY, Instant.now().toString());
         }
         if (request.currentStep() != null) {
             updates.put("onboardingCurrentStep", Integer.toString(Math.max(0, Math.min(request.currentStep(), 6))));

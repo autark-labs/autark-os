@@ -79,9 +79,9 @@ function BackupsPage() {
     return [...new Set(localOperation ? [...durableOperations, localOperation] : durableOperations)];
   }, [backupJobsQuery.data, running]);
   const appBackupAvailability = backupOperationAvailability('app_backup', activeBackupOperations);
-  const fullBackupAvailability = backupOperationAvailability('full_backup', activeBackupOperations);
+  const fullBackupOperationAvailability = backupOperationAvailability('full_backup', activeBackupOperations);
   const restoreAvailability = backupOperationAvailability('restore', activeBackupOperations);
-  const routineBackupAvailability = backupOperationAvailability('routine_backup', activeBackupOperations);
+  const routineBackupOperationAvailability = backupOperationAvailability('routine_backup', activeBackupOperations);
   const verifyAvailability = backupOperationAvailability('verify', activeBackupOperations);
   const backupReport = useBackupReportRepository({ paused: Boolean(restoreFlow || running || currentActiveJob) });
   const runAppBackupMutation = useRunAppBackupMutation();
@@ -92,6 +92,16 @@ function BackupsPage() {
   const verifyRestorePointMutation = useVerifyRestorePointMutation();
   const activeJobQuery = useAutarkOsJobQuery(currentActiveJob && !terminalJob(currentActiveJob) ? currentActiveJob.jobId : null);
   const report = backupReport.report;
+  const recoveryLimitedApps = report?.apps.filter((app) => !app.backupAvailable) ?? [];
+  const batchBackupUnavailableReason = recoveryLimitedApps.length
+    ? `Review ${recoveryLimitedApps.map((app) => app.appName).join(', ')} in My Apps before running a full or routine backup because the original Compose configuration is missing.`
+    : '';
+  const fullBackupAvailability = batchBackupUnavailableReason
+    ? { disabled: true, reason: batchBackupUnavailableReason }
+    : fullBackupOperationAvailability;
+  const routineBackupAvailability = batchBackupUnavailableReason
+    ? { disabled: true, reason: batchBackupUnavailableReason }
+    : routineBackupOperationAvailability;
   const pageError = error ?? (backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null);
   const refreshBackupReport = backupReport.refresh;
 

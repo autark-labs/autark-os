@@ -20,14 +20,14 @@ public class AppTelemetryService {
     }
 
     public RuntimeModels.AppTelemetry telemetry(InstalledApp app) {
-        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
+        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId());
         return telemetryForContainers(containers);
     }
 
     public Map<String, RuntimeModels.AppTelemetry> telemetryForApps(List<InstalledApp> apps) {
         Map<String, List<String>> containerNamesByAppId = new LinkedHashMap<>();
         for (InstalledApp app : apps) {
-            List<String> names = runtimeStatusResolver.containerNames(composeExecutor.containers(composeFile(app), app.composeProject()));
+            List<String> names = runtimeStatusResolver.containerNames(composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId()));
             containerNamesByAppId.put(app.appId(), names);
         }
         List<String> containerNames = containerNamesByAppId.values().stream()

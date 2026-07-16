@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { isBootstrapAuthenticated, loadApplicationBootstrap } from '../App.bootstrap';
+import { loadApplicationBootstrap, resolveBootstrapAuthentication } from '../App.bootstrap';
 import type { AdminSecurityStatus } from '../api/AdminSecurityAPIClient';
 import type { OnboardingState } from '../types/system';
 
@@ -20,7 +20,9 @@ test('loads security and onboarding state into one ready bootstrap result', asyn
   const result = await loadApplicationBootstrap({
     getSecurityStatus: async () => unclaimedStatus,
     getOnboardingState: async () => onboarding('complete'),
+    validateAdminToken: async () => false,
     readAdminToken: () => '',
+    clearAdminToken: () => undefined,
   });
 
   assert.deepEqual(result, {
@@ -30,11 +32,14 @@ test('loads security and onboarding state into one ready bootstrap result', asyn
   });
 });
 
-test('preserves the existing bootstrap authentication mapping', () => {
-  assert.equal(isBootstrapAuthenticated({ ...unclaimedStatus, authRequired: false }, ''), true);
-  assert.equal(isBootstrapAuthenticated({ ...unclaimedStatus, devMode: true }, ''), true);
-  assert.equal(isBootstrapAuthenticated(unclaimedStatus, 'stored-token'), true);
-  assert.equal(isBootstrapAuthenticated(unclaimedStatus, ''), false);
+test('validates stored authentication instead of trusting stale browser state', async () => {
+  let cleared = false;
+  assert.equal(await resolveBootstrapAuthentication({ ...unclaimedStatus, authRequired: false }, '', async () => false, () => undefined), true);
+  assert.equal(await resolveBootstrapAuthentication({ ...unclaimedStatus, devMode: true }, '', async () => false, () => undefined), true);
+  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, 'active-token', async () => true, () => undefined), true);
+  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, '', async () => true, () => undefined), false);
+  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, 'expired-token', async () => false, () => { cleared = true; }), false);
+  assert.equal(cleared, true);
 });
 
 test('does not request onboarding when security bootstrap fails', async () => {
@@ -49,7 +54,9 @@ test('does not request onboarding when security bootstrap fails', async () => {
         onboardingRequested = true;
         return onboarding('complete');
       },
+      validateAdminToken: async () => false,
       readAdminToken: () => '',
+      clearAdminToken: () => undefined,
     }),
     /Backend unavailable/,
   );
@@ -64,7 +71,9 @@ test('surfaces onboarding bootstrap failures without fabricating a ready result'
       getOnboardingState: async () => {
         throw new Error('Onboarding unavailable');
       },
+      validateAdminToken: async () => false,
       readAdminToken: () => '',
+      clearAdminToken: () => undefined,
     }),
     /Onboarding unavailable/,
   );
@@ -81,7 +90,9 @@ test('can retry bootstrap and recover after a transient failure', async () => {
       return unclaimedStatus;
     },
     getOnboardingState: async () => onboarding('in_progress'),
+    validateAdminToken: async () => false,
     readAdminToken: () => '',
+    clearAdminToken: () => undefined,
   };
 
   await assert.rejects(loadApplicationBootstrap(dependencies), /Backend starting/);

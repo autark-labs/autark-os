@@ -14,6 +14,7 @@ import java.util.function.Supplier;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.AppRuntimeFiles;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
@@ -133,7 +134,9 @@ class BackupReportService {
         RestorePoint latest = restorePoints.stream().findFirst().orElse(null);
         long dataSize = fileOperations.directorySize(Path.of(app.runtimePath()));
         BackupModels.BackupContract contract = backupContractService.backupContract(app, manifestsById.get(app.appId()));
-        String status = appBackupStatus(policy, latest, contract);
+        boolean backupAvailable = AppRuntimeFiles.hasComposeFile(app.runtimePath());
+        String backupUnavailableReason = backupAvailable ? "" : missingRuntimeReason(app.appName());
+        String status = appBackupStatus(policy, latest, contract, backupAvailable);
         return new BackupModels.AppBackupStatus(
                 app.appId(),
                 app.appName(),
@@ -146,12 +149,17 @@ class BackupReportService {
                 dataSize,
                 latest,
                 restorePoints,
-                statusMessage(policy, latest, contract),
+                statusMessage(policy, latest, contract, backupAvailable, backupUnavailableReason),
+                backupAvailable,
+                backupUnavailableReason,
                 nextBackup(policy),
                 Instant.now());
     }
 
-    private String appBackupStatus(InstallModels.BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
+    private String appBackupStatus(InstallModels.BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract, boolean backupAvailable) {
+        if (!backupAvailable) {
+            return "recovery_limited";
+        }
         if (!policy.enabled()) {
             return "unprotected";
         }
@@ -170,7 +178,10 @@ class BackupReportService {
         return "not_backed_up";
     }
 
-    private String statusMessage(InstallModels.BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract) {
+    private String statusMessage(InstallModels.BackupPolicy policy, RestorePoint latest, BackupModels.BackupContract contract, boolean backupAvailable, String backupUnavailableReason) {
+        if (!backupAvailable) {
+            return backupUnavailableReason;
+        }
         if (!policy.enabled()) {
             return "Backups are off.";
         }
@@ -187,6 +198,10 @@ class BackupReportService {
             return "Protected by restore point.";
         }
         return "No completed restore point yet.";
+    }
+
+    private String missingRuntimeReason(String appName) {
+        return appName + " cannot use normal backups because its original Compose file is missing. Review it in My Apps and use archive-first cleanup if you no longer need the container.";
     }
 
     private String nextRunLabel(ProjectSettings settings) {

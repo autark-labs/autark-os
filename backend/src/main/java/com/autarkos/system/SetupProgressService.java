@@ -28,9 +28,9 @@ public class SetupProgressService {
             "starter_apps",
             "first_backup",
             "done");
-    private static final String COMPLETED_KEY = "setupProgressCompletedSteps";
+    private static final String COMPLETED_KEY = SetupCompletionState.PROGRESS_COMPLETED_KEY;
     private static final String SKIPPED_KEY = "setupProgressSkippedSteps";
-    private static final String UPDATED_KEY = "setupProgressUpdatedAt";
+    private static final String UPDATED_KEY = SetupCompletionState.PROGRESS_UPDATED_KEY;
 
     private final ProjectSettingsRepository repository;
     private final Supplier<Instant> clock;
@@ -49,7 +49,12 @@ public class SetupProgressService {
         Map<String, String> values = repository.readAll();
         List<String> completed = listValue(values.get(COMPLETED_KEY));
         List<String> skipped = listValue(values.get(SKIPPED_KEY));
-        boolean setupComplete = completed.contains("done");
+        boolean setupComplete = SetupCompletionState.isComplete(values);
+        if (setupComplete && !completed.contains("done")) {
+            completed = append(completed, "done");
+        } else if (!setupComplete && completed.contains("done")) {
+            completed = without(completed, "done");
+        }
         return new SetupProgressModels.SetupProgress(
                 SETUP_VERSION,
                 completed,
@@ -81,7 +86,8 @@ public class SetupProgressService {
         repository.saveValues(Map.of(
                 COMPLETED_KEY, encode(completed),
                 SKIPPED_KEY, encode(skipped),
-                UPDATED_KEY, clock.get().toString()));
+                UPDATED_KEY, clock.get().toString(),
+                SetupCompletionState.ONBOARDING_STATUS_KEY, completed.contains("done") ? "complete" : "in_progress"));
     }
 
     private String nextStep(List<String> completed, List<String> skipped) {

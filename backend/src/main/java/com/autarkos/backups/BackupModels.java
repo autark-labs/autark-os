@@ -21,6 +21,8 @@ public final class BackupModels {
             RestorePoint latestBackup,
             List<RestorePoint> restorePoints,
             String message,
+            boolean backupAvailable,
+            String backupUnavailableReason,
             String nextBackup,
             Instant checkedAt) {
     }

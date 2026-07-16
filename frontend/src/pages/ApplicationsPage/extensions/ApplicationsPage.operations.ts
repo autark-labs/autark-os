@@ -56,6 +56,44 @@ export function runtimeControlsDisabled(operationState: AppOperationState, loadi
   return kind !== 'idle' && kind !== 'failed';
 }
 
+export function applicationActionRestriction(item: Pick<ApplicationSurfaceItem, 'availableActions'>, actionId: string) {
+  const action = item.availableActions.find((candidate) => candidate.id === actionId);
+  return {
+    disabled: Boolean(action?.disabled),
+    reason: action?.reason || '',
+  };
+}
+
+export function runtimeActionDisabled(
+  item: Pick<ApplicationSurfaceItem, 'availableActions' | 'operationState'>,
+  action: ApplicationRuntimeAction,
+  loadingAction: ApplicationRuntimeAction | null,
+) {
+  return runtimeControlsDisabled(item.operationState, loadingAction) || applicationActionRestriction(item, action).disabled;
+}
+
+export function runtimeActionDisabledReason(
+  item: Pick<ApplicationSurfaceItem, 'availableActions' | 'name' | 'operationState'>,
+  action: ApplicationRuntimeAction,
+  loadingAction: ApplicationRuntimeAction | null,
+) {
+  const restriction = applicationActionRestriction(item, action);
+  if (restriction.disabled) return restriction.reason || `This action is unavailable for ${item.name}.`;
+  if (loadingAction) return `${runtimeActionLabel(loadingAction)} is already running for ${item.name}.`;
+  if (item.operationState.kind !== 'idle' && item.operationState.kind !== 'failed') {
+    return item.operationState.currentStep || `${item.operationState.label} is currently running for ${item.name}.`;
+  }
+  return 'This runtime control is currently available.';
+}
+
+function runtimeActionLabel(action: ApplicationRuntimeAction) {
+  if (action === 'start') return 'Starting';
+  if (action === 'stop') return 'Pausing';
+  if (action === 'backup') return 'Backing up';
+  if (action === 'repair') return 'Repairing';
+  return 'Restarting';
+}
+
 export function operationBlocksManagement(operationState: AppOperationState) {
   const kind = operationState?.kind ?? 'idle';
   return kind !== 'idle' && kind !== 'failed';

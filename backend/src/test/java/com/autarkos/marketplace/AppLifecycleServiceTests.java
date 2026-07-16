@@ -778,6 +778,62 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void missingComposeUninstallArchivesContainerBeforeRemovingTheAppRecord() throws Exception {
+        Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
+
+        InstallModels.UninstallPlan plan = service.uninstallPlan("vaultwarden");
+        AppActionResult result = service.uninstall("vaultwarden");
+
+        assertThat(plan.headline()).contains("original Compose file is gone");
+        assertThat(plan.safetyCheckpointMessage()).contains("writable filesystem").contains("Mounted files");
+        assertThat(result.message()).contains("recovery archive");
+        assertThat(composeExecutor.archiveCalled).isTrue();
+        assertThat(repository.findAppById("vaultwarden")).isEmpty();
+    }
+
+    @Test
+    void missingComposeUninstallKeepsContainerAndAppRecordWhenArchiveFails() throws Exception {
+        Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
+        composeExecutor.failArchive = true;
+
+        assertThatThrownBy(() -> service.uninstall("vaultwarden"))
+                .hasMessageContaining("Could not uninstall Vaultwarden");
+
+        assertThat(composeExecutor.archiveCalled).isTrue();
+        assertThat(repository.findAppById("vaultwarden")).isPresent();
+    }
+
+    @Test
+    void missingComposeBlocksStartWithARecoveryActionInsteadOfRawDockerFailure() throws Exception {
+        Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
+
+        AppRuntimeView app = service.getApp("vaultwarden");
+        InstallModels.AppSettingsChangePlan settingsPlan = service.settingsChangePlan("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:8090"));
+
+        assertThat(app.availableActions())
+                .filteredOn(action -> List.of("start", "restart", "settings", "backup").contains(action.id()))
+                .allSatisfy(action -> {
+                    assertThat(action.disabled()).isTrue();
+                    assertThat(action.reason()).isPresent();
+                });
+        assertThat(settingsPlan.saveAllowed()).isFalse();
+        assertThat(settingsPlan.blockedReasons()).anySatisfy(reason -> assertThat(reason).contains("Compose file is missing"));
+        assertThatThrownBy(() -> service.start("vaultwarden"))
+                .hasMessageContaining("original Compose file is missing")
+                .hasMessageContaining("recovery archive");
+        assertThat(composeExecutor.upCalled).isFalse();
+    }
+
+    @Test
+    void missingComposeCanStillStopAnAdoptedContainerByManagedLabels() throws Exception {
+        Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
+
+        service.stop("vaultwarden");
+
+        assertThat(composeExecutor.stopManagedCalled).isTrue();
+    }
+
+    @Test
     void updateSettingsPersistsValidatedUserPreferences() {
         AppRuntimeView app = service.updateSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
@@ -999,6 +1055,9 @@ class AppLifecycleServiceTests {
         boolean upCalled;
         List<String> failUpOutput = List.of();
         boolean failDown;
+        boolean archiveCalled;
+        boolean failArchive;
+        boolean stopManagedCalled;
         boolean transitionToStarting;
         String requiredProjectName;
 
@@ -1020,6 +1079,12 @@ class AppLifecycleServiceTests {
         }
 
         @Override
+        public RuntimeModels.DockerComposeResult stopManagedProject(Path composeFile, String projectName, String appId) {
+            stopManagedCalled = true;
+            return stop(composeFile, projectName);
+        }
+
+        @Override
         public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
             restartCalled = true;
             if (transitionToStarting) {
@@ -1034,6 +1099,14 @@ class AppLifecycleServiceTests {
                 return new RuntimeModels.DockerComposeResult(1, List.of("failed to remove " + projectName));
             }
             return new RuntimeModels.DockerComposeResult(0, List.of("removed " + projectName));
+        }
+
+        @Override
+        public RuntimeModels.DockerComposeResult archiveAndRemoveManagedProject(String projectName, String appId, Path archiveDirectory) {
+            archiveCalled = true;
+            return failArchive
+                    ? new RuntimeModels.DockerComposeResult(1, List.of("archive failed; no containers removed"))
+                    : new RuntimeModels.DockerComposeResult(0, List.of("Saved container writable-filesystem recovery archive: " + archiveDirectory));
         }
 
         @Override

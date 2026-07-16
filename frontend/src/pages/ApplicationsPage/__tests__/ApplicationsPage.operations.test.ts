@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { operationStateForItem, runtimeControlsDisabled, operationBlocksManagement } from '../extensions/ApplicationsPage.operations';
+import {
+  applicationActionRestriction,
+  operationBlocksManagement,
+  operationStateForItem,
+  runtimeActionDisabled,
+  runtimeActionDisabledReason,
+  runtimeControlsDisabled,
+} from '../extensions/ApplicationsPage.operations';
 
 test('operationStateForItem maps local runtime actions before idle state', () => {
   assert.deepEqual(operationStateForItem(item('vaultwarden'), 'start', null, []), {
@@ -174,6 +181,29 @@ test('runtime controls remain available after a failed operation', () => {
   assert.equal(runtimeControlsDisabled({ kind: 'failed' }, null), false);
   assert.equal(runtimeControlsDisabled({ kind: 'starting' }, null), true);
   assert.equal(runtimeControlsDisabled({ kind: 'idle' }, 'start'), true);
+});
+
+test('canonical action restrictions disable missing-runtime controls with an explanation', () => {
+  const missingRuntime = {
+    name: 'Vaultwarden',
+    operationState: { kind: 'idle' },
+    availableActions: [
+      {
+        id: 'start',
+        label: 'Start',
+        disabled: true,
+        reason: 'The original Compose file is missing.',
+      },
+    ],
+  };
+
+  assert.deepEqual(applicationActionRestriction(missingRuntime, 'start'), {
+    disabled: true,
+    reason: 'The original Compose file is missing.',
+  });
+  assert.equal(runtimeActionDisabled(missingRuntime, 'start', null), true);
+  assert.equal(runtimeActionDisabledReason(missingRuntime, 'start', null), 'The original Compose file is missing.');
+  assert.equal(runtimeActionDisabled(missingRuntime, 'stop', null), false);
 });
 
 test('failed operations do not block settings or uninstall recovery actions', () => {

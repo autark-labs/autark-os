@@ -1,6 +1,7 @@
 import type { InternalAxiosRequestConfig } from 'axios';
 
 const STORAGE_KEY = 'autark-os-admin-token';
+export const ADMIN_SESSION_EXPIRED_EVENT = 'autark-os-admin-session-expired';
 
 type TokenStorage = Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>;
 
@@ -29,10 +30,6 @@ export function clearAdminToken(storage: TokenStorage | undefined = globalThis.l
 }
 
 export function applyAdminAuthHeader(config: InternalAxiosRequestConfig, storage: TokenStorage | undefined = globalThis.localStorage) {
-  const method = String(config?.method || 'get').toLowerCase();
-  if (['get', 'head', 'options'].includes(method)) {
-    return config;
-  }
   const token = readAdminToken(storage);
   if (!token) {
     return config;

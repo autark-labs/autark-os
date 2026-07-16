@@ -46,7 +46,7 @@ class AppHealthService {
     }
 
     AppHealthSnapshot healthSnapshot(InstalledApp app) {
-        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
+        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId());
         AppRuntimeStatus runtime = runtimeStatusResolver.normalize(containers);
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
         String accessUrl = runtimeStatusResolver.accessUrl(app, manifest, containers);

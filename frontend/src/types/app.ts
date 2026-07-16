@@ -12,6 +12,8 @@ export type AutarkOsAction = {
   route?: string | null;
   confirmationRequired: boolean;
   danger: boolean;
+  disabled?: boolean;
+  reason?: string | null;
 };
 
 export type AutarkOsIssue = {

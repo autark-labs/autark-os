@@ -96,6 +96,33 @@ class BackupServiceCanonicalAppTests {
     }
 
     @Test
+    void missingComposeDisablesNormalAndFullBackupsWithRecoveryGuidance() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        Files.delete(runtimeLayout.appRoot("homepage").resolve("compose.yaml"));
+        BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService);
+
+        BackupModels.BackupReport report = service.report();
+        BackupModels.BackupRunResult appBackup = service.run("homepage");
+        BackupModels.BackupRunResult fullBackup = service.runFullBackup("manual");
+
+        assertThat(report.apps()).singleElement().satisfies(app -> {
+            assertThat(app.status()).isEqualTo("recovery_limited");
+            assertThat(app.backupAvailable()).isFalse();
+            assertThat(app.backupUnavailableReason()).contains("original Compose file is missing").contains("archive-first cleanup");
+        });
+        assertThat(appBackup.status()).isEqualTo("failed");
+        assertThat(appBackup.message()).contains("cannot use normal backups");
+        assertThat(fullBackup.status()).isEqualTo("failed");
+        assertThat(fullBackup.message()).contains("Full backup is unavailable").contains("Homepage");
+    }
+
+    @Test
     void completedRestorePointMakesAppProtected() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);

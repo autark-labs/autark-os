@@ -61,14 +61,17 @@ public class AppReconciliationService {
             return item(app.appId(), app.appName(), AutarkOsStates.AppStatus.MISSING, DockerResourceOwnership.OWNED, false, "No owned containers were found for this app.");
         }
         DockerResourceOwnership ownership = strongestOwnership(containers);
+        if (isExplicitlyAdopted(metadata)) {
+            String status = statusFromContainers(containers);
+            String detail = metadata.installState() != null && metadata.installState().toLowerCase().contains("missing_compose")
+                    ? "Autark-OS adopted this container, but its Compose configuration is missing. Stop and archive-first cleanup remain available."
+                    : "Autark-OS explicitly adopted this existing container.";
+            return item(app.appId(), app.appName(), status, DockerResourceOwnership.OWNED, lifecycleEligible(status, DockerResourceOwnership.OWNED), detail);
+        }
         if (ownership == DockerResourceOwnership.FOREIGN) {
             return item(app.appId(), app.appName(), "Managed elsewhere", ownership, false, "Docker reports containers owned by another Autark-OS instance.");
         }
         if (ownership == DockerResourceOwnership.LEGACY_UNSCOPED) {
-            if (isExplicitlyAdopted(metadata)) {
-                String status = statusFromContainers(containers);
-                return item(app.appId(), app.appName(), status, DockerResourceOwnership.OWNED, lifecycleEligible(status, DockerResourceOwnership.OWNED), "Autark-OS explicitly adopted this legacy container.");
-            }
             return item(app.appId(), app.appName(), AutarkOsStates.AppStatus.NEEDS_ATTENTION, ownership, false, "Docker reports legacy Autark-OS containers without instance ownership labels.");
         }
         String status = statusFromContainers(containers);
@@ -92,7 +95,7 @@ public class AppReconciliationService {
         if (metadata == null || !isOwnedMetadata(metadata)) {
             return false;
         }
-        return "adopted".equalsIgnoreCase(metadata.installState())
+        return (metadata.installState() != null && metadata.installState().toLowerCase().startsWith("adopted"))
                 || "recovered".equalsIgnoreCase(metadata.installState());
     }
 

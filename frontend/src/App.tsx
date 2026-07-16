@@ -10,7 +10,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ProjectPrimaryButton } from './components/primitives/ProjectButtons';
 import AppShell from './layout/AppShell';
 import { routeAliases } from './layout/navigationModel';
-import { readAdminToken } from './lib/adminSecuritySession';
+import { ADMIN_SESSION_EXPIRED_EVENT, clearAdminToken, readAdminToken } from './lib/adminSecuritySession';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
 import { Toaster } from './components/ui/sonner';
@@ -100,7 +100,9 @@ function AppContent() {
       const result = await loadApplicationBootstrap({
         getSecurityStatus: AdminSecurityAPIClient.status,
         getOnboardingState: SystemAPIClient.onboarding,
+        validateAdminToken: AdminSecurityAPIClient.session,
         readAdminToken,
+        clearAdminToken,
       });
       if (bootstrapRequestId.current === requestId) {
         setBootState({ phase: 'ready', bootstrap: result });
@@ -142,6 +144,12 @@ function AppContent() {
 function ReadyApplication({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
   const [authenticated, setAuthenticated] = useState(bootstrap.authenticated);
   const [onboardingComplete, setOnboardingComplete] = useState(bootstrap.onboardingComplete);
+
+  useEffect(() => {
+    const handleExpiredSession = () => setAuthenticated(false);
+    globalThis.addEventListener?.(ADMIN_SESSION_EXPIRED_EVENT, handleExpiredSession);
+    return () => globalThis.removeEventListener?.(ADMIN_SESSION_EXPIRED_EVENT, handleExpiredSession);
+  }, []);
 
   if (!onboardingComplete) {
     return (

@@ -76,6 +76,7 @@ test('backupPageViewModel handles a missing report without throwing', () => {
 test('backup status labels distinguish backups on from recoverable restore points', () => {
   assert.equal(backupStatusLabel('unprotected'), 'Backups off');
   assert.equal(backupStatusLabel('not_backed_up'), 'No restore point yet');
+  assert.equal(backupStatusLabel('recovery_limited'), 'Recovery limited');
   assert.equal(backupStatusLabel('protected'), 'Protected by restore point');
 });
 

@@ -103,7 +103,12 @@ for required_file in \
   selected-options.json \
   config-redacted.env \
   installer-stage.log \
-  release-metadata.json; do
+  release-metadata.json \
+  application-state.json \
+  jobs.json \
+  recent-activity.json \
+  observed-services.json \
+  docker-inventory.txt; do
   [[ -f "${bundle_root}/${required_file}" ]]
 done
 
@@ -119,6 +124,9 @@ assert manifest["supportConsoleCompatible"] is True
 assert "install-plan.json" in manifest["files"]
 assert "pre-install-doctor.json" in manifest["files"]
 assert "installer-stage.log" in manifest["files"]
+assert "application-state.json" in manifest["files"]
+assert "jobs.json" in manifest["files"]
+assert "docker-inventory.txt" in manifest["files"]
 PY
 
 python3 - "${bundle_root}/selected-options.json" <<'PY'

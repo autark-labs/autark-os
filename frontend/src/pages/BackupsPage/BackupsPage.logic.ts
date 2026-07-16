@@ -43,6 +43,7 @@ export function capitalizeBackupLabel(value: string) {
 export function backupStatusLabel(status: string) {
   if (status === 'manual_only') return 'Manual run required';
   if (status === 'needs_backup_review') return 'Needs backup review';
+  if (status === 'recovery_limited') return 'Recovery limited';
   if (status === 'not_backed_up') return 'No restore point yet';
   if (status === 'unprotected') return 'Backups off';
   if (status === 'protected') return 'Protected by restore point';

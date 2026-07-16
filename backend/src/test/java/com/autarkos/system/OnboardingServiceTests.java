@@ -21,6 +21,7 @@ import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
+import com.autarkos.security.AdminSecurityService;
 
 class OnboardingServiceTests {
 
@@ -29,6 +30,31 @@ class OnboardingServiceTests {
 
     @TempDir
     Path externalRoot;
+
+    @Test
+    void adminClaimSettingsDoNotSilentlyCompleteFirstBootSetup() {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);
+        AdminSecurityService security = new AdminSecurityService(repository, false);
+        security.status();
+
+        OnboardingModels.OnboardingState state = service(repository, runtimeLayout).state();
+
+        assertThat(repository.hasAnySettings()).isTrue();
+        assertThat(state.status()).isEqualTo("not_started");
+    }
+
+    @Test
+    void completingOnboardingAlsoCompletesTheSharedSetupProgress() {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);
+        OnboardingService service = service(repository, runtimeLayout);
+
+        service.complete();
+
+        assertThat(service.state().status()).isEqualTo("complete");
+        assertThat(new SetupProgressService(repository).status().setupComplete()).isTrue();
+    }
 
     @Test
     void preparesAndReturnsExternalBackupDestination() throws Exception {
@@ -64,6 +90,10 @@ class OnboardingServiceTests {
     private OnboardingService service() {
         RuntimeLayout runtimeLayout = runtimeLayout();
         ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);
+        return service(repository, runtimeLayout);
+    }
+
+    private OnboardingService service(ProjectSettingsRepository repository, RuntimeLayout runtimeLayout) {
         ProjectSettingsService settingsService = new ProjectSettingsService(repository, new ActivityLogService(mock(ActivityLogRepository.class)));
         return new OnboardingService(repository, settingsService, runtimeLayout, new FakeTailscaleService(), new FakeSystemDoctorService());
     }

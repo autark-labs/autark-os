@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.ApplicationBehaviorStates;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.AppRuntimeFiles;
 import com.autarkos.marketplace.install.AppRuntimeMetadataReader;
 import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -217,22 +218,37 @@ public class ObservedServiceService {
         if (service.catalogAppId() == null || service.catalogAppId().isBlank()) {
             return unavailablePlan(id, displayName, null, "Autark-OS cannot adopt this service until it is matched to a catalog app.", "Choose the matching app first.");
         }
+        String runtimePath = resolvedRuntimePath(service);
+        boolean composeAvailable = AppRuntimeFiles.hasComposeFile(runtimePath);
         return new HostModels.ObservedServiceAdoptionPlan(
                 id,
                 true,
-                "Autark-OS will take control of " + displayName + " without deleting its data or recreating its container.",
+                composeAvailable
+                        ? "Autark-OS will take control of " + displayName + " without deleting its data or recreating its container."
+                        : "Autark-OS can add " + displayName + " for visibility and safe recovery, but its original Compose file is missing.",
                 containers(service),
                 service.catalogAppId(),
-                List.of("Current Autark-OS ownership record", "Managed app access settings"),
+                composeAvailable
+                        ? List.of("Current Autark-OS ownership record", "Managed app access settings")
+                        : List.of("Current Autark-OS ownership record", "Managed app access settings", "Recovery-limited state until Compose configuration is restored"),
                 false,
-                "Existing data paths and the running container are preserved.",
-                List.of("Autark-OS will treat this service as managed after adoption. Do not run another installer for the same app unless you intentionally want multiple copies."),
+                composeAvailable
+                        ? "Existing data paths and the running container are preserved."
+                        : "The existing container is unchanged during adoption. A later reviewed uninstall will export its writable filesystem before removal and leave mounted storage in place.",
+                composeAvailable
+                        ? List.of("Autark-OS will treat this service as managed after adoption. Do not run another installer for the same app unless you intentionally want multiple copies.")
+                        : List.of(
+                                "Start, restart, repair, and settings changes are unavailable while the Compose file is missing.",
+                                "Stopping and archive-first cleanup remain available.",
+                                "Do not remove the container manually if you may need files from its writable layer."),
                 "",
                 confirmationText(displayName),
                 List.of(
                         "Add " + displayName + " to My Apps as a managed app.",
                         "Keep the existing Docker container and access URL.",
-                        "Record this Autark-OS installation as the owner for app recovery and Discover status."),
+                        composeAvailable
+                                ? "Record this Autark-OS installation as the owner for app recovery and Discover status."
+                                : "Record this app as adopted with recovery limits so every page reports the missing configuration honestly."),
                 List.of());
     }
 
@@ -259,7 +275,7 @@ public class ObservedServiceService {
         Instant now = Instant.now();
         AutarkOsIdentity identity = currentIdentity.get();
         String accessUrl = firstPresent(service.url(), manifest == null ? null : manifest.accessUrl());
-        String runtimePath = firstPresent(metadataValue(service, "dataPaths"), metadataValue(service, "runtimePath"), manifest == null ? "" : identity.runtimeRoot() + "/apps/" + appId);
+        String runtimePath = resolvedRuntimePath(service);
         Optional<RuntimeModels.AppRuntimeMetadata> runtimeMetadata = runtimeMetadataReader.read(java.nio.file.Path.of(runtimePath))
                 .filter(metadata -> appId.equals(metadata.catalogAppId()));
         String composeProject = firstPresent(
@@ -270,14 +286,14 @@ public class ObservedServiceService {
                 runtimeMetadata.map(RuntimeModels.AppRuntimeMetadata::appInstanceId).orElse(""),
                 metadataValue(service, "appInstanceId"),
                 "appinst_adopted_" + appId);
-        String autarkOsInstanceId = firstPresent(
-                runtimeMetadata.map(RuntimeModels.AppRuntimeMetadata::instanceId).orElse(""),
-                identity.instanceId());
+        String autarkOsInstanceId = identity.instanceId();
+        boolean composeAvailable = AppRuntimeFiles.hasComposeFile(runtimePath);
+        String installState = composeAvailable ? "adopted" : "adopted_missing_compose";
 
         installedAppRepository.save(new InstalledApp(
                 appId,
                 displayName,
-                "Ready",
+                composeAvailable ? "Ready" : "Needs attention",
                 runtimePath,
                 composeProject,
                 accessUrl,
@@ -288,12 +304,24 @@ public class ObservedServiceService {
                 appId,
                 autarkOsInstanceId,
                 runtimePath,
-                "adopted",
+                installState,
                 "owned",
                 now,
                 now));
         installedAppRepository.saveSettings(appId, InstallModels.InstallSettings.defaults(accessUrl));
         repository.markManaged(id, identity.instanceId(), now);
+        if (!composeAvailable) {
+            if (activityLogService != null) {
+                activityLogService.warning("host", "adopt_observed_service", "Service adopted with recovery limits", displayName + " is visible, but its Compose file is missing.", appId);
+            }
+            return new HostModels.ActionResult(
+                    true,
+                    "warning",
+                    "Service adopted with recovery limits",
+                    displayName + " is visible in My Apps. Its Compose file is missing, so Autark-OS can stop it or archive it safely, but cannot start or reconfigure it.",
+                    id,
+                    "open_apps");
+        }
         if (activityLogService != null) {
             activityLogService.success("host", "adopt_observed_service", "Service adopted", "Autark-OS now manages " + displayName + ".", appId);
         }
@@ -330,6 +358,13 @@ public class ObservedServiceService {
         } catch (java.io.IOException exception) {
             return "";
         }
+    }
+
+    private String resolvedRuntimePath(ObservedService service) {
+        AutarkOsIdentity identity = currentIdentity.get();
+        String appId = service.catalogAppId();
+        String fallback = appId == null || appId.isBlank() ? identity.runtimeRoot() + "/apps/unknown" : identity.runtimeRoot() + "/apps/" + appId;
+        return firstPresent(metadataValue(service, "dataPaths"), metadataValue(service, "runtimePath"), fallback);
     }
 
     private String displayName(ObservedService service) {

@@ -21,10 +21,10 @@ test('stores and clears the admin session token', () => {
   assert.equal(readAdminToken(storage), '');
 });
 
-test('adds bearer token only to mutating requests', () => {
+test('adds the bearer token to read and mutating requests', () => {
   const storage = memoryStorage();
   writeAdminToken('abc123', storage);
 
-  assert.equal(applyAdminAuthHeader({ method: 'get', headers: {} }, storage).headers.Authorization, undefined);
+  assert.equal(applyAdminAuthHeader({ method: 'get', headers: {} }, storage).headers.Authorization, 'Bearer abc123');
   assert.equal(applyAdminAuthHeader({ method: 'post', headers: {} }, storage).headers.Authorization, 'Bearer abc123');
 });

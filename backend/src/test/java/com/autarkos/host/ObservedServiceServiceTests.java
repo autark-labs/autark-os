@@ -242,6 +242,13 @@ class ObservedServiceServiceTests {
     void adoptRecoverableServiceCreatesManagedAppStateAndPreservesObservedTruth() {
         ObservedServiceRepository observedRepository = repository();
         InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout());
+        Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
+        try {
+            java.nio.file.Files.createDirectories(appRoot);
+            java.nio.file.Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
+        } catch (java.io.IOException exception) {
+            throw new RuntimeException(exception);
+        }
         observedRepository.upsert(new ObservedService(
                 "docker:autark-os-vaultwarden",
                 "docker",
@@ -261,7 +268,7 @@ class ObservedServiceServiceTests {
                 Instant.parse("2026-06-21T12:00:00Z"),
                 null,
                 null,
-                "{\"containerName\":\"autark-os-vaultwarden\",\"composeProject\":\"autark-os-vaultwarden\",\"appInstanceId\":\"appinst_legacy_vault\",\"dataPaths\":\"/var/lib/autark-os/apps/vaultwarden\"}"));
+                "{\"containerName\":\"autark-os-vaultwarden\",\"composeProject\":\"autark-os-vaultwarden\",\"appInstanceId\":\"appinst_legacy_vault\",\"dataPaths\":\"" + appRoot + "\"}"));
         ObservedServiceService service = new ObservedServiceService(
                 observedRepository,
                 new ObservedServiceScanner(List::of, currentIdentity()),
@@ -278,7 +285,7 @@ class ObservedServiceServiceTests {
         assertThat(installedRepository.findAppById("vaultwarden")).hasValueSatisfying(app -> {
             assertThat(app.appName()).isEqualTo("Vaultwarden");
             assertThat(app.accessUrl()).isEqualTo("http://localhost:8090");
-            assertThat(app.runtimePath()).isEqualTo("/var/lib/autark-os/apps/vaultwarden");
+            assertThat(app.runtimePath()).isEqualTo(appRoot.toString());
         });
         assertThat(installedRepository.ownershipFor("vaultwarden")).hasValueSatisfying(ownership -> {
             assertThat(ownership.installState()).isEqualTo("adopted");
@@ -290,6 +297,53 @@ class ObservedServiceServiceTests {
             assertThat(observed.ownershipState()).isEqualTo("owned_managed");
             assertThat(observed.userVisibility()).isEqualTo("observed");
             assertThat(observed.autarkOsInstanceId()).isEqualTo("current-instance");
+        });
+    }
+
+    @Test
+    void missingComposeAdoptionIsHonestAndUsesTheCurrentInstanceIdentity() {
+        ObservedServiceRepository observedRepository = repository();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout());
+        Path missingRuntime = runtimeRoot.resolve("apps/vaultwarden");
+        observedRepository.upsert(new ObservedService(
+                "docker:stopped-vaultwarden",
+                "docker",
+                "autarkos_old_vaultwarden",
+                "vaultwarden",
+                "http://localhost:8090",
+                "External",
+                "LAN",
+                "vaultwarden",
+                "inferred",
+                "foreign_autark_os",
+                "observed",
+                "stopped",
+                false,
+                "old-instance",
+                Instant.parse("2026-06-21T12:00:00Z"),
+                Instant.parse("2026-06-21T12:00:00Z"),
+                null,
+                null,
+                "{\"composeProject\":\"autarkos_old_vaultwarden\",\"appInstanceId\":\"appinst_old_vault\",\"dataPaths\":\"" + missingRuntime + "\"}"));
+        ObservedServiceService service = new ObservedServiceService(
+                observedRepository,
+                new ObservedServiceScanner(List::of, currentIdentity()),
+                installedRepository,
+                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                currentIdentity(),
+                null);
+
+        HostModels.ObservedServiceAdoptionPlan plan = service.adoptionPlan("docker:stopped-vaultwarden");
+        HostModels.ActionResult result = service.adopt("docker:stopped-vaultwarden", new HostModels.ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
+
+        assertThat(plan.summary()).contains("Compose file is missing");
+        assertThat(plan.warnings()).anySatisfy(risk -> assertThat(risk).contains("Start, restart, repair"));
+        assertThat(result.ok()).isTrue();
+        assertThat(result.severity()).isEqualTo("warning");
+        assertThat(result.message()).contains("cannot start or reconfigure");
+        assertThat(installedRepository.ownershipFor("vaultwarden")).hasValueSatisfying(ownership -> {
+            assertThat(ownership.installState()).isEqualTo("adopted_missing_compose");
+            assertThat(ownership.autarkOsInstanceId()).isEqualTo("current-instance");
         });
     }
 

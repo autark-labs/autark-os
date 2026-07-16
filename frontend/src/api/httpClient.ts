@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { applyAdminAuthHeader } from '@/lib/adminSecuritySession';
+import { ADMIN_SESSION_EXPIRED_EVENT, applyAdminAuthHeader, clearAdminToken } from '@/lib/adminSecuritySession';
 
 export const httpClient = axios.create({
   headers: {
@@ -8,6 +8,20 @@ export const httpClient = axios.create({
 });
 
 httpClient.interceptors.request.use((config) => applyAdminAuthHeader(config));
+httpClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401 && !isLoginRequest(error.config?.url)) {
+      clearAdminToken();
+      globalThis.dispatchEvent?.(new Event(ADMIN_SESSION_EXPIRED_EVENT));
+    }
+    return Promise.reject(error);
+  },
+);
+
+function isLoginRequest(url: string | undefined) {
+  return Boolean(url?.includes('/api/admin/security/login') || url?.includes('/api/admin/security/claim'));
+}
 
 export function apiErrorMessage(error: unknown, fallback = 'Something went wrong.') {
   if (axios.isAxiosError(error)) {

@@ -36,6 +36,14 @@ public class AdminSecurityController {
         return session.authorized() ? ResponseEntity.ok(session) : ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(session);
     }
 
+    @GetMapping("/session")
+    public AdminSecuritySession session(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        boolean authorized = service.authenticate(bearerToken(authorization));
+        return authorized
+                ? new AdminSecuritySession(true, "", "Admin session is active.")
+                : AdminSecuritySession.denied("Admin session has expired. Log in again.");
+    }
+
     @PostMapping("/logout")
     public AdminSecuritySession logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
         service.logout(bearerToken(authorization));

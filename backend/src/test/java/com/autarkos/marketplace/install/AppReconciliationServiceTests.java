@@ -79,6 +79,23 @@ class AppReconciliationServiceTests {
     }
 
     @Test
+    void explicitAdoptionOverridesTheOldInstanceLabelsAcrossCanonicalState() {
+        InstalledAppRepository repository = repository();
+        repository.save(installed("vaultwarden", "Needs attention"));
+        repository.saveOwnershipMetadata(owned("vaultwarden", "adopted_missing_compose"));
+
+        assertThat(service(repository, List.of(
+                new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_old_vaultwarden", "Exited (0) 2 hours ago", DockerResourceOwnership.FOREIGN, "appinst_old", "autarkos_old_vaultwarden"))).reconcile())
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.status()).isEqualTo("Stopped");
+                    assertThat(item.ownership()).isEqualTo(DockerResourceOwnership.OWNED);
+                    assertThat(item.lifecycleEligible()).isTrue();
+                    assertThat(item.detail()).contains("Compose configuration is missing");
+                });
+    }
+
+    @Test
     void reportsOwnedContainerWithoutDatabaseRowAsNeedsSetupWithoutAdoptingIt() {
         InstalledAppRepository repository = repository();
 

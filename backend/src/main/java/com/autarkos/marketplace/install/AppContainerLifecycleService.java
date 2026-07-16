@@ -36,7 +36,7 @@ class AppContainerLifecycleService {
     }
 
     AppActionResult stop(InstalledApp app, Path composeFile) {
-        RuntimeModels.DockerComposeResult result = composeExecutor.stop(composeFile, app.composeProject());
+        RuntimeModels.DockerComposeResult result = composeExecutor.stopManagedProject(composeFile, app.composeProject(), app.appId());
         return completeAction(app, "stop", result, "Stopped " + app.appName(), "Could not stop " + app.appName());
     }
 

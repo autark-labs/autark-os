@@ -39,6 +39,8 @@ export type AppBackupStatus = {
   latestBackup: RestorePoint | null;
   restorePoints: RestorePoint[];
   message: string;
+  backupAvailable: boolean;
+  backupUnavailableReason: string;
   nextBackup: string;
   checkedAt: string;
 };

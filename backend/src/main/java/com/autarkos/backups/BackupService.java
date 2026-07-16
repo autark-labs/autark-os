@@ -21,6 +21,7 @@ import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.AppLifecycleService;
+import com.autarkos.marketplace.install.AppRuntimeFiles;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
@@ -141,6 +142,15 @@ public class BackupService {
         List<InstalledApp> protectedApps = apps.stream()
                 .filter(app -> installedAppRepository.settingsFor(app.appId()).map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults()).enabled())
                 .toList();
+        List<InstalledApp> recoveryLimitedApps = apps.stream()
+                .filter(app -> !AppRuntimeFiles.hasComposeFile(app.runtimePath()))
+                .toList();
+        if (!recoveryLimitedApps.isEmpty()) {
+            String appNames = recoveryLimitedApps.stream().map(InstalledApp::appName).collect(java.util.stream.Collectors.joining(", "));
+            String message = "Full backup is unavailable because the original Compose file is missing for: " + appNames + ". Review these apps in My Apps before running a full backup.";
+            RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, message);
+            return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
+        }
         if (protectedApps.isEmpty()) {
             RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, "No apps are currently eligible for backup.");
             return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
@@ -179,6 +189,11 @@ public class BackupService {
         InstalledApp app = installedAppRepository.findAppById(appId)
                 .orElseThrow(() -> new InstallationException("App is not installed: " + appId));
         Path source = Path.of(app.runtimePath()).toAbsolutePath().normalize();
+        if (!AppRuntimeFiles.hasComposeFile(app.runtimePath())) {
+            String message = app.appName() + " cannot use normal backups because its original Compose file is missing. Review it in My Apps and use archive-first cleanup if you no longer need the container.";
+            RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, message);
+            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
+        }
         InstallModels.BackupPolicy policy = installedAppRepository.settingsFor(appId)
                 .map(InstallModels.InstallSettings::backup)
                 .orElse(InstallModels.BackupPolicy.defaults());

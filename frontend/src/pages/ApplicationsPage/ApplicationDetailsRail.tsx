@@ -15,7 +15,7 @@ import { ExpandedOperationStatus } from './components/AppOperationStatus';
 import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { ApplicationManagementPanel } from './ApplicationManagementPanel';
-import { runtimeControlsDisabled } from './extensions/ApplicationsPage.operations';
+import { runtimeActionDisabled, runtimeActionDisabledReason, runtimeControlsDisabled } from './extensions/ApplicationsPage.operations';
 import type { ApplicationActionHandlers, ApplicationNextAction, ApplicationRuntimeAction, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationDetailsRailProps = {
@@ -149,8 +149,14 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
 });
 
 function RailControls({ actions, item, loadingAction }: { actions: ApplicationActionHandlers; item: ApplicationSurfaceItem; loadingAction: ApplicationRuntimeAction | null }) {
-  const runtimeActionDisabled = runtimeControlsDisabled(item.operationState, loadingAction);
-  const runtimeDisabledReason = runtimeControlDisabledReason(item, loadingAction);
+  const primaryAction: ApplicationRuntimeAction = item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'start' : 'stop';
+  const actionDisabled = (action: ApplicationRuntimeAction) => runtimeActionDisabled(item, action, loadingAction);
+  const disabledReason = (action: ApplicationRuntimeAction) => runtimeActionDisabledReason(item, action, loadingAction);
+  const nextRuntimeAction: ApplicationRuntimeAction | null = item.nextAction?.id === 'start_app'
+    ? 'start'
+    : item.nextAction?.id === 'create_backup' ? 'backup' : null;
+  const nextActionDisabled = nextRuntimeAction ? actionDisabled(nextRuntimeAction) : runtimeControlsDisabled(item.operationState, loadingAction);
+  const nextActionReason = nextRuntimeAction ? disabledReason(nextRuntimeAction) : disabledReason('repair');
   const repairAction = item.availableActions.find((action) => action.id === 'repair');
 
   return (
@@ -171,9 +177,9 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
               <p className="font-medium">{item.nextAction.label}</p>
               <p className="mt-1 text-xs leading-5">{item.nextAction.description}</p>
             </div>
-            <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
-              <ApplicationWarningButton className="shadow-none" disabled={runtimeActionDisabled} onClick={() => actions.onRunNextAction(item.id)} size="sm" type="button">
-                {runtimeActionDisabled && item.nextAction.id === 'start_app' ? 'Running' : nextActionButtonLabel(item.nextAction.id)}
+            <DisabledAction disabled={nextActionDisabled} reason={nextActionReason}>
+              <ApplicationWarningButton className="shadow-none" disabled={nextActionDisabled} onClick={() => actions.onRunNextAction(item.id)} size="sm" type="button">
+                {loadingAction && nextRuntimeAction ? 'Running' : nextActionDisabled && nextRuntimeAction ? 'Unavailable' : nextActionButtonLabel(item.nextAction.id)}
               </ApplicationWarningButton>
             </DisabledAction>
           </div>
@@ -187,31 +193,31 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
 
       {item.managementState === 'managed' && (
         <div className="grid gap-2 sm:grid-cols-3">
-          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
-            <ApplicationDarkControlButton disabled={runtimeActionDisabled} onClick={() => item.readinessState === 'paused' || item.readinessState === 'stopped' ? actions.onStart(item.id) : actions.onStop(item.id)} type="button">
+          <DisabledAction disabled={actionDisabled(primaryAction)} reason={disabledReason(primaryAction)}>
+            <ApplicationDarkControlButton disabled={actionDisabled(primaryAction)} onClick={() => primaryAction === 'start' ? actions.onStart(item.id) : actions.onStop(item.id)} type="button">
               {loadingAction === 'start' || loadingAction === 'stop'
                 ? <Loader2 className="animate-spin" data-icon="inline-start" />
                 : item.readinessState === 'paused' || item.readinessState === 'stopped' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
               {loadingAction === 'start' ? 'Starting' : loadingAction === 'stop' ? 'Pausing' : item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'Start' : 'Pause'}
             </ApplicationDarkControlButton>
           </DisabledAction>
-          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
-            <ApplicationDarkControlButton disabled={runtimeActionDisabled} onClick={() => actions.onRestart(item.id)} type="button">
+          <DisabledAction disabled={actionDisabled('restart')} reason={disabledReason('restart')}>
+            <ApplicationDarkControlButton disabled={actionDisabled('restart')} onClick={() => actions.onRestart(item.id)} type="button">
               {loadingAction === 'restart' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />}
               {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
             </ApplicationDarkControlButton>
           </DisabledAction>
-          <DisabledAction disabled={runtimeActionDisabled} reason={runtimeDisabledReason}>
-            <ApplicationDarkControlButton disabled={runtimeActionDisabled} onClick={() => actions.onCreateBackup(item.id)} type="button">
+          <DisabledAction disabled={actionDisabled('backup')} reason={disabledReason('backup')}>
+            <ApplicationDarkControlButton disabled={actionDisabled('backup')} onClick={() => actions.onCreateBackup(item.id)} type="button">
               {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
               {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
             </ApplicationDarkControlButton>
           </DisabledAction>
           {repairAction && (
-            <DisabledAction disabled={runtimeActionDisabled || Boolean(repairAction.disabled)} reason={repairAction.disabled ? repairAction.reason || 'Repair is not available for this app right now.' : runtimeDisabledReason}>
+            <DisabledAction disabled={actionDisabled('repair')} reason={disabledReason('repair')}>
               <Button
                 className="border-orange-300/40 bg-slate-900 text-orange-100 hover:bg-slate-700 hover:text-orange-50"
-                disabled={runtimeActionDisabled || Boolean(repairAction.disabled)}
+                disabled={actionDisabled('repair')}
                 onClick={() => actions.onRepair(item.id)}
                 title={repairAction.reason || undefined}
                 type="button"
@@ -241,24 +247,6 @@ function nextActionButtonLabel(id: ApplicationNextAction['id']) {
   if (id === 'start_app') return 'Start';
   if (id === 'create_backup') return 'Create backup';
   return 'Review';
-}
-
-function runtimeControlDisabledReason(item: ApplicationSurfaceItem, loadingAction: ApplicationRuntimeAction | null) {
-  if (loadingAction) {
-    return `${runtimeActionLabel(loadingAction)} is already running for ${item.name}.`;
-  }
-  if (item.operationState.kind !== 'idle' && item.operationState.kind !== 'failed') {
-    return item.operationState.currentStep || `${item.operationState.label} is currently running for ${item.name}.`;
-  }
-  return 'This runtime control is currently available.';
-}
-
-function runtimeActionLabel(action: ApplicationRuntimeAction) {
-  if (action === 'start') return 'Starting';
-  if (action === 'stop') return 'Pausing';
-  if (action === 'backup') return 'Backing up';
-  if (action === 'repair') return 'Repairing';
-  return 'Restarting';
 }
 
 function RecentActivitySummary({ item }: { item: ApplicationSurfaceItem }) {

@@ -148,6 +148,10 @@ export function RestoreList({ apps, appRestorePoints, fullRestorePoints, onDetai
 }
 
 export function AppBackupCard({ app, onRun, operationAvailability, running, showAdvancedMetrics, timeZone }: { app: AppBackupStatus; onRun: (app: AppBackupStatus) => void; operationAvailability: BackupOperationAvailability; running: boolean; showAdvancedMetrics: boolean; timeZone: string }) {
+  const disabled = operationAvailability.disabled || app.status === 'unprotected' || !app.backupAvailable;
+  const disabledReason = operationAvailability.disabled
+    ? operationAvailability.reason
+    : app.backupUnavailableReason || 'Turn backups on for this app before creating a restore point.';
   return (
     <BackupInset className="p-4">
       <div className="flex items-start justify-between gap-3">
@@ -174,8 +178,8 @@ export function AppBackupCard({ app, onRun, operationAvailability, running, show
           <p className="mt-1 text-xs leading-5 text-slate-500">{app.backupContract.summary}</p>
         </BackupInset>
       )}
-      <DisabledAction className="mt-4 w-full" disabled={operationAvailability.disabled || app.status === 'unprotected'} reason={operationAvailability.disabled ? operationAvailability.reason : 'Turn backups on for this app before creating a restore point.'}>
-        <ProjectDarkControlButton className="mt-4 w-full" disabled={operationAvailability.disabled || app.status === 'unprotected'} onClick={() => onRun(app)} size="sm" type="button">
+      <DisabledAction className="mt-4 w-full" disabled={disabled} reason={disabledReason}>
+        <ProjectDarkControlButton className="mt-4 w-full" disabled={disabled} onClick={() => onRun(app)} size="sm" type="button">
           {running ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
           {running ? 'Running' : 'Back up app'}
         </ProjectDarkControlButton>

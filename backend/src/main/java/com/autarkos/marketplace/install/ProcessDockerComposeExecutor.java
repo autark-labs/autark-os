@@ -1,5 +1,7 @@
 package com.autarkos.marketplace.install;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,23 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
     }
 
     @Override
+    public RuntimeModels.DockerComposeResult stopManagedProject(Path composeFile, String projectName, String appId) {
+        if (Files.isRegularFile(composeFile)) {
+            return stop(composeFile, projectName);
+        }
+        ContainerSelection selection = managedContainerIds(projectName, appId);
+        if (!selection.successful()) {
+            return new RuntimeModels.DockerComposeResult(selection.exitCode(), selection.output());
+        }
+        if (selection.containerIds().isEmpty()) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("No matching managed containers were found."));
+        }
+        List<String> command = new ArrayList<>(List.of("docker", "stop"));
+        command.addAll(selection.containerIds());
+        return runCommand(command);
+    }
+
+    @Override
     public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
         return run(composeFile, projectName, "restart");
     }
@@ -53,6 +72,57 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
             return List.of();
         }
         return parseContainers(result.output());
+    }
+
+    @Override
+    public List<RuntimeModels.DockerContainerStatus> containersForApp(Path composeFile, String projectName, String appId) {
+        if (Files.isRegularFile(composeFile)) {
+            return containers(composeFile, projectName);
+        }
+        List<String> command = managedDockerCommand("ps", "-a", projectName, appId);
+        command.addAll(List.of("--format", "{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Ports}}\t{{.Label \"com.docker.compose.service\"}}"));
+        RuntimeModels.DockerComposeResult result = runCommand(command);
+        if (!result.successful()) {
+            return List.of();
+        }
+        return result.output().stream()
+                .map(this::containerFromColumns)
+                .filter(container -> !container.name().isBlank())
+                .toList();
+    }
+
+    @Override
+    public RuntimeModels.DockerComposeResult archiveAndRemoveManagedProject(String projectName, String appId, Path archiveDirectory) {
+        ContainerSelection selection = managedContainerIds(projectName, appId);
+        if (!selection.successful()) {
+            return new RuntimeModels.DockerComposeResult(selection.exitCode(), selection.output());
+        }
+        if (selection.containerIds().isEmpty()) {
+            return new RuntimeModels.DockerComposeResult(0, List.of("No matching managed containers remained to archive or remove."));
+        }
+        try {
+            Files.createDirectories(archiveDirectory);
+        } catch (IOException exception) {
+            return new RuntimeModels.DockerComposeResult(1, List.of("Could not create the container recovery archive folder: " + exception.getMessage()));
+        }
+
+        List<String> output = new ArrayList<>();
+        for (String containerId : selection.containerIds()) {
+            Path archive = archiveDirectory.resolve(safeFileToken(appId) + "-container-" + containerId.substring(0, Math.min(12, containerId.length())) + ".tar");
+            RuntimeModels.DockerComposeResult exported = runCommand(List.of("docker", "export", "--output", archive.toString(), containerId));
+            output.addAll(exported.output());
+            if (!exported.successful() || !regularNonEmptyFile(archive)) {
+                output.add("Container removal was cancelled because its writable-filesystem archive could not be verified: " + archive);
+                return new RuntimeModels.DockerComposeResult(exported.successful() ? 1 : exported.exitCode(), output);
+            }
+            output.add("Saved container writable-filesystem recovery archive: " + archive);
+        }
+
+        List<String> remove = new ArrayList<>(List.of("docker", "rm", "-f"));
+        remove.addAll(selection.containerIds());
+        RuntimeModels.DockerComposeResult removed = runCommand(remove);
+        output.addAll(removed.output());
+        return new RuntimeModels.DockerComposeResult(removed.exitCode(), output);
     }
 
     @Override
@@ -173,6 +243,60 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
             throw new InstallationException("Unable to run Docker Compose. " + result.output());
         }
         return new RuntimeModels.DockerComposeResult(result.exitCode(), result.outputLines());
+    }
+
+    private ContainerSelection managedContainerIds(String projectName, String appId) {
+        RuntimeModels.DockerComposeResult result = runCommand(managedDockerCommand("ps", "-a", projectName, appId, "--format", "{{.ID}}"));
+        if (!result.successful()) {
+            return new ContainerSelection(result.exitCode(), List.of(), result.output());
+        }
+        List<String> ids = result.output().stream()
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .toList();
+        if (ids.stream().anyMatch(value -> !value.matches("[a-fA-F0-9]{12,64}"))) {
+            return new ContainerSelection(1, List.of(), List.of("Docker returned an invalid managed container identifier; no containers were changed."));
+        }
+        return new ContainerSelection(0, ids, result.output());
+    }
+
+    private List<String> managedDockerCommand(String operation, String option, String projectName, String appId, String... trailing) {
+        List<String> command = new ArrayList<>(List.of(
+                "docker", operation, option,
+                "--filter", "label=com.docker.compose.project=" + projectName,
+                "--filter", "label=autark-os.app-id=" + appId));
+        command.addAll(List.of(trailing));
+        return command;
+    }
+
+    private String safeFileToken(String value) {
+        String safe = value == null ? "app" : value.replaceAll("[^A-Za-z0-9._-]", "-");
+        return safe.isBlank() ? "app" : safe;
+    }
+
+    private RuntimeModels.DockerContainerStatus containerFromColumns(String line) {
+        String[] parts = line.split("\\t", -1);
+        return new RuntimeModels.DockerContainerStatus(
+                part(parts, 0),
+                part(parts, 4),
+                part(parts, 1),
+                "",
+                part(parts, 2),
+                part(parts, 3));
+    }
+
+    private boolean regularNonEmptyFile(Path file) {
+        try {
+            return Files.isRegularFile(file) && Files.size(file) > 0;
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    private record ContainerSelection(int exitCode, List<String> containerIds, List<String> output) {
+        boolean successful() {
+            return exitCode == 0;
+        }
     }
 
     private RuntimeModels.ContainerTelemetry telemetry(String line) {

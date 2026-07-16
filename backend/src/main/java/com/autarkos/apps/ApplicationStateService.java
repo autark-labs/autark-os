@@ -384,20 +384,7 @@ public class ApplicationStateService {
         if (operation != null && !AutarkOsStates.OperationKind.IDLE.equals(operation.kind()) && !AutarkOsStates.OperationKind.FAILED.equals(operation.kind())) {
             return List.of();
         }
-        boolean paused = AutarkOsStates.ReadinessState.PAUSED.equals(app.readinessState()) || AutarkOsStates.ReadinessState.STOPPED.equals(app.readinessState()) || AutarkOsStates.AppStatus.STOPPED.equals(app.friendlyStatus());
-        List<AutarkOsAction> runtimeActions = paused
-                ? List.of(
-                        AutarkOsAction.post("start", "Start", "/api/apps/" + app.appId() + "/start", false, false),
-                        AutarkOsAction.post("restart", "Restart", "/api/apps/" + app.appId() + "/restart", false, false))
-                : List.of(
-                        AutarkOsAction.post("stop", "Pause", "/api/apps/" + app.appId() + "/stop", false, false),
-                        AutarkOsAction.post("restart", "Restart", "/api/apps/" + app.appId() + "/restart", false, false));
-        if (!repairRecommended(app)) {
-            return runtimeActions;
-        }
-        java.util.ArrayList<AutarkOsAction> actions = new java.util.ArrayList<>(runtimeActions);
-        actions.add(AutarkOsAction.post("repair", "Repair", "/api/apps/" + app.appId() + "/repair", false, false));
-        return actions;
+        return AppRuntimeView.defaultAvailableActions(app.appId(), app.friendlyStatus(), app.runtimePath(), repairRecommended(app));
     }
 
     private boolean repairRecommended(AppRuntimeView app) {

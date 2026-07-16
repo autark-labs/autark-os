@@ -90,7 +90,7 @@ public record AppRuntimeView(
                 AppOperationView.idle(),
                 "managed:" + appId,
                 0,
-                defaultAvailableActions(appId, friendlyStatus),
+                defaultAvailableActions(appId, friendlyStatus, runtimePath, false),
                 technicalStatus,
                 healthCheck,
                 runtimePath,
@@ -151,7 +151,7 @@ public record AppRuntimeView(
                 AppOperationView.idle(),
                 "managed:" + appId,
                 0,
-                defaultAvailableActions(appId, friendlyStatus),
+                defaultAvailableActions(appId, friendlyStatus, runtimePath, false),
                 technicalStatus,
                 healthCheck,
                 runtimePath,
@@ -235,18 +235,33 @@ public record AppRuntimeView(
         };
     }
 
-    private static List<AutarkOsAction> defaultAvailableActions(String appId, String friendlyStatus) {
+    public static List<AutarkOsAction> defaultAvailableActions(String appId, String friendlyStatus, String runtimePath, boolean repairRecommended) {
         if (appId == null || appId.isBlank()) {
             return List.of();
         }
         boolean paused = AutarkOsStates.AppStatus.STOPPED.equals(friendlyStatus) || AutarkOsStates.AppStatus.PAUSED.equals(friendlyStatus);
-        return paused
+        boolean composeAvailable = AppRuntimeFiles.hasComposeFile(runtimePath);
+        String missingComposeReason = "The original Compose file is missing. Stop and archive-first uninstall remain available, but this action needs the Compose configuration.";
+        List<AutarkOsAction> actions = new java.util.ArrayList<>(paused
                 ? List.of(
                         AutarkOsAction.post("start", "Start", "/api/apps/" + appId + "/start", false, false),
                         AutarkOsAction.post("restart", "Restart", "/api/apps/" + appId + "/restart", false, false))
                 : List.of(
                         AutarkOsAction.post("stop", "Pause", "/api/apps/" + appId + "/stop", false, false),
-                        AutarkOsAction.post("restart", "Restart", "/api/apps/" + appId + "/restart", false, false));
+                        AutarkOsAction.post("restart", "Restart", "/api/apps/" + appId + "/restart", false, false)));
+        if (!composeAvailable) {
+            actions.replaceAll(action -> "start".equals(action.id()) || "restart".equals(action.id())
+                    ? AutarkOsAction.disabledPost(action.id(), action.label(), action.href().orElse(""), missingComposeReason)
+                    : action);
+            actions.add(AutarkOsAction.disabledPost("settings", "Settings", "/api/apps/" + appId + "/settings", missingComposeReason));
+            actions.add(AutarkOsAction.disabledPost("backup", "Backup", "/api/backups/apps/" + appId + "/run", "A normal app backup is unavailable because its runtime folder is missing. Use archive-first uninstall to preserve the container writable layer."));
+        }
+        if (repairRecommended) {
+            actions.add(composeAvailable
+                    ? AutarkOsAction.post("repair", "Repair", "/api/apps/" + appId + "/repair", false, false)
+                    : AutarkOsAction.disabledPost("repair", "Repair", "/api/apps/" + appId + "/repair", missingComposeReason));
+        }
+        return List.copyOf(actions);
     }
 
     private static String backupStateFromSettings(InstallModels.InstallSettings settings) {

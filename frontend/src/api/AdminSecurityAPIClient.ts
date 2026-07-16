@@ -29,4 +29,12 @@ export const AdminSecurityAPIClient = {
     const response = await httpClient.post<AdminSecuritySession>('/api/admin/security/login', { password });
     return response.data;
   },
+
+  async session(token: string) {
+    if (!token) return false;
+    const response = await httpClient.get<AdminSecuritySession>('/api/admin/security/session', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return response.data.authorized;
+  },
 };

@@ -34,9 +34,9 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   assert.match(operations, /kind: 'saving_settings'/);
   assert.match(operations, /kind: 'failed'/);
   assert.match(advanced, /actionLoadingByItemId/);
-  assert.match(advanced, /runtimeControlsDisabled\(item\.operationState, loadingAction\)/);
+  assert.match(advanced, /runtimeActionDisabled\(item, action, loadingAction\)/);
   assert.match(rail, /actionLoadingByItemId/);
-  assert.match(rail, /runtimeControlsDisabled\(item\.operationState, loadingAction\)/);
+  assert.match(rail, /runtimeActionDisabled\(item, action, loadingAction\)/);
 });
 
 test('applications page pins and unpins observed services through canonical application state', () => {
@@ -267,10 +267,10 @@ test('applications page finish pass removes placeholders and explains disabled r
 
   assert.match(rail, /DisabledAction/);
   assert.match(advanced, /DisabledAction/);
-  assert.match(rail, /runtimeControlDisabledReason\(item, loadingAction\)/);
-  assert.match(advanced, /runtimeControlDisabledReason\(item, loadingAction\)/);
-  assert.match(rail, /reason=\{runtimeDisabledReason\}/);
-  assert.match(advanced, /reason=\{runtimeDisabledReason\}/);
+  assert.match(rail, /runtimeActionDisabledReason\(item, action, loadingAction\)/);
+  assert.match(advanced, /runtimeActionDisabledReason\(item, action, loadingAction\)/);
+  assert.match(rail, /reason=\{disabledReason\(/);
+  assert.match(advanced, /reason=\{disabledReason\(/);
 });
 
 test('applications page has managed-app empty states and compact recent activity', () => {

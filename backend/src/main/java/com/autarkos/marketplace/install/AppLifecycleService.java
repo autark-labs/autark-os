@@ -125,6 +125,7 @@ public class AppLifecycleService {
     public AppActionResult start(String appId) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "start");
+        assertComposeAvailable(app, "start");
         return containerLifecycleService.start(app, composeFile(app));
     }
 
@@ -137,6 +138,7 @@ public class AppLifecycleService {
     public AppActionResult restart(String appId) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "restart");
+        assertComposeAvailable(app, "restart");
         return containerLifecycleService.restart(app, composeFile(app));
     }
 
@@ -147,6 +149,7 @@ public class AppLifecycleService {
     AppActionResult repair(String appId, boolean automatic) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "repair");
+        assertComposeAvailable(app, "repair");
         AppHealthSnapshot before = healthService.healthSnapshot(app);
         List<String> logs = new java.util.ArrayList<>();
         logs.add("Before repair: " + before.status() + " - " + before.message());
@@ -213,6 +216,7 @@ public class AppLifecycleService {
     public AppRuntimeView updateSettings(String appId, InstallModels.InstallSettings settings) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "update settings for");
+        assertComposeAvailable(app, "update settings for");
         String defaultAccessUrl = app.accessUrl();
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(defaultAccessUrl));
         InstallModels.InstallSettings sanitized = settingsPolicy.sanitize(settings, app);
@@ -283,6 +287,12 @@ public class AppLifecycleService {
 
     public InstallModels.AppSettingsChangePlan settingsChangePlan(String appId, InstallModels.InstallSettings settings) {
         InstalledApp app = installedApp(appId);
+        if (!AppRuntimeFiles.isComposeFile(composeFile(app))) {
+            String reason = "The original Compose file is missing. Settings cannot be changed until that configuration is restored.";
+            return new InstallModels.AppSettingsChangePlan(
+                    app.appId(), app.appName(), "blocked", "Settings unavailable", reason,
+                    false, false, false, false, List.of(), List.of(), List.of(reason));
+        }
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         return settingsPolicy.settingsChangePlan(app, current, settingsPolicy.sanitize(settings, app));
     }
@@ -496,7 +506,7 @@ public class AppLifecycleService {
 
     private AppRuntimeView refresh(InstalledApp app, boolean includeTelemetry) {
         app = reconcileRuntimeMetadata(app);
-        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containers(composeFile(app), app.composeProject());
+        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId());
         AppRuntimeStatus status = runtimeStatusResolver.normalize(containers);
         repository.updateStatus(app.appId(), status.friendlyStatus());
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
@@ -721,6 +731,14 @@ public class AppLifecycleService {
         if (metadata.appInstanceId() == null || metadata.appInstanceId().isBlank()
                 || metadata.autarkOsInstanceId() == null || metadata.autarkOsInstanceId().isBlank()) {
             throw new InstallationException(app.appName() + " has incomplete Autark-OS ownership metadata, so Autark-OS will not " + action + " it automatically.");
+        }
+    }
+
+    private void assertComposeAvailable(InstalledApp app, String action) {
+        if (!AppRuntimeFiles.isComposeFile(composeFile(app))) {
+            throw new InstallationException(
+                    app.appName() + " cannot " + action + " because its original Compose file is missing. "
+                            + "You can still stop it or use the reviewed uninstall plan to save a recovery archive before cleanup.");
         }
     }
 

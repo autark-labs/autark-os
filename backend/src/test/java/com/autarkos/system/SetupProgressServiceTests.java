@@ -68,6 +68,17 @@ class SetupProgressServiceTests {
         assertThat(progress.setupComplete()).isTrue();
     }
 
+    @Test
+    void completingDoneMakesOnboardingUseTheSameCompletionState() {
+        ProjectSettingsRepository repository = repository();
+        SetupProgressService service = service(repository);
+
+        service.completeStep("done");
+
+        assertThat(repository.readAll().get("onboardingStatus")).isEqualTo("complete");
+        assertThat(service.status().setupComplete()).isTrue();
+    }
+
     private SetupProgressService service() {
         return service(repository());
     }
