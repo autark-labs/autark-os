@@ -3,6 +3,7 @@ import { JobsAPIClient } from '@/api/JobsAPIClient';
 import type { AutarkOsJob } from '@/types/jobs';
 import {
   JOB_FAMILIES,
+  jobListRefetchInterval,
   activeJobs,
   activeJobsByFamily,
   currentJobStep,
@@ -15,6 +16,7 @@ import {
 
 export {
   JOB_FAMILIES,
+  jobListRefetchInterval,
   activeJobs,
   activeJobsByFamily,
   currentJobStep,
@@ -34,7 +36,7 @@ export function useAutarkOsJobsQuery() {
   return useQuery<AutarkOsJob[]>({
     queryKey: jobQueryKeys.all,
     queryFn: () => JobsAPIClient.list(),
-    refetchInterval: 1_200,
+    refetchInterval: (query) => jobListRefetchInterval(query.state.data),
     staleTime: 1_200,
   });
 }

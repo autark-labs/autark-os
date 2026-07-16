@@ -2,6 +2,9 @@ import type { AutarkOsJob, AutarkOsJobStep } from '@/types/jobs';
 
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
+export const ACTIVE_JOB_LIST_REFETCH_INTERVAL_MS = 1_200;
+export const IDLE_JOB_LIST_REFETCH_INTERVAL_MS = 15_000;
+
 export const JOB_FAMILIES = {
   appLifecycle: ['install_app', 'repair_app', 'update_app', 'uninstall_app', 'start_app', 'stop_app', 'restart_app'],
   backup: ['backup', 'backup_verify', 'backup_restore', 'restore'],
@@ -23,6 +26,12 @@ export function activeJobs(jobs: AutarkOsJob[] | null | undefined, types: string
 
 export function latestActiveJob(jobs: AutarkOsJob[] | null | undefined, types: string[] = []) {
   return activeJobs(jobs, types)[0] ?? null;
+}
+
+export function jobListRefetchInterval(jobs: AutarkOsJob[] | null | undefined) {
+  return activeJobs(jobs).length > 0
+    ? ACTIVE_JOB_LIST_REFETCH_INTERVAL_MS
+    : IDLE_JOB_LIST_REFETCH_INTERVAL_MS;
 }
 
 export function activeJobsByFamily(jobs: AutarkOsJob[] | null | undefined) {

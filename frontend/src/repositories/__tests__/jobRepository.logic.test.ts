@@ -5,6 +5,7 @@ import {
   activeJobs,
   activeJobsByFamily,
   currentJobStepText,
+  jobListRefetchInterval,
   jobProgressPercent,
   jobTypeLabel,
   latestActiveJob,
@@ -48,6 +49,17 @@ test('activeJobsByFamily groups app lifecycle and backup work', () => {
   assert.deepEqual(families.appLifecycle.map((candidate) => candidate.jobId), ['uninstall', 'repair', 'install']);
   assert.deepEqual(families.backup.map((candidate) => candidate.jobId), ['restore']);
   assert.deepEqual(families.install.map((candidate) => candidate.jobId), ['install']);
+});
+
+test('job list polling stays responsive during work and relaxes while idle', () => {
+  assert.equal(jobListRefetchInterval(undefined), 15_000);
+  assert.equal(jobListRefetchInterval([]), 15_000);
+  assert.equal(jobListRefetchInterval([
+    job('finished', 'backup', 'vaultwarden', 'succeeded', '2026-06-21T12:04:00Z'),
+  ]), 15_000);
+  assert.equal(jobListRefetchInterval([
+    job('active', 'install_app', 'vaultwarden', 'running', '2026-06-21T12:05:00Z'),
+  ]), 1_200);
 });
 
 test('job progress and current step derive stable user-facing progress', () => {
