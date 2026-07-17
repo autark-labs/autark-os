@@ -83,9 +83,15 @@ From another device on the same home network, use the address shown by the insta
 http://<device-address>:8082
 ```
 
-When Autark-OS opens, finish the first setup screen. Confirm the device name, storage location, backup choice, and private access state.
+When Autark-OS opens, it first asks you to protect the appliance. On the server, run:
 
-For a step-by-step walkthrough, see [First run](./first-run.md).
+```bash
+sudo autark-os admin setup-code
+```
+
+Enter that local code in the browser and create an administrator password with at least 12 characters. The browser does not show the code because only someone with administrator access to the server should be able to claim it. Then confirm the device name, storage location, backup choice, and private access state.
+
+For a step-by-step walkthrough, see [First run](./first-run.md). For login and lost-password help, see [Administrator access and recovery](./security-and-admin-access.md).
 
 ## Install Your First App
 

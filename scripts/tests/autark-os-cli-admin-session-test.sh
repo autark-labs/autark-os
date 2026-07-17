@@ -36,12 +36,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def record(self):
         with open(request_log, "a") as output:
-            output.write(f"{self.command} {self.path} auth={self.headers.get('Authorization', '')}\n")
+            output.write(f"{self.command} {self.path} auth={self.headers.get('Authorization', '')} client={self.headers.get('X-Autark-OS-Client', '')}\n")
 
     def do_GET(self):
         self.record()
         if self.path == "/api/admin/security/status":
-            return self.send_json({"devMode": False, "claimed": True, "authRequired": True, "message": "Login required", "setupCode": ""})
+            return self.send_json({"devMode": False, "claimed": True, "authRequired": True, "message": "Login required", "setupCodeCommand": "sudo autark-os admin setup-code", "passwordResetCommand": "sudo autark-os admin reset-password"})
         if self.path == "/api/admin/security/session":
             return self.send_json({"authorized": self.headers.get("Authorization") == "Bearer cli-session-token", "token": "", "message": "checked"})
         if self.path == "/api/system/onboarding":
@@ -55,7 +55,9 @@ class Handler(BaseHTTPRequestHandler):
         body = self.body()
         if self.path == "/api/admin/security/login":
             if json.loads(body).get("password") == "correct horse battery staple":
-                return self.send_json({"authorized": True, "token": "cli-session-token", "message": "Logged in"})
+                if self.headers.get("X-Autark-OS-Client") != "cli":
+                    return self.send_json({"authorized": False, "token": "", "message": "CLI marker required"}, 401)
+                return self.send_json({"authorized": True, "token": "cli-session-token", "message": "Logged in", "expiresAt": "2026-07-16T13:00:00Z", "retryAfterSeconds": 0})
             return self.send_json({"authorized": False, "token": "", "message": "Password rejected"}, 401)
         if self.path == "/api/system/onboarding/complete" and self.headers.get("Authorization") == "Bearer cli-session-token":
             return self.send_json({"status": "complete"})
@@ -93,6 +95,6 @@ output="$(
 grep -q 'Setup complete.' <<<"${output}"
 [[ "$(cat "${token_file}")" == "cli-session-token" ]]
 [[ "$(stat -c '%a' "${token_file}")" == "600" ]]
-grep -q 'POST /api/admin/security/login auth=' "${request_log}"
+grep -q 'POST /api/admin/security/login auth= client=cli' "${request_log}"
 grep -q 'PUT /api/system/onboarding auth=Bearer cli-session-token' "${request_log}"
 grep -q 'POST /api/system/onboarding/complete auth=Bearer cli-session-token' "${request_log}"

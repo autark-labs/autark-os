@@ -206,6 +206,8 @@ function SecurityPanel({ setup }: { setup: SystemSetupStatus | null }) {
     <SettingsGroup description="Configure security and access options." title="Security">
       <ReadOnlyRow label="Service user" note="Recommended production user for backend operations." value={setup?.expectedUser || 'autarkos'} />
       <ReadOnlyRow label="Docker socket access" note="Required for Autark-OS to manage containers." value={setup?.dockerVersion ? 'Available' : 'Not detected'} />
+      <ReadOnlyRow label="Administrator sessions" note="Browser sessions expire after inactivity and end whenever the backend restarts." value="Protected cookie" />
+      <ReadOnlyRow label="Lost password" note="Run this command on the Autark-OS server. It preserves apps, settings, and backups." value="sudo autark-os admin reset-password" />
     </SettingsGroup>
   );
 }

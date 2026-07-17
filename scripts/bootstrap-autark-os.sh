@@ -1773,6 +1773,7 @@ LAN URL:
   $([[ -n "${lan_ip}" ]] && printf 'http://%s:%s' "${lan_ip}" "${port}" || printf 'Run "hostname -I", then open http://<host-ip>:%s' "${port}")
 
 Useful commands:
+  sudo autark-os admin setup-code
   autark-os doctor
   autark-os where
   autark-os setup --print-next-step
@@ -1780,6 +1781,7 @@ Useful commands:
   autark-os logs
 
 If this is a headless or remote homelab host, use the LAN URL from another device on the same network.
+The setup code is intentionally available only from the server's local root-authorized command above.
 
 NEXT
 }

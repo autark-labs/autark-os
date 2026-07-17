@@ -9,37 +9,52 @@ const unclaimedStatus: AdminSecurityStatus = {
   claimed: false,
   authRequired: true,
   message: 'Set up an administrator password.',
-  setupCode: 'ABCD-EFGH',
+  setupCodeCommand: 'sudo autark-os admin setup-code',
+  passwordResetCommand: 'sudo autark-os admin reset-password',
 };
 
 function onboarding(status: OnboardingState['status']): OnboardingState {
   return { status } as OnboardingState;
 }
 
-test('loads security and onboarding state into one ready bootstrap result', async () => {
+test('does not request protected onboarding state before authentication', async () => {
+  let onboardingRequested = false;
+  let legacyCleared = false;
   const result = await loadApplicationBootstrap({
     getSecurityStatus: async () => unclaimedStatus,
-    getOnboardingState: async () => onboarding('complete'),
-    validateAdminToken: async () => false,
-    readAdminToken: () => '',
-    clearAdminToken: () => undefined,
+    getOnboardingState: async () => {
+      onboardingRequested = true;
+      return onboarding('complete');
+    },
+    validateAdminSession: async () => false,
+    clearLegacyAdminToken: () => { legacyCleared = true; },
   });
 
   assert.deepEqual(result, {
     securityStatus: unclaimedStatus,
-    onboardingComplete: true,
+    onboardingComplete: false,
     authenticated: false,
   });
+  assert.equal(onboardingRequested, false);
+  assert.equal(legacyCleared, true);
 });
 
-test('validates stored authentication instead of trusting stale browser state', async () => {
-  let cleared = false;
-  assert.equal(await resolveBootstrapAuthentication({ ...unclaimedStatus, authRequired: false }, '', async () => false, () => undefined), true);
-  assert.equal(await resolveBootstrapAuthentication({ ...unclaimedStatus, devMode: true }, '', async () => false, () => undefined), true);
-  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, 'active-token', async () => true, () => undefined), true);
-  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, '', async () => true, () => undefined), false);
-  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, 'expired-token', async () => false, () => { cleared = true; }), false);
-  assert.equal(cleared, true);
+test('validates the protected cookie session instead of trusting browser state', async () => {
+  assert.equal(await resolveBootstrapAuthentication({ ...unclaimedStatus, authRequired: false }, async () => false), true);
+  assert.equal(await resolveBootstrapAuthentication({ ...unclaimedStatus, devMode: true }, async () => false), true);
+  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, async () => true), true);
+  assert.equal(await resolveBootstrapAuthentication(unclaimedStatus, async () => false), false);
+});
+
+test('loads protected onboarding state after the cookie session is authenticated', async () => {
+  const result = await loadApplicationBootstrap({
+    getSecurityStatus: async () => ({ ...unclaimedStatus, claimed: true }),
+    getOnboardingState: async () => onboarding('complete'),
+    validateAdminSession: async () => true,
+    clearLegacyAdminToken: () => undefined,
+  });
+  assert.equal(result.authenticated, true);
+  assert.equal(result.onboardingComplete, true);
 });
 
 test('does not request onboarding when security bootstrap fails', async () => {
@@ -54,9 +69,8 @@ test('does not request onboarding when security bootstrap fails', async () => {
         onboardingRequested = true;
         return onboarding('complete');
       },
-      validateAdminToken: async () => false,
-      readAdminToken: () => '',
-      clearAdminToken: () => undefined,
+      validateAdminSession: async () => false,
+      clearLegacyAdminToken: () => undefined,
     }),
     /Backend unavailable/,
   );
@@ -64,16 +78,15 @@ test('does not request onboarding when security bootstrap fails', async () => {
   assert.equal(onboardingRequested, false);
 });
 
-test('surfaces onboarding bootstrap failures without fabricating a ready result', async () => {
+test('surfaces onboarding bootstrap failures after authentication', async () => {
   await assert.rejects(
     loadApplicationBootstrap({
       getSecurityStatus: async () => unclaimedStatus,
       getOnboardingState: async () => {
         throw new Error('Onboarding unavailable');
       },
-      validateAdminToken: async () => false,
-      readAdminToken: () => '',
-      clearAdminToken: () => undefined,
+      validateAdminSession: async () => true,
+      clearLegacyAdminToken: () => undefined,
     }),
     /Onboarding unavailable/,
   );
@@ -90,9 +103,8 @@ test('can retry bootstrap and recover after a transient failure', async () => {
       return unclaimedStatus;
     },
     getOnboardingState: async () => onboarding('in_progress'),
-    validateAdminToken: async () => false,
-    readAdminToken: () => '',
-    clearAdminToken: () => undefined,
+    validateAdminSession: async () => false,
+    clearLegacyAdminToken: () => undefined,
   };
 
   await assert.rejects(loadApplicationBootstrap(dependencies), /Backend starting/);

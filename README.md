@@ -64,6 +64,8 @@ sudo apt install ./autark-os_<version>_amd64.deb
 
 On Linux desktops, the `.run` installer can show a graphical confirmation before opening a terminal for install progress. On servers and SSH sessions, it uses the same guided terminal installer. Tailscale remains optional and is configured later from **Access** rather than during base installation.
 
+After installation, claim the appliance with the code from `sudo autark-os admin setup-code`. The code is available only through local administrator access and is never exposed by the unclaimed web API. See [Administrator access and recovery](docs/security-and-admin-access.md).
+
 General tarball install:
 
 ```bash

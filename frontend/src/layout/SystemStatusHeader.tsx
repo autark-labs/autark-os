@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { JobProgress } from '@/components/autark-os/JobProgress';
+import { AdminSessionControl } from '@/components/autark-os/AdminSessionControl';
 import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
 import { ThemeSelectorPopover } from '@/components/autark-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,7 @@ function SystemStatusHeader() {
           <ThemeSelectorPopover />
           <StatusPopover loading={loading} service={dockerService} />
           <TailscaleControlPopover check={tailscaleCheck} loading={loading} />
+          <AdminSessionControl compact />
           <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-slate-400 sm:inline-flex">
             {error ? 'Status unavailable' : checkedAt}
           </span>

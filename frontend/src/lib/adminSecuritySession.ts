@@ -1,46 +1,31 @@
-import type { InternalAxiosRequestConfig } from 'axios';
-
 const STORAGE_KEY = 'autark-os-admin-token';
 export const ADMIN_SESSION_EXPIRED_EVENT = 'autark-os-admin-session-expired';
+export type AdminSessionEndReason = 'expired' | 'logout';
 
-type TokenStorage = Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>;
+type TokenStorage = Pick<Storage, 'removeItem'>;
+let expirationNotified = false;
 
-export function readAdminToken(storage: TokenStorage | undefined = globalThis.localStorage) {
+export function clearLegacyAdminToken(storage: TokenStorage | undefined = globalThis.localStorage) {
   try {
-    return storage?.getItem(STORAGE_KEY) || '';
+    storage?.removeItem(STORAGE_KEY);
   } catch {
-    return '';
+    // A blocked storage API must not prevent cookie-based authentication.
   }
 }
 
-export function writeAdminToken(token: string, storage: TokenStorage | undefined = globalThis.localStorage) {
-  try {
-    if (token) {
-      storage?.setItem(STORAGE_KEY, token);
-    } else {
-      storage?.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage failures; the current request can still continue.
-  }
+export function markAdminSessionActive() {
+  expirationNotified = false;
 }
 
-export function clearAdminToken(storage: TokenStorage | undefined = globalThis.localStorage) {
-  writeAdminToken('', storage);
+export function notifyAdminSessionExpired() {
+  if (expirationNotified) {
+    return;
+  }
+  expirationNotified = true;
+  globalThis.dispatchEvent?.(new CustomEvent<AdminSessionEndReason>(ADMIN_SESSION_EXPIRED_EVENT, { detail: 'expired' }));
 }
 
-export function applyAdminAuthHeader(config: InternalAxiosRequestConfig, storage: TokenStorage | undefined = globalThis.localStorage) {
-  const token = readAdminToken(storage);
-  if (!token) {
-    return config;
-  }
-  if (typeof config.headers.set === 'function') {
-    config.headers.set('Authorization', `Bearer ${token}`);
-    return config;
-  }
-  config.headers = {
-    ...config.headers,
-    Authorization: `Bearer ${token}`,
-  } as InternalAxiosRequestConfig['headers'];
-  return config;
+export function notifyAdminLogout() {
+  expirationNotified = true;
+  globalThis.dispatchEvent?.(new CustomEvent<AdminSessionEndReason>(ADMIN_SESSION_EXPIRED_EVENT, { detail: 'logout' }));
 }

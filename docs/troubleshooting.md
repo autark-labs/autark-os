@@ -36,6 +36,22 @@ autark-os logs
 
 This command asks for administrator approval when system service logs are protected by Linux, shows the latest 200 messages, and then exits. To keep watching for new messages, run `autark-os logs --follow` and press `Ctrl+C` when you are done.
 
+## You cannot claim or log in
+
+For a new installation, retrieve the setup code on the Autark-OS server:
+
+```bash
+sudo autark-os admin setup-code
+```
+
+The browser intentionally cannot display or retrieve this code. If the appliance is already claimed and the password is lost, reset it locally:
+
+```bash
+sudo autark-os admin reset-password
+```
+
+The reset revokes existing sessions but preserves apps, settings, backups, Docker resources, and Tailscale. If a session merely expired, log in again; do not reset the password.
+
 ## An app needs attention
 
 Open **My Apps**, select the app, and read the recommended action. Use **Repair** only after reviewing the message. If the app is protected, create or confirm a restore point before making a risky change.

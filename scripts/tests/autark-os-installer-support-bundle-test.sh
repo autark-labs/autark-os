@@ -68,6 +68,12 @@ cat >"${log_dir}/installer.log" <<LOG
 [autark-os] installer started
 token=log-secret-token
 Authorization: Bearer bearer-secret-token
+setupCode=AAAA-BBBB-CCCC-DDDD
+Cookie: autark-os-admin-session=browser-session-secret
+Private URL: http://192.168.1.20:8082
+Owner: person@example.com
+Home: /home/jackson/autark-os
+deviceName=raspberrypi
 LOG
 
 AUTARK_OS_CONFIG_FILE="${config_file}" \
@@ -144,8 +150,13 @@ grep -q 'COUCHDB_PASSWORD=\[redacted\]' "${bundle_root}/config-redacted.env"
 grep -q 'TAILSCALE_AUTH_KEY=\[redacted\]' "${bundle_root}/config-redacted.env"
 grep -q 'token=\[redacted\]' "${bundle_root}/installer-stage.log"
 grep -q 'Bearer \[redacted\]' "${bundle_root}/installer-stage.log"
+grep -q 'setupCode=\[redacted\]' "${bundle_root}/installer-stage.log"
+grep -q '\[redacted-private-url\]' "${bundle_root}/installer-stage.log"
+grep -q '\[redacted-email\]' "${bundle_root}/installer-stage.log"
+grep -q '\[redacted-home-path\]' "${bundle_root}/installer-stage.log"
+grep -q 'deviceName=\[redacted-host\]' "${bundle_root}/installer-stage.log"
 
-if rg -n 'plain-secret-token|secret-couchdb-password|tskey-secret-value|state-secret-token|log-secret-token|bearer-secret-token' "${bundle_root}" >/tmp/autark-os-support-bundle-secrets.txt; then
+if rg -n 'plain-secret-token|secret-couchdb-password|tskey-secret-value|state-secret-token|log-secret-token|bearer-secret-token|AAAA-BBBB|browser-session-secret|192\.168\.1\.20|person@example\.com|/home/jackson|raspberrypi' "${bundle_root}" >/tmp/autark-os-support-bundle-secrets.txt; then
   cat /tmp/autark-os-support-bundle-secrets.txt
   exit 1
 fi

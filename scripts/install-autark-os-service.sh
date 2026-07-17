@@ -277,6 +277,20 @@ check_state() {
     fi
   done
 
+  local admin_credential_dir="${RUNTIME_DIR}/config"
+  local admin_local_secret="${admin_credential_dir}/admin-local-secret"
+  local admin_setup_code="${admin_credential_dir}/admin-setup-code"
+  if [[ -f "${admin_local_secret}" ]]; then
+    status_line "Admin recovery credential" "protected ($(stat -c '%a %U:%G' "${admin_local_secret}" 2>/dev/null || printf 'owner-only'))"
+  else
+    status_line "Admin recovery credential" "not initialized (start the service)"
+  fi
+  if [[ -f "${admin_setup_code}" ]]; then
+    status_line "Admin setup code" "available with sudo autark-os admin setup-code"
+  else
+    status_line "Admin setup code" "not present (expected after claim)"
+  fi
+
   if [[ -f "${TARGET_BACKEND_JAR}" ]]; then
     status_line "Backend jar" "${TARGET_BACKEND_JAR}"
   else

@@ -169,6 +169,9 @@ jobs:
           bash scripts/tests/autark-os-update-delivery-test.sh
           bash scripts/tests/autark-os-unified-update-flow-test.sh
           bash scripts/tests/autark-os-safe-uninstall-flow-test.sh
+          bash scripts/tests/autark-os-cli-admin-session-test.sh
+          bash scripts/tests/autark-os-admin-recovery-test.sh
+          bash scripts/tests/autark-os-installer-support-bundle-test.sh
 
       - name: Build architecture-specific artifacts
         env:

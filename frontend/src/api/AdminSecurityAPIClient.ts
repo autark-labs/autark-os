@@ -5,13 +5,16 @@ export type AdminSecurityStatus = {
   claimed: boolean;
   authRequired: boolean;
   message: string;
-  setupCode: string;
+  setupCodeCommand: string;
+  passwordResetCommand: string;
 };
 
 export type AdminSecuritySession = {
   authorized: boolean;
   token: string;
   message: string;
+  expiresAt: string | null;
+  retryAfterSeconds: number | null;
 };
 
 export const AdminSecurityAPIClient = {
@@ -30,11 +33,14 @@ export const AdminSecurityAPIClient = {
     return response.data;
   },
 
-  async session(token: string) {
-    if (!token) return false;
+  async session() {
     const response = await httpClient.get<AdminSecuritySession>('/api/admin/security/session', {
-      headers: { Authorization: `Bearer ${token}` },
+      validateStatus: (status) => status === 200 || status === 401,
     });
     return response.data.authorized;
+  },
+
+  async logout() {
+    await httpClient.post('/api/admin/security/logout');
   },
 };

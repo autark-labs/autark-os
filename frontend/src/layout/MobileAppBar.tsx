@@ -2,6 +2,7 @@ import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House,
 import type { LucideIcon } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
+import { AdminSessionControl } from '@/components/autark-os/AdminSessionControl';
 import { ThemeSelectorPopover } from '@/components/autark-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
 import {
@@ -124,6 +125,7 @@ function MobileAppBar() {
                   <Link to="/settings">Settings</Link>
                 </Button>
               </div>
+              <AdminSessionControl className="w-full" />
             </div>
           </SheetContent>
         </Sheet>

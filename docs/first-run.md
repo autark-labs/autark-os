@@ -2,6 +2,16 @@
 
 After installation, open the address printed by the installer. On the server itself, this is usually `http://localhost:8082`.
 
+## Claim the appliance
+
+Before the setup wizard opens, Autark-OS asks for a local setup code and a new administrator password. On the server, run:
+
+```bash
+sudo autark-os admin setup-code
+```
+
+Enter that code in the browser and choose a password with at least 12 characters. The browser cannot retrieve the code on its own, and the code disappears after a successful claim. See [Administrator access and recovery](./security-and-admin-access.md) if you lose the password later.
+
 ## Complete setup
 
 The setup screen asks for a few choices:

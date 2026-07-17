@@ -1,26 +1,30 @@
 import axios from 'axios';
-import { ADMIN_SESSION_EXPIRED_EVENT, applyAdminAuthHeader, clearAdminToken } from '@/lib/adminSecuritySession';
+import { notifyAdminSessionExpired } from '@/lib/adminSecuritySession';
 
 export const httpClient = axios.create({
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-httpClient.interceptors.request.use((config) => applyAdminAuthHeader(config));
 httpClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (axios.isAxiosError(error) && error.response?.status === 401 && !isLoginRequest(error.config?.url)) {
-      clearAdminToken();
-      globalThis.dispatchEvent?.(new Event(ADMIN_SESSION_EXPIRED_EVENT));
+      notifyAdminSessionExpired();
     }
     return Promise.reject(error);
   },
 );
 
 function isLoginRequest(url: string | undefined) {
-  return Boolean(url?.includes('/api/admin/security/login') || url?.includes('/api/admin/security/claim'));
+  return Boolean(
+    url?.includes('/api/admin/security/status')
+    || url?.includes('/api/admin/security/session')
+    || url?.includes('/api/admin/security/login')
+    || url?.includes('/api/admin/security/claim'),
+  );
 }
 
 export function apiErrorMessage(error: unknown, fallback = 'Something went wrong.') {

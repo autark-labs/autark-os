@@ -1,30 +1,40 @@
 import assert from 'node:assert/strict';
-import { test } from 'vitest';
-import { applyAdminAuthHeader, clearAdminToken, readAdminToken, writeAdminToken } from '../adminSecuritySession';
+import { afterEach, test } from 'vitest';
+import { ADMIN_SESSION_EXPIRED_EVENT, clearLegacyAdminToken, markAdminSessionActive, notifyAdminSessionExpired } from '../adminSecuritySession';
 
 function memoryStorage() {
   const values = new Map();
   return {
-    getItem: (key) => values.get(key) ?? null,
+    values,
     setItem: (key, value) => values.set(key, value),
     removeItem: (key) => values.delete(key),
   };
 }
 
-test('stores and clears the admin session token', () => {
+afterEach(() => markAdminSessionActive());
+
+test('removes the legacy plaintext browser token', () => {
   const storage = memoryStorage();
+  storage.setItem('autark-os-admin-token', 'abc123');
 
-  writeAdminToken('abc123', storage);
-  assert.equal(readAdminToken(storage), 'abc123');
-
-  clearAdminToken(storage);
-  assert.equal(readAdminToken(storage), '');
+  clearLegacyAdminToken(storage);
+  assert.equal(storage.values.has('autark-os-admin-token'), false);
 });
 
-test('adds the bearer token to read and mutating requests', () => {
-  const storage = memoryStorage();
-  writeAdminToken('abc123', storage);
+test('emits only one expired-session event for a burst of unauthorized requests', () => {
+  let eventCount = 0;
+  const previousDispatch = globalThis.dispatchEvent;
+  Object.defineProperty(globalThis, 'dispatchEvent', {
+    configurable: true,
+    value: (event: Event) => {
+      if (event.type === ADMIN_SESSION_EXPIRED_EVENT) eventCount += 1;
+      return true;
+    },
+  });
 
-  assert.equal(applyAdminAuthHeader({ method: 'get', headers: {} }, storage).headers.Authorization, 'Bearer abc123');
-  assert.equal(applyAdminAuthHeader({ method: 'post', headers: {} }, storage).headers.Authorization, 'Bearer abc123');
+  notifyAdminSessionExpired();
+  notifyAdminSessionExpired();
+  assert.equal(eventCount, 1);
+
+  Object.defineProperty(globalThis, 'dispatchEvent', { configurable: true, value: previousDispatch });
 });

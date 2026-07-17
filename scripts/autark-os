@@ -28,6 +28,7 @@ Commands:
   install    Install Autark-OS or print a shared install plan.
   doctor     Check host setup, service health, and core API readiness. Use --json for scripts.
   setup      Start or resume the first-boot setup flow.
+  admin      Show the local setup code or reset the administrator password.
   repair     Check installed Autark-OS and print recovery actions.
   update     Run the unified Autark-OS update flow or one scoped stage.
   uninstall  Remove Autark-OS service paths through the guided uninstall flow.
@@ -161,7 +162,21 @@ api_get() {
   local path="$1"
   local base_url
   base_url="$(resolve_base_url)"
-  curl -fsS "${base_url}${path}"
+  local headers=()
+  local header_file="" exit_code=0
+  case "${path}" in
+    /api/health|/api/admin/security/status) ;;
+    *)
+      ensure_admin_session
+      if [[ -n "${ADMIN_TOKEN}" ]]; then
+        header_file="$(admin_header_file)"
+        headers+=(-H "@${header_file}")
+      fi
+      ;;
+  esac
+  curl -fsS "${headers[@]}" "${base_url}${path}" || exit_code=$?
+  [[ -z "${header_file}" ]] || rm -f "${header_file}"
+  return "${exit_code}"
 }
 
 admin_token_cache_file() {
@@ -237,7 +252,7 @@ ensure_admin_session() {
   fi
   clear_cached_admin_token
 
-  local base_url status_file response_file claimed auth_required setup_code password confirmation request_path body http_status token
+  local base_url status_file response_file claimed auth_required password confirmation request_path body http_status token
   base_url="$(resolve_base_url)"
   status_file="$(mktemp)"
   response_file="$(mktemp)"
@@ -257,19 +272,18 @@ ensure_admin_session() {
     request_path="/api/admin/security/login"
     body="{\"password\":\"$(json_escape "${password}")\"}"
   else
-    setup_code="$(json_value setupCode "${status_file}")"
     if [[ -n "${AUTARK_OS_ADMIN_SETUP_CODE:-}" ]]; then
       confirmation="${AUTARK_OS_ADMIN_SETUP_CODE}"
     else
-      printf 'Setup code shown by this Autark-OS install: %s\n' "${setup_code}" >/dev/tty
-      printf 'Confirm setup code: ' >/dev/tty
+      printf 'Get the local setup code in another terminal with:\n  sudo autark-os admin setup-code\n' >/dev/tty
+      printf 'Setup code: ' >/dev/tty
       IFS= read -r confirmation </dev/tty
     fi
     request_path="/api/admin/security/claim"
     body="{\"setupCode\":\"$(json_escape "${confirmation}")\",\"password\":\"$(json_escape "${password}")\"}"
   fi
 
-  http_status="$(printf '%s' "${body}" | curl -sS -o "${response_file}" -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary @- "${base_url}${request_path}" || true)"
+  http_status="$(printf '%s' "${body}" | curl -sS -o "${response_file}" -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Autark-OS-Client: cli' --data-binary @- "${base_url}${request_path}" || true)"
   token="$(json_value token "${response_file}")"
   if [[ "${http_status}" != "200" || -z "${token}" ]]; then
     local message
@@ -432,7 +446,97 @@ print_setup_next_step() {
   local base_url
   base_url="$(resolve_base_url)"
   log "Open Autark-OS: ${base_url}"
+  log "First-time setup code: sudo autark-os admin setup-code"
   log "Run 'autark-os doctor' if the page is not reachable."
+}
+
+installed_runtime_root() {
+  local value=""
+  value="$(configured_value AUTARK_OS_RUNTIME_ROOT)"
+  [[ -n "${value}" ]] || value="/var/lib/autark-os"
+  printf '%s\n' "${value}"
+}
+
+require_local_root() {
+  [[ "$(id -u)" -eq 0 ]] || die "This local recovery command requires root approval. Rerun it with sudo."
+}
+
+admin_setup_code_command() {
+  require_local_root
+  local setup_code_file
+  setup_code_file="$(installed_runtime_root)/config/admin-setup-code"
+  if [[ ! -r "${setup_code_file}" ]]; then
+    die "No local setup code is available. If this appliance is already claimed, use 'sudo autark-os admin reset-password'. If it is new, make sure the service is running and retry."
+  fi
+  head -n 1 "${setup_code_file}"
+}
+
+admin_reset_password_command() {
+  require_local_root
+  local runtime_root local_secret_file local_secret password confirmation base_url response_file header_file body http_status
+  runtime_root="$(installed_runtime_root)"
+  local_secret_file="${runtime_root}/config/admin-local-secret"
+  [[ -r "${local_secret_file}" ]] || die "The local administrator recovery credential is missing. Start or repair Autark-OS, then retry."
+  local_secret="$(head -n 1 "${local_secret_file}" 2>/dev/null || true)"
+  [[ -n "${local_secret}" ]] || die "The local administrator recovery credential is empty. Repair Autark-OS, then retry."
+
+  password="$(read_admin_secret "New admin password: " "${AUTARK_OS_ADMIN_NEW_PASSWORD:-}")"
+  if [[ -n "${AUTARK_OS_ADMIN_NEW_PASSWORD_CONFIRMATION:-}" ]]; then
+    confirmation="${AUTARK_OS_ADMIN_NEW_PASSWORD_CONFIRMATION}"
+  else
+    confirmation="$(read_admin_secret "Confirm new admin password: ")"
+  fi
+  [[ "${password}" == "${confirmation}" ]] || die "The administrator password confirmation did not match. No changes were made."
+  [[ "${#password}" -ge 12 ]] || die "Use an administrator password with at least 12 characters. No changes were made."
+
+  base_url="http://127.0.0.1:$(resolve_port)"
+  response_file="$(mktemp)"
+  header_file="$(mktemp)"
+  chmod 600 "${response_file}" "${header_file}" 2>/dev/null || true
+  printf 'X-Autark-OS-Local-Secret: %s\n' "${local_secret}" >"${header_file}"
+  body="{\"password\":\"$(json_escape "${password}")\"}"
+  http_status="$(printf '%s' "${body}" | curl -sS -o "${response_file}" -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "@${header_file}" --data-binary @- "${base_url}/api/admin/security/local/reset-password" || true)"
+  rm -f "${header_file}"
+  if [[ "${http_status}" != "200" || "$(json_bool ok "${response_file}")" != "true" ]]; then
+    local message
+    message="$(json_value message "${response_file}")"
+    rm -f "${response_file}"
+    die "${message:-Autark-OS could not reset the administrator password. Check 'autark-os status' and retry.}"
+  fi
+  rm -f "${response_file}"
+  clear_cached_admin_token
+  log "Administrator password reset. All active sessions were revoked; log in again with the new password."
+  log "Apps, settings, and backups were preserved."
+}
+
+admin_command() {
+  case "${1:-help}" in
+    setup-code)
+      shift || true
+      [[ $# -eq 0 ]] || die "Usage: autark-os admin setup-code"
+      admin_setup_code_command
+      ;;
+    reset-password)
+      shift || true
+      [[ $# -eq 0 ]] || die "Usage: autark-os admin reset-password"
+      admin_reset_password_command
+      ;;
+    help|-h|--help)
+      cat <<ADMIN_USAGE
+Usage: autark-os admin <command>
+
+Local administrator recovery commands:
+  setup-code      Print the first-run claim code. Requires sudo/root.
+  reset-password  Set a new administrator password and revoke sessions. Requires sudo/root.
+
+These commands operate only through local root-readable credentials. They do
+not delete apps, settings, backups, Docker state, or the Tailscale identity.
+ADMIN_USAGE
+      ;;
+    *)
+      die "Unknown admin command: ${1}. Run 'autark-os admin --help'."
+      ;;
+  esac
 }
 
 bootstrap_installer() {
@@ -1222,8 +1326,7 @@ wait_for_update_health() {
   local waited=0
   local base_url="http://127.0.0.1:$(resolve_port)"
   while (( waited < UPDATE_HEALTH_TIMEOUT )); do
-    if curl --fail --silent --show-error --max-time 3 "${base_url}/api/health" >/dev/null 2>&1 \
-      && curl --fail --silent --show-error --max-time 3 "${base_url}/api/system/version" >/dev/null 2>&1; then
+    if curl --fail --silent --show-error --max-time 3 "${base_url}/api/health" >/dev/null 2>&1; then
       return 0
     fi
     sleep 2
@@ -1717,12 +1820,18 @@ UPDATE_USAGE
 
 redact_stream() {
   sed -E \
-    -e 's/([A-Za-z0-9_]*(TOKEN|Token|token|PASSWORD|Password|password|SECRET|Secret|secret|AUTH_KEY|auth_key|API_KEY|api_key|CREDENTIAL|credential|PRIVATE_KEY|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*)[^[:space:]",}]+/\1[redacted]/g' \
+    -e 's/([A-Za-z0-9_]*(TOKEN|Token|token|PASSWORD|Password|password|SECRET|Secret|secret|SESSION|Session|session|COOKIE|Cookie|cookie|SETUP_CODE|setupCode|setup_code|AUTH_KEY|auth_key|API_KEY|api_key|CREDENTIAL|credential|PRIVATE_KEY|private_key)[A-Za-z0-9_]*[[:space:]]*[=:][[:space:]]*)[^[:space:]",}]+/\1[redacted]/g' \
+    -e 's/(Cookie:[[:space:]]*).*/\1[redacted]/g' \
     -e 's/(Authorization:[[:space:]]*Bearer[[:space:]]+)[^[:space:]]+/\1[redacted]/g' \
     -e 's/(Bearer[[:space:]]+)[A-Za-z0-9._~+\/=-]+/\1[redacted]/g' \
-    -e 's/("([^"]*(token|password|secret|authKey|auth_key|apiKey|api_key|credential|privateKey|private_key)[^"]*)"[[:space:]]*:[[:space:]]*")[^"]*(")/\1[redacted]\4/g' \
+    -e 's/("([^"]*(token|password|secret|session|cookie|setupCode|setup_code|authKey|auth_key|apiKey|api_key|credential|privateKey|private_key)[^"]*)"[[:space:]]*:[[:space:]]*")[^"]*(")/\1[redacted]\4/g' \
     -e 's/[A-Za-z0-9.-]+\.ts\.net\.?/[redacted-tailnet-host]/g' \
-    -e 's/100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}/[redacted-tailnet-ip]/g'
+    -e 's/100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}/[redacted-tailnet-ip]/g' \
+    -e 's#https?://(localhost|127\.[0-9.]+|10\.[0-9.]+|192\.168\.[0-9.]+|172\.(1[6-9]|2[0-9]|3[01])\.[0-9.]+|[A-Za-z0-9-]+\.local)(:[0-9]+)?(/[^[:space:]"]*)?#[redacted-private-url]#g' \
+    -e 's#(10\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|192\.168\.[0-9]{1,3}\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}|127\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})#[redacted-lan-ip]#g' \
+    -e 's#/(home|Users)/[^/[:space:]"]+#[redacted-home-path]#g' \
+    -e 's/[A-Za-z0-9.!#$%&*+?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/[redacted-email]/g' \
+    -e 's/((host(name)?|device[_-]?name|login[_-]?name|user[_-]?name)[[:space:]]*[=:][[:space:]]*)[^[:space:],;"]+/\1[redacted-host]/Ig'
 }
 
 redact_file_to() {
@@ -1781,7 +1890,7 @@ support_bundle_run_autark_os_doctor() {
 support_bundle_api_capture() {
   local path="$1"
   local target="$2"
-  if api_get "${path}" >"${target}.raw" 2>"${target}.err"; then
+  if (api_get "${path}") >"${target}.raw" 2>"${target}.err"; then
     redact_file_to "${target}.raw" "${target}"
   else
     write_json_unavailable "${target}" "GET ${path}" "The local Autark-OS API did not return this diagnostic."
@@ -2643,6 +2752,10 @@ case "${1:-help}" in
   setup)
     shift || true
     setup "$@"
+    ;;
+  admin)
+    shift || true
+    admin_command "$@"
     ;;
   repair)
     shift || true

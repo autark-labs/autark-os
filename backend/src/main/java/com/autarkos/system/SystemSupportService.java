@@ -307,7 +307,9 @@ public class SystemSupportService {
         return List.of(
                 new SupportModels.SupportRedactionRule("secrets", "Secrets and credentials", "Masks passwords, tokens, API keys, auth values, and credential fields in plain text or JSON-like logs."),
                 new SupportModels.SupportRedactionRule("tailnet-dns", "Tailnet hostnames", "Masks private ts.net hostnames and private URLs before support data is displayed or copied."),
-                new SupportModels.SupportRedactionRule("tailnet-ip", "Tailnet IP addresses", "Masks Tailscale 100.64.0.0/10 addresses that identify private devices."));
+                new SupportModels.SupportRedactionRule("tailnet-ip", "Tailnet IP addresses", "Masks Tailscale 100.64.0.0/10 addresses that identify private devices."),
+                new SupportModels.SupportRedactionRule("local-network", "Local network details", "Masks local URLs, private LAN addresses, and host or device identifiers."),
+                new SupportModels.SupportRedactionRule("local-identity", "Local identity details", "Masks email addresses, login names, and user home paths."));
     }
 
     private boolean healthyStatus(String status) {

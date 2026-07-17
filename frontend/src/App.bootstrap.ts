@@ -10,33 +10,27 @@ export type ApplicationBootstrap = {
 export type ApplicationBootstrapDependencies = {
   getSecurityStatus: () => Promise<AdminSecurityStatus>;
   getOnboardingState: () => Promise<OnboardingState>;
-  validateAdminToken: (token: string) => Promise<boolean>;
-  readAdminToken: () => string;
-  clearAdminToken: () => void;
+  validateAdminSession: () => Promise<boolean>;
+  clearLegacyAdminToken: () => void;
 };
 
-export async function loadApplicationBootstrap({ getSecurityStatus, getOnboardingState, validateAdminToken, readAdminToken, clearAdminToken }: ApplicationBootstrapDependencies): Promise<ApplicationBootstrap> {
+export async function loadApplicationBootstrap({ getSecurityStatus, getOnboardingState, validateAdminSession, clearLegacyAdminToken }: ApplicationBootstrapDependencies): Promise<ApplicationBootstrap> {
   const securityStatus = await getSecurityStatus();
-  const adminToken = readAdminToken();
-  const authenticated = await resolveBootstrapAuthentication(securityStatus, adminToken, validateAdminToken, clearAdminToken);
-  const onboarding = await getOnboardingState();
+  clearLegacyAdminToken();
+  const authenticated = await resolveBootstrapAuthentication(securityStatus, validateAdminSession);
+  const onboarding = authenticated ? await getOnboardingState() : null;
 
   return {
     securityStatus,
-    onboardingComplete: onboarding.status === 'complete',
+    onboardingComplete: onboarding?.status === 'complete',
     authenticated,
   };
 }
 
 export async function resolveBootstrapAuthentication(
   status: AdminSecurityStatus,
-  adminToken: string,
-  validateAdminToken: (token: string) => Promise<boolean>,
-  clearAdminToken: () => void,
+  validateAdminSession: () => Promise<boolean>,
 ): Promise<boolean> {
   if (!status.authRequired || status.devMode) return true;
-  if (!adminToken) return false;
-  const authenticated = await validateAdminToken(adminToken);
-  if (!authenticated) clearAdminToken();
-  return authenticated;
+  return validateAdminSession();
 }

@@ -8,6 +8,7 @@ The repository README is the public overview. These guides focus on installing, 
 
 - [Install Autark-OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
 - [First run](./first-run.md): finish setup, install a first app, and understand app ownership labels.
+- [Administrator access and recovery](./security-and-admin-access.md): claim the appliance, understand sessions, reset a lost password, and use safe remote access.
 
 ## Use And Recover
 

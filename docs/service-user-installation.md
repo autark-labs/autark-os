@@ -40,6 +40,17 @@ These defaults can be changed with `--runtime-dir`, `--install-dir`, `--config-d
 
 The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `autark-os version` reads the live backend when it is reachable and falls back to that env file when the service is stopped.
 
+## Local Administrator Credentials
+
+The backend creates two owner-readable files under the runtime `config` folder:
+
+- `admin-setup-code` exists only while the appliance is unclaimed. `sudo autark-os admin setup-code` reads it without exposing it through the API.
+- `admin-local-secret` authenticates the loopback-only root password-reset call. It is not an administrator password and must never be copied into support output.
+
+Both files use mode `0600`. The setup code is stored as a one-way hash in the database and its local file is deleted after claim. Browser and CLI session tokens are stored only as hashes in backend memory, so a service restart intentionally ends all sessions.
+
+Use `sudo autark-os admin reset-password` for recovery. The CLI must run as root, reads the local recovery credential, calls the loopback endpoint, and revokes active sessions without changing runtime data.
+
 ## Tailscale
 
 The base installer does not install Tailscale or sign the server into an account. Finish the base installation, then use **Access** in Autark-OS when you are ready to configure private access.

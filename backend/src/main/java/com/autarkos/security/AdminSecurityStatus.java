@@ -5,5 +5,6 @@ public record AdminSecurityStatus(
         boolean claimed,
         boolean authRequired,
         String message,
-        String setupCode) {
+        String setupCodeCommand,
+        String passwordResetCommand) {
 }

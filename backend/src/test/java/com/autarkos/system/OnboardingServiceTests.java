@@ -35,7 +35,7 @@ class OnboardingServiceTests {
     void adminClaimSettingsDoNotSilentlyCompleteFirstBootSetup() {
         RuntimeLayout runtimeLayout = runtimeLayout();
         ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);
-        AdminSecurityService security = new AdminSecurityService(repository, false);
+        AdminSecurityService security = new AdminSecurityService(repository, runtimeLayout, false);
         security.status();
 
         OnboardingModels.OnboardingState state = service(repository, runtimeLayout).state();

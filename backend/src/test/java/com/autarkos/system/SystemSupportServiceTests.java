@@ -17,7 +17,7 @@ class SystemSupportServiceTests {
     void redactsSecretsAndTailnetUrls() {
         SupportDataRedactor redactor = new SupportDataRedactor();
 
-        String redacted = redactor.redact("COUCHDB_PASSWORD=secret123 token: abc https://project.tail123.ts.net:5984 100.90.12.8 Authorization: Bearer abcdefghijklmnop {\"api_key\":\"json-secret\"}");
+        String redacted = redactor.redact("COUCHDB_PASSWORD=secret123 token: abc setupCode=AAAA-BBBB Cookie: autark-os-admin-session=session-value; other=cookie-value\nhttps://project.tail123.ts.net:5984 100.90.12.8 Authorization: Bearer abcdefghijklmnop {\"api_key\":\"json-secret\",\"hostname\":\"raspberrypi\"} http://192.168.1.20:8082 /home/jackson/autark-os user@example.com deviceName=home-server");
 
         assertThat(redacted)
                 .doesNotContain("secret123")
@@ -26,12 +26,24 @@ class SystemSupportServiceTests {
                 .doesNotContain("100.90.12.8")
                 .doesNotContain("abcdefghijklmnop")
                 .doesNotContain("json-secret")
+                .doesNotContain("AAAA-BBBB")
+                .doesNotContain("session-value")
+                .doesNotContain("cookie-value")
+                .doesNotContain("raspberrypi")
+                .doesNotContain("192.168.1.20")
+                .doesNotContain("jackson")
+                .doesNotContain("user@example.com")
+                .doesNotContain("home-server")
                 .contains("COUCHDB_PASSWORD=[redacted]")
                 .contains("token: [redacted]")
                 .contains("[tailnet-url-redacted]")
                 .contains("[tailnet-ip-redacted]")
                 .contains("Bearer [redacted]")
-                .contains("\"api_key\":\"[redacted]\"");
+                .contains("\"api_key\":\"[redacted]\"")
+                .contains("[private-url-redacted]")
+                .contains("[home-path-redacted]")
+                .contains("[email-redacted]")
+                .contains("[host-redacted]");
     }
 
     @Test

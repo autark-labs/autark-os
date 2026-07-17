@@ -6,11 +6,12 @@ import { SystemAPIClient } from './api/SystemAPIClient';
 import { loadApplicationBootstrap, type ApplicationBootstrap } from './App.bootstrap';
 import { safePostSetupPath, setupRedirectTarget } from './App.onboarding';
 import { ProjectSettingsProvider } from './contexts/ProjectSettingsContext';
+import { AdminSessionControlsProvider } from './contexts/AdminSessionContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProjectPrimaryButton } from './components/primitives/ProjectButtons';
 import AppShell from './layout/AppShell';
 import { routeAliases } from './layout/navigationModel';
-import { ADMIN_SESSION_EXPIRED_EVENT, clearAdminToken, readAdminToken } from './lib/adminSecuritySession';
+import { ADMIN_SESSION_EXPIRED_EVENT, clearLegacyAdminToken, markAdminSessionActive, type AdminSessionEndReason } from './lib/adminSecuritySession';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
 import { Toaster } from './components/ui/sonner';
@@ -100,9 +101,8 @@ function AppContent() {
       const result = await loadApplicationBootstrap({
         getSecurityStatus: AdminSecurityAPIClient.status,
         getOnboardingState: SystemAPIClient.onboarding,
-        validateAdminToken: AdminSecurityAPIClient.session,
-        readAdminToken,
-        clearAdminToken,
+        validateAdminSession: AdminSecurityAPIClient.session,
+        clearLegacyAdminToken,
       });
       if (bootstrapRequestId.current === requestId) {
         setBootState({ phase: 'ready', bootstrap: result });
@@ -138,36 +138,44 @@ function AppContent() {
     return <BootstrapUnavailableScreen message={bootState.message} onRetry={() => void bootstrap()} />;
   }
 
-  return <ReadyApplication bootstrap={bootState.bootstrap} />;
+  return <ReadyApplication bootstrap={bootState.bootstrap} onRebootstrap={() => void bootstrap()} />;
 }
 
-function ReadyApplication({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
+function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: ApplicationBootstrap; onRebootstrap: () => void }) {
   const [authenticated, setAuthenticated] = useState(bootstrap.authenticated);
   const [onboardingComplete, setOnboardingComplete] = useState(bootstrap.onboardingComplete);
+  const [sessionEndedReason, setSessionEndedReason] = useState<AdminSessionEndReason | null>(null);
 
   useEffect(() => {
-    const handleExpiredSession = () => setAuthenticated(false);
+    const handleExpiredSession = (event: Event) => {
+      setAuthenticated(false);
+      setSessionEndedReason((event as CustomEvent<AdminSessionEndReason>).detail || 'expired');
+    };
     globalThis.addEventListener?.(ADMIN_SESSION_EXPIRED_EVENT, handleExpiredSession);
     return () => globalThis.removeEventListener?.(ADMIN_SESSION_EXPIRED_EVENT, handleExpiredSession);
   }, []);
 
+  useEffect(() => {
+    if (authenticated) {
+      markAdminSessionActive();
+    }
+  }, [authenticated]);
+
+  if (bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode && !authenticated) {
+    return <AdminSecurityGate onAuthenticated={onRebootstrap} sessionEndedReason={sessionEndedReason} status={bootstrap.securityStatus} />;
+  }
+
   if (!onboardingComplete) {
     return (
       <ProjectSettingsProvider>
-        {bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode && !authenticated ? (
-          <AdminSecurityGate onAuthenticated={() => setAuthenticated(true)} status={bootstrap.securityStatus} />
-        ) : (
-          <IncompleteOnboardingRoutes onComplete={() => setOnboardingComplete(true)} />
-        )}
+        <IncompleteOnboardingRoutes onComplete={() => setOnboardingComplete(true)} />
       </ProjectSettingsProvider>
     );
   }
 
   return (
-    <ProjectSettingsProvider>
-      {bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode && !authenticated ? (
-        <AdminSecurityGate onAuthenticated={() => setAuthenticated(true)} status={bootstrap.securityStatus} />
-      ) : (
+    <AdminSessionControlsProvider enabled={bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode}>
+      <ProjectSettingsProvider>
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<Navigate replace to="/home" />} />
@@ -189,8 +197,8 @@ function ReadyApplication({ bootstrap }: { bootstrap: ApplicationBootstrap }) {
             <Route path="/diagnostics" element={<Suspense fallback={<PageFallback />}><SupportPage /></Suspense>} />
           </Route>
         </Routes>
-      )}
-    </ProjectSettingsProvider>
+      </ProjectSettingsProvider>
+    </AdminSessionControlsProvider>
   );
 }
 
