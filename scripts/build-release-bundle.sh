@@ -18,6 +18,11 @@ DRY_RUN=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HOST_MATRIX_FILE="${SCRIPT_DIR}/supported-host-matrix.env"
+RELEASE_DOCS_SOURCE_DIR="${REPO_ROOT}/docs/release"
+LICENSE_SOURCE="${REPO_ROOT}/LICENSE.md"
+COMMERCIAL_LICENSE_SOURCE="${REPO_ROOT}/COMMERCIAL-LICENSE.md"
+SUPPORT_SOURCE="${REPO_ROOT}/SUPPORT.md"
+SECURITY_SOURCE="${REPO_ROOT}/SECURITY.md"
 [[ -r "${HOST_MATRIX_FILE}" ]] || { printf '[autark-os release] error: supported host policy is missing: %s\n' "${HOST_MATRIX_FILE}" >&2; exit 1; }
 # shellcheck source=supported-host-matrix.env
 source "${HOST_MATRIX_FILE}"
@@ -52,6 +57,10 @@ The bundle layout is:
   scripts/autark-os-gui-installer.sh
   scripts/autark-os
   scripts/autark-os-fileops
+  docs/GETTING_STARTED.md
+  docs/RELEASE_NOTES.md
+  docs/LICENSE.md
+  docs/THIRD_PARTY_NOTICES.md
 USAGE
 }
 
@@ -371,7 +380,15 @@ write_release_json() {
     "scripts/install-autark-os.sh",
     "scripts/autark-os-gui-installer.sh",
     "scripts/autark-os",
-    "scripts/autark-os-fileops"
+    "scripts/autark-os-fileops",
+    "docs/GETTING_STARTED.md",
+    "docs/RELEASE_NOTES.md",
+    "docs/LICENSE.md",
+    "docs/THIRD_PARTY_NOTICES.md",
+    "docs/THIRD_PARTY_COMPONENTS.txt",
+    "docs/THIRD_PARTY_FRONTEND_LOCK.txt",
+    "docs/SUPPORT.md",
+    "docs/SECURITY.md"
   ],
   "signatureStatus": "unsigned-reserved"
 }
@@ -396,6 +413,109 @@ write_provenance_json() {
 JSON
 }
 
+release_commit_summaries() {
+  local summaries
+  summaries="$(git -C "${REPO_ROOT}" log -n 12 --format='- %s (%h)' "${BUILD_SHA}" 2>/dev/null || true)"
+  if [[ -n "${summaries}" ]]; then
+    printf '%s\n' "${summaries}"
+  else
+    printf '%s\n' "- Release built from source revision ${BUILD_SHA}."
+  fi
+}
+
+write_release_notes() {
+  local docs_dir="$1"
+  cat >"${docs_dir}/RELEASE_NOTES.md" <<NOTES
+# Autark-OS ${VERSION}
+
+Release channel: ${CHANNEL}
+Source revision: ${BUILD_SHA}
+Built: ${BUILD_DATE}
+
+## User-visible changes
+
+$(release_commit_summaries)
+
+## Fixed issues
+
+This release includes the fixes represented by the source revisions above. If
+you are upgrading from an earlier release, review the update plan before
+confirming it and keep a verified backup where one is available.
+
+## Upgrade And Compatibility Notes
+
+- Use \`autark-os update\` for the guided update and automatic health rollback.
+- The portable installer updates an existing Autark-OS installation instead of
+  creating a second one.
+- Supported hosts are Debian 12/13 and Ubuntu 24.04/26.04 on amd64 or arm64,
+  plus 64-bit Raspberry Pi OS 11/12/13 on arm64. A Pi 5 is primarily targeted
+  by Raspberry Pi OS 13 and also supported on Pi OS 12.
+- Managed application data, backups, Docker, and the host Tailscale identity
+  are preserved by a normal Autark-OS update.
+
+## Known Limitations
+
+- This is a controlled beta release. Test it on a non-critical host before
+  relying on it for important services.
+- Tailscale is optional and private links require a connected Tailscale host.
+- App catalog coverage is still early; review each app's install plan and
+  backup state before relying on it.
+- Backups are not described as encrypted. Only restore points shown as verified
+  should be treated as ready for recovery.
+
+## Verify This Download
+
+Verify the checksums supplied with this release before installing:
+
+\`\`\`bash
+sha256sum -c SHA256SUMS --ignore-missing
+\`\`\`
+
+The release page for this immutable tag is:
+
+${RELEASE_NOTES_URL}
+
+For technical component information, read \`THIRD_PARTY_NOTICES.md\` in this
+same documentation directory.
+NOTES
+}
+
+copy_release_docs() {
+  local jar="$1"
+  local docs_dir="${OUTPUT_DIR}/docs"
+  local required_source
+  for required_source in \
+    "${RELEASE_DOCS_SOURCE_DIR}/GETTING_STARTED.md" \
+    "${RELEASE_DOCS_SOURCE_DIR}/THIRD_PARTY_NOTICES.md" \
+    "${LICENSE_SOURCE}" \
+    "${COMMERCIAL_LICENSE_SOURCE}" \
+    "${SUPPORT_SOURCE}" \
+    "${SECURITY_SOURCE}"; do
+    [[ -r "${required_source}" ]] || die "Required release documentation is missing: ${required_source}"
+  done
+  run_cmd mkdir -p "${docs_dir}"
+  run_cmd cp "${RELEASE_DOCS_SOURCE_DIR}/GETTING_STARTED.md" "${docs_dir}/GETTING_STARTED.md"
+  run_cmd cp "${RELEASE_DOCS_SOURCE_DIR}/THIRD_PARTY_NOTICES.md" "${docs_dir}/THIRD_PARTY_NOTICES.md"
+  run_cmd cp "${LICENSE_SOURCE}" "${docs_dir}/LICENSE.md"
+  run_cmd cp "${COMMERCIAL_LICENSE_SOURCE}" "${docs_dir}/COMMERCIAL-LICENSE.md"
+  run_cmd cp "${SUPPORT_SOURCE}" "${docs_dir}/SUPPORT.md"
+  run_cmd cp "${SECURITY_SOURCE}" "${docs_dir}/SECURITY.md"
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    printf '+ write %q/RELEASE_NOTES.md and third-party dependency inventories\n' "${docs_dir}"
+    return 0
+  fi
+  write_release_notes "${docs_dir}"
+  {
+    printf '# Java libraries packaged in backend/autark-os-backend.jar\n\n'
+    unzip -Z1 "${jar}" 2>/dev/null | awk -F/ '/^BOOT-INF\/lib\/[^/]+$/ {print $3}' | sort -u
+  } >"${docs_dir}/THIRD_PARTY_COMPONENTS.txt"
+  if [[ -r "${REPO_ROOT}/frontend/yarn.lock" ]]; then
+    cp "${REPO_ROOT}/frontend/yarn.lock" "${docs_dir}/THIRD_PARTY_FRONTEND_LOCK.txt"
+  else
+    printf '# Frontend dependency lockfile was not available in this source checkout.\n' >"${docs_dir}/THIRD_PARTY_FRONTEND_LOCK.txt"
+  fi
+}
+
 create_bundle() {
   local jar
   jar="$(find_backend_jar)"
@@ -417,6 +537,7 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/autark-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os" "${OUTPUT_DIR}/scripts/autark-os"
   run_cmd cp "${SCRIPT_DIR}/autark-os-fileops" "${OUTPUT_DIR}/scripts/autark-os-fileops"
+  copy_release_docs "${jar}"
   run_cmd chmod +x \
     "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh" \
     "${OUTPUT_DIR}/scripts/install-autark-os-service.sh" \
@@ -427,12 +548,12 @@ create_bundle() {
   write_metadata
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '+ cd %q && find backend runtime scripts \\( -type f -o -type l \\) -print0 | sort -z | xargs -0 sha256sum; sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
+    printf '+ cd %q && find backend runtime scripts docs \\( -type f -o -type l \\) -print0 | sort -z | xargs -0 sha256sum; sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
   else
     (
       cd "${OUTPUT_DIR}"
       {
-        find backend runtime scripts \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum
+        find backend runtime scripts docs \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum
         sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json
       } >SHA256SUMS
     )

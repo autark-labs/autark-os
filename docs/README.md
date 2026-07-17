@@ -21,6 +21,8 @@ The repository README is the public overview. These guides focus on installing, 
 - [Technical installation](./technical-installation.md): release artifacts, supported hosts, preflight checks, runtime storage, and installed paths.
 - [Portable and offline installation](./offline-install.md): verify and install copied release artifacts without downloading during setup.
 - [Service and storage reference](./service-user-installation.md): the installed service, durable data paths, systemd, Docker access, and Tailscale operator setup.
+- [Support policy](../SUPPORT.md): what Autark Labs can help with and when to contact an upstream app project.
+- [Security reporting](../SECURITY.md): how to report a security issue without exposing credentials publicly.
 
 ## Before You Change The Host
 

@@ -150,6 +150,9 @@ docs/          Installation, operation, recovery, and technical-admin guides
 - [Troubleshooting](docs/troubleshooting.md)
 - [Technical installation](docs/technical-installation.md)
 - [Service and storage reference](docs/service-user-installation.md)
+- [Support policy](SUPPORT.md)
+- [Security reporting](SECURITY.md)
+- [License](LICENSE.md) and [commercial licensing](COMMERCIAL-LICENSE.md)
 
 ## Known Beta Gaps
 

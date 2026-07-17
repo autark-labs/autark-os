@@ -14,6 +14,7 @@ SERVER_PORT="${AUTARK_OS_SERVER_PORT:-8082}"
 BACKEND_JAR="${AUTARK_OS_BACKEND_JAR:-}"
 CLI_LINK="${AUTARK_OS_CLI_LINK:-/usr/local/bin/autark-os}"
 SUDOERS_FILE="${AUTARK_OS_SUDOERS_FILE:-/etc/sudoers.d/autark-os-fileops}"
+DOCUMENTATION_DIR="${AUTARK_OS_DOCUMENTATION_DIR:-/usr/share/doc/autark-os}"
 AUTARK_OS_VERSION="${AUTARK_OS_VERSION:-0.0.1-SNAPSHOT}"
 AUTARK_OS_BUILD_SHA="${AUTARK_OS_BUILD_SHA:-}"
 AUTARK_OS_BUILD_DATE="${AUTARK_OS_BUILD_DATE:-}"
@@ -66,7 +67,8 @@ Environment overrides:
   AUTARK_OS_SERVICE_NAME, AUTARK_OS_SERVICE_FILE, AUTARK_OS_CLI_LINK,
   AUTARK_OS_FILEOPS_HELPER, AUTARK_OS_SUDOERS_FILE, AUTARK_OS_VERSION,
   AUTARK_OS_BUILD_SHA, AUTARK_OS_BUILD_DATE, AUTARK_OS_UPDATE_CHANNEL,
-  AUTARK_OS_INSTALL_METHOD, AUTARK_OS_UPDATE_REPOSITORY
+  AUTARK_OS_INSTALL_METHOD, AUTARK_OS_UPDATE_REPOSITORY,
+  AUTARK_OS_DOCUMENTATION_DIR
 USAGE
 }
 
@@ -238,7 +240,7 @@ require_root_or_reexec() {
   fi
   command_exists sudo || die "This installer needs root privileges. Install sudo or rerun as root."
   log "Requesting administrator privileges."
-  exec sudo --preserve-env=AUTARK_OS_USER,AUTARK_OS_GROUP,AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_FILEOPS_HELPER,AUTARK_OS_SUDOERS_FILE,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
+  exec sudo --preserve-env=AUTARK_OS_USER,AUTARK_OS_GROUP,AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_FILEOPS_HELPER,AUTARK_OS_SUDOERS_FILE,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_DOCUMENTATION_DIR,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
 }
 
 status_line() {
@@ -682,6 +684,35 @@ EOF
   rm -f "${public_env}"
 }
 
+install_release_docs() {
+  local docs_source="${REPO_ROOT}/docs"
+  local document
+  local required_documents=(
+    GETTING_STARTED.md
+    RELEASE_NOTES.md
+    LICENSE.md
+    COMMERCIAL-LICENSE.md
+    THIRD_PARTY_NOTICES.md
+    THIRD_PARTY_COMPONENTS.txt
+    THIRD_PARTY_FRONTEND_LOCK.txt
+    SUPPORT.md
+    SECURITY.md
+  )
+  if [[ ! -d "${docs_source}" ]]; then
+    warn "Release documentation is missing from ${docs_source}."
+    return 0
+  fi
+  run install -d -o root -g root -m 0755 "${DOCUMENTATION_DIR}"
+  for document in "${required_documents[@]}"; do
+    if [[ -r "${docs_source}/${document}" ]]; then
+      run install -o root -g root -m 0644 "${docs_source}/${document}" "${DOCUMENTATION_DIR}/${document}"
+    else
+      warn "Release documentation is missing: ${docs_source}/${document}"
+    fi
+  done
+  log "Installed offline release documentation at ${DOCUMENTATION_DIR}."
+}
+
 install_runtime_image() {
   [[ -x "${RUNTIME_IMAGE_SOURCE}/bin/java" ]] || return 0
   if [[ "${DRY_RUN}" -eq 1 ]]; then
@@ -815,6 +846,7 @@ main() {
   install_runtime_image
   install_backend_jar || true
   install_release_metadata
+  install_release_docs
   write_env_file
   write_systemd_unit
   enable_service

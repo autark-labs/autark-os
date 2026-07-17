@@ -233,10 +233,11 @@ Version: ${VERSION}
 Section: admin
 Priority: optional
 Architecture: ${ARCHITECTURE}
-Maintainer: Autark Labs <support@autarklabs.local>
+Maintainer: Autark Labs <licensing@autarklabs.com>
 Depends: bash, sudo, systemd, curl, ca-certificates
 Installed-Size: ${size_kb}
 Homepage: https://github.com/autark-labs/autark-os
+License: Autark Community License (ACL) v1.0
 Description: Calm local control center for self-hosted apps
  Autark-OS installs and manages supported self-hosted apps with Docker
  Compose, private access, backups, restore, and guided recovery.
@@ -456,13 +457,15 @@ POSTRM
 
 package_deb() {
   require_tool dpkg-deb
-  local work_dir deb_root payload_dir size_kb
+  local work_dir deb_root payload_dir documentation_dir size_kb
   work_dir="$(mktemp -d)"
   trap 'rm -rf "${work_dir}"' RETURN
   deb_root="${work_dir}/deb-root"
   payload_dir="${deb_root}/usr/lib/autark-os/release"
-  mkdir -p "${payload_dir}" "${deb_root}/DEBIAN"
+  documentation_dir="${deb_root}/usr/share/doc/autark-os"
+  mkdir -p "${payload_dir}" "${documentation_dir}" "${deb_root}/DEBIAN"
   cp -a "${BUNDLE_DIR}/." "${payload_dir}/"
+  cp -a "${BUNDLE_DIR}/docs/." "${documentation_dir}/"
   chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os" "${payload_dir}/scripts/autark-os-fileops"
   size_kb="$(installed_size_kb "${deb_root}/usr")"
   write_deb_control "${deb_root}" "${size_kb}"

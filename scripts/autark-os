@@ -45,6 +45,9 @@ Commands:
   url        Print the local Autark-OS URL.
   help       Show this help.
 
+Offline documentation:
+  /usr/share/doc/autark-os/GETTING_STARTED.md
+
 Environment:
   AUTARK_OS_SERVICE_NAME  Override the systemd service name.
   AUTARK_OS_BASE_URL      Override the local API URL.

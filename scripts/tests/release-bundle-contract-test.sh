@@ -30,6 +30,15 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-fileops" ]]
 [[ -x "${bundle_dir}/runtime/bin/java" ]]
+[[ -f "${bundle_dir}/docs/GETTING_STARTED.md" ]]
+[[ -f "${bundle_dir}/docs/RELEASE_NOTES.md" ]]
+[[ -f "${bundle_dir}/docs/LICENSE.md" ]]
+[[ -f "${bundle_dir}/docs/COMMERCIAL-LICENSE.md" ]]
+[[ -f "${bundle_dir}/docs/THIRD_PARTY_NOTICES.md" ]]
+[[ -f "${bundle_dir}/docs/THIRD_PARTY_COMPONENTS.txt" ]]
+[[ -f "${bundle_dir}/docs/THIRD_PARTY_FRONTEND_LOCK.txt" ]]
+[[ -f "${bundle_dir}/docs/SUPPORT.md" ]]
+[[ -f "${bundle_dir}/docs/SECURITY.md" ]]
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^java.compiler@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
 
@@ -46,6 +55,9 @@ grep -q 'autark-os-provenance.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/install-autark-os.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-gui-installer.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-fileops' "${bundle_dir}/SHA256SUMS"
+grep -q 'docs/GETTING_STARTED.md' "${bundle_dir}/SHA256SUMS"
+grep -q 'docs/RELEASE_NOTES.md' "${bundle_dir}/SHA256SUMS"
+grep -q 'docs/LICENSE.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'runtime/bin/java' "${bundle_dir}/SHA256SUMS"
 grep -q '^SuccessExitStatus=143$' "${bundle_dir}/scripts/install-autark-os-service.sh"
 
@@ -74,6 +86,9 @@ assert "backend/autark-os-backend.jar" in release["artifacts"]
 assert "runtime/bin/java" in release["artifacts"]
 assert "scripts/autark-os-gui-installer.sh" in release["artifacts"]
 assert "scripts/autark-os-fileops" in release["artifacts"]
+assert "docs/GETTING_STARTED.md" in release["artifacts"]
+assert "docs/RELEASE_NOTES.md" in release["artifacts"]
+assert "docs/LICENSE.md" in release["artifacts"]
 assert provenance["schemaVersion"] == 2
 assert provenance["buildSha"] == release["buildSha"]
 assert provenance["buildDate"] == release["buildDate"]
@@ -81,6 +96,14 @@ assert provenance["artifactArchitecture"] == release["artifactArchitecture"]
 assert provenance["runtimeArchitecture"] == release["runtimeArchitecture"]
 assert provenance["signatureStatus"] == "unsigned-reserved"
 PY
+
+grep -q '^# Autark-OS: Getting Started And Recovery$' "${bundle_dir}/docs/GETTING_STARTED.md"
+grep -q '^# Autark-OS 1.2.3$' "${bundle_dir}/docs/RELEASE_NOTES.md"
+grep -q '^## Known Limitations$' "${bundle_dir}/docs/RELEASE_NOTES.md"
+grep -q '^# Autark Community License' "${bundle_dir}/docs/LICENSE.md"
+grep -q '^# Third-Party Components$' "${bundle_dir}/docs/THIRD_PARTY_NOTICES.md"
+grep -q '^# Autark-OS Support Policy$' "${bundle_dir}/docs/SUPPORT.md"
+grep -q '^# Reporting A Security Issue$' "${bundle_dir}/docs/SECURITY.md"
 
 mismatch_output="${tmp_dir}/identity-mismatch.out"
 if AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=other-build-sha "${repo_root}/scripts/build-release-bundle.sh" \
