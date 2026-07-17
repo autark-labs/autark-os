@@ -165,7 +165,7 @@ api_get() {
   local headers=()
   local header_file="" exit_code=0
   case "${path}" in
-    /api/health|/api/admin/security/status) ;;
+    /api/health|/api/admin/security/status|/api/system/version) ;;
     *)
       ensure_admin_session
       if [[ -n "${ADMIN_TOKEN}" ]]; then
