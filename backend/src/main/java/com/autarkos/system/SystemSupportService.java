@@ -256,8 +256,8 @@ public class SystemSupportService {
                     "Backups",
                     report.status(),
                     redact(report.headline()),
-                    "%d of %d apps protected. %d recent restore point(s). %d failed backup(s)."
-                            .formatted(report.protectedApps(), report.totalApps(), report.recentRestorePoints().size(), report.failedBackups()));
+                    "%s. %d of %d apps protected. %d recent restore point(s). %d failed backup(s)."
+                            .formatted(report.destination().message(), report.protectedApps(), report.totalApps(), report.recentRestorePoints().size(), report.failedBackups()));
         } catch (RuntimeException exception) {
             return failedSummary("backups", "Backups", exception);
         }

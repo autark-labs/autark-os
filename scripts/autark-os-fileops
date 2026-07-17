@@ -3,7 +3,7 @@
 
 This helper is designed to be called through a narrow sudoers rule. It refuses
 arbitrary paths and commands. File operations stay under the configured
-Autark-OS runtime and backup roots; the sole host operation grants the fixed
+Autark-OS runtime and approved backup roots; the sole host operation grants the fixed
 Autark-OS service user permission to manage Tailscale Serve.
 """
 
@@ -24,6 +24,9 @@ import zipfile
 APP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 AUTARK_OS_SERVICE_USER = "autarkos"
 TRUSTED_TAILSCALE_PATHS = (Path("/usr/bin/tailscale"), Path("/usr/local/bin/tailscale"))
+DESTINATION_CONFIG = Path(os.environ.get("AUTARK_OS_FILEOPS_DESTINATION_CONFIG", "/etc/autark-os/backup-destination.env"))
+UNSUPPORTED_EXTERNAL_FILESYSTEMS = {"proc", "procfs", "sysfs", "devtmpfs", "tmpfs", "devpts", "cgroup", "cgroup2", "squashfs", "overlay", "ramfs"}
+SYSTEM_ROOTS = (Path("/etc"), Path("/root"), Path("/usr"), Path("/bin"), Path("/sbin"), Path("/proc"), Path("/sys"), Path("/dev"), Path("/tmp"))
 
 
 def die(message: str) -> None:
@@ -43,6 +46,89 @@ def require_inside(path: Path, root: Path, label: str) -> Path:
     return path
 
 
+def path_is_inside(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
+def reject_symlink_segments(path: Path) -> None:
+    current = path.anchor and Path(path.anchor) or Path("/")
+    for part in path.parts[1:]:
+        current = current / part
+        if current.exists() and current.is_symlink():
+            die("backup destinations cannot use symbolic links")
+
+
+def mount_info(path: Path) -> tuple[Path, str, str]:
+    """Return mount point, source device, and filesystem type for a real path."""
+    target = path.resolve(strict=False)
+    entries: list[tuple[Path, str, str]] = []
+    try:
+        for line in Path("/proc/self/mountinfo").read_text(encoding="utf-8").splitlines():
+            left, separator, right = line.partition(" - ")
+            if not separator:
+                continue
+            fields = left.split()
+            right_fields = right.split()
+            if len(fields) < 5 or len(right_fields) < 2:
+                continue
+            mount_point = Path(fields[4].replace("\\040", " ").replace("\\011", "\t"))
+            entries.append((mount_point, right_fields[1], right_fields[0]))
+    except OSError:
+        entries = []
+    matches = [entry for entry in entries if path_is_inside(target, entry[0])]
+    if matches:
+        return max(matches, key=lambda entry: len(entry[0].parts))
+    return Path("/"), "unknown", "unknown"
+
+
+def mount_identity(path: Path) -> str:
+    mount_point, source, filesystem = mount_info(path)
+    return f"{source}|{filesystem}|{mount_point}"
+
+
+def read_destination_config() -> dict[str, str]:
+    if not DESTINATION_CONFIG.is_file():
+        return {}
+    values: dict[str, str] = {}
+    for line in DESTINATION_CONFIG.read_text(encoding="utf-8").splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            values[key.strip()] = value.strip()
+    return values
+
+
+def configured_roots() -> dict[Path, str]:
+    values = read_destination_config()
+    roots: dict[Path, str] = {}
+    current = values.get("BACKUP_DESTINATION_PATH", "")
+    current_identity = values.get("BACKUP_DESTINATION_MOUNT_IDENTITY", "")
+    if current:
+        roots[resolved(current)] = current_identity
+    for item in values.get("BACKUP_DESTINATION_HISTORY", "").split(";"):
+        path, separator, identity = item.partition("|")
+        if separator and path:
+            roots[resolved(path)] = identity
+    return roots
+
+
+def approved_backup_root(args: argparse.Namespace) -> Path:
+    candidate = resolved(args.backup_root)
+    internal = resolved(args.runtime_root / "backups")
+    if candidate == internal:
+        return candidate
+    roots = configured_roots()
+    expected_identity = roots.get(candidate)
+    if not expected_identity:
+        die("backup root is not an approved Autark-OS destination")
+    if mount_identity(candidate) != expected_identity:
+        die("the approved backup drive is missing or a different drive is mounted at this path")
+    return candidate
+
+
 def require_app_id(app_id: str) -> str:
     if not APP_ID_RE.match(app_id or ""):
         die("invalid app id")
@@ -57,6 +143,84 @@ def app_root(args: argparse.Namespace) -> Path:
 def backup_path(args: argparse.Namespace, value: str, label: str = "backup path") -> Path:
     path = resolved(value)
     return require_inside(path, args.backup_root, label)
+
+
+def probe_destination(path: Path) -> None:
+    probe = path / f".autark-os-write-probe-{os.getpid()}-{os.urandom(4).hex()}"
+    try:
+        probe.write_text("Autark-OS backup destination probe\n", encoding="utf-8")
+        if not probe.read_text(encoding="utf-8").startswith("Autark-OS backup destination probe"):
+            die("backup destination did not return the validation probe")
+    finally:
+        probe.unlink(missing_ok=True)
+
+
+def validate_external_destination(args: argparse.Namespace) -> tuple[Path, str]:
+    destination = resolved(args.destination)
+    if not destination.is_absolute() or destination == Path("/"):
+        die("backup destination must be a dedicated absolute folder")
+    if path_is_inside(destination, args.runtime_root):
+        die("external backup destination cannot be inside the Autark-OS runtime")
+    if any(path_is_inside(destination, root) for root in SYSTEM_ROOTS):
+        die("external backup destination cannot be a system folder")
+    reject_symlink_segments(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    mount_point, _source, filesystem = mount_info(destination)
+    runtime_identity = mount_identity(args.runtime_root)
+    identity = mount_identity(destination)
+    if identity == runtime_identity:
+        die("external backup destination must be on a different mounted filesystem")
+    if filesystem.lower() in UNSUPPORTED_EXTERNAL_FILESYSTEMS:
+        die(f"unsupported backup filesystem: {filesystem}")
+    probe_destination(destination)
+    return destination, identity
+
+
+def configure_backup_destination(args: argparse.Namespace) -> None:
+    internal = resolved(args.runtime_root / "backups")
+    prior = configured_roots()
+    history: dict[Path, str] = {}
+    for path, previous_identity in prior.items():
+        if path != resolved(args.destination) and previous_identity:
+            history[path] = previous_identity
+    for raw_path in args.history_root or []:
+        path = resolved(raw_path)
+        if path != resolved(args.destination) and path in prior:
+            history[path] = prior[path]
+
+    if resolved(args.destination) == internal:
+        if not history:
+            DESTINATION_CONFIG.unlink(missing_ok=True)
+            print("cleared external backup destination; internal Autark-OS backups are active")
+            return
+        write_destination_config("", "", "", "", history)
+        print("internal Autark-OS backups are active; previous external restore locations remain approved")
+        return
+    destination, identity = validate_external_destination(args)
+    mount_point, _source, filesystem = mount_info(destination)
+    write_destination_config(destination, identity, mount_point, filesystem, history)
+    print(f"configured approved backup destination {destination}")
+
+
+def write_destination_config(destination: str | Path, identity: str, mount_point: str | Path, filesystem: str, history: dict[Path, str]) -> None:
+    history_value = ";".join(f"{path}|{stored_identity}" for path, stored_identity in history.items())
+    DESTINATION_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    temporary = DESTINATION_CONFIG.with_name(DESTINATION_CONFIG.name + ".tmp")
+    temporary.write_text(
+        "\n".join([
+            "# Root-owned Autark-OS approved backup destination.",
+            f"BACKUP_DESTINATION_PATH={destination}",
+            f"BACKUP_DESTINATION_MOUNT_IDENTITY={identity}",
+            f"BACKUP_DESTINATION_MOUNT_POINT={mount_point}",
+            f"BACKUP_DESTINATION_FILESYSTEM={filesystem}",
+            f"BACKUP_DESTINATION_HISTORY={history_value}",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, DESTINATION_CONFIG)
+    os.chmod(DESTINATION_CONFIG, 0o600)
 
 
 def clear_contents(path: Path) -> None:
@@ -195,6 +359,7 @@ def parser() -> argparse.ArgumentParser:
         "delete-backup",
         "repair-runtime-ownership",
         "configure-tailscale-operator",
+        "configure-backup-destination",
     ])
     parser.add_argument("--runtime-root")
     parser.add_argument("--backup-root")
@@ -206,6 +371,10 @@ def parser() -> argparse.ArgumentParser:
     parser.add_argument("--path")
     parser.add_argument("--user")
     parser.add_argument("--group")
+    parser.add_argument("--destination-identity")
+    parser.add_argument("--destination-filesystem")
+    parser.add_argument("--destination-mount-point")
+    parser.add_argument("--history-root", action="append")
     return parser
 
 
@@ -217,7 +386,12 @@ def main(argv: list[str]) -> int:
     if not args.runtime_root or not args.backup_root:
         die("--runtime-root and --backup-root are required for file operations")
     args.runtime_root = resolved(args.runtime_root)
-    args.backup_root = require_inside(resolved(args.backup_root), args.runtime_root, "backup root")
+    if args.operation == "configure-backup-destination":
+        if not args.destination:
+            die("--destination is required")
+        configure_backup_destination(args)
+        return 0
+    args.backup_root = approved_backup_root(args)
     if args.operation in {"clear-runtime", "restore-app-data", "create-safety-archive", "repair-runtime-ownership"} and not args.app:
         die("--app is required")
     if args.operation == "restore-app-data" and not args.archive:

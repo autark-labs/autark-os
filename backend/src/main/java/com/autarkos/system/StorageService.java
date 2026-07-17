@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.BackupModels;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -41,6 +43,7 @@ public class StorageService {
     private final StorageSampleRepository storageSampleRepository;
     private final AppInstanceViewProvider appInstanceViewProvider;
     private final RuntimeFileOperations fileOperations;
+    private final BackupDestinationService backupDestinationService;
     private Instant lastWarningLoggedAt = Instant.EPOCH;
     private String lastWarningStatus = "";
 
@@ -68,30 +71,40 @@ public class StorageService {
                         List.of(),
                         new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
                         Instant.now()))
-                .toList(), fileOperations);
+                .toList(), fileOperations, null);
+    }
+
+    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations) {
+        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, appInstanceViewProvider, fileOperations, null);
     }
 
     @Autowired
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations) {
+    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.activityLogService = activityLogService;
         this.storageSampleRepository = storageSampleRepository;
         this.appInstanceViewProvider = appInstanceViewProvider;
         this.fileOperations = fileOperations;
+        this.backupDestinationService = backupDestinationService;
     }
 
     public StorageModels.StorageReport report() {
         Path runtimeRoot = runtimeLayout.runtimeRoot();
         Path appsRoot = runtimeRoot.resolve("apps").normalize();
-        Path backupsRoot = runtimeRoot.resolve("backups").normalize();
+        BackupModels.BackupDestination backupDestination = backupDestinationService == null ? null : backupDestinationService.current();
+        Path backupsRoot = backupDestination != null && backupDestination.ready()
+                ? Path.of(backupDestination.configuredPath()).normalize()
+                : runtimeRoot.resolve("backups").normalize();
         ensure(runtimeRoot);
 
         List<InstalledApp> installedApps = managedInstalledApps();
         Set<String> installedIds = installedApps.stream().map(InstalledApp::appId).collect(HashSet::new, Set::add, Set::addAll);
         StorageModels.StorageUsage hostDisk = diskUsage("Host disk", runtimeRoot);
         StorageModels.StorageUsage runtimeDisk = directoryUsage("Autark-OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
-        StorageModels.StorageUsage backupStorage = directoryUsage("Backups", backupsRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
+        StorageModels.StorageUsage backupStorage = backupDestination != null && !backupDestination.ready()
+                ? new StorageModels.StorageUsage("Backup destination unavailable", backupDestination.configuredPath(), 0, 0, 0, 0)
+                : diskUsage("Backups", backupsRoot);
         List<StorageModels.AppStorageUsage> apps = installedApps.stream()
                 .map(this::appStorage)
                 .sorted(Comparator.comparingLong(StorageModels.AppStorageUsage::usedBytes).reversed())
@@ -100,7 +113,7 @@ public class StorageService {
         List<StorageModels.OrphanedStorage> orphaned = orphanedStorage(appsRoot, installedIds);
         InstallStorageSafety installSafety = installSafety(hostDisk.usableBytes());
         String status = status(hostDisk.usedPercent(), orphaned.size());
-        List<StorageModels.StorageRecommendation> recommendations = recommendations(status, hostDisk, backupStorage, orphaned, apps);
+        List<StorageModels.StorageRecommendation> recommendations = recommendations(status, hostDisk, backupStorage, orphaned, apps, backupDestination);
         maybeLogWarning(status, hostDisk, orphaned.size());
 
         return new StorageModels.StorageReport(
@@ -114,6 +127,7 @@ public class StorageService {
                 orphaned,
                 recommendations,
                 installSafety,
+                backupDestination,
                 Instant.now());
     }
 
@@ -130,8 +144,7 @@ public class StorageService {
         }
         try {
             long removedBytes = fileOperations.directorySize(orphanPath);
-            Path checkpoint = runtimeLayout.runtimeRoot()
-                    .resolve("backups")
+            Path checkpoint = activeBackupRoot()
                     .resolve("storage-cleanup")
                     .resolve(safeName + "-before-cleanup-" + CHECKPOINT_FORMAT.format(Instant.now()) + ".zip")
                     .toAbsolutePath()
@@ -157,6 +170,12 @@ public class StorageService {
             activityLogService.error("system", "storage_cleanup", "Storage cleanup failed", exception.getMessage(), null, exception);
             throw new com.autarkos.marketplace.install.InstallationException("Autark-OS could not clean up that folder.", exception);
         }
+    }
+
+    private Path activeBackupRoot() {
+        return backupDestinationService == null
+                ? runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize()
+                : backupDestinationService.activeRoot();
     }
 
     private StorageModels.AppStorageUsage appStorage(InstalledApp app) {
@@ -249,7 +268,13 @@ public class StorageService {
                 true);
     }
 
-    private List<StorageModels.StorageRecommendation> recommendations(String status, StorageModels.StorageUsage hostDisk, StorageModels.StorageUsage backupStorage, List<StorageModels.OrphanedStorage> orphaned, List<StorageModels.AppStorageUsage> apps) {
+    private List<StorageModels.StorageRecommendation> recommendations(
+            String status,
+            StorageModels.StorageUsage hostDisk,
+            StorageModels.StorageUsage backupStorage,
+            List<StorageModels.OrphanedStorage> orphaned,
+            List<StorageModels.AppStorageUsage> apps,
+            BackupModels.BackupDestination backupDestination) {
         java.util.ArrayList<StorageModels.StorageRecommendation> recommendations = new java.util.ArrayList<>();
         if ("critical".equals(status)) {
             recommendations.add(new StorageModels.StorageRecommendation("disk-critical", "danger", "Free up space soon", "The host disk is critically full. Installs, backups, and app updates may fail.", "Review largest apps"));
@@ -261,7 +286,9 @@ public class StorageService {
         if (!orphaned.isEmpty()) {
             recommendations.add(new StorageModels.StorageRecommendation("orphaned-data", "warning", "Unused app data found", "Autark-OS found folders that do not match an installed app. Review them before cleanup.", "Review unused data"));
         }
-        if (backupStorage.usedBytes() == 0) {
+        if (backupDestination != null && !backupDestination.ready()) {
+            recommendations.add(new StorageModels.StorageRecommendation("backup-destination-unavailable", "warning", "Backup drive needs attention", backupDestination.message(), "Open backups"));
+        } else if (backupStorage.usedBytes() == 0) {
             recommendations.add(new StorageModels.StorageRecommendation("backups-empty", "neutral", "No backup files found", "Backup storage is empty. Run a routine or manual backup to create the first restore point.", "Open backups"));
         }
         apps.stream().filter(app -> !app.backupEnabled()).findFirst().ifPresent(app ->

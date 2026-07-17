@@ -1,4 +1,5 @@
 import type { AutarkOsAction, AutarkOsIssue } from './app';
+import type { BackupDestination } from './backup';
 
 export type SystemMetrics = {
   deviceName: string;
@@ -322,6 +323,7 @@ export type StorageReport = {
   orphanedData: OrphanedStorage[];
   recommendations: StorageRecommendation[];
   installSafety: InstallStorageSafety;
+  backupDestination: BackupDestination | null;
   checkedAt: string;
 };
 

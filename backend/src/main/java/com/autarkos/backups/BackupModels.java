@@ -49,7 +49,30 @@ public final class BackupModels {
             String backupRoot,
             List<AppBackupStatus> apps,
             List<RestorePoint> recentRestorePoints,
+            BackupDestination destination,
             Instant checkedAt) {
+    }
+
+    public record BackupDestination(
+            String kind,
+            String status,
+            String configuredPath,
+            String mountPoint,
+            String deviceIdentity,
+            String filesystemType,
+            boolean available,
+            boolean writable,
+            long usableBytes,
+            boolean protectsAgainstRuntimeDriveFailure,
+            String message,
+            String actionLabel,
+            Instant checkedAt) {
+        public boolean ready() {
+            return available && writable && "ready".equals(status);
+        }
+    }
+
+    public record BackupDestinationRequest(String path) {
     }
 
     public record BackupRunResult(

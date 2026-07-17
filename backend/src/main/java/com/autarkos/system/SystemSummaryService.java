@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.BackupModels;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
@@ -24,6 +26,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
     private final Supplier<SetupProgressModels.SetupProgress> setupProgress;
     private final Supplier<String> lanUrl;
     private final Supplier<Instant> clock;
+    private final Supplier<BackupModels.BackupDestination> backupDestination;
 
     @Autowired
     public SystemSummaryService(
@@ -31,8 +34,9 @@ public class SystemSummaryService implements SystemSummaryProvider {
             ProjectSettingsService settingsService,
             InstanceIdentityService identityService,
             SystemSetupService setupService,
-            SetupProgressService setupProgressService) {
-        this(() -> applicationStateService.snapshot().managedApps(), settingsService::current, identityService::current, setupService::status, setupProgressService::status, () -> "http://localhost:8082", Instant::now);
+            SetupProgressService setupProgressService,
+            BackupDestinationService backupDestinationService) {
+        this(() -> applicationStateService.snapshot().managedApps(), settingsService::current, identityService::current, setupService::status, setupProgressService::status, () -> "http://localhost:8082", Instant::now, backupDestinationService::current);
     }
 
     public SystemSummaryService(
@@ -42,7 +46,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
             Supplier<SystemSetupModels.SystemSetupStatus> setupStatus,
             Supplier<String> lanUrl,
             Supplier<Instant> clock) {
-        this(appViews, settings, identity, setupStatus, () -> null, lanUrl, clock);
+        this(appViews, settings, identity, setupStatus, () -> null, lanUrl, clock, () -> null);
     }
 
     public SystemSummaryService(
@@ -53,6 +57,18 @@ public class SystemSummaryService implements SystemSummaryProvider {
             Supplier<SetupProgressModels.SetupProgress> setupProgress,
             Supplier<String> lanUrl,
             Supplier<Instant> clock) {
+        this(appViews, settings, identity, setupStatus, setupProgress, lanUrl, clock, () -> null);
+    }
+
+    public SystemSummaryService(
+            Supplier<List<AppInstanceView>> appViews,
+            Supplier<ProjectSettings> settings,
+            Supplier<AutarkOsIdentity> identity,
+            Supplier<SystemSetupModels.SystemSetupStatus> setupStatus,
+            Supplier<SetupProgressModels.SetupProgress> setupProgress,
+            Supplier<String> lanUrl,
+            Supplier<Instant> clock,
+            Supplier<BackupModels.BackupDestination> backupDestination) {
         this.appViews = appViews;
         this.settings = settings;
         this.identity = identity;
@@ -60,6 +76,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
         this.setupProgress = setupProgress;
         this.lanUrl = lanUrl;
         this.clock = clock;
+        this.backupDestination = backupDestination;
     }
 
     public SystemSummaryModels.SystemSummary summary() {
@@ -128,6 +145,10 @@ public class SystemSummaryService implements SystemSummaryProvider {
     }
 
     private SystemSummaryModels.BackupSummary backups(List<AppInstanceView> apps) {
+        BackupModels.BackupDestination destination = backupDestination.get();
+        if (destination != null && !destination.ready()) {
+            return new SystemSummaryModels.BackupSummary("destination_unavailable", destination.message());
+        }
         boolean needsFirstRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(app.backupState()));
         boolean protectedByRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(app.backupState()));
         return needsFirstRestorePoint

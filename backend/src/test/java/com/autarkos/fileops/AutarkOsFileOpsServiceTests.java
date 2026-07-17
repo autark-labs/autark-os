@@ -86,7 +86,7 @@ class AutarkOsFileOpsServiceTests {
 
         assertThatThrownBy(() -> service.restoreAppData(outsideArchive, "full", "home-assistant"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Autark-OS backups");
+                .hasMessageContaining("approved Autark-OS backup destination");
     }
 
     @Test

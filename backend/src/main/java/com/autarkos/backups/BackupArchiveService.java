@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.function.Function;
 
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.marketplace.install.InstallationException;
@@ -19,11 +20,13 @@ class BackupArchiveService {
     private final RuntimeFileOperations fileOperations;
     private final AutarkOsFileOpsService fileOpsService;
     private final Supplier<Path> backupRoot;
+    private final Function<Path, Path> archiveRootResolver;
 
-    BackupArchiveService(RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, Supplier<Path> backupRoot) {
+    BackupArchiveService(RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, Supplier<Path> backupRoot, Function<Path, Path> archiveRootResolver) {
         this.fileOperations = fileOperations;
         this.fileOpsService = fileOpsService;
         this.backupRoot = backupRoot;
+        this.archiveRootResolver = archiveRootResolver;
     }
 
     void validateAppBackup(Path source) throws IOException {
@@ -60,18 +63,18 @@ class BackupArchiveService {
     }
 
     long createFullArchive(List<InstalledApp> apps, Path destination) throws IOException {
-        return fileOpsService.createFullArchive(apps.stream().map(InstalledApp::appId).toList(), destination);
+        return fileOpsService.createFullArchive(apps.stream().map(InstalledApp::appId).toList(), destination, backupRoot.get());
     }
 
     long createAppArchive(String appId, Path destination) throws IOException {
-        return fileOpsService.createSafetyArchive(appId, destination);
+        return fileOpsService.createSafetyArchive(appId, destination, backupRoot.get());
     }
 
     long createSafetyArchive(String appId, Path destination) throws IOException {
-        return fileOpsService.createSafetyArchive(appId, destination);
+        return fileOpsService.createSafetyArchive(appId, destination, backupRoot.get());
     }
 
     void restoreAppData(Path restorePoint, String scope, String appId) throws IOException {
-        fileOpsService.restoreAppData(restorePoint, scope, appId);
+        fileOpsService.restoreAppData(restorePoint, scope, appId, archiveRootResolver.apply(restorePoint));
     }
 }

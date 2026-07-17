@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.backups.BackupModels;
 import com.autarkos.system.SystemCommandRunner;
 
 @Service
@@ -59,24 +60,32 @@ public class AutarkOsFileOpsService {
     }
 
     public long createSafetyArchive(String appId, Path destination) throws IOException {
+        return createSafetyArchive(appId, destination, backupRoot());
+    }
+
+    public long createSafetyArchive(String appId, Path destination, Path approvedBackupRoot) throws IOException {
         Path appRoot = appRoot(appId);
-        Path backupPath = requireBackupPath(destination);
+        Path backupPath = requireBackupPath(destination, approvedBackupRoot);
         try {
             return localOperations.createArchive(appRoot, backupPath);
         } catch (IOException exception) {
             if (!isPermissionFailure(exception)) {
                 throw exception;
             }
-            runPrivileged("create-safety-archive", "--app", appId, "--destination", backupPath.toString());
+            runPrivileged("create-safety-archive", approvedBackupRoot, "--app", appId, "--destination", backupPath.toString());
             return Files.isRegularFile(backupPath) ? Files.size(backupPath) : 0;
         }
     }
 
     public long createFullArchive(List<String> appIds, Path destination) throws IOException {
+        return createFullArchive(appIds, destination, backupRoot());
+    }
+
+    public long createFullArchive(List<String> appIds, Path destination, Path approvedBackupRoot) throws IOException {
         if (appIds == null || appIds.isEmpty()) {
             throw new IllegalArgumentException("At least one app id is required for a full archive.");
         }
-        Path backupPath = requireBackupPath(destination);
+        Path backupPath = requireBackupPath(destination, approvedBackupRoot);
         Map<String, Path> sources = new LinkedHashMap<>();
         for (String appId : appIds) {
             sources.put(appId, appRoot(appId));
@@ -88,13 +97,17 @@ public class AutarkOsFileOpsService {
             if (!isPermissionFailure(exception)) {
                 throw exception;
             }
-            runPrivileged("create-full-archive", "--apps", joinedAppIds, "--destination", backupPath.toString());
+            runPrivileged("create-full-archive", approvedBackupRoot, "--apps", joinedAppIds, "--destination", backupPath.toString());
             return Files.isRegularFile(backupPath) ? Files.size(backupPath) : 0;
         }
     }
 
     public void restoreAppData(Path archive, String scope, String appId) throws IOException {
-        Path backupPath = requireBackupPath(archive);
+        restoreAppData(archive, scope, appId, backupRoot());
+    }
+
+    public void restoreAppData(Path archive, String scope, String appId, Path approvedBackupRoot) throws IOException {
+        Path backupPath = requireBackupPath(archive, approvedBackupRoot);
         Path appRoot = appRoot(appId);
         String restoreScope = scope == null || scope.isBlank() ? "app" : scope;
         try {
@@ -103,19 +116,23 @@ public class AutarkOsFileOpsService {
             if (!isPermissionFailure(exception)) {
                 throw exception;
             }
-            runPrivileged("restore-app-data", "--app", appId, "--archive", backupPath.toString(), "--scope", restoreScope);
+            runPrivileged("restore-app-data", approvedBackupRoot, "--app", appId, "--archive", backupPath.toString(), "--scope", restoreScope);
         }
     }
 
     public void deleteBackup(Path backupPath) throws IOException {
-        Path path = requireBackupPath(backupPath);
+        deleteBackup(backupPath, backupRoot());
+    }
+
+    public void deleteBackup(Path backupPath, Path approvedBackupRoot) throws IOException {
+        Path path = requireBackupPath(backupPath, approvedBackupRoot);
         try {
             localOperations.deleteBackup(path);
         } catch (IOException exception) {
             if (!isPermissionFailure(exception)) {
                 throw exception;
             }
-            runPrivileged("delete-backup", "--path", path.toString());
+            runPrivileged("delete-backup", approvedBackupRoot, "--path", path.toString());
         }
     }
 
@@ -135,10 +152,30 @@ public class AutarkOsFileOpsService {
         }
     }
 
-    private Path requireBackupPath(Path path) {
+    /** Writes the root-owned allow-list only after the destination has passed the canonical probe. */
+    public void configureBackupDestination(BackupModels.BackupDestination destination, List<Path> history) throws IOException {
+        Path root = Path.of(destination.configuredPath()).toAbsolutePath().normalize();
+        List<String> args = new ArrayList<>();
+        args.add("--destination");
+        args.add(root.toString());
+        args.add("--destination-identity");
+        args.add(destination.deviceIdentity());
+        args.add("--destination-filesystem");
+        args.add(destination.filesystemType());
+        args.add("--destination-mount-point");
+        args.add(destination.mountPoint());
+        for (Path previous : history == null ? List.<Path>of() : history) {
+            args.add("--history-root");
+            args.add(previous.toAbsolutePath().normalize().toString());
+        }
+        runPrivileged("configure-backup-destination", root, args.toArray(String[]::new));
+    }
+
+    private Path requireBackupPath(Path path, Path approvedBackupRoot) {
         Path normalized = path.toAbsolutePath().normalize();
-        if (!normalized.startsWith(backupRoot())) {
-            throw new IllegalArgumentException("File operation paths must stay under Autark-OS backups.");
+        Path root = approvedBackupRoot.toAbsolutePath().normalize();
+        if (!normalized.startsWith(root)) {
+            throw new IllegalArgumentException("File operation paths must stay under the approved Autark-OS backup destination.");
         }
         return normalized;
     }
@@ -152,6 +189,10 @@ public class AutarkOsFileOpsService {
     }
 
     private void runPrivileged(String operation, String... args) throws IOException {
+        runPrivileged(operation, backupRoot(), args);
+    }
+
+    private void runPrivileged(String operation, Path approvedBackupRoot, String... args) throws IOException {
         List<String> command = new ArrayList<>();
         command.add("sudo");
         command.add("-n");
@@ -160,7 +201,7 @@ public class AutarkOsFileOpsService {
         command.add("--runtime-root");
         command.add(runtimeLayout.runtimeRoot().toString());
         command.add("--backup-root");
-        command.add(backupRoot().toString());
+        command.add(approvedBackupRoot.toAbsolutePath().normalize().toString());
         command.addAll(List.of(args));
         CommandResult result = commandRunner.run(command.toArray(String[]::new));
         if (!result.successful()) {

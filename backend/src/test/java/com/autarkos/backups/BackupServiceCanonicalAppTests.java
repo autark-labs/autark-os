@@ -359,5 +359,10 @@ class BackupServiceCanonicalAppTests {
         public void restoreAppData(Path archive, String scope, String appId) {
             restoreCalls.add(appId + "|" + scope + "|" + archive.toAbsolutePath().normalize());
         }
+
+        @Override
+        public void restoreAppData(Path archive, String scope, String appId, Path approvedBackupRoot) {
+            restoreAppData(archive, scope, appId);
+        }
     }
 }

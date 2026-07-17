@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.function.Predicate;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -19,18 +20,21 @@ class RestorePlanner {
     private final BackupVerificationService backupVerificationService;
     private final RestoreSimulationService restoreSimulationService;
     private final Supplier<List<InstalledApp>> managedInstalledApps;
+    private final Predicate<Path> archiveAvailable;
 
     RestorePlanner(
             BackupRepository backupRepository,
             BackupContractService backupContractService,
             BackupVerificationService backupVerificationService,
             RestoreSimulationService restoreSimulationService,
-            Supplier<List<InstalledApp>> managedInstalledApps) {
+            Supplier<List<InstalledApp>> managedInstalledApps,
+            Predicate<Path> archiveAvailable) {
         this.backupRepository = backupRepository;
         this.backupContractService = backupContractService;
         this.backupVerificationService = backupVerificationService;
         this.restoreSimulationService = restoreSimulationService;
         this.managedInstalledApps = managedInstalledApps;
+        this.archiveAvailable = archiveAvailable;
     }
 
     RestoreModels.RestorePlan restorePlan(long restorePointId, String targetAppId) {
@@ -89,7 +93,7 @@ class RestorePlanner {
                 backupVerificationService.restoreConfidence(point, affected),
                 AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())
                         && !affected.isEmpty()
-                        && Files.isRegularFile(Path.of(point.path()))
+                        && archiveAvailable.test(Path.of(point.path()))
                         && !AutarkOsStates.RestoreSimulationStatus.FAILED.equals(simulation.status()),
                 Instant.now());
     }

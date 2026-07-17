@@ -11,6 +11,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.BackupModels;
 
 @Service
 public class SystemDoctorService {
@@ -18,11 +20,18 @@ public class SystemDoctorService {
     private final SystemSetupService setupService;
     private final ProjectSettingsRepository settingsRepository;
     private final RuntimeLayout runtimeLayout;
+    private final BackupDestinationService backupDestinationService;
 
     public SystemDoctorService(SystemSetupService setupService, ProjectSettingsRepository settingsRepository, RuntimeLayout runtimeLayout) {
+        this(setupService, settingsRepository, runtimeLayout, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public SystemDoctorService(SystemSetupService setupService, ProjectSettingsRepository settingsRepository, RuntimeLayout runtimeLayout, BackupDestinationService backupDestinationService) {
         this.setupService = setupService;
         this.settingsRepository = settingsRepository;
         this.runtimeLayout = runtimeLayout;
+        this.backupDestinationService = backupDestinationService;
     }
 
     public SystemSetupModels.SystemDoctorStatus status() {
@@ -64,6 +73,20 @@ public class SystemDoctorService {
     }
 
     private SystemSetupModels.SystemSetupCheck backupDestinationCheck() {
+        if (backupDestinationService != null) {
+            BackupModels.BackupDestination destination = backupDestinationService.current();
+            String status = destination.ready() ? (destination.protectsAgainstRuntimeDriveFailure() ? SystemCapabilityCatalog.OK : SystemCapabilityCatalog.NEUTRAL) : SystemCapabilityCatalog.WARNING;
+            return new SystemSetupModels.SystemSetupCheck(
+                    SystemCapabilityCatalog.BACKUP_DESTINATION,
+                    "Backup destination",
+                    status,
+                    destination.message(),
+                    destination.protectsAgainstRuntimeDriveFailure()
+                            ? "External drive: " + destination.mountPoint()
+                            : destination.configuredPath(),
+                    destination.actionLabel(),
+                    "/backups");
+        }
         String defaultDestination = runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize().toString();
         String destination = settingsRepository.backupDestination(runtimeLayout.runtimeRoot().resolve("backups")).toString();
         boolean external = !destination.equals(defaultDestination);

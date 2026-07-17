@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, Copy, HelpCircle } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
 import { Input } from '@/components/ui/input';
 import {
@@ -23,7 +23,7 @@ import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
-import type { BackupSettingsSummary } from '@/types/backup';
+import type { BackupDestination, BackupSettingsSummary } from '@/types/backup';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
 import type { SettingsSection } from './SettingsPage.sections';
 
@@ -79,13 +79,14 @@ type SystemPanelProps = {
 export type SettingsPanelBySectionProps = {
   advancedChecks: SystemSetupCheck[];
   apps: AppRuntimeView[];
-  backupRoot: string | null;
+  backupDestination: BackupDestination | null;
   backupSchedule: BackupSettingsSummary | null;
   copied: string | null;
   doctor: SystemDoctorStatus | null;
   draft: ProjectSettings;
   metrics: SystemMetrics | null;
   onCopy: (value: string, id: string) => void;
+  onConfigureBackupDestination: (path: string) => Promise<void>;
   onUpdate: (update: Partial<ProjectSettings>) => void;
   requiredChecks: SystemSetupCheck[];
   sectionId: SettingsSection;
@@ -93,7 +94,7 @@ export type SettingsPanelBySectionProps = {
   version: ProjectVersionInfo | null;
 };
 
-export function SettingsPanelBySection({ advancedChecks, apps, backupRoot, backupSchedule, copied, doctor, draft, metrics, onCopy, onUpdate, requiredChecks, sectionId, setup, version }: SettingsPanelBySectionProps) {
+export function SettingsPanelBySection({ advancedChecks, apps, backupDestination, backupSchedule, copied, doctor, draft, metrics, onConfigureBackupDestination, onCopy, onUpdate, requiredChecks, sectionId, setup, version }: SettingsPanelBySectionProps) {
   switch (sectionId) {
     case 'general':
       return <GeneralPanel draft={draft} onUpdate={onUpdate} />;
@@ -102,7 +103,7 @@ export function SettingsPanelBySection({ advancedChecks, apps, backupRoot, backu
     case 'applications':
       return <ApplicationsPanel apps={apps} draft={draft} onUpdate={onUpdate} />;
     case 'backups':
-      return <BackupsPanel apps={apps} backupRoot={backupRoot} backupSchedule={backupSchedule} draft={draft} onUpdate={onUpdate} />;
+      return <BackupsPanel apps={apps} backupDestination={backupDestination} backupSchedule={backupSchedule} draft={draft} onConfigureBackupDestination={onConfigureBackupDestination} onUpdate={onUpdate} />;
     case 'storage':
       return <StoragePanel metrics={metrics} />;
     case 'network':
@@ -165,8 +166,23 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
   );
 }
 
-function BackupsPanel({ apps, backupRoot, backupSchedule, draft, onUpdate }: PanelProps & { apps: AppRuntimeView[]; backupRoot: string | null; backupSchedule: BackupSettingsSummary | null }) {
+function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfigureBackupDestination, onUpdate }: PanelProps & { apps: AppRuntimeView[]; backupDestination: BackupDestination | null; backupSchedule: BackupSettingsSummary | null; onConfigureBackupDestination: (path: string) => Promise<void> }) {
   const protectedApps = apps.filter((app) => app.canonicalBackupState === 'protected_by_restore_point').length;
+  const [destinationPath, setDestinationPath] = useState(backupDestination?.configuredPath || '');
+  const [updatingDestination, setUpdatingDestination] = useState(false);
+  useEffect(() => setDestinationPath(backupDestination?.configuredPath || ''), [backupDestination?.configuredPath]);
+  const external = backupDestination?.kind === 'external';
+  const destinationReady = backupDestination?.status === 'ready';
+
+  async function updateDestination() {
+    setUpdatingDestination(true);
+    try {
+      await onConfigureBackupDestination(destinationPath.trim());
+    } finally {
+      setUpdatingDestination(false);
+    }
+  }
+
   return (
     <SettingsGroup description="Control automatic backup behavior for all app data." title="Backups">
       <SettingRow controlId="settings-automatic-backups" helpId="automaticBackupsEnabled" label="Automatic backups" note="Back up all supported app data on a schedule.">
@@ -181,7 +197,20 @@ function BackupsPanel({ apps, backupRoot, backupSchedule, draft, onUpdate }: Pan
       <SettingRow controlId="settings-backup-retention" helpId="automaticBackupsEnabled" label="Retention" note="How many days automatic backups should be kept.">
         <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-retention" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
-      <ReadOnlyRow label="Backup folder" note="Current destination used by routine and manual restore points." value={backupRoot || 'Unavailable'} />
+      <SettingRow controlId="settings-backup-destination" helpId="automaticBackupsEnabled" label="Backup destination" note="Use an external mounted drive for protection against failure of this device's runtime drive.">
+        <div className="grid w-full max-w-xl gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Input className="min-w-0 flex-1 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-destination" onChange={(event) => setDestinationPath(event.target.value)} placeholder="/mnt/backup-drive/autark-os-backups" value={destinationPath} />
+            <ProjectDarkControlButton disabled={!destinationPath.trim() || updatingDestination} onClick={() => void updateDestination()} size="sm" type="button">
+              {updatingDestination ? 'Checking…' : 'Use destination'}
+            </ProjectDarkControlButton>
+          </div>
+          <p className={cn('text-xs leading-5', destinationReady ? 'text-slate-400' : 'text-amber-200')}>
+            {backupDestination?.message || 'Autark-OS has not checked a backup destination yet.'}
+          </p>
+          {backupDestination && <p className="text-xs text-slate-500">{external ? `External drive${backupDestination.mountPoint ? ` mounted at ${backupDestination.mountPoint}` : ''}.` : 'Stored on this device. It protects against app mistakes, not runtime-drive failure.'}</p>}
+        </div>
+      </SettingRow>
       <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={<LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule?.nextRoutineRun }} />} />
       <ReadOnlyRow label="Apps protected" note="Installed apps with at least one completed restore point." value={`${protectedApps}/${apps.length}`} />
     </SettingsGroup>

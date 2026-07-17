@@ -32,6 +32,7 @@ class BackupReportService {
     private final RuntimeFileOperations fileOperations;
     private final BackupContractService backupContractService;
     private final Supplier<Path> backupRoot;
+    private final BackupDestinationService destinationService;
 
     BackupReportService(
             InstalledAppRepository installedAppRepository,
@@ -40,7 +41,8 @@ class BackupReportService {
             MarketplaceCatalogService catalogService,
             RuntimeFileOperations fileOperations,
             BackupContractService backupContractService,
-            Supplier<Path> backupRoot) {
+            Supplier<Path> backupRoot,
+            BackupDestinationService destinationService) {
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
         this.projectSettingsService = projectSettingsService;
@@ -48,6 +50,7 @@ class BackupReportService {
         this.fileOperations = fileOperations;
         this.backupContractService = backupContractService;
         this.backupRoot = backupRoot;
+        this.destinationService = destinationService;
     }
 
     BackupModels.BackupReport report(List<InstalledApp> installedApps) {
@@ -62,8 +65,9 @@ class BackupReportService {
                 .toList();
         int protectedApps = (int) apps.stream().filter(BackupModels.AppBackupStatus::protectedByBackups).count();
         int failedBackups = (int) recent.stream().filter(point -> AutarkOsStates.RestorePointStatus.FAILED.equals(point.status())).count();
-        long backupStorage = fileOperations.directorySize(backupRoot.get());
-        String status = status(apps, failedBackups);
+        BackupModels.BackupDestination destination = destinationService.current();
+        long backupStorage = destination.ready() ? fileOperations.directorySize(Path.of(destination.configuredPath())) : 0;
+        String status = destination.ready() ? status(apps, failedBackups) : "warning";
         ProjectSettings settings = projectSettingsService.current();
         RestorePoint lastRoutine = recent.stream()
                 .filter(point -> "automatic".equals(point.source()))
@@ -80,8 +84,8 @@ class BackupReportService {
 
         return new BackupModels.BackupReport(
                 status,
-                headline(status),
-                summary(installedApps.size(), protectedApps, failedBackups),
+                headline(status, destination),
+                summary(installedApps.size(), protectedApps, failedBackups, destination),
                 new BackupModels.BackupSettingsSummary(
                         settings.automaticBackupsEnabled(),
                         settings.backupFrequency(),
@@ -89,8 +93,8 @@ class BackupReportService {
                         settings.backupTime(),
                         settings.timeZone(),
                         nextRunLabel(settings),
-                        schedulerHealth(settings, lastRoutine),
-                        schedulerMessage(settings, lastRoutine),
+                        schedulerHealth(settings, lastRoutine, destination),
+                        schedulerMessage(settings, lastRoutine, destination),
                         lastRoutine,
                         lastSuccessfulRoutine,
                         lastSuccessfulVerification,
@@ -100,9 +104,10 @@ class BackupReportService {
                 installedApps.size() - protectedApps,
                 failedBackups,
                 backupStorage,
-                backupRoot.get().toString(),
+                destination.configuredPath(),
                 apps,
                 recent,
+                destination,
                 Instant.now());
     }
 
@@ -241,9 +246,12 @@ class BackupReportService {
         };
     }
 
-    private String schedulerHealth(ProjectSettings settings, RestorePoint lastRoutine) {
+    private String schedulerHealth(ProjectSettings settings, RestorePoint lastRoutine, BackupModels.BackupDestination destination) {
         if (!settings.automaticBackupsEnabled()) {
             return "off";
+        }
+        if (!destination.ready()) {
+            return "warning";
         }
         if (lastRoutine != null && AutarkOsStates.RestorePointStatus.FAILED.equals(lastRoutine.status())) {
             return "warning";
@@ -251,9 +259,12 @@ class BackupReportService {
         return "healthy";
     }
 
-    private String schedulerMessage(ProjectSettings settings, RestorePoint lastRoutine) {
+    private String schedulerMessage(ProjectSettings settings, RestorePoint lastRoutine, BackupModels.BackupDestination destination) {
         if (!settings.automaticBackupsEnabled()) {
             return "Automatic backups are turned off in Settings.";
+        }
+        if (!destination.ready()) {
+            return destination.message();
         }
         if (lastRoutine != null && AutarkOsStates.RestorePointStatus.FAILED.equals(lastRoutine.status())) {
             return "The latest routine backup failed: " + lastRoutine.message();
@@ -289,7 +300,10 @@ class BackupReportService {
         return "protected";
     }
 
-    private String headline(String status) {
+    private String headline(String status, BackupModels.BackupDestination destination) {
+        if (!destination.ready()) {
+            return "Backup destination needs attention";
+        }
         return switch (status) {
             case "protected" -> "Backups look ready";
             case "warning" -> "A backup needs attention";
@@ -297,7 +311,10 @@ class BackupReportService {
         };
     }
 
-    private String summary(int totalApps, int protectedApps, int failedBackups) {
+    private String summary(int totalApps, int protectedApps, int failedBackups, BackupModels.BackupDestination destination) {
+        if (!destination.ready()) {
+            return destination.message() + " Reconnect or update the destination before creating another backup.";
+        }
         if (totalApps == 0) {
             return "Install apps to begin backup protection.";
         }

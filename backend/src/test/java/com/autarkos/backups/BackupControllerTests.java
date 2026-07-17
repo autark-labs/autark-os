@@ -62,6 +62,23 @@ class BackupControllerTests {
     }
 
     @Test
+    void configuresBackupDestinationAndRefreshesCanonicalApplicationState() {
+        BackupService backupService = mock(BackupService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        BackupController controller = new BackupController(backupService, jobService(), applicationStateService);
+        BackupModels.BackupDestination destination = new BackupModels.BackupDestination(
+                "external", "ready", "/mnt/backups/autark-os", "/mnt/backups", "uuid:backup", "ext4", true, true,
+                Long.MAX_VALUE, true, "External backup drive is connected and ready.", "Open Backups", Instant.now());
+        when(backupService.configureDestination("/mnt/backups/autark-os")).thenReturn(destination);
+
+        BackupModels.BackupDestination result = controller.configureDestination(new BackupModels.BackupDestinationRequest("/mnt/backups/autark-os"));
+
+        assertThat(result).isEqualTo(destination);
+        verify(backupService).configureDestination("/mnt/backups/autark-os");
+        verify(applicationStateService).invalidate();
+    }
+
+    @Test
     void verifyRestorePointReturnsQueuedJobWithoutRunningVerificationInline() {
         BackupService backupService = mock(BackupService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);

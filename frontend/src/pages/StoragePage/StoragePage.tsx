@@ -129,7 +129,7 @@ function StoragePage() {
           <SignalCard icon={statusIcon(report?.status)} label="Health" value={report?.headline || 'Unknown'} detail={storageHero.action} tone={statusTone(report?.status)} />
           <SignalCard icon={HardDrive} label="Free space" value={report ? formatBytes(report.hostDisk.usableBytes) : 'Unknown'} detail={report ? `${percentLabel(report.hostDisk.usedPercent)} used overall` : 'Not reported'} tone={usageTone(report?.hostDisk.usedPercent)} />
           <SignalCard icon={Database} label="App data" value={formatBytes(appDataBytes)} detail={`${report?.apps.length ?? 0} installed apps tracked`} tone="info" />
-          <SignalCard icon={Archive} label="Backup data" value={report ? formatBytes(report.backupStorage.usedBytes) : 'Unknown'} detail={`${appsWithBackupsOn}/${report?.apps.length ?? 0} apps with backups on`} tone="success" />
+          <SignalCard icon={Archive} label="Backup data" value={report ? formatBytes(report.backupStorage.usedBytes) : 'Unknown'} detail={report?.backupDestination?.status === 'ready' ? `${report.backupDestination.kind === 'external' ? 'External drive · ' : ''}${appsWithBackupsOn}/${report.apps.length} apps with backups on` : report?.backupDestination?.message || `${appsWithBackupsOn}/${report?.apps.length ?? 0} apps with backups on`} tone={report?.backupDestination && report.backupDestination.status !== 'ready' ? 'warning' : 'success'} />
         </div>
       </Surface>
 
@@ -138,10 +138,10 @@ function StoragePage() {
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
             <div className="flex flex-col gap-5">
               <StoragePanel>
-                <SectionHeader icon={HardDrive} title="Space breakdown" description="The main places storage goes: apps you run, backups that protect them, and free room for growth." />
+                <SectionHeader icon={HardDrive} title="Space breakdown" description={report.backupDestination?.kind === 'external' ? 'App storage and free room are on this device. Backup storage is shown separately for the external drive.' : 'The main places storage goes: apps you run, backups that protect them, and free room for growth.'} />
                 <div className="mt-5 grid gap-4 lg:grid-cols-3">
                   <StorageShareCard color="bg-cyan-300" detail={`${report.apps.length} installed apps`} label="App data" totalBytes={report.hostDisk.totalBytes} valueBytes={appDataBytes} />
-                  <StorageShareCard color="bg-emerald-400" detail={`${appsWithBackupsOn}/${report.apps.length} apps with backups on`} label="Backups" totalBytes={report.hostDisk.totalBytes} valueBytes={report.backupStorage.usedBytes} />
+                  <StorageShareCard color="bg-emerald-400" detail={report.backupDestination?.kind === 'external' ? `External drive · ${appsWithBackupsOn}/${report.apps.length} apps with backups on` : `${appsWithBackupsOn}/${report.apps.length} apps with backups on`} label={report.backupDestination?.kind === 'external' ? 'External backups' : 'Backups'} totalBytes={report.backupStorage.totalBytes || report.hostDisk.totalBytes} valueBytes={report.backupStorage.usedBytes} />
                   <StorageShareCard color="bg-sky-400" detail="Ready for installs and growth" label="Free room" totalBytes={report.hostDisk.totalBytes} valueBytes={report.hostDisk.usableBytes} />
                 </div>
               </StoragePanel>
@@ -181,6 +181,8 @@ function StoragePage() {
                 <SectionHeader compact icon={Archive} title="Backups" />
                 <div className="mt-4 grid gap-3">
                   <FactRow label="Apps with backups on" value={`${appsWithBackupsOn}/${report.apps.length}`} />
+                  <FactRow label="Destination" value={report.backupDestination?.kind === 'external' ? 'External drive' : 'This device'} />
+                  {report.backupDestination && report.backupDestination.status !== 'ready' && <FactRow label="Destination status" value={report.backupDestination.message} />}
                   <FactRow label="Backup storage used" value={formatBytes(report.backupStorage.usedBytes)} />
                   {showAdvancedMetrics && <FactRow label="Backup folder" value={report.backupStorage.path} />}
                 </div>

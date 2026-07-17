@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
+import com.autarkos.backups.BackupModels;
 import com.autarkos.marketplace.install.AppInstanceView;
 
 class SystemSummaryServiceTests {
@@ -92,6 +93,24 @@ class SystemSummaryServiceTests {
         SystemSummaryModels.SystemSummary summary = service.summary();
 
         assertThat(summary.backups().state()).isEqualTo("protected_by_restore_point");
+    }
+
+    @Test
+    void reportsAnUnavailableExternalBackupDriveBeforeClaimingProtection() {
+        SystemSummaryService service = new SystemSummaryService(
+                List::of,
+                () -> ProjectSettings.defaults("autark-os-test"),
+                () -> new AutarkOsIdentity("pos_test", "autark-os-test", "/runtime", "sha256:test", Instant.parse("2026-06-20T12:00:00Z"), 1),
+                () -> setupStatus("ready", "Docker 29.6.0"),
+                () -> null,
+                () -> "http://localhost:8082",
+                Instant::now,
+                () -> new BackupModels.BackupDestination("external", "missing", "/mnt/backups/autark-os", "/mnt/backups", "uuid:expected", "ext4", false, false, 0, true, "Reconnect the approved backup drive.", "Reconnect drive", Instant.now()));
+
+        SystemSummaryModels.SystemSummary summary = service.summary();
+
+        assertThat(summary.backups().state()).isEqualTo("destination_unavailable");
+        assertThat(summary.backups().summary()).contains("Reconnect the approved backup drive");
     }
 
     @Test

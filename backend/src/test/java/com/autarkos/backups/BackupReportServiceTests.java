@@ -2,6 +2,7 @@ package com.autarkos.backups;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -33,6 +34,10 @@ class BackupReportServiceTests {
     }
 
     private BackupReportService service() {
+        BackupDestinationService destinationService = mock(BackupDestinationService.class);
+        when(destinationService.current()).thenReturn(new BackupModels.BackupDestination(
+                "internal", "ready", "/tmp/autark-os-backups", "/", "filesystem:test", "ext4", true, true,
+                Long.MAX_VALUE, false, "Internal backups are ready.", "Choose external drive", Instant.now()));
         return new BackupReportService(
                 mock(InstalledAppRepository.class),
                 mock(BackupRepository.class),
@@ -40,7 +45,8 @@ class BackupReportServiceTests {
                 mock(MarketplaceCatalogService.class),
                 mock(RuntimeFileOperations.class),
                 mock(BackupContractService.class),
-                () -> Path.of("/tmp/autark-os-backups"));
+                () -> Path.of("/tmp/autark-os-backups"),
+                destinationService);
     }
 
     private ProjectSettings settings(String timeZone) {

@@ -17,6 +17,7 @@ import java.util.zip.ZipOutputStream;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
@@ -35,6 +36,7 @@ class AppUninstallService {
     private final TailscaleService tailscaleService;
     private final PrivateAccessStateResolver privateAccessStateResolver;
     private final ActivityLogService activityLogService;
+    private final BackupDestinationService backupDestinationService;
 
     AppUninstallService(
             InstalledAppRepository repository,
@@ -43,6 +45,17 @@ class AppUninstallService {
             BackupRepository backupRepository,
             TailscaleService tailscaleService,
             ActivityLogService activityLogService) {
+        this(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, null);
+    }
+
+    AppUninstallService(
+            InstalledAppRepository repository,
+            DockerComposeExecutor composeExecutor,
+            RuntimeLayout runtimeLayout,
+            BackupRepository backupRepository,
+            TailscaleService tailscaleService,
+            ActivityLogService activityLogService,
+            BackupDestinationService backupDestinationService) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.runtimeLayout = runtimeLayout;
@@ -50,6 +63,7 @@ class AppUninstallService {
         this.tailscaleService = tailscaleService;
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.activityLogService = activityLogService;
+        this.backupDestinationService = backupDestinationService;
     }
 
     InstallModels.UninstallPlan uninstallPlan(InstalledApp app) {
@@ -151,7 +165,9 @@ class AppUninstallService {
     }
 
     private Path backupRoot() {
-        return runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize();
+        return backupDestinationService == null
+                ? runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize()
+                : backupDestinationService.activeRoot();
     }
 
     private Path containerArchiveDirectory(InstalledApp app) {

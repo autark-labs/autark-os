@@ -92,14 +92,21 @@ function BackupsPage() {
   const verifyRestorePointMutation = useVerifyRestorePointMutation();
   const activeJobQuery = useAutarkOsJobQuery(currentActiveJob && !terminalJob(currentActiveJob) ? currentActiveJob.jobId : null);
   const report = backupReport.report;
+  const destinationUnavailableReason = report && report.destination.status !== 'ready'
+    ? `${report.destination.message} Update the backup destination in Settings before creating a new backup.`
+    : '';
   const recoveryLimitedApps = report?.apps.filter((app) => !app.backupAvailable) ?? [];
   const batchBackupUnavailableReason = recoveryLimitedApps.length
     ? `Review ${recoveryLimitedApps.map((app) => app.appName).join(', ')} in My Apps before running a full or routine backup because the original Compose configuration is missing.`
     : '';
-  const fullBackupAvailability = batchBackupUnavailableReason
+  const fullBackupAvailability = destinationUnavailableReason
+    ? { disabled: true, reason: destinationUnavailableReason }
+    : batchBackupUnavailableReason
     ? { disabled: true, reason: batchBackupUnavailableReason }
     : fullBackupOperationAvailability;
-  const routineBackupAvailability = batchBackupUnavailableReason
+  const routineBackupAvailability = destinationUnavailableReason
+    ? { disabled: true, reason: destinationUnavailableReason }
+    : batchBackupUnavailableReason
     ? { disabled: true, reason: batchBackupUnavailableReason }
     : routineBackupOperationAvailability;
   const pageError = error ?? (backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null);
@@ -146,8 +153,12 @@ function BackupsPage() {
     }
   }, [backupJobsQuery.error]);
 
+  const appBackupOperationAvailability = destinationUnavailableReason
+    ? { disabled: true, reason: destinationUnavailableReason }
+    : appBackupAvailability;
+
   async function runManualAppBackup(app: AppBackupStatus) {
-    if (appBackupAvailability.disabled) return;
+    if (appBackupOperationAvailability.disabled) return;
     await runBackup(`app-${app.appId}`, () => runAppBackupMutation.mutateAsync(app.appId));
   }
 
@@ -360,6 +371,15 @@ function BackupsPage() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex flex-col gap-5">
             <BackupPanel>
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                  <p className="text-sm font-bold text-white">{report.destination.kind === 'external' ? 'External backup drive' : 'Backup location on this device'}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">{report.destination.message}</p>
+                </div>
+                <ProjectDarkControlButton asChild size="sm">
+                  <Link to="/settings">{report.destination.status === 'ready' ? 'Review destination' : 'Fix destination'}</Link>
+                </ProjectDarkControlButton>
+              </div>
               <SectionHeader icon={DatabaseBackup} title="Create a manual backup" description="Choose the smallest backup that matches what you are about to do." />
               <div className="mt-5 grid gap-4 lg:grid-cols-3">
                 {showAdvancedMetrics && <ActionCard
@@ -423,7 +443,7 @@ function BackupsPage() {
               <SectionHeader icon={Boxes} title="App backups" description="Create a focused backup for a specific app." />
               <div className="mt-5 grid gap-3 md:grid-cols-2">
                 {report.apps.length ? report.apps.map((app) => (
-                  <AppBackupCard app={app} key={app.appId} onRun={runManualAppBackup} operationAvailability={appBackupAvailability} running={running === `app-${app.appId}`} showAdvancedMetrics={showAdvancedMetrics} timeZone={report.settings.timeZone || 'UTC'} />
+                  <AppBackupCard app={app} key={app.appId} onRun={runManualAppBackup} operationAvailability={appBackupOperationAvailability} running={running === `app-${app.appId}`} showAdvancedMetrics={showAdvancedMetrics} timeZone={report.settings.timeZone || 'UTC'} />
                 )) : (
                   <EmptyState title="No apps installed" description="Install apps to begin backup protection." />
                 )}
@@ -435,6 +455,8 @@ function BackupsPage() {
             <BackupPanel>
               <SectionHeader compact icon={HardDrive} title="Storage" />
               <div className="mt-4 grid gap-3">
+                <FactRow label="Destination" value={report.destination.kind === 'external' ? 'External drive' : 'This device'} />
+                <FactRow label="Destination status" value={report.destination.status === 'ready' ? 'Ready' : report.destination.message} />
                 <FactRow label="Used" value={formatBackupBytes(report.backupStorageBytes)} />
                 <FactRow label="Restore points" value={`${report.recentRestorePoints.length}`} />
                 <FactRow label="Protected by restore point" value={`${report.protectedApps}/${report.totalApps}`} />

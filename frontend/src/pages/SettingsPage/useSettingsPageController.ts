@@ -8,12 +8,12 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { copyText } from '@/lib/copyText';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
-import type { BackupSettingsSummary } from '@/types/backup';
+import type { BackupDestination, BackupSettingsSummary } from '@/types/backup';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupStatus } from '@/types/system';
 import type { SettingsGroupId } from './SettingsPage.sections';
 
 export type SettingsState = {
-  backupRoot: string | null;
+  backupDestination: BackupDestination | null;
   backupSchedule: BackupSettingsSummary | null;
   doctor: SystemDoctorStatus | null;
   metrics: SystemMetrics | null;
@@ -23,7 +23,7 @@ export type SettingsState = {
 };
 
 const initialSettingsState: SettingsState = {
-  backupRoot: null,
+  backupDestination: null,
   backupSchedule: null,
   doctor: null,
   metrics: null,
@@ -70,7 +70,7 @@ export function useSettingsPageController() {
       ]);
       setState((current) => ({
         ...current,
-        backupRoot: backupReport?.backupRoot ?? null,
+        backupDestination: backupReport?.destination ?? null,
         backupSchedule: backupReport?.settings ?? null,
         metrics,
         projectSettings,
@@ -132,6 +132,23 @@ export function useSettingsPageController() {
   const updateDraft = useCallback((update: Partial<ProjectSettings>) => {
     setDraft((current) => (current ? { ...current, ...update } : current));
   }, []);
+
+  const configureBackupDestination = useCallback(async (path: string) => {
+    try {
+      const destination = await BackupAPIClient.configureDestination(path);
+      setState((current) => ({ ...current, backupDestination: destination }));
+      await Promise.all([appState.refresh(), doctorQuery.refetch()]);
+      showActionNotification({
+        ok: true,
+        severity: 'success',
+        title: 'Backup destination updated',
+        message: destination.message,
+      }, 'Backup destination updated');
+    } catch (error) {
+      showActionErrorNotification(error, 'Backup destination could not be updated');
+      throw error;
+    }
+  }, [appState, doctorQuery]);
 
   const save = useCallback(async () => {
     if (!draft) return;
@@ -204,6 +221,7 @@ export function useSettingsPageController() {
     continueNavigation,
     copy,
     copied,
+    configureBackupDestination,
     doctor,
     draft,
     dirty,

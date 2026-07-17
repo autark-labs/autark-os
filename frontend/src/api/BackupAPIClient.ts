@@ -1,10 +1,25 @@
 import { httpClient } from './httpClient';
 import type { AutarkOsJob } from '@/types/jobs';
-import type { BackupReport, RestorePlan } from '@/types/backup';
+import type { BackupDestination, BackupReport, RestorePlan } from '@/types/backup';
 
 export const BackupAPIClient = {
   async report() {
     const response = await httpClient.get<BackupReport>('/api/backups');
+    return response.data;
+  },
+
+  async destination() {
+    const response = await httpClient.get<BackupDestination>('/api/backups/destination');
+    return response.data;
+  },
+
+  async previewDestination(path: string) {
+    const response = await httpClient.post<BackupDestination>('/api/backups/destination/preview', { path });
+    return response.data;
+  },
+
+  async configureDestination(path: string) {
+    const response = await httpClient.post<BackupDestination>('/api/backups/destination', { path });
     return response.data;
   },
 

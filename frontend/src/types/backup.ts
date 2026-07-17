@@ -60,6 +60,22 @@ export type BackupSettingsSummary = {
   nextRoutineRun: string;
 };
 
+export type BackupDestination = {
+  kind: 'internal' | 'external' | string;
+  status: 'ready' | 'missing' | 'read_only' | 'insufficient_space' | 'unsupported' | 'swapped' | 'warning' | string;
+  configuredPath: string;
+  mountPoint: string | null;
+  deviceIdentity: string | null;
+  filesystemType: string | null;
+  available: boolean;
+  writable: boolean;
+  usableBytes: number;
+  protectsAgainstRuntimeDriveFailure: boolean;
+  message: string;
+  actionLabel: string | null;
+  checkedAt: string;
+};
+
 export type BackupContract = {
   strategy: 'file-only' | 'sqlite' | 'postgres' | 'app-export' | 'multi-service' | 'none' | 'unknown' | string;
   label: string;
@@ -80,6 +96,7 @@ export type BackupReport = {
   failedBackups: number;
   backupStorageBytes: number;
   backupRoot: string;
+  destination: BackupDestination;
   apps: AppBackupStatus[];
   recentRestorePoints: RestorePoint[];
   checkedAt: string;

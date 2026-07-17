@@ -66,6 +66,7 @@ function SettingsPage() {
     continueNavigation,
     copy,
     copied,
+    configureBackupDestination,
     doctor,
     draft,
     dirty,
@@ -188,7 +189,7 @@ function SettingsPage() {
             <SettingsPanelBySection
               advancedChecks={advancedChecks}
               apps={appState.apps}
-              backupRoot={state.backupRoot}
+              backupDestination={state.backupDestination}
               backupSchedule={state.backupSchedule}
               copied={copied}
               doctor={doctor}
@@ -196,6 +197,7 @@ function SettingsPage() {
               key={sectionId}
               metrics={state.metrics}
               onCopy={copy}
+              onConfigureBackupDestination={configureBackupDestination}
               onUpdate={updateDraft}
               requiredChecks={requiredChecks}
               sectionId={sectionId}

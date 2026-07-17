@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.network.tailscale.TailscaleService;
+import com.autarkos.backups.BackupDestinationService;
 
 @Service
 public class OnboardingService {
@@ -25,13 +26,20 @@ public class OnboardingService {
     private final RuntimeLayout runtimeLayout;
     private final TailscaleService tailscaleService;
     private final SystemDoctorService doctorService;
+    private final BackupDestinationService backupDestinationService;
 
     public OnboardingService(ProjectSettingsRepository settingsRepository, ProjectSettingsService settingsService, RuntimeLayout runtimeLayout, TailscaleService tailscaleService, SystemDoctorService doctorService) {
+        this(settingsRepository, settingsService, runtimeLayout, tailscaleService, doctorService, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OnboardingService(ProjectSettingsRepository settingsRepository, ProjectSettingsService settingsService, RuntimeLayout runtimeLayout, TailscaleService tailscaleService, SystemDoctorService doctorService, BackupDestinationService backupDestinationService) {
         this.settingsRepository = settingsRepository;
         this.settingsService = settingsService;
         this.runtimeLayout = runtimeLayout;
         this.tailscaleService = tailscaleService;
         this.doctorService = doctorService;
+        this.backupDestinationService = backupDestinationService;
     }
 
     public OnboardingModels.OnboardingState state() {
@@ -42,7 +50,7 @@ public class OnboardingService {
                 intValue(values, "onboardingCurrentStep", 0),
                 settings.deviceName(),
                 runtimeLayout.runtimeRoot().toString(),
-                settingsRepository.backupDestination(defaultBackupDestination()).toString(),
+                currentBackupDestination(),
                 tailscaleService.status().connected(),
                 value(values, "privateAccessChoice", tailscaleService.status().connected() ? "already-connected" : "local-only"),
                 settings.automaticBackupsEnabled(),
@@ -70,7 +78,11 @@ public class OnboardingService {
             updates.put("onboardingCurrentStep", Integer.toString(Math.max(0, Math.min(request.currentStep(), 6))));
         }
         if (request.backupDestination() != null) {
-            updates.put("backupDestination", cleanBackupDestination(request.backupDestination()));
+            if (backupDestinationService != null) {
+                backupDestinationService.configure(request.backupDestination());
+            } else {
+                updates.put("backupDestination", cleanBackupDestination(request.backupDestination()));
+            }
         }
         if (request.privateAccessChoice() != null) {
             updates.put("privateAccessChoice", cleanPrivateAccessChoice(request.privateAccessChoice()));
@@ -162,6 +174,13 @@ public class OnboardingService {
 
     private Path defaultBackupDestination() {
         return runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize();
+    }
+
+    private String currentBackupDestination() {
+        if (backupDestinationService != null) {
+            return backupDestinationService.current().configuredPath();
+        }
+        return settingsRepository.backupDestination(defaultBackupDestination()).toString();
     }
 
     private String cleanBackupDestination(String destination) {

@@ -100,4 +100,38 @@ run.assert_called_once_with(
     capture_output=True,
     text=True,
 )
+
+runtime = Path(sys.argv[2]) / "runtime"
+internal = runtime / "backups"
+external = Path(sys.argv[2]) / "external-backups"
+runtime.mkdir(parents=True, exist_ok=True)
+external.mkdir(exist_ok=True)
+module.DESTINATION_CONFIG = Path(sys.argv[2]) / "backup-destination.env"
+module.DESTINATION_CONFIG.write_text(
+    f"BACKUP_DESTINATION_PATH={external}\nBACKUP_DESTINATION_MOUNT_IDENTITY=external-drive\n",
+    encoding="utf-8",
+)
+
+approved_args = argparse.Namespace(runtime_root=runtime, backup_root=external)
+with patch.object(module, "mount_identity", return_value="external-drive"):
+    assert module.approved_backup_root(approved_args) == external.resolve()
+
+with patch.object(module, "mount_identity", return_value="replacement-drive"):
+    try:
+        module.approved_backup_root(approved_args)
+        raise AssertionError("expected a swapped external drive to be rejected")
+    except SystemExit as error:
+        assert error.code == 1
+
+with patch.object(module, "mount_identity", return_value="external-drive"):
+    try:
+        module.approved_backup_root(argparse.Namespace(runtime_root=runtime, backup_root=Path(sys.argv[2]) / "arbitrary"))
+        raise AssertionError("expected an arbitrary backup root to be rejected")
+    except SystemExit as error:
+        assert error.code == 1
+
+module.configure_backup_destination(argparse.Namespace(runtime_root=runtime, destination=internal, history_root=[]))
+saved = module.read_destination_config()
+assert saved.get("BACKUP_DESTINATION_PATH", "") == ""
+assert str(external.resolve()) in saved.get("BACKUP_DESTINATION_HISTORY", "")
 PY

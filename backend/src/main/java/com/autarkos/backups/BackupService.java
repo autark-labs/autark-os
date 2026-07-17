@@ -51,6 +51,7 @@ public class BackupService {
     private final BackupArchiveService backupArchiveService;
     private final RestorePlanner restorePlanner;
     private final RestoreExecutor restoreExecutor;
+    private final BackupDestinationService backupDestinationService;
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService) {
         this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, () -> installedAppRepository.findAllApps().stream()
@@ -79,8 +80,12 @@ public class BackupService {
         this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
     }
 
-    @Autowired
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService) {
+        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, new BackupDestinationService(runtimeLayout, settingsRepository, fileOpsService));
+    }
+
+    @Autowired
+    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
@@ -88,17 +93,30 @@ public class BackupService {
         this.settingsRepository = settingsRepository;
         this.projectSettingsService = projectSettingsService;
         this.appInstanceViewProvider = appInstanceViewProvider;
+        this.backupDestinationService = backupDestinationService;
         BackupContractService backupContractService = new BackupContractService(catalogService);
         this.backupVerificationService = new BackupVerificationService(backupRepository, installedAppRepository, backupContractService, activityLogService);
-        this.backupReportService = new BackupReportService(installedAppRepository, backupRepository, projectSettingsService, catalogService, fileOperations, backupContractService, this::backupRoot);
-        this.backupArchiveService = new BackupArchiveService(fileOperations, fileOpsService, this::backupRoot);
+        this.backupReportService = new BackupReportService(installedAppRepository, backupRepository, projectSettingsService, catalogService, fileOperations, backupContractService, this::backupRoot, backupDestinationService);
+        this.backupArchiveService = new BackupArchiveService(fileOperations, fileOpsService, this::backupRoot, backupDestinationService::approvedRootForArchive);
         RestoreSimulationService restoreSimulationService = new RestoreSimulationService(backupContractService, this::backupRoot);
-        this.restorePlanner = new RestorePlanner(backupRepository, backupContractService, backupVerificationService, restoreSimulationService, this::managedInstalledApps);
+        this.restorePlanner = new RestorePlanner(backupRepository, backupContractService, backupVerificationService, restoreSimulationService, this::managedInstalledApps, backupDestinationService::archiveAvailable);
         this.restoreExecutor = new RestoreExecutor(backupRepository, installedAppRepository, activityLogService, appLifecycleService, fileOperations, backupArchiveService, restorePlanner, this::backupRoot);
     }
 
     public BackupModels.BackupReport report() {
         return backupReportService.report(managedInstalledApps());
+    }
+
+    public BackupModels.BackupDestination destination() {
+        return backupDestinationService.current();
+    }
+
+    public BackupModels.BackupDestination previewDestination(String path) {
+        return backupDestinationService.preview(path);
+    }
+
+    public BackupModels.BackupDestination configureDestination(String path) {
+        return backupDestinationService.configure(path);
     }
 
     public BackupModels.BackupRunResult run(String appId) {
@@ -138,6 +156,11 @@ public class BackupService {
     }
 
     public BackupModels.BackupRunResult runFullBackup(String source) {
+        BackupModels.BackupDestination destinationState = backupDestinationService.current();
+        if (!destinationState.ready()) {
+            RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, destinationState.message());
+            return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
+        }
         List<InstalledApp> apps = managedInstalledApps();
         List<InstalledApp> protectedApps = apps.stream()
                 .filter(app -> installedAppRepository.settingsFor(app.appId()).map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults()).enabled())
@@ -201,6 +224,11 @@ public class BackupService {
             RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, "Backups are turned off for this app.");
             return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
+        BackupModels.BackupDestination destinationState = backupDestinationService.current();
+        if (!destinationState.ready()) {
+            RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, destinationState.message());
+            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
+        }
         try {
             backupArchiveService.validateAppBackup(source);
             Files.createDirectories(backupRoot().resolve(app.appId()));
@@ -247,7 +275,7 @@ public class BackupService {
     }
 
     private Path backupRoot() {
-        return settingsRepository.backupDestination(runtimeLayout.runtimeRoot().resolve("backups"));
+        return backupDestinationService.activeRoot();
     }
 
     private String userMessage(Exception exception) {

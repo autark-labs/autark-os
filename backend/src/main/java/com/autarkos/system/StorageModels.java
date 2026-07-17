@@ -3,6 +3,8 @@ package com.autarkos.system;
 import java.time.Instant;
 import java.util.List;
 
+import com.autarkos.backups.BackupModels;
+
 public final class StorageModels {
 
     private StorageModels() {
@@ -56,6 +58,7 @@ public final class StorageModels {
             List<OrphanedStorage> orphanedData,
             List<StorageRecommendation> recommendations,
             InstallStorageSafety installSafety,
+            BackupModels.BackupDestination backupDestination,
             Instant checkedAt) {
     }
 

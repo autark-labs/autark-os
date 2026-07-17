@@ -19,7 +19,7 @@ The setup screen asks for a few choices:
 1. **Device name** — choose a name you will recognize later.
 2. **Readiness** — read any warning before continuing. Docker is required to install apps from **Discover**.
 3. **Private access** — choose private access now if you use Tailscale, or choose local-only if you only need your home network.
-4. **Backups** — keep automatic backups on unless you have a reason to postpone them.
+4. **Backups** — keep automatic backups on unless you have a reason to postpone them. Same-device backups help with app recovery; select a mounted external drive if you also need protection from a runtime-drive failure. See [Backups and recovery](./backups-and-recovery.md) before selecting or removing a drive.
 5. **Starter apps** — these are optional suggestions, not installed apps.
 
 Choose **Finish setup** when the review screen says the server is ready.

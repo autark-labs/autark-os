@@ -35,6 +35,23 @@ public class BackupController {
         return backupService.report();
     }
 
+    @GetMapping("/destination")
+    public BackupModels.BackupDestination destination() {
+        return backupService.destination();
+    }
+
+    @PostMapping("/destination/preview")
+    public BackupModels.BackupDestination previewDestination(@RequestBody BackupModels.BackupDestinationRequest request) {
+        return backupService.previewDestination(request == null ? "" : request.path());
+    }
+
+    @PostMapping("/destination")
+    public BackupModels.BackupDestination configureDestination(@RequestBody BackupModels.BackupDestinationRequest request) {
+        BackupModels.BackupDestination destination = backupService.configureDestination(request == null ? "" : request.path());
+        invalidateApplicationState();
+        return destination;
+    }
+
     @PostMapping("/apps/{appId}/run")
     public AutarkOsJob run(@PathVariable String appId) {
         AutarkOsJob job = jobService.start(AutarkOsStates.JobType.BACKUP, appId, backupSteps(), () -> {
