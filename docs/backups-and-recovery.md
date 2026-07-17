@@ -22,7 +22,11 @@ Before safely removing an external drive, wait for any active backup or restore 
 
 For apps using the supported stopped-app file contract, Autark-OS pauses the app before making the archive and starts it again afterward. Apps that need a database dump, SQLite-aware hook, or another app-specific process are shown as **needs review** until that contract is implemented; they are not called protected.
 
-Autark-OS keeps the number of ordinary app and full restore points selected in your backup settings. It never removes the newest verified restore point for an app merely because newer retention cleanup is running. Pre-restore safety checkpoints are kept separately for recovery review.
+Autark-OS treats the two retention settings differently: an app’s **Backup retention** is the number of routine restore points to keep, while the appliance-level automatic backup setting is measured in days. Manual backups and pre-restore or pre-uninstall safety checkpoints are kept for review; Autark-OS does not silently remove them as ordinary routine cleanup. It never removes the newest verified restore point for an app merely because retention cleanup is running.
+
+Autark-OS periodically removes old routine history and completed job records to keep the appliance responsive. Recent warnings and failed jobs remain available longer for support. A restore record is never silently removed just because an external drive is disconnected. If the expected archive folder is present but its archive is missing, the record stays visible and is marked as needing attention instead of being presented as a usable restore point.
+
+New backups pause when the selected destination has less than 512 MB free. Free space or reconnect the approved backup drive, then try again.
 
 ## Restore safely
 

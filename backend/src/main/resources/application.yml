@@ -24,3 +24,13 @@ autark-os:
       enabled: true
       initial-delay-ms: 30000
       interval-ms: 60000
+    retention:
+      initial-delay-ms: 120000
+      interval-ms: 21600000
+  retention:
+    # Routine records are short-lived; warnings and failed jobs remain longer
+    # for support and recovery review. Active jobs are never selected for pruning.
+    routine-record-days: 30
+    attention-record-days: 180
+    initial-delay-ms: 90000
+    interval-ms: 21600000

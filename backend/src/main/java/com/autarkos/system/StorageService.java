@@ -35,6 +35,7 @@ public class StorageService {
     private static final long MINIMUM_INSTALL_FREE_BYTES = 5L * 1024L * 1024L * 1024L;
     private static final Duration WARNING_LOG_INTERVAL = Duration.ofMinutes(30);
     private static final Duration STORAGE_SAMPLE_RETENTION = Duration.ofDays(7);
+    private static final Duration STORAGE_SAMPLE_INTERVAL = Duration.ofMinutes(15);
     private static final DateTimeFormatter CHECKPOINT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
     private final RuntimeLayout runtimeLayout;
@@ -45,6 +46,7 @@ public class StorageService {
     private final RuntimeFileOperations fileOperations;
     private final BackupDestinationService backupDestinationService;
     private Instant lastWarningLoggedAt = Instant.EPOCH;
+    private Instant lastStorageSampleAt = Instant.EPOCH;
     private String lastWarningStatus = "";
 
     public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository) {
@@ -201,6 +203,10 @@ public class StorageService {
 
     private void recordStorageSamples(List<StorageModels.AppStorageUsage> apps) {
         Instant sampledAt = Instant.now();
+        if (Duration.between(lastStorageSampleAt, sampledAt).compareTo(STORAGE_SAMPLE_INTERVAL) < 0) {
+            return;
+        }
+        lastStorageSampleAt = sampledAt;
         for (StorageModels.AppStorageUsage app : apps) {
             storageSampleRepository.save(new StorageSampleEntity(app.appId(), app.usedBytes(), sampledAt.toString()));
         }

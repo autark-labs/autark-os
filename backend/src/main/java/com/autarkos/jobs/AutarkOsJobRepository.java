@@ -4,8 +4,10 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface AutarkOsJobRepository extends JpaRepository<AutarkOsJobEntity, String> {
 
@@ -28,4 +30,17 @@ public interface AutarkOsJobRepository extends JpaRepository<AutarkOsJobEntity, 
             order by created_at asc
             """, nativeQuery = true)
     List<AutarkOsJobEntity> activeJobs();
+
+    @Query(value = "select * from autark_os_jobs where status in ('queued', 'running') and job_type in ('backup', 'backup_verify', 'backup_restore', 'uninstall_app') limit 1", nativeQuery = true)
+    List<AutarkOsJobEntity> activeBackupRelatedJobs();
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from autark_os_jobs where status in ('succeeded', 'cancelled', 'canceled') and updated_at < :cutoff", nativeQuery = true)
+    int deleteCompletedBefore(@Param("cutoff") String cutoff);
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from autark_os_jobs where status = 'failed' and updated_at < :cutoff", nativeQuery = true)
+    int deleteFailedBefore(@Param("cutoff") String cutoff);
 }

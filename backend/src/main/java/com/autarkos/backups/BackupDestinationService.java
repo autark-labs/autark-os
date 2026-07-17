@@ -152,6 +152,10 @@ public class BackupDestinationService {
             if (!inspection.writable()) {
                 return destination("internal", "read_only", root, inspection, false, "Autark-OS cannot write to its internal backup folder.", "Review storage");
             }
+            if (inspection.usableBytes() < MINIMUM_USABLE_SPACE_BYTES) {
+                return destination("internal", "insufficient_space", root, inspection, false,
+                        "This device needs at least 512 MB of free space before Autark-OS can create archives.", "Free device space");
+            }
             return destination("internal", "ready", root, inspection, false,
                     "Backups are ready on this device. They help with app recovery but do not protect against a drive failure.", "Choose external drive");
         } catch (IOException exception) {

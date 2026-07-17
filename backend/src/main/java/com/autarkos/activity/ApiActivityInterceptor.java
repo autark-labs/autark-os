@@ -50,9 +50,8 @@ public class ApiActivityInterceptor implements HandlerInterceptor {
         if (!"GET".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
-        return path.equals("/api/apps/reliability")
-                || path.equals("/api/network/diagnostics")
-                || path.equals("/api/network/private-access/reconciliation")
-                || path.equals("/api/system/setup-status");
+        // Successful reads are normal UI polling, not user-visible activity. Keeping
+        // them in SQLite turns an idle dashboard into an unbounded event producer.
+        return false;
     }
 }

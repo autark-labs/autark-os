@@ -3,8 +3,10 @@ package com.autarkos.activity;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface ActivityLogRepository extends JpaRepository<ActivityLogEntity, Long> {
 
@@ -26,4 +28,14 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLogEntity, 
             @Param("category") String category,
             @Param("outcome") String outcome,
             @Param("appId") String appId);
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from activity_logs where level in ('info', 'success') and created_at < :cutoff", nativeQuery = true)
+    int deleteRoutineBefore(@Param("cutoff") String cutoff);
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from activity_logs where level in ('warning', 'error') and created_at < :cutoff", nativeQuery = true)
+    int deleteAttentionBefore(@Param("cutoff") String cutoff);
 }

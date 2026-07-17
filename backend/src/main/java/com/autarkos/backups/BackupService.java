@@ -3,6 +3,7 @@ package com.autarkos.backups;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -17,6 +18,7 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.fileops.LocalAutarkOsFileOperations;
+import com.autarkos.jobs.AutarkOsJobRepository;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
@@ -55,6 +57,7 @@ public class BackupService {
     private final AppLifecycleService appLifecycleService;
     private final MarketplaceCatalogService catalogService;
     private final AutarkOsFileOpsService fileOpsService;
+    private final AutarkOsJobRepository jobRepository;
     private final BackupArchiveManifestService archiveManifestService = new BackupArchiveManifestService();
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService) {
@@ -85,11 +88,15 @@ public class BackupService {
     }
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, new BackupDestinationService(runtimeLayout, settingsRepository, fileOpsService));
+        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, new BackupDestinationService(runtimeLayout, settingsRepository, fileOpsService), null);
+    }
+
+    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService) {
+        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, backupDestinationService, null);
     }
 
     @Autowired
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService) {
+    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, AutarkOsJobRepository jobRepository) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
@@ -101,6 +108,7 @@ public class BackupService {
         this.appLifecycleService = appLifecycleService;
         this.catalogService = catalogService;
         this.fileOpsService = fileOpsService;
+        this.jobRepository = jobRepository;
         BackupContractService backupContractService = new BackupContractService(catalogService);
         this.backupVerificationService = new BackupVerificationService(backupRepository, installedAppRepository, backupContractService, activityLogService);
         this.backupReportService = new BackupReportService(installedAppRepository, backupRepository, projectSettingsService, catalogService, fileOperations, backupContractService, this::backupRoot, backupDestinationService);
@@ -111,6 +119,7 @@ public class BackupService {
     }
 
     public BackupModels.BackupReport report() {
+        reconcileUnavailableRestorePoints();
         return backupReportService.report(managedInstalledApps());
     }
 
@@ -200,7 +209,7 @@ public class BackupService {
             if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
                 return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.verificationMessage(), point, Instant.now());
             }
-            enforceFullRetention(projectSettingsService.current().backupRetentionDays());
+            enforceFullRetentionDays(projectSettingsService.current().backupRetentionDays());
             activityLogService.success("backup", cleanSource(source) + "_full_backup", "Full backup completed", point.message(), null);
             protectedApps.forEach(app -> installedAppRepository.recordEvent(app.appId(), "backup_completed", "Included in full " + cleanSource(source) + " backup."));
             return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.COMPLETED, point.message(), point, Instant.now());
@@ -223,6 +232,23 @@ public class BackupService {
 
     public RestoreModels.RestoreResult restore(long restorePointId, String targetAppId) {
         return restoreExecutor.restore(restorePointId, targetAppId);
+    }
+
+    /** Called by scheduled maintenance after all backup-related jobs are idle. */
+    public int pruneRoutineRetention() {
+        if (backupOperationActive()) {
+            return 0;
+        }
+        int removed = enforceFullRetentionDays(projectSettingsService.current().backupRetentionDays());
+        for (InstalledApp app : managedInstalledApps()) {
+            int retention = installedAppRepository.settingsFor(app.appId())
+                    .map(InstallModels.InstallSettings::backup)
+                    .orElse(InstallModels.BackupPolicy.defaults())
+                    .retention();
+            removed += enforceRetention(app.appId(), retention);
+        }
+        reconcileUnavailableRestorePoints();
+        return removed;
     }
 
     private BackupModels.BackupRunResult runAppBackup(String appId, String backupSource) {
@@ -340,51 +366,97 @@ public class BackupService {
         }
     }
 
-    private void enforceRetention(String appId, int retention) {
+    private int enforceRetention(String appId, int retention) {
         List<RestorePoint> ordinary = backupRepository.forApp(appId, 200).stream()
                 .map(RestorePoints::toDomain)
                 .filter(point -> AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status()))
-                .filter(point -> !"pre_restore".equals(point.source()))
+                // A person explicitly asked for manual backups and safety checkpoints.
+                // Keep those until they choose to remove them; only routine points use the
+                // app's count-based retention policy.
+                .filter(point -> "automatic".equals(point.source()))
                 .toList();
-        enforceRetention(ordinary, retention, appId, "app");
+        return deleteEligibleRestorePoints(BackupRetentionPolicy.pruneByCount(ordinary, retention), appId, "app");
     }
 
-    private void enforceFullRetention(int retention) {
+    private int enforceFullRetentionDays(int retentionDays) {
+        Instant cutoff = Instant.now().minus(Duration.ofDays(Math.max(retentionDays, 1)));
         List<RestorePoint> ordinary = backupRepository.recent(200).stream()
                 .map(RestorePoints::toDomain)
                 .filter(point -> "full".equals(point.scope()))
                 .filter(point -> AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status()))
-                .filter(point -> !"pre_restore".equals(point.source()))
+                .filter(point -> "automatic".equals(point.source()))
                 .toList();
-        enforceRetention(ordinary, retention, "all apps", "full");
+        return deleteEligibleRestorePoints(BackupRetentionPolicy.pruneBefore(ordinary, cutoff), "all apps", "full");
     }
 
-    private void enforceRetention(List<RestorePoint> ordinary, int retention, String subject, String scope) {
-        RestorePoint newestVerified = ordinary.stream()
-                .filter(point -> AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus()))
-                .findFirst()
-                .orElse(null);
-        for (int index = Math.max(retention, 1); index < ordinary.size(); index++) {
-            RestorePoint candidate = ordinary.get(index);
-            if (newestVerified != null && candidate.id() == newestVerified.id()) {
-                continue;
-            }
+    private int deleteEligibleRestorePoints(List<RestorePoint> candidates, String subject, String scope) {
+        if (backupOperationActive()) {
+            return 0;
+        }
+        int removed = 0;
+        for (RestorePoint candidate : candidates) {
             try {
                 Path archive = Path.of(candidate.path());
                 fileOpsService.deleteBackup(archive, backupDestinationService.approvedRootForArchive(archive));
                 Files.deleteIfExists(archiveManifestService.manifestPath(archive));
                 backupRepository.deleteById(candidate.id());
+                removed++;
                 activityLogService.info("backup", "backup_retention_pruned", "Removed expired restore point", "Autark-OS removed an older " + scope + " restore point for " + subject + " after keeping the newest verified recovery point.");
             } catch (RuntimeException | IOException exception) {
                 activityLogService.warning("backup", "backup_retention_needs_attention", "Older restore point was kept", "Autark-OS could not safely remove an older restore point. It remains available for review.", "full".equals(scope) ? null : subject);
             }
         }
+        return removed;
     }
 
     private RestorePoint findRestorePoint(long restorePointId) {
         return backupRepository.findById(restorePointId)
                 .map(RestorePoints::toDomain)
                 .orElseThrow(() -> new InstallationException("Restore point was not found."));
+    }
+
+    /**
+     * A disconnected external drive is not proof that an archive disappeared.
+     * Only mark a record unavailable when its containing folder is present but
+     * the archive itself is gone. The record remains visible for support and
+     * is no longer presented as a verified recovery point.
+     */
+    private void reconcileUnavailableRestorePoints() {
+        backupRepository.recent(200).forEach(entity -> {
+            if (!AutarkOsStates.RestorePointStatus.COMPLETED.equals(entity.status())
+                    || AutarkOsStates.RestorePointStatus.FAILED.equals(entity.verificationStatus())
+                    || entity.path() == null
+                    || entity.path().isBlank()) {
+                return;
+            }
+            try {
+                Path archive = Path.of(entity.path());
+                Path parent = archive.getParent();
+                if (parent != null && Files.isDirectory(parent) && !Files.isRegularFile(archive)) {
+                    entity.updateVerification(
+                            AutarkOsStates.RestorePointStatus.FAILED,
+                            "Backup archive is unavailable. Reconnect the original backup drive or create a new restore point.",
+                            "low",
+                            Instant.now().toString());
+                    backupRepository.save(entity);
+                    activityLogService.warning(
+                            "backup",
+                            "backup_archive_unavailable",
+                            "Restore point needs attention",
+                            entity.appName() + " has a restore record, but its archive is no longer available in the expected folder.",
+                            "__full__".equals(entity.appId()) ? null : entity.appId());
+                }
+            } catch (RuntimeException ignored) {
+                // A malformed legacy path remains visible for manual support review.
+            }
+        });
+    }
+
+    private boolean backupOperationActive() {
+        if (jobRepository == null) {
+            return false;
+        }
+        return !jobRepository.activeBackupRelatedJobs().isEmpty();
     }
 
     private List<InstalledApp> managedInstalledApps() {
@@ -415,7 +487,7 @@ public class BackupService {
         }
         String normalized = source.trim().toLowerCase();
         return switch (normalized) {
-            case "automatic", "pre_restore" -> normalized;
+            case "automatic", "pre_restore", "pre_uninstall" -> normalized;
             default -> "manual";
         };
     }
