@@ -1,62 +1,27 @@
 package com.autarkos.marketplace.install.models;
 
 import java.time.Instant;
-import java.util.List;
-
-import com.autarkos.marketplace.install.AppRuntimeView;
-
 public final class UpdateModels {
 
     private UpdateModels() {
     }
 
-    public record AppUpdatePlan(
-            String appId,
-            String appName,
-            String currentImage,
-            String targetImage,
-            String risk,
-            boolean updateAvailable,
-            String updateChannel,
-            String releaseNotesUrl,
-            String sourceUrl,
-            String registryStrategy,
-            String backupCheckpointStatus,
-            String rollbackSupport,
-            List<String> steps,
-            List<String> warnings,
-            boolean executable,
-            Instant plannedAt) {
-    }
-
-    public record AppUpdateResult(
-            String appId,
-            String appName,
+    public record AppUpdateCapability(
+            boolean available,
             String status,
-            String message,
-            List<String> logs,
-            AppRuntimeView app,
-            Instant completedAt) {
-    }
-
-    public record AppUpdateStatus(
-            String appId,
-            String appName,
-            String currentImage,
-            String targetImage,
-            String currentVersion,
-            String targetVersion,
-            boolean updateAvailable,
-            String updateChannel,
-            String releaseNotesUrl,
-            String sourceUrl,
-            String registryAdvisory,
-            String registryStrategy,
-            String risk,
-            boolean backupRequired,
-            String backupCheckpointStatus,
-            boolean rollbackAvailable,
-            String rollbackSupport,
+            String headline,
+            String summary,
+            String reasonCode,
             Instant checkedAt) {
+
+        public static AppUpdateCapability unavailable() {
+            return new AppUpdateCapability(
+                    false,
+                    "unsupported",
+                    "App updates are not available yet",
+                    "Autark-OS keeps managed app updates disabled until it can preserve saved settings, secrets, access, and recovery state through a reversible update job.",
+                    "settings_preserving_updates_not_implemented",
+                    Instant.now());
+        }
     }
 }

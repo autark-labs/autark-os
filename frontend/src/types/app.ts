@@ -286,56 +286,6 @@ export type AppActionResult = {
   jobId?: string | null;
 };
 
-export type AppUpdateStatus = {
-  appId: string;
-  appName: string;
-  currentImage: string;
-  targetImage: string;
-  currentVersion: string;
-  targetVersion: string;
-  updateAvailable: boolean;
-  updateChannel: string;
-  releaseNotesUrl: string | null;
-  sourceUrl: string | null;
-  registryAdvisory: string;
-  registryStrategy: string;
-  risk: 'low' | 'medium' | 'high' | string;
-  backupRequired: boolean;
-  backupCheckpointStatus: string;
-  rollbackAvailable: boolean;
-  rollbackSupport: string;
-  checkedAt: string;
-};
-
-export type AppUpdatePlan = {
-  appId: string;
-  appName: string;
-  currentImage: string;
-  targetImage: string;
-  risk: string;
-  updateAvailable: boolean;
-  updateChannel: string;
-  releaseNotesUrl: string | null;
-  sourceUrl: string | null;
-  registryStrategy: string;
-  backupCheckpointStatus: string;
-  rollbackSupport: string;
-  steps: string[];
-  warnings: string[];
-  executable: boolean;
-  plannedAt: string;
-};
-
-export type AppUpdateResult = {
-  appId: string;
-  appName: string;
-  status: 'completed' | 'rolled_back' | 'skipped' | 'failed' | string;
-  message: string;
-  logs: string[];
-  app: AppRuntimeView | null;
-  completedAt: string;
-};
-
 export type AppReliabilityIssue = {
   appId: string;
   appName: string;

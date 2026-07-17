@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -92,8 +93,8 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/updates")
-    public List<UpdateModels.AppUpdateStatus> updates() {
-        return appUpdateService.statuses();
+    public UpdateModels.AppUpdateCapability updates() {
+        return appUpdateService.capability();
     }
 
     @GetMapping("/{id}")
@@ -119,8 +120,8 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/{id}/update-plan")
-    public UpdateModels.AppUpdatePlan updatePlan(@PathVariable String id) {
-        return appUpdateService.plan(id);
+    public ResponseEntity<UpdateModels.AppUpdateCapability> updatePlan(@PathVariable String id) {
+        return appUpdatesUnavailable();
     }
 
     @PostMapping("/{id}/start")
@@ -210,13 +211,13 @@ public class InstalledAppsController {
     }
 
     @PostMapping("/{id}/update")
-    public UpdateModels.AppUpdateResult update(@PathVariable String id) {
-        return refreshAfter(appUpdateService.update(id));
+    public ResponseEntity<UpdateModels.AppUpdateCapability> update(@PathVariable String id) {
+        return appUpdatesUnavailable();
     }
 
     @PostMapping("/{id}/rollback")
-    public UpdateModels.AppUpdateResult rollback(@PathVariable String id) {
-        return refreshAfter(appUpdateService.rollback(id));
+    public ResponseEntity<UpdateModels.AppUpdateCapability> rollback(@PathVariable String id) {
+        return appUpdatesUnavailable();
     }
 
     @PostMapping("/{id}/private-access/enable")
@@ -263,6 +264,10 @@ public class InstalledAppsController {
     private <T> T refreshAfter(T result) {
         applicationStateService.invalidate();
         return result;
+    }
+
+    private ResponseEntity<UpdateModels.AppUpdateCapability> appUpdatesUnavailable() {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(appUpdateService.capability());
     }
 
     private AppActionResult refreshAfter(AppActionResult result) {

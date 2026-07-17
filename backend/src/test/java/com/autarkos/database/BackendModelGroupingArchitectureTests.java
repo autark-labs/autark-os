@@ -13,7 +13,6 @@ import com.autarkos.marketplace.install.models.GuideModels;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
-import com.autarkos.marketplace.install.models.UpdateModels;
 
 class BackendModelGroupingArchitectureTests {
 
@@ -30,7 +29,6 @@ class BackendModelGroupingArchitectureTests {
                 Path.of("src/main/java/com/autarkos/marketplace/install/models/InstallModels.java"),
                 Path.of("src/main/java/com/autarkos/marketplace/install/models/ReliabilityModels.java"),
                 Path.of("src/main/java/com/autarkos/marketplace/install/models/RuntimeModels.java"),
-                Path.of("src/main/java/com/autarkos/marketplace/install/models/UpdateModels.java"),
                 Path.of("src/main/java/com/autarkos/system/OnboardingModels.java"),
                 Path.of("src/main/java/com/autarkos/system/SetupProgressModels.java"),
                 Path.of("src/main/java/com/autarkos/system/SupportModels.java"),
@@ -56,7 +54,6 @@ class BackendModelGroupingArchitectureTests {
                 Path.of("src/main/java/com/autarkos/marketplace/install/AppSetupGuide.java"),
                 Path.of("src/main/java/com/autarkos/marketplace/install/InstallSettings.java"),
                 Path.of("src/main/java/com/autarkos/marketplace/install/AppTelemetry.java"),
-                Path.of("src/main/java/com/autarkos/marketplace/install/AppUpdatePlan.java"),
                 Path.of("src/main/java/com/autarkos/system/api/OnboardingState.java"),
                 Path.of("src/main/java/com/autarkos/system/api/SupportBundle.java"),
                 Path.of("src/main/java/com/autarkos/system/api/SystemSetupStatus.java"),

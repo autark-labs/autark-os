@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
@@ -26,12 +30,72 @@ import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.AppUpdateService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.marketplace.install.models.UpdateModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.monitoring.MonitoringMetricsService;
 import com.autarkos.testsupport.JpaTestRepositories;
 
 class InstalledAppsControllerTests {
+
+    @Test
+    void updateHttpRoutesAreExplicitlyUnsupportedAndDoNotReachLifecycleServices() throws Exception {
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        InstalledAppsController controller = new InstalledAppsController(
+                lifecycleService,
+                mock(MonitoringMetricsService.class),
+                new AppUpdateService(),
+                applicationStateService,
+                jobService());
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        mvc.perform(MockMvcRequestBuilders.get("/api/apps/updates"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unsupported\""));
+        for (String path : List.of("/api/apps/vaultwarden/update-plan", "/api/apps/vaultwarden/update", "/api/apps/vaultwarden/rollback")) {
+            var request = path.endsWith("update-plan")
+                    ? MockMvcRequestBuilders.get(path)
+                    : MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON);
+            mvc.perform(request)
+                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(409))
+                    .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unsupported\""));
+        }
+
+        verifyNoUpdateWork(lifecycleService, applicationStateService);
+    }
+
+    @Test
+    void appUpdateEndpointsReturnAnExplicitUnsupportedCapabilityWithoutStartingWork() {
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
+        AppUpdateService updateService = new AppUpdateService();
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        InstalledAppsController controller = new InstalledAppsController(
+                lifecycleService,
+                metricsService,
+                updateService,
+                applicationStateService,
+                jobService());
+
+        UpdateModels.AppUpdateCapability listed = controller.updates();
+        var plan = controller.updatePlan("vaultwarden");
+        var update = controller.update("vaultwarden");
+        var rollback = controller.rollback("vaultwarden");
+
+        assertThat(listed.available()).isFalse();
+        assertThat(listed.status()).isEqualTo("unsupported");
+        assertThat(plan.getStatusCode().value()).isEqualTo(409);
+        assertThat(update.getStatusCode().value()).isEqualTo(409);
+        assertThat(rollback.getStatusCode().value()).isEqualTo(409);
+        assertThat(plan.getBody()).extracting(UpdateModels.AppUpdateCapability::reasonCode)
+                .isEqualTo(listed.reasonCode());
+        assertThat(update.getBody()).extracting(UpdateModels.AppUpdateCapability::reasonCode)
+                .isEqualTo(listed.reasonCode());
+        assertThat(rollback.getBody()).extracting(UpdateModels.AppUpdateCapability::reasonCode)
+                .isEqualTo(listed.reasonCode());
+        verifyNoUpdateWork(lifecycleService, applicationStateService);
+    }
 
     @Test
     void lifecycleMutationReturnsDurableJobWithoutImplyingReadiness() {
@@ -304,6 +368,11 @@ class InstalledAppsControllerTests {
                 List.of(),
                 List.of(),
                 Instant.parse("2026-06-21T12:00:00Z"));
+    }
+
+    private void verifyNoUpdateWork(AppLifecycleService lifecycleService, ApplicationStateService applicationStateService) {
+        verify(lifecycleService, never()).getApp("vaultwarden");
+        verify(applicationStateService, never()).invalidate();
     }
 
     private AppRuntimeView appRuntimeView(String appId) {

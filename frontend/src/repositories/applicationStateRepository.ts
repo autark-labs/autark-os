@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { ApplicationStateAPIClient } from '@/api/ApplicationStateAPIClient';
-import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import type { ApplicationState } from '@/types/applicationState';
 import {
   accessByAppId,
@@ -21,7 +20,6 @@ import {
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   telemetryByAppId,
-  updatesByAppId,
 } from './applicationStateRepository.logic';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
 import type { AppOwnershipView } from '@/types/appOwnership';
@@ -47,10 +45,7 @@ export {
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   telemetryByAppId,
-  updatesByAppId,
 };
-
-export const appUpdatesQueryKey = ['app-updates'];
 
 export type ApplicationStateRepositoryView = {
   accessByAppId: Record<string, AppAccessCheck>;
@@ -70,15 +65,6 @@ export function useApplicationStateQuery() {
     queryFn: () => ApplicationStateAPIClient.get(),
     refetchInterval: 10_000,
     staleTime: 10_000,
-  });
-}
-
-export function useAppUpdatesQuery() {
-  return useQuery({
-    queryKey: appUpdatesQueryKey,
-    queryFn: () => InstalledAppsAPIClient.updates(),
-    refetchInterval: 30_000,
-    staleTime: 30_000,
   });
 }
 
@@ -157,8 +143,4 @@ export function setRuntimeAppStatusInApplicationStateCache(queryClient: QueryCli
 
 export function removeManagedAppFromApplicationStateCache(queryClient: QueryClient, appId: string) {
   queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => removeManagedAppFromState(current, appId));
-}
-
-export function invalidateAppUpdates(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({ queryKey: appUpdatesQueryKey });
 }

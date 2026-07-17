@@ -3,7 +3,6 @@ import type {
   AppHealthSnapshot,
   AppInstanceView,
   AppTelemetry,
-  AppUpdateStatus,
   AppRuntimeView,
   BackendAppOperationState,
 } from '@/types/app';
@@ -66,10 +65,6 @@ export function healthByAppId(state?: ApplicationState | null): Record<string, A
 
 export function accessByAppId(state?: ApplicationState | null): Record<string, AppAccessCheck> {
   return Object.fromEntries(managedRuntimeApps(state).map((app) => [app.appId, accessCheckFromApp(app)]));
-}
-
-export function updatesByAppId(updates: AppUpdateStatus[] = []): Record<string, AppUpdateStatus> {
-  return Object.fromEntries(updates.map((update) => [update.appId, update]));
 }
 
 export function catalogAppIsManaged(state: ApplicationState | null | undefined, catalogAppId?: string | null) {

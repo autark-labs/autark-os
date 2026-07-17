@@ -1,4 +1,4 @@
-# Maintain, repair, update, and uninstall
+# Maintain, repair, update Autark-OS, and uninstall
 
 ## Repair an app
 
@@ -51,6 +51,11 @@ autark-os update rollback
 
 Application updates are separate. Updating Autark-OS does not silently update
 Vaultwarden, Jellyfin, or other managed applications.
+
+Managed application updates are currently unavailable. This is intentional:
+Autark-OS will not offer an update until it can preserve each app's saved
+settings, storage, access configuration, secrets, and recovery state through a
+reversible update process.
 
 ## Uninstall without deleting app data
 

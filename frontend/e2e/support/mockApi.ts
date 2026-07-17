@@ -513,7 +513,6 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
   if (pathname === '/api/observed-services') return observedServices;
   if (pathname.includes('/adoption-plan')) return { serviceId: 'foreign-immich', displayName: observedServices[0].displayName, available: true, summary: 'Review the fixture recovery plan.', confirmationText: 'RECOVER', blockedReasons: [], warnings: ['Existing data is preserved.'], steps: ['Apply current instance labels.'], containers: ['immich-server'], catalogAppId: 'immich', labels: [], labelsToApply: [], dataPaths: ['/var/lib/immich'], dataPreservation: 'Existing data is preserved.', restartRequired: false, safetyCheckpointAvailable: true, disabledReason: null };
   if (pathname.startsWith('/api/observed-services/')) return { ok: true, severity: 'success', title: 'Fixture action complete', message: 'The fixture state is unchanged.', applicationState: currentAppState };
-  if (pathname === '/api/apps/updates') return [];
   if (pathname.startsWith('/api/apps/')) return method === 'GET' ? runtimeApp : activeJob;
   return {};
 }

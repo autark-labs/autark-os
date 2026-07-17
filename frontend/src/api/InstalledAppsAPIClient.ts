@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, AppUpdateResult, AppUpdateStatus, InstallSettings, UninstallPlan } from '@/types/app';
+import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, InstallSettings, UninstallPlan } from '@/types/app';
 import type { AutarkOsJob } from '@/types/jobs';
 
 export type InstalledAppLifecycleAction = 'start' | 'stop' | 'restart';
@@ -36,11 +36,6 @@ export const InstalledAppsAPIClient = {
     return response.data;
   },
 
-  async updates() {
-    const response = await httpClient.get<AppUpdateStatus[]>('/api/apps/updates');
-    return response.data;
-  },
-
   async appTelemetry(appId: string) {
     const response = await httpClient.get<AppTelemetry>(`/api/apps/${appId}/telemetry`);
     return response.data;
@@ -56,11 +51,6 @@ export const InstalledAppsAPIClient = {
     return response.data;
   },
 
-  async updatePlan(appId: string) {
-    const response = await httpClient.get<AppUpdatePlan>(`/api/apps/${appId}/update-plan`);
-    return response.data;
-  },
-
   async runAction(appId: string, action: InstalledAppLifecycleAction) {
     const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/${action}`);
     return response.data;
@@ -68,16 +58,6 @@ export const InstalledAppsAPIClient = {
 
   async repair(appId: string) {
     const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/repair`);
-    return response.data;
-  },
-
-  async updateApp(appId: string) {
-    const response = await httpClient.post<AppUpdateResult>(`/api/apps/${appId}/update`);
-    return response.data;
-  },
-
-  async rollbackApp(appId: string) {
-    const response = await httpClient.post<AppUpdateResult>(`/api/apps/${appId}/rollback`);
     return response.data;
   },
 
