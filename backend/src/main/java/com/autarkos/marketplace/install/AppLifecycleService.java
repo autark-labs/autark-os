@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
@@ -138,6 +139,29 @@ public class AppLifecycleService {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "stop");
         return containerLifecycleService.stop(app, composeFile(app));
+    }
+
+    /**
+     * Stops a managed app and confirms that Docker no longer reports one of its
+     * containers as running. Backup and restore use this stricter operation so
+     * a successful command alone is never treated as a safe quiescent state.
+     */
+    public AppActionResult stopAndConfirm(String appId) {
+        InstalledApp app = installedApp(appId);
+        AppActionResult result = stop(appId);
+        RuntimeModels.DockerComposeResult status = composeExecutor.ps(composeFile(app), app.composeProject());
+        if (!status.successful()) {
+            throw new InstallationException("Autark-OS stopped " + app.appName() + " but could not confirm its container state.");
+        }
+        boolean stillRunning = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId()).stream()
+                .anyMatch(container -> {
+                    String state = container.state() == null ? "" : container.state().trim().toLowerCase();
+                    return "running".equals(state) || "restarting".equals(state);
+                });
+        if (stillRunning) {
+            throw new InstallationException("Autark-OS could not confirm that " + app.appName() + " is stopped. No backup or restore data was changed.");
+        }
+        return result;
     }
 
     public AppActionResult restart(String appId) {
@@ -601,10 +625,10 @@ public class AppLifecycleService {
         if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
             return AutarkOsStates.BackupState.DISABLED;
         }
-        boolean hasCompletedRestorePoint = backupRepository.forApp(appId, 10).stream()
+        boolean hasVerifiedRestorePoint = backupRepository.forApp(appId, 10).stream()
                 .map(RestorePoints::toDomain)
-                .anyMatch(restorePoint -> AutarkOsStates.RestorePointStatus.COMPLETED.equalsIgnoreCase(restorePoint.status()));
-        return hasCompletedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
+                .anyMatch(BackupProtectionPolicy::isProtected);
+        return hasVerifiedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
     }
 
     private boolean isRepairAvailable(String status) {

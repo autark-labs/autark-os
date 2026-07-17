@@ -95,8 +95,25 @@ public class ManifestYamlReader {
                 strings(runtime, "environment"),
                 strings(runtime, "labels"),
                 strings(runtime, "backupPaths"),
+                text(runtime, "backupStrategy"),
+                integer(runtime, "backupContractVersion", 0),
                 bool(runtime, "privileged"),
                 runtimeServices(runtime, access, usage));
+    }
+
+    private int integer(Map<String, Object> values, String key, int fallback) {
+        Object value = values.get(key);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     private List<RuntimeServiceManifest> runtimeServices(Map<String, Object> runtime, AccessManifest access, UsageManifest usage) {

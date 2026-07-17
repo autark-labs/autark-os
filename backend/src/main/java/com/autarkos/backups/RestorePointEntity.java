@@ -50,6 +50,15 @@ public class RestorePointEntity {
     @Column(name = "checksum_sha256")
     private String checksumSha256;
 
+    @Column(name = "integrity_baseline_sha256")
+    private String integrityBaselineSha256;
+
+    @Column(name = "backup_contract_strategy", nullable = false)
+    private String backupContractStrategy;
+
+    @Column(name = "backup_contract_version", nullable = false)
+    private int backupContractVersion;
+
     @Column(name = "restore_confidence", nullable = false)
     private String restoreConfidence;
 
@@ -62,7 +71,7 @@ public class RestorePointEntity {
     protected RestorePointEntity() {
     }
 
-    RestorePointEntity(String appId, String appName, String scope, String source, String includedAppIds, String path, String status, long sizeBytes, String message, String createdAt) {
+    RestorePointEntity(String appId, String appName, String scope, String source, String includedAppIds, String path, String status, long sizeBytes, String message, String checksumSha256, String backupContractStrategy, int backupContractVersion, String createdAt) {
         this.appId = appId;
         this.appName = appName;
         this.scope = scope;
@@ -72,9 +81,14 @@ public class RestorePointEntity {
         this.status = status;
         this.sizeBytes = sizeBytes;
         this.message = message;
-        this.verificationStatus = "not_checked";
-        this.verificationMessage = "Backup has not been verified yet.";
-        this.checksumSha256 = "";
+        this.verificationStatus = backupContractVersion < 1 && "completed".equals(status) ? "legacy_unverified" : "not_checked";
+        this.verificationMessage = backupContractVersion < 1 && "completed".equals(status)
+                ? "This restore point was created before Autark-OS recorded an immutable integrity baseline. Create a new backup before restoring."
+                : "Backup has not been verified yet.";
+        this.checksumSha256 = checksumSha256 == null ? "" : checksumSha256;
+        this.integrityBaselineSha256 = checksumSha256 == null ? "" : checksumSha256;
+        this.backupContractStrategy = backupContractStrategy == null || backupContractStrategy.isBlank() ? "legacy_unverified" : backupContractStrategy;
+        this.backupContractVersion = Math.max(backupContractVersion, 0);
         this.restoreConfidence = "unknown";
         this.createdAt = createdAt;
     }
@@ -131,6 +145,18 @@ public class RestorePointEntity {
         return checksumSha256;
     }
 
+    String integrityBaselineSha256() {
+        return integrityBaselineSha256;
+    }
+
+    String backupContractStrategy() {
+        return backupContractStrategy;
+    }
+
+    int backupContractVersion() {
+        return backupContractVersion;
+    }
+
     String restoreConfidence() {
         return restoreConfidence;
     }
@@ -143,10 +169,9 @@ public class RestorePointEntity {
         return createdAt;
     }
 
-    void updateVerification(String verificationStatus, String verificationMessage, String checksumSha256, String restoreConfidence, String verifiedAt) {
+    public void updateVerification(String verificationStatus, String verificationMessage, String restoreConfidence, String verifiedAt) {
         this.verificationStatus = verificationStatus;
         this.verificationMessage = verificationMessage;
-        this.checksumSha256 = checksumSha256;
         this.restoreConfidence = restoreConfidence;
         this.verifiedAt = verifiedAt;
     }

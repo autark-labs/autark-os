@@ -137,4 +137,6 @@ runtime:
     - autark-os.version=1.26.4
   backupPaths:
     - data
+  backupStrategy: database_dump_required
+  backupContractVersion: 1
   privileged: false

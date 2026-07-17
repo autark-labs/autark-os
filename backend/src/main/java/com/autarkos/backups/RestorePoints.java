@@ -8,6 +8,10 @@ public final class RestorePoints {
     }
 
     public static RestorePointEntity create(String appId, String appName, String scope, String source, String includedAppIds, String path, String status, long sizeBytes, String message) {
+        return create(appId, appName, scope, source, includedAppIds, path, status, sizeBytes, message, "", "legacy_unverified", 0);
+    }
+
+    public static RestorePointEntity create(String appId, String appName, String scope, String source, String includedAppIds, String path, String status, long sizeBytes, String message, String integrityBaselineSha256, String backupContractStrategy, int backupContractVersion) {
         return new RestorePointEntity(
                 appId,
                 appName,
@@ -18,6 +22,9 @@ public final class RestorePoints {
                 clean(status, "failed"),
                 sizeBytes,
                 message == null ? "" : message,
+                integrityBaselineSha256 == null ? "" : integrityBaselineSha256,
+                clean(backupContractStrategy, "legacy_unverified"),
+                Math.max(backupContractVersion, 0),
                 Instant.now().toString());
     }
 
@@ -36,6 +43,9 @@ public final class RestorePoints {
                 clean(entity.verificationStatus(), "not_checked"),
                 clean(entity.verificationMessage(), "Backup has not been verified yet."),
                 entity.checksumSha256() == null ? "" : entity.checksumSha256(),
+                entity.integrityBaselineSha256() == null ? "" : entity.integrityBaselineSha256(),
+                clean(entity.backupContractStrategy(), "legacy_unverified"),
+                Math.max(entity.backupContractVersion(), 0),
                 clean(entity.restoreConfidence(), "unknown"),
                 instant(entity.verifiedAt()),
                 Instant.parse(entity.createdAt()));

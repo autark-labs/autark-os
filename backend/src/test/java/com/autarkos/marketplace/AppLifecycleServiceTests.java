@@ -510,7 +510,7 @@ class AppLifecycleServiceTests {
         assertThat(withoutRestorePoint.remediation().state()).isEqualTo("repair_failed");
         assertThat(withoutRestorePoint.remediation().summary()).doesNotContain("restore point");
 
-        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 128, "Backup completed.");
+        RestorePointTestRecords.recordVerified(backupRepository, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", 128, "Backup completed.");
 
         AppRuntimeView withRestorePoint = service.getApp("vaultwarden");
 

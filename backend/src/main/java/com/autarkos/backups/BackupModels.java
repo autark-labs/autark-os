@@ -29,6 +29,7 @@ public final class BackupModels {
 
     public record BackupContract(
             String strategy,
+            int version,
             String label,
             String confidence,
             boolean reviewRequired,

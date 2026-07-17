@@ -11,6 +11,7 @@ import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -239,9 +240,9 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         if (restorePoints.isEmpty()) {
             return AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
         }
-        boolean hasCompletedRestorePoint = restorePoints.stream()
-                .anyMatch(restorePoint -> AutarkOsStates.RestorePointStatus.COMPLETED.equalsIgnoreCase(restorePoint.status()));
-        if (hasCompletedRestorePoint) {
+        boolean hasVerifiedRestorePoint = restorePoints.stream()
+                .anyMatch(BackupProtectionPolicy::isProtected);
+        if (hasVerifiedRestorePoint) {
             return AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT;
         }
         RestorePoint latest = restorePoints.getFirst();

@@ -1,6 +1,7 @@
 package com.autarkos.backups;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import java.nio.file.Files;
@@ -81,13 +82,14 @@ class BackupServiceCanonicalAppTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
         installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
 
         BackupModels.BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
 
         assertThat(report.protectedApps()).isZero();
         assertThat(report.status()).isEqualTo("attention");
-        assertThat(report.summary()).isEqualTo("0 of 1 apps are protected by a restore point.");
+        assertThat(report.summary()).isEqualTo("0 of 1 apps are protected by a verified restore point.");
         assertThat(report.apps()).singleElement().satisfies(app -> {
             assertThat(app.status()).isEqualTo("not_backed_up");
             assertThat(app.protectedByBackups()).isFalse();
@@ -123,7 +125,7 @@ class BackupServiceCanonicalAppTests {
     }
 
     @Test
-    void completedRestorePointMakesAppProtected() throws Exception {
+    void legacyRestorePointIsNotPresentedAsProtected() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
@@ -135,13 +137,13 @@ class BackupServiceCanonicalAppTests {
 
         BackupModels.BackupReport report = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).report();
 
-        assertThat(report.protectedApps()).isEqualTo(1);
-        assertThat(report.status()).isEqualTo("protected");
-        assertThat(report.summary()).isEqualTo("1 of 1 apps are protected by a restore point.");
+        assertThat(report.protectedApps()).isZero();
+        assertThat(report.status()).isEqualTo("attention");
+        assertThat(report.summary()).isEqualTo("0 of 1 apps are protected by a verified restore point.");
         assertThat(report.apps()).singleElement().satisfies(app -> {
-            assertThat(app.status()).isEqualTo("protected");
-            assertThat(app.protectedByBackups()).isTrue();
-            assertThat(app.message()).isEqualTo("Protected by restore point.");
+            assertThat(app.status()).isEqualTo("not_backed_up");
+            assertThat(app.protectedByBackups()).isFalse();
+            assertThat(app.message()).contains("legacy restore point");
         });
     }
 
@@ -155,21 +157,18 @@ class BackupServiceCanonicalAppTests {
         installedRepository.save(homepage);
         saveOwned(installedRepository, homepage);
         installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
-        Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/autark-os-full-test.zip");
-        Files.createDirectories(archive.getParent());
-        writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
-        RestorePoint point = RestorePointTestRecords.record(backupRepository, "__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
         RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
         BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService);
+        RestorePoint point = service.run("homepage").restorePoint();
 
         RestoreModels.RestoreResult result = service.restore(point.id(), "homepage");
 
         assertThat(result.status()).as(String.join("\n", result.logs())).isEqualTo("completed");
-        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|full|" + archive.toAbsolutePath().normalize());
+        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
     }
 
     @Test
-    void restoreReportsWarningWhenAppDataRestoresButAppCannotRestart() throws Exception {
+    void restoreRollsBackToVerifiedSafetyCheckpointWhenAppCannotRestart() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
@@ -178,11 +177,8 @@ class BackupServiceCanonicalAppTests {
         installedRepository.save(homepage);
         saveOwned(installedRepository, homepage);
         installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
-        Path archive = runtimeLayout.runtimeRoot().resolve("backups/full/autark-os-full-test.zip");
-        Files.createDirectories(archive.getParent());
-        writeZip(archive, "homepage/config/settings.yaml", "title: restored\n");
-        RestorePoint point = RestorePointTestRecords.record(backupRepository, "__full__", "All apps", "full", "manual", "homepage", archive.toString(), "completed", Files.size(archive), "Full backup completed.");
         RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
+        RestorePoint point = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService).run("homepage").restorePoint();
         BackupService service = backupService(
                 runtimeLayout,
                 installedRepository,
@@ -191,12 +187,86 @@ class BackupServiceCanonicalAppTests {
                 fileOpsService,
                 new FailingStartDockerComposeExecutor());
 
-        RestoreModels.RestoreResult result = service.restore(point.id(), "homepage");
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+                .hasMessageContaining("could not restore the safety checkpoint");
+        assertThat(fileOpsService.restoreCalls).hasSize(2);
+        assertThat(fileOpsService.restoreCalls.getFirst()).isEqualTo("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
+        assertThat(fileOpsService.restoreCalls.get(1)).contains("homepage|app|").contains("pre-restore");
+    }
 
-        assertThat(result.status()).isEqualTo("warning");
-        assertThat(result.message()).contains("could not restart");
-        assertThat(result.logs()).anySatisfy(log -> assertThat(log).contains("Autark-OS could not start Homepage"));
-        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|full|" + archive.toAbsolutePath().normalize());
+    @Test
+    void tamperedArchiveFailsVerificationAndBlocksRestoreBeforeLiveDataChanges() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
+        BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService);
+
+        RestorePoint point = service.run("homepage").restorePoint();
+        assertThat(Files.isRegularFile(Path.of(point.path() + ".manifest.json"))).isTrue();
+        assertThat(Files.readString(Path.of(point.path() + ".manifest.json"))).contains("appImageIdentity").contains("homepage").contains("archiveFormat");
+        Files.writeString(Path.of(point.path()), "tampered", java.nio.file.StandardOpenOption.APPEND);
+
+        BackupModels.BackupVerificationResult verification = service.verify(point.id());
+        RestoreModels.RestorePlan plan = service.restorePlan(point.id(), "homepage");
+
+        assertThat(verification.status()).isEqualTo("failed");
+        assertThat(verification.message()).contains("checksum").contains("immutable");
+        assertThat(plan.executable()).isFalse();
+        assertThat(fileOpsService.restoreCalls).isEmpty();
+    }
+
+    @Test
+    void modifiedBackupManifestFailsVerificationAndBlocksRestore() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService);
+
+        RestorePoint point = service.run("homepage").restorePoint();
+        Files.writeString(Path.of(point.path() + ".manifest.json"), "{}", java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+
+        BackupModels.BackupVerificationResult verification = service.verify(point.id());
+        RestoreModels.RestorePlan plan = service.restorePlan(point.id(), "homepage");
+
+        assertThat(verification.status()).isEqualTo("failed");
+        assertThat(verification.message()).contains("manifest");
+        assertThat(plan.executable()).isFalse();
+    }
+
+    @Test
+    void failedStopPreventsColdBackupBeforeAnyArchiveIsCreated() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        BackupService service = backupService(
+                runtimeLayout,
+                installedRepository,
+                backupRepository,
+                catalogService,
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                new FailingStopDockerComposeExecutor());
+
+        BackupModels.BackupRunResult result = service.run("homepage");
+
+        assertThat(result.status()).isEqualTo("failed");
+        assertThat(result.message()).contains("Could not stop Homepage");
+        assertThat(Files.exists(runtimeLayout.runtimeRoot().resolve("backups/homepage"))).isFalse();
     }
 
     private AppLifecycleService appLifecycleService(RuntimeLayout runtimeLayout, InstalledAppRepository repository, MarketplaceCatalogService catalogService, BackupRepository backupRepository) {
@@ -345,6 +415,13 @@ class BackupServiceCanonicalAppTests {
         @Override
         public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
             return new RuntimeModels.DockerComposeResult(1, List.of("failed to bind host port 0.0.0.0:8080/tcp: address already in use"));
+        }
+    }
+
+    private static class FailingStopDockerComposeExecutor extends NoopDockerComposeExecutor {
+        @Override
+        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            return new RuntimeModels.DockerComposeResult(1, List.of("container did not stop"));
         }
     }
 

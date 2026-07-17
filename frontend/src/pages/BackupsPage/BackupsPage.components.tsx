@@ -477,7 +477,13 @@ function RestorePointRow({ apps, onDetails, onRestore, onVerify, point, restoreA
 function VerificationBadge({ point }: { point: RestorePoint }) {
   const status = point.verificationStatus || 'not_checked';
   const tone = status === 'verified' ? 'success' : status === 'failed' ? 'danger' : 'warning';
-  const label = status === 'verified' ? `Verified · ${capitalizeBackupLabel(point.restoreConfidence || 'unknown')}` : status === 'failed' ? 'Verification failed' : 'Not verified';
+  const label = status === 'verified'
+    ? `Verified · ${capitalizeBackupLabel(point.restoreConfidence || 'unknown')}`
+    : status === 'legacy_unverified'
+      ? 'Legacy · verify with a new backup'
+      : status === 'failed'
+        ? 'Verification failed'
+        : 'Not verified';
   return <StatusBadge tone={tone}>{label}</StatusBadge>;
 }
 

@@ -64,7 +64,10 @@ class BackupReportService {
                 .map(RestorePoints::toDomain)
                 .toList();
         int protectedApps = (int) apps.stream().filter(BackupModels.AppBackupStatus::protectedByBackups).count();
-        int failedBackups = (int) recent.stream().filter(point -> AutarkOsStates.RestorePointStatus.FAILED.equals(point.status())).count();
+        int failedBackups = (int) recent.stream()
+                .filter(point -> AutarkOsStates.RestorePointStatus.FAILED.equals(point.status())
+                        || AutarkOsStates.RestorePointStatus.FAILED.equals(point.verificationStatus()))
+                .count();
         BackupModels.BackupDestination destination = destinationService.current();
         long backupStorage = destination.ready() ? fileOperations.directorySize(Path.of(destination.configuredPath())) : 0;
         String status = destination.ready() ? status(apps, failedBackups) : "warning";
@@ -177,7 +180,9 @@ class BackupReportService {
         if (AutarkOsStates.RestorePointStatus.FAILED.equals(latest.status())) {
             return AutarkOsStates.RestorePointStatus.FAILED;
         }
-        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())) {
+        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())
+                && AutarkOsStates.RestorePointStatus.VERIFIED.equals(latest.verificationStatus())
+                && !contract.reviewRequired()) {
             return "protected";
         }
         return "not_backed_up";
@@ -199,8 +204,16 @@ class BackupReportService {
         if (AutarkOsStates.RestorePointStatus.FAILED.equals(latest.status())) {
             return latest.message();
         }
+        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())
+                && AutarkOsStates.RestorePointStatus.VERIFIED.equals(latest.verificationStatus())
+                && !contract.reviewRequired()) {
+            return "Protected by a verified restore point.";
+        }
+        if ("legacy_unverified".equals(latest.verificationStatus())) {
+            return "This is a legacy restore point without an immutable integrity baseline. Create a new backup before relying on it.";
+        }
         if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())) {
-            return "Protected by restore point.";
+            return "A restore point exists, but it is not verified yet.";
         }
         return "No completed restore point yet.";
     }
@@ -321,6 +334,6 @@ class BackupReportService {
         if (failedBackups > 0) {
             return failedBackups + " recent backup failure" + (failedBackups == 1 ? "" : "s") + " recorded.";
         }
-        return protectedApps + " of " + totalApps + " apps are protected by a restore point.";
+        return protectedApps + " of " + totalApps + " apps are protected by a verified restore point.";
     }
 }

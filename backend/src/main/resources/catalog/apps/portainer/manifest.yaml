@@ -84,4 +84,6 @@ runtime:
     - /var/run/docker.sock:/var/run/docker.sock
   labels: [autark-os.managed=true, autark-os.app-id=portainer, autark-os.version=2.21.5]
   backupPaths: [data]
+  backupStrategy: cold_file
+  backupContractVersion: 1
   privileged: false

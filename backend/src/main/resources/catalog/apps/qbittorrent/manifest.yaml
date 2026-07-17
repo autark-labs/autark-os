@@ -156,4 +156,6 @@ runtime:
     - autark-os.version=5.2.2
   backupPaths:
     - config
+  backupStrategy: sqlite_aware
+  backupContractVersion: 1
   privileged: false

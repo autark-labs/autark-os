@@ -71,6 +71,6 @@ class BackupReportServiceTests {
     }
 
     private RestorePoint restorePoint(Instant createdAt) {
-        return new RestorePoint(1, "__full__", "All apps", "full", "automatic", "", "completed", "", 0, "Completed", "not_checked", "", "", "unknown", null, createdAt);
+        return new RestorePoint(1, "__full__", "All apps", "full", "automatic", "", "completed", "", 0, "Completed", "not_checked", "", "", "", "legacy_unverified", 0, "unknown", null, createdAt);
     }
 }

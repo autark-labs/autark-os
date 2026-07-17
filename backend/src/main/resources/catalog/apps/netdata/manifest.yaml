@@ -137,4 +137,6 @@ runtime:
     - autark-os.version=2.10.3
   backupPaths:
     - config
+  backupStrategy: cold_file
+  backupContractVersion: 1
   privileged: false

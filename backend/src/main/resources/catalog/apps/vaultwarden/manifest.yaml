@@ -63,7 +63,7 @@ user:
     - Optional admin dashboard
   plainLanguage: Vaultwarden gives you a private password manager that feels familiar if you have used Bitwarden before. Autark-OS prepares storage, networking, backups, and private access so the install is approachable.
 technical:
-  summary: Deploys a Vaultwarden container with persistent data, reverse proxy labels, Tailscale access, daily encrypted backups, and an Autark-OS managed network.
+  summary: Deploys a Vaultwarden container with persistent data, reverse proxy labels, Tailscale access, backup readiness guidance, and an Autark-OS managed network.
   requirements:
     - 1 CPU core
     - 512 MB RAM
@@ -136,4 +136,6 @@ runtime:
     - autark-os.version=1.36.0
   backupPaths:
     - data
+  backupStrategy: sqlite_aware
+  backupContractVersion: 1
   privileged: false

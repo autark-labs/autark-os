@@ -39,6 +39,8 @@ public class BackupSchedulerService {
             result.ifPresent(run -> {
                 if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(run.status())) {
                     activityLogService.success("backup", "scheduled_backup_completed", "Routine backup completed", run.message(), null);
+                } else if ("not_applicable".equals(run.status())) {
+                    activityLogService.info("backup", "scheduled_backup_not_applicable", "Routine backup not needed", run.message(), null);
                 } else {
                     activityLogService.error("backup", "scheduled_backup_failed", "Routine backup failed", run.message(), null, null);
                 }

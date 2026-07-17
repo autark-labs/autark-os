@@ -16,6 +16,9 @@ public record RestorePoint(
         String verificationStatus,
         String verificationMessage,
         String checksumSha256,
+        String integrityBaselineSha256,
+        String backupContractStrategy,
+        int backupContractVersion,
         String restoreConfidence,
         Instant verifiedAt,
         Instant createdAt) {

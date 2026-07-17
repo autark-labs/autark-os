@@ -197,4 +197,6 @@ runtime:
   backupPaths:
     - data
     - config
+  backupStrategy: database_dump_required
+  backupContractVersion: 1
   privileged: false

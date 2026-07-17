@@ -137,4 +137,6 @@ runtime:
   backupPaths:
     - data
     - extensions
+  backupStrategy: cold_file
+  backupContractVersion: 1
   privileged: false

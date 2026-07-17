@@ -21,7 +21,8 @@ class BackupContractService {
     BackupModels.BackupContract backupContract(InstalledApp app, ApplicationManifest appManifest) {
         if (appManifest == null) {
             return new BackupModels.BackupContract(
-                    "unknown",
+                    "review_required",
+                    0,
                     "Unknown backup contract",
                     "needs_review",
                     true,
@@ -29,52 +30,41 @@ class BackupContractService {
                     List.of("Catalog manifest was not found for " + app.appId() + "."));
         }
         List<String> backupPaths = appManifest.runtime().backupPaths();
-        boolean multiService = appManifest.runtime().multiService();
-        boolean hasPostgres = backupPaths.stream().anyMatch(path -> path.toLowerCase().contains("postgres"));
-        boolean hasSqlite = appManifest.includes().stream().anyMatch(item -> item.toLowerCase().contains("sqlite"))
-                || backupPaths.stream().anyMatch(path -> path.toLowerCase().contains("sqlite") || path.equalsIgnoreCase("data"));
+        String declaredStrategy = appManifest.runtime().backupStrategy();
+        int declaredVersion = appManifest.runtime().backupContractVersion();
+        if (declaredStrategy == null || declaredStrategy.isBlank() || declaredVersion < 1) {
+            return new BackupModels.BackupContract(
+                    "review_required",
+                    0,
+                    "Backup contract needs review",
+                    "needs_review",
+                    true,
+                    "This catalog item has not declared a versioned backup and restore contract yet.",
+                    List.of("Autark-OS will keep existing restore points visible, but will not call this app protected or restore it automatically."));
+        }
         if (backupPaths.isEmpty()) {
             return new BackupModels.BackupContract(
-                    "none",
+                    "review_required",
+                    declaredVersion,
                     "No declared backup paths",
                     "weak",
                     true,
                     "The manifest does not declare managed backup paths yet.",
                     List.of("Autark-OS cannot prove what data should be included."));
         }
-        if (hasPostgres) {
-            return new BackupModels.BackupContract(
-                    "postgres",
-                    "Database-aware review",
-                    "needs_review",
-                    true,
-                    "This app stores data in PostgreSQL. File snapshots exist, but a database dump/restore contract is still needed.",
-                    List.of("Declared paths: " + String.join(", ", backupPaths), "Restore will replace managed folders but does not yet run a database dump/import."));
-        }
-        if (multiService) {
-            return new BackupModels.BackupContract(
-                    "multi-service",
-                    "Multi-service review",
-                    "needs_review",
-                    true,
-                    "This app uses multiple containers. Autark-OS needs a stronger app-specific backup contract before calling it fully protected.",
-                    List.of("Declared paths: " + String.join(", ", backupPaths), "Services: " + appManifest.runtime().services().size()));
-        }
-        if (hasSqlite) {
-            return new BackupModels.BackupContract(
-                    "sqlite",
-                    "SQLite/file backup",
-                    "standard",
-                    false,
-                    "Autark-OS backs up the declared managed data folder. This is suitable for simple apps using local files or SQLite.",
-                    List.of("Declared paths: " + String.join(", ", backupPaths)));
-        }
-        return new BackupModels.BackupContract(
-                "file-only",
-                "File backup",
-                "standard",
-                false,
-                "Autark-OS backs up the declared managed files for this app.",
-                List.of("Declared paths: " + String.join(", ", backupPaths)));
+        return switch (declaredStrategy.trim().toLowerCase()) {
+            case "cold_file" -> new BackupModels.BackupContract(
+                    "cold_file", declaredVersion, "Stopped app file backup", "standard", false,
+                    "Autark-OS stops this app, confirms it is stopped, then creates and verifies a managed-file restore point.",
+                    List.of("Declared paths: " + String.join(", ", backupPaths), "The app is restarted after the archive is verified."));
+            case "hot_file", "sqlite_aware", "database_dump_required" -> new BackupModels.BackupContract(
+                    declaredStrategy.trim().toLowerCase(), declaredVersion, "Backup contract needs review", "needs_review", true,
+                    "This app declares " + declaredStrategy.replace('_', ' ') + ", but this release does not yet run its required consistency hook.",
+                    List.of("Declared paths: " + String.join(", ", backupPaths), "Autark-OS will not make an automatic protection or restore claim until the hook is implemented."));
+            default -> new BackupModels.BackupContract(
+                    "review_required", declaredVersion, "Backup contract needs review", "needs_review", true,
+                    "This app declares an unsupported backup strategy: " + declaredStrategy + ".",
+                    List.of("Declare cold_file, hot_file, sqlite_aware, or database_dump_required."));
+        };
     }
 }

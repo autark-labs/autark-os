@@ -146,6 +146,8 @@ runtime:
     - export
     - consume
     - postgres
+  backupStrategy: database_dump_required
+  backupContractVersion: 1
   privileged: false
   services:
     - name: web

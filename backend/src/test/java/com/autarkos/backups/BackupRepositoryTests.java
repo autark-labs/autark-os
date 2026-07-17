@@ -20,8 +20,9 @@ class BackupRepositoryTests {
     void recordsQueriesAndUpdatesRestorePoints() {
         BackupRepository repository = repository();
 
-        RestorePointEntity point = repository.save(RestorePoints.create("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.tar", "completed", 1024, "Backup completed."));
-        point.updateVerification("verified", "Archive checksum matched.", "abc123", "high", "2026-06-20T12:00:00Z");
+        String baseline = "a".repeat(64);
+        RestorePointEntity point = repository.save(RestorePoints.create("vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "/backups/vaultwarden.tar", "completed", 1024, "Backup completed.", baseline, "cold_file", 1));
+        point.updateVerification("verified", "Archive checksum matched.", "high", "2026-06-20T12:00:00Z");
         repository.save(point);
 
         RestorePoint found = repository.findById(point.id()).map(RestorePoints::toDomain).orElseThrow();
@@ -31,7 +32,9 @@ class BackupRepositoryTests {
         assertThat(found.source()).isEqualTo("manual");
         assertThat(found.sizeBytes()).isEqualTo(1024);
         assertThat(found.verificationStatus()).isEqualTo("verified");
-        assertThat(found.checksumSha256()).isEqualTo("abc123");
+        assertThat(found.checksumSha256()).isEqualTo(baseline);
+        assertThat(found.integrityBaselineSha256()).isEqualTo(baseline);
+        assertThat(found.backupContractStrategy()).isEqualTo("cold_file");
         assertThat(found.restoreConfidence()).isEqualTo("high");
         assertThat(found.verifiedAt()).isNotNull();
         assertThat(repository.forApp("vaultwarden", 10)).hasSize(1);

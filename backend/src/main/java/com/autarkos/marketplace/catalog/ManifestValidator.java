@@ -31,6 +31,7 @@ public class ManifestValidator {
     private static final Set<String> HEALTH_TYPES = Set.of("http", "tcp", "container", "no-web-ui", "none");
     private static final Set<String> SUPPORT_LEVELS = Set.of("Ready", "Needs testing", "Advanced", "Experimental");
     private static final Set<String> SMOKE_TEST_STATUSES = Set.of("Passed", "Needs hardware test", "Needs end-to-end test", "Blocked", "Not applicable");
+    private static final Set<String> BACKUP_STRATEGIES = Set.of("cold_file", "hot_file", "sqlite_aware", "database_dump_required");
 
     public void validate(ApplicationManifest manifest) {
         List<String> errors = new ArrayList<>();
@@ -92,6 +93,15 @@ public class ManifestValidator {
 
         if (manifest.runtime().backupPaths().isEmpty()) {
             errors.add("runtime.backupPaths must declare the app data preserved by backups and uninstall");
+        }
+
+        if (manifest.runtime().backupStrategy() == null || manifest.runtime().backupStrategy().isBlank()) {
+            errors.add("runtime.backupStrategy must declare the versioned backup contract");
+        } else if (!BACKUP_STRATEGIES.contains(manifest.runtime().backupStrategy())) {
+            errors.add("runtime.backupStrategy must be a supported backup contract strategy");
+        }
+        if (manifest.runtime().backupContractVersion() < 1) {
+            errors.add("runtime.backupContractVersion must be at least 1");
         }
 
         if (manifest.usage().setupSteps().isEmpty()) {

@@ -20,10 +20,14 @@ import com.autarkos.marketplace.install.InstalledAppRepository;
 
 class BackupVerificationService {
 
+    private static final long MAX_ARCHIVE_ENTRIES = 100_000;
+    private static final long MAX_UNCOMPRESSED_ARCHIVE_BYTES = 64L * 1024L * 1024L * 1024L;
+
     private final BackupRepository backupRepository;
     private final InstalledAppRepository installedAppRepository;
     private final BackupContractService backupContractService;
     private final ActivityLogService activityLogService;
+    private final BackupArchiveManifestService archiveManifestService = new BackupArchiveManifestService();
 
     BackupVerificationService(
             BackupRepository backupRepository,
@@ -38,31 +42,39 @@ class BackupVerificationService {
 
     VerificationUpdate verifyRestorePoint(RestorePoint point) {
         if (!AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())) {
-            RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Only completed backups can be verified.", "", "low");
+            RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Only completed backups can be verified.", "low");
+            return new VerificationUpdate(updated, result(updated));
+        }
+        if (!hasImmutableBaseline(point)) {
+            RestorePoint updated = updateVerification(point.id(), "legacy_unverified", "This restore point was created before Autark-OS recorded an immutable integrity baseline. Create a new backup before restoring.", "unknown");
             return new VerificationUpdate(updated, result(updated));
         }
         try {
             Path path = Path.of(point.path());
             if (!Files.isRegularFile(path)) {
-                RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup file is missing.", "", "low");
+                RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup file is missing.", "low");
                 return new VerificationUpdate(updated, result(updated));
             }
             ZipSummary summary = inspectZip(path);
             if (summary.entries() == 0 || summary.bytes() <= 0) {
-                RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup archive is empty.", "", "low");
+                RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup archive is empty.", "low");
                 return new VerificationUpdate(updated, result(updated));
             }
             String checksum = checksum(path);
+            if (!point.integrityBaselineSha256().equals(checksum)) {
+                RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup archive checksum no longer matches the immutable creation-time baseline.", "low");
+                return new VerificationUpdate(updated, result(updated));
+            }
+            archiveManifestService.validate(path, point);
             RestorePoint updated = updateVerification(
                     point.id(),
                     AutarkOsStates.RestorePointStatus.VERIFIED,
                     "Verified " + summary.entries() + " file(s) and " + summary.bytes() + " byte(s) inside the archive.",
-                    checksum,
                     confidenceFor(point));
             activityLogService.success("backup", "backup_verified", "Backup verified", updated.appName() + " restore point is readable.", null);
             return new VerificationUpdate(updated, result(updated));
         } catch (RuntimeException | IOException exception) {
-            RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), "", "low");
+            RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), "low");
             RuntimeException logged = exception instanceof RuntimeException runtimeException ? runtimeException : new InstallationException(userMessage(exception), exception);
             activityLogService.error("backup", "backup_verification_failed", "Backup verification failed", userMessage(exception), point.appId(), logged);
             return new VerificationUpdate(updated, result(updated));
@@ -84,6 +96,44 @@ class BackupVerificationService {
         return reviewRequired ? "Medium" : "High";
     }
 
+    IntegrityCheck restoreIntegrity(RestorePoint point) {
+        if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
+            return IntegrityCheck.blocked("This restore point has not passed verification.");
+        }
+        if (!hasImmutableBaseline(point)) {
+            return IntegrityCheck.blocked("This restore point does not have an immutable integrity baseline.");
+        }
+        try {
+            Path archive = Path.of(point.path());
+            if (!Files.isRegularFile(archive)) {
+                return IntegrityCheck.blocked("Backup file is missing.");
+            }
+            ZipSummary summary = inspectZip(archive);
+            if (summary.entries() == 0 || summary.bytes() <= 0) {
+                return IntegrityCheck.blocked("Backup archive is empty.");
+            }
+            if (!point.integrityBaselineSha256().equals(checksum(archive))) {
+                return IntegrityCheck.blocked("Backup archive checksum no longer matches the immutable creation-time baseline.");
+            }
+            archiveManifestService.validate(archive, point);
+            return IntegrityCheck.ready();
+        } catch (RuntimeException | IOException exception) {
+            return IntegrityCheck.blocked(userMessage(exception));
+        }
+    }
+
+    String captureIntegrityBaseline(Path archive) throws IOException {
+        return checksum(archive);
+    }
+
+    void writeArchiveManifest(Path archive, String checksumSha256, String appId, String appName, String scope, String source, String includedAppIds, BackupModels.BackupContract contract) throws IOException {
+        writeArchiveManifest(archive, checksumSha256, appId, appName, scope, source, includedAppIds, contract, "not recorded for this safety checkpoint");
+    }
+
+    void writeArchiveManifest(Path archive, String checksumSha256, String appId, String appName, String scope, String source, String includedAppIds, BackupModels.BackupContract contract, String appImageIdentity) throws IOException {
+        archiveManifestService.write(archive, checksumSha256, appId, appName, scope, source, includedAppIds, contract, appImageIdentity);
+    }
+
     private String confidenceFor(RestorePoint point) {
         if ("full".equals(point.scope()) && point.includedAppIds() != null && point.includedAppIds().contains(",")) {
             boolean reviewRequired = java.util.Arrays.stream(point.includedAppIds().split(","))
@@ -101,13 +151,12 @@ class BackupVerificationService {
                 .isPresent() ? "medium" : "high";
     }
 
-    private RestorePoint updateVerification(long id, String verificationStatus, String verificationMessage, String checksumSha256, String restoreConfidence) {
+    private RestorePoint updateVerification(long id, String verificationStatus, String verificationMessage, String restoreConfidence) {
         RestorePointEntity entity = backupRepository.findById(id)
                 .orElseThrow(() -> new InstallationException("Restore point was not found."));
         entity.updateVerification(
                 RestorePoints.clean(verificationStatus, "not_checked"),
                 RestorePoints.clean(verificationMessage, "Backup verification has not run."),
-                checksumSha256 == null ? "" : checksumSha256,
                 RestorePoints.clean(restoreConfidence, "unknown"),
                 Instant.now().toString());
         return RestorePoints.toDomain(backupRepository.save(entity));
@@ -121,10 +170,19 @@ class BackupVerificationService {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 if (!entry.isDirectory()) {
+                    if (entry.getName().startsWith("/") || entry.getName().contains("..\\") || entry.getName().contains("../")) {
+                        throw new InstallationException("Backup archive contains an unsafe file path.");
+                    }
                     entries++;
+                    if (entries > MAX_ARCHIVE_ENTRIES) {
+                        throw new InstallationException("Backup archive has too many files to verify safely.");
+                    }
                     int read;
                     while ((read = zip.read(buffer)) >= 0) {
                         bytes += read;
+                        if (bytes > MAX_UNCOMPRESSED_ARCHIVE_BYTES) {
+                            throw new InstallationException("Backup archive expands beyond the safe verification limit.");
+                        }
                     }
                 }
                 zip.closeEntry();
@@ -156,6 +214,24 @@ class BackupVerificationService {
     }
 
     private record ZipSummary(long entries, long bytes) {
+    }
+
+    private boolean hasImmutableBaseline(RestorePoint point) {
+        return point.integrityBaselineSha256() != null && point.integrityBaselineSha256().matches("[a-f0-9]{64}")
+                && point.backupContractVersion() >= 1
+                && point.backupContractStrategy() != null
+                && !point.backupContractStrategy().isBlank()
+                && !"legacy_unverified".equals(point.backupContractStrategy());
+    }
+
+    record IntegrityCheck(boolean restorable, String message) {
+        static IntegrityCheck ready() {
+            return new IntegrityCheck(true, "Backup archive matches its immutable integrity baseline.");
+        }
+
+        static IntegrityCheck blocked(String message) {
+            return new IntegrityCheck(false, message);
+        }
     }
 
     record VerificationUpdate(RestorePoint restorePoint, BackupModels.BackupVerificationResult result) {

@@ -146,4 +146,6 @@ runtime:
   backupPaths:
     - etc-pihole
     - etc-dnsmasq
+  backupStrategy: cold_file
+  backupContractVersion: 1
   privileged: false

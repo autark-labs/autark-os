@@ -15,13 +15,15 @@ export function restorePointDetails(point: RestorePoint, apps: AppBackupStatus[]
     ? `Verified with ${point.restoreConfidence || 'unknown'} confidence.`
     : point.verificationStatus === 'failed'
       ? 'Verification failed. Do not restore until this has been reviewed.'
-      : 'Not verified yet. Verify before restoring when possible.';
+      : point.verificationStatus === 'legacy_unverified'
+        ? 'Legacy restore point. It has no immutable integrity baseline, so create a new backup before restoring.'
+        : 'Not verified yet. Normal restore is blocked until verification succeeds.';
 
   return {
     title: point.scope === 'full' ? 'Full restore point details' : `${point.appName} restore point details`,
     includedApps,
     verification,
-    checksum: point.checksumSha256 || 'No checksum recorded',
+    checksum: point.integrityBaselineSha256 || point.checksumSha256 || 'No immutable checksum recorded',
     location: point.path,
     restoreSummary: plan?.summary || 'Open restore to preview the exact restore steps.',
     warnings: plan?.warnings?.length ? plan.warnings : defaultWarnings(point),

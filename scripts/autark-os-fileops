@@ -19,6 +19,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 APP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -246,25 +247,46 @@ def restore_app_data(args: argparse.Namespace) -> None:
     destination = app_root(args)
     archive = backup_path(args, args.archive, "restore archive")
     scope = args.scope or "app"
-    clear_contents(destination)
-    with zipfile.ZipFile(archive) as restore_zip:
-        for info in restore_zip.infolist():
-            if info.is_dir():
-                continue
-            if is_zip_symlink(info):
-                die(f"restore archive contains unsupported symlink: {info.filename}")
-            name = info.filename
-            if scope == "full":
-                prefix = f"{args.app}/"
-                if not name.startswith(prefix):
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=".autark-os-restore-", dir=destination.parent))
+    previous = destination.parent / f".{destination.name}.pre-restore-{os.getpid()}"
+    moved_previous = False
+    try:
+        with zipfile.ZipFile(archive) as restore_zip:
+            restored_files = 0
+            for info in restore_zip.infolist():
+                if info.is_dir():
                     continue
-                name = name[len(prefix):]
-            if not safe_archive_name(name):
-                die(f"restore archive contains unsafe path: {info.filename}")
-            target = require_inside(destination / name, destination, "restore target")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with restore_zip.open(info) as source, target.open("wb") as output:
-                shutil.copyfileobj(source, output)
+                if is_zip_symlink(info):
+                    die(f"restore archive contains unsupported symlink: {info.filename}")
+                name = info.filename
+                if scope == "full":
+                    prefix = f"{args.app}/"
+                    if not name.startswith(prefix):
+                        continue
+                    name = name[len(prefix):]
+                if not safe_archive_name(name):
+                    die(f"restore archive contains unsafe path: {info.filename}")
+                target = require_inside(staging / name, staging, "restore target")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with restore_zip.open(info) as source, target.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+                restored_files += 1
+        if restored_files == 0:
+            die("restore archive does not contain restorable app data")
+        if destination.exists():
+            os.replace(destination, previous)
+            moved_previous = True
+        os.replace(staging, destination)
+        if moved_previous:
+            shutil.rmtree(previous)
+    except Exception:
+        if moved_previous and not destination.exists() and previous.exists():
+            os.replace(previous, destination)
+        raise
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
     print(f"restored {args.app}")
 
 

@@ -63,6 +63,10 @@ class RestorePlanner {
         } else if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
             warnings.add("This restore point has not been verified yet.");
         }
+        BackupVerificationService.IntegrityCheck integrity = backupVerificationService.restoreIntegrity(point);
+        if (!integrity.restorable()) {
+            warnings.add(integrity.message());
+        }
         RestoreModels.RestoreSimulationResult simulation = restoreSimulationService.simulateRestore(point, affected);
         if (AutarkOsStates.RestoreSimulationStatus.FAILED.equals(simulation.status())) {
             warnings.add(simulation.message());
@@ -70,10 +74,11 @@ class RestorePlanner {
             warnings.add("Restore simulation needs review: " + simulation.message());
         }
         List<String> steps = List.of(
-                "Stop affected app services",
-                "Create a safety backup of current app data",
-                "Replace current data from the selected restore point",
-                "Start affected app services again",
+                "Stop and confirm affected app services are paused",
+                "Create a safety checkpoint of current app data",
+                "Extract the selected restore point into a staging area",
+                "Validate staged data, then replace current data",
+                "Start affected app services and check their state",
                 "Record restore activity");
         String scope = "full".equals(point.scope()) && targetAppId == null ? "full" : "app";
         return new RestoreModels.RestorePlan(
@@ -92,8 +97,11 @@ class RestorePlanner {
                 simulation,
                 backupVerificationService.restoreConfidence(point, affected),
                 AutarkOsStates.RestorePointStatus.COMPLETED.equals(point.status())
+                        && AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())
                         && !affected.isEmpty()
                         && archiveAvailable.test(Path.of(point.path()))
+                        && integrity.restorable()
+                        && affected.stream().map(backupContractService::backupContract).noneMatch(BackupModels.BackupContract::reviewRequired)
                         && !AutarkOsStates.RestoreSimulationStatus.FAILED.equals(simulation.status()),
                 Instant.now());
     }

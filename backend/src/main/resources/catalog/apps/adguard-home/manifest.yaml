@@ -142,4 +142,6 @@ runtime:
   backupPaths:
     - work
     - conf
+  backupStrategy: cold_file
+  backupContractVersion: 1
   privileged: false

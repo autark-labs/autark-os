@@ -13,6 +13,7 @@ import java.util.function.Supplier;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.install.AppActionResult;
+import com.autarkos.marketplace.install.AppHealthSnapshot;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -29,6 +30,7 @@ class RestoreExecutor {
     private final AppLifecycleService appLifecycleService;
     private final RuntimeFileOperations fileOperations;
     private final BackupArchiveService backupArchiveService;
+    private final BackupVerificationService backupVerificationService;
     private final RestorePlanner restorePlanner;
     private final Supplier<Path> backupRoot;
 
@@ -39,6 +41,7 @@ class RestoreExecutor {
             AppLifecycleService appLifecycleService,
             RuntimeFileOperations fileOperations,
             BackupArchiveService backupArchiveService,
+            BackupVerificationService backupVerificationService,
             RestorePlanner restorePlanner,
             Supplier<Path> backupRoot) {
         this.backupRepository = backupRepository;
@@ -47,6 +50,7 @@ class RestoreExecutor {
         this.appLifecycleService = appLifecycleService;
         this.fileOperations = fileOperations;
         this.backupArchiveService = backupArchiveService;
+        this.backupVerificationService = backupVerificationService;
         this.restorePlanner = restorePlanner;
         this.backupRoot = backupRoot;
     }
@@ -84,17 +88,34 @@ class RestoreExecutor {
         Path destination = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         try {
             logs.add("Stopping " + app.appName() + ".");
-            AppActionResult stop = appLifecycleService.stop(app.appId());
+            AppActionResult stop = appLifecycleService.stopAndConfirm(app.appId());
             logs.add(stop.message());
         } catch (RuntimeException exception) {
-            logs.add("Autark-OS could not stop " + app.appName() + ": " + userMessage(exception));
+            String message = "Autark-OS could not stop " + app.appName() + ". No data was changed: " + userMessage(exception);
+            logs.add(message);
+            throw new InstallationException(message, exception);
         }
+        Path safetyArchive = null;
+        InstallationException restoreFailure = null;
         try {
             if (Files.exists(destination) && fileOperations.directorySize(destination) > 0) {
                 Files.createDirectories(backupRoot.get().resolve("pre-restore"));
-                Path safety = backupRoot.get().resolve("pre-restore").resolve(app.appId() + "-pre-restore-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
-                long size = backupArchiveService.createSafetyArchive(app.appId(), safety);
-                backupRepository.save(RestorePoints.create(app.appId(), app.appName(), "app", "pre_restore", app.appId(), safety.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety backup created before restore."));
+                safetyArchive = backupRoot.get().resolve("pre-restore").resolve(app.appId() + "-pre-restore-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
+                long size = backupArchiveService.createSafetyArchive(app.appId(), safetyArchive);
+                BackupModels.BackupContract safetyContract = new BackupModels.BackupContract(
+                        "cold_file", 1, "Stopped app file backup", "standard", false,
+                        "Safety checkpoint created before restore.", List.of());
+                String baseline = backupVerificationService.captureIntegrityBaseline(safetyArchive);
+                backupVerificationService.writeArchiveManifest(
+                        safetyArchive, baseline, app.appId(), app.appName(), "app", "pre_restore", app.appId(), safetyContract);
+                RestorePoint safetyPoint = RestorePoints.toDomain(backupRepository.save(RestorePoints.create(
+                        app.appId(), app.appName(), "app", "pre_restore", app.appId(), safetyArchive.toString(),
+                        AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety checkpoint created before restore.",
+                        baseline, safetyContract.strategy(), safetyContract.version())));
+                safetyPoint = backupVerificationService.verifyRestorePoint(safetyPoint).restorePoint();
+                if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(safetyPoint.verificationStatus())) {
+                    throw new InstallationException("Autark-OS could not verify the safety checkpoint before restoring.");
+                }
                 logs.add("Created safety backup for " + app.appName() + ".");
             }
             backupArchiveService.restoreAppData(Path.of(point.path()), point.scope(), app.appId());
@@ -104,19 +125,49 @@ class RestoreExecutor {
         } catch (RuntimeException | IOException exception) {
             installedAppRepository.recordEvent(app.appId(), "restore_failed", userMessage(exception));
             activityLogService.error("backup", "restore_app", "Restore failed for " + app.appName(), userMessage(exception), app.appId(), exception);
-            throw new InstallationException("Restore failed for " + app.appName() + ": " + userMessage(exception), exception);
-        } finally {
-            try {
-                logs.add("Starting " + app.appName() + ".");
-                AppActionResult start = appLifecycleService.start(app.appId());
-                logs.add(start.message());
-            } catch (RuntimeException exception) {
-                String message = "Autark-OS could not start " + app.appName() + ": " + userMessage(exception);
-                logs.add(message);
-                return new RestoreAppResult(app.appId(), app.appName(), message);
-            }
+            restoreFailure = new InstallationException("Restore failed for " + app.appName() + ": " + userMessage(exception), exception);
         }
-        return new RestoreAppResult(app.appId(), app.appName(), null);
+        String restartFailure = null;
+        try {
+            logs.add("Starting " + app.appName() + ".");
+            AppActionResult start = startAndCheck(app, logs);
+            logs.add(start.message());
+        } catch (RuntimeException exception) {
+            restartFailure = "Autark-OS could not start " + app.appName() + ": " + userMessage(exception);
+            logs.add(restartFailure);
+        }
+        if (restartFailure != null && safetyArchive != null) {
+            try {
+                logs.add("Restoring the verified safety checkpoint for " + app.appName() + ".");
+                backupArchiveService.restoreAppData(safetyArchive, "app", app.appId());
+                AppActionResult recovered = startAndCheck(app, logs);
+                logs.add(recovered.message());
+            } catch (RuntimeException | IOException recoveryException) {
+                String message = restartFailure + " Autark-OS also could not restore the safety checkpoint: " + userMessage(recoveryException);
+                installedAppRepository.recordEvent(app.appId(), "restore_recovery_failed", message);
+                activityLogService.error("backup", "restore_recovery_failed", "Restore recovery needs attention for " + app.appName(), message, app.appId(), recoveryException);
+                throw new InstallationException(message, recoveryException);
+            }
+            String message = "Autark-OS could not start " + app.appName() + " after the requested restore. Its verified pre-restore data was restored and the app was started again; the requested restore was rolled back.";
+            installedAppRepository.recordEvent(app.appId(), "restore_rolled_back", message);
+            activityLogService.warning("backup", "restore_rolled_back", "Restore rolled back for " + app.appName(), message, app.appId());
+            throw new InstallationException(message);
+        }
+        if (restoreFailure != null) {
+            throw restoreFailure;
+        }
+        return new RestoreAppResult(app.appId(), app.appName(), restartFailure);
+    }
+
+    private AppActionResult startAndCheck(InstalledApp app, List<String> logs) {
+        AppActionResult result = appLifecycleService.start(app.appId());
+        AppHealthSnapshot health = appLifecycleService.healthSnapshot(app.appId());
+        logs.add("Post-restore health: " + health.status() + " - " + health.message());
+        if (AutarkOsStates.AppStatus.UNAVAILABLE.equals(health.status())
+                || AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(health.status())) {
+            throw new InstallationException("Post-restore health check failed for " + app.appName() + ": " + health.message());
+        }
+        return result;
     }
 
     private String restoreRestartWarningMessage(List<InstalledApp> apps, List<RestoreAppResult> restartFailures) {

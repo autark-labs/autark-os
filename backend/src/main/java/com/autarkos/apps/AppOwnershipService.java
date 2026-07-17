@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
@@ -132,14 +133,10 @@ public class AppOwnershipService {
         if (settings.backup() == null || !settings.backup().enabled()) {
             return AutarkOsStates.BackupState.DISABLED;
         }
-        boolean hasCompletedRestorePoint = backupRepository.forApp(app.appId(), 10).stream()
+        boolean hasVerifiedRestorePoint = backupRepository.forApp(app.appId(), 10).stream()
                 .map(RestorePoints::toDomain)
-                .anyMatch(this::completedRestorePoint);
-        return hasCompletedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
-    }
-
-    private boolean completedRestorePoint(RestorePoint restorePoint) {
-        return AutarkOsStates.RestorePointStatus.COMPLETED.equalsIgnoreCase(restorePoint.status());
+                .anyMatch(BackupProtectionPolicy::isProtected);
+        return hasVerifiedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
     }
 
     private boolean ownershipCompatible(String appId) {

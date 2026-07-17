@@ -13,6 +13,8 @@ public record RuntimeManifest(
         List<String> environment,
         List<String> labels,
         List<String> backupPaths,
+        String backupStrategy,
+        int backupContractVersion,
         boolean privileged,
         List<RuntimeServiceManifest> services) {
 
@@ -28,7 +30,7 @@ public record RuntimeManifest(
             List<String> labels,
             List<String> backupPaths,
             boolean privileged) {
-        this(containerName, composeProject, image, network, runtimeRoot, ports, volumes, environment, labels, backupPaths, privileged, List.of());
+        this(containerName, composeProject, image, network, runtimeRoot, ports, volumes, environment, labels, backupPaths, "cold_file", 1, privileged, List.of());
     }
 
     public boolean multiService() {

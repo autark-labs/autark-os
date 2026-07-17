@@ -139,4 +139,6 @@ runtime:
   backupPaths:
     - data
     - letsencrypt
+  backupStrategy: sqlite_aware
+  backupContractVersion: 1
   privileged: false

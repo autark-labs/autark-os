@@ -12,6 +12,9 @@ export type RestorePoint = {
   verificationStatus: 'verified' | 'warning' | 'failed' | 'not_checked' | string;
   verificationMessage: string;
   checksumSha256: string;
+  integrityBaselineSha256: string;
+  backupContractStrategy: string;
+  backupContractVersion: number;
   restoreConfidence: 'high' | 'medium' | 'low' | 'unknown' | string;
   verifiedAt: string | null;
   createdAt: string;
@@ -78,6 +81,7 @@ export type BackupDestination = {
 
 export type BackupContract = {
   strategy: 'file-only' | 'sqlite' | 'postgres' | 'app-export' | 'multi-service' | 'none' | 'unknown' | string;
+  version: number;
   label: string;
   confidence: 'standard' | 'needs_review' | 'weak' | string;
   reviewRequired: boolean;

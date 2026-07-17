@@ -3,6 +3,8 @@ package com.autarkos.fileops;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.SimpleFileVisitor;
 import java.util.Comparator;
 import java.util.List;
@@ -54,9 +56,37 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
 
     @Override
     public void restoreAppData(Path archive, String scope, String appId, Path destination) throws IOException {
-        clearDirectoryContents(destination);
-        Files.createDirectories(destination);
-        extractAppArchive(archive, scope, appId, destination);
+        Path parent = destination.toAbsolutePath().normalize().getParent();
+        if (parent == null) {
+            throw new IOException("Restore destination has no parent folder.");
+        }
+        Files.createDirectories(parent);
+        Path staging = Files.createTempDirectory(parent, ".autark-os-restore-");
+        Path previous = parent.resolve("." + destination.getFileName() + ".pre-restore-" + java.util.UUID.randomUUID());
+        boolean previousMoved = false;
+        try {
+            extractAppArchive(archive, scope, appId, staging);
+            if (!containsRestorableFiles(staging)) {
+                throw new IOException("Restore point does not contain restorable app data.");
+            }
+            if (Files.exists(destination)) {
+                move(destination, previous);
+                previousMoved = true;
+            }
+            move(staging, destination);
+            if (previousMoved) {
+                deleteRecursively(previous);
+            }
+        } catch (IOException exception) {
+            if (previousMoved && !Files.exists(destination) && Files.exists(previous)) {
+                move(previous, destination);
+            }
+            throw exception;
+        } finally {
+            if (Files.exists(staging)) {
+                deleteRecursively(staging);
+            }
+        }
     }
 
     private void extractAppArchive(Path archive, String scope, String appId, Path destination) throws IOException {
@@ -87,6 +117,28 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
                 Files.createDirectories(target.getParent());
                 Files.copy(zip, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 zip.closeEntry();
+            }
+        }
+    }
+
+    private boolean containsRestorableFiles(Path directory) throws IOException {
+        try (Stream<Path> paths = Files.walk(directory)) {
+            return paths.anyMatch(path -> !path.equals(directory) && Files.isRegularFile(path));
+        }
+    }
+
+    private void move(Path source, Path destination) throws IOException {
+        try {
+            Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(source, destination);
+        }
+    }
+
+    private void deleteRecursively(Path directory) throws IOException {
+        try (Stream<Path> paths = Files.walk(directory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
             }
         }
     }

@@ -249,7 +249,7 @@ class AppOwnershipServiceTests {
         assertThat(unprotected.protectedByBackups()).isFalse();
         assertThat(unprotected.firstBackupRecommended()).isTrue();
 
-        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", "completed", 1024, "Backup completed.");
+        RestorePointTestRecords.recordVerified(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", 1024, "Backup completed.");
 
         DiscoverInstallModels.DiscoverInstalledAppSummary protectedApp = service(repository, observedRepository(), backupRepository)
                 .app("vaultwarden")
