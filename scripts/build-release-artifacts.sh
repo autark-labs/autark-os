@@ -699,16 +699,22 @@ sha256_for() {
 }
 
 write_artifact_manifest() {
-  local tar_name deb_name run_name
+  local tar_name deb_name run_name release_build_sha release_build_date
   tar_name="$(basename "${TARBALL}")"
   deb_name="$(basename "${DEB}")"
   run_name="$(basename "${RUN_INSTALLER}")"
+  release_build_sha="$(build_sha)"
+  release_build_date="$(build_date)"
+  [[ -n "${release_build_sha}" && "${release_build_sha}" != "development" && "${release_build_sha}" != "unknown" ]] || die "Release bundle is missing a verified build SHA."
+  [[ -n "${release_build_date}" && "${release_build_date}" != "development" ]] || die "Release bundle is missing a verified build date."
   cat >"${ARTIFACT_MANIFEST}" <<JSON
 {
   "schemaVersion": 2,
   "name": "autark-os",
   "version": "$(json_escape "${VERSION}")",
   "channel": "$(json_escape "${CHANNEL}")",
+  "buildSha": "$(json_escape "${release_build_sha}")",
+  "buildDate": "$(json_escape "${release_build_date}")",
   "artifactArchitecture": "$(json_escape "${ARCHITECTURE}")",
   "runtimeArchitecture": "$(json_escape "${ARCHITECTURE}")",
   "supportedHostPolicyVersion": "$(json_escape "${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}")",

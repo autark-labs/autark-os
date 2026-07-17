@@ -94,7 +94,7 @@ def supported_hosts(policy: dict[str, str]) -> dict:
     }
 
 
-def verify_source_manifest(manifest: dict, architecture: str, version: str, channel: str) -> None:
+def verify_source_manifest(manifest: dict, architecture: str, version: str, channel: str) -> tuple[str, str]:
     if manifest.get("schemaVersion") != 2:
         raise ReleaseManifestError(f"{architecture} artifact manifest must use schemaVersion 2")
     if manifest.get("version") != version:
@@ -109,6 +109,13 @@ def verify_source_manifest(manifest: dict, architecture: str, version: str, chan
         raise ReleaseManifestError(f"{architecture} artifact manifest declares the wrong architecture")
     if manifest.get("runtimeArchitecture") != architecture:
         raise ReleaseManifestError(f"{architecture} runtime manifest declares the wrong architecture")
+    build_sha = str(manifest.get("buildSha", ""))
+    build_date = str(manifest.get("buildDate", ""))
+    if not build_sha or build_sha in {"development", "unknown"}:
+        raise ReleaseManifestError(f"{architecture} artifact manifest has no verified buildSha")
+    if not build_date or build_date == "development":
+        raise ReleaseManifestError(f"{architecture} artifact manifest has no verified buildDate")
+    return build_sha, build_date
 
 
 def collect_architecture_assets(
@@ -119,13 +126,13 @@ def collect_architecture_assets(
     channel: str,
     repository: str,
     tag: str,
-) -> tuple[list[dict], str]:
+) -> tuple[list[dict], str, str, str]:
     architecture_dir = input_root / architecture
     source_manifest_path = architecture_dir / "autark-os-artifacts.json"
     if not source_manifest_path.is_file():
         raise ReleaseManifestError(f"Missing {architecture} artifact manifest: {source_manifest_path}")
     source_manifest = load_json(source_manifest_path)
-    verify_source_manifest(source_manifest, architecture, version, channel)
+    build_sha, build_date = verify_source_manifest(source_manifest, architecture, version, channel)
     policy_version = str(source_manifest.get("supportedHostPolicyVersion", ""))
     if not policy_version:
         raise ReleaseManifestError(f"{architecture} artifact manifest has no supportedHostPolicyVersion")
@@ -169,7 +176,7 @@ def collect_architecture_assets(
                 "mediaType": MEDIA_TYPES[artifact_type],
             }
         )
-    return public_assets, policy_version
+    return public_assets, policy_version, build_sha, build_date
 
 
 def write_release_notes(
@@ -217,8 +224,10 @@ def compose(args: argparse.Namespace) -> None:
     policy = parse_env(policy_path)
     assets: list[dict] = []
     policy_versions: set[str] = set()
+    artifact_build_shas: set[str] = set()
+    artifact_build_dates: set[str] = set()
     for architecture in ARCHITECTURES:
-        architecture_assets, policy_version = collect_architecture_assets(
+        architecture_assets, policy_version, artifact_build_sha, artifact_build_date = collect_architecture_assets(
             input_root,
             output_dir,
             architecture,
@@ -229,12 +238,20 @@ def compose(args: argparse.Namespace) -> None:
         )
         assets.extend(architecture_assets)
         policy_versions.add(policy_version)
+        artifact_build_shas.add(artifact_build_sha)
+        artifact_build_dates.add(artifact_build_date)
 
     expected_policy_version = required_policy_value(policy, "AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION")
     if policy_versions != {expected_policy_version}:
         raise ReleaseManifestError(
             f"Artifact host policy versions {sorted(policy_versions)} do not match {expected_policy_version}"
         )
+    if artifact_build_shas != {args.build_sha}:
+        raise ReleaseManifestError(
+            f"Artifact build SHAs {sorted(artifact_build_shas)} do not match workflow build SHA {args.build_sha!r}"
+        )
+    if len(artifact_build_dates) != 1:
+        raise ReleaseManifestError(f"Artifact build dates do not agree: {sorted(artifact_build_dates)}")
 
     published_at = args.published_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     release_manifest = {
@@ -248,7 +265,11 @@ def compose(args: argparse.Namespace) -> None:
         "releaseNotesUrl": args.release_notes_url,
         "minimumBootstrapSchemaVersion": 1,
         "supportedHostPolicyVersion": expected_policy_version,
-        "source": {"repository": args.repository, "buildSha": args.build_sha},
+        "source": {
+            "repository": args.repository,
+            "buildSha": args.build_sha,
+            "buildDate": next(iter(artifact_build_dates)),
+        },
         "requirements": {
             "minimumMemoryMb": int(required_policy_value(policy, "AUTARK_OS_MIN_MEMORY_MB")),
             "minimumDiskKb": int(required_policy_value(policy, "AUTARK_OS_MIN_DISK_KB")),
@@ -300,6 +321,13 @@ def validate_release_dir(release_dir: Path) -> None:
         raise ReleaseManifestError("Public release channel must be beta or stable")
     if manifest.get("prerelease") != (manifest.get("channel") != "stable"):
         raise ReleaseManifestError("Prerelease state does not agree with the release channel")
+    source = manifest.get("source")
+    if not isinstance(source, dict) or not source.get("repository"):
+        raise ReleaseManifestError("Public release manifest has no source repository")
+    if not source.get("buildSha") or source.get("buildSha") in {"development", "unknown"}:
+        raise ReleaseManifestError("Public release manifest has no verified source build SHA")
+    if not source.get("buildDate") or source.get("buildDate") == "development":
+        raise ReleaseManifestError("Public release manifest has no verified source build date")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, list) or len(artifacts) != 6:
         raise ReleaseManifestError("Public release manifest must contain six architecture-specific artifacts")

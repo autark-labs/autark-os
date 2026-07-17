@@ -38,7 +38,7 @@ sudo /opt/autark-os/bin/install-autark-os-service.sh --dry-run
 
 These defaults can be changed with `--runtime-dir`, `--install-dir`, `--config-dir`, and `--log-dir`. Rerunning the installer with the same flags updates the systemd unit and environment file in place.
 
-The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `autark-os version` reads the live backend when it is reachable and falls back to that env file when the service is stopped.
+The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `autark-os version` reads the live backend when it is reachable and falls back to that env file when the service is stopped. The service check also compares that metadata with the backend JAR that is actually installed. If it reports a release-identity mismatch, run `sudo autark-os update` to replace the installed files from a verified release, or ask support to review the output.
 
 ## Local Administrator Credentials
 

@@ -67,6 +67,11 @@ AUTARK_OS_VERSION=9.8.7-beta.6
 AUTARK_OS_BUILD_SHA=installed-build-sha
 AUTARK_OS_BUILD_DATE=2026-07-15T03:00:00Z
 ENV
+python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
+  --output "${check_install}/backend/autark-os-backend.jar" \
+  --version 9.8.7-beta.6 \
+  --build-sha installed-build-sha \
+  --build-date 2026-07-15T03:00:00Z
 cat >"${check_bin}/id" <<'SH'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-u" ]]; then
@@ -92,3 +97,21 @@ AUTARK_OS_SERVICE_FILE="${tmp_dir}/check-autark-os.service" \
 grep -q 'Autark-OS version:.*9.8.7-beta.6' "${tmp_dir}/check.out"
 grep -q 'Build SHA:.*installed-build-sha' "${tmp_dir}/check.out"
 grep -q 'Build date:.*2026-07-15T03:00:00Z' "${tmp_dir}/check.out"
+grep -q 'Backend jar version:.*9.8.7-beta.6' "${tmp_dir}/check.out"
+
+python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
+  --output "${check_install}/backend/autark-os-backend.jar" \
+  --version 9.8.7-beta.5 \
+  --build-sha installed-build-sha \
+  --build-date 2026-07-15T03:00:00Z
+if PATH="${check_bin}:/usr/bin:/bin" \
+  AUTARK_OS_RUNTIME_DIR="${check_runtime}" \
+  AUTARK_OS_CONFIG_DIR="${check_config}" \
+  AUTARK_OS_INSTALL_DIR="${check_install}" \
+  AUTARK_OS_LOG_DIR="${check_logs}" \
+  AUTARK_OS_SERVICE_FILE="${tmp_dir}/check-autark-os.service" \
+  "${repo_root}/scripts/install-autark-os-service.sh" --check >"${tmp_dir}/mismatched-check.out" 2>&1; then
+  printf 'Expected an installed release identity mismatch to fail service verification.\n' >&2
+  exit 1
+fi
+grep -q 'Installed release identity does not match the backend jar' "${tmp_dir}/mismatched-check.out"

@@ -156,6 +156,10 @@ jobs:
 
       - name: Test and build application
         working-directory: backend
+        env:
+          AUTARK_OS_BUILD_VERSION: ${{ needs.prepare.outputs.version }}
+          AUTARK_OS_BUILD_SHA: ${{ github.sha }}
+          AUTARK_OS_BUILD_DATE: ${{ needs.prepare.outputs.published_at }}
         run: ./gradlew test bootJar --console=plain
 
       - name: Run installer and release contracts
@@ -179,6 +183,8 @@ jobs:
           CHANNEL: ${{ needs.prepare.outputs.channel }}
           RELEASE_NOTES_URL: ${{ needs.prepare.outputs.release_notes_url }}
           ARCHITECTURE: ${{ matrix.architecture }}
+          AUTARK_OS_BUILD_SHA: ${{ github.sha }}
+          AUTARK_OS_BUILD_DATE: ${{ needs.prepare.outputs.published_at }}
         run: |
           set -euo pipefail
           scripts/build-release-artifacts.sh \
@@ -206,6 +212,8 @@ jobs:
           assert manifest["schemaVersion"] == 2
           assert manifest["artifactArchitecture"] == architecture
           assert manifest["runtimeArchitecture"] == architecture
+          assert manifest["buildSha"] == "${GITHUB_SHA}"
+          assert manifest["buildDate"] == "${{ needs.prepare.outputs.published_at }}"
           PY
 
       - name: Retain architecture build output

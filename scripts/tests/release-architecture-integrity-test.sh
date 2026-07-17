@@ -5,8 +5,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp_dir="$(mktemp -d)"
 fake_jar="${repo_root}/backend/build/libs/autark-os-backend-architecture-integrity-test.jar"
 trap 'rm -rf "${tmp_dir}"; rm -f "${fake_jar}"' EXIT
-mkdir -p "$(dirname "${fake_jar}")"
-printf 'fake backend jar for architecture integrity test\n' >"${fake_jar}"
+python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
+  --output "${fake_jar}" \
+  --version 0.0.0-runtime-test \
+  --build-sha architecture-test-sha
 
 host_architecture="$(dpkg --print-architecture)"
 case "${host_architecture}" in
@@ -43,7 +45,7 @@ FILE
 chmod +x "${fake_bin}/file"
 
 wrong_runtime_output="${tmp_dir}/wrong-runtime.out"
-if PATH="${fake_bin}:${PATH}" AUTARK_OS_RUNTIME_DIR="${runtime_source}" \
+if PATH="${fake_bin}:${PATH}" AUTARK_OS_RUNTIME_DIR="${runtime_source}" AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=architecture-test-sha \
   "${repo_root}/scripts/build-release-bundle.sh" \
   --skip-build \
   --version 0.0.0-runtime-test \

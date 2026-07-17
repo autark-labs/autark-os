@@ -127,6 +127,13 @@ env_file_value() {
   awk -F= -v key="${key}" '$1 == key {print $2; exit}' "${file}"
 }
 
+jar_manifest_value() {
+  local jar="$1"
+  local key="$2"
+  command_exists unzip || return 1
+  unzip -p "${jar}" META-INF/MANIFEST.MF 2>/dev/null | tr -d '\r' | awk -F': ' -v key="${key}" '$1 == key {print $2; exit}'
+}
+
 java_major_version() {
   local java_cmd="$1"
   local version
@@ -257,6 +264,7 @@ check_state() {
   log "Checking Autark-OS service-user setup."
   local installed_env="${CONFIG_DIR}/autark-os.env"
   local installed_version installed_sha installed_date
+  local jar_version="" jar_sha="" jar_date="" identity_ok=0
   installed_version="$(env_file_value "${installed_env}" AUTARK_OS_VERSION)"
   installed_sha="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_SHA)"
   installed_date="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_DATE)"
@@ -293,6 +301,20 @@ check_state() {
 
   if [[ -f "${TARGET_BACKEND_JAR}" ]]; then
     status_line "Backend jar" "${TARGET_BACKEND_JAR}"
+    if command_exists unzip; then
+      jar_version="$(jar_manifest_value "${TARGET_BACKEND_JAR}" Implementation-Version || true)"
+      jar_sha="$(jar_manifest_value "${TARGET_BACKEND_JAR}" Autark-OS-Build-Sha || true)"
+      jar_date="$(jar_manifest_value "${TARGET_BACKEND_JAR}" Autark-OS-Build-Date || true)"
+      status_line "Backend jar version" "${jar_version:-missing}"
+      status_line "Backend jar build SHA" "${jar_sha:-missing}"
+      status_line "Backend jar build date" "${jar_date:-missing}"
+      if [[ "${jar_version}" != "${installed_version}" || "${jar_sha}" != "${installed_sha}" || "${jar_date}" != "${installed_date}" ]]; then
+        identity_ok=1
+      fi
+    else
+      status_line "Backend jar identity" "cannot inspect (unzip is missing)"
+      identity_ok=1
+    fi
   else
     status_line "Backend jar" "missing (${TARGET_BACKEND_JAR})"
   fi
@@ -358,6 +380,11 @@ check_state() {
     fi
   else
     status_line "Tailscale" "missing"
+  fi
+
+  if [[ "${identity_ok}" -ne 0 ]]; then
+    warn "Installed release identity does not match the backend jar. Run 'sudo autark-os update' or reinstall a verified release bundle."
+    return 1
   fi
 }
 

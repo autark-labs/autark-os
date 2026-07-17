@@ -7,11 +7,13 @@ jar_dir="${repo_root}/backend/build/libs"
 fake_jar="${jar_dir}/autark-os-backend-artifacts-test.jar"
 trap 'rm -rf "${tmp_dir}"; rm -f "${fake_jar}"' EXIT
 
-mkdir -p "${jar_dir}"
-printf 'fake jar for release artifacts contract test\n' >"${fake_jar}"
+python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
+  --output "${fake_jar}" \
+  --version 3.4.5 \
+  --build-sha artifacts-build-sha
 
 artifacts_dir="${tmp_dir}/artifacts"
-"${repo_root}/scripts/build-release-artifacts.sh" \
+AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=artifacts-build-sha "${repo_root}/scripts/build-release-artifacts.sh" \
   --skip-build \
   --version 3.4.5 \
   --channel beta \
@@ -32,6 +34,9 @@ artifact_manifest="${artifacts_dir}/autark-os-artifacts.json"
 [[ -x "${run_installer}" ]]
 [[ -f "${checksums}" ]]
 [[ -f "${artifact_manifest}" ]]
+grep -q '^AUTARK_OS_VERSION=3.4.5$' "${bundle_dir}/autark-os-release.env"
+grep -q '^AUTARK_OS_BUILD_SHA=artifacts-build-sha$' "${bundle_dir}/autark-os-release.env"
+grep -q '^AUTARK_OS_BUILD_DATE=2026-01-01T00:00:00Z$' "${bundle_dir}/autark-os-release.env"
 
 tar -tzf "${tarball}" >/tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/scripts/autark-os$' /tmp/autark-os-tarball-contents.txt
@@ -46,6 +51,10 @@ dpkg-deb -c "${deb}" >/tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/backend/autark-os-backend.jar' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/scripts/autark-os' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/scripts/autark-os-fileops' /tmp/autark-os-deb-contents.txt
+deb_data_dir="${tmp_dir}/deb-data"
+dpkg-deb -x "${deb}" "${deb_data_dir}"
+grep -q '^AUTARK_OS_VERSION=3.4.5$' "${deb_data_dir}/usr/lib/autark-os/release/autark-os-release.env"
+grep -q '^AUTARK_OS_BUILD_SHA=artifacts-build-sha$' "${deb_data_dir}/usr/lib/autark-os/release/autark-os-release.env"
 
 control_dir="${tmp_dir}/deb-control"
 mkdir -p "${control_dir}"
@@ -87,6 +96,8 @@ extract_dir="${tmp_dir}/run-extract"
 [[ -x "${extract_dir}/scripts/bootstrap-autark-os.sh" ]]
 [[ -f "${extract_dir}/scripts/supported-host-matrix.env" ]]
 [[ -f "${extract_dir}/backend/autark-os-backend.jar" ]]
+grep -q '^AUTARK_OS_VERSION=3.4.5$' "${extract_dir}/autark-os-release.env"
+grep -q '^AUTARK_OS_BUILD_SHA=artifacts-build-sha$' "${extract_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_ARTIFACT_ARCHITECTURE=amd64$' "${extract_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_RUNTIME_ARCHITECTURE=amd64$' "${extract_dir}/autark-os-release.env"
 file -Lb "${extract_dir}/runtime/bin/java" | grep -qE 'x86-64|x86_64'
@@ -115,6 +126,8 @@ manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["schemaVersion"] == 2
 assert manifest["version"] == "3.4.5"
 assert manifest["channel"] == "beta"
+assert manifest["buildSha"] == "artifacts-build-sha"
+assert manifest["buildDate"] != "development"
 assert manifest["artifactArchitecture"] == "amd64"
 assert manifest["runtimeArchitecture"] == "amd64"
 assert manifest["supportedHostPolicyVersion"] == "2"

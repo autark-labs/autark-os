@@ -7,12 +7,14 @@ jar_dir="${repo_root}/backend/build/libs"
 fake_jar="${jar_dir}/autark-os-backend-contract-test.jar"
 trap 'rm -rf "${tmp_dir}"; rm -f "${fake_jar}"' EXIT
 
-mkdir -p "${jar_dir}"
-printf 'fake jar for release bundle contract test\n' >"${fake_jar}"
+python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
+  --output "${fake_jar}" \
+  --version 1.2.3 \
+  --build-sha contract-build-sha
 
 bundle_dir="${tmp_dir}/autark-os-1.2.3"
 architecture="$(dpkg --print-architecture)"
-"${repo_root}/scripts/build-release-bundle.sh" \
+AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${repo_root}/scripts/build-release-bundle.sh" \
   --skip-build \
   --version 1.2.3 \
   --channel beta \
@@ -32,6 +34,8 @@ architecture="$(dpkg --print-architecture)"
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
 
 grep -q '^AUTARK_OS_VERSION=1.2.3$' "${bundle_dir}/autark-os-release.env"
+grep -q '^AUTARK_OS_BUILD_SHA=contract-build-sha$' "${bundle_dir}/autark-os-release.env"
+grep -q '^AUTARK_OS_BUILD_DATE=2026-01-01T00:00:00Z$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_UPDATE_CHANNEL=beta$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_RELEASE_NOTES_URL=https://example.invalid/autark-os/1.2.3$' "${bundle_dir}/autark-os-release.env"
 grep -q "^AUTARK_OS_ARTIFACT_ARCHITECTURE=${architecture}$" "${bundle_dir}/autark-os-release.env"
@@ -55,6 +59,8 @@ provenance = json.load(open(sys.argv[2], encoding="utf-8"))
 assert release["schemaVersion"] == 2
 assert release["version"] == "1.2.3"
 assert release["channel"] == "beta"
+assert release["buildSha"] == "contract-build-sha"
+assert release["buildDate"] == "2026-01-01T00:00:00Z"
 assert release["releaseNotesUrl"] == "https://example.invalid/autark-os/1.2.3"
 assert release["artifactArchitecture"] in {"amd64", "arm64"}
 assert release["runtimeArchitecture"] == release["artifactArchitecture"]
@@ -69,10 +75,24 @@ assert "runtime/bin/java" in release["artifacts"]
 assert "scripts/autark-os-gui-installer.sh" in release["artifacts"]
 assert "scripts/autark-os-fileops" in release["artifacts"]
 assert provenance["schemaVersion"] == 2
+assert provenance["buildSha"] == release["buildSha"]
+assert provenance["buildDate"] == release["buildDate"]
 assert provenance["artifactArchitecture"] == release["artifactArchitecture"]
 assert provenance["runtimeArchitecture"] == release["runtimeArchitecture"]
 assert provenance["signatureStatus"] == "unsigned-reserved"
 PY
+
+mismatch_output="${tmp_dir}/identity-mismatch.out"
+if AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=other-build-sha "${repo_root}/scripts/build-release-bundle.sh" \
+  --skip-build \
+  --version 1.2.3 \
+  --channel beta \
+  --architecture "${architecture}" \
+  --output-dir "${tmp_dir}/identity-mismatch" >"${mismatch_output}" 2>&1; then
+  printf 'Expected --skip-build to reject a backend jar from a different build SHA.\n' >&2
+  exit 1
+fi
+grep -q "does not match requested release build SHA" "${mismatch_output}"
 
 python3 - "${bundle_dir}" <<'PY'
 from pathlib import Path

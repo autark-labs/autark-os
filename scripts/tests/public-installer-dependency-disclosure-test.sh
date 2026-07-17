@@ -7,11 +7,13 @@ jar_dir="${repo_root}/backend/build/libs"
 fake_jar="${jar_dir}/autark-os-backend-dependency-disclosure-test.jar"
 trap 'rm -rf "${tmp_dir}"; rm -f "${fake_jar}"' EXIT
 
-mkdir -p "${jar_dir}"
-printf 'fake jar for dependency disclosure test\n' >"${fake_jar}"
+python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
+  --output "${fake_jar}" \
+  --version 2.1.1 \
+  --build-sha dependency-disclosure-sha
 
 bundle_dir="${tmp_dir}/autark-os-2.1.1"
-"${repo_root}/scripts/build-release-bundle.sh" \
+AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=dependency-disclosure-sha "${repo_root}/scripts/build-release-bundle.sh" \
   --skip-build \
   --version 2.1.1 \
   --channel stable \

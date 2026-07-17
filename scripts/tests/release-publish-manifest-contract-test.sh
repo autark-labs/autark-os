@@ -39,6 +39,8 @@ manifest = {
     "name": "autark-os",
     "version": version,
     "channel": channel,
+    "buildSha": "abc123",
+    "buildDate": "2026-07-13T12:00:00Z",
     "artifactArchitecture": architecture,
     "runtimeArchitecture": architecture,
     "supportedHostPolicyVersion": "2",
@@ -98,7 +100,11 @@ assert manifest["prerelease"] is True
 assert manifest["publishedAt"] == "2026-07-13T12:00:00Z"
 assert manifest["minimumBootstrapSchemaVersion"] == 1
 assert manifest["supportedHostPolicyVersion"] == "2"
-assert manifest["source"] == {"repository": "autark-labs/autark-os", "buildSha": "abc123"}
+assert manifest["source"] == {
+    "repository": "autark-labs/autark-os",
+    "buildSha": "abc123",
+    "buildDate": "2026-07-13T12:00:00Z",
+}
 assert manifest["supportedHosts"]["ubuntu"]["versions"] == ["24.04", "26.04"]
 assert manifest["supportedHosts"]["debian"]["versions"] == ["12", "13"]
 assert manifest["supportedHosts"]["raspbian"]["versions"] == ["11", "12", "13"]
@@ -121,4 +127,3 @@ if "${repo_root}/scripts/compose-release-manifest.py" validate --release-dir "${
   exit 1
 fi
 grep -q 'Public artifact checksum mismatch' "${corrupt_output}"
-

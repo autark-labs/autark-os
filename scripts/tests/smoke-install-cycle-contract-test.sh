@@ -7,11 +7,13 @@ jar_dir="${repo_root}/backend/build/libs"
 fake_jar="${jar_dir}/autark-os-backend-smoke-contract-test.jar"
 trap 'rm -rf "${tmp_dir}"; rm -f "${fake_jar}"' EXIT
 
-mkdir -p "${jar_dir}"
-printf 'fake jar for smoke install cycle contract test\n' >"${fake_jar}"
+python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
+  --output "${fake_jar}" \
+  --version smoke-contract \
+  --build-sha smoke-contract-sha
 
 bundle_dir="${tmp_dir}/autark-os-smoke-bundle"
-"${repo_root}/scripts/build-release-bundle.sh" \
+AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=smoke-contract-sha "${repo_root}/scripts/build-release-bundle.sh" \
   --skip-build \
   --version smoke-contract \
   --channel smoke \

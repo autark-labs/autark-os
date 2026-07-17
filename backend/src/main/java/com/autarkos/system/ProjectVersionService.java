@@ -2,6 +2,8 @@ package com.autarkos.system;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
 
 import org.springframework.stereotype.Service;
 
@@ -13,20 +15,22 @@ public class ProjectVersionService {
     private final RuntimeLayout runtimeLayout;
     private final ProjectSettingsService settingsService;
     private final InstanceIdentityService identityService;
+    private final ReleaseIdentity packagedIdentity;
 
     public ProjectVersionService(RuntimeLayout runtimeLayout, ProjectSettingsService settingsService, InstanceIdentityService identityService) {
         this.runtimeLayout = runtimeLayout;
         this.settingsService = settingsService;
         this.identityService = identityService;
+        this.packagedIdentity = readPackagedIdentity();
     }
 
     public ProjectVersionInfo info() {
         ProjectSettings settings = settingsService.current();
         AutarkOsIdentity identity = identityService.current();
         return new ProjectVersionInfo(
-                firstPresent(System.getenv("AUTARK_OS_VERSION"), packageVersion(), "0.0.1-SNAPSHOT"),
-                firstPresent(System.getenv("AUTARK_OS_BUILD_SHA"), "development"),
-                firstPresent(System.getenv("AUTARK_OS_BUILD_DATE"), "development"),
+                firstPresent(packagedIdentity.version(), System.getenv("AUTARK_OS_VERSION"), "0.0.1-SNAPSHOT"),
+                firstPresent(packagedIdentity.buildSha(), System.getenv("AUTARK_OS_BUILD_SHA"), "development"),
+                firstPresent(packagedIdentity.buildDate(), System.getenv("AUTARK_OS_BUILD_DATE"), "development"),
                 firstPresent(System.getenv("AUTARK_OS_INSTALL_DIR"), "/opt/autark-os"),
                 runtimeLayout.runtimeRoot().toString(),
                 identity.instanceId(),
@@ -47,9 +51,22 @@ public class ProjectVersionService {
         return firstPresent(System.getenv("AUTARK_OS_BACKEND_JAR"), "/opt/autark-os/backend/autark-os-backend.jar");
     }
 
-    private String packageVersion() {
-        Package pkg = ProjectVersionService.class.getPackage();
-        return pkg == null ? "" : pkg.getImplementationVersion();
+    private ReleaseIdentity readPackagedIdentity() {
+        try {
+            Path artifact = Path.of(ProjectVersionService.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            if (!artifact.toString().endsWith(".jar")) {
+                return ReleaseIdentity.empty();
+            }
+            try (JarFile jar = new JarFile(artifact.toFile())) {
+                Attributes attributes = jar.getManifest().getMainAttributes();
+                return new ReleaseIdentity(
+                        attributes.getValue("Implementation-Version"),
+                        attributes.getValue("Autark-OS-Build-Sha"),
+                        attributes.getValue("Autark-OS-Build-Date"));
+            }
+        } catch (Exception ignored) {
+            return ReleaseIdentity.empty();
+        }
     }
 
     private String firstPresent(String... values) {
@@ -59,5 +76,11 @@ public class ProjectVersionService {
             }
         }
         return "";
+    }
+
+    private record ReleaseIdentity(String version, String buildSha, String buildDate) {
+        private static ReleaseIdentity empty() {
+            return new ReleaseIdentity("", "", "");
+        }
     }
 }

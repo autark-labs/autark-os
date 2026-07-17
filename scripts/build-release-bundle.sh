@@ -6,6 +6,12 @@ VERSION="${AUTARK_OS_VERSION:-0.0.1-SNAPSHOT}"
 CHANNEL="${AUTARK_OS_UPDATE_CHANNEL:-beta}"
 RELEASE_NOTES_URL="${AUTARK_OS_RELEASE_NOTES_URL:-}"
 ARTIFACT_ARCHITECTURE="${AUTARK_OS_ARTIFACT_ARCHITECTURE:-}"
+BUILD_SHA="${AUTARK_OS_BUILD_SHA:-}"
+BUILD_DATE="${AUTARK_OS_BUILD_DATE:-}"
+VERSION_WAS_PROVIDED=0
+BUILD_SHA_WAS_PROVIDED=0
+[[ -n "${AUTARK_OS_VERSION:-}" ]] && VERSION_WAS_PROVIDED=1
+[[ -n "${AUTARK_OS_BUILD_SHA:-}" ]] && BUILD_SHA_WAS_PROVIDED=1
 SKIP_BUILD=0
 DRY_RUN=0
 
@@ -29,6 +35,8 @@ Options:
   --channel VALUE   Release channel metadata. Default: ${CHANNEL}.
   --architecture VALUE Artifact architecture: amd64 or arm64. Default: build host architecture.
   --release-notes-url URL Release notes URL metadata.
+  --build-sha SHA    Build commit recorded in the backend jar and release metadata.
+  --build-date DATE  UTC build timestamp recorded in the backend jar and release metadata.
   --skip-build      Use the existing backend boot jar.
   --dry-run         Print actions without creating files.
   -h, --help        Show this help.
@@ -131,9 +139,11 @@ parse_args() {
         shift
         [[ $# -gt 0 ]] || die "--version requires a value."
         VERSION="$1"
+        VERSION_WAS_PROVIDED=1
         ;;
       --version=*)
         VERSION="${1#*=}"
+        VERSION_WAS_PROVIDED=1
         ;;
       --channel)
         shift
@@ -158,6 +168,24 @@ parse_args() {
         ;;
       --release-notes-url=*)
         RELEASE_NOTES_URL="${1#*=}"
+        ;;
+      --build-sha)
+        shift
+        [[ $# -gt 0 ]] || die "--build-sha requires a value."
+        BUILD_SHA="$1"
+        BUILD_SHA_WAS_PROVIDED=1
+        ;;
+      --build-sha=*)
+        BUILD_SHA="${1#*=}"
+        BUILD_SHA_WAS_PROVIDED=1
+        ;;
+      --build-date)
+        shift
+        [[ $# -gt 0 ]] || die "--build-date requires a value."
+        BUILD_DATE="$1"
+        ;;
+      --build-date=*)
+        BUILD_DATE="${1#*=}"
         ;;
       --supported-architectures|--supported-architectures=*)
         die "--supported-architectures has been replaced by one --architecture per artifact build."
@@ -184,10 +212,47 @@ parse_args() {
   if [[ "${OUTPUT_DIR}" != /* ]]; then
     OUTPUT_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
   fi
+  [[ -n "${BUILD_SHA}" ]] || BUILD_SHA="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || printf unknown)"
+  [[ -n "${BUILD_DATE}" ]] || BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if [[ "${SKIP_BUILD}" -eq 1 && "${DRY_RUN}" -eq 0 ]]; then
+    [[ "${VERSION_WAS_PROVIDED}" -eq 1 ]] || die "--skip-build requires an explicit --version or AUTARK_OS_VERSION."
+    [[ "${BUILD_SHA_WAS_PROVIDED}" -eq 1 ]] || die "--skip-build requires an explicit --build-sha or AUTARK_OS_BUILD_SHA."
+  fi
 }
 
 find_backend_jar() {
-  find "${REPO_ROOT}/backend/build/libs" -maxdepth 1 -type f -name 'autark-os-backend*.jar' ! -name '*plain*.jar' | sort | head -n 1
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    printf '%s\n' "${AUTARK_OS_BACKEND_JAR:-${REPO_ROOT}/backend/build/libs/autark-os-backend-VERSION.jar}"
+    return 0
+  fi
+  if [[ -n "${AUTARK_OS_BACKEND_JAR:-}" ]]; then
+    [[ -r "${AUTARK_OS_BACKEND_JAR}" ]] || die "AUTARK_OS_BACKEND_JAR is not readable: ${AUTARK_OS_BACKEND_JAR}"
+    printf '%s\n' "${AUTARK_OS_BACKEND_JAR}"
+    return 0
+  fi
+  local jars=()
+  mapfile -t jars < <(find "${REPO_ROOT}/backend/build/libs" -maxdepth 1 -type f -name 'autark-os-backend*.jar' ! -name '*plain*.jar' | sort)
+  [[ "${#jars[@]}" -eq 1 ]] || die "Expected exactly one backend boot jar. Set AUTARK_OS_BACKEND_JAR explicitly or remove stale jars from backend/build/libs."
+  printf '%s\n' "${jars[0]}"
+}
+
+jar_manifest_value() {
+  local jar="$1"
+  local key="$2"
+  has_command unzip || die "unzip is required to inspect the backend jar release identity."
+  unzip -p "${jar}" META-INF/MANIFEST.MF 2>/dev/null | tr -d '\r' | awk -F': ' -v key="${key}" '$1 == key {print $2; exit}'
+}
+
+verify_backend_jar_identity() {
+  local jar="$1"
+  local jar_version jar_sha jar_date
+  jar_version="$(jar_manifest_value "${jar}" Implementation-Version)"
+  jar_sha="$(jar_manifest_value "${jar}" Autark-OS-Build-Sha)"
+  jar_date="$(jar_manifest_value "${jar}" Autark-OS-Build-Date)"
+  [[ "${jar_version}" == "${VERSION}" ]] || die "Backend jar version '${jar_version:-missing}' does not match requested release version '${VERSION}'. Rebuild without --skip-build or select the matching jar."
+  [[ -n "${jar_sha}" && "${jar_sha}" != "development" && "${jar_sha}" != "unknown" ]] || die "Backend jar is missing a release build SHA. Rebuild without --skip-build."
+  [[ "${jar_sha}" == "${BUILD_SHA}" ]] || die "Backend jar build SHA '${jar_sha}' does not match requested release build SHA '${BUILD_SHA}'."
+  [[ -n "${jar_date}" && "${jar_date}" != "development" ]] || die "Backend jar is missing a release build date. Rebuild without --skip-build."
 }
 
 build_runtime() {
@@ -212,20 +277,17 @@ build_project() {
     run_cmd env bash -lc "cd '${REPO_ROOT}/frontend' && yarn install"
   fi
   log "Building backend boot jar."
-  run_cmd env AUTARK_OS_BUILD_VERSION="${VERSION}" \
+  run_cmd env AUTARK_OS_BUILD_VERSION="${VERSION}" AUTARK_OS_BUILD_SHA="${BUILD_SHA}" AUTARK_OS_BUILD_DATE="${BUILD_DATE}" \
     "${REPO_ROOT}/backend/gradlew" -p "${REPO_ROOT}/backend" clean bootJar
 }
 
 write_metadata() {
-  local build_sha build_date
-  build_sha="$(git -C "${REPO_ROOT}" rev-parse --short=12 HEAD 2>/dev/null || printf unknown)"
-  build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     cat <<META
 + cat > ${OUTPUT_DIR}/autark-os-release.env
 AUTARK_OS_VERSION=${VERSION}
-AUTARK_OS_BUILD_SHA=${build_sha}
-AUTARK_OS_BUILD_DATE=${build_date}
+AUTARK_OS_BUILD_SHA=${BUILD_SHA}
+AUTARK_OS_BUILD_DATE=${BUILD_DATE}
 AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
 AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
 AUTARK_OS_ARTIFACT_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
@@ -238,8 +300,8 @@ META
   fi
   cat >"${OUTPUT_DIR}/autark-os-release.env" <<META
 AUTARK_OS_VERSION=${VERSION}
-AUTARK_OS_BUILD_SHA=${build_sha}
-AUTARK_OS_BUILD_DATE=${build_date}
+AUTARK_OS_BUILD_SHA=${BUILD_SHA}
+AUTARK_OS_BUILD_DATE=${BUILD_DATE}
 AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
 AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
 AUTARK_OS_ARTIFACT_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
@@ -248,8 +310,8 @@ AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSIO
 AUTARK_OS_MIN_MEMORY_MB=${AUTARK_OS_MIN_MEMORY_MB}
 AUTARK_OS_MIN_DISK_KB=${AUTARK_OS_MIN_DISK_KB}
 META
-  write_release_json "${build_sha}" "${build_date}"
-  write_provenance_json "${build_sha}" "${build_date}"
+  write_release_json "${BUILD_SHA}" "${BUILD_DATE}"
+  write_provenance_json "${BUILD_SHA}" "${BUILD_DATE}"
 }
 
 json_space_list() {
@@ -337,7 +399,10 @@ JSON
 create_bundle() {
   local jar
   jar="$(find_backend_jar)"
-  [[ -n "${jar}" && -r "${jar}" ]] || die "No backend boot jar found. Run without --skip-build or build with './backend/gradlew -p backend bootJar'."
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    [[ -n "${jar}" && -r "${jar}" ]] || die "No backend boot jar found. Run without --skip-build or build with './backend/gradlew -p backend bootJar'."
+  fi
+  [[ "${DRY_RUN}" -eq 1 ]] || verify_backend_jar_identity "${jar}"
 
   log "Creating release bundle at ${OUTPUT_DIR}."
   run_cmd rm -rf "${OUTPUT_DIR}"
