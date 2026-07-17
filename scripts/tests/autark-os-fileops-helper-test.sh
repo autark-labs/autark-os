@@ -99,6 +99,7 @@ run.assert_called_once_with(
     check=False,
     capture_output=True,
     text=True,
+    env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/root", "LANG": "C"},
 )
 
 runtime = Path(sys.argv[2]) / "runtime"
@@ -107,6 +108,7 @@ external = Path(sys.argv[2]) / "external-backups"
 runtime.mkdir(parents=True, exist_ok=True)
 external.mkdir(exist_ok=True)
 module.DESTINATION_CONFIG = Path(sys.argv[2]) / "backup-destination.env"
+module.RUNTIME_CONFIG = Path(sys.argv[2]) / "autark-os.env"
 module.DESTINATION_CONFIG.write_text(
     f"BACKUP_DESTINATION_PATH={external}\nBACKUP_DESTINATION_MOUNT_IDENTITY=external-drive\n",
     encoding="utf-8",
@@ -123,6 +125,17 @@ with patch.object(module, "mount_identity", return_value="replacement-drive"):
     except SystemExit as error:
         assert error.code == 1
 
+module.RUNTIME_CONFIG.write_text(
+    f"AUTARK_OS_RUNTIME_ROOT={runtime}\n",
+    encoding="utf-8",
+)
+assert module.require_configured_runtime_root(runtime.resolve()) == runtime.resolve()
+try:
+    module.require_configured_runtime_root(Path(sys.argv[2]) / "another-runtime")
+    raise AssertionError("expected a non-installed runtime root to be rejected")
+except SystemExit as error:
+    assert error.code == 1
+
 with patch.object(module, "mount_identity", return_value="external-drive"):
     try:
         module.approved_backup_root(argparse.Namespace(runtime_root=runtime, backup_root=Path(sys.argv[2]) / "arbitrary"))
@@ -134,4 +147,22 @@ module.configure_backup_destination(argparse.Namespace(runtime_root=runtime, des
 saved = module.read_destination_config()
 assert saved.get("BACKUP_DESTINATION_PATH", "") == ""
 assert str(external.resolve()) in saved.get("BACKUP_DESTINATION_HISTORY", "")
+
+# A root helper must not follow an app-folder symlink outside the runtime.
+outside = Path(sys.argv[2]) / "outside-app"
+outside.mkdir(exist_ok=True)
+(runtime / "apps").mkdir(exist_ok=True)
+link = runtime / "apps" / "escaped"
+link.symlink_to(outside, target_is_directory=True)
+try:
+    module.app_root(argparse.Namespace(runtime_root=runtime, app="escaped"))
+    raise AssertionError("expected a symlinked app folder to be rejected")
+except SystemExit as error:
+    assert error.code == 1
+
+try:
+    module.repair_runtime_ownership(argparse.Namespace(runtime_root=runtime, app="home-assistant", user="root", group="root"))
+    raise AssertionError("expected arbitrary ownership repair to be rejected")
+except SystemExit as error:
+    assert error.code == 1
 PY

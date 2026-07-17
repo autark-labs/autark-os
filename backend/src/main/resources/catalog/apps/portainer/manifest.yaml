@@ -2,7 +2,7 @@ id: portainer
 metadata:
   name: Portainer
   category: Infrastructure
-  description: Advanced Docker management dashboard for users who understand container administration.
+  description: Advanced Docker management dashboard with full control of this host's Docker engine.
   shortValue: Inspect Docker resources from a browser-based management console.
   badge: Advanced
   downloads: 0
@@ -18,7 +18,7 @@ metadata:
   installTime: 2-4 minutes
   difficulty: Advanced
   supportLevel: Advanced
-  supportSummary: Available for experienced Docker operators; it can change resources outside Autark-OS management.
+  supportSummary: Available for experienced Docker operators; Docker socket access can change any container or host-mounted resource.
   accessUrl: http://localhost:9000
   tags: [Docker, Containers, Administration]
 testing:
@@ -29,10 +29,10 @@ testing:
 user:
   bestFor: [Experienced Docker operators]
   highlights: [Container inspection, Docker administration]
-  plainLanguage: Portainer is a powerful Docker control panel. Use it only when you are comfortable managing containers directly.
+  plainLanguage: Portainer is a powerful Docker control panel with full access to this server's Docker engine. Use it only when you are comfortable granting an app administrative Docker control.
 technical:
-  summary: Runs Portainer with persistent configuration and Docker socket access.
-  requirements: [Docker Engine, Docker socket access]
+  summary: Runs Portainer with persistent configuration and the host Docker socket. Docker socket access is effectively host-administrative.
+  requirements: [Docker Engine, Docker socket access with host-administrative impact]
   includes: [Portainer dashboard, Persistent configuration]
   configuration:
     - label: Dashboard URL
@@ -42,16 +42,16 @@ access:
   defaultMode: local-and-private
   privateAccessRecommended: true
   requiresFirstRunSetup: true
-  notes: [Portainer can manage resources outside Autark-OS.]
+  notes: [Portainer can manage resources outside Autark-OS and has administrative Docker control of this host.]
 usage:
   kind: admin-service
   primaryAction: open-dashboard
   openUrlLabel: Open Portainer
   headline: Manage Docker carefully
-  summary: Open Portainer to inspect Docker resources. Autark-OS-managed apps remain owned by Autark-OS.
-  setupSteps: [Create the Portainer administrator account, Avoid changing Autark-OS-managed resources directly]
+  summary: Open Portainer to inspect Docker resources. It has administrative Docker access; Autark-OS-managed apps remain owned by Autark-OS.
+  setupSteps: [Create the Portainer administrator account, Review the Docker access warning, Avoid changing Autark-OS-managed resources directly]
   fields: []
-  notes: [Use Autark-OS pages for managed app lifecycle actions.]
+  notes: [Use Autark-OS pages for managed app lifecycle actions. Do not grant Portainer access to untrusted users.]
 setup:
   kind: infrastructure
   automation: manual
@@ -61,6 +61,7 @@ setup:
       sensitive: false
   userSteps:
     - Open Portainer and create its administrator account.
+    - Treat Portainer access as administrative access to this host's Docker engine.
     - Use Autark-OS to install, update, back up, or remove Autark-OS-managed apps.
     - Review Portainer changes carefully before applying them to other Docker resources.
   automationCapabilities: []

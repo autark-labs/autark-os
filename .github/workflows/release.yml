@@ -176,6 +176,8 @@ jobs:
           bash scripts/tests/autark-os-cli-admin-session-test.sh
           bash scripts/tests/autark-os-admin-recovery-test.sh
           bash scripts/tests/autark-os-installer-support-bundle-test.sh
+          bash scripts/tests/service-hardening-contract-test.sh
+          bash scripts/tests/service-hardening-drift-test.sh
 
       - name: Build architecture-specific artifacts
         env:

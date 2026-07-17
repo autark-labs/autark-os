@@ -38,6 +38,26 @@ sudo /opt/autark-os/bin/install-autark-os-service.sh --dry-run
 
 These defaults can be changed with `--runtime-dir`, `--install-dir`, `--config-dir`, and `--log-dir`. Rerunning the installer with the same flags updates the systemd unit and environment file in place.
 
+## Privilege Boundary And Service Hardening
+
+Autark-OS runs the backend as the unprivileged `autarkos` system user. Its runtime data and logs are writable to that user; program files, the backend JAR, the systemd unit, the sudoers rule, and host configuration are owned by `root` and are not writable by `autarkos`.
+
+Autark-OS needs Docker access to manage supported apps. On standard Docker installations, membership in the `docker` group is effectively host-administrative access. Treat anyone who can control the Autark-OS backend or its catalog images as trusted to administer this host. Ordinary managed app containers do not receive the Docker socket or Autark-OS file helper.
+
+The systemd service uses a private temporary directory, read-only system paths, protected home/kernel/control-group settings, a restricted network socket list, a cleared capability set, a restrictive umask, and explicit writable runtime, log, and configuration paths. The configuration exception is only for the root-owned approved-backup destination record.
+
+`NoNewPrivileges`, `RestrictSUIDSGID`, and `MemoryDenyWriteExecute` remain disabled for now. The first two would prevent the service from invoking the bounded root helper through `sudo`; the last would prevent the Java runtime from using its normal just-in-time compiler. The helper is root-owned, its checksum is recorded during installation, and it accepts only named operations and managed runtime/approved backup paths; it cannot run arbitrary commands. This is intentionally a narrow exception until the helper can be replaced by a dedicated root service with a more restrictive interface.
+
+Run this after an upgrade or if you suspect local permission changes:
+
+```bash
+sudo /opt/autark-os/bin/install-autark-os-service.sh --check
+```
+
+If it reports hardening or ownership drift, rerun the same installer with your normal installation paths. Do not manually loosen the unit, sudoers file, or `/opt/autark-os` permissions to work around an app problem; use Diagnostics or support guidance instead.
+
+The reviewed hardening profile requires systemd 247 or newer. The installer checks that before changing service files, so an unsupported host leaves its current install in place for normal update rollback or recovery. Use a supported Debian, Ubuntu, or Raspberry Pi OS release rather than manually removing hardening directives.
+
 The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `autark-os version` reads the live backend when it is reachable and falls back to that env file when the service is stopped. The service check also compares that metadata with the backend JAR that is actually installed. If it reports a release-identity mismatch, run `sudo autark-os update` to replace the installed files from a verified release, or ask support to review the output.
 
 ## Local Administrator Credentials

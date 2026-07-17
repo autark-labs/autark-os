@@ -35,7 +35,7 @@ AUTARK_OS_ALLOW_INSTALL_COLLISION=1 "${repo_root}/scripts/install-autark-os-serv
   --port 8082 >"${tmp_dir}/override.out"
 
 grep -q "Collision preflight override enabled" "${tmp_dir}/override.out"
-grep -Fq "+ install -d -o root -g autarkos -m 0755 ${tmp_dir}/install/bin" "${tmp_dir}/override.out"
+grep -Fq "+ install -d -o root -g root -m 0755 ${tmp_dir}/install/bin" "${tmp_dir}/override.out"
 
 stale_config_dir="${tmp_dir}/stale-config"
 stale_runtime_dir="${tmp_dir}/stale-runtime"

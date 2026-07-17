@@ -25,7 +25,11 @@ import zipfile
 APP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 AUTARK_OS_SERVICE_USER = "autarkos"
 TRUSTED_TAILSCALE_PATHS = (Path("/usr/bin/tailscale"), Path("/usr/local/bin/tailscale"))
-DESTINATION_CONFIG = Path(os.environ.get("AUTARK_OS_FILEOPS_DESTINATION_CONFIG", "/etc/autark-os/backup-destination.env"))
+# This is deliberately not configurable by environment. The helper runs with
+# root privileges; allowing a caller to redirect its allow-list file would turn
+# an otherwise bounded operation into an arbitrary-path approval mechanism.
+DESTINATION_CONFIG = Path("/etc/autark-os/backup-destination.env")
+RUNTIME_CONFIG = Path("/etc/autark-os/autark-os.env")
 UNSUPPORTED_EXTERNAL_FILESYSTEMS = {"proc", "procfs", "sysfs", "devtmpfs", "tmpfs", "devpts", "cgroup", "cgroup2", "squashfs", "overlay", "ramfs"}
 SYSTEM_ROOTS = (Path("/etc"), Path("/root"), Path("/usr"), Path("/bin"), Path("/sbin"), Path("/proc"), Path("/sys"), Path("/dev"), Path("/tmp"))
 
@@ -102,6 +106,24 @@ def read_destination_config() -> dict[str, str]:
     return values
 
 
+def configured_runtime_root() -> Path | None:
+    """Return the runtime root recorded by the root-owned installed config."""
+    if not RUNTIME_CONFIG.is_file():
+        return None
+    for line in RUNTIME_CONFIG.read_text(encoding="utf-8").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.strip() == "AUTARK_OS_RUNTIME_ROOT" and value.strip():
+            return resolved(value.strip())
+    die("installed service configuration does not define AUTARK_OS_RUNTIME_ROOT")
+
+
+def require_configured_runtime_root(runtime_root: Path) -> Path:
+    configured_root = configured_runtime_root()
+    if configured_root is not None and runtime_root != configured_root:
+        die("runtime root does not match this installed Autark-OS service")
+    return runtime_root
+
+
 def configured_roots() -> dict[Path, str]:
     values = read_destination_config()
     roots: dict[Path, str] = {}
@@ -138,7 +160,10 @@ def require_app_id(app_id: str) -> str:
 
 def app_root(args: argparse.Namespace) -> Path:
     app_id = require_app_id(args.app)
-    return require_inside(args.runtime_root / "apps" / app_id, args.runtime_root / "apps", "app runtime path")
+    apps_root = resolved(args.runtime_root / "apps")
+    # Resolve existing path segments before comparison so a symlinked app
+    # folder cannot escape the managed runtime while this helper runs as root.
+    return require_inside(resolved(apps_root / app_id), apps_root, "app runtime path")
 
 
 def backup_path(args: argparse.Namespace, value: str, label: str = "backup path") -> Path:
@@ -320,7 +345,7 @@ def create_full_archive(args: argparse.Namespace) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for app_id in app_ids:
-            source = require_inside(args.runtime_root / "apps" / app_id, args.runtime_root / "apps", "app runtime path")
+            source = app_root(argparse.Namespace(runtime_root=args.runtime_root, app=app_id))
             if not source.exists():
                 continue
             for path in source.rglob("*"):
@@ -342,6 +367,8 @@ def delete_backup(args: argparse.Namespace) -> None:
 
 
 def repair_runtime_ownership(args: argparse.Namespace) -> None:
+    if args.user != AUTARK_OS_SERVICE_USER or args.group != AUTARK_OS_SERVICE_USER:
+        die("runtime ownership can only be repaired for the autarkos service user")
     root = app_root(args)
     uid = pwd.getpwnam(args.user).pw_uid
     gid = grp.getgrnam(args.group).gr_gid
@@ -364,6 +391,7 @@ def configure_tailscale_operator(_args: argparse.Namespace) -> None:
         check=False,
         capture_output=True,
         text=True,
+        env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "HOME": "/root", "LANG": "C"},
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "tailscale returned no details").strip()
@@ -408,6 +436,7 @@ def main(argv: list[str]) -> int:
     if not args.runtime_root or not args.backup_root:
         die("--runtime-root and --backup-root are required for file operations")
     args.runtime_root = resolved(args.runtime_root)
+    args.runtime_root = require_configured_runtime_root(args.runtime_root)
     if args.operation == "configure-backup-destination":
         if not args.destination:
             die("--destination is required")

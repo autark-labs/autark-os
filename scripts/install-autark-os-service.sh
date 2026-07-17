@@ -99,6 +99,19 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+require_supported_systemd_hardening() {
+  # ProtectClock is the newest directive in the reviewed unit profile. Debian
+  # 11/Raspberry Pi OS Bullseye ships systemd 247; every supported target is
+  # at or above that baseline. Refuse before changing files on older hosts so
+  # an update leaves the previous unit available for rollback.
+  command_exists systemctl || return 0
+  local systemd_version
+  systemd_version="$(systemctl --version 2>/dev/null | awk 'NR == 1 {print $2}')"
+  if [[ "${systemd_version}" =~ ^[0-9]+$ && "${systemd_version}" -lt 247 ]]; then
+    die "Autark-OS requires systemd 247 or newer for its supported service hardening profile. No service files were changed; upgrade this host or use a supported OS release."
+  fi
+}
+
 refresh_derived_paths() {
   TARGET_BACKEND_JAR="${INSTALL_DIR}/backend/autark-os-backend.jar"
   TARGET_RUNTIME_DIR="${INSTALL_DIR}/runtime"
@@ -265,11 +278,12 @@ path_mount_summary() {
 check_state() {
   log "Checking Autark-OS service-user setup."
   local installed_env="${CONFIG_DIR}/autark-os.env"
-  local installed_version installed_sha installed_date
-  local jar_version="" jar_sha="" jar_date="" identity_ok=0
+  local installed_version installed_sha installed_date installed_helper_sha actual_helper_sha
+  local jar_version="" jar_sha="" jar_date="" identity_ok=0 security_ok=0
   installed_version="$(env_file_value "${installed_env}" AUTARK_OS_VERSION)"
   installed_sha="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_SHA)"
   installed_date="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_DATE)"
+  installed_helper_sha="$(env_file_value "${installed_env}" AUTARK_OS_FILEOPS_HELPER_SHA256)"
   [[ -n "${installed_version}" ]] || installed_version="${AUTARK_OS_VERSION}"
   [[ -n "${installed_sha}" ]] || installed_sha="$(build_sha)"
   [[ -n "${installed_date}" ]] || installed_date="$(build_date)"
@@ -384,13 +398,130 @@ check_state() {
     status_line "Tailscale" "missing"
   fi
 
+  # Only enforce ownership checks for real system locations. Custom paths are
+  # deliberately supported for isolated tests and development installations.
+  if [[ "${AUTARK_OS_ENFORCE_SERVICE_HARDENING_CHECK:-0}" == 1 || "${INSTALL_DIR}" == /opt/* || "${CONFIG_DIR}" == /etc/* || "${SERVICE_FILE}" == /etc/* || "${SUDOERS_FILE}" == /etc/* ]]; then
+    local security_paths_ok=1
+    check_root_owned_path() {
+      local label="$1"
+      local path="$2"
+      local required="$3"
+      if [[ ! -e "${path}" ]]; then
+        status_line "${label}" "missing (${path})"
+        security_paths_ok=0
+        return
+      fi
+      local owner mode
+      owner="$(stat -c '%U' "${path}" 2>/dev/null || printf 'unknown')"
+      mode="$(stat -c '%a' "${path}" 2>/dev/null || printf '0000')"
+      if [[ "${owner}" != root || ! "${mode}" =~ ^[0-7]{3,4}$ || $(( 8#${mode} & 0022 )) -ne 0 ]]; then
+        status_line "${label}" "needs repair (${owner}:${mode})"
+        security_paths_ok=0
+        return
+      fi
+      status_line "${label}" "protected (${owner}:${mode})"
+    }
+    check_root_owned_path "Installed helper" "${INSTALLED_FILEOPS_HELPER}" "required"
+    check_root_owned_path "Autark-OS command" "${INSTALLED_CLI}" "required"
+    check_root_owned_path "Bootstrap helper" "${INSTALLED_BOOTSTRAP}" "required"
+    check_root_owned_path "Host support matrix" "${INSTALLED_HOST_MATRIX}" "required"
+    check_root_owned_path "Installed backend" "${TARGET_BACKEND_JAR}" "required"
+    check_root_owned_path "Program directory" "${INSTALL_DIR}" "required"
+    check_root_owned_path "Service unit" "${SERVICE_FILE}" "required"
+    check_root_owned_path "Sudoers rule" "${SUDOERS_FILE}" "required"
+    check_root_owned_path "Service environment" "${installed_env}" "required"
+    if [[ -e "${CONFIG_DIR}/backup-destination.env" ]]; then
+      check_root_owned_path "Backup destination policy" "${CONFIG_DIR}/backup-destination.env" "optional"
+    fi
+    if [[ -x "${INSTALLED_FILEOPS_HELPER}" && -n "${installed_helper_sha}" ]] && command_exists sha256sum; then
+      actual_helper_sha="$(sha256sum "${INSTALLED_FILEOPS_HELPER}" | awk '{print $1}')"
+      if [[ "${actual_helper_sha}" != "${installed_helper_sha}" ]]; then
+        status_line "Installed helper identity" "needs repair (checksum differs)"
+        security_paths_ok=0
+      else
+        status_line "Installed helper identity" "verified"
+      fi
+    elif [[ -x "${INSTALLED_FILEOPS_HELPER}" ]]; then
+      status_line "Installed helper identity" "needs repair (checksum is missing)"
+      security_paths_ok=0
+    fi
+    if [[ -f "${SERVICE_FILE}" ]]; then
+      local required_directives=(
+        'NoNewPrivileges=false'
+        'PrivateTmp=true'
+        'ProtectSystem=strict'
+        'ProtectHome=true'
+        'ProtectKernelTunables=true'
+        'ProtectKernelModules=true'
+        'ProtectControlGroups=true'
+        'ProtectClock=true'
+        'ProtectKernelLogs=true'
+        'PrivateDevices=true'
+        'LockPersonality=true'
+        'RestrictRealtime=true'
+        'SystemCallArchitectures=native'
+        'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6'
+        'CapabilityBoundingSet='
+        'AmbientCapabilities='
+      )
+      local directive
+      for directive in "${required_directives[@]}"; do
+        if ! grep -Fxq "${directive}" "${SERVICE_FILE}"; then
+          status_line "Service hardening" "needs repair (missing ${directive})"
+          security_paths_ok=0
+          break
+        fi
+      done
+      if ! grep -Fxq "ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}" "${SERVICE_FILE}"; then
+        status_line "Service hardening" "needs repair (missing explicit writable paths)"
+        security_paths_ok=0
+      fi
+    fi
+    if [[ -f "${SUDOERS_FILE}" ]] && ! grep -Fqx "${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_FILEOPS_HELPER} *" "${SUDOERS_FILE}"; then
+      status_line "Sudoers rule" "needs repair (helper allow-list differs)"
+      security_paths_ok=0
+    fi
+    if id "${AUTARK_OS_USER}" >/dev/null 2>&1; then
+      local service_groups unexpected_group=""
+      service_groups="$(id -nG "${AUTARK_OS_USER}")"
+      local group_name
+      for group_name in ${service_groups}; do
+        if [[ "${group_name}" != "${AUTARK_OS_GROUP}" && "${group_name}" != docker ]]; then
+          unexpected_group="${group_name}"
+          break
+        fi
+      done
+      if [[ -n "${unexpected_group}" ]]; then
+        status_line "Service user groups" "needs review (unexpected ${unexpected_group})"
+        security_paths_ok=0
+      else
+        status_line "Service user groups" "expected (${service_groups})"
+      fi
+    else
+      status_line "Service user groups" "needs repair (service user is missing)"
+      security_paths_ok=0
+    fi
+    if [[ "${security_paths_ok}" -eq 1 ]]; then
+      status_line "Service hardening" "protected (privileged helper exception documented)"
+    else
+      security_ok=1
+    fi
+  else
+    status_line "Service hardening" "not checked for custom paths"
+  fi
+
   if [[ "${identity_ok}" -ne 0 ]]; then
     warn "Installed release identity does not match the backend jar. Run 'sudo autark-os update' or reinstall a verified release bundle."
+    return 1
+  fi
+  if [[ "${security_ok}" -ne 0 ]]; then
+    warn "Installed service permissions or hardening directives have drifted. Run 'sudo ${INSTALLED_SETUP_SCRIPT}' to repair them."
     return 1
   fi
 }
 
 preflight_host() {
+  require_supported_systemd_hardening
   if [[ -x "${RUNTIME_IMAGE_SOURCE}/bin/java" && -z "${AUTARK_OS_JAVA_BIN:-}" ]]; then
     JAVA_BIN="${RUNTIME_IMAGE_SOURCE}/bin/java"
   fi
@@ -513,14 +644,14 @@ ensure_directories() {
   run install -d -o root -g "${AUTARK_OS_GROUP}" -m 0750 "${CONFIG_DIR}"
   run install -d -o "${AUTARK_OS_USER}" -g "${AUTARK_OS_GROUP}" -m 0750 "${LOG_DIR}"
   run install -d -o root -g root -m 0755 "${INSTALL_DIR}"
-  run install -d -o root -g "${AUTARK_OS_GROUP}" -m 0750 "${INSTALL_DIR}/backend"
+  run install -d -o root -g root -m 0755 "${INSTALL_DIR}/backend"
   # The installed command is intentionally available to the interactive host
   # user through /usr/local/bin. Runtime and configuration paths remain private.
-  run install -d -o root -g "${AUTARK_OS_GROUP}" -m 0755 "${INSTALL_DIR}/bin"
+  run install -d -o root -g root -m 0755 "${INSTALL_DIR}/bin"
 }
 
 install_setup_script() {
-  run install -o root -g "${AUTARK_OS_GROUP}" -m 0750 "${SCRIPT_PATH}" "${INSTALLED_SETUP_SCRIPT}"
+  run install -o root -g root -m 0750 "${SCRIPT_PATH}" "${INSTALLED_SETUP_SCRIPT}"
   log "Installed setup script to ${INSTALLED_SETUP_SCRIPT}."
 }
 
@@ -532,11 +663,11 @@ install_cli() {
     warn "Autark-OS helper command is missing from ${cli_source}."
     return 0
   fi
-  run install -o root -g "${AUTARK_OS_GROUP}" -m 0755 "${cli_source}" "${INSTALLED_CLI}"
+  run install -o root -g root -m 0755 "${cli_source}" "${INSTALLED_CLI}"
   log "Installed Autark-OS helper command to ${INSTALLED_CLI}."
   if [[ -f "${bootstrap_source}" && -f "${host_matrix_source}" ]]; then
-    run install -o root -g "${AUTARK_OS_GROUP}" -m 0755 "${bootstrap_source}" "${INSTALLED_BOOTSTRAP}"
-    run install -o root -g "${AUTARK_OS_GROUP}" -m 0644 "${host_matrix_source}" "${INSTALLED_HOST_MATRIX}"
+    run install -o root -g root -m 0755 "${bootstrap_source}" "${INSTALLED_BOOTSTRAP}"
+    run install -o root -g root -m 0644 "${host_matrix_source}" "${INSTALLED_HOST_MATRIX}"
     log "Installed shared installer helpers beside the Autark-OS command."
   else
     warn "Shared installer helpers are missing. The installed 'autark-os install' and installer support-report plan may be unavailable."
@@ -649,7 +780,7 @@ install_backend_jar() {
     return 1
   fi
   [[ -f "${source_jar}" ]] || die "Backend jar does not exist: ${source_jar}"
-  run install -o root -g "${AUTARK_OS_GROUP}" -m 0640 "${source_jar}" "${TARGET_BACKEND_JAR}"
+  run install -o root -g root -m 0644 "${source_jar}" "${TARGET_BACKEND_JAR}"
   BACKEND_JAR_READY=1
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     log "Would install backend jar to ${TARGET_BACKEND_JAR}."
@@ -720,6 +851,8 @@ install_runtime_image() {
   else
     rm -rf "${TARGET_RUNTIME_DIR}"
     cp -a "${RUNTIME_IMAGE_SOURCE}" "${TARGET_RUNTIME_DIR}"
+    chown -R root:root "${TARGET_RUNTIME_DIR}"
+    chmod -R go-w "${TARGET_RUNTIME_DIR}"
   fi
   JAVA_BIN="${TARGET_RUNTIME_DIR}/bin/java"
 }
@@ -727,6 +860,7 @@ install_runtime_image() {
 write_env_file() {
   local env_file="${CONFIG_DIR}/autark-os.env"
   local setup_command="sudo ${INSTALLED_SETUP_SCRIPT}"
+  local fileops_helper_sha=""
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     log "Would write ${env_file} with runtime root ${RUNTIME_DIR} and port ${SERVER_PORT}."
     return 0
@@ -735,7 +869,12 @@ write_env_file() {
   local tmp_file
   tmp_file="$(mktemp)"
   if [[ -f "${env_file}" ]]; then
-    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_FILEOPS_HELPER|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
+    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_FILEOPS_HELPER|AUTARK_OS_FILEOPS_HELPER_SHA256|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
+  fi
+  if command_exists sha256sum; then
+    fileops_helper_sha="$(sha256sum "${INSTALLED_FILEOPS_HELPER}" | awk '{print $1}')"
+  else
+    die "sha256sum is required to record the installed privileged helper identity."
   fi
   cat >>"${tmp_file}" <<EOF
 AUTARK_OS_RUNTIME_ROOT=${RUNTIME_DIR}
@@ -744,6 +883,7 @@ AUTARK_OS_CONFIG_DIR=${CONFIG_DIR}
 AUTARK_OS_LOG_DIR=${LOG_DIR}
 AUTARK_OS_BACKEND_JAR=${TARGET_BACKEND_JAR}
 AUTARK_OS_FILEOPS_HELPER=${INSTALLED_FILEOPS_HELPER}
+AUTARK_OS_FILEOPS_HELPER_SHA256=${fileops_helper_sha}
 AUTARK_OS_VERSION=${AUTARK_OS_VERSION}
 AUTARK_OS_BUILD_SHA=$(build_sha)
 AUTARK_OS_BUILD_DATE=$(build_date)
@@ -790,7 +930,29 @@ ExecStart=${JAVA_BIN} -jar ${TARGET_BACKEND_JAR}
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=5
+# The bounded root helper is invoked through sudo for restore, cleanup, and
+# Tailscale operator repair. sudo needs to retain its setuid transition, so
+# NoNewPrivileges cannot be enabled until that helper becomes a dedicated root
+# service. All other compatible sandboxing remains enabled below.
 NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectKernelLogs=true
+PrivateDevices=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+# The root helper also writes the root-owned approved-backup destination file.
+ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}
 
 [Install]
 WantedBy=multi-user.target
