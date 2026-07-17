@@ -16,6 +16,7 @@ const routes: RouteCase[] = [
   { name: 'Discover', path: '/discover', expected: /Discover Apps/i },
   { name: 'Access', path: '/access', expected: /^Access$/i },
   { name: 'Backups', path: '/backups', expected: /Create a manual backup/i },
+  { name: 'Autark Pro', path: '/pro', expected: /Autark Pro is being built/i },
   { name: 'Storage', path: '/storage', expected: /Space breakdown/i },
   { name: 'Settings', path: '/settings', expected: /Autark-OS controls/i },
   { name: 'Diagnostics', path: '/diagnostics', expected: /Autark-OS Diagnostics/i },
@@ -24,6 +25,11 @@ const routes: RouteCase[] = [
 async function openRoute(page: Page, route: RouteCase) {
   await installMockApi(page, route.scenario ?? 'ready');
   await page.goto(route.path, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: route.expected }).first()).toBeVisible();
+  if (route.path === '/pro') {
+    await expect(page).toHaveTitle(/Autark Pro · Autark-OS/i);
+  }
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: route.expected }).first()).toBeVisible();
   await stabilizePage(page);
 }
@@ -70,5 +76,16 @@ test('loading, empty, and error fixtures retain clear user-facing states', async
   await installMockApi(page, 'error');
   await page.goto('/storage', { waitUntil: 'domcontentloaded' });
   await expect(page.getByText(/Fixture storage service is unavailable/i)).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('an unknown browser route renders the intentional not-found page', async ({ page }) => {
+  await installMockApi(page, 'ready');
+  await page.goto('/no-longer-here?source=bookmark', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: /That page is not part of this Autark-OS server/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Go to Home/i })).toBeVisible();
+  await expect(page).toHaveTitle(/Page not found · Autark-OS/i);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { name: /That page is not part of this Autark-OS server/i })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });

@@ -18,7 +18,8 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@spa-route-manifest": ["../backend/src/main/resources/spa-route-manifest.json"]
     }
   },
   "include": ["src/main.tsx", "src/**/*.d.ts"],

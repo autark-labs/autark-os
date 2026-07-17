@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { AdminSecurityAPIClient } from './api/AdminSecurityAPIClient';
@@ -11,7 +11,9 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ProjectPrimaryButton } from './components/primitives/ProjectButtons';
 import AppShell from './layout/AppShell';
 import { routeAliases } from './layout/navigationModel';
+import { appRoutes, specialRoutes } from './appRouteManifest';
 import { ADMIN_SESSION_EXPIRED_EVENT, clearLegacyAdminToken, markAdminSessionActive, type AdminSessionEndReason } from './lib/adminSecuritySession';
+import { RouteLoadErrorBoundary } from './components/autark-os/RouteLoadErrorBoundary';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
 import { Toaster } from './components/ui/sonner';
@@ -27,6 +29,7 @@ const ResolveExistingAppsPage = lazy(() => import('./pages/ResolveExistingAppsPa
 const SettingsPage = lazy(() => import('./pages/SettingsPage/SettingsPage'));
 const StoragePage = lazy(() => import('./pages/StoragePage/StoragePage'));
 const SupportPage = lazy(() => import('./pages/SupportPage/SupportPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage/NotFoundPage'));
 
 type BootState =
   | { phase: 'loading' }
@@ -48,6 +51,14 @@ function PageFallback({ fullScreen = false }: { fullScreen?: boolean }) {
         <span>{fullScreen ? 'Starting Autark-OS' : 'Loading page'}</span>
       </div>
     </div>
+  );
+}
+
+function LazyRoute({ children, fullScreen = false, pageName }: { children: ReactNode; fullScreen?: boolean; pageName: string }) {
+  return (
+    <RouteLoadErrorBoundary fullScreen={fullScreen} pageName={pageName}>
+      <Suspense fallback={<PageFallback fullScreen={fullScreen} />}>{children}</Suspense>
+    </RouteLoadErrorBoundary>
   );
 }
 
@@ -178,23 +189,24 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
       <ProjectSettingsProvider>
         <Routes>
           <Route element={<AppShell />}>
-            <Route index element={<Navigate replace to="/home" />} />
+            <Route index element={<Navigate replace to={appRoutes.home} />} />
             {Object.entries(routeAliases).map(([from, to]) => (
-              <Route element={<Navigate replace to={to} />} key={from} path={from} />
+              <Route element={<LegacyRouteRedirect to={to} />} key={from} path={from} />
             ))}
-            <Route path="/home" element={<Suspense fallback={<PageFallback />}><OverviewPage /></Suspense>} />
-            <Route path="/setup" element={<Navigate replace to="/home" />} />
-            <Route path="/apps" element={<Suspense fallback={<PageFallback />}><ApplicationsPage /></Suspense>} />
-            <Route path="/apps/found" element={<Suspense fallback={<PageFallback />}><ResolveExistingAppsPage /></Suspense>} />
-            <Route path="/resolve-existing-apps" element={<Navigate replace to="/apps/found" />} />
-            <Route path="/discover" element={<Suspense fallback={<PageFallback />}><MarketplacePage /></Suspense>} />
-            <Route path="/access" element={<Suspense fallback={<PageFallback />}><NetworkPage /></Suspense>} />
-            <Route path="/storage" element={<Suspense fallback={<PageFallback />}><StoragePage /></Suspense>} />
-            <Route path="/backups" element={<Suspense fallback={<PageFallback />}><BackupsPage /></Suspense>} />
-            <Route path="/pro" element={<Suspense fallback={<PageFallback />}><ProPage /></Suspense>} />
-            <Route path="/activity" element={<Suspense fallback={<PageFallback />}><MonitoringPage /></Suspense>} />
-            <Route path="/settings" element={<Suspense fallback={<PageFallback />}><SettingsPage /></Suspense>} />
-            <Route path="/diagnostics" element={<Suspense fallback={<PageFallback />}><SupportPage /></Suspense>} />
+            <Route path={appRoutes.home} element={<LazyRoute pageName="Home"><OverviewPage /></LazyRoute>} />
+            <Route path={specialRoutes.setup} element={<Navigate replace to={appRoutes.home} />} />
+            <Route path={appRoutes.apps} element={<LazyRoute pageName="My Apps"><ApplicationsPage /></LazyRoute>} />
+            <Route path={specialRoutes.foundApps} element={<LazyRoute pageName="Existing apps"><ResolveExistingAppsPage /></LazyRoute>} />
+            <Route path={specialRoutes.resolveExistingApps} element={<Navigate replace to={specialRoutes.foundApps} />} />
+            <Route path={appRoutes.discover} element={<LazyRoute pageName="Discover"><MarketplacePage /></LazyRoute>} />
+            <Route path={appRoutes.access} element={<LazyRoute pageName="Access"><NetworkPage /></LazyRoute>} />
+            <Route path={appRoutes.storage} element={<LazyRoute pageName="Storage"><StoragePage /></LazyRoute>} />
+            <Route path={appRoutes.backups} element={<LazyRoute pageName="Backups"><BackupsPage /></LazyRoute>} />
+            <Route path={appRoutes.pro} element={<LazyRoute pageName="Autark Pro"><ProPage /></LazyRoute>} />
+            <Route path={appRoutes.activity} element={<LazyRoute pageName="Activity Log"><MonitoringPage /></LazyRoute>} />
+            <Route path={appRoutes.settings} element={<LazyRoute pageName="Settings"><SettingsPage /></LazyRoute>} />
+            <Route path={appRoutes.diagnostics} element={<LazyRoute pageName="Diagnostics"><SupportPage /></LazyRoute>} />
+            <Route path="*" element={<LazyRoute pageName="Page not found"><NotFoundPage /></LazyRoute>} />
           </Route>
         </Routes>
       </ProjectSettingsProvider>
@@ -205,10 +217,15 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
 function IncompleteOnboardingRoutes({ onComplete }: { onComplete: () => void }) {
   return (
     <Routes>
-      <Route path="/setup" element={<Suspense fallback={<PageFallback fullScreen />}><SetupRoute onComplete={onComplete} /></Suspense>} />
+      <Route path={specialRoutes.setup} element={<LazyRoute fullScreen pageName="Setup"><SetupRoute onComplete={onComplete} /></LazyRoute>} />
       <Route path="*" element={<RedirectToSetup />} />
     </Routes>
   );
+}
+
+function LegacyRouteRedirect({ to }: { to: string }) {
+  const location = useLocation();
+  return <Navigate replace to={{ hash: location.hash, pathname: to, search: location.search }} />;
 }
 
 function RedirectToSetup() {

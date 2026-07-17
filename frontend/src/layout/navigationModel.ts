@@ -1,30 +1,22 @@
+import { appRoutes } from '@/appRouteManifest';
+
+export { routeAliases } from '@/appRouteManifest';
+
 export const primaryNavigation = [
-  { id: 'home', label: 'Home', to: '/home', icon: 'home', activePaths: ['/home', '/overview'] },
-  { id: 'apps', label: 'My Apps', to: '/apps', icon: 'apps', activePaths: ['/apps', '/applications'] },
-  { id: 'discover', label: 'Discover', to: '/discover', icon: 'discover', activePaths: ['/discover', '/marketplace'] },
-  { id: 'access', label: 'Access', to: '/access', icon: 'access', activePaths: ['/access', '/network'] },
-  { id: 'backups', label: 'Backups', to: '/backups', icon: 'backups', activePaths: ['/backups'] },
-  { id: 'pro', label: 'Autark Pro', to: '/pro', icon: 'pro', activePaths: ['/pro'] },
+  { id: 'home', label: 'Home', to: appRoutes.home, icon: 'home', activePaths: [appRoutes.home, '/overview'] },
+  { id: 'apps', label: 'My Apps', to: appRoutes.apps, icon: 'apps', activePaths: [appRoutes.apps, '/applications'] },
+  { id: 'discover', label: 'Discover', to: appRoutes.discover, icon: 'discover', activePaths: [appRoutes.discover, '/marketplace'] },
+  { id: 'access', label: 'Access', to: appRoutes.access, icon: 'access', activePaths: [appRoutes.access, '/network'] },
+  { id: 'backups', label: 'Backups', to: appRoutes.backups, icon: 'backups', activePaths: [appRoutes.backups] },
+  { id: 'pro', label: 'Autark Pro', to: appRoutes.pro, icon: 'pro', activePaths: [appRoutes.pro] },
 ];
 
 export const advancedNavigation = [
-  { id: 'storage', label: 'Storage', to: '/storage', icon: 'storage', activePaths: ['/storage', '/files-storage'] },
-  { id: 'settings', label: 'Settings', to: '/settings', icon: 'settings', activePaths: ['/settings'] },
-  { id: 'diagnostics', label: 'Diagnostics', to: '/diagnostics', icon: 'diagnostics', activePaths: ['/diagnostics', '/terminal', '/safe-diagnostics'] },
-  { id: 'activity', label: 'Activity Log', to: '/activity', icon: 'activity', activePaths: ['/activity', '/monitoring', '/system-activity'] },
+  { id: 'storage', label: 'Storage', to: appRoutes.storage, icon: 'storage', activePaths: [appRoutes.storage, '/files-storage'] },
+  { id: 'settings', label: 'Settings', to: appRoutes.settings, icon: 'settings', activePaths: [appRoutes.settings] },
+  { id: 'diagnostics', label: 'Diagnostics', to: appRoutes.diagnostics, icon: 'diagnostics', activePaths: [appRoutes.diagnostics, '/terminal', '/safe-diagnostics'] },
+  { id: 'activity', label: 'Activity Log', to: appRoutes.activity, icon: 'activity', activePaths: [appRoutes.activity, '/monitoring', '/system-activity'] },
 ];
-
-export const routeAliases = {
-  '/overview': '/home',
-  '/applications': '/apps',
-  '/marketplace': '/discover',
-  '/network': '/access',
-  '/files-storage': '/storage',
-  '/terminal': '/diagnostics',
-  '/safe-diagnostics': '/diagnostics',
-  '/monitoring': '/activity',
-  '/system-activity': '/activity',
-};
 
 export function navigationGroups(viewMode = 'basic') {
   const groups = [

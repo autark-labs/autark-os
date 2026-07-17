@@ -1,0 +1,31 @@
+{
+  "routes": {
+    "home": "/home",
+    "apps": "/apps",
+    "discover": "/discover",
+    "access": "/access",
+    "storage": "/storage",
+    "backups": "/backups",
+    "pro": "/pro",
+    "activity": "/activity",
+    "settings": "/settings",
+    "diagnostics": "/diagnostics"
+  },
+  "specialRoutes": {
+    "root": "/",
+    "setup": "/setup",
+    "foundApps": "/apps/found",
+    "resolveExistingApps": "/resolve-existing-apps"
+  },
+  "aliases": {
+    "/overview": "/home",
+    "/applications": "/apps",
+    "/marketplace": "/discover",
+    "/network": "/access",
+    "/files-storage": "/storage",
+    "/terminal": "/diagnostics",
+    "/safe-diagnostics": "/diagnostics",
+    "/monitoring": "/activity",
+    "/system-activity": "/activity"
+  }
+}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ArrowRight, Layers3, ShieldCheck, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PageShell } from '@/components/layout/PageShell';
@@ -6,14 +7,18 @@ import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/pri
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 
 function ProPage() {
+  useEffect(() => {
+    document.title = 'Autark Pro · Autark-OS';
+  }, []);
+
   return (
     <PageShell>
-      <ProjectPanel className="overflow-hidden p-0">
+      <ProjectPanel aria-labelledby="pro-page-title" className="overflow-hidden p-0">
         <div className="border-b border-cyan-300/20 bg-app-hero-default p-6 md:p-8">
           <MetadataBadge tone="info">Separate paid app</MetadataBadge>
           <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-2xl">
-              <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl">Autark Pro is being built as a standalone app.</h1>
+              <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl" id="pro-page-title">Autark Pro is being built as a standalone app.</h1>
               <p className="mt-4 text-base leading-7 text-sky-100/80">The free Autark-OS appliance stays fully local. It does not register this server, accept license codes, send heartbeats, or connect to a Pro service.</p>
             </div>
             <span className="grid size-14 shrink-0 place-items-center rounded-2xl border border-cyan-300/25 bg-cyan-400/10 text-cyan-100"><Sparkles className="size-7" /></span>
