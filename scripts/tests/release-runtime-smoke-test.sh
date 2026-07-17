@@ -90,3 +90,4 @@ printf 'SERVER_PORT=%s\n' "${port}" >"${cli_config}"
 AUTARK_OS_CONFIG_FILE="${cli_config}" "${bundle_dir}/scripts/autark-os" version >"${tmp_dir}/cli-version.out"
 grep -q "Version:.*${jar_version}" "${tmp_dir}/cli-version.out"
 grep -q "Build SHA:.*${jar_sha}" "${tmp_dir}/cli-version.out"
+"${bundle_dir}/scripts/autark-os" help | grep -q '/usr/share/doc/autark-os/GETTING_STARTED.md'

@@ -215,6 +215,14 @@ jobs:
           assert manifest["buildSha"] == "${GITHUB_SHA}"
           assert manifest["buildDate"] == "${{ needs.prepare.outputs.published_at }}"
           PY
+          bundle_dir="${artifact_dir}/autark-os-${VERSION}-${ARCHITECTURE}"
+          test -f "${bundle_dir}/docs/GETTING_STARTED.md"
+          test -f "${bundle_dir}/docs/RELEASE_NOTES.md"
+          test -f "${bundle_dir}/docs/LICENSE.md"
+          test -f "${bundle_dir}/docs/THIRD_PARTY_NOTICES.md"
+          grep -q "^Source revision: ${GITHUB_SHA}$" "${bundle_dir}/docs/RELEASE_NOTES.md"
+          grep -q '^## Known Limitations$' "${bundle_dir}/docs/RELEASE_NOTES.md"
+          dpkg-deb -c "${artifact_dir}/autark-os_${VERSION}_${ARCHITECTURE}.deb" | grep -q './usr/share/doc/autark-os/GETTING_STARTED.md'
 
       - name: Retain architecture build output
         uses: actions/upload-artifact@v6

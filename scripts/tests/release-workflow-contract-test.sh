@@ -28,6 +28,8 @@ grep -q 'AUTARK_OS_BUILD_VERSION: \${{ needs.prepare.outputs.version }}' "${work
 grep -q 'AUTARK_OS_BUILD_SHA: \${{ github.sha }}' "${workflow}"
 grep -q 'AUTARK_OS_BUILD_DATE: \${{ needs.prepare.outputs.published_at }}' "${workflow}"
 grep -q 'assert manifest\["buildSha"\] == "\${GITHUB_SHA}"' "${workflow}"
+grep -q 'docs/GETTING_STARTED.md' "${workflow}"
+grep -q '/usr/share/doc/autark-os/GETTING_STARTED.md' "${workflow}"
 
 if grep -q -- '--clobber' "${workflow}"; then
   printf 'Release workflow must never overwrite existing release assets.\n' >&2

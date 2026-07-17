@@ -100,6 +100,7 @@ PY
 grep -q '^# Autark-OS: Getting Started And Recovery$' "${bundle_dir}/docs/GETTING_STARTED.md"
 grep -q '^# Autark-OS 1.2.3$' "${bundle_dir}/docs/RELEASE_NOTES.md"
 grep -q '^## Known Limitations$' "${bundle_dir}/docs/RELEASE_NOTES.md"
+grep -q '^https://example.invalid/autark-os/1.2.3$' "${bundle_dir}/docs/RELEASE_NOTES.md"
 grep -q '^# Autark Community License' "${bundle_dir}/docs/LICENSE.md"
 grep -q '^# Third-Party Components$' "${bundle_dir}/docs/THIRD_PARTY_NOTICES.md"
 grep -q '^# Autark-OS Support Policy$' "${bundle_dir}/docs/SUPPORT.md"

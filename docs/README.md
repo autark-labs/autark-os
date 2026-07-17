@@ -8,6 +8,7 @@ The repository README is the public overview. These guides focus on installing, 
 
 - [Install Autark-OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
 - [First run](./first-run.md): finish setup, install a first app, and understand app ownership labels.
+- [Getting started and recovery](./getting-started.md): keep the essential opening, update, recovery, and support commands close at hand.
 - [Administrator access and recovery](./security-and-admin-access.md): claim the appliance, understand sessions, reset a lost password, and use safe remote access.
 
 ## Use And Recover
@@ -23,6 +24,7 @@ The repository README is the public overview. These guides focus on installing, 
 - [Service and storage reference](./service-user-installation.md): the installed service, durable data paths, systemd, Docker access, and Tailscale operator setup.
 - [Support policy](../SUPPORT.md): what Autark Labs can help with and when to contact an upstream app project.
 - [Security reporting](../SECURITY.md): how to report a security issue without exposing credentials publicly.
+- [Third-party notices](./third-party-notices.md): where to find the included runtime and dependency inventories.
 
 ## Before You Change The Host
 

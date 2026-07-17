@@ -18,7 +18,7 @@ DRY_RUN=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 HOST_MATRIX_FILE="${SCRIPT_DIR}/supported-host-matrix.env"
-RELEASE_DOCS_SOURCE_DIR="${REPO_ROOT}/docs/release"
+RELEASE_DOCS_SOURCE_DIR="${REPO_ROOT}/docs"
 LICENSE_SOURCE="${REPO_ROOT}/LICENSE.md"
 COMMERCIAL_LICENSE_SOURCE="${REPO_ROOT}/COMMERCIAL-LICENSE.md"
 SUPPORT_SOURCE="${REPO_ROOT}/SUPPORT.md"
@@ -223,6 +223,7 @@ parse_args() {
   fi
   [[ -n "${BUILD_SHA}" ]] || BUILD_SHA="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || printf unknown)"
   [[ -n "${BUILD_DATE}" ]] || BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  [[ -n "${RELEASE_NOTES_URL}" ]] || RELEASE_NOTES_URL="https://github.com/autark-labs/autark-os/releases/tag/v${VERSION}"
   if [[ "${SKIP_BUILD}" -eq 1 && "${DRY_RUN}" -eq 0 ]]; then
     [[ "${VERSION_WAS_PROVIDED}" -eq 1 ]] || die "--skip-build requires an explicit --version or AUTARK_OS_VERSION."
     [[ "${BUILD_SHA_WAS_PROVIDED}" -eq 1 ]] || die "--skip-build requires an explicit --build-sha or AUTARK_OS_BUILD_SHA."
@@ -485,8 +486,8 @@ copy_release_docs() {
   local docs_dir="${OUTPUT_DIR}/docs"
   local required_source
   for required_source in \
-    "${RELEASE_DOCS_SOURCE_DIR}/GETTING_STARTED.md" \
-    "${RELEASE_DOCS_SOURCE_DIR}/THIRD_PARTY_NOTICES.md" \
+    "${RELEASE_DOCS_SOURCE_DIR}/getting-started.md" \
+    "${RELEASE_DOCS_SOURCE_DIR}/third-party-notices.md" \
     "${LICENSE_SOURCE}" \
     "${COMMERCIAL_LICENSE_SOURCE}" \
     "${SUPPORT_SOURCE}" \
@@ -494,8 +495,8 @@ copy_release_docs() {
     [[ -r "${required_source}" ]] || die "Required release documentation is missing: ${required_source}"
   done
   run_cmd mkdir -p "${docs_dir}"
-  run_cmd cp "${RELEASE_DOCS_SOURCE_DIR}/GETTING_STARTED.md" "${docs_dir}/GETTING_STARTED.md"
-  run_cmd cp "${RELEASE_DOCS_SOURCE_DIR}/THIRD_PARTY_NOTICES.md" "${docs_dir}/THIRD_PARTY_NOTICES.md"
+  run_cmd cp "${RELEASE_DOCS_SOURCE_DIR}/getting-started.md" "${docs_dir}/GETTING_STARTED.md"
+  run_cmd cp "${RELEASE_DOCS_SOURCE_DIR}/third-party-notices.md" "${docs_dir}/THIRD_PARTY_NOTICES.md"
   run_cmd cp "${LICENSE_SOURCE}" "${docs_dir}/LICENSE.md"
   run_cmd cp "${COMMERCIAL_LICENSE_SOURCE}" "${docs_dir}/COMMERCIAL-LICENSE.md"
   run_cmd cp "${SUPPORT_SOURCE}" "${docs_dir}/SUPPORT.md"
