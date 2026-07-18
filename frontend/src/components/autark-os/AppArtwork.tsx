@@ -16,7 +16,7 @@ export function AppArtwork({ className, iconUrl, index = 0, name }: { className?
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgb(56_189_248_/_0.22),transparent_55%)] opacity-80" />
       <Sparkles aria-hidden="true" className="relative z-10 size-14 text-cyan-100/80" />
       {iconUrl && <img alt="" className="absolute z-20 size-20 object-contain drop-shadow-[0_8px_18px_rgb(0_0_0_/_0.5)]" onError={(event) => { event.currentTarget.style.display = 'none'; }} src={iconUrl} />}
-      <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0b1831] to-transparent" />
+      <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#102644] to-transparent" />
       <span className="sr-only">{name} artwork</span>
     </div>
   );

@@ -47,6 +47,7 @@ export type ApplicationSurfaceItem = {
   sourceId?: string;
   sortKey?: string;
   displayOrder?: number;
+  category?: string;
   name: string;
   kind: 'managed' | 'pinned' | 'observed';
   managementState: AppManagementState;
