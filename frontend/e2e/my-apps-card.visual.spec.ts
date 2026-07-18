@@ -43,6 +43,12 @@ test('My Apps basic cards use the compact homepage launcher treatment', async ({
 
   await page.getByRole('radio', { name: 'Grid view' }).click();
   await manageButton.click();
+  await expect(page.getByLabel('Status legend')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Attention' }).click();
+  await expect(page.getByText('No attention needed')).toBeVisible();
+  await page.getByRole('tab', { name: 'Overview' }).click();
+  await page.screenshot({ path: 'test-results/my-apps-rail-option-b.png', fullPage: false });
   await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
 });
 
