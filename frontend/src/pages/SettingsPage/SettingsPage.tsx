@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   Code2,
@@ -9,6 +9,7 @@ import {
   Save,
   Settings,
   ShieldCheck,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
@@ -58,7 +59,7 @@ function SettingsErrorState({ actionLabel = 'Retry', message, onAction, title }:
 }
 
 /** Composes the Settings controller, navigation, and typed section panels. */
-function SettingsPage() {
+function SettingsPage({ embedded = false, initialGroup, onRequestClose }: { embedded?: boolean; initialGroup?: SettingsGroupId; onRequestClose?: () => void }) {
   const {
     activeGroup,
     appState,
@@ -87,6 +88,7 @@ function SettingsPage() {
     state,
     updateDraft,
   } = useSettingsPageController();
+  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
 
   const requiredChecks = useMemo(
     () => state.setup?.checks?.filter((check) => ['service-user', 'runtime-root', 'docker', 'fileops', 'tailscale', 'tailscale-operator'].includes(check.id)) ?? [],
@@ -100,6 +102,26 @@ function SettingsPage() {
   const activeGroupMeta = topLevelSettingsGroups.find((group) => group.id === activeGroupId) || topLevelSettingsGroups[0];
   const ActiveGroupIcon = groupIcons[activeGroupId];
 
+  useEffect(() => {
+    if (initialGroup) setActiveGroup(initialGroup);
+  }, [initialGroup, setActiveGroup]);
+
+  const requestClose = () => {
+    if (!onRequestClose) return;
+    if (dirty) {
+      setCloseConfirmationOpen(true);
+      return;
+    }
+    onRequestClose();
+  };
+
+  const saveAndClose = async () => {
+    if (await save()) {
+      setCloseConfirmationOpen(false);
+      onRequestClose?.();
+    }
+  };
+
   if (loading) return <SettingsLoadingState />;
 
   if (!draft) {
@@ -111,9 +133,9 @@ function SettingsPage() {
   }
 
   return (
-    <PageShell>
-      <Surface as="header" className="overflow-hidden" tone="panel">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-sky-400/20 bg-slate-900 p-6 md:p-7">
+    <PageShell contained={embedded} className={embedded ? 'min-h-0 flex-1' : undefined} contentClassName={embedded ? 'gap-3 p-3 sm:p-4' : undefined}>
+      <Surface as="header" className="sticky top-0 z-10 shrink-0 overflow-hidden" tone="panel">
+        <div className={cn('flex flex-wrap items-start justify-between gap-4 border-b border-sky-400/20 bg-slate-900', embedded ? 'p-4' : 'p-6 md:p-7')}>
           <div>
             <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Settings</p>
             <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Autark-OS controls</h1>
@@ -133,6 +155,12 @@ function SettingsPage() {
                 {saving ? 'Saving' : 'Save changes'}
               </ProjectPrimaryButton>
             </DisabledAction>
+            {embedded && (
+              <ProjectDarkControlButton aria-label="Close settings" onClick={requestClose} type="button">
+                <X className="size-4" />
+                Close
+              </ProjectDarkControlButton>
+            )}
           </div>
         </div>
         <div className="grid gap-4 p-5 md:grid-cols-3">
@@ -145,7 +173,7 @@ function SettingsPage() {
       {loadError && <SettingsErrorState message={loadError} onAction={reload} title="Settings could not refresh" />}
       {saveError && <SettingsErrorState actionLabel="Try save again" message={`${saveError} Your edits are still here.`} onAction={() => void save()} title="Settings could not save" />}
 
-      <Surface as="nav" className="grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-4" tone="panel">
+      <Surface as="nav" className="shrink-0 grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-4" tone="panel">
         {topLevelSettingsGroups.map((group) => {
           const groupId = group.id as SettingsGroupId;
           const Icon = groupIcons[groupId];
@@ -172,7 +200,7 @@ function SettingsPage() {
         })}
       </Surface>
 
-      <Surface as="main" className="p-5" tone="panel">
+      <Surface as="main" className="shrink-0 p-5" tone="panel">
         <ProjectInset className="mb-5">
           <div className="flex items-start gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 text-cyan-200">
@@ -230,6 +258,19 @@ function SettingsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
             <AlertDialogAction className="bg-orange-500 text-white hover:bg-orange-400" onClick={continueNavigation}>Discard and leave</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={closeConfirmationOpen} onOpenChange={setCloseConfirmationOpen}>
+        <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save settings before closing?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">Your changes have not been saved yet.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <ProjectDarkControlButton onClick={() => { setCloseConfirmationOpen(false); onRequestClose?.(); }} type="button">Discard changes</ProjectDarkControlButton>
+            <ProjectPrimaryButton disabled={saving} onClick={() => void saveAndClose()} type="button">{saving ? 'Saving' : 'Save and close'}</ProjectPrimaryButton>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

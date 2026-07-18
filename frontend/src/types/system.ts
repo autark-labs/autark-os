@@ -84,7 +84,6 @@ export type RecommendedAction = {
   primaryAction?: AutarkOsAction | null;
   secondaryAction?: AutarkOsAction | null;
   sourceIssueIds: string[];
-  dismissible: boolean;
 };
 
 export type SetupProgress = {

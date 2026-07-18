@@ -116,9 +116,12 @@ export function CommandCard({ command, copied, description, id, label, onCopy }:
   );
 }
 
-export function RelatedLink({ detail, title, to }: { detail: string; title: string; to: string }) {
+export function RelatedLink({ detail, onClick, title, to }: { detail: string; onClick?: () => void; title: string; to?: string }) {
+  if (onClick) {
+    return <button className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-left text-sm transition hover:border-cyan-300/45 hover:bg-slate-700" onClick={onClick} type="button"><p className="font-semibold text-white">{title}</p><p className="mt-1 text-xs leading-5 text-slate-400">{detail}</p></button>;
+  }
   return (
-    <Link className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm no-underline transition hover:border-cyan-300/45 hover:bg-slate-700" to={to}>
+    <Link className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm no-underline transition hover:border-cyan-300/45 hover:bg-slate-700" to={to || '/diagnostics'}>
       <span className="block font-bold text-white">{title}</span>
       <span className="mt-1 block text-xs leading-5 text-slate-500">{detail}</span>
     </Link>

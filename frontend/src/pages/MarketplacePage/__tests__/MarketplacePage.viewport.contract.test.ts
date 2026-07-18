@@ -5,8 +5,8 @@ import { test } from 'vitest';
 
 const page = readFileSync(resolve(process.cwd(), 'src/pages/MarketplacePage/MarketplacePage.tsx'), 'utf8');
 
-test('Discover keeps only one dominant recommendation above the catalog', () => {
-  assert.match(page, /\{!showStartHere && <CanonicalRecommendedAction className="mb-4" \/>\}/);
+test('Discover keeps its first-run guidance without duplicating global recommendations', () => {
+  assert.doesNotMatch(page, /CanonicalRecommendedAction/);
   assert.match(page, /\{showStartHere && \([\s\S]*<StarterAppHandoff/);
   assert.doesNotMatch(page, /Recommended path/);
 });

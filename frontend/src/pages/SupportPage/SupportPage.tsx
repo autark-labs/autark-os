@@ -17,6 +17,7 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { copyText } from '@/lib/copyText';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import type { ObservedServiceView } from '@/types/observedService';
@@ -45,6 +46,7 @@ const initialState: SupportState = {
 
 function SupportPage() {
   const { showAdvancedMetrics } = useProjectSettings();
+  const { openSettings } = useSettingsDialog();
   const appState = useApplicationStateRepository();
   const [state, setState] = useState<SupportState>(initialState);
   const [loading, setLoading] = useState(true);
@@ -319,7 +321,7 @@ function SupportPage() {
           <SupportPanel>
             <SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." />
             <div className="mt-4 grid gap-2">
-              <RelatedLink to="/settings" title="Settings" detail="Host setup checks and service-user guidance." />
+              <RelatedLink onClick={() => openSettings('advanced')} title="Settings" detail="Host setup checks and service-user guidance." />
               <RelatedLink to="/resolve-existing-apps" title="Resolve Existing Apps" detail="Review apps found on this server." />
               <RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />
               {showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}

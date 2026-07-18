@@ -4,7 +4,6 @@ import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDri
 import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
@@ -14,6 +13,7 @@ import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/E
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { showActionNotification, showJobNotification } from '@/lib/actionNotifications';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -55,6 +55,7 @@ type RestoreView = 'timeline' | 'list';
 function BackupsPage() {
   const queryClient = useQueryClient();
   const { showAdvancedMetrics } = useProjectSettings();
+  const { openSettings } = useSettingsDialog();
   const [running, setRunning] = useState<string | null>(null);
   const [restoreFlow, setRestoreFlow] = useState<RestoreFlowState | null>(null);
   const [restoreView, setRestoreView] = useState<RestoreView>('timeline');
@@ -365,8 +366,6 @@ function BackupsPage() {
         {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
       </Surface>
 
-      <CanonicalRecommendedAction />
-
       {report && (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex flex-col gap-5">
@@ -376,8 +375,8 @@ function BackupsPage() {
                   <p className="text-sm font-bold text-white">{report.destination.kind === 'external' ? 'External backup drive' : 'Backup location on this device'}</p>
                   <p className="mt-1 text-sm leading-6 text-slate-400">{report.destination.message}</p>
                 </div>
-                <ProjectDarkControlButton asChild size="sm">
-                  <Link to="/settings">{report.destination.status === 'ready' ? 'Review destination' : 'Fix destination'}</Link>
+                <ProjectDarkControlButton onClick={() => openSettings('backups')} size="sm" type="button">
+                  {report.destination.status === 'ready' ? 'Review destination' : 'Fix destination'}
                 </ProjectDarkControlButton>
               </div>
               <SectionHeader icon={DatabaseBackup} title="Create a manual backup" description="Choose the smallest backup that matches what you are about to do." />

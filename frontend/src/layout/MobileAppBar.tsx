@@ -1,6 +1,7 @@
 import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House, LayoutGrid, Loader2, Menu, Settings, ShieldCheck, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
+import { NotificationCenterPopover } from '@/components/autark-os/NotificationCenter';
 import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
 import { AdminSessionControl } from '@/components/autark-os/AdminSessionControl';
 import { ThemeSelectorPopover } from '@/components/autark-os/ThemeSelectorPopover';
@@ -15,6 +16,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
 import { jobTypeLabel, useGlobalActiveAutarkOsJob } from '@/repositories/jobRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
@@ -48,6 +50,7 @@ const navIcons: Record<string, LucideIcon> = {
 function MobileAppBar() {
   const location = useLocation();
   const { viewMode } = useProjectSettings();
+  const { openSettings } = useSettingsDialog();
   const doctorQuery = useSystemDoctorQuery();
   const activeJobQuery = useGlobalActiveAutarkOsJob();
   const navGroups = navigationGroups(viewMode) as NavGroup[];
@@ -66,6 +69,10 @@ function MobileAppBar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        <NotificationCenterPopover />
+        <Button aria-label="Open settings" className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white" onClick={() => openSettings()} size="sm" type="button" variant="outline">
+          <Settings className="size-4" />
+        </Button>
         <ThemeSelectorPopover className="px-2" />
         <Sheet>
           <SheetTrigger asChild>
@@ -121,9 +128,7 @@ function MobileAppBar() {
                 <Button asChild className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white" size="sm" variant="outline">
                   <Link to="/diagnostics">Diagnostics</Link>
                 </Button>
-                <Button asChild className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white" size="sm" variant="outline">
-                  <Link to="/settings">Settings</Link>
-                </Button>
+                <Button className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white" onClick={() => openSettings()} size="sm" type="button" variant="outline">Settings</Button>
               </div>
               <AdminSessionControl className="w-full" />
             </div>

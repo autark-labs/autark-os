@@ -6,6 +6,7 @@ import { SystemAPIClient } from './api/SystemAPIClient';
 import { loadApplicationBootstrap, type ApplicationBootstrap } from './App.bootstrap';
 import { safePostSetupPath, setupRedirectTarget } from './App.onboarding';
 import { ProjectSettingsProvider } from './contexts/ProjectSettingsContext';
+import { SettingsDialogProvider, useSettingsDialog } from './contexts/SettingsDialogContext';
 import { AdminSessionControlsProvider } from './contexts/AdminSessionContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ProjectPrimaryButton } from './components/primitives/ProjectButtons';
@@ -26,7 +27,6 @@ const NetworkPage = lazy(() => import('./pages/NetworkPage/NetworkPage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage/OverviewPage'));
 const ProPage = lazy(() => import('./pages/ProPage/ProPage'));
 const ResolveExistingAppsPage = lazy(() => import('./pages/ResolveExistingAppsPage/ResolveExistingAppsPage'));
-const SettingsPage = lazy(() => import('./pages/SettingsPage/SettingsPage'));
 const StoragePage = lazy(() => import('./pages/StoragePage/StoragePage'));
 const SupportPage = lazy(() => import('./pages/SupportPage/SupportPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage/NotFoundPage'));
@@ -187,8 +187,9 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
   return (
     <AdminSessionControlsProvider enabled={bootstrap.securityStatus.authRequired && !bootstrap.securityStatus.devMode}>
       <ProjectSettingsProvider>
-        <Routes>
-          <Route element={<AppShell />}>
+        <SettingsDialogProvider>
+          <Routes>
+            <Route element={<AppShell />}>
             <Route index element={<Navigate replace to={appRoutes.home} />} />
             {Object.entries(routeAliases).map(([from, to]) => (
               <Route element={<LegacyRouteRedirect to={to} />} key={from} path={from} />
@@ -204,11 +205,12 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
             <Route path={appRoutes.backups} element={<LazyRoute pageName="Backups"><BackupsPage /></LazyRoute>} />
             <Route path={appRoutes.pro} element={<LazyRoute pageName="Autark Pro"><ProPage /></LazyRoute>} />
             <Route path={appRoutes.activity} element={<LazyRoute pageName="Activity Log"><MonitoringPage /></LazyRoute>} />
-            <Route path={appRoutes.settings} element={<LazyRoute pageName="Settings"><SettingsPage /></LazyRoute>} />
+            <Route path={appRoutes.settings} element={<SettingsLegacyRoute />} />
             <Route path={appRoutes.diagnostics} element={<LazyRoute pageName="Diagnostics"><SupportPage /></LazyRoute>} />
             <Route path="*" element={<LazyRoute pageName="Page not found"><NotFoundPage /></LazyRoute>} />
-          </Route>
-        </Routes>
+            </Route>
+          </Routes>
+        </SettingsDialogProvider>
       </ProjectSettingsProvider>
     </AdminSessionControlsProvider>
   );
@@ -245,6 +247,16 @@ function SetupRoute({ onComplete }: { onComplete: () => void }) {
       }}
     />
   );
+}
+
+function SettingsLegacyRoute() {
+  const navigate = useNavigate();
+  const { openSettings } = useSettingsDialog();
+  useEffect(() => {
+    openSettings();
+    navigate(`${appRoutes.home}?settings=open`, { replace: true });
+  }, [navigate, openSettings]);
+  return null;
 }
 
 export default App;

@@ -3,11 +3,9 @@ package com.autarkos.system;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
@@ -20,8 +18,7 @@ class RecommendedActionServiceTests {
     @Test
     void setupActionWinsBeforeIssuePriority() {
         RecommendedActionService service = service(
-                summary(false, List.of(issue("docker", "critical", "docker_unavailable"))),
-                new InMemoryDismissals());
+                summary(false, List.of(issue("docker", "critical", "docker_unavailable"))));
 
         RecommendedAction action = service.current();
 
@@ -35,8 +32,7 @@ class RecommendedActionServiceTests {
                 summary(true, List.of(
                         issue("private", "info", "private_access_needs_setup"),
                         issue("backup", "info", "backup_enabled_no_restore_point"),
-                        issue("app", "warning", "app_missing_container"))),
-                new InMemoryDismissals());
+                        issue("app", "warning", "app_missing_container"))));
 
         RecommendedAction action = service.current();
 
@@ -49,8 +45,7 @@ class RecommendedActionServiceTests {
         RecommendedActionService service = service(
                 summary(true, List.of(
                         issue("private", "info", "private_access_needs_setup"),
-                        issue("backup", "info", "backup_enabled_no_restore_point"))),
-                new InMemoryDismissals());
+                        issue("backup", "info", "backup_enabled_no_restore_point"))));
 
         RecommendedAction action = service.current();
 
@@ -58,28 +53,16 @@ class RecommendedActionServiceTests {
     }
 
     @Test
-    void dismissedWarningsAreSkippedButCriticalActionsRemainVisible() {
-        InMemoryDismissals dismissals = new InMemoryDismissals();
-        dismissals.dismiss("warning-app");
-        dismissals.dismiss("critical-docker");
+    void serviceAlwaysReturnsTheCurrentHighestPriorityIssue() {
+        RecommendedActionService service = service(summary(true, List.of(
+                issue("warning-app", "warning", "app_needs_attention"),
+                issue("backup", "info", "backup_enabled_no_restore_point"))));
 
-        RecommendedActionService warningService = service(
-                summary(true, List.of(
-                        issue("warning-app", "warning", "app_needs_attention"),
-                        issue("backup", "info", "backup_enabled_no_restore_point"))),
-                dismissals);
-        RecommendedActionService criticalService = service(
-                summary(true, List.of(
-                        issue("critical-docker", "critical", "docker_unavailable"),
-                        issue("backup", "info", "backup_enabled_no_restore_point"))),
-                dismissals);
-
-        assertThat(warningService.current().id()).isEqualTo("backup");
-        assertThat(criticalService.current().id()).isEqualTo("critical-docker");
+        assertThat(service.current().id()).isEqualTo("warning-app");
     }
 
-    private RecommendedActionService service(SystemSummaryModels.SystemSummary summary, RecommendedActionDismissals dismissals) {
-        return new RecommendedActionService((Supplier<SystemSummaryModels.SystemSummary>) () -> summary, dismissals);
+    private RecommendedActionService service(SystemSummaryModels.SystemSummary summary) {
+        return new RecommendedActionService((Supplier<SystemSummaryModels.SystemSummary>) () -> summary);
     }
 
     private SystemSummaryModels.SystemSummary summary(boolean setupComplete, List<AutarkOsIssue> issues) {
@@ -109,19 +92,5 @@ class RecommendedActionServiceTests {
                 Optional.of(AutarkOsAction.route("open-" + id, "Open " + id, "/" + id)),
                 List.of(),
                 Map.of());
-    }
-
-    private static final class InMemoryDismissals implements RecommendedActionDismissals {
-        private final Set<String> dismissed = new HashSet<>();
-
-        @Override
-        public boolean dismissed(String actionId) {
-            return dismissed.contains(actionId);
-        }
-
-        @Override
-        public void dismiss(String actionId) {
-            dismissed.add(actionId);
-        }
     }
 }

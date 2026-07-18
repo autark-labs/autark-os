@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { RefreshStatus } from '@/components/RefreshStatus';
-import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { PageShell } from '@/components/layout/PageShell';
@@ -283,8 +282,6 @@ function NetworkPage() {
         </div>
         <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} tone="info" updatedAt={appState.updatedAt ?? network.updatedAt} />
       </header>
-
-      <CanonicalRecommendedAction />
 
       {pageError && <AccessPageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
 

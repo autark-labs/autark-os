@@ -12,6 +12,5 @@ public record RecommendedAction(
         String body,
         Optional<AutarkOsAction> primaryAction,
         Optional<AutarkOsAction> secondaryAction,
-        List<String> sourceIssueIds,
-        boolean dismissible) {
+        List<String> sourceIssueIds) {
 }

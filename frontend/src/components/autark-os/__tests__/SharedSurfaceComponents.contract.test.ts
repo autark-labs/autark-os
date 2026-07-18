@@ -117,7 +117,7 @@ test('active pages use shared surface components instead of local page state car
   assert.match(source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx'), /ResponsiveDetailsSheet/);
   assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationGuideTab.tsx'), /CopyField/);
   assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationLinksTab.tsx'), /CopyField/);
-  assert.match(source('src/pages/OverviewPage/OverviewPage.tsx'), /RecommendedActionCard/);
+  assert.match(source('src/components/autark-os/NotificationCenter.tsx'), /useRecommendedActionQuery/);
   assert.match(source('src/pages/ApplicationsPage/ApplicationsPage.tsx'), /FoundAppsPrompt/);
   assert.match(source('src/pages/OverviewPage/OverviewPage.tsx'), /FoundAppsPrompt/);
 });

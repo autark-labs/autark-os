@@ -17,6 +17,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { Button } from '@/components/ui/button';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
+import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
 import type { ProjectVersionInfo, SystemSetupStatus } from '@/types/system';
 import { navigationGroups } from './navigationModel';
@@ -64,6 +65,7 @@ export function sidebarUpdateIndicator(updateStatus?: string) {
 function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const { setViewMode, settings, viewMode } = useProjectSettings();
+  const { openSettings } = useSettingsDialog();
   const [version, setVersion] = useState<ProjectVersionInfo | null>(null);
   const [setup, setSetup] = useState<SystemSetupStatus | null>(null);
 
@@ -172,6 +174,15 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       {collapsed ? (
         <div className="mt-6 hidden gap-3 lg:mt-auto lg:grid">
           <button
+            aria-label="Open settings"
+            className="grid size-9 place-items-center rounded-lg border border-sky-400/30 bg-slate-900 text-sky-100 transition hover:border-cyan-300/45 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+            onClick={() => openSettings()}
+            title="Settings"
+            type="button"
+          >
+            <Settings className="size-4" />
+          </button>
+          <button
             aria-label={`Switch to ${viewMode === 'advanced' ? 'Basic' : 'Advanced'} view`}
             className="grid size-9 place-items-center rounded-lg border border-sky-400/30 bg-slate-900 text-xs font-bold text-sky-100 transition hover:border-cyan-300/45 hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
             onClick={() => setViewMode(viewMode === 'advanced' ? 'basic' : 'advanced')}
@@ -183,10 +194,16 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           <div className={cn('mx-auto size-2 rounded-full', setupReady ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} title={setupReady ? 'Ready for your apps' : 'Setup needs attention'} />
         </div>
       ) : <div className="mt-6 hidden rounded-xl border border-sky-400/25 bg-slate-900 p-3 shadow-lg shadow-slate-950/20 lg:mt-auto lg:block">
-        <div className="flex items-start gap-3">
-          <div className="grid size-9 shrink-0 place-items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 text-cyan-200">
+          <div className="flex items-start gap-3">
+          <button
+            aria-label="Open settings"
+            className="grid size-9 shrink-0 place-items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 text-cyan-200 transition hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+            onClick={() => openSettings()}
+            title="Settings"
+            type="button"
+          >
             <Settings className="size-4" />
-          </div>
+          </button>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="truncate text-sm font-bold text-white">{deviceName}</span>

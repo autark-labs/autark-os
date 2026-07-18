@@ -16,16 +16,13 @@ import com.autarkos.api.AutarkOsIssue;
 public class RecommendedActionService implements RecommendedActionProvider {
 
     private final Supplier<SystemSummaryModels.SystemSummary> systemSummary;
-    private final RecommendedActionDismissals dismissals;
-
     @Autowired
-    public RecommendedActionService(SystemSummaryProvider systemSummaryProvider, RecommendedActionDismissals dismissals) {
-        this((Supplier<SystemSummaryModels.SystemSummary>) systemSummaryProvider::summary, dismissals);
+    public RecommendedActionService(SystemSummaryProvider systemSummaryProvider) {
+        this((Supplier<SystemSummaryModels.SystemSummary>) systemSummaryProvider::summary);
     }
 
-    public RecommendedActionService(Supplier<SystemSummaryModels.SystemSummary> systemSummary, RecommendedActionDismissals dismissals) {
+    public RecommendedActionService(Supplier<SystemSummaryModels.SystemSummary> systemSummary) {
         this.systemSummary = systemSummary;
-        this.dismissals = dismissals;
     }
 
     @Override
@@ -39,24 +36,17 @@ public class RecommendedActionService implements RecommendedActionProvider {
                     summary.setup().summary(),
                     Optional.of(AutarkOsAction.route("open-setup", "Continue setup", "/setup")),
                     Optional.empty(),
-                    List.of(),
-                    false);
+                    List.of());
         }
 
         return summary.issues().stream()
                 .sorted(Comparator.comparingInt(this::priority))
                 .map(this::fromIssue)
-                .filter(action -> !action.dismissible() || !dismissals.dismissed(action.id()))
                 .findFirst()
                 .orElseGet(this::none);
     }
 
-    public void dismiss(String actionId) {
-        dismissals.dismiss(actionId);
-    }
-
     private RecommendedAction fromIssue(AutarkOsIssue issue) {
-        boolean critical = "critical".equals(issue.severity());
         return new RecommendedAction(
                 issue.id(),
                 issue.severity(),
@@ -64,8 +54,7 @@ public class RecommendedActionService implements RecommendedActionProvider {
                 issue.summary(),
                 issue.primaryAction(),
                 issue.secondaryActions().stream().findFirst(),
-                List.of(issue.id()),
-                !critical);
+                List.of(issue.id()));
     }
 
     private int priority(AutarkOsIssue issue) {
@@ -91,7 +80,6 @@ public class RecommendedActionService implements RecommendedActionProvider {
                 "Autark-OS does not see anything that needs your attention right now.",
                 Optional.empty(),
                 Optional.empty(),
-                List.of(),
-                false);
+                List.of());
     }
 }

@@ -12,10 +12,6 @@ export const SystemAPIClient = {
     return response.data;
   },
 
-  async dismissRecommendedAction(actionId: string) {
-    await httpClient.post(`/api/recommended-action/${encodeURIComponent(actionId)}/dismiss`);
-  },
-
   async setupProgress() {
     const response = await httpClient.get<SetupProgress>('/api/setup/progress');
     return response.data;

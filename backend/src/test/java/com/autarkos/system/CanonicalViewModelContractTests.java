@@ -89,8 +89,7 @@ class CanonicalViewModelContractTests {
                 "Autark-OS does not see anything that needs your attention right now.",
                 Optional.empty(),
                 Optional.empty(),
-                List.of(),
-                false);
+                List.of());
 
         assertFixtureShape("recommended-action-none.json", action);
     }

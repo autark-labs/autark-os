@@ -12,13 +12,11 @@ import {
 } from './components/HomeCards';
 import { HomeHero } from './components/HomeHero';
 import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
-import { RecommendedActionCard } from '@/components/autark-os/RecommendedActionCard';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useHomeRepository } from '@/repositories/homeRepository';
-import { useDismissRecommendedActionMutation } from '@/repositories/recommendedActionRepository';
 import { managedAppIconUrl, observedServiceIconUrl } from './extensions/OverviewPage.appTiles';
 import { applicationDeepLinkForManagedApp, applicationDeepLinkForObservedService } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { homeMajorActivity } from './extensions/OverviewPage.activity';
@@ -31,7 +29,6 @@ function OverviewPage() {
   const { viewMode } = useProjectSettings();
   const appState = useApplicationStateRepository();
   const home = useHomeRepository();
-  const dismissRecommendedAction = useDismissRecommendedActionMutation();
 
   const apps = useMemo(() => appState.applicationState?.managedApps ?? [], [appState.applicationState]);
   const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
@@ -39,7 +36,6 @@ function OverviewPage() {
   const observedNeedingReview = appState.foundServices;
   const majorActivity = useMemo(() => homeMajorActivity(home.activity, 5) as ActivityLog[], [home.activity]);
   const showActivityLogLink = shouldShowActivityLogLink(viewMode, majorActivity);
-  const primaryAction = home.recommendedAction?.id === 'no-action-needed' ? null : home.recommendedAction;
   const deviceName = home.summary?.deviceName || 'Autark-OS';
   const summaryAvailability = homeSummaryAvailability(home.summary, home.summaryError);
   const systemMetrics = homeSystemMetrics(home.summary, summaryAvailability);
@@ -54,31 +50,6 @@ function OverviewPage() {
 
       <section className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start">
         <div className="grid gap-5">
-          {primaryAction ? (
-            <RecommendedActionCard
-              model={{
-                body: primaryAction.body,
-                dismissible: primaryAction.dismissible,
-                primaryAction: primaryAction.primaryAction,
-                severity: primaryAction.severity,
-                title: primaryAction.title,
-              }}
-              dismissing={dismissRecommendedAction.isPending}
-              onDismiss={primaryAction.dismissible ? () => dismissRecommendedAction.mutate(primaryAction.id) : undefined}
-            />
-          ) : summaryAvailability === 'unavailable' ? (
-            <RecommendedActionCard model={{ body: 'Autark-OS could not load the current server summary. Try refreshing Home once the service is available.', severity: 'warning', title: 'System status unavailable' }} />
-          ) : (
-            <RecommendedActionCard
-              model={{
-                body: apps.length ? 'Autark-OS does not see anything urgent right now.' : 'Start with a verified app and Autark-OS will guide the setup.',
-                primaryAction: { id: 'open-discover', label: apps.length ? 'Discover apps' : 'Install your first app', route: '/discover', confirmationRequired: false, danger: false },
-                severity: 'success',
-                title: apps.length ? 'Everything important looks good' : 'Start with Discover',
-              }}
-            />
-          )}
-
           {observedNeedingReview.length > 0 && (
             <FoundAppsPrompt
               model={{
@@ -162,14 +133,6 @@ function OverviewPage() {
               <HomeMetricCard detail={systemMetrics.storage.detail} icon={Database} label="Storage" tone={systemMetrics.storage.tone} value={systemMetrics.storage.value} />
             </div>
           </HomeSection>
-
-          {home.summary?.issues.length ? (
-            <HomeSection title="Needs Review">
-              <div className="grid gap-2">
-                {home.summary.issues.slice(0, 3).map((issue) => <HomeIssueBanner issue={issue} key={issue.id} />)}
-              </div>
-            </HomeSection>
-          ) : null}
 
           <HomeSection
             action={showActivityLogLink ? <ProjectDarkControlButton asChild size="sm"><Link to="/activity">Activity Log</Link></ProjectDarkControlButton> : null}

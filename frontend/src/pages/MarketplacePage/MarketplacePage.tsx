@@ -6,7 +6,6 @@ import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { PageShell } from '@/components/layout/PageShell';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { CanonicalRecommendedAction } from '@/components/autark-os/CanonicalRecommendedAction';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
@@ -353,8 +352,6 @@ function MarketplacePage() {
         marketplaceActivity={marketplaceActivity}
         onRefresh={refreshDiscover}
       />
-
-      {!showStartHere && <CanonicalRecommendedAction className="mb-4" />}
 
       {discoverError && <DiscoverErrorState className="mb-5" message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
       <InstallJobBanner apps={apps} installJob={installJob} selectedAppId={selectedApp.id} />

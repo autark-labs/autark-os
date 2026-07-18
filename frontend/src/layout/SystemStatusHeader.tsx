@@ -3,6 +3,7 @@ import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-
 import { Link } from 'react-router-dom';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { AdminSessionControl } from '@/components/autark-os/AdminSessionControl';
+import { NotificationCenterPopover } from '@/components/autark-os/NotificationCenter';
 import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
 import { ThemeSelectorPopover } from '@/components/autark-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,7 @@ function SystemStatusHeader() {
 
         <div className="flex min-w-0 items-center gap-2">
           {activeJob && <GlobalJobPopover job={activeJob} />}
+          <NotificationCenterPopover />
           <ThemeSelectorPopover />
           <StatusPopover loading={loading} service={dockerService} />
           <TailscaleControlPopover check={tailscaleCheck} loading={loading} />

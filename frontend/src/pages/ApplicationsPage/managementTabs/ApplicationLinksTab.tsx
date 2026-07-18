@@ -2,11 +2,13 @@ import { ExternalLink, KeyRound, Link2, Server } from 'lucide-react';
 import { CopyField } from '@/components/autark-os/CopyField';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { accessDeepLinkForManagedApp, accessDeepLinkForObservedService } from '@/pages/NetworkPage/extensions/NetworkPage.deepLinks';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) {
   const accessHref = accessRouteForApplicationItem(item);
+  const { openSettings } = useSettingsDialog();
 
   return (
     <div className="grid gap-4">
@@ -24,11 +26,9 @@ export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) 
             Access
           </Link>
         </Button>
-        <Button asChild className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" variant="outline">
-          <Link to="/settings">
-            <Server data-icon="inline-start" />
-            System settings
-          </Link>
+        <Button className="border-sky-400/40 bg-slate-800 text-sky-50 hover:bg-slate-700 hover:text-white" onClick={() => openSettings()} type="button" variant="outline">
+          <Server data-icon="inline-start" />
+          System settings
         </Button>
       </section>
     </div>

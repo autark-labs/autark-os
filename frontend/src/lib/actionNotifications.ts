@@ -12,6 +12,8 @@ export type ActionNotificationResult = {
   nextAction?: unknown;
 };
 
+export const ACTION_NOTIFICATION_EVENT = 'autark-os:action-notification';
+
 type ActionNotification = {
   severity: string;
   title: string;
@@ -37,5 +39,14 @@ function showNotification(notification: ActionNotification) {
     description: notification.message || undefined,
     duration: notification.sticky ? Infinity : undefined,
   });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(ACTION_NOTIFICATION_EVENT, {
+      detail: {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        occurredAt: new Date().toISOString(),
+        ...notification,
+      },
+    }));
+  }
   return notification;
 }

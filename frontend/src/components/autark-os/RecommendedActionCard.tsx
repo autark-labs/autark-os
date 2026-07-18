@@ -1,14 +1,13 @@
-import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
+import { ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { AutarkOsAction } from '@/types/app';
 
 export type RecommendedActionCardModel = {
   body: string;
-  dismissible?: boolean;
   primaryAction?: AutarkOsAction | null;
   severity?: string;
   title: string;
@@ -16,12 +15,10 @@ export type RecommendedActionCardModel = {
 
 type RecommendedActionCardProps = {
   className?: string;
-  dismissing?: boolean;
   model: RecommendedActionCardModel;
-  onDismiss?: () => void;
 };
 
-export function RecommendedActionCard({ className, dismissing = false, model, onDismiss }: RecommendedActionCardProps) {
+export function RecommendedActionCard({ className, model }: RecommendedActionCardProps) {
   const tone = severityTone(model.severity);
   const Icon = severityIcon(model.severity);
   return (
@@ -34,16 +31,10 @@ export function RecommendedActionCard({ className, dismissing = false, model, on
           <div className="min-w-0">
             <p className="m-0 text-base font-bold text-slate-50">{model.title}</p>
             <p className="m-0 mt-1 text-sm leading-6 text-sky-100/70">{model.body}</p>
-            {model.dismissible && <p className="m-0 mt-1 text-xs text-sky-100/55">You can dismiss this after reviewing it.</p>}
           </div>
         </div>
         <div className="flex items-center gap-2">
           <RecommendedActionButton action={model.primaryAction} severity={model.severity} />
-          {model.dismissible && onDismiss && (
-            <ProjectDarkControlButton aria-label="Dismiss recommendation" disabled={dismissing} onClick={onDismiss} size="icon" type="button">
-              <X className="size-4" />
-            </ProjectDarkControlButton>
-          )}
         </div>
       </div>
     </Surface>

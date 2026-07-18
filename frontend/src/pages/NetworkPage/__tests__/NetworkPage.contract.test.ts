@@ -79,5 +79,5 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(issues, /to="\/diagnostics"/);
 
   assert.match(shell, /sticky top-0 z-40/);
-  assert.doesNotMatch(header, /sticky top-0/);
+  assert.match(header, /NotificationCenterPopover/);
 });

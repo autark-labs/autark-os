@@ -22,8 +22,8 @@ test('advanced navigation keeps operational pages reachable outside basic mode',
 
   assert.equal(groups.length, 2);
   assert.deepEqual(groups[0].items.map((item) => item.label), ['Home', 'My Apps', 'Discover', 'Access', 'Backups', 'Autark Pro']);
-  assert.deepEqual(groups[1].items.map((item) => item.label), ['Storage', 'Settings', 'Diagnostics', 'Activity Log']);
-  assert.deepEqual(advancedNavigation.map((item) => item.to), ['/storage', '/settings', '/diagnostics', '/activity']);
+  assert.deepEqual(groups[1].items.map((item) => item.label), ['Storage', 'Diagnostics', 'Activity Log']);
+  assert.deepEqual(advancedNavigation.map((item) => item.to), ['/storage', '/diagnostics', '/activity']);
 });
 
 test('old active concepts have intentional aliases to MVP routes', () => {
@@ -42,5 +42,5 @@ test('primary navigation remains within MVP scope', () => {
 
 test('operational pages removed from basic nav remain reachable through contextual links', () => {
   assert.match(source('src/pages/BackupsPage/BackupsPage.tsx'), /to="\/storage"/);
-  assert.match(source('src/layout/SystemStatusHeader.tsx'), /to="\/settings"/);
+  assert.match(source('src/layout/Sidebar.tsx'), /openSettings/);
 });

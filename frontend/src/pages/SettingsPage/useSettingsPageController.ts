@@ -151,7 +151,7 @@ export function useSettingsPageController() {
   }, [appState, doctorQuery]);
 
   const save = useCallback(async () => {
-    if (!draft) return;
+    if (!draft) return false;
     setSaving(true);
     setSaveError(null);
     try {
@@ -173,10 +173,12 @@ export function useSettingsPageController() {
         title: 'Settings saved',
         message: result.appDefaults.message,
       }, 'Settings saved');
+      return true;
     } catch (error) {
       const message = apiErrorMessage(error, 'Settings could not be saved.');
       setSaveError(message);
       showActionErrorNotification(error, 'Settings could not be saved');
+      return false;
     } finally {
       setSaving(false);
     }

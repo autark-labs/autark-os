@@ -21,6 +21,11 @@ test('wide view opens global popovers, app management, and the Discover dialog',
   await expect(page.getByText(/Docker ready/i)).toBeVisible();
   await page.keyboard.press('Escape');
 
+  await page.getByRole('button', { name: /Open notifications/i }).click();
+  await expect(page.getByText(/Current attention and this session/i)).toBeVisible();
+  await expect(page.getByLabel('Action needed')).toBeVisible();
+  await page.keyboard.press('Escape');
+
   await page.getByRole('button', { name: /Theme:/i }).click();
   await expect(page.getByRole('button', { name: /Forest/i })).toBeVisible();
   await page.keyboard.press('Escape');

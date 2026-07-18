@@ -13,7 +13,6 @@ export const primaryNavigation = [
 
 export const advancedNavigation = [
   { id: 'storage', label: 'Storage', to: appRoutes.storage, icon: 'storage', activePaths: [appRoutes.storage, '/files-storage'] },
-  { id: 'settings', label: 'Settings', to: appRoutes.settings, icon: 'settings', activePaths: [appRoutes.settings] },
   { id: 'diagnostics', label: 'Diagnostics', to: appRoutes.diagnostics, icon: 'diagnostics', activePaths: [appRoutes.diagnostics, '/terminal', '/safe-diagnostics'] },
   { id: 'activity', label: 'Activity Log', to: appRoutes.activity, icon: 'activity', activePaths: [appRoutes.activity, '/monitoring', '/system-activity'] },
 ];
