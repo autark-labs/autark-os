@@ -91,10 +91,12 @@ test('marketplace hides dead link controls when an app lacks URLs or review targ
   assert.doesNotMatch(duplicateWarning, /cannot open the existing service review yet|Review existing service[\s\S]*disabled/);
 });
 
-test('catalog cards keep long app names readable instead of clipping them to one line', () => {
+test('dense launcher cards keep canonical app states visible and long app names readable', () => {
   const list = source('MarketplaceAppList.tsx');
 
-  assert.match(list, /line-clamp-2 min-w-0 break-words text-base text-slate-50/);
-  assert.match(list, /line-clamp-2 min-h-10 break-words text-base font-bold text-slate-50/);
+  assert.match(list, /line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-50/);
+  assert.match(list, /marketplaceCardToneClass\(app\)/);
+  assert.match(list, /\{app\.stateLabel\}/);
+  assert.match(list, /aria-label=\{`Select \$\{app\.name\}`\}/);
   assert.match(list, /title=\{app\.name\}/);
 });

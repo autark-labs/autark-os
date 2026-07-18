@@ -290,7 +290,7 @@ export const ApplicationsPage = () => {
       }
 
       if (canCloseManagement()) {
-        clearApplicationFocus();
+        closeManagement();
       }
     };
 
@@ -298,7 +298,7 @@ export const ApplicationsPage = () => {
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown, true);
     };
-  }, [canCloseManagement, clearApplicationFocus, managementOpen]);
+  }, [canCloseManagement, closeManagement, managementOpen]);
 
   useEffect(() => {
     if (!trackedAppJobIds.length) {

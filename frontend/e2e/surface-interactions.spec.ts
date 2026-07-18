@@ -46,6 +46,13 @@ test('wide view opens global popovers, app management, and the Discover dialog',
   await expect(page.getByRole('button', { name: /^Manage app$/i })).toBeVisible();
   await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
   expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeExpand);
+
+  await page.getByRole('button', { name: /^Manage app$/i }).click();
+  await expect(page.getByText(/^Management$/i)).toBeVisible();
+  await page.getByRole('searchbox', { name: /Search managed and linked apps/i }).click();
+  await expect(page.getByText(/^Management$/i).locator('xpath=ancestor::section[1]')).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.getByRole('button', { name: /^Manage app$/i })).toBeVisible();
+  await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await openReadyRoute(page, '/discover', { width: 1280, height: 960 });

@@ -54,6 +54,7 @@ import {
 } from './extensions/MarketplacePage.logic';
 import { MarketplaceAppDetail } from './MarketplaceAppDetail';
 import { MarketplaceAppList } from './MarketplaceAppList';
+import { MarketplaceAppRail } from './MarketplaceAppRail';
 import { defaultAnswersFromSchema } from './MarketplaceSetupPanel';
 import {
   marketplaceDetailId,
@@ -83,6 +84,7 @@ function DiscoverErrorState({ message, onRetry, title = 'Discover needs attentio
 
 function MarketplacePage() {
   const { showAdvancedMetrics } = useProjectSettings();
+  const wideRailLayout = useDiscoverRailLayout();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedAppId, setSelectedAppId] = useState('vaultwarden');
@@ -292,11 +294,26 @@ function MarketplacePage() {
   );
   const discoverFilterValue = showAdvancedMetrics ? selectedCategory : basicCatalogMode;
 
+  useEffect(() => {
+    if (detailAppId || !visibleApps.length) {
+      return;
+    }
+    setSelectedAppId((currentAppId) => visibleApps.some((app) => app.id === currentAppId) ? currentAppId : visibleApps[0].id);
+  }, [detailAppId, visibleApps]);
+
   function openAppDetails(appId: string) {
     detailTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     catalogScrollPositionRef.current = window.scrollY;
     setSelectedAppId(appId);
     setSearchParams(marketplaceSearchWithDetail(searchParams, appId));
+  }
+
+  function selectApp(appId: string) {
+    if (wideRailLayout) {
+      setSelectedAppId(appId);
+      return;
+    }
+    openAppDetails(appId);
   }
 
   function closeAppDetails() {
@@ -390,38 +407,49 @@ function MarketplacePage() {
         searchAriaLabel="Search Discover apps"
         searchPlaceholder="Search by name, purpose, or category..."
         searchValue={searchQuery}
+        wideLayout="2xl"
       />
 
-      <div className="grid items-start gap-6 2xl:grid-cols-[minmax(620px,1fr)_minmax(420px,560px)]">
-        <MarketplaceAppList apps={visibleApps} density={showAdvancedMetrics ? 'full' : 'basic'} installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null} modeLabel={showAdvancedMetrics ? 'All apps' : basicCatalogMode === 'all-safe' ? 'Ready apps' : 'Starter apps'} onSelect={openAppDetails} onSortChange={setSortBy} selectedAppId={detailAppId ?? ''} sortBy={sortBy} />
-        {detailView && (
-          <MarketplaceAppDetail
-            app={detailView.app}
-            appView={detailView}
-            backupJob={backupJob?.subjectId === detailView.id ? backupJob : null}
-            installJob={installJob?.subjectId === detailView.id ? installJob : null}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <MarketplaceAppList apps={visibleApps} installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null} modeLabel={showAdvancedMetrics ? 'All apps' : basicCatalogMode === 'all-safe' ? 'Ready apps' : 'Starter apps'} onSelect={selectApp} onSortChange={setSortBy} selectedAppId={selectedView?.id ?? ''} sortBy={sortBy} />
+        {selectedView && (
+          <MarketplaceAppRail
+            appView={selectedView}
             installLocked={selectedAppInstallLocked}
-            installOptions={installOptions ?? fallbackInstallOptions}
-            installPlan={installPlan}
-            installPreview={installPreview}
             installStatusMessage={installStatusMessage}
             installing={selectedAppInstalling}
-            installedApp={detailView.installedApp ?? null}
-            onBack={closeAppDetails}
-            onCreateBackup={createFirstBackup}
-            onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(detailView.id)}
-            onInstall={(options) => installApp(detailView.id, options)}
-            onReinstallCurrent={reinstallWithCurrentSettings}
-            onRequestPlan={(options) => requestPlan(detailView.id, options)}
-            onSetupAnswersChange={changeSetupAnswers}
-            planLoading={planLoading}
-            recoveryMode={recoveryAppId === detailView.id ? recoveryMode : null}
-            setupAnswers={setupAnswers}
-            setupReady={installPreview?.valid ?? true}
-            setupSchema={detailView.setupSchema}
+            onReviewDetails={() => openAppDetails(selectedView.id)}
           />
         )}
       </div>
+
+      {detailView && (
+        <MarketplaceAppDetail
+          app={detailView.app}
+          appView={detailView}
+          backupJob={backupJob?.subjectId === detailView.id ? backupJob : null}
+          installJob={installJob?.subjectId === detailView.id ? installJob : null}
+          installLocked={selectedAppInstallLocked}
+          installOptions={installOptions ?? fallbackInstallOptions}
+          installPlan={installPlan}
+          installPreview={installPreview}
+          installStatusMessage={installStatusMessage}
+          installing={selectedAppInstalling}
+          installedApp={detailView.installedApp ?? null}
+          onBack={closeAppDetails}
+          onCreateBackup={createFirstBackup}
+          onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(detailView.id)}
+          onInstall={(options) => installApp(detailView.id, options)}
+          onReinstallCurrent={reinstallWithCurrentSettings}
+          onRequestPlan={(options) => requestPlan(detailView.id, options)}
+          onSetupAnswersChange={changeSetupAnswers}
+          planLoading={planLoading}
+          recoveryMode={recoveryAppId === detailView.id ? recoveryMode : null}
+          setupAnswers={setupAnswers}
+          setupReady={installPreview?.valid ?? true}
+          setupSchema={detailView.setupSchema}
+        />
+      )}
     </PageShell>
   );
 }
@@ -593,4 +621,19 @@ function readStartHereDismissed() {
 
 function appNameForJob(job: AutarkOsJob, apps: DiscoverAppView[]) {
   return apps.find((app) => app.id === job.subjectId)?.name || job.subjectId || 'this app';
+}
+
+function useDiscoverRailLayout() {
+  const query = '(min-width: 1280px)';
+  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(query);
+    const update = () => setMatches(mediaQuery.matches);
+    update();
+    mediaQuery.addEventListener('change', update);
+    return () => mediaQuery.removeEventListener('change', update);
+  }, []);
+
+  return matches;
 }

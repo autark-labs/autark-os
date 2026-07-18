@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
@@ -8,7 +8,6 @@ import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } 
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
-import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
@@ -62,7 +61,6 @@ type AppDetailProps = {
 export function MarketplaceAppDetail({ app, appView, backupJob, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onReinstallCurrent, onRequestPlan, onSetupAnswersChange, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
-  const sideBySideLayout = useSideBySideDetailLayout();
   const isInstalled = Boolean(installedApp);
   const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
   const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId) : '/apps';
@@ -208,14 +206,6 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
     </div>
   );
 
-  if (sideBySideLayout) {
-    return (
-      <Card className="sticky top-24 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border-sky-400/25 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
-        <CardContent className="p-5">{content}</CardContent>
-      </Card>
-    );
-  }
-
   return (
     <ResponsiveDetailsSheet
       model={{ description: app.description, title: app.name }}
@@ -225,21 +215,6 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
       {content}
     </ResponsiveDetailsSheet>
   );
-}
-
-function useSideBySideDetailLayout() {
-  const query = '(min-width: 1536px)';
-  const [matches, setMatches] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia(query);
-    const update = () => setMatches(mediaQuery.matches);
-    update();
-    mediaQuery.addEventListener('change', update);
-    return () => mediaQuery.removeEventListener('change', update);
-  }, []);
-
-  return matches;
 }
 
 function DocsSourceMenu({ app }: { app: MarketplaceApp }) {

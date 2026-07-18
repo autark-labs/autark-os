@@ -16,6 +16,7 @@ type SearchFilterBarProps = {
   filterAriaLabel: string;
   filterValue?: string;
   filters?: SearchFilterOption[];
+  wideLayout?: 'xl' | '2xl';
   onFilterChange?: (value: string) => void;
   onSearchChange: (value: string) => void;
   searchAriaLabel: string;
@@ -34,10 +35,15 @@ export function SearchFilterBar({
   searchAriaLabel,
   searchPlaceholder,
   searchValue,
+  wideLayout = 'xl',
 }: SearchFilterBarProps) {
+  const wideLayoutClass = wideLayout === '2xl'
+    ? '2xl:flex-row 2xl:items-center 2xl:justify-between'
+    : 'xl:flex-row xl:items-center xl:justify-between';
+
   return (
     <Surface className={cn('p-3 shadow-slate-950/20', className)} tone="panel">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className={cn('flex flex-col gap-3', wideLayoutClass)}>
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-200/70" />
           <Input
