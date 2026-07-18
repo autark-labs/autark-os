@@ -1,5 +1,5 @@
-import { forwardRef, useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Pause, Play, RotateCw, ShieldCheck, Wrench, X } from 'lucide-react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, ExternalLink, Loader2, Pause, Play, RotateCw, ShieldCheck, Wrench, X } from 'lucide-react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import {
   Card,
@@ -37,23 +37,63 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
 ) {
   const [managementTab, setManagementTab] = useState('overview');
   const [railView, setRailView] = useState<RailView>('overview');
+  const managementDrawerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setManagementTab(item?.operationState.kind === 'failed' ? 'recovery' : 'overview');
     setRailView('overview');
   }, [item?.id, item?.operationState.kind]);
 
+  useEffect(() => {
+    const drawer = managementDrawerRef.current;
+    if (!drawer) {
+      return;
+    }
+    if (managementOpen) {
+      drawer.removeAttribute('inert');
+      return;
+    }
+    drawer.setAttribute('inert', '');
+  }, [item?.id, managementOpen]);
+
   return (
-    <Card
-      size="sm"
-      className={cn(
-        'relative z-30 h-fit w-full scroll-mt-5 justify-self-end overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 transition-[height,width,box-shadow] duration-300 ease-out lg:h-full lg:max-h-full lg:overflow-y-auto lg:sticky lg:top-5 lg:w-[22rem]',
-        managementOpen && 'shadow-2xl shadow-cyan-950/50 lg:h-full lg:w-[66rem] xl:w-[72rem]',
-      )}
+    <div
+      className="relative z-30 h-fit w-full scroll-mt-5 justify-self-end lg:h-full lg:sticky lg:top-5 lg:w-[22rem]"
       onPointerDown={(event) => event.stopPropagation()}
       ref={ref}
     >
-      <CardHeader className="min-w-0 gap-2 px-3">
+      {item && (
+        <section
+          aria-hidden={!managementOpen}
+          className={cn(
+            'absolute right-[calc(100%-1px)] top-0 z-20 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-y-auto rounded-l-2xl border border-r-0 border-cyan-300/40 bg-slate-900 text-slate-50 shadow-2xl shadow-cyan-950/40 transition-transform duration-300 ease-out motion-reduce:transition-none',
+            managementOpen ? 'translate-x-0' : 'pointer-events-none translate-x-[calc(100%+22rem)]',
+          )}
+          ref={managementDrawerRef}
+        >
+          <div className="border-b border-sky-400/20 px-3 py-3">
+            <p className="text-sm font-semibold text-white">Management</p>
+            <p className="text-xs leading-5 text-sky-100/60">Focused controls, settings, links, and diagnostics for the selected item.</p>
+          </div>
+          <ApplicationManagementPanel
+            actions={actions}
+            item={item}
+            onTabValueChange={setManagementTab}
+            settingsLoadingAction={settingsLoadingByItemId[item.id] ?? null}
+            tabValue={managementTab}
+            variant="rail"
+          />
+        </section>
+      )}
+
+      <Card
+        size="sm"
+        className={cn(
+          'relative z-30 h-fit w-full overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 transition-[border-radius,box-shadow] duration-200 ease-out lg:h-full lg:max-h-full lg:overflow-y-auto',
+          managementOpen && 'rounded-l-none shadow-2xl shadow-cyan-950/50',
+        )}
+      >
+        <CardHeader className="min-w-0 gap-2 px-3">
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex items-start gap-2">
             {item && <ApplicationIcon item={item} size="md" />}
@@ -95,88 +135,27 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
             </div>
           )}
         </div>
-      </CardHeader>
+        </CardHeader>
 
-      <CardContent className="min-h-0 overflow-visible px-3">
+        <CardContent className="min-h-0 overflow-hidden px-3">
         {item ? (
-          <div
-            className={cn(
-              'grid transition-[grid-template-columns,gap] duration-300 ease-out',
-              managementOpen
-                ? 'grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_21rem]'
-                : 'grid-cols-[0fr_minmax(0,1fr)] gap-0',
-            )}
-          >
-            <div
-              aria-hidden={!managementOpen}
-              className={cn(
-                'min-w-0 overflow-hidden transition-[max-height,opacity] duration-200',
-                managementOpen ? 'max-h-[80rem] opacity-100 delay-100' : 'max-h-0 pointer-events-none opacity-0',
-              )}
-            >
-              <div className="mb-2">
-                <p className="text-sm font-semibold text-white">Management</p>
-                <p className="text-xs text-sky-100/60">Focused controls, settings, links, and diagnostics for the selected item.</p>
-              </div>
-              <ApplicationManagementPanel
-                actions={actions}
-                item={item}
-                onTabValueChange={setManagementTab}
-                settingsLoadingAction={settingsLoadingByItemId[item.id] ?? null}
-                tabValue={managementTab}
-                variant="rail"
-              />
-            </div>
-
-            <div className="min-h-0 min-w-0">
-              {managementOpen ? (
-                <div className="flex flex-col gap-3">
-                  <ExpandedOperationStatus item={item} />
-                  {item.operationState.kind === 'failed' && (
-                    <Button
-                      className="justify-start bg-red-600 text-white shadow-lg shadow-red-950/30 hover:bg-red-500"
-                      onClick={() => {
-                        setManagementTab('recovery');
-                        onManagementOpenChange(true);
-                      }}
-                      type="button"
-                    >
-                      <AlertTriangle data-icon="inline-start" />
-                      Open recovery
-                    </Button>
-                  )}
-                  <RailControls actions={actions} item={item} loadingAction={actionLoadingByItemId[item.id] ?? null} />
-
-                  <div className="grid gap-2 text-sm">
-                    <InfoRow label="Type" value={labelForManagementState(item.managementState)} />
-                    <InfoRow label="State" value={labelForReadiness(item.readinessState)} />
-                    <InfoRow label="Attention" value={labelForAttention(item.attentionState)} />
-                    <InfoRow label="Access" value={item.access} />
-                    <InfoRow label="Backup" value={item.backup} />
-                    {item.lastEvent && <InfoRow label="Last event" value={item.lastEvent} />}
-                  </div>
-                  <RecentActivitySummary item={item} />
-                </div>
-              ) : (
-                <CompactRailView
-                  actions={actions}
-                  item={item}
-                  loadingAction={actionLoadingByItemId[item.id] ?? null}
-                  onOpenRecovery={() => {
-                    setManagementTab('recovery');
-                    onManagementOpenChange(true);
-                  }}
-                  railView={railView}
-                  setRailView={setRailView}
-                />
-              )}
-            </div>
-          </div>
+          <CompactRailView
+            actions={actions}
+            item={item}
+            loadingAction={actionLoadingByItemId[item.id] ?? null}
+            onOpenRecovery={() => {
+              setManagementTab('recovery');
+              onManagementOpenChange(true);
+            }}
+            railView={railView}
+            setRailView={setRailView}
+          />
         ) : (
           <p className="text-sm text-sky-100/70">No item selected.</p>
         )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 });
 
@@ -198,7 +177,8 @@ function CompactRailView({
   const issues = buildAttentionIssues({ actions, item, loadingAction, onOpenRecovery });
 
   return (
-    <div className="flex min-h-0 flex-col gap-3">
+    <div className="flex min-h-0 flex-col gap-3" data-management-state={labelForManagementState(item.managementState)}>
+      <ExpandedOperationStatus item={item} />
       <StatusLegend />
       <Tabs onValueChange={(value) => setRailView(value as RailView)} value={railView}>
         <TabsList className="w-full rounded-lg border border-sky-400/20 bg-slate-800 p-1" variant="default">
@@ -443,15 +423,6 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
         )}
       </div>
     </section>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-lg bg-slate-800 px-3 py-2">
-      <span className="text-sky-100/70">{label}</span>
-      <span className="font-medium text-white">{value}</span>
-    </div>
   );
 }
 

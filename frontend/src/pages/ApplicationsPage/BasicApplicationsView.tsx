@@ -19,19 +19,21 @@ export function BasicApplicationsView({ actionLoadingByItemId, emptyState, items
   }
 
   return (
-    <section className="grid h-full min-h-0 grid-cols-[repeat(auto-fill,13rem)] content-start items-start justify-start gap-3 overflow-y-auto overscroll-contain pr-1">
-      {items.map((item) => (
-        <ApplicationCard
-          key={item.id}
-          item={item}
-          actionLoading={actionLoadingByItemId?.[item.id]}
-          managementOpen={managementOpen}
-          obscured={Boolean(selectedId) && selectedId !== item.id}
-          onAction={onAction}
-          onSelect={onSelect}
-          selected={selectedId === item.id}
-        />
-      ))}
+    <section className="relative h-full min-h-0">
+      <div className="grid h-full min-h-0 grid-cols-[repeat(auto-fill,13rem)] content-start items-start justify-start gap-3 overflow-y-auto overscroll-contain pr-1">
+        {items.map((item) => (
+          <ApplicationCard
+            key={item.id}
+            item={item}
+            actionLoading={actionLoadingByItemId?.[item.id]}
+            managementOpen={managementOpen}
+            onAction={onAction}
+            onSelect={onSelect}
+            selected={selectedId === item.id}
+          />
+        ))}
+      </div>
+      {managementOpen && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 bg-slate-950/15 backdrop-blur-[1px]" />}
     </section>
   );
 }

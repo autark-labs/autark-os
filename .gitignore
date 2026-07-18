@@ -18,6 +18,7 @@ backend/.gradle/
 
 # Node / Vite
 frontend/node_modules/
+frontend/src/wireframes/*
 frontend/dist/
 frontend/.vite/
 frontend/.env.local
@@ -49,3 +50,4 @@ docs/development
 docs/current-app-state
 .superpowers
 docs/superpowers
+frontend/discover-wireframes.html

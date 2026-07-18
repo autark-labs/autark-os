@@ -52,7 +52,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
 
   return (
     <Card className="flex h-full min-h-0 flex-col !gap-0 overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
-      <CardContent className="min-h-0 flex-1 overflow-hidden px-3 pb-3">
+      <CardContent className="relative min-h-0 flex-1 overflow-hidden px-3 pb-3">
         {!items.length ? (
           <AdvancedEmptyState emptyState={emptyState} />
         ) : (
@@ -82,7 +82,6 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                       !managementOpen && 'hover:-translate-y-0.5 hover:bg-sky-50 hover:shadow-lg',
                       item.attentionState !== 'none' && cn('bg-orange-200', !managementOpen && 'hover:bg-orange-100'),
                       item.readinessState === 'paused' && cn('bg-slate-200', !managementOpen && 'hover:bg-slate-100'),
-                      managementOpen && selectedId && selectedId !== item.id && 'opacity-35 blur-[1px]',
                       selectedId === item.id && cn(
                         'bg-cyan-100 shadow-xl shadow-cyan-300/35 ring-2 ring-cyan-300/40',
                         !managementOpen && 'hover:bg-cyan-50',
@@ -189,6 +188,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
           </Table>
         </div>
         )}
+        {managementOpen && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 bg-slate-950/15 backdrop-blur-[1px]" />}
       </CardContent>
     </Card>
   );

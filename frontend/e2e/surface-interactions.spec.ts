@@ -33,8 +33,19 @@ test('wide view opens global popovers, app management, and the Discover dialog',
   await openReadyRoute(page, '/apps', { width: 1280, height: 960 });
   await expect(page.getByText(/My Apps/i).first()).toBeVisible();
   await page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i }).click();
+  const railStatusBeforeExpand = await page.getByLabel('Status legend').boundingBox();
+  const scrollBeforeExpand = await page.evaluate(() => window.scrollY);
   await page.getByRole('button', { name: /Manage app/i }).click();
   await expect(page.getByText(/^Management$/i)).toBeVisible();
+  const railStatusAfterExpand = await page.getByLabel('Status legend').boundingBox();
+  expect(railStatusAfterExpand?.x).toBeCloseTo(railStatusBeforeExpand?.x ?? 0, 0);
+  expect(railStatusAfterExpand?.width).toBeCloseTo(railStatusBeforeExpand?.width ?? 0, 0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeExpand);
+  await page.getByRole('button', { name: /Close details/i }).click();
+  await expect(page.getByText(/^Management$/i).locator('xpath=ancestor::section[1]')).toHaveAttribute('aria-hidden', 'true');
+  await expect(page.getByRole('button', { name: /^Manage app$/i })).toBeVisible();
+  await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeExpand);
   await expectNoHorizontalOverflow(page);
 
   await openReadyRoute(page, '/discover', { width: 1280, height: 960 });

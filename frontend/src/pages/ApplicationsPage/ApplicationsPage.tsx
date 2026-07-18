@@ -194,9 +194,16 @@ export const ApplicationsPage = () => {
     navigate('/apps', { replace: true });
   }, [navigate]);
 
+  const closeManagement = useCallback(() => {
+    setManagementOpen(false);
+    if (selectedItem) {
+      navigate(applicationDeepLinkForSurfaceItem(selectedItem), { replace: true });
+    }
+  }, [navigate, selectedItem]);
+
   const handleManagementOpenChange = useCallback((open: boolean) => {
     if (!open) {
-      clearApplicationFocus();
+      closeManagement();
       return;
     }
     if (selectedItem) {
@@ -204,7 +211,7 @@ export const ApplicationsPage = () => {
       return;
     }
     setManagementOpen(true);
-  }, [clearApplicationFocus, focusApplicationItem, selectedItem]);
+  }, [closeManagement, focusApplicationItem, selectedItem]);
 
   const handleCollectionFilterChange = useCallback((nextFilters: string[]) => {
     const normalizedFilters = nextFilters.filter((filter): filter is ApplicationCollectionFilter => (
@@ -273,34 +280,6 @@ export const ApplicationsPage = () => {
       return undefined;
     }
 
-    const ensureRailVisible = () => {
-      const rail = railRef.current;
-      if (!rail) {
-        return;
-      }
-
-      const margin = 20;
-      const rect = rail.getBoundingClientRect();
-      const availableHeight = window.innerHeight - margin * 2;
-      let scrollDelta = 0;
-
-      if (rect.height <= availableHeight) {
-        if (rect.bottom > window.innerHeight - margin) {
-          scrollDelta = rect.bottom - window.innerHeight + margin;
-        } else if (rect.top < margin) {
-          scrollDelta = rect.top - margin;
-        }
-      } else if (rect.top > margin || rect.top < margin) {
-        scrollDelta = rect.top - margin;
-      }
-
-      if (Math.abs(scrollDelta) > 1) {
-        window.scrollTo({ behavior: 'smooth', top: window.scrollY + scrollDelta });
-      }
-    };
-
-    const scrollTimers = [0, 160, 340].map((delay) => window.setTimeout(ensureRailVisible, delay));
-
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && railRef.current?.contains(target)) {
@@ -317,7 +296,6 @@ export const ApplicationsPage = () => {
 
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => {
-      scrollTimers.forEach((timer) => window.clearTimeout(timer));
       document.removeEventListener('pointerdown', handlePointerDown, true);
     };
   }, [canCloseManagement, clearApplicationFocus, managementOpen]);

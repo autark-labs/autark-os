@@ -22,7 +22,6 @@ export function ApplicationCard({
   actionLoading,
   item,
   managementOpen,
-  obscured,
   onAction,
   onSelect,
   selected,
@@ -30,7 +29,6 @@ export function ApplicationCard({
   actionLoading?: ApplicationRuntimeAction | null;
   item: ApplicationSurfaceItem;
   managementOpen: boolean;
-  obscured: boolean;
   onAction?: (item: ApplicationSurfaceItem, actionId: string) => void;
   onSelect: (id: string) => void;
   selected: boolean;
@@ -56,7 +54,6 @@ export function ApplicationCard({
         'relative h-[218px] w-[13rem] overflow-hidden rounded-xl border border-sky-300/20 bg-[#102644] !py-0 !gap-0 text-slate-50 shadow-lg shadow-slate-950/20 ring-0 transition duration-200',
         !managementOpen && 'cursor-pointer hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-[#173455] hover:shadow-xl hover:shadow-cyan-950/30',
         managementOpen && 'pointer-events-none cursor-default',
-        managementOpen && obscured && 'scale-[0.98] opacity-35 blur-[1px]',
         selected && 'z-10 border-cyan-300/80 shadow-xl shadow-cyan-950/30 ring-1 ring-cyan-300/45',
       )}
       ref={cardRef}
