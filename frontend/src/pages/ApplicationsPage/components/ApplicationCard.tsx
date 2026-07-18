@@ -72,72 +72,74 @@ export function ApplicationCard({
         <span className="sr-only">Manage {item.name}</span>
       </button>
 
-      <div className="pointer-events-none relative z-10">
-        <AppArtwork className="h-32 transition duration-300 group-hover:scale-[1.02]" iconUrl={item.iconUrl} index={item.id.length} name={item.name} />
-        <span className="absolute z-100 left-3 top-3 rounded-full border border-slate-950/40 bg-slate-950/65 px-2 py-1 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">
-          {item.managementState === 'linked' ? 'Linked' : 'Managed app'}
-        </span>
-        <div className="space-y-1 px-3 pb-3 pt-2">
+      <div className="pointer-events-none relative z-10 flex h-full flex-col">
+        <div className="relative shrink-0">
+          <AppArtwork className="h-32 transition duration-300 group-hover:scale-[1.02]" iconUrl={item.iconUrl} index={item.id.length} name={item.name} />
+          <span className="absolute left-3 top-3 z-30 rounded-full border border-slate-950/40 bg-slate-950/65 px-2 py-1 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">
+            {item.managementState === 'linked' ? 'Linked' : 'Managed app'}
+          </span>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col px-3 pb-2 pt-2">
           <p className="m-0 truncate text-sm font-semibold text-white" title={item.name}>{item.name}</p>
           <p className="m-0 truncate text-xs text-slate-400">{item.category || 'App'}</p>
-          <div className="flex items-center gap-1.5 border-t border-sky-300/10 pt-2 text-[0.7rem] font-medium">
+          <div className="mt-auto flex items-center justify-between gap-2 border-t border-sky-300/10 pt-2 text-[0.7rem] font-medium">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className={cn('size-1.5 shrink-0 rounded-full', readinessTone(item))} />
               <span className={cn(readinessTextTone(item))}>{statusLabel(item)}</span>
             </span>
+
+            <DropdownMenu>
+              <div className="pointer-events-auto flex shrink-0 items-center gap-1">
+                {item.href ? (
+                  <a
+                    aria-label={`Open ${item.name}`}
+                    className="inline-flex size-6 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
+                    href={item.href}
+                    onClick={(event) => event.stopPropagation()}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <ExternalLink className="size-3.5" />
+                  </a>
+                ) : null}
+                <DropdownMenuTrigger asChild>
+                  <button
+                    aria-label={`${item.name} actions`}
+                    className="inline-flex size-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
+                    disabled={managementOpen}
+                    onClick={(event) => event.stopPropagation()}
+                    type="button"
+                  >
+                    <MoreVertical className="size-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+              </div>
+              <DropdownMenuContent align="end" className="min-w-44 border-sky-300/20 bg-[#0b1831] text-slate-100" onClick={(event) => event.stopPropagation()}>
+                <DropdownMenuLabel className="text-xs text-slate-400">{item.name}</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-sky-300/10" />
+                {actions.map((action) => action.href ? (
+                  <DropdownMenuItem asChild key={action.id}>
+                    <a href={action.href} rel="noreferrer" target={action.href.startsWith('/') ? undefined : '_blank'}>{action.label}</a>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    disabled={action.disabled}
+                    key={action.id}
+                    onSelect={() => onAction?.(item, action.id)}
+                    title={action.reason || undefined}
+                  >
+                    {action.label}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator className="bg-sky-300/10" />
+                <DropdownMenuItem asChild>
+                  <Link to={manageHref}>Manage details</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
-
-      <DropdownMenu>
-        <div className="absolute bottom-2.5 right-2.5 z-20 flex items-center gap-1">
-          {item.href ? (
-            <a
-              aria-label={`Open ${item.name}`}
-              className="inline-flex size-6 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
-              href={item.href}
-              onClick={(event) => event.stopPropagation()}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <ExternalLink className="size-3.5" />
-            </a>
-          ) : null}
-          <DropdownMenuTrigger asChild>
-            <button
-              aria-label={`${item.name} actions`}
-              className="inline-flex size-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
-              disabled={managementOpen}
-              onClick={(event) => event.stopPropagation()}
-              type="button"
-            >
-              <MoreVertical className="size-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-        </div>
-        <DropdownMenuContent align="end" className="min-w-44 border-sky-300/20 bg-[#0b1831] text-slate-100" onClick={(event) => event.stopPropagation()}>
-          <DropdownMenuLabel className="text-xs text-slate-400">{item.name}</DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-sky-300/10" />
-          {actions.map((action) => action.href ? (
-            <DropdownMenuItem asChild key={action.id}>
-              <a href={action.href} rel="noreferrer" target={action.href.startsWith('/') ? undefined : '_blank'}>{action.label}</a>
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem
-              disabled={action.disabled}
-              key={action.id}
-              onSelect={() => onAction?.(item, action.id)}
-              title={action.reason || undefined}
-            >
-              {action.label}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator className="bg-sky-300/10" />
-          <DropdownMenuItem asChild>
-            <Link to={manageHref}>Manage details</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
 
       {item.attentionState !== 'none' && <AttentionIndicator item={item} className="absolute right-3 top-3 z-20" />}
     </Card>
