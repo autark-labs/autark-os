@@ -1,21 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, AppWindow, Boxes, CalendarClock, DatabaseBackup, HardDrive, Layers3, Loader2, Play, RotateCcw } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
-import { RefreshStatus } from '@/components/RefreshStatus';
-import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
-import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
-import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { Surface } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { showActionNotification, showJobNotification } from '@/lib/actionNotifications';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   useBackupReportRepository,
   useBackupJobsQuery,
@@ -34,23 +26,17 @@ import {
 } from '@/repositories/applicationStateRepository';
 import type { AppBackupStatus, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
-import {
-  ActionCard,
-  AppBackupCard,
-  BackupPanel,
-  AttentionCard,
-  FactRow,
-  ProtectionPanel,
-  RestoreFlowDialog,
-  RestoreList,
-  RoutineHealthPanel,
-  RoutineTimeline,
-  SectionHeader,
-} from './BackupsPage.components';
+import { RestoreFlowDialog } from './BackupsPage.components';
 import type { RestoreFlowState } from './BackupsPage.components';
-import { activeBackupJobs, backupJobRunningId, backupOperationAvailability, backupOperationForJob, backupOperationForRunningId, backupPageViewModel, capitalizeBackupLabel, formatBackupBytes, selectActiveBackupJob } from './BackupsPage.logic';
-
-type RestoreView = 'timeline' | 'list';
+import {
+  activeBackupJobs,
+  backupJobRunningId,
+  backupOperationAvailability,
+  backupOperationForJob,
+  backupOperationForRunningId,
+  selectActiveBackupJob,
+} from './BackupsPage.logic';
+import { BackupTimelineWorkspace } from './BackupTimelineWorkspace';
 
 function BackupsPage() {
   const queryClient = useQueryClient();
@@ -58,7 +44,6 @@ function BackupsPage() {
   const { openSettings } = useSettingsDialog();
   const [running, setRunning] = useState<string | null>(null);
   const [restoreFlow, setRestoreFlow] = useState<RestoreFlowState | null>(null);
-  const [restoreView, setRestoreView] = useState<RestoreView>('timeline');
   const [activeJob, setActiveJob] = useState<AutarkOsJob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const restoreOriginRef = useRef<HTMLElement | null>(null);
@@ -309,22 +294,6 @@ function BackupsPage() {
     }
   }
 
-  const {
-    appRestorePoints,
-    fullRestorePoints,
-    latestRestore,
-    needsAttention,
-    protectionHero,
-    routineRestorePoints,
-  } = backupPageViewModel(report) as {
-    appRestorePoints: RestorePoint[];
-    fullRestorePoints: RestorePoint[];
-    latestRestore: RestorePoint | null;
-    needsAttention: AppBackupStatus[];
-    protectionHero: { summary: string; title: string };
-    routineRestorePoints: RestorePoint[];
-  };
-
   if (backupReport.isLoading) {
     return (
       <BackupsLoadingState />
@@ -332,148 +301,32 @@ function BackupsPage() {
   }
 
   return (
-    <PageShell>
-      <Surface as="header" className="overflow-hidden" tone="panel">
-        <div className="grid gap-5 border-b border-sky-400/20 bg-slate-900 p-6 md:p-7 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="flex min-w-0 flex-col justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Backups</p>
-              <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">{protectionHero.title}</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 md:text-base">{protectionHero.summary}</p>
-            </div>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <DisabledAction disabled={routineBackupAvailability.disabled || !report?.settings.automaticBackupsEnabled} reason={routineBackupAvailability.disabled ? routineBackupAvailability.reason : 'Turn on routine backups in Settings first.'}>
-                <ProjectPrimaryButton disabled={routineBackupAvailability.disabled || !report?.settings.automaticBackupsEnabled} onClick={() => void runRoutineBackup()} type="button">
-                  {running === 'routine' ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
-                  Run routine backup
-                </ProjectPrimaryButton>
-              </DisabledAction>
-              {showAdvancedMetrics && (
-                <DisabledAction disabled={fullBackupAvailability.disabled} reason={fullBackupAvailability.reason}>
-                  <ProjectDarkControlButton disabled={fullBackupAvailability.disabled} onClick={() => void runFullBackup()} type="button">
-                    {running === 'full' ? <Loader2 className="size-4 animate-spin" /> : <Layers3 className="size-4" />}
-                    Full checkpoint
-                  </ProjectDarkControlButton>
-                </DisabledAction>
-              )}
-              <RefreshStatus intervalLabel={restoreFlow || running ? 'Auto-update paused' : 'Auto-updates every 30s'} onRefresh={() => void backupReport.refresh()} refreshing={backupReport.isFetching || activeJobQuery.isFetching} updatedAt={backupReport.updatedAt} />
-            </div>
-          </div>
-          <ProtectionPanel latestRestore={latestRestore} report={report} />
-        </div>
-
-        {pageError && <BackupsErrorState message={pageError} onRetry={() => void backupReport.refresh()} />}
-        {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
-      </Surface>
-
+    <PageShell
+      className="lg:h-[calc(100dvh-7.25rem)] lg:min-h-0"
+      contained
+      contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
+    >
+      {pageError && <BackupsErrorState message={pageError} onRetry={() => void backupReport.refresh()} />}
+      {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
       {report && (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="flex flex-col gap-5">
-            <BackupPanel>
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
-                <div>
-                  <p className="text-sm font-bold text-white">{report.destination.kind === 'external' ? 'External backup drive' : 'Backup location on this device'}</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">{report.destination.message}</p>
-                </div>
-                <ProjectDarkControlButton onClick={() => openSettings('backups')} size="sm" type="button">
-                  {report.destination.status === 'ready' ? 'Review destination' : 'Fix destination'}
-                </ProjectDarkControlButton>
-              </div>
-              <SectionHeader icon={DatabaseBackup} title="Create a manual backup" description="Choose the smallest backup that matches what you are about to do." />
-              <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                {showAdvancedMetrics && <ActionCard
-                  busy={running === 'full'}
-                  description="One restore point for every supported installed app."
-                  icon={Layers3}
-                  disabled={fullBackupAvailability.disabled}
-                  disabledReason={fullBackupAvailability.reason}
-                  label="Full checkpoint"
-                  onClick={() => void runFullBackup()}
-                  title="Back up everything"
-                  tone="cyan"
-                />}
-                <ActionCard
-                  busy={false}
-                  description="Use an app card below when you only need one app."
-                  icon={AppWindow}
-                  label={`${report.apps.length} apps available`}
-                  onClick={() => {
-                    document.getElementById('app-backups')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
-                  title="Back up one app"
-                  tone="sky"
-                />
-                <ActionCard
-                  busy={running === 'routine'}
-                  description={report.settings.automaticBackupsEnabled ? `${capitalizeBackupLabel(report.settings.frequency)} near ${report.settings.backupTime} (${report.settings.timeZone || 'UTC'})` : 'Turn on routine backups in Settings.'}
-                  disabled={routineBackupAvailability.disabled || !report.settings.automaticBackupsEnabled}
-                  disabledReason={routineBackupAvailability.disabled ? routineBackupAvailability.reason : 'Turn on routine backups in Settings first.'}
-                  icon={CalendarClock}
-                  label="Routine path"
-                  onClick={() => void runRoutineBackup()}
-                  title="Run routine now"
-                  tone="emerald"
-                />
-              </div>
-            </BackupPanel>
-
-            <RoutineHealthPanel report={report} showAdvancedMetrics={showAdvancedMetrics} />
-
-            <BackupPanel>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <SectionHeader icon={RotateCcw} title="Restore" description="Browse restore points as a visual routine timeline or a compact list." />
-                <Tabs className="w-fit shrink-0" onValueChange={(value) => setRestoreView(value as RestoreView)} value={restoreView}>
-                  <TabsList className="border border-sky-400/25 bg-slate-800">
-                    <TabsTrigger className="px-3 text-slate-400 data-active:text-white" value="timeline">Timeline</TabsTrigger>
-                    <TabsTrigger className="px-3 text-slate-400 data-active:text-white" value="list">List</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-              <div className="mt-3 min-h-[400px]">
-                {restoreView === 'timeline' ? (
-                  <RoutineTimeline apps={report.apps} latestRestore={latestRestore} nextRun={report.settings.nextRoutineRun} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} points={routineRestorePoints} restoreAvailability={restoreAvailability} running={running} timeZone={report.settings.timeZone || 'UTC'} verifyAvailability={verifyAvailability} />
-                ) : (
-                  <RestoreList apps={report.apps} appRestorePoints={appRestorePoints} fullRestorePoints={fullRestorePoints} onDetails={openRestorePointDetails} onRestore={openRestore} onVerify={verifyRestorePoint} restoreAvailability={restoreAvailability} running={running} timeZone={report.settings.timeZone || 'UTC'} verifyAvailability={verifyAvailability} />
-                )}
-              </div>
-            </BackupPanel>
-
-            <BackupPanel id="app-backups">
-              <SectionHeader icon={Boxes} title="App backups" description="Create a focused backup for a specific app." />
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
-                {report.apps.length ? report.apps.map((app) => (
-                  <AppBackupCard app={app} key={app.appId} onRun={runManualAppBackup} operationAvailability={appBackupOperationAvailability} running={running === `app-${app.appId}`} showAdvancedMetrics={showAdvancedMetrics} timeZone={report.settings.timeZone || 'UTC'} />
-                )) : (
-                  <EmptyState title="No apps installed" description="Install apps to begin backup protection." />
-                )}
-              </div>
-            </BackupPanel>
-          </div>
-
-          <aside className="flex flex-col gap-5">
-            <BackupPanel>
-              <SectionHeader compact icon={HardDrive} title="Storage" />
-              <div className="mt-4 grid gap-3">
-                <FactRow label="Destination" value={report.destination.kind === 'external' ? 'External drive' : 'This device'} />
-                <FactRow label="Destination status" value={report.destination.status === 'ready' ? 'Ready' : report.destination.message} />
-                <FactRow label="Used" value={formatBackupBytes(report.backupStorageBytes)} />
-                <FactRow label="Restore points" value={`${report.recentRestorePoints.length}`} />
-                <FactRow label="Protected by restore point" value={`${report.protectedApps}/${report.totalApps}`} />
-                {showAdvancedMetrics && <FactRow label="Backup folder" value={report.backupRoot} />}
-                <ProjectDarkControlButton asChild className="mt-1 justify-start" size="sm">
-                  <Link to="/storage">View storage</Link>
-                </ProjectDarkControlButton>
-              </div>
-            </BackupPanel>
-
-            <BackupPanel>
-              <SectionHeader compact icon={AlertTriangle} title="Needs attention" />
-              <div className="mt-4 grid gap-3">
-                {needsAttention.length ? needsAttention.map((app) => <AttentionCard app={app} key={app.appId} />) : <EmptyState compact title={report.totalApps ? 'All apps have restore points' : 'No apps installed'} description={report.totalApps ? 'Installed apps are protected by completed restore points.' : 'Install an app before backup protection can begin.'} />}
-              </div>
-            </BackupPanel>
-          </aside>
-        </div>
+        <BackupTimelineWorkspace
+          appBackupAvailability={appBackupOperationAvailability}
+          fullBackupAvailability={fullBackupAvailability}
+          onCreateAppBackup={runManualAppBackup}
+          onCreateFullBackup={() => void runFullBackup()}
+          onOpenRestoreDetails={openRestorePointDetails}
+          onOpenRestorePlan={openRestore}
+          onOpenSettings={() => openSettings('backups')}
+          onRefresh={() => void backupReport.refresh()}
+          onRunRoutineBackup={() => void runRoutineBackup()}
+          onVerifyRestorePoint={verifyRestorePoint}
+          refreshing={backupReport.isFetching || activeJobQuery.isFetching}
+          report={report}
+          restoreAvailability={restoreAvailability}
+          routineBackupAvailability={routineBackupAvailability}
+          running={running}
+          verifyAvailability={verifyAvailability}
+        />
       )}
 
       <RestoreFlowDialog
@@ -497,8 +350,8 @@ function BackupsPage() {
 
 function BackupJobBanner({ job }: { job: AutarkOsJob }) {
   return (
-    <div className="border-b border-cyan-300/30 bg-cyan-400/10 px-6 py-4">
-      <JobProgress job={job} subjectLabel={backupSubjectLabel(job)} />
+    <div className="shrink-0 border-b border-cyan-300/30 bg-cyan-400/10 px-3 py-2">
+      <JobProgress compact job={job} subjectLabel={backupSubjectLabel(job)} />
     </div>
   );
 }

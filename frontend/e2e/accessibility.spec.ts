@@ -64,8 +64,7 @@ test('Discover, Access, and Settings have no serious or critical axe violations'
 
 test('backup restore dialog has no serious or critical axe violations', async ({ page }) => {
   await openRoute(page, '/backups', 'idle');
-  await page.getByRole('tab', { name: /^List$/i }).click();
-  await page.getByRole('button', { name: /^Details$/i }).first().click();
+  await page.getByRole('button', { name: /^Details$/i }).click();
   await expect(page.getByRole('dialog')).toContainText(/Restore point details/i);
   await expectNoSeriousAccessibilityViolations(page);
 });

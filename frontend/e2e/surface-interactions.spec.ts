@@ -104,9 +104,8 @@ test('narrow view keeps sheets and the backup dialog within the viewport', async
   await expectNoHorizontalOverflow(page);
 
   await openReadyRoute(page, '/backups', { width: 390, height: 844 }, 'idle');
-  await expect(page.getByText(/Create a manual backup/i)).toBeVisible();
-  await page.getByRole('tab', { name: /^List$/i }).click();
-  await page.getByRole('button', { name: /^Details$/i }).first().click();
+  await expect(page.getByText(/Backup timeline/i)).toBeVisible();
+  await page.getByRole('button', { name: /^Details$/i }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText(/Restore point details/i);
   const box = await dialog.boundingBox();

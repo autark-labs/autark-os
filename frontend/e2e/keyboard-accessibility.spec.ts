@@ -43,11 +43,7 @@ test('setup, app management, and Access controls work with the keyboard', async 
 
 test('backup dialog traps focus and returns it to the trigger when closed', async ({ page }) => {
   await openRoute(page, '/backups', 'idle');
-  const listTab = page.getByRole('tab', { name: /^List$/i });
-  await listTab.focus();
-  await page.keyboard.press('Enter');
-
-  const details = page.getByRole('button', { name: /^Details$/i }).first();
+  const details = page.getByRole('button', { name: /^Details$/i });
   await details.focus();
   await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog');
