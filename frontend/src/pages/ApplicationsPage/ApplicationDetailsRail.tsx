@@ -40,16 +40,17 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
 
   return (
     <Card
+      size="sm"
       className={cn(
-        'relative z-30 h-fit w-full scroll-mt-5 justify-self-end overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 transition-[width,box-shadow] duration-300 ease-out lg:max-h-full lg:overflow-y-auto lg:sticky lg:top-5 lg:w-[22rem]',
-        managementOpen && 'shadow-2xl shadow-cyan-950/50 lg:w-[66rem] xl:w-[72rem]',
+        'relative z-30 h-fit w-full scroll-mt-5 justify-self-end overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0 transition-[height,width,box-shadow] duration-300 ease-out lg:max-h-full lg:overflow-y-auto lg:sticky lg:top-5 lg:w-[22rem]',
+        managementOpen && 'shadow-2xl shadow-cyan-950/50 lg:h-full lg:w-[66rem] xl:w-[72rem]',
       )}
       onPointerDown={(event) => event.stopPropagation()}
       ref={ref}
     >
-      <CardHeader>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
+      <CardHeader className="gap-2 px-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-start gap-2">
             {item && <ApplicationIcon item={item} size="md" />}
             <div className="min-w-0 flex-1">
               <CardTitle className="truncate text-white">{item?.name ?? 'Selected app'}</CardTitle>
@@ -79,13 +80,13 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
         </div>
       </CardHeader>
 
-      <CardContent className="overflow-hidden">
+      <CardContent className="overflow-hidden px-3">
         {item ? (
           <div
             className={cn(
               'grid transition-[grid-template-columns,gap] duration-300 ease-out',
               managementOpen
-                ? 'grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_21rem]'
+                ? 'grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_21rem]'
                 : 'grid-cols-[0fr_minmax(0,1fr)] gap-0',
             )}
           >
@@ -96,7 +97,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
                 managementOpen ? 'max-h-[80rem] opacity-100 delay-100' : 'max-h-0 pointer-events-none opacity-0',
               )}
             >
-              <div className="mb-3">
+              <div className="mb-2">
                 <p className="text-sm font-semibold text-white">Management</p>
                 <p className="text-xs text-sky-100/60">Focused controls, settings, links, and diagnostics for the selected item.</p>
               </div>
@@ -111,7 +112,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
             </div>
 
             <div className="min-w-0">
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                 <ExpandedOperationStatus item={item} />
                 {item.operationState.kind === 'failed' && (
                   <Button

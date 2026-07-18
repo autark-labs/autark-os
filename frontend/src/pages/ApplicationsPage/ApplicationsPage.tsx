@@ -55,6 +55,20 @@ import {
 } from './extensions/ApplicationsPage.presentation';
 
 type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'backup'>;
+const foundAppsPromptDismissalKey = 'autark-os.my-apps.found-apps-prompt-dismissed.v1';
+
+function readFoundAppsPromptDismissal() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  try {
+    return window.sessionStorage.getItem(foundAppsPromptDismissalKey) || '';
+  } catch {
+    return '';
+  }
+}
+
 export const ApplicationsPage = () => {
   const { setViewMode, viewMode } = useProjectSettings();
   const queryClient = useQueryClient();
@@ -70,6 +84,7 @@ export const ApplicationsPage = () => {
   const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
   const [trackedAppJobIds, setTrackedAppJobIds] = useState<string[]>([]);
+  const [dismissedFoundServicesSignature, setDismissedFoundServicesSignature] = useState(readFoundAppsPromptDismissal);
   const appliedDeepLinkKeyRef = useRef('');
   const railRef = useRef<HTMLDivElement | null>(null);
   const deepLinkTarget = useMemo(() => parseApplicationsDeepLink(location.search), [location.search]);
@@ -111,6 +126,11 @@ export const ApplicationsPage = () => {
   const managedItems = useMemo(() => items.filter((item) => item.managementState === 'managed'), [items]);
   const linkedItems = useMemo(() => items.filter((item) => item.managementState === 'linked'), [items]);
   const foundServices = appState.foundServices;
+  const foundServicesSignature = useMemo(
+    () => foundServices.map((service) => service.id).sort().join('|'),
+    [foundServices],
+  );
+  const showFoundAppsPrompt = Boolean(foundServicesSignature && dismissedFoundServicesSignature !== foundServicesSignature);
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items.filter((item) => {
@@ -140,6 +160,19 @@ export const ApplicationsPage = () => {
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
+
+  const dismissFoundAppsPrompt = useCallback(() => {
+    if (!foundServicesSignature) {
+      return;
+    }
+
+    setDismissedFoundServicesSignature(foundServicesSignature);
+    try {
+      window.sessionStorage.setItem(foundAppsPromptDismissalKey, foundServicesSignature);
+    } catch {
+      // The in-memory state still dismisses the prompt when session storage is unavailable.
+    }
+  }, [foundServicesSignature]);
 
   const focusApplicationItem = useCallback((item: ApplicationSurfaceItem, managementOpen = false) => {
     setSelectedId(item.id);
@@ -586,8 +619,8 @@ export const ApplicationsPage = () => {
     >
       <AppsPageHeader attentionCount={attentionCount} linkedCount={linkedCount} managedCount={managedCount} />
 
-      {foundServices.length > 0 && (
-        <FoundAppsPrompt className="gap-2 p-3" model={{ count: foundServices.length, reviewHref: '/apps/found' }} />
+      {showFoundAppsPrompt && (
+        <FoundAppsPrompt className="gap-2 p-3" model={{ count: foundServices.length, reviewHref: '/apps/found' }} onDismiss={dismissFoundAppsPrompt} />
       )}
 
       <div className="grid gap-3">

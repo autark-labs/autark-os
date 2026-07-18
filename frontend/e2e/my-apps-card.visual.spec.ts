@@ -45,3 +45,21 @@ test('My Apps basic cards use the compact homepage launcher treatment', async ({
   await manageButton.click();
   await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
 });
+
+test('My Apps found-app notice links to review and can be dismissed for the session', async ({ page }) => {
+  await installMockApi(page, 'ready');
+  await page.setViewportSize({ width: 1280, height: 960 });
+  await page.goto('/apps', { waitUntil: 'domcontentloaded' });
+  await stabilizePage(page);
+
+  const reviewLink = page.getByRole('link', { name: 'Review existing apps' });
+  await expect(reviewLink).toBeVisible();
+  await reviewLink.click();
+  await expect(page).toHaveURL(/\/apps\/found$/);
+
+  await page.goBack({ waitUntil: 'domcontentloaded' });
+  await stabilizePage(page);
+  await expect(reviewLink).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss found apps notice' }).click();
+  await expect(page.getByRole('heading', { name: 'Found on this server' })).toBeHidden();
+});

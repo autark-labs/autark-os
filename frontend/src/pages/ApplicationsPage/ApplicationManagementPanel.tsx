@@ -72,7 +72,7 @@ export function ApplicationManagementPanel({
       )}
     >
       <Tabs className="gap-0" defaultValue="overview" onValueChange={onTabValueChange} value={tabValue}>
-        <TabsList className="w-full justify-start overflow-x-auto rounded-none border-b border-sky-400/20 bg-slate-900 px-3 py-2" variant="line">
+        <TabsList className={cn('w-full justify-start overflow-x-auto rounded-none border-b border-sky-400/20 bg-slate-900', rail ? 'px-2 py-1' : 'px-3 py-2')} variant="line">
           {recoveryNeeded && (
             <TabsTrigger className="bg-red-600 px-3 py-2 text-white data-active:bg-red-500 data-active:text-white" value="recovery">
               Recovery
@@ -86,7 +86,7 @@ export function ApplicationManagementPanel({
           <ManagementTabTrigger value="advanced">Advanced</ManagementTabTrigger>
         </TabsList>
 
-        <div className="p-4">
+        <div className={rail ? 'p-3' : 'p-4'}>
           {recoveryNeeded && (
             <TabsContent className="grid gap-4" value="recovery">
               <ApplicationRecoveryTab
