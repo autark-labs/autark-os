@@ -6,6 +6,7 @@ import { test } from 'vitest';
 const page = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/ApplicationsPage.tsx'), 'utf8');
 const advancedView = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/AdvancedApplicationsView.tsx'), 'utf8');
 const card = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/ApplicationCard.tsx'), 'utf8');
+const header = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppsPageHeader.tsx'), 'utf8');
 const stateBadges = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppStateBadges.tsx'), 'utf8');
 
 test('My Apps renders canonical managed and linked collections without mixing in found services', () => {
@@ -16,18 +17,20 @@ test('My Apps renders canonical managed and linked collections without mixing in
   assert.match(page, /Linked services/);
   assert.match(page, /<BasicApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(page, /<AdvancedApplicationsView[\s\S]*items=\{visibleItems\}/);
-  assert.match(card, /<ManagementBadge item=\{item\} \/>/);
-  assert.match(card, /line-clamp-1 min-h-5 max-w-40/);
+  assert.match(card, /<AppArtwork/);
+  assert.match(card, /h-\[218px\] w-\[13rem\]/);
   assert.match(card, /card\.setAttribute\('inert', ''\)/);
   assert.match(card, /title=\{item\.name\}/);
   assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
-  assert.match(page, /title="My Apps"/);
+  assert.match(header, /title="My Apps"/);
 });
 
-test('My Apps uses solid high-contrast state badges on its light app cards', () => {
+test('My Apps uses quiet status dots and compact action affordances on dark app cards', () => {
   assert.match(stateBadges, /<StatusBadge\s+appearance="solid"/);
   assert.match(stateBadges, /<MetadataBadge appearance="solid" tone="neutral">/);
-  assert.match(card, /<AttentionIndicator item=\{item\} className="absolute right-3 top-11" \/>/);
+  assert.match(card, /<AttentionIndicator item=\{item\} className="absolute right-3 top-3 z-20" \/>/);
+  assert.match(card, /DropdownMenuContent/);
+  assert.match(card, /aria-label=\{`Open \$\{item\.name\}`\}/);
 });
 
 test('My Apps sends non-managed services to the dedicated existing-app review flow', () => {

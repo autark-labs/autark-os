@@ -11,7 +11,6 @@ import {
   Server,
   Settings,
   ShieldCheck,
-  Sparkles,
   Store,
   Wifi,
 } from 'lucide-react';
@@ -21,15 +20,8 @@ import type { AppInstanceView } from '@/types/app';
 import type { HomeSystemMetric } from '../extensions/OverviewPage.systemStatus';
 import { managedAppIconUrl } from '../extensions/OverviewPage.appTiles';
 import { applicationDeepLinkForManagedApp } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
+import { AppArtwork } from '@/components/autark-os/AppArtwork';
 
-const artworkGradients = [
-  'from-emerald-950 via-slate-950 to-cyan-950',
-  'from-blue-950 via-slate-950 to-indigo-950',
-  'from-cyan-950 via-slate-950 to-sky-950',
-  'from-fuchsia-950 via-slate-950 to-indigo-950',
-  'from-orange-950 via-slate-950 to-rose-950',
-  'from-violet-950 via-slate-950 to-blue-950',
-];
 
 export function InstalledAppsLauncher({ apps }: { apps: AppInstanceView[] }) {
   return (
@@ -66,12 +58,7 @@ function InstalledAppCard({ app, index }: { app: AppInstanceView; index: number 
         rel={openUrl ? 'noreferrer' : undefined}
         target={openUrl ? '_blank' : undefined}
       >
-        <div className={cn('relative flex h-28 items-center justify-center overflow-hidden bg-gradient-to-br sm:h-32', artworkGradients[index % artworkGradients.length])}>
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgb(56_189_248_/_0.22),transparent_55%)] opacity-80 transition duration-300 group-hover:scale-105" />
-          <Sparkles className="relative z-10 size-14 text-cyan-100/80" />
-          {iconUrl && <img alt="" className="absolute z-20 size-20 object-contain drop-shadow-[0_8px_18px_rgb(0_0_0_/_0.5)] transition duration-300 group-hover:scale-[1.03]" onError={(event) => { event.currentTarget.style.display = 'none'; }} src={iconUrl} />}
-          <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0b1831] to-transparent" />
-        </div>
+        <AppArtwork className="h-28 transition duration-300 group-hover:scale-[1.02] sm:h-32" iconUrl={iconUrl} index={index} name={app.name} />
         <div className="space-y-1 px-3 pb-3 pt-2">
           <p className="m-0 truncate text-sm font-semibold text-white">{app.name}</p>
           <p className="m-0 truncate text-xs text-slate-400">{app.category}</p>

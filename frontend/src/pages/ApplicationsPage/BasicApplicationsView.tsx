@@ -1,29 +1,33 @@
 import { Search } from 'lucide-react';
 import { ProjectEmptyState } from '@/components/primitives/EmptyState';
 import { ApplicationCard } from './components/ApplicationCard';
-import type { ApplicationEmptyState, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
+import type { ApplicationEmptyState, ApplicationRuntimeAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type BasicApplicationsViewProps = {
   emptyState: ApplicationEmptyState;
   items: ApplicationSurfaceItem[];
+  actionLoadingByItemId?: Record<string, ApplicationRuntimeAction | null | undefined>;
   managementOpen: boolean;
+  onAction?: (item: ApplicationSurfaceItem, actionId: string) => void;
   onSelect: (id: string) => void;
   selectedId?: string;
 };
 
-export function BasicApplicationsView({ emptyState, items, managementOpen, onSelect, selectedId }: BasicApplicationsViewProps) {
+export function BasicApplicationsView({ actionLoadingByItemId, emptyState, items, managementOpen, onAction, onSelect, selectedId }: BasicApplicationsViewProps) {
   if (!items.length) {
     return <ApplicationsEmptyState emptyState={emptyState} />;
   }
 
   return (
-    <section className="grid min-h-[44rem] grid-cols-[repeat(auto-fill,12rem)] items-start justify-start gap-3">
+    <section className="grid min-h-[44rem] grid-cols-[repeat(auto-fill,13rem)] items-start justify-start gap-3">
       {items.map((item) => (
         <ApplicationCard
           key={item.id}
           item={item}
+          actionLoading={actionLoadingByItemId?.[item.id]}
           managementOpen={managementOpen}
           obscured={Boolean(selectedId) && selectedId !== item.id}
+          onAction={onAction}
           onSelect={onSelect}
           selected={selectedId === item.id}
         />

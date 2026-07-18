@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
-import { MetricCard } from '@/components/primitives/MetricCard';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { Surface } from '@/components/primitives/Surface';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import {
@@ -28,6 +28,7 @@ import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan } from '@
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
+import { AppsPageHeader } from './components/AppsPageHeader';
 import { mapUninstallPlanToDestructiveActionPlan } from './extensions/ApplicationsPage.destructiveActions';
 import {
   applicationDeepLinkForSurfaceItem,
@@ -55,7 +56,7 @@ import {
 
 type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'backup'>;
 export const ApplicationsPage = () => {
-  const { viewMode } = useProjectSettings();
+  const { setViewMode, viewMode } = useProjectSettings();
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -565,18 +566,21 @@ export const ApplicationsPage = () => {
     onUnpinObservedService: unpinObservedService,
   };
 
+  const handleCardAction = (item: ApplicationSurfaceItem, actionId: string) => {
+    const id = item.sourceId || item.id;
+    if (actionId === 'start') return handleStart(id);
+    if (actionId === 'stop') return handleStop(id);
+    if (actionId === 'restart') return handleRestart(id);
+    if (actionId === 'repair') return handleRepair(id);
+    if (actionId === 'backup') return handleCreateBackup(id);
+    if (actionId === 'pin') return void pinObservedService(id);
+    if (actionId === 'unpin') return void unpinObservedService(id);
+    return undefined;
+  };
+
   return (
     <PageShell>
-      <PageHeader
-        description="Open managed apps and keep the linked services on this server in view."
-        title="My Apps"
-      >
-        <div className="grid gap-3 p-4 sm:grid-cols-3">
-          <MetricCard label="Managed" value={managedCount} />
-          <MetricCard label="Linked" value={linkedCount} />
-          <MetricCard label="Needs review" tone={attentionCount > 0 ? 'attention' : 'default'} value={attentionCount} />
-        </div>
-      </PageHeader>
+      <AppsPageHeader attentionCount={attentionCount} linkedCount={linkedCount} managedCount={managedCount} />
 
       {foundServices.length > 0 && (
         <FoundAppsPrompt model={{ count: foundServices.length, reviewHref: '/apps/found' }} />
@@ -584,7 +588,28 @@ export const ApplicationsPage = () => {
 
       <div className="grid gap-3">
         <SearchFilterBar
-          actions={<ApplicationCollectionFilterDropdown filters={collectionFilters} onChange={handleCollectionFilterChange} />}
+          actions={(
+            <div className="flex flex-wrap items-center gap-2">
+              <ApplicationCollectionFilterDropdown filters={collectionFilters} onChange={handleCollectionFilterChange} />
+              <ToggleGroup
+                aria-label="App view"
+                onValueChange={(value) => {
+                  if (value === 'basic' || value === 'advanced') setViewMode(value);
+                }}
+                size="sm"
+                type="single"
+                value={viewMode}
+                variant="outline"
+              >
+                <ToggleGroupItem aria-label="Grid view" className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="basic">
+                  <LayoutGrid className="size-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem aria-label="List view" className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="advanced">
+                  <List className="size-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          )}
           filterAriaLabel="Filter app types"
           onSearchChange={setQuery}
           searchAriaLabel="Search managed and linked apps"
@@ -602,9 +627,11 @@ export const ApplicationsPage = () => {
       <section className="grid min-h-[44rem] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {viewMode === 'basic' ? (
           <BasicApplicationsView
+            actionLoadingByItemId={actionLoadingByAppId}
             emptyState={emptyState}
             items={visibleItems}
             managementOpen={managementOpen}
+            onAction={handleCardAction}
             onSelect={handleSelectItem}
             selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
           />

@@ -64,9 +64,9 @@ test('applications page uses split behavior states instead of a single app statu
 
   assert.match(basic, /ApplicationCard/);
   assert.match(applicationCard, /item\.attentionState !== 'none'/);
-  assert.match(applicationCard, /item\.readinessState === 'paused'/);
+  assert.match(applicationCard, /labelForReadiness/);
   assert.match(applicationCard, /from '\.\/AppStateBadges'/);
-  assert.match(applicationCard, /ReadinessBadge item=\{item\} overlay/);
+  assert.match(applicationCard, /AppArtwork/);
   assert.match(applicationCard, /AttentionIndicator item=\{item\}/);
   assert.doesNotMatch(applicationCard, /CompactOperationStatus/);
   assert.doesNotMatch(basic, /item\.runtimeState === 'paused'/);
