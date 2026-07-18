@@ -1,14 +1,16 @@
-import { Clock3 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Check, CircleAlert, Clock3, Container, Network, type LucideIcon } from 'lucide-react';
 import overviewBackground from '@/assets/overviewBackground.webp';
-import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import type { SystemSummary } from '@/types/system';
 import type { HomeSummaryAvailability } from '../extensions/OverviewPage.systemStatus';
 
 export function HomeHero({
   deviceName,
+  children,
   summaryAvailability,
   summary,
 }: {
+  children?: ReactNode;
   deviceName: string;
   summaryAvailability: HomeSummaryAvailability;
   summary: SystemSummary | null;
@@ -17,44 +19,52 @@ export function HomeHero({
   const loading = summaryAvailability === 'loading';
   const unavailable = summaryAvailability === 'unavailable';
   const statusTone = loading ? 'info' : unavailable || needsReview ? 'warning' : 'success';
-  const readyStatus = loading ? 'Checking' : unavailable ? 'Status unavailable' : needsReview ? 'Needs review' : 'Ready';
+  const readyStatus = loading ? 'Checking' : unavailable ? 'Status unavailable' : needsReview ? 'Needs review' : 'System healthy';
+  const accessStatus = accessHeroStatus(summary);
 
   return (
-    <header className="relative overflow-hidden rounded-2xl border border-cyan-800/20 bg-slate-900/70 shadow-2xl shadow-cyan-950/20">
-      <div className="relative min-h-[360px] overflow-hidden md:min-h-[430px]">
-        <img alt="" className="absolute inset-x-0 top-0 h-full w-full object-cover object-center opacity-95" src={overviewBackground} />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgb(13_23_40_/_0.48)_0%,rgb(13_23_40_/_0.12)_46%,rgb(13_23_40_/_0.24)_100%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgb(13_23_40_/_0.03)_0%,rgb(13_23_40_/_0)_40%,rgb(13_23_40_/_0.34)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[#0d1728]" />
+    <header className="relative isolate h-[clamp(26rem,calc(100dvh-25rem),36rem)] min-h-[26rem] overflow-hidden bg-[#070d21] text-slate-50">
+      <img alt="" className="absolute inset-0 -z-20 h-full w-full object-cover object-[58%_46%] opacity-95" src={overviewBackground} />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgb(5_13_32_/_0.92)_0%,rgb(5_13_32_/_0.5)_32%,rgb(5_13_32_/_0.06)_70%,rgb(5_13_32_/_0.12)_100%)]" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgb(5_13_32_/_0.08)_0%,rgb(5_13_32_/_0.01)_52%,rgb(7_13_33_/_0.42)_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 -z-10 h-36 bg-gradient-to-b from-transparent via-[#08112a]/20 to-[#071022]/90" />
 
-        <div className="relative z-10 flex min-h-[360px] flex-col justify-between gap-7 p-5 md:min-h-[430px] md:p-7">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-            <div className="max-w-2xl">
-              <p className="m-0 text-xs font-black uppercase tracking-normal text-cyan-600">Autark-OS</p>
-              <h1 className="m-0 mt-3 text-4xl font-black leading-none text-slate-100 md:text-5xl">
-                {timeGreeting()}, {shortName(deviceName)}.
-              </h1>
-              <p className="mt-4 max-w-xl text-lg font-semibold leading-7 text-slate-100/90">
-                {homeHeroSubtitle(summary, summaryAvailability)}
-              </p>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Open apps, handle the next setup step, and keep your home server calm.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-              <StatusBadge tone={statusTone}>{readyStatus}</StatusBadge>
-              {loading && (
-                <span className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-100 shadow-md shadow-cyan-950/15">
-                  <Clock3 className="size-3.5" />
-                  Updating
-                </span>
-              )}
+      <div className="relative flex h-full flex-col justify-between gap-5 p-5 md:p-7">
+        <div className="flex items-start justify-between gap-5">
+          <div className="max-w-2xl">
+            <p className="m-0 text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200/80">Autark-OS Console</p>
+            <h1 className="m-0 mt-4 text-[clamp(2.5rem,4.5vw,3.35rem)] font-black leading-[0.98] tracking-[-0.04em] text-white">
+              {timeGreeting()}, {shortName(deviceName)}.
+            </h1>
+            <p className="mt-4 text-lg font-medium leading-7 text-slate-100/85">
+              {homeHeroSubtitle(summary, summaryAvailability)}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-2" aria-label="Home server status">
+              <HeroStatusChip icon={statusTone === 'warning' ? CircleAlert : Check} label={readyStatus} tone={statusTone} />
+              {loading && <HeroStatusChip icon={Clock3} label="Updating" tone="info" />}
+              {!loading && <HeroStatusChip icon={Container} label={summary?.docker.ready ? 'Docker ready' : 'Docker needs setup'} tone={summary?.docker.ready ? 'success' : 'warning'} />}
+              {!loading && <HeroStatusChip icon={Network} label={accessStatus.label} tone={accessStatus.tone} />}
             </div>
           </div>
         </div>
+
+        {children}
       </div>
     </header>
+  );
+}
+
+function HeroStatusChip({ icon: Icon, label, tone }: { icon: LucideIcon; label: string; tone: 'info' | 'success' | 'warning' }) {
+  const toneClass = tone === 'success'
+    ? 'border-emerald-300/20 bg-slate-950/45 text-emerald-100'
+    : tone === 'warning'
+      ? 'border-amber-300/25 bg-slate-950/55 text-amber-100'
+      : 'border-cyan-300/20 bg-slate-950/45 text-cyan-100';
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium backdrop-blur-sm ${toneClass}`}>
+      <Icon className="size-3.5" />
+      {label}
+    </span>
   );
 }
 
@@ -64,6 +74,14 @@ function homeHeroSubtitle(summary: SystemSummary | null, availability: HomeSumma
   if (summary?.issues.length) return 'Your server needs a quick look.';
   if (summary?.setup.complete === false) return summary.setup.summary || 'Finish setup to unlock the full Autark-OS experience.';
   return 'Your digital home is ready.';
+}
+
+function accessHeroStatus(summary: SystemSummary | null) {
+  if (summary?.access.mode === 'private_ready') return { label: 'Private access ready', tone: 'success' as const };
+  if (summary?.access.mode === 'local_only') return { label: 'Local access ready', tone: 'success' as const };
+  if (summary?.access.mode === 'mocked_dev') return { label: 'Development access', tone: 'info' as const };
+  if (summary?.access.mode === 'private_needs_setup' || summary?.access.mode === 'not_ready') return { label: 'Access needs setup', tone: 'warning' as const };
+  return { label: 'Access unavailable', tone: 'warning' as const };
 }
 
 function timeGreeting() {

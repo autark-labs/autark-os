@@ -18,8 +18,8 @@ test('Home and My Apps consume the same canonical found-service collection', () 
   assert.match(repository, /pinnedExternalServices: pinnedExternalServices\(state\)/);
   assert.match(home, /const pinnedServices = appState\.pinnedExternalServices/);
   assert.match(home, /const observedNeedingReview = appState\.foundServices/);
-  assert.match(home, /<FoundAppsPrompt/);
-  assert.match(home, /reviewHref: '\/apps\/found'/);
+  assert.match(home, /const observedNeedingReview = appState\.foundServices/);
+  assert.match(home, /observedCount=\{observedNeedingReview\.length\}/);
   assert.match(applications, /const foundServices = appState\.foundServices/);
   assert.match(applications, /<FoundAppsPrompt/);
   assert.match(applications, /reviewHref: '\/apps\/found'/);
