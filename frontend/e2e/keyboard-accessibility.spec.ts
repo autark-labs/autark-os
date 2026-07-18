@@ -42,11 +42,16 @@ test('setup, app management, and Access controls work with the keyboard', async 
 });
 
 test('backup dialog traps focus and returns it to the trigger when closed', async ({ page }) => {
-  await openRoute(page, '/backups', 'idle');
+  await openRoute(page, '/backups?app=vaultwarden&backup=101', 'idle');
+  await expect(page.getByText(/Backups \/ App backups \/ Vaultwarden with a deliberately long/i)).toBeVisible();
+  await expect(page.locator('nav[aria-label="Backup folders"] img[src="/app-images/vaultwarden.svg"]')).toBeVisible();
+  await expect(page).toHaveURL(/\/backups\?app=vaultwarden&backup=101$/);
+
   const fullCheckpoints = page.getByRole('button', { name: /Full checkpoints/i });
   await fullCheckpoints.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText('Backups / Full checkpoints')).toBeVisible();
+  await expect(page).toHaveURL(/\/backups\?scope=full$/);
 
   const chooseApp = page.getByRole('button', { name: /^Choose an app$/i });
   await chooseApp.focus();
@@ -55,6 +60,12 @@ test('backup dialog traps focus and returns it to the trigger when closed', asyn
   await appDirectory.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText(/Backups \/ App backups \/ Vaultwarden with a deliberately long/i)).toBeVisible();
+  await expect(page).toHaveURL(/\/backups\?app=vaultwarden$/);
+
+  const restorePoint = page.locator('button').filter({ hasText: /vaultwarden-with-a-deliberately-long-self-hosted-service-name-2025-01-14\.autark-backup/i });
+  await restorePoint.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/backups\?app=vaultwarden&backup=101$/);
 
   const details = page.getByRole('button', { name: /^Details$/i });
   await details.focus();

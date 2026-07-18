@@ -23,6 +23,7 @@ import { terminalJob } from '@/repositories/jobRepository';
 import {
   invalidateApplicationState,
   setAutarkOsJobInApplicationStateCache,
+  useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import type { AppBackupStatus, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
@@ -42,6 +43,7 @@ function BackupsPage() {
   const queryClient = useQueryClient();
   const { showAdvancedMetrics } = useProjectSettings();
   const { openSettings } = useSettingsDialog();
+  const applicationState = useApplicationStateRepository();
   const [running, setRunning] = useState<string | null>(null);
   const [restoreFlow, setRestoreFlow] = useState<RestoreFlowState | null>(null);
   const [activeJob, setActiveJob] = useState<AutarkOsJob | null>(null);
@@ -78,6 +80,11 @@ function BackupsPage() {
   const verifyRestorePointMutation = useVerifyRestorePointMutation();
   const activeJobQuery = useAutarkOsJobQuery(currentActiveJob && !terminalJob(currentActiveJob) ? currentActiveJob.jobId : null);
   const report = backupReport.report;
+  const appIconUrlById = useMemo(() => backupAppIconUrls(
+    report?.apps ?? [],
+    applicationState.applicationState?.managedApps ?? [],
+    applicationState.apps,
+  ), [applicationState.applicationState?.managedApps, applicationState.apps, report?.apps]);
   const destinationUnavailableReason = report && report.destination.status !== 'ready'
     ? `${report.destination.message} Update the backup destination in Settings before creating a new backup.`
     : '';
@@ -310,6 +317,7 @@ function BackupsPage() {
       {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
       {report && (
         <BackupColumnNavigatorWorkspace
+          appIconUrlById={appIconUrlById}
           appBackupAvailability={appBackupOperationAvailability}
           fullBackupAvailability={fullBackupAvailability}
           onCreateAppBackup={runManualAppBackup}
@@ -346,6 +354,31 @@ function BackupsPage() {
       />
     </PageShell>
   );
+}
+
+function backupAppIconUrls(
+  backupApps: AppBackupStatus[],
+  managedApps: Array<{ catalogAppId: string; icon: string }>,
+  runtimeApps: Array<{ appId: string; image: string | null }>,
+) {
+  const managedIconByAppId = new Map(managedApps.map((app) => [app.catalogAppId, app.icon]));
+  const runtimeImageByAppId = new Map(runtimeApps.map((app) => [app.appId, app.image]));
+
+  return Object.fromEntries(backupApps.map((app) => [
+    app.appId,
+    imageUrl(managedIconByAppId.get(app.appId))
+      || imageUrl(runtimeImageByAppId.get(app.appId))
+      || catalogAppIconUrl(app.appId),
+  ]));
+}
+
+function imageUrl(value: string | null | undefined) {
+  const url = value?.trim() || '';
+  return /^(?:\/|https?:\/\/|data:image\/)/.test(url) ? url : null;
+}
+
+function catalogAppIconUrl(appId: string) {
+  return /^[a-z0-9][a-z0-9-]*$/.test(appId) ? `/app-images/${appId}.svg` : null;
 }
 
 function BackupJobBanner({ job }: { job: AutarkOsJob }) {

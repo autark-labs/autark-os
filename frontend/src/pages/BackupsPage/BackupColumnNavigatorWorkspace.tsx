@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
   AppWindow,
@@ -41,10 +42,16 @@ import {
   formatBackupBytes,
   formatBackupDate,
 } from './BackupsPage.logic';
+import {
+  backupNavigatorSearchWithSelection,
+  parseBackupNavigatorRoute,
+  type BackupDirectoryKey,
+} from './BackupsPage.detailRoute';
 
-type DirectoryKey = 'all' | 'full' | `app:${string}`;
+type DirectoryKey = BackupDirectoryKey;
 
 type WorkspaceProps = {
+  appIconUrlById: Record<string, string | null>;
   appBackupAvailability: BackupOperationAvailability;
   fullBackupAvailability: BackupOperationAvailability;
   onCreateAppBackup: (app: AppBackupStatus) => void;
@@ -64,6 +71,7 @@ type WorkspaceProps = {
 };
 
 export function BackupColumnNavigatorWorkspace({
+  appIconUrlById,
   appBackupAvailability,
   fullBackupAvailability,
   onCreateAppBackup,
@@ -81,34 +89,36 @@ export function BackupColumnNavigatorWorkspace({
   running,
   verifyAvailability,
 }: WorkspaceProps) {
-  const [directory, setDirectory] = useState<DirectoryKey>('all');
-  const [selectedPointId, setSelectedPointId] = useState<number | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const restorePoints = useMemo(
     () => [...report.recentRestorePoints]
       .filter((point) => point.status === 'completed')
       .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
     [report.recentRestorePoints],
   );
+  const route = useMemo(
+    () => parseBackupNavigatorRoute(searchParams, report.apps, restorePoints),
+    [report.apps, restorePoints, searchParams],
+  );
+  const directory = route.directory;
   const selectedApp = findApp(report.apps, directory);
   const directoryPoints = useMemo(
     () => restorePoints.filter((point) => pointMatchesDirectory(point, directory)),
     [directory, restorePoints],
   );
-  const selectedPoint = directoryPoints.find((point) => point.id === selectedPointId) ?? directoryPoints[0] ?? null;
+  const selectedPoint = directoryPoints.find((point) => point.id === route.restorePointId) ?? directoryPoints[0] ?? null;
   const attentionMessage = backupAttentionMessage(report);
   const routineDisabled = routineBackupAvailability.disabled || !report.settings.automaticBackupsEnabled;
   const routineReason = routineBackupAvailability.disabled
     ? routineBackupAvailability.reason
     : 'Turn on routine backups in Settings first.';
 
-  useEffect(() => {
-    setSelectedPointId((current) => directoryPoints.some((point) => point.id === current)
-      ? current
-      : directoryPoints[0]?.id ?? null);
-  }, [directoryPoints]);
-
   function chooseDirectory(nextDirectory: DirectoryKey) {
-    setDirectory(nextDirectory);
+    setSearchParams(backupNavigatorSearchWithSelection(searchParams, { directory: nextDirectory }), { replace: true });
+  }
+
+  function selectRestorePoint(restorePointId: number) {
+    setSearchParams(backupNavigatorSearchWithSelection(searchParams, { directory, restorePointId }), { replace: true });
   }
 
   return (
@@ -124,10 +134,11 @@ export function BackupColumnNavigatorWorkspace({
 
       <BackupActions
         attentionMessage={attentionMessage}
+        appIconUrlById={appIconUrlById}
         apps={report.apps}
         fullBackupAvailability={fullBackupAvailability}
         nextRunLabel={report.settings.nextRunLabel || formatBackupDate(report.settings.nextRoutineRun, report.settings.timeZone)}
-        onChooseApp={(appId) => setDirectory(appDirectoryKey(appId))}
+        onChooseApp={(appId) => chooseDirectory(appDirectoryKey(appId))}
         onCreateFullBackup={onCreateFullBackup}
         onRunRoutineBackup={onRunRoutineBackup}
         routineDisabled={routineDisabled}
@@ -140,6 +151,7 @@ export function BackupColumnNavigatorWorkspace({
         <FolderColumn
           apps={report.apps}
           attentionMessage={attentionMessage}
+          appIconUrlById={appIconUrlById}
           directory={directory}
           onChooseDirectory={chooseDirectory}
           restorePoints={restorePoints}
@@ -156,7 +168,8 @@ export function BackupColumnNavigatorWorkspace({
           />
           {directoryPoints.length ? (
             <RestoreFileList
-              onSelect={setSelectedPointId}
+              appIconUrlById={appIconUrlById}
+              onSelect={selectRestorePoint}
               points={directoryPoints}
               selectedPointId={selectedPoint?.id ?? null}
               timeZone={report.settings.timeZone}
@@ -168,6 +181,7 @@ export function BackupColumnNavigatorWorkspace({
           <PreviewSlot
             app={selectedApp}
             appBackupAvailability={appBackupAvailability}
+            appIconUrlById={appIconUrlById}
             onCreateAppBackup={onCreateAppBackup}
             onOpenDetails={onOpenRestoreDetails}
             onOpenRestorePlan={onOpenRestorePlan}
@@ -186,6 +200,7 @@ export function BackupColumnNavigatorWorkspace({
         <PreviewSlot
           app={selectedApp}
           appBackupAvailability={appBackupAvailability}
+          appIconUrlById={appIconUrlById}
           compact
           onCreateAppBackup={onCreateAppBackup}
           onOpenDetails={onOpenRestoreDetails}
@@ -242,6 +257,7 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
 
 function BackupActions({
   attentionMessage,
+  appIconUrlById,
   apps,
   fullBackupAvailability,
   nextRunLabel,
@@ -254,6 +270,7 @@ function BackupActions({
   running,
 }: {
   attentionMessage: string | null;
+  appIconUrlById: Record<string, string | null>;
   apps: AppBackupStatus[];
   fullBackupAvailability: BackupOperationAvailability;
   nextRunLabel: string;
@@ -281,7 +298,7 @@ function BackupActions({
           <DropdownMenuContent align="end" className="w-64 border-sky-300/20 bg-slate-900 text-sky-50">
             <DropdownMenuLabel>Back up an app</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-sky-300/15" />
-            {apps.length ? apps.map((app) => <DropdownMenuItem className="gap-2" key={app.appId} onSelect={() => onChooseApp(app.appId)}><AppWindow className="size-4 text-sky-100/65" /><span className="min-w-0 flex-1 truncate">{app.appName}</span><span className="text-xs text-sky-100/60">{backupStatusLabel(app.status)}</span></DropdownMenuItem>) : <DropdownMenuItem disabled>No installed apps</DropdownMenuItem>}
+            {apps.length ? apps.map((app) => <DropdownMenuItem className="gap-2" key={app.appId} onSelect={() => onChooseApp(app.appId)}><BackupAppIcon iconUrl={appIconUrlById[app.appId]} /><span className="min-w-0 flex-1 truncate">{app.appName}</span><span className="text-xs text-sky-100/60">{backupStatusLabel(app.status)}</span></DropdownMenuItem>) : <DropdownMenuItem disabled>No installed apps</DropdownMenuItem>}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -292,12 +309,14 @@ function BackupActions({
 function FolderColumn({
   apps,
   attentionMessage,
+  appIconUrlById,
   directory,
   onChooseDirectory,
   restorePoints,
 }: {
   apps: AppBackupStatus[];
   attentionMessage: string | null;
+  appIconUrlById: Record<string, string | null>;
   directory: DirectoryKey;
   onChooseDirectory: (directory: DirectoryKey) => void;
   restorePoints: RestorePoint[];
@@ -309,7 +328,7 @@ function FolderColumn({
         <FolderButton active={directory === 'all'} count={restorePoints.length} icon={FolderOpen} label="All backups" onClick={() => onChooseDirectory('all')} />
         <FolderButton active={directory === 'full'} count={restorePoints.filter((point) => point.scope === 'full').length} icon={FolderArchive} label="Full checkpoints" onClick={() => onChooseDirectory('full')} />
         <p className="mt-3 px-2 text-xs font-semibold uppercase tracking-wide text-sky-100/65">App backups</p>
-        {apps.map((app) => <FolderButton app={app} active={directory === appDirectoryKey(app.appId)} count={restorePoints.filter((point) => point.appId === app.appId).length} icon={app.status === 'protected' ? Folder : CircleAlert} key={app.appId} label={app.appName} onClick={() => onChooseDirectory(appDirectoryKey(app.appId))} />)}
+        {apps.map((app) => <FolderButton app={app} appIconUrl={appIconUrlById[app.appId]} active={directory === appDirectoryKey(app.appId)} count={restorePoints.filter((point) => point.appId === app.appId).length} icon={app.status === 'protected' ? Folder : CircleAlert} key={app.appId} label={app.appName} onClick={() => onChooseDirectory(appDirectoryKey(app.appId))} />)}
       </nav>
       {attentionMessage && <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-400/5 p-3"><div className="flex items-center gap-2 text-amber-200"><CircleAlert className="size-3.5" /><span className="text-xs font-semibold">{attentionMessage}</span></div><p className="mt-1 text-xs leading-5 text-sky-100/60">Select an app folder to see its backup state and next action.</p></div>}
     </aside>
@@ -319,6 +338,7 @@ function FolderColumn({
 function FolderButton({
   active,
   app,
+  appIconUrl,
   count,
   icon: Icon,
   label,
@@ -326,13 +346,14 @@ function FolderButton({
 }: {
   active: boolean;
   app?: AppBackupStatus;
+  appIconUrl?: string | null;
   count: number;
   icon: LucideIcon;
   label: string;
   onClick: () => void;
 }) {
   const needsAttention = Boolean(app && app.status !== 'protected');
-  return <button className={cn('flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-slate-800', active && 'bg-cyan-300/15 text-cyan-100', needsAttention && !active && 'text-amber-100/85')} onClick={onClick} type="button"><Icon className={cn('size-4 shrink-0 text-sky-100/55', active && 'text-cyan-200', needsAttention && 'text-amber-200')} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{label}</span><span className="block truncate text-xs text-sky-100/65">{app ? backupStatusLabel(app.status) : `${count} ${count === 1 ? 'file' : 'files'}`}</span></span><span className="shrink-0 text-xs text-sky-100/65">{count}</span><ChevronRight className="size-3.5 shrink-0 text-sky-100/35" /></button>;
+  return <button className={cn('flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-slate-800', active && 'bg-cyan-300/15 text-cyan-100', needsAttention && !active && 'text-amber-100/85')} onClick={onClick} type="button">{app ? <BackupAppIcon className={cn(active && 'ring-1 ring-cyan-300/40', needsAttention && 'ring-1 ring-amber-300/35')} iconUrl={appIconUrl} /> : <Icon className={cn('size-4 shrink-0 text-sky-100/55', active && 'text-cyan-200', needsAttention && 'text-amber-200')} />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{label}</span><span className="block truncate text-xs text-sky-100/65">{app ? backupStatusLabel(app.status) : `${count} ${count === 1 ? 'file' : 'files'}`}</span></span><span className="shrink-0 text-xs text-sky-100/65">{count}</span><ChevronRight className="size-3.5 shrink-0 text-sky-100/35" /></button>;
 }
 
 function DirectoryHeader({
@@ -361,27 +382,30 @@ function DirectoryHeader({
 }
 
 function RestoreFileList({
+  appIconUrlById,
   onSelect,
   points,
   selectedPointId,
   timeZone,
 }: {
+  appIconUrlById: Record<string, string | null>;
   onSelect: (id: number) => void;
   points: RestorePoint[];
   selectedPointId: number | null;
   timeZone: string;
 }) {
-  return <div className="min-h-0 flex-1 overflow-y-auto p-2">{groupPoints(points).map(([label, group]) => <div key={label}><p className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-sky-100/65">{label}</p>{group.map((point) => <RestoreFileRow active={point.id === selectedPointId} key={point.id} onClick={() => onSelect(point.id)} point={point} timeZone={timeZone} />)}</div>)}</div>;
+  return <div className="min-h-0 flex-1 overflow-y-auto p-2">{groupPoints(points).map(([label, group]) => <div key={label}><p className="px-2 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-sky-100/65">{label}</p>{group.map((point) => <RestoreFileRow active={point.id === selectedPointId} appIconUrl={appIconUrlById[point.appId]} key={point.id} onClick={() => onSelect(point.id)} point={point} timeZone={timeZone} />)}</div>)}</div>;
 }
 
-function RestoreFileRow({ active, onClick, point, timeZone }: { active: boolean; onClick: () => void; point: RestorePoint; timeZone: string }) {
+function RestoreFileRow({ active, appIconUrl, onClick, point, timeZone }: { active: boolean; appIconUrl?: string | null; onClick: () => void; point: RestorePoint; timeZone: string }) {
   const tone = restorePointTone(point);
-  return <button className={cn('flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-slate-800', active && 'bg-cyan-300/15 ring-1 ring-cyan-300/30')} onClick={onClick} type="button"><span className={cn('grid size-9 shrink-0 place-items-center rounded-lg border border-sky-300/15 bg-slate-950', tone.text)}><FileArchive className="size-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-white" title={restoreFileName(point)}>{restoreFileName(point)}</span><span className="mt-0.5 block truncate text-xs text-sky-100/60">{formatBackupDate(point.createdAt, timeZone)} · {formatBackupBytes(point.sizeBytes)}</span></span><StatusBadge tone={tone.badgeTone}>{verificationLabel(point)}</StatusBadge></button>;
+  return <button className={cn('flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-left transition hover:bg-slate-800', active && 'bg-cyan-300/15 ring-1 ring-cyan-300/30')} onClick={onClick} type="button">{point.scope === 'full' ? <span className={cn('grid size-9 shrink-0 place-items-center rounded-lg border border-sky-300/15 bg-slate-950', tone.text)}><FileArchive className="size-4" /></span> : <BackupAppIcon className="size-9 rounded-lg" iconUrl={appIconUrl} />}<span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-white" title={restoreFileName(point)}>{restoreFileName(point)}</span><span className="mt-0.5 block truncate text-xs text-sky-100/60">{formatBackupDate(point.createdAt, timeZone)} · {formatBackupBytes(point.sizeBytes)}</span></span><StatusBadge tone={tone.badgeTone}>{verificationLabel(point)}</StatusBadge></button>;
 }
 
 function PreviewSlot({
   app,
   appBackupAvailability,
+  appIconUrlById,
   compact = false,
   onCreateAppBackup,
   onOpenDetails,
@@ -396,6 +420,7 @@ function PreviewSlot({
 }: {
   app: AppBackupStatus | null;
   appBackupAvailability: BackupOperationAvailability;
+  appIconUrlById: Record<string, string | null>;
   compact?: boolean;
   onCreateAppBackup: (app: AppBackupStatus) => void;
   onOpenDetails: (point: RestorePoint) => void;
@@ -415,7 +440,7 @@ function PreviewSlot({
   const appBackupReason = appBackupAvailability.disabled ? appBackupAvailability.reason : selectedApp?.backupUnavailableReason || 'Turn backups on for this app before creating a restore point.';
   return (
     <section className={cn('rounded-xl border border-sky-300/20 bg-slate-900 p-4', compact && 'mt-3')}>
-      <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2"><span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border border-sky-300/15 bg-slate-800', tone.text)}>{point.verificationStatus === 'verified' ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}</span><div className="min-w-0"><p className="line-clamp-2 break-words text-sm font-semibold leading-5 text-white">{point.scope === 'full' ? 'Full checkpoint' : point.appName}</p><p className="mt-0.5 text-xs text-sky-100/60">{formatBackupDate(point.createdAt, timeZone)} · {formatBackupBytes(point.sizeBytes)}</p></div></div><StatusBadge tone={tone.badgeTone}>{verificationLabel(point)}</StatusBadge></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex min-w-0 items-center gap-2">{point.scope === 'full' ? <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border border-sky-300/15 bg-slate-800', tone.text)}>{point.verificationStatus === 'verified' ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}</span> : <BackupAppIcon className="size-8 rounded-lg" iconUrl={appIconUrlById[point.appId]} />}<div className="min-w-0"><p className="line-clamp-2 break-words text-sm font-semibold leading-5 text-white">{point.scope === 'full' ? 'Full checkpoint' : point.appName}</p><p className="mt-0.5 text-xs text-sky-100/60">{formatBackupDate(point.createdAt, timeZone)} · {formatBackupBytes(point.sizeBytes)}</p></div></div><StatusBadge tone={tone.badgeTone}>{verificationLabel(point)}</StatusBadge></div>
       <p className="mt-3 text-xs leading-5 text-sky-100/65">{point.scope === 'full' ? 'This file contains a recovery point for every protected app at that moment.' : `This file contains the backup data Autark-OS recorded for ${point.appName}.`} Review the plan before restoring anything.</p>
       <div className="mt-4 grid gap-2"><PreviewFact icon={point.scope === 'full' ? Layers3 : AppWindow} label="Restore scope" value={point.scope === 'full' ? 'All protected apps' : point.appName} /><PreviewFact icon={point.verificationStatus === 'verified' ? CheckCircle2 : Clock3} label="Verification" value={verificationDetail(point)} /><PreviewFact icon={CalendarClock} label="Next scheduled backup" value={settings.nextRunLabel || formatBackupDate(settings.nextRoutineRun, timeZone)} /></div>
       <div className="mt-4 flex flex-wrap gap-2"><DisabledAction disabled={restoreAvailability.disabled} reason={restoreAvailability.reason}><ProjectPrimaryButton disabled={restoreAvailability.disabled} onClick={() => onOpenRestorePlan(point)} size="sm" type="button"><ArchiveRestore className="size-3.5" />Review restore plan</ProjectPrimaryButton></DisabledAction><DisabledAction disabled={verifyAvailability.disabled} reason={verifyAvailability.reason}><ProjectDarkControlButton disabled={verifyAvailability.disabled} onClick={() => onVerify(point)} size="sm" type="button">{running === `verify-${point.id}` ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}{running === `verify-${point.id}` ? 'Verifying' : point.verificationStatus === 'verified' ? 'View verification' : 'Verify file'}</ProjectDarkControlButton></DisabledAction></div>
@@ -448,6 +473,15 @@ function EmptyPreview({
   const disabled = appBackupAvailability.disabled || !app.backupAvailable || app.status === 'unprotected';
   const reason = appBackupAvailability.disabled ? appBackupAvailability.reason : app.backupUnavailableReason || 'Turn backups on for this app before creating a restore point.';
   return <section className="rounded-xl border border-sky-300/20 bg-slate-900 p-4"><div className="flex items-center gap-2"><CircleAlert className="size-4 text-amber-200" /><p className="text-sm font-semibold text-white">No recovery file yet</p></div><p className="mt-2 text-xs leading-5 text-sky-100/65">{app.message || `Create the first backup for ${app.appName}.`}</p><DisabledAction disabled={disabled} reason={reason}><ProjectPrimaryButton className="mt-4" disabled={disabled} onClick={() => onCreateAppBackup(app)} size="sm" type="button">{running === `app-${app.appId}` ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}{running === `app-${app.appId}` ? 'Backing up' : 'Back up this app'}</ProjectPrimaryButton></DisabledAction></section>;
+}
+
+function BackupAppIcon({ className, iconUrl }: { className?: string; iconUrl?: string | null }) {
+  return (
+    <span aria-hidden="true" className={cn('relative grid size-5 shrink-0 place-items-center overflow-hidden rounded-md border border-sky-300/15 bg-slate-800', className)}>
+      <AppWindow className="size-3 text-sky-100/60" />
+      {iconUrl && <img alt="" className="absolute inset-0 size-full object-contain p-0.5" onError={(event) => { event.currentTarget.style.display = 'none'; }} src={iconUrl} />}
+    </span>
+  );
 }
 
 function appDirectoryKey(appId: string): DirectoryKey {
