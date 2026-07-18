@@ -23,7 +23,7 @@ export function HomeHero({
   const accessStatus = accessHeroStatus(summary);
 
   return (
-    <header className="relative isolate h-[clamp(26rem,calc(100dvh-25rem),36rem)] min-h-[26rem] overflow-hidden bg-[#070d21] text-slate-50">
+    <header className="relative isolate h-[clamp(26rem,calc(100dvh-25rem),36rem)] min-h-[26rem] overflow-hidden rounded-2xl border border-sky-300/20 bg-[#070d21] text-slate-50 shadow-xl shadow-slate-950/20">
       <img alt="" className="absolute inset-0 -z-20 h-full w-full object-cover object-[58%_46%] opacity-95" src={overviewBackground} />
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgb(5_13_32_/_0.92)_0%,rgb(5_13_32_/_0.5)_32%,rgb(5_13_32_/_0.06)_70%,rgb(5_13_32_/_0.12)_100%)]" />
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgb(5_13_32_/_0.08)_0%,rgb(5_13_32_/_0.01)_52%,rgb(7_13_33_/_0.42)_100%)]" />

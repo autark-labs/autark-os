@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import {
+  Activity,
   ArrowUpRight,
   Database,
   ExternalLink,
@@ -156,7 +157,7 @@ function SystemStatusItem({ detail, icon: Icon, label, tone, value }: { detail: 
 }
 
 function ActivityIcon() {
-  return <span className="grid size-7 place-items-center rounded-lg bg-cyan-400/10 text-cyan-200"><Wifi className="size-4" /></span>;
+  return <span className="grid size-7 place-items-center rounded-lg bg-cyan-400/10 text-cyan-200"><Activity className="size-4" /></span>;
 }
 
 function QuickLinksPanel() {

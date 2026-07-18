@@ -19,7 +19,7 @@ function OverviewPage() {
   const systemMetrics = homeSystemMetrics(home.summary, summaryAvailability);
 
   return (
-    <PageShell className="bg-[#050b1b]">
+    <PageShell>
       <HomeHero
         deviceName={deviceName}
         summaryAvailability={summaryAvailability}
