@@ -1,8 +1,9 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Archive,
   ArrowUpRight,
+  AppWindow,
   CheckCircle2,
   ChevronRight,
   CircleAlert,
@@ -11,6 +12,7 @@ import {
   FolderSearch,
   HardDrive,
   Info,
+  LineChart,
   PackageOpen,
   ShieldCheck,
   Trash2,
@@ -22,7 +24,7 @@ import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, Surface } from '@/components/primitives/Surface';
 import { semanticStatusVariants, type SemanticStatusTone } from '@/components/primitives/SemanticVariants';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { appRoutes } from '@/appRouteManifest';
 import { cn } from '@/lib/utils';
 import type { AppStorageUsage, OrphanedStorage, StorageReport, StorageUsage } from '@/types/system';
@@ -38,6 +40,7 @@ import {
 } from './StoragePage.presentation';
 
 type StorageCapacityRibbonWorkspaceProps = {
+  appIconUrlById: Record<string, string | null>;
   copiedPathId: string | null;
   onCopyPath: (value: string, id: string) => void;
   onReviewOrphan: (orphan: OrphanedStorage) => void;
@@ -48,7 +51,10 @@ type StorageCapacityRibbonWorkspaceProps = {
   updatedAt: Date | null;
 };
 
+type StorageWorkspaceTab = 'overview' | 'apps' | 'backups' | 'cleanup' | 'advanced';
+
 export function StorageCapacityRibbonWorkspace({
+  appIconUrlById,
   copiedPathId,
   onCopyPath,
   onRefresh,
@@ -58,16 +64,22 @@ export function StorageCapacityRibbonWorkspace({
   showAdvancedMetrics,
   updatedAt,
 }: StorageCapacityRibbonWorkspaceProps) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<StorageWorkspaceTab>('overview');
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(() => report.apps[0]?.appId ?? null);
   const appDataBytes = appStorageTotal(report);
   const appsWithBackupsOn = report.apps.filter((app) => app.backupEnabled).length;
   const largestApps = report.apps.slice(0, 3);
   const firstOrphan = report.orphanedData[0] ?? null;
   const hero = storageHeroCopy(report);
+  const selectedApp = report.apps.find((app) => app.appId === selectedAppId) ?? report.apps[0] ?? null;
 
   function reviewOrphan(orphan: OrphanedStorage) {
-    setDetailsOpen(false);
     onReviewOrphan(orphan);
+  }
+
+  function selectApp(appId: string) {
+    setSelectedAppId(appId);
+    setWorkspaceTab('apps');
   }
 
   return (
@@ -82,30 +94,60 @@ export function StorageCapacityRibbonWorkspace({
 
       <CapacityReadout appDataBytes={appDataBytes} appsWithBackupsOn={appsWithBackupsOn} report={report} summary={hero.summary} />
 
-      <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(18rem,1fr)_minmax(17rem,0.8fr)_17rem]">
-        <GrowthPanel apps={report.apps} status={report.status} weeklyGrowthBytes={weeklyAppGrowth(report)} />
-        <SpaceDriversPanel apps={largestApps} totalApps={report.apps.length} />
-        <AttentionPanel
-          firstOrphan={firstOrphan}
-          onOpenDetails={() => setDetailsOpen(true)}
-          onReviewOrphan={reviewOrphan}
-          report={report}
-        />
-      </section>
+      <Tabs className="min-h-0 flex-1 gap-0" onValueChange={(value) => setWorkspaceTab(value as StorageWorkspaceTab)} value={workspaceTab}>
+        <Surface className="flex min-h-0 flex-1 flex-col overflow-hidden border-sky-300/20 bg-slate-900" tone="panel">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-300/15 px-3 py-2">
+            <TabsList className="min-w-0 max-w-full justify-start overflow-x-auto rounded-lg border border-sky-300/15 bg-slate-950/25 p-1" variant="default">
+              <StorageWorkspaceTabTrigger icon={LineChart} label="Overview" value="overview" />
+              <StorageWorkspaceTabTrigger icon={PackageOpen} label="App data" value="apps" />
+              <StorageWorkspaceTabTrigger icon={Archive} label="Backups" value="backups" />
+              <StorageWorkspaceTabTrigger icon={Trash2} label="Cleanup" value="cleanup" />
+              {showAdvancedMetrics && <StorageWorkspaceTabTrigger icon={Database} label="Advanced" value="advanced" />}
+            </TabsList>
+          </div>
 
-      <StorageDetailsSheet
-        appDataBytes={appDataBytes}
-        appsWithBackupsOn={appsWithBackupsOn}
-        copiedPathId={copiedPathId}
-        onCopyPath={onCopyPath}
-        onOpenChange={setDetailsOpen}
-        onReviewOrphan={reviewOrphan}
-        open={detailsOpen}
-        report={report}
-        showAdvancedMetrics={showAdvancedMetrics}
-      />
+          <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="overview">
+            <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(18rem,1fr)_minmax(17rem,0.8fr)_17rem]">
+              <GrowthPanel apps={report.apps} status={report.status} weeklyGrowthBytes={weeklyAppGrowth(report)} />
+              <SpaceDriversPanel appIconUrlById={appIconUrlById} apps={largestApps} onSelectApp={selectApp} totalApps={report.apps.length} />
+              <AttentionPanel firstOrphan={firstOrphan} onOpenCleanup={() => setWorkspaceTab('cleanup')} report={report} />
+            </section>
+          </TabsContent>
+
+          <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="apps">
+            <AppDataWorkspace
+              appIconUrlById={appIconUrlById}
+              apps={report.apps}
+              copiedPathId={copiedPathId}
+              onCopyPath={onCopyPath}
+              onSelectApp={setSelectedAppId}
+              selectedApp={selectedApp}
+              selectedAppId={selectedApp?.appId ?? null}
+              showAdvancedMetrics={showAdvancedMetrics}
+            />
+          </TabsContent>
+
+          <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="backups">
+            <BackupWorkspace appsWithBackupsOn={appsWithBackupsOn} report={report} />
+          </TabsContent>
+
+          <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="cleanup">
+            <CleanupWorkspace onReviewOrphan={reviewOrphan} orphans={report.orphanedData} showAdvancedMetrics={showAdvancedMetrics} />
+          </TabsContent>
+
+          {showAdvancedMetrics && (
+            <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" value="advanced">
+              <AdvancedStorageWorkspace report={report} />
+            </TabsContent>
+          )}
+        </Surface>
+      </Tabs>
     </section>
   );
+}
+
+function StorageWorkspaceTabTrigger({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: StorageWorkspaceTab }) {
+  return <TabsTrigger className="shrink-0 px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value={value}><Icon aria-hidden="true" className="size-3.5" />{label}</TabsTrigger>;
 }
 
 function StorageCapacityHeader({ freeBytes, onRefresh, refreshing, updatedAt, usedPercent }: {
@@ -260,7 +302,12 @@ function InlineMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SpaceDriversPanel({ apps, totalApps }: { apps: AppStorageUsage[]; totalApps: number }) {
+function SpaceDriversPanel({ appIconUrlById, apps, onSelectApp, totalApps }: {
+  appIconUrlById: Record<string, string | null>;
+  apps: AppStorageUsage[];
+  onSelectApp: (appId: string) => void;
+  totalApps: number;
+}) {
   return (
     <Surface className="min-h-0 border-sky-300/20 bg-slate-900 p-4" tone="panel">
       <div className="flex items-center justify-between gap-3">
@@ -271,17 +318,19 @@ function SpaceDriversPanel({ apps, totalApps }: { apps: AppStorageUsage[]; total
         <PackageOpen aria-hidden="true" className="size-4 text-cyan-200" />
       </div>
       <div className="mt-3 grid gap-2">
-        {apps.length ? apps.map((app) => <SpaceDriverRow app={app} key={app.appId} />) : <ProjectInset className="border-sky-300/15 bg-slate-950/25 text-xs text-sky-100/60">Installed app storage will appear here.</ProjectInset>}
+        {apps.length
+          ? apps.map((app) => <SpaceDriverRow app={app} iconUrl={appIconUrlById[app.appId]} key={app.appId} onClick={() => onSelectApp(app.appId)} />)
+          : <ProjectInset className="border-sky-300/15 bg-slate-950/25 text-xs text-sky-100/60">Installed app storage will appear here.</ProjectInset>}
       </div>
-      {totalApps > apps.length && <p className="mt-3 text-xs text-sky-100/55">Showing the largest {apps.length} of {totalApps} tracked apps.</p>}
+      {totalApps > apps.length && <p className="mt-3 text-xs text-sky-100/55">Showing the largest {apps.length} of {totalApps} tracked apps. Select one to inspect its storage.</p>}
     </Surface>
   );
 }
 
-function SpaceDriverRow({ app }: { app: AppStorageUsage }) {
+function SpaceDriverRow({ app, iconUrl, onClick }: { app: AppStorageUsage; iconUrl: string | null; onClick: () => void }) {
   return (
-    <ProjectInset className="flex min-w-0 items-center gap-2.5 border-sky-300/15 bg-slate-950/25 px-2.5 py-2">
-      <span className="grid size-6 shrink-0 place-items-center rounded-md border border-cyan-300/15 bg-cyan-400/10 text-cyan-200"><PackageOpen aria-hidden="true" className="size-3.5" /></span>
+    <button className="flex min-w-0 items-center gap-2.5 rounded-lg border border-sky-300/15 bg-slate-950/25 px-2.5 py-2 text-left transition hover:border-cyan-300/30 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" onClick={onClick} type="button">
+      <StorageAppIcon appName={app.appName} iconUrl={iconUrl} />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium text-white">{app.appName}</span>
         <span className="block truncate text-[0.68rem] text-slate-400">{app.backupEnabled ? `${app.backupFrequency} backup` : 'Backup off'}</span>
@@ -290,14 +339,13 @@ function SpaceDriverRow({ app }: { app: AppStorageUsage }) {
         <span className="block text-xs font-semibold text-white">{formatStorageBytes(app.usedBytes)}</span>
         <span className={cn('block text-[0.68rem]', app.sevenDayGrowthBytes > 0 ? 'text-amber-200' : 'text-sky-100/60')}>{storageGrowthLabel(app)}</span>
       </span>
-    </ProjectInset>
+    </button>
   );
 }
 
-function AttentionPanel({ firstOrphan, onOpenDetails, onReviewOrphan, report }: {
+function AttentionPanel({ firstOrphan, onOpenCleanup, report }: {
   firstOrphan: OrphanedStorage | null;
-  onOpenDetails: () => void;
-  onReviewOrphan: (orphan: OrphanedStorage) => void;
+  onOpenCleanup: () => void;
   report: StorageReport;
 }) {
   const recommendations = report.recommendations;
@@ -318,10 +366,10 @@ function AttentionPanel({ firstOrphan, onOpenDetails, onReviewOrphan, report }: 
           <AttentionFact icon={HardDrive} label="Space to recover" value={formatStorageBytes(firstOrphan.usedBytes)} />
           <AttentionFact icon={ShieldCheck} label="Safety" value="Checkpoint before cleanup" />
         </div>
-        <ProjectWarningButton className="mt-auto w-full" onClick={() => onReviewOrphan(firstOrphan)} type="button">
+        {recommendations.length > 0 && <div className="mt-3 grid gap-2">{recommendations.map((item) => <RecommendationRow key={item.id} recommendation={item} />)}</div>}
+        <ProjectWarningButton className="mt-auto w-full" onClick={onOpenCleanup} type="button">
           Review cleanup <ChevronRight aria-hidden="true" className="size-3.5" />
         </ProjectWarningButton>
-        <button className="mt-2 text-xs font-medium text-amber-100/75 underline-offset-4 hover:text-amber-50 hover:underline" onClick={onOpenDetails} type="button">View all storage details</button>
       </Surface>
     );
   }
@@ -343,7 +391,8 @@ function AttentionPanel({ firstOrphan, onOpenDetails, onReviewOrphan, report }: 
         <AttentionFact icon={PackageOpen} label="Managed apps" value={`${report.apps.length} tracked`} />
         <AttentionFact icon={Info} label="Status" value={needsAttention ? 'Review recommended' : 'No action needed'} />
       </div>
-      <ProjectDarkControlButton className="mt-auto w-full" onClick={onOpenDetails} type="button">View storage details <ChevronRight aria-hidden="true" className="size-3.5" /></ProjectDarkControlButton>
+      {recommendations.length > 1 && <div className="mt-3 grid gap-2">{recommendations.filter((item) => item !== recommendation).map((item) => <RecommendationRow key={item.id} recommendation={item} />)}</div>}
+      <ProjectDarkControlButton className="mt-auto w-full" onClick={onOpenCleanup} type="button">Open cleanup workspace <ChevronRight aria-hidden="true" className="size-3.5" /></ProjectDarkControlButton>
     </Surface>
   );
 }
@@ -357,76 +406,117 @@ function AttentionFact({ icon: Icon, label, value }: { icon: LucideIcon; label: 
   );
 }
 
-function StorageDetailsSheet({ appDataBytes, appsWithBackupsOn, copiedPathId, onCopyPath, onOpenChange, onReviewOrphan, open, report, showAdvancedMetrics }: {
-  appDataBytes: number;
-  appsWithBackupsOn: number;
+function AppDataWorkspace({
+  appIconUrlById,
+  apps,
+  copiedPathId,
+  onCopyPath,
+  onSelectApp,
+  selectedApp,
+  selectedAppId,
+  showAdvancedMetrics,
+}: {
+  appIconUrlById: Record<string, string | null>;
+  apps: AppStorageUsage[];
   copiedPathId: string | null;
   onCopyPath: (value: string, id: string) => void;
-  onOpenChange: (open: boolean) => void;
-  onReviewOrphan: (orphan: OrphanedStorage) => void;
-  open: boolean;
-  report: StorageReport;
+  onSelectApp: (appId: string) => void;
+  selectedApp: AppStorageUsage | null;
+  selectedAppId: string | null;
   showAdvancedMetrics: boolean;
 }) {
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full gap-0 border-sky-300/30 bg-slate-900 p-0 text-slate-50 sm:!max-w-xl" side="right">
-        <SheetHeader className="border-b border-sky-300/15 pr-12">
-          <SheetTitle className="text-lg text-white">Storage details</SheetTitle>
-          <SheetDescription className="text-slate-400">Full inventory, backup posture, and safe cleanup candidates.</SheetDescription>
-        </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="grid gap-4">
-            <DetailSection description="Capacity and the current next action." icon={HardDrive} title="Storage status">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <DetailFact label="Status" value={report.headline || 'Unknown'} />
-                <DetailFact label="Free room" value={formatStorageBytes(report.hostDisk.usableBytes)} />
-                <DetailFact label="App data" value={formatStorageBytes(appDataBytes)} />
-                <DetailFact label="Used overall" value={storagePercentLabel(report.hostDisk.usedPercent)} />
-              </div>
-              {report.recommendations.length > 0 && <div className="mt-3 grid gap-2">{report.recommendations.map((recommendation) => <RecommendationRow key={recommendation.id} recommendation={recommendation} />)}</div>}
-            </DetailSection>
-
-            <DetailSection description="The largest managed app folders, ordered by current use." icon={PackageOpen} title="App data">
-              <div className="grid gap-2">
-                {report.apps.length ? report.apps.map((app) => <DetailedAppRow app={app} copiedPathId={copiedPathId} key={app.appId} onCopyPath={onCopyPath} showAdvancedMetrics={showAdvancedMetrics} />) : <ProjectInset className="text-sm text-slate-400">Installed app storage will appear here after apps are installed.</ProjectInset>}
-              </div>
-            </DetailSection>
-
-            <DetailSection description="Backup data stays visible without mixing external-drive usage into this computer’s capacity." icon={Archive} title="Backups">
-              <div className="grid gap-2 sm:grid-cols-2">
-                <DetailFact label="Apps with backups on" value={`${appsWithBackupsOn}/${report.apps.length}`} />
-                <DetailFact label="Destination" value={report.backupDestination?.kind === 'external' ? 'External drive' : 'This device'} />
-                <DetailFact label="Backup storage used" value={formatStorageBytes(report.backupStorage.usedBytes)} />
-                {report.backupDestination && report.backupDestination.status !== 'ready' && <DetailFact label="Destination status" value={report.backupDestination.message} />}
-              </div>
-              <Link className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-200 hover:text-cyan-100" to={appRoutes.backups}>Open backups <ArrowUpRight aria-hidden="true" className="size-3.5" /></Link>
-            </DetailSection>
-
-            <DetailSection description="Autark-OS creates a safety checkpoint before removing unused app folders." icon={FolderSearch} title="Unused data">
-              <div className="grid gap-2">
-                {report.orphanedData.length ? report.orphanedData.map((orphan) => <DetailedOrphanRow key={orphan.path} onReview={() => onReviewOrphan(orphan)} orphan={orphan} showAdvancedMetrics={showAdvancedMetrics} />) : <ProjectInset className="text-sm text-slate-400">Autark-OS did not find orphaned app data.</ProjectInset>}
-              </div>
-            </DetailSection>
-
-            {showAdvancedMetrics && <DetailSection description="Exact paths and filesystem totals for troubleshooting." icon={Database} title="Advanced filesystem details"><div className="grid gap-2">{[report.hostDisk, report.runtimeDisk, report.backupStorage].map((usage) => <UsageDetail key={usage.label} usage={usage} />)}</div></DetailSection>}
-          </div>
+    <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(15rem,0.55fr)_minmax(0,1.45fr)]">
+      <Surface className="min-h-0 p-3" tone="inset">
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div><p className="text-sm font-semibold text-white">App data</p><p className="mt-1 text-xs text-sky-100/60">Choose an app to inspect its storage.</p></div>
+          <PackageOpen aria-hidden="true" className="size-4 text-cyan-200" />
         </div>
-      </SheetContent>
-    </Sheet>
+        <div className="mt-3 grid gap-2">
+          {apps.length
+            ? apps.map((app) => <StorageAppSelectorRow active={app.appId === selectedAppId} app={app} iconUrl={appIconUrlById[app.appId]} key={app.appId} onClick={() => onSelectApp(app.appId)} />)
+            : <ProjectInset className="border-sky-300/15 bg-slate-950/25 text-sm text-slate-400">Installed app storage will appear here after apps are installed.</ProjectInset>}
+        </div>
+      </Surface>
+
+      <Surface className="min-h-0 p-4" tone="panel">
+        {!selectedApp ? (
+          <div className="grid h-full min-h-56 place-items-center text-center"><div><PackageOpen aria-hidden="true" className="mx-auto size-5 text-sky-100/50" /><p className="mt-3 text-sm font-semibold text-white">No app storage yet</p><p className="mt-1 text-xs text-sky-100/60">Installed apps will appear here when they report storage use.</p></div></div>
+        ) : (
+          <div className="flex min-h-full flex-col">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <StorageAppIcon appName={selectedApp.appName} className="size-10 rounded-xl" iconUrl={appIconUrlById[selectedApp.appId]} />
+                <div className="min-w-0"><p className="truncate text-base font-semibold text-white">{selectedApp.appName}</p><p className="mt-0.5 text-xs text-sky-100/60">Managed app storage</p></div>
+              </div>
+              <MetadataBadge>{selectedApp.status}</MetadataBadge>
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <DetailFact label="Current use" value={formatStorageBytes(selectedApp.usedBytes)} />
+              <DetailFact label="7-day change" value={storageGrowthLabel(selectedApp)} />
+              <DetailFact label="Backups" value={selectedApp.backupEnabled ? selectedApp.backupFrequency : 'Off'} />
+            </div>
+            <StorageTrendChart trend={selectedApp.trend} />
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <DetailFact label="Last backup" value={lastBackupLabel(selectedApp.lastBackup)} />
+              <DetailFact label="Storage status" value={selectedApp.status} />
+            </div>
+            {showAdvancedMetrics && <div className="mt-3 flex items-center gap-2"><p className="min-w-0 flex-1 select-text truncate font-mono text-xs text-slate-300" title={selectedApp.path}>{selectedApp.path}</p><ProjectDarkControlButton className="shrink-0" onClick={() => onCopyPath(selectedApp.path, selectedApp.appId)} size="sm" type="button">{copiedPathId === selectedApp.appId ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}{copiedPathId === selectedApp.appId ? 'Copied' : 'Copy path'}</ProjectDarkControlButton></div>}
+          </div>
+        )}
+      </Surface>
+    </section>
   );
 }
 
-function DetailSection({ children, description, icon: Icon, title }: { children: ReactNode; description: string; icon: LucideIcon; title: string }) {
+function StorageAppSelectorRow({ active, app, iconUrl, onClick }: { active: boolean; app: AppStorageUsage; iconUrl: string | null; onClick: () => void }) {
+  return <button aria-pressed={active} className={cn('flex w-full min-w-0 items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60', active ? 'border-cyan-300/40 bg-cyan-400/10' : 'border-sky-300/15 bg-slate-950/25 hover:border-cyan-300/30 hover:bg-slate-800')} onClick={onClick} type="button"><StorageAppIcon appName={app.appName} iconUrl={iconUrl} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium text-white">{app.appName}</span><span className="mt-0.5 block truncate text-xs text-sky-100/60">{app.backupEnabled ? `${app.backupFrequency} backup` : 'Backup off'}</span></span><span className="shrink-0 text-right"><span className="block text-xs font-semibold text-white">{formatStorageBytes(app.usedBytes)}</span><span className={cn('block text-[0.68rem]', app.sevenDayGrowthBytes > 0 ? 'text-amber-200' : 'text-sky-100/60')}>{storageGrowthLabel(app)}</span></span></button>;
+}
+
+function BackupWorkspace({ appsWithBackupsOn, report }: { appsWithBackupsOn: number; report: StorageReport }) {
+  const destination = report.backupDestination;
+  const destinationReady = !destination || destination.status === 'ready';
   return (
-    <section>
-      <div className="flex items-start gap-2">
-        <span className="grid size-7 shrink-0 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200"><Icon aria-hidden="true" className="size-3.5" /></span>
-        <div><h2 className="text-sm font-semibold text-white">{title}</h2><p className="mt-0.5 text-xs leading-5 text-slate-400">{description}</p></div>
-      </div>
-      <div className="mt-3">{children}</div>
+    <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
+      <Surface className="p-4" tone="inset">
+        <WorkspaceHeading description="Backup data stays visible here without adding external-drive usage to this computer’s capacity." icon={Archive} title="Backup posture" />
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <DetailFact label="Apps with backups on" value={`${appsWithBackupsOn}/${report.apps.length}`} />
+          <DetailFact label="Destination" value={destination?.kind === 'external' ? 'External drive' : 'This device'} />
+          <DetailFact label="Backup storage used" value={formatStorageBytes(report.backupStorage.usedBytes)} />
+          <DetailFact label="Destination status" value={destination?.message || 'Not configured'} />
+        </div>
+        <Link className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-200 hover:text-cyan-100 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" to={appRoutes.backups}>Open backups <ArrowUpRight aria-hidden="true" className="size-3.5" /></Link>
+      </Surface>
+      <Surface className={cn('p-4', destinationReady ? 'border-emerald-300/20 bg-emerald-400/5' : 'border-amber-300/20 bg-amber-400/5')} tone="panel">
+        <div className="flex items-start gap-2"><span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border', destinationReady ? 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100' : 'border-amber-300/25 bg-amber-400/10 text-amber-100')}>{destinationReady ? <ShieldCheck aria-hidden="true" className="size-4" /> : <CircleAlert aria-hidden="true" className="size-4" />}</span><div><p className="text-sm font-semibold text-white">{destinationReady ? 'Backup destination is ready' : 'Backup destination needs attention'}</p><p className={cn('mt-1 text-xs leading-5', destinationReady ? 'text-emerald-100/75' : 'text-amber-100/75')}>{destination?.message || 'Choose a destination in Backups before creating recovery files.'}</p></div></div>
+      </Surface>
     </section>
   );
+}
+
+function CleanupWorkspace({ onReviewOrphan, orphans, showAdvancedMetrics }: { onReviewOrphan: (orphan: OrphanedStorage) => void; orphans: OrphanedStorage[]; showAdvancedMetrics: boolean }) {
+  return (
+    <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
+      <Surface className="p-4" tone="inset">
+        <WorkspaceHeading description="Autark-OS creates a safety checkpoint before removing unused app folders." icon={FolderSearch} title="Unused data" />
+        <div className="mt-4 grid gap-2">{orphans.length ? orphans.map((orphan) => <DetailedOrphanRow key={orphan.path} onReview={() => onReviewOrphan(orphan)} orphan={orphan} showAdvancedMetrics={showAdvancedMetrics} />) : <ProjectInset className="border-emerald-300/20 bg-emerald-400/5 text-sm text-emerald-100/75">Autark-OS did not find unused app data.</ProjectInset>}</div>
+      </Surface>
+      <Surface className="p-4" tone="panel"><WorkspaceHeading description="Cleanup keeps app data safe by default." icon={ShieldCheck} title="Safe flow" /><div className="mt-4 grid gap-2"><DetailFact label="1" value="Review contents" /><DetailFact label="2" value="Create checkpoint" /><DetailFact label="3" value="Confirm cleanup" /></div></Surface>
+    </section>
+  );
+}
+
+function AdvancedStorageWorkspace({ report }: { report: StorageReport }) {
+  return <section className="min-h-full"><Surface className="p-4" tone="inset"><WorkspaceHeading description="Exact paths and filesystem totals for troubleshooting." icon={Database} title="Advanced filesystem details" /><div className="mt-4 grid gap-2">{[report.hostDisk, report.runtimeDisk, report.backupStorage].map((usage) => <UsageDetail key={usage.label} usage={usage} />)}</div></Surface></section>;
+}
+
+function WorkspaceHeading({ description, icon: Icon, title }: { description: string; icon: LucideIcon; title: string }) {
+  return <div className="flex items-start gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200"><Icon aria-hidden="true" className="size-3.5" /></span><div><h2 className="text-sm font-semibold text-white">{title}</h2><p className="mt-0.5 text-xs leading-5 text-slate-400">{description}</p></div></div>;
+}
+
+function StorageAppIcon({ appName, className, iconUrl }: { appName: string; className?: string; iconUrl: string | null }) {
+  return <span aria-label={`${appName} icon`} className={cn('relative grid size-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200', className)}><AppWindow aria-hidden="true" className="size-3.5" />{iconUrl && <img alt="" className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = 'none'; }} src={iconUrl} />}</span>;
 }
 
 function DetailFact({ label, value }: { label: string; value: string }) {
@@ -436,16 +526,6 @@ function DetailFact({ label, value }: { label: string; value: string }) {
 function RecommendationRow({ recommendation }: { recommendation: StorageReport['recommendations'][number] }) {
   const tone = recommendation.tone === 'danger' ? 'danger' : recommendation.tone === 'warning' ? 'warning' : recommendation.tone === 'success' ? 'success' : 'neutral';
   return <div className={cn('rounded-lg p-3', semanticStatusVariants({ tone }))}><p className="text-sm font-semibold text-white">{recommendation.title}</p><p className="mt-1 text-xs leading-5 text-current/80">{recommendation.message}</p></div>;
-}
-
-function DetailedAppRow({ app, copiedPathId, onCopyPath, showAdvancedMetrics }: { app: AppStorageUsage; copiedPathId: string | null; onCopyPath: (value: string, id: string) => void; showAdvancedMetrics: boolean }) {
-  return (
-    <ProjectInset className="border-sky-300/15 bg-slate-950/25 px-3 py-3">
-      <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-white">{app.appName}</p><MetadataBadge>{app.status}</MetadataBadge></div><p className="mt-1 text-xs text-slate-400">Managed app data</p></div><p className="text-sm font-semibold text-white">{formatStorageBytes(app.usedBytes)}</p></div>
-      <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><DetailFact label="Backups" value={app.backupEnabled ? app.backupFrequency : 'Off'} /><DetailFact label="7-day change" value={storageGrowthLabel(app)} /></div>
-      {showAdvancedMetrics && <div className="mt-3 flex items-center gap-2"><p className="min-w-0 flex-1 select-text truncate font-mono text-xs text-slate-300" title={app.path}>{app.path}</p><ProjectDarkControlButton className="shrink-0" onClick={() => onCopyPath(app.path, app.appId)} size="sm" type="button">{copiedPathId === app.appId ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}{copiedPathId === app.appId ? 'Copied' : 'Copy path'}</ProjectDarkControlButton></div>}
-    </ProjectInset>
-  );
 }
 
 function DetailedOrphanRow({ onReview, orphan, showAdvancedMetrics }: { onReview: () => void; orphan: OrphanedStorage; showAdvancedMetrics: boolean }) {
@@ -474,6 +554,13 @@ function growthSummary(appCount: number, weeklyGrowthBytes: number) {
 function signedBytes(value: number) {
   if (value === 0) return 'No change';
   return `${value > 0 ? '+' : '-'}${formatStorageBytes(Math.abs(value))}`;
+}
+
+function lastBackupLabel(value: string) {
+  if (!value) return 'No completed backup reported';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short' });
 }
 
 function usageTone(value: number): SemanticStatusTone {

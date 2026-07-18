@@ -68,6 +68,8 @@ test('wide view opens global popovers, app management, and the Discover dialog',
 
   await openReadyRoute(page, '/storage', { width: 1280, height: 960 });
   await page.getByRole('button', { name: /^Review cleanup$/i }).click();
+  await expect(page.getByRole('tab', { name: /^Cleanup$/i })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: /^Review$/i }).click();
   await expect(page.getByRole('dialog')).toContainText(/Clean up unused app data/i);
   await expectNoHorizontalOverflow(page);
 

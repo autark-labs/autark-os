@@ -9,15 +9,27 @@ function source(relativePath: string) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('unused storage inventory is progressively disclosed without clearing the selected cleanup target', () => {
+test('storage details stay in the workspace while cleanup keeps its selected target', () => {
   const page = source('src/pages/StoragePage/StoragePage.tsx');
   const workspace = source('src/pages/StoragePage/StorageCapacityRibbonWorkspace.tsx');
 
   assert.match(page, /onReviewOrphan=\{setCleanupTarget\}/);
-  assert.match(workspace, /setDetailsOpen\(false\);/);
-  assert.match(workspace, /report\.orphanedData\.map/);
+  assert.match(workspace, /<Tabs className="min-h-0 flex-1 gap-0"/);
+  assert.doesNotMatch(workspace, /StorageDetailsSheet/);
+  assert.match(workspace, /value="cleanup"/);
+  assert.match(workspace, /orphans\.map/);
   assert.match(workspace, /onReview=\{\(\) => onReviewOrphan\(orphan\)\}/);
   assert.match(page, /setCleanupTarget\(null\)/);
+});
+
+test('storage app rows use live application artwork with a safe fallback', () => {
+  const page = source('src/pages/StoragePage/StoragePage.tsx');
+  const workspace = source('src/pages/StoragePage/StorageCapacityRibbonWorkspace.tsx');
+
+  assert.match(page, /storageAppIconUrls/);
+  assert.match(page, /catalogAppIconUrl/);
+  assert.match(workspace, /function StorageAppIcon/);
+  assert.match(workspace, /appIconUrlById/);
 });
 
 test('cleanup refreshes storage, application state, and activity surfaces after a checkpointed cleanup', () => {
