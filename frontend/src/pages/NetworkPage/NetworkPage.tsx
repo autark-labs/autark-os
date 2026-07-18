@@ -38,7 +38,7 @@ import {
   useAccessNetworkRepository,
   useRemoveStalePrivateAccessMutation,
 } from '@/repositories/networkRepository';
-import type { PrivateAccessReconciliationReport, SystemSetupStatus, TailscaleStatus } from '@/types/network';
+import type { PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';
 import { HostSetupPanel } from './HostSetupPanel';
 import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';
@@ -57,7 +57,6 @@ import {
   parseAccessDeepLink,
   type AccessDeepLinkTab,
 } from './extensions/NetworkPage.deepLinks';
-import { tailscaleSetupTasks } from './extensions/NetworkPage.tailscaleSetup';
 import type { ReachabilityService, ReachabilityTypeFilter, ReachabilityZoneId } from './extensions/NetworkPage.types';
 import {
   acknowledgePendingReachability,
@@ -294,9 +293,6 @@ function NetworkPage() {
         <AccessPageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
-          {(showAdvancedMetrics || !network.tailscale?.connected) && (
-            <PrivateAccessSetupPath reconciliation={network.reconciliation} setup={network.setupStatus} tailscale={network.tailscale} />
-          )}
           <Tabs className="flex min-h-0 flex-1 flex-col gap-3" onValueChange={handleTabChange} value={selectedTab}>
             <SearchFilterBar
               actions={(
@@ -402,34 +398,6 @@ function AccessSummaryMetric({ attention = false, label, value }: { attention?: 
   );
 }
 
-function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconciliation: PrivateAccessReconciliationReport | null; setup: SystemSetupStatus | null; tailscale: TailscaleStatus | null }) {
-  const tasks = tailscaleSetupTasks({ reconciliation, setup, tailscale });
-  const blockingTask = tasks.find((task) => task.status === 'warning');
-  const connected = Boolean(tailscale?.connected);
-
-  return (
-    <Surface className="p-3" tone="panel">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-50">Private access setup</p>
-          <p className="mt-1 max-w-3xl text-sm text-sky-100/70">
-            {blockingTask?.detail || 'Tailscale is connected and private links are ready for trusted devices.'} Use the Tailscale control in the app header to sign in or check its status.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={connected ? 'success' : 'warning'}>{connected ? 'Connected' : 'Local-only available'}</StatusBadge>
-          {blockingTask && <StatusBadge tone="warning">{blockingTask.title}</StatusBadge>}
-        </div>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {tasks.map((task) => (
-          <SetupStatus key={task.id} task={task} />
-        ))}
-      </div>
-    </Surface>
-  );
-}
-
 function StalePrivateLinksPanel({
   loadingId,
   onRemoveStaleMapping,
@@ -488,16 +456,6 @@ function StalePrivateLinksPanel({
         </NetworkInset>
       ))}
     </NetworkPanel>
-  );
-}
-
-function SetupStatus({ task }: { task: ReturnType<typeof tailscaleSetupTasks>[number] }) {
-  return (
-    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-sky-400/20 bg-slate-800 px-2.5 py-2" title={task.detail}>
-      <span className={cn('size-1.5 shrink-0 rounded-full', task.status === 'ok' ? 'bg-emerald-300' : task.status === 'warning' ? 'bg-orange-300' : 'bg-sky-300')} />
-      <span className="max-w-52 truncate text-xs font-medium text-slate-100">{task.title}</span>
-      <span className="text-[11px] text-sky-100/55">{task.primaryAction.command || task.primaryAction.label}</span>
-    </div>
   );
 }
 
