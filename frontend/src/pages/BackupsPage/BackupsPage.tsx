@@ -36,7 +36,7 @@ import {
   backupOperationForRunningId,
   selectActiveBackupJob,
 } from './BackupsPage.logic';
-import { BackupTimelineWorkspace } from './BackupTimelineWorkspace';
+import { BackupColumnNavigatorWorkspace } from './BackupColumnNavigatorWorkspace';
 
 function BackupsPage() {
   const queryClient = useQueryClient();
@@ -302,14 +302,14 @@ function BackupsPage() {
 
   return (
     <PageShell
-      className="lg:h-[calc(100dvh-7.25rem)] lg:min-h-0"
+      className="xl:h-[calc(100dvh-7.25rem)] xl:min-h-0"
       contained
-      contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
+      contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
     >
       {pageError && <BackupsErrorState message={pageError} onRetry={() => void backupReport.refresh()} />}
       {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
       {report && (
-        <BackupTimelineWorkspace
+        <BackupColumnNavigatorWorkspace
           appBackupAvailability={appBackupOperationAvailability}
           fullBackupAvailability={fullBackupAvailability}
           onCreateAppBackup={runManualAppBackup}

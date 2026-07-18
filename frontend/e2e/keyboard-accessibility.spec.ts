@@ -43,6 +43,19 @@ test('setup, app management, and Access controls work with the keyboard', async 
 
 test('backup dialog traps focus and returns it to the trigger when closed', async ({ page }) => {
   await openRoute(page, '/backups', 'idle');
+  const fullCheckpoints = page.getByRole('button', { name: /Full checkpoints/i });
+  await fullCheckpoints.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('Backups / Full checkpoints')).toBeVisible();
+
+  const chooseApp = page.getByRole('button', { name: /^Choose an app$/i });
+  await chooseApp.focus();
+  await page.keyboard.press('Enter');
+  const appDirectory = page.getByRole('menuitem', { name: /Vaultwarden with a deliberately long/i });
+  await appDirectory.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByText(/Backups \/ App backups \/ Vaultwarden with a deliberately long/i)).toBeVisible();
+
   const details = page.getByRole('button', { name: /^Details$/i });
   await details.focus();
   await page.keyboard.press('Enter');
