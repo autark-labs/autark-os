@@ -4,9 +4,6 @@ import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card';
 import { ProjectEmptyState } from '@/components/primitives/EmptyState';
 import {
@@ -35,7 +32,7 @@ type AdvancedApplicationsViewProps = {
   selectedId?: string;
 };
 
-const tableHeadClass = 'text-sky-100/70';
+const tableHeadClass = 'sticky top-0 z-20 bg-slate-800 text-sky-100/70';
 const tableCellMutedClass = 'text-slate-700';
 
 export function AdvancedApplicationsView({ actions, actionLoadingByItemId, emptyState, items, managementOpen, onSelect, selectedId }: AdvancedApplicationsViewProps) {
@@ -54,19 +51,13 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
   }, [managementOpen]);
 
   return (
-    <Card className="min-h-[44rem] overflow-visible rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
-      <CardHeader>
-        <CardTitle className="text-white">Operations</CardTitle>
-        <CardDescription className="text-sky-100/70">
-          Review app state, access posture, backup coverage, and runtime controls in a compact operations view.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <Card className="flex h-full min-h-0 flex-col !gap-0 overflow-hidden rounded-2xl border border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 ring-0">
+      <CardContent className="min-h-0 flex-1 overflow-hidden px-3 pb-3">
         {!items.length ? (
           <AdvancedEmptyState emptyState={emptyState} />
         ) : (
-        <div className="rounded-xl border border-sky-400/25 bg-slate-800 px-2 pb-2">
-          <Table aria-hidden={managementOpen} className="border-separate border-spacing-y-2" ref={tableRef}>
+        <div data-testid="advanced-table-scroll-area" className="h-full min-h-0 overflow-auto overscroll-contain rounded-xl border border-sky-400/25 bg-slate-800 px-2 pb-2">
+          <Table aria-hidden={managementOpen} className="border-separate border-spacing-y-2" containerClassName="overflow-visible" ref={tableRef}>
               <TableHeader>
                 <TableRow className="border-transparent hover:bg-transparent">
                 <TableHead className={tableHeadClass}>Name</TableHead>

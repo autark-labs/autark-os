@@ -579,15 +579,20 @@ export const ApplicationsPage = () => {
   };
 
   return (
-    <PageShell>
+    <PageShell
+      className="lg:h-[calc(100dvh-7.25rem)] lg:min-h-0"
+      contained
+      contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
+    >
       <AppsPageHeader attentionCount={attentionCount} linkedCount={linkedCount} managedCount={managedCount} />
 
       {foundServices.length > 0 && (
-        <FoundAppsPrompt model={{ count: foundServices.length, reviewHref: '/apps/found' }} />
+        <FoundAppsPrompt className="gap-2 p-3" model={{ count: foundServices.length, reviewHref: '/apps/found' }} />
       )}
 
       <div className="grid gap-3">
         <SearchFilterBar
+          className="p-2"
           actions={(
             <div className="flex flex-wrap items-center gap-2">
               <ApplicationCollectionFilterDropdown filters={collectionFilters} onChange={handleCollectionFilterChange} />
@@ -624,7 +629,7 @@ export const ApplicationsPage = () => {
         )}
       </div>
 
-      <section className="grid min-h-[44rem] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem]">
         {viewMode === 'basic' ? (
           <BasicApplicationsView
             actionLoadingByItemId={actionLoadingByAppId}
@@ -636,7 +641,7 @@ export const ApplicationsPage = () => {
             selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
           />
         ) : (
-          <div className="max-h-[44rem] min-h-[44rem] overflow-y-auto pr-1">
+          <div className="min-h-0 overflow-hidden">
             <AdvancedApplicationsView
               actions={actions}
               actionLoadingByItemId={actionLoadingByAppId}

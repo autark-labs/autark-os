@@ -2,12 +2,16 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Table = React.forwardRef<HTMLDivElement, React.ComponentProps<"table">>(function Table({ className, ...props }, ref) {
+type TableProps = React.ComponentProps<"table"> & {
+  containerClassName?: string
+};
+
+const Table = React.forwardRef<HTMLDivElement, TableProps>(function Table({ className, containerClassName, ...props }, ref) {
   return (
     <div
       ref={ref}
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      className={cn("relative w-full overflow-x-auto", containerClassName)}
     >
       <table
         data-slot="table"

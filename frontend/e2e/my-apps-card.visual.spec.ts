@@ -15,8 +15,33 @@ test('My Apps basic cards use the compact homepage launcher treatment', async ({
   await expect(page.getByRole('menuitem', { name: /Restart app/i })).toBeVisible();
   await page.keyboard.press('Escape');
   await expectNoHorizontalOverflow(page);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
   await page.screenshot({ path: 'test-results/my-apps-basic-final.png', fullPage: false });
 
+  await page.getByRole('radio', { name: 'List view' }).click();
+  const tableScrollArea = page.getByTestId('advanced-table-scroll-area');
+  const nameHeader = page.getByRole('columnheader', { name: 'Name' });
+  await expect(nameHeader).toBeVisible();
+  await expect(nameHeader).toHaveCSS('position', 'sticky');
+  await expect(page.locator('[data-slot="table-container"]').first()).toBeVisible();
+  await tableScrollArea.evaluate((element) => {
+    const tableBody = element.querySelector('tbody');
+    const sourceRow = tableBody?.querySelector('tr');
+    if (!tableBody || !sourceRow) return;
+    for (let index = 0; index < 20; index += 1) {
+      tableBody.appendChild(sourceRow.cloneNode(true));
+    }
+  });
+  await expect.poll(() => tableScrollArea.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  const scrollAreaBox = await tableScrollArea.boundingBox();
+  await tableScrollArea.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const scrolledHeaderBox = await nameHeader.boundingBox();
+  expect(scrolledHeaderBox?.y).toBeGreaterThanOrEqual((scrollAreaBox?.y ?? 0) - 1);
+  expect(scrolledHeaderBox?.y).toBeLessThan((scrollAreaBox?.y ?? 0) + 24);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
+  await page.screenshot({ path: 'test-results/my-apps-advanced-final.png', fullPage: false });
+
+  await page.getByRole('radio', { name: 'Grid view' }).click();
   await manageButton.click();
   await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
 });
