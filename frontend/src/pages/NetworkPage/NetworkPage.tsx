@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import { Network, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -131,6 +131,7 @@ function NetworkPage() {
   );
   const selectedTab = !showAdvancedMetrics && activeTab && !['matrix', 'issues'].includes(activeTab) ? 'matrix' : activeTab ?? deepLinkTarget.tab ?? 'matrix';
   const focusedService = useMemo(() => displayedReachabilityServices.find((service) => service.id === focusedServiceId) ?? null, [displayedReachabilityServices, focusedServiceId]);
+  const needsReviewCount = issues.length;
 
   const copyAccessLink = useCallback(async (appId: string, linkKind: string, url: string | null) => {
     if (!url) return;
@@ -274,103 +275,155 @@ function NetworkPage() {
   }, [pendingReachabilityByServiceId, reachabilityServices]);
 
   return (
-    <PageShell>
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold leading-none text-slate-50 md:text-3xl">Access</h2>
-          <p className="mt-2 max-w-2xl text-sm text-sky-100/70">Open local links, review private Tailscale links, and fix access issues from one place.</p>
-        </div>
-        <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={refreshAll} refreshing={pageRefreshing} tone="info" updatedAt={appState.updatedAt ?? network.updatedAt} />
-      </header>
+    <PageShell
+      className="lg:h-[calc(100dvh-7.25rem)] lg:min-h-0"
+      contained
+      contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
+    >
+      <AccessPageHeader
+        needsReviewCount={needsReviewCount}
+        onRefresh={refreshAll}
+        refreshing={pageRefreshing}
+        serviceCount={reachabilityServices.length}
+        updatedAt={appState.updatedAt ?? network.updatedAt}
+      />
 
       {pageError && <AccessPageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
 
       {pageLoading ? (
         <AccessPageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : (
-        <>
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           {(showAdvancedMetrics || !network.tailscale?.connected) && (
             <PrivateAccessSetupPath reconciliation={network.reconciliation} setup={network.setupStatus} tailscale={network.tailscale} />
           )}
-          <SearchFilterBar
-            actions={<ServiceTypeFilterDropdown filters={typeFilters} onChange={setTypeFilters} />}
-            filterAriaLabel="Filter reachability services"
-            onSearchChange={setQuery}
-            searchAriaLabel="Search services"
-            searchPlaceholder="Search services"
-            searchValue={query}
-          />
-          <Tabs className="gap-5" onValueChange={handleTabChange} value={selectedTab}>
-            <TabsList className="w-full min-w-0 max-w-full justify-start overflow-x-auto border-b border-sky-400/20 bg-slate-900/95 p-0 py-2 backdrop-blur" variant="line">
-              <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="matrix">Matrix</TabsTrigger>
-              <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="issues">Issues</TabsTrigger>
-              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="devices">Trusted devices</TabsTrigger>}
-              {showAdvancedMetrics && <TabsTrigger className="px-3 py-2 text-sky-100/60 data-active:text-cyan-100" value="advanced">Map and diagnostics</TabsTrigger>}
-            </TabsList>
-            <TabsContent className="min-h-[560px]" value="matrix">
-              <ReachabilityMatrix
-                copiedLinkKey={copiedLinkKey}
-                focusedServiceId={focusedServiceId}
-                items={filteredReachabilityServices}
-                loadingServiceIds={loadingServiceIds}
-                onCopyLink={copyAccessLink}
-                onFocusService={focusReachabilityService}
-                onMoveService={moveReachabilityService}
-              />
-              <StalePrivateLinksPanel
-                loadingId={staleActionLoadingId}
-                onRemoveStaleMapping={removeStaleMapping}
-                reconciliation={network.reconciliation}
-              />
+          <Tabs className="flex min-h-0 flex-1 flex-col gap-3" onValueChange={handleTabChange} value={selectedTab}>
+            <SearchFilterBar
+              actions={(
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <ServiceTypeFilterDropdown filters={typeFilters} onChange={setTypeFilters} />
+                  <TabsList className="min-w-0 max-w-full justify-start overflow-x-auto rounded-lg border border-sky-400/20 bg-slate-800 p-1" variant="default">
+                    <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="matrix">Matrix</TabsTrigger>
+                    <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="issues">Issues</TabsTrigger>
+                    {showAdvancedMetrics && <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="devices">Devices</TabsTrigger>}
+                    {showAdvancedMetrics && <TabsTrigger className="px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value="advanced">Diagnostics</TabsTrigger>}
+                  </TabsList>
+                </div>
+              )}
+              className="p-2"
+              filterAriaLabel="Filter reachability services"
+              onSearchChange={setQuery}
+              searchAriaLabel="Search services"
+              searchPlaceholder="Search services"
+              searchValue={query}
+            />
+            <TabsContent className="m-0 min-h-0 flex-1 overflow-hidden" value="matrix">
+              <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
+                <ReachabilityMatrix
+                  className="min-h-[32rem] lg:min-h-0 lg:flex-1"
+                  copiedLinkKey={copiedLinkKey}
+                  focusedServiceId={focusedServiceId}
+                  items={filteredReachabilityServices}
+                  loadingServiceIds={loadingServiceIds}
+                  onCopyLink={copyAccessLink}
+                  onFocusService={focusReachabilityService}
+                  onMoveService={moveReachabilityService}
+                />
+                <StalePrivateLinksPanel
+                  loadingId={staleActionLoadingId}
+                  onRemoveStaleMapping={removeStaleMapping}
+                  reconciliation={network.reconciliation}
+                />
+              </div>
             </TabsContent>
-            <TabsContent className="min-h-[560px]" value="issues">
+            <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="issues">
               <NetworkIssuesPanel issues={issues} onReviewPrivateLinks={() => handleTabChange('matrix')} />
             </TabsContent>
-            {showAdvancedMetrics && <TabsContent className="min-h-[560px]" value="devices">
+            {showAdvancedMetrics && <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="devices">
               <NetworkDevicesPanel devices={devices} />
             </TabsContent>}
-            {showAdvancedMetrics && <TabsContent className="min-h-[560px]" value="advanced">
-              <div className="grid gap-5">
+            {showAdvancedMetrics && <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="advanced">
+              <div className="grid gap-3">
                 <HostSetupPanel setup={network.setupStatus} />
                 <NetworkAdvancedPanel diagnostics={network.diagnostics} guide={network.guide} tailscale={network.tailscale} />
               </div>
             </TabsContent>}
           </Tabs>
-        </>
+        </div>
       )}
     </PageShell>
+  );
+}
+
+function AccessPageHeader({
+  needsReviewCount,
+  onRefresh,
+  refreshing,
+  serviceCount,
+  updatedAt,
+}: {
+  needsReviewCount: number;
+  onRefresh: () => void;
+  refreshing: boolean;
+  serviceCount: number;
+  updatedAt: Date | null;
+}) {
+  return (
+    <Surface as="header" className="overflow-hidden border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20" tone="panel">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
+            <Network aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Access</h1>
+            <p className="m-0 text-sm text-sky-100/70">Private links, home-network access, and service reachability.</p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <AccessSummaryMetric label="Reachable services" value={serviceCount} />
+          <AccessSummaryMetric attention={needsReviewCount > 0} label="Needs review" value={needsReviewCount} />
+          <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+function AccessSummaryMetric({ attention = false, label, value }: { attention?: boolean; label: string; value: number }) {
+  return (
+    <div className={cn(
+      'min-w-28 rounded-xl border border-sky-300/15 bg-slate-950/25 px-3 py-2 text-right',
+      attention && 'border-amber-300/30 bg-amber-400/5',
+    )}>
+      <p className={cn('text-lg font-semibold leading-none text-white', attention && 'text-amber-100')}>{value}</p>
+      <p className="mt-1 text-[0.68rem] text-slate-400">{label}</p>
+    </div>
   );
 }
 
 function PrivateAccessSetupPath({ reconciliation, setup, tailscale }: { reconciliation: PrivateAccessReconciliationReport | null; setup: SystemSetupStatus | null; tailscale: TailscaleStatus | null }) {
   const tasks = tailscaleSetupTasks({ reconciliation, setup, tailscale });
   const blockingTask = tasks.find((task) => task.status === 'warning');
-  const statusLabel = blockingTask ? blockingTask.title : 'Private access ready';
   const connected = Boolean(tailscale?.connected);
 
   return (
-    <Surface className="p-5" tone="panel">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Private access setup path</p>
-          <h3 className="mt-2 text-xl font-black text-slate-50">{statusLabel}</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-sky-100/70">
-            Local access works without Tailscale. Use the Tailscale control in the app header to sign in or check its status before turning on private links.
+    <Surface className="p-3" tone="panel">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-50">Private access setup</p>
+          <p className="mt-1 max-w-3xl text-sm text-sky-100/70">
+            {blockingTask?.detail || 'Tailscale is connected and private links are ready for trusted devices.'} Use the Tailscale control in the app header to sign in or check its status.
           </p>
         </div>
-        <StatusBadge tone={connected ? 'success' : 'warning'}>
-          {connected ? 'Connected' : 'Local-only available'}
-        </StatusBadge>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone={connected ? 'success' : 'warning'}>{connected ? 'Connected' : 'Local-only available'}</StatusBadge>
+          {blockingTask && <StatusBadge tone="warning">{blockingTask.title}</StatusBadge>}
+        </div>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-3 flex flex-wrap gap-2">
         {tasks.map((task) => (
-          <SetupStep
-            action={task.primaryAction.command || task.primaryAction.label}
-            detail={task.detail}
-            key={task.id}
-            label={task.title}
-            status={task.status}
-          />
+          <SetupStatus key={task.id} task={task} />
         ))}
       </div>
     </Surface>
@@ -438,18 +491,13 @@ function StalePrivateLinksPanel({
   );
 }
 
-function SetupStep({ action, detail, label, status }: { action: string; detail: string; label: string; status: string }) {
+function SetupStatus({ task }: { task: ReturnType<typeof tailscaleSetupTasks>[number] }) {
   return (
-    <NetworkInset className="p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h4 className="font-semibold text-slate-50">{label}</h4>
-        <StatusBadge tone={status === 'ok' ? 'success' : status === 'warning' ? 'warning' : 'neutral'}>
-          {status === 'ok' ? 'Ready' : status === 'warning' ? 'Needs setup' : 'Later'}
-        </StatusBadge>
-      </div>
-      <p className="mt-2 text-sm leading-6 text-sky-100/70">{detail}</p>
-      <p className="mt-3 text-xs font-semibold text-cyan-200">{action}</p>
-    </NetworkInset>
+    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-sky-400/20 bg-slate-800 px-2.5 py-2" title={task.detail}>
+      <span className={cn('size-1.5 shrink-0 rounded-full', task.status === 'ok' ? 'bg-emerald-300' : task.status === 'warning' ? 'bg-orange-300' : 'bg-sky-300')} />
+      <span className="max-w-52 truncate text-xs font-medium text-slate-100">{task.title}</span>
+      <span className="text-[11px] text-sky-100/55">{task.primaryAction.command || task.primaryAction.label}</span>
+    </div>
   );
 }
 

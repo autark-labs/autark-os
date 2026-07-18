@@ -23,6 +23,7 @@ test('My Apps renders canonical managed and linked collections without mixing in
   assert.match(card, /title=\{item\.name\}/);
   assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
   assert.match(header, /title="My Apps"/);
+  assert.match(header, /<AppWindow aria-hidden="true" className="size-5" \/>/);
 });
 
 test('My Apps uses quiet status dots and compact action affordances on dark app cards', () => {

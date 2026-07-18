@@ -128,16 +128,12 @@ export function ApplicationManagementPanel({
 
           <TabsContent className="grid gap-4" value="advanced">
             <ObservedServiceCatalogMatchSection actions={actions} item={item} />
-            <section className="flex flex-col gap-3 rounded-xl border border-sky-400/20 bg-slate-800 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-white">Support details</p>
-                <p className="text-xs leading-5 text-sky-100/60">Copy the compact app state, runtime path, access links, and last event for troubleshooting.</p>
-              </div>
+            <div className="flex justify-end">
               <ApplicationDarkControlButton className="w-fit" onClick={() => copySupportDetails(item)} size="sm" type="button">
                 <Copy data-icon="inline-start" />
                 Copy details
               </ApplicationDarkControlButton>
-            </section>
+            </div>
             <Accordion className="rounded-xl border border-sky-400/20 bg-slate-800 px-3" collapsible defaultValue="runtime" type="single">
               <AccordionItem value="runtime">
                 <AccordionTrigger className="text-sky-50">Runtime details</AccordionTrigger>

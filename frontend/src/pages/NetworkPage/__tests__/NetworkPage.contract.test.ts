@@ -49,7 +49,14 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(matrix, /ServiceIcon/);
   assert.match(matrix, /service\.iconUrl/);
   assert.match(matrix, /bg-cyan-950\/80/);
-  assert.match(matrix, /xl:max-h-\[calc\(100vh-17rem\)\]/);
+  assert.match(page, /lg:h-\[calc\(100dvh-7\.25rem\)\]/);
+  assert.match(page, /lg:!overflow-hidden/);
+  assert.match(page, /AccessPageHeader/);
+  assert.match(page, /<Network aria-hidden="true" className="size-5" \/>/);
+  assert.match(page, /<Surface as="header"/);
+  assert.match(page, /bg-\[#07142b\]\/90/);
+  assert.match(matrix, /className\?: string/);
+  assert.match(matrix, /xl:grid-rows-\[auto_minmax\(0,1fr\)\]/);
   assert.match(matrix, /xl:\[contain:layout_paint\]/);
   assert.match(matrix, /flex min-h-\[22rem\] flex-col/);
   assert.match(matrix, /xl:auto-rows-max/);

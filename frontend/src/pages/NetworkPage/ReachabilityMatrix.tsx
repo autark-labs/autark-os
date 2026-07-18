@@ -61,6 +61,7 @@ const zones: Zone[] = [
 ];
 
 export function ReachabilityMatrix({
+  className,
   copiedLinkKey,
   focusedServiceId,
   items,
@@ -69,6 +70,7 @@ export function ReachabilityMatrix({
   onFocusService,
   onMoveService,
 }: {
+  className?: string;
   copiedLinkKey: string | null;
   focusedServiceId: string | null;
   items: ReachabilityService[];
@@ -161,7 +163,7 @@ export function ReachabilityMatrix({
   return (
     <NetworkPanel
       action={<MetadataBadge>{items.length} services</MetadataBadge>}
-      className="overflow-hidden xl:max-h-[calc(100vh-17rem)]"
+      className={cn('min-h-0 overflow-hidden xl:grid-rows-[auto_minmax(0,1fr)]', className)}
       description="On a phone, choose an access zone and use Details and actions to change a managed app. On desktop, you can also drag managed apps between zones."
       title="Reachability matrix"
     >
@@ -186,7 +188,7 @@ export function ReachabilityMatrix({
         ))}
       </Tabs>
 
-      <div className="hidden gap-3 xl:grid xl:grid-cols-4 xl:overflow-hidden">
+      <div className="hidden gap-3 xl:min-h-0 xl:flex-1 xl:grid xl:grid-cols-4 xl:overflow-hidden">
         {zones.map((zone) => {
           const Icon = zone.icon;
           const zoneItems = items.filter((item) => item.zone === zone.id);
@@ -196,7 +198,7 @@ export function ReachabilityMatrix({
               aria-label={zone.title}
               className={cn(
                 'flex min-h-[22rem] flex-col gap-2 rounded-xl border p-3 transition-colors',
-                'xl:max-h-[calc(100vh-24rem)] xl:overflow-hidden xl:overscroll-contain xl:[contain:layout_paint]',
+                'xl:min-h-0 xl:overflow-hidden xl:overscroll-contain xl:[contain:layout_paint]',
                 zone.warning ? 'border-orange-400/30 bg-orange-500/10' : 'border-sky-400/25 bg-slate-800',
                 activeDropZone === zone.id && zone.droppable && 'border-cyan-300/60 bg-slate-700/80',
               )}

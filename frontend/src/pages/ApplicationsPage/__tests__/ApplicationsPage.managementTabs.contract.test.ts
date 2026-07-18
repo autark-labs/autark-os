@@ -128,6 +128,8 @@ test('applications page management panel uses canonical runtime data instead of 
   assert.match(panel, /item\.runtime\.image/);
   assert.match(panel, /item\.runtime\.recentEvents/);
   assert.match(panel, /formatRuntimeTimestamp/);
+  assert.match(panel, /Copy details/);
+  assert.doesNotMatch(panel, /Copy the compact app state, runtime path, access links, and last event for troubleshooting\./);
   assert.match(page, /invalidateApplicationState\(queryClient\)/);
   assert.match(liveModel, /recentEvents: app\.recentEvents \?\? \[\]/);
   assert.match(liveModel, /runtime: appRuntimeDetails\(app, health, telemetry\)/);

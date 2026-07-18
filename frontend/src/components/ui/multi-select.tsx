@@ -98,11 +98,15 @@ export function MultiSelect({
           <CommandList className="bg-slate-800 text-slate-50">
             <CommandEmpty className="text-sky-100/65">{emptyText}</CommandEmpty>
             <CommandGroup className="text-slate-50">
-              {selectedOptions.length > 0 && (
-                <CommandItem className="text-sky-100/80 data-selected:bg-slate-700 data-selected:text-white" onSelect={() => onValueChange([])} value="Clear filters">
-                  <span>Clear filters</span>
-                </CommandItem>
-              )}
+              <CommandItem
+                className="text-sky-100/80 data-selected:bg-slate-700 data-selected:text-white"
+                disabled={selectedOptions.length === 0}
+                forceMount
+                onSelect={() => onValueChange([])}
+                value="Clear filters"
+              >
+                <span>Clear filters</span>
+              </CommandItem>
               {options.map((option) => {
                 const checked = selected.has(option.value);
                 return (
