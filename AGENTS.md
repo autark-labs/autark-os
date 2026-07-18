@@ -52,6 +52,34 @@ A good slice includes:
 
 Avoid landing invisible infrastructure unless it directly unlocks the current slice.
 
+### Diagnose before changing behavior
+
+For a bug, reproduce the exact interaction and trace the event, state, route, and effect sequence before editing code. Do not tune layout, animation, styling, or timing in response to a symptom until the source of the state transition is proven.
+
+Required behavior:
+
+- Identify every writer of the state involved in the bug and name the source of truth.
+- For visual stutters, unexpected dialogs, selections, or navigation, inspect the browser timeline or instrument the interaction; do not infer the cause from static source alone.
+- Make the smallest local change that removes the proven conflicting transition.
+- Preserve the existing visual and interaction contract during a behavioral fix unless the user explicitly asks to change it.
+- Do not add new layers, synchronization paths, timers, animations, or abstractions merely to mask a bug.
+- If the root cause is not established, stop after read-only investigation and report the evidence before proposing a change.
+
+Prefer deleting a conflicting state write or simplifying ownership over adding coordination code. A simple, directly traceable state transition is more valuable than a flexible but opaque abstraction.
+
+### Prototype visual changes before implementation
+
+Use the local wireframe workflow whenever a visual change has meaningful layout, hierarchy, density, progressive-disclosure, or interaction-design choices. This includes new page compositions, right rails, drawers, card systems, and any request with two or more reasonable layout options.
+
+Required behavior:
+
+- Create or extend an isolated locally hosted wireframe in `frontend/src/wireframes/` with its companion HTML entry point in `frontend/`.
+- Use the wireframe to present concrete options before production implementation when the design direction is not already explicit.
+- Keep wireframes out of production routes and application state; they are decision tools, not temporary application code.
+- After the user chooses an option, implement that option faithfully in a lean slice instead of continuing to explore alternatives in production code.
+
+Do not require a wireframe for a proven one-line bug fix, copy change, or tightly specified visual adjustment. The purpose is to make design decisions observable early, not to add ceremony.
+
 ### No partial state-model implementations
 
 When a request is to consolidate, replace, or make a single source of truth for a product concept, the work is not done until every active backend and frontend consumer uses that source or the user has explicitly approved a temporary exception.
