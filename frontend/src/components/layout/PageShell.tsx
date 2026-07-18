@@ -18,7 +18,7 @@ export function PageShell({
       className,
     )}>
       <div className={cn(
-        'mx-auto flex w-full max-w-[96rem] flex-col p-4 md:p-5 2xl:px-6',
+        'mx-auto flex w-full flex-col max-w-10xl overflow-hidden',
         contained ? 'h-full min-h-0 gap-4 overflow-y-auto overscroll-contain' : 'gap-5',
         contentClassName,
       )}>
