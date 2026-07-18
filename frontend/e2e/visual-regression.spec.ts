@@ -19,7 +19,7 @@ const visualCases: VisualCase[] = [
   { name: 'backups-1440', path: '/backups', expected: /^Backups$/i, viewport: { width: 1440, height: 1000 } },
   { name: 'backups-1024', path: '/backups', expected: /^Backups$/i, viewport: { width: 1024, height: 960 } },
   { name: 'backups-390', path: '/backups', expected: /^Backups$/i, viewport: { width: 390, height: 844 } },
-  { name: 'storage-768', path: '/storage', expected: /Space breakdown/i, viewport: { width: 768, height: 960 } },
+  { name: 'storage-768', path: '/storage', expected: /^Storage$/i, viewport: { width: 768, height: 960 } },
   { name: 'settings-1280', path: '/settings', expected: /Autark-OS controls/i, viewport: { width: 1280, height: 960 } },
   { name: 'diagnostics-1024', path: '/diagnostics', expected: /Autark-OS Diagnostics/i, viewport: { width: 1024, height: 960 } },
 ];

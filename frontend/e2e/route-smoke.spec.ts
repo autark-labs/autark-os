@@ -17,7 +17,7 @@ const routes: RouteCase[] = [
   { name: 'Access', path: '/access', expected: /^Access$/i },
   { name: 'Backups', path: '/backups', expected: /^Backups$/i },
   { name: 'Autark Pro', path: '/pro', expected: /Autark Pro is being built/i },
-  { name: 'Storage', path: '/storage', expected: /Space breakdown/i },
+  { name: 'Storage', path: '/storage', expected: /^Storage$/i },
   { name: 'Settings', path: '/settings', expected: /Autark-OS controls/i },
   { name: 'Diagnostics', path: '/diagnostics', expected: /Autark-OS Diagnostics/i },
 ];

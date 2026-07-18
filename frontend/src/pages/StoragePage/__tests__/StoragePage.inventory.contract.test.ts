@@ -9,15 +9,15 @@ function source(relativePath: string) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('unused storage inventory can expand without clearing the selected cleanup target', () => {
+test('unused storage inventory is progressively disclosed without clearing the selected cleanup target', () => {
   const page = source('src/pages/StoragePage/StoragePage.tsx');
+  const workspace = source('src/pages/StoragePage/StorageCapacityRibbonWorkspace.tsx');
 
-  assert.match(page, /showAllCleanupCandidates/);
-  assert.match(page, /allCleanupCandidates\.slice\(0, 4\)/);
-  assert.match(page, /Show all \$\{allCleanupCandidates\.length\} folders/);
-  assert.match(page, /Show less/);
+  assert.match(page, /onReviewOrphan=\{setCleanupTarget\}/);
+  assert.match(workspace, /setDetailsOpen\(false\);/);
+  assert.match(workspace, /report\.orphanedData\.map/);
+  assert.match(workspace, /onReview=\{\(\) => onReviewOrphan\(orphan\)\}/);
   assert.match(page, /setCleanupTarget\(null\)/);
-  assert.doesNotMatch(page, /setShowAllCleanupCandidates\([^\n]+setCleanupTarget/);
 });
 
 test('cleanup refreshes storage, application state, and activity surfaces after a checkpointed cleanup', () => {
@@ -31,8 +31,8 @@ test('cleanup refreshes storage, application state, and activity surfaces after 
 });
 
 test('advanced technical paths use readable, selectable text', () => {
-  const page = source('src/pages/StoragePage/StoragePage.tsx');
+  const workspace = source('src/pages/StoragePage/StorageCapacityRibbonWorkspace.tsx');
 
-  assert.match(page, /select-text truncate font-mono text-xs text-slate-300/);
-  assert.match(page, /select-text break-all font-mono text-xs text-orange-100\/85/);
+  assert.match(workspace, /select-text truncate font-mono text-xs text-slate-300/);
+  assert.match(workspace, /select-text break-all font-mono text-xs text-amber-100\/85/);
 });
