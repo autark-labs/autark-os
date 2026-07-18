@@ -12,10 +12,12 @@ test('Storage keeps details in the in-page workspace and retains cleanup confirm
   await page.getByRole('button', { name: /Vaultwarden with a deliberately long/i }).first().click();
 
   await expect(page.getByRole('tab', { name: /^App data$/i })).toHaveAttribute('aria-selected', 'true');
+  await expect(page).toHaveURL(/\/storage\?tab=apps&app=vaultwarden$/);
   await expect(page.locator('img[src="/app-images/vaultwarden.svg"]').first()).toBeVisible();
   await expect(page.getByText('Managed app storage')).toBeVisible();
 
   await page.getByRole('tab', { name: /^Cleanup$/i }).click();
+  await expect(page).toHaveURL(/\/storage\?tab=cleanup$/);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: /^Review$/i }).click();
   await expect(page.getByRole('dialog')).toContainText(/Clean up unused app data/i);

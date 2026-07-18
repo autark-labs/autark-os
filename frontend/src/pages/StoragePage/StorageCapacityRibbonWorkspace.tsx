@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Archive,
   ArrowUpRight,
@@ -38,6 +38,11 @@ import {
   storagePercentLabel,
   weeklyAppGrowth,
 } from './StoragePage.presentation';
+import {
+  parseStorageWorkspaceRoute,
+  storageWorkspaceSearchWithSelection,
+  type StorageWorkspaceTab,
+} from './StoragePage.detailRoute';
 
 type StorageCapacityRibbonWorkspaceProps = {
   appIconUrlById: Record<string, string | null>;
@@ -51,8 +56,6 @@ type StorageCapacityRibbonWorkspaceProps = {
   updatedAt: Date | null;
 };
 
-type StorageWorkspaceTab = 'overview' | 'apps' | 'backups' | 'cleanup' | 'advanced';
-
 export function StorageCapacityRibbonWorkspace({
   appIconUrlById,
   copiedPathId,
@@ -64,22 +67,33 @@ export function StorageCapacityRibbonWorkspace({
   showAdvancedMetrics,
   updatedAt,
 }: StorageCapacityRibbonWorkspaceProps) {
-  const [workspaceTab, setWorkspaceTab] = useState<StorageWorkspaceTab>('overview');
-  const [selectedAppId, setSelectedAppId] = useState<string | null>(() => report.apps[0]?.appId ?? null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const appDataBytes = appStorageTotal(report);
   const appsWithBackupsOn = report.apps.filter((app) => app.backupEnabled).length;
   const largestApps = report.apps.slice(0, 3);
   const firstOrphan = report.orphanedData[0] ?? null;
   const hero = storageHeroCopy(report);
-  const selectedApp = report.apps.find((app) => app.appId === selectedAppId) ?? report.apps[0] ?? null;
+  const route = useMemo(
+    () => parseStorageWorkspaceRoute(searchParams, report.apps, showAdvancedMetrics),
+    [report.apps, searchParams, showAdvancedMetrics],
+  );
+  const workspaceTab = route.tab;
+  const selectedApp = report.apps.find((app) => app.appId === route.appId) ?? report.apps[0] ?? null;
 
   function reviewOrphan(orphan: OrphanedStorage) {
     onReviewOrphan(orphan);
   }
 
   function selectApp(appId: string) {
-    setSelectedAppId(appId);
-    setWorkspaceTab('apps');
+    updateRoute({ appId, tab: 'apps' });
+  }
+
+  function selectTab(tab: StorageWorkspaceTab) {
+    updateRoute({ appId: tab === 'apps' ? selectedApp?.appId ?? null : null, tab });
+  }
+
+  function updateRoute(selection: { appId: string | null; tab: StorageWorkspaceTab }) {
+    setSearchParams(storageWorkspaceSearchWithSelection(searchParams, selection), { replace: true });
   }
 
   return (
@@ -94,9 +108,9 @@ export function StorageCapacityRibbonWorkspace({
 
       <CapacityReadout appDataBytes={appDataBytes} appsWithBackupsOn={appsWithBackupsOn} report={report} summary={hero.summary} />
 
-      <Tabs className="min-h-0 flex-1 gap-0" onValueChange={(value) => setWorkspaceTab(value as StorageWorkspaceTab)} value={workspaceTab}>
+      <Tabs className="min-h-0 flex-1 gap-0" onValueChange={(value) => selectTab(value as StorageWorkspaceTab)} value={workspaceTab}>
         <Surface className="flex min-h-0 flex-1 flex-col overflow-hidden border-sky-300/20 bg-slate-900" tone="panel">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-300/15 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-300/15 px-3 py-3">
             <TabsList className="min-w-0 max-w-full justify-start overflow-x-auto rounded-lg border border-sky-300/15 bg-slate-950/25 p-1" variant="default">
               <StorageWorkspaceTabTrigger icon={LineChart} label="Overview" value="overview" />
               <StorageWorkspaceTabTrigger icon={PackageOpen} label="App data" value="apps" />
@@ -110,7 +124,7 @@ export function StorageCapacityRibbonWorkspace({
             <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(18rem,1fr)_minmax(17rem,0.8fr)_17rem]">
               <GrowthPanel apps={report.apps} status={report.status} weeklyGrowthBytes={weeklyAppGrowth(report)} />
               <SpaceDriversPanel appIconUrlById={appIconUrlById} apps={largestApps} onSelectApp={selectApp} totalApps={report.apps.length} />
-              <AttentionPanel firstOrphan={firstOrphan} onOpenCleanup={() => setWorkspaceTab('cleanup')} report={report} />
+              <AttentionPanel firstOrphan={firstOrphan} onOpenCleanup={() => selectTab('cleanup')} report={report} />
             </section>
           </TabsContent>
 
@@ -120,9 +134,9 @@ export function StorageCapacityRibbonWorkspace({
               apps={report.apps}
               copiedPathId={copiedPathId}
               onCopyPath={onCopyPath}
-              onSelectApp={setSelectedAppId}
+              onSelectApp={selectApp}
               selectedApp={selectedApp}
-              selectedAppId={selectedApp?.appId ?? null}
+              selectedAppId={route.appId ?? selectedApp?.appId ?? null}
               showAdvancedMetrics={showAdvancedMetrics}
             />
           </TabsContent>
@@ -276,21 +290,29 @@ function GrowthPanel({ apps, status, weeklyGrowthBytes }: { apps: AppStorageUsag
   );
 }
 
-function StorageTrendChart({ trend }: { trend: Array<{ sampledAt: string; usedBytes: number }> }) {
+function StorageTrendChart({ emphasizeChanges = false, trend }: { emphasizeChanges?: boolean; trend: Array<{ sampledAt: string; usedBytes: number }> }) {
   if (trend.length < 2) {
     return <div className="mt-4 grid h-28 place-items-center rounded-xl border border-dashed border-sky-300/20 bg-slate-950/25 px-4 text-center text-xs text-sky-100/60">Recent growth will appear after a few storage checks.</div>;
   }
 
+  const lowest = Math.min(...trend.map((point) => point.usedBytes));
   const highest = Math.max(...trend.map((point) => point.usedBytes), 1);
+  const range = highest - lowest;
   return (
-    <div className="mt-4 flex h-28 items-end gap-2 rounded-xl border border-sky-300/15 bg-slate-950/30 px-3 pb-3 pt-2" aria-label="Recent app storage samples">
+    <div className="mt-4 flex h-28 items-end gap-2 rounded-xl border border-sky-300/15 bg-slate-950/30 px-3 pb-3 pt-2" aria-label={emphasizeChanges ? 'Recent app storage change, scaled to the app’s recent range' : 'Recent app storage samples'}>
       {trend.map((point, index) => (
         <div className="flex h-full flex-1 flex-col justify-end" key={point.sampledAt} title={`${formatStorageBytes(point.usedBytes)} at ${new Date(point.sampledAt).toLocaleString()}`}>
-          <span className={cn('rounded-t bg-cyan-300/70', index === trend.length - 1 && 'bg-amber-300')} style={{ height: `${Math.max(16, (point.usedBytes / highest) * 100)}%` }} />
+          <span className={cn('rounded-t bg-cyan-300/70', index === trend.length - 1 && 'bg-amber-300')} style={{ height: `${storageTrendBarHeight(point.usedBytes, highest, lowest, range, emphasizeChanges)}%` }} />
         </div>
       ))}
     </div>
   );
+}
+
+function storageTrendBarHeight(value: number, highest: number, lowest: number, range: number, emphasizeChanges: boolean) {
+  if (!emphasizeChanges) return Math.max(24, (value / highest) * 100);
+  if (range === 0) return 72;
+  return 36 + ((value - lowest) / range) * 64;
 }
 
 function InlineMetric({ label, value }: { label: string; value: string }) {
@@ -353,21 +375,16 @@ function AttentionPanel({ firstOrphan, onOpenCleanup, report }: {
 
   if (firstOrphan) {
     return (
-      <Surface className="flex min-h-0 flex-col border-amber-300/20 bg-amber-400/5 p-4" tone="panel">
+      <Surface className="self-start border-amber-300/20 bg-amber-400/5 p-4" tone="panel">
         <div className="flex items-start gap-2">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-amber-300/25 bg-amber-400/10 text-amber-100"><Trash2 aria-hidden="true" className="size-4" /></span>
           <div>
             <p className="text-sm font-semibold text-white">One safe review</p>
-            <p className="mt-1 text-xs leading-5 text-amber-100/75">{formatStorageBytes(firstOrphan.usedBytes)} is not tied to an installed app.</p>
+            <p className="mt-1 text-xs leading-5 text-amber-100/75">{formatStorageBytes(firstOrphan.usedBytes)} can be reclaimed after review.</p>
           </div>
         </div>
-        <div className="mt-4 grid gap-2">
-          <AttentionFact icon={FolderSearch} label="Candidate" value={firstOrphan.name} />
-          <AttentionFact icon={HardDrive} label="Space to recover" value={formatStorageBytes(firstOrphan.usedBytes)} />
-          <AttentionFact icon={ShieldCheck} label="Safety" value="Checkpoint before cleanup" />
-        </div>
-        {recommendations.length > 0 && <div className="mt-3 grid gap-2">{recommendations.map((item) => <RecommendationRow key={item.id} recommendation={item} />)}</div>}
-        <ProjectWarningButton className="mt-auto w-full" onClick={onOpenCleanup} type="button">
+        <p className="mt-3 truncate text-xs font-semibold text-amber-50" title={firstOrphan.name}>{firstOrphan.name}</p>
+        <ProjectWarningButton className="mt-4 w-full" onClick={onOpenCleanup} type="button">
           Review cleanup <ChevronRight aria-hidden="true" className="size-3.5" />
         </ProjectWarningButton>
       </Surface>
@@ -376,7 +393,7 @@ function AttentionPanel({ firstOrphan, onOpenCleanup, report }: {
 
   const needsAttention = report.status === 'warning' || report.status === 'critical' || Boolean(recommendation);
   return (
-    <Surface className={cn('flex min-h-0 flex-col p-4', needsAttention ? 'border-amber-300/20 bg-amber-400/5' : 'border-emerald-300/20 bg-emerald-400/5')} tone="panel">
+    <Surface className={cn('self-start p-4', needsAttention ? 'border-amber-300/20 bg-amber-400/5' : 'border-emerald-300/20 bg-emerald-400/5')} tone="panel">
       <div className="flex items-start gap-2">
         <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border', needsAttention ? 'border-amber-300/25 bg-amber-400/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100')}>
           {needsAttention ? <CircleAlert aria-hidden="true" className="size-4" /> : <CheckCircle2 aria-hidden="true" className="size-4" />}
@@ -392,7 +409,7 @@ function AttentionPanel({ firstOrphan, onOpenCleanup, report }: {
         <AttentionFact icon={Info} label="Status" value={needsAttention ? 'Review recommended' : 'No action needed'} />
       </div>
       {recommendations.length > 1 && <div className="mt-3 grid gap-2">{recommendations.filter((item) => item !== recommendation).map((item) => <RecommendationRow key={item.id} recommendation={item} />)}</div>}
-      <ProjectDarkControlButton className="mt-auto w-full" onClick={onOpenCleanup} type="button">Open cleanup workspace <ChevronRight aria-hidden="true" className="size-3.5" /></ProjectDarkControlButton>
+      <ProjectDarkControlButton className="mt-4 w-full" onClick={onOpenCleanup} type="button">Open cleanup workspace <ChevronRight aria-hidden="true" className="size-3.5" /></ProjectDarkControlButton>
     </Surface>
   );
 }
@@ -456,7 +473,7 @@ function AppDataWorkspace({
               <DetailFact label="7-day change" value={storageGrowthLabel(selectedApp)} />
               <DetailFact label="Backups" value={selectedApp.backupEnabled ? selectedApp.backupFrequency : 'Off'} />
             </div>
-            <StorageTrendChart trend={selectedApp.trend} />
+            <StorageTrendChart emphasizeChanges trend={selectedApp.trend} />
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <DetailFact label="Last backup" value={lastBackupLabel(selectedApp.lastBackup)} />
               <DetailFact label="Storage status" value={selectedApp.status} />
