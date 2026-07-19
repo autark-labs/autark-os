@@ -31,9 +31,6 @@ public interface AutarkOsJobRepository extends JpaRepository<AutarkOsJobEntity, 
             """, nativeQuery = true)
     List<AutarkOsJobEntity> activeJobs();
 
-    @Query(value = "select * from autark_os_jobs where status in ('queued', 'running') and job_type in ('backup', 'backup_verify', 'backup_restore', 'uninstall_app') limit 1", nativeQuery = true)
-    List<AutarkOsJobEntity> activeBackupRelatedJobs();
-
     @Modifying
     @Transactional
     @Query(value = "delete from autark_os_jobs where status in ('succeeded', 'cancelled', 'canceled') and updated_at < :cutoff", nativeQuery = true)

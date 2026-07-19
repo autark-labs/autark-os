@@ -112,6 +112,26 @@ class BackupControllerTests {
     }
 
     @Test
+    void conflictingVerificationFailsItsJobWithTheActiveOperationMessage() {
+        BackupService backupService = mock(BackupService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        AutarkOsJobService jobService = jobService();
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        when(backupService.verify(42L)).thenThrow(new RecoveryOperationConflictException(
+                RecoveryOperationCoordinator.Operation.APP_BACKUP,
+                RecoveryOperationCoordinator.Operation.RESTORE_VERIFICATION));
+
+        AutarkOsJob job = controller.verify(42L);
+        jobService.runQueuedJobsNow();
+
+        AutarkOsJob failed = jobService.findById(job.jobId()).orElseThrow();
+        assertThat(failed.status()).isEqualTo("failed");
+        assertThat(failed.error().message())
+                .isEqualTo("Autark-OS is already creating an app backup. Wait for it to finish before starting restore-point verification.");
+        verify(backupService).verify(42L);
+    }
+
+    @Test
     void restorePointReturnsQueuedJobWithoutRunningRestoreInline() {
         BackupService backupService = mock(BackupService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);

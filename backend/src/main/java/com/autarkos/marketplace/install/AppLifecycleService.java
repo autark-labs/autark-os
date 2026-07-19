@@ -18,6 +18,7 @@ import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -53,8 +54,12 @@ public class AppLifecycleService {
     private final AppContainerLifecycleService containerLifecycleService;
     private final AppReliabilityService reliabilityService;
     private final PrivateAccessStateResolver privateAccessStateResolver;
-    @Autowired
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService) {
+        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, new RecoveryOperationCoordinator());
+    }
+
+    @Autowired
+    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -64,7 +69,7 @@ public class AppLifecycleService {
         this.accessChecker = new AppAccessChecker();
         this.settingsPolicy = new AppSettingsPolicy(repository, runtimeStatusResolver);
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
-        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService);
+        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations);
         this.healthService = new AppHealthService(repository, composeExecutor, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
         this.containerLifecycleService = new AppContainerLifecycleService(repository, composeExecutor, activityLogService, this::refresh);
         this.reliabilityService = new AppReliabilityService(repository, tailscaleService);

@@ -9,7 +9,6 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -18,7 +17,6 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.fileops.LocalAutarkOsFileOperations;
-import com.autarkos.jobs.AutarkOsJobRepository;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
@@ -39,7 +37,6 @@ import com.autarkos.system.RuntimeFileOperations;
 public class BackupService {
 
     private static final DateTimeFormatter BACKUP_NAME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
-    private final AtomicBoolean automaticBackupRunning = new AtomicBoolean(false);
 
     private final RuntimeLayout runtimeLayout;
     private final InstalledAppRepository installedAppRepository;
@@ -57,7 +54,7 @@ public class BackupService {
     private final AppLifecycleService appLifecycleService;
     private final MarketplaceCatalogService catalogService;
     private final AutarkOsFileOpsService fileOpsService;
-    private final AutarkOsJobRepository jobRepository;
+    private final RecoveryOperationCoordinator recoveryOperations;
     private final BackupArchiveManifestService archiveManifestService = new BackupArchiveManifestService();
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService) {
@@ -88,15 +85,15 @@ public class BackupService {
     }
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, new BackupDestinationService(runtimeLayout, settingsRepository, fileOpsService), null);
+        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, new BackupDestinationService(runtimeLayout, settingsRepository, fileOpsService), new RecoveryOperationCoordinator());
     }
 
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, backupDestinationService, null);
+        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, backupDestinationService, new RecoveryOperationCoordinator());
     }
 
     @Autowired
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, AutarkOsJobRepository jobRepository) {
+    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
@@ -108,7 +105,7 @@ public class BackupService {
         this.appLifecycleService = appLifecycleService;
         this.catalogService = catalogService;
         this.fileOpsService = fileOpsService;
-        this.jobRepository = jobRepository;
+        this.recoveryOperations = recoveryOperations;
         BackupContractService backupContractService = new BackupContractService(catalogService);
         this.backupVerificationService = new BackupVerificationService(backupRepository, installedAppRepository, backupContractService, activityLogService);
         this.backupReportService = new BackupReportService(installedAppRepository, backupRepository, projectSettingsService, catalogService, fileOperations, backupContractService, this::backupRoot, backupDestinationService);
@@ -132,23 +129,40 @@ public class BackupService {
     }
 
     public BackupModels.BackupDestination configureDestination(String path) {
-        return backupDestinationService.configure(path);
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.BACKUP_DESTINATION_CHANGE,
+                () -> backupDestinationService.configure(path));
     }
 
     public BackupModels.BackupRunResult run(String appId) {
-        return runAppBackup(appId, "manual");
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.APP_BACKUP,
+                () -> runAppBackup(appId, "manual"));
     }
 
     public BackupModels.BackupRunResult runAutomatic() {
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.ROUTINE_BACKUP,
+                this::runAutomaticUnlocked);
+    }
+
+    private BackupModels.BackupRunResult runAutomaticUnlocked() {
         ProjectSettings settings = projectSettingsService.current();
         if (!settings.automaticBackupsEnabled()) {
             RestorePoint point = recordRestorePoint("__full__", "All apps", "full", "automatic", "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, "Automatic backups are turned off.");
             return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
-        return runFullBackup("automatic");
+        return runFullBackupUnlocked("automatic");
     }
 
     public Optional<BackupModels.BackupRunResult> runAutomaticIfDue() {
+        return recoveryOperations.tryRunExclusive(
+                        RecoveryOperationCoordinator.Operation.ROUTINE_BACKUP,
+                        this::runAutomaticIfDueUnlocked)
+                .orElseGet(Optional::empty);
+    }
+
+    private Optional<BackupModels.BackupRunResult> runAutomaticIfDueUnlocked() {
         ProjectSettings settings = projectSettingsService.current();
         if (!settings.automaticBackupsEnabled()) {
             return Optional.empty();
@@ -160,18 +174,17 @@ public class BackupService {
         if (!backupReportService.routineBackupDue(settings, lastRoutine, Instant.now())) {
             return Optional.empty();
         }
-        if (!automaticBackupRunning.compareAndSet(false, true)) {
-            return Optional.empty();
-        }
-        try {
-            activityLogService.info("backup", "scheduled_backup_due", "Routine backup started", "Autark-OS started the scheduled routine backup window.");
-            return Optional.of(runAutomatic());
-        } finally {
-            automaticBackupRunning.set(false);
-        }
+        activityLogService.info("backup", "scheduled_backup_due", "Routine backup started", "Autark-OS started the scheduled routine backup window.");
+        return Optional.of(runAutomaticUnlocked());
     }
 
     public BackupModels.BackupRunResult runFullBackup(String source) {
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.FULL_BACKUP,
+                () -> runFullBackupUnlocked(source));
+    }
+
+    private BackupModels.BackupRunResult runFullBackupUnlocked(String source) {
         BackupModels.BackupDestination destinationState = backupDestinationService.current();
         if (!destinationState.ready()) {
             RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), "", "", AutarkOsStates.RestorePointStatus.FAILED, 0, destinationState.message());
@@ -223,22 +236,31 @@ public class BackupService {
     }
 
     public RestoreModels.RestorePlan restorePlan(long restorePointId, String targetAppId) {
-        return restorePlanner.restorePlan(restorePointId, targetAppId);
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.RESTORE_PLAN,
+                () -> restorePlanner.restorePlan(restorePointId, targetAppId));
     }
 
     public BackupModels.BackupVerificationResult verify(long restorePointId) {
-        return backupVerificationService.verifyRestorePoint(findRestorePoint(restorePointId)).result();
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.RESTORE_VERIFICATION,
+                () -> backupVerificationService.verifyRestorePoint(findRestorePoint(restorePointId)).result());
     }
 
     public RestoreModels.RestoreResult restore(long restorePointId, String targetAppId) {
-        return restoreExecutor.restore(restorePointId, targetAppId);
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.RESTORE,
+                () -> restoreExecutor.restore(restorePointId, targetAppId));
     }
 
-    /** Called by scheduled maintenance after all backup-related jobs are idle. */
+    /** Called by scheduled maintenance. Busy recovery work wins and cleanup retries later. */
     public int pruneRoutineRetention() {
-        if (backupOperationActive()) {
-            return 0;
-        }
+        return recoveryOperations.tryRunExclusive(
+                RecoveryOperationCoordinator.Operation.BACKUP_RETENTION,
+                this::pruneRoutineRetentionUnlocked).orElse(0);
+    }
+
+    private int pruneRoutineRetentionUnlocked() {
         int removed = enforceFullRetentionDays(projectSettingsService.current().backupRetentionDays());
         for (InstalledApp app : managedInstalledApps()) {
             int retention = installedAppRepository.settingsFor(app.appId())
@@ -390,9 +412,6 @@ public class BackupService {
     }
 
     private int deleteEligibleRestorePoints(List<RestorePoint> candidates, String subject, String scope) {
-        if (backupOperationActive()) {
-            return 0;
-        }
         int removed = 0;
         for (RestorePoint candidate : candidates) {
             try {
@@ -450,13 +469,6 @@ public class BackupService {
                 // A malformed legacy path remains visible for manual support review.
             }
         });
-    }
-
-    private boolean backupOperationActive() {
-        if (jobRepository == null) {
-            return false;
-        }
-        return !jobRepository.activeBackupRelatedJobs().isEmpty();
     }
 
     private List<InstalledApp> managedInstalledApps() {

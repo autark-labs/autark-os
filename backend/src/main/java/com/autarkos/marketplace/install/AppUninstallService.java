@@ -18,6 +18,7 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
@@ -37,6 +38,7 @@ class AppUninstallService {
     private final PrivateAccessStateResolver privateAccessStateResolver;
     private final ActivityLogService activityLogService;
     private final BackupDestinationService backupDestinationService;
+    private final RecoveryOperationCoordinator recoveryOperations;
 
     AppUninstallService(
             InstalledAppRepository repository,
@@ -45,7 +47,7 @@ class AppUninstallService {
             BackupRepository backupRepository,
             TailscaleService tailscaleService,
             ActivityLogService activityLogService) {
-        this(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, null);
+        this(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, null, new RecoveryOperationCoordinator());
     }
 
     AppUninstallService(
@@ -56,6 +58,18 @@ class AppUninstallService {
             TailscaleService tailscaleService,
             ActivityLogService activityLogService,
             BackupDestinationService backupDestinationService) {
+        this(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, new RecoveryOperationCoordinator());
+    }
+
+    AppUninstallService(
+            InstalledAppRepository repository,
+            DockerComposeExecutor composeExecutor,
+            RuntimeLayout runtimeLayout,
+            BackupRepository backupRepository,
+            TailscaleService tailscaleService,
+            ActivityLogService activityLogService,
+            BackupDestinationService backupDestinationService,
+            RecoveryOperationCoordinator recoveryOperations) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.runtimeLayout = runtimeLayout;
@@ -64,6 +78,7 @@ class AppUninstallService {
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.activityLogService = activityLogService;
         this.backupDestinationService = backupDestinationService;
+        this.recoveryOperations = recoveryOperations;
     }
 
     InstallModels.UninstallPlan uninstallPlan(InstalledApp app) {
@@ -95,6 +110,12 @@ class AppUninstallService {
     }
 
     AppActionResult uninstall(InstalledApp app, InstallModels.InstallSettings settings, Path composeFile) {
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.UNINSTALL_CHECKPOINT,
+                () -> uninstallUnlocked(app, settings, composeFile));
+    }
+
+    private AppActionResult uninstallUnlocked(InstalledApp app, InstallModels.InstallSettings settings, Path composeFile) {
         List<String> logs = new java.util.ArrayList<>();
         SafetyCheckpointResult checkpoint = createPreUninstallCheckpoint(app);
         logs.addAll(checkpoint.logs());

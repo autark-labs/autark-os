@@ -21,6 +21,7 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.BackupModels;
+import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -45,6 +46,7 @@ public class StorageService {
     private final AppInstanceViewProvider appInstanceViewProvider;
     private final RuntimeFileOperations fileOperations;
     private final BackupDestinationService backupDestinationService;
+    private final RecoveryOperationCoordinator recoveryOperations;
     private Instant lastWarningLoggedAt = Instant.EPOCH;
     private Instant lastStorageSampleAt = Instant.EPOCH;
     private String lastWarningStatus = "";
@@ -80,8 +82,12 @@ public class StorageService {
         this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, appInstanceViewProvider, fileOperations, null);
     }
 
-    @Autowired
     public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService) {
+        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, appInstanceViewProvider, fileOperations, backupDestinationService, new RecoveryOperationCoordinator());
+    }
+
+    @Autowired
+    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.activityLogService = activityLogService;
@@ -89,6 +95,7 @@ public class StorageService {
         this.appInstanceViewProvider = appInstanceViewProvider;
         this.fileOperations = fileOperations;
         this.backupDestinationService = backupDestinationService;
+        this.recoveryOperations = recoveryOperations;
     }
 
     public StorageModels.StorageReport report() {
@@ -134,6 +141,12 @@ public class StorageService {
     }
 
     public StorageModels.StorageCleanupResult cleanupOrphan(String name) {
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.STORAGE_CLEANUP,
+                () -> cleanupOrphanUnlocked(name));
+    }
+
+    private StorageModels.StorageCleanupResult cleanupOrphanUnlocked(String name) {
         String safeName = safeOrphanName(name);
         Path appsRoot = runtimeLayout.runtimeRoot().resolve("apps").toAbsolutePath().normalize();
         Path orphanPath = appsRoot.resolve(safeName).normalize();

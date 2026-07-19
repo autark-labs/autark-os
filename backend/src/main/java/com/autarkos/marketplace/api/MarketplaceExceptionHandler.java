@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.backups.RecoveryOperationConflictException;
 import com.autarkos.marketplace.catalog.ManifestValidationException;
 import com.autarkos.marketplace.install.DuplicateInstallAcknowledgementRequiredException;
 import com.autarkos.marketplace.install.InstallationException;
@@ -39,6 +40,21 @@ public class MarketplaceExceptionHandler {
                 "app_lifecycle_error",
                 exception.getMessage(),
                 List.of(),
+                Instant.now()));
+    }
+
+    @ExceptionHandler(RecoveryOperationConflictException.class)
+    public ResponseEntity<ApiError> recoveryOperationConflict(RecoveryOperationConflictException exception) {
+        activityLogService.warning(
+                "backup",
+                "recovery_operation_conflict",
+                "Recovery operation is already running",
+                exception.getMessage(),
+                null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(
+                "recovery_operation_conflict",
+                exception.getMessage(),
+                List.of("Wait for the current operation to finish, then try again."),
                 Instant.now()));
     }
 
