@@ -9,15 +9,19 @@ async function openDiscover(page: Parameters<typeof installMockApi>[0], viewport
 }
 
 test('wide Discover keeps a selected app in the dense launcher detail rail', async ({ page }) => {
-  await openDiscover(page, { width: 1280, height: 960 });
+  await openDiscover(page, { width: 1440, height: 960 });
 
   const rail = page.getByLabel('Selected Discover app');
   await expect(rail).toContainText('Vaultwarden');
   await page.getByRole('button', { name: 'Select Immich' }).click();
   await expect(rail).toContainText('Immich');
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(rail).toContainText('App details');
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: 'test-results/discover-dense-rail-wide.png', fullPage: false });
+  await page.getByRole('button', { name: 'Full details' }).click();
+  await expect(page.getByRole('dialog')).toContainText('App details');
+  await expect(page.getByRole('dialog')).toContainText('Advanced app info');
 });
 
 test('narrow Discover opens the selected app in the full review sheet', async ({ page }) => {

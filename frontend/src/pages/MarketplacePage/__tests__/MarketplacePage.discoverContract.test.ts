@@ -17,12 +17,16 @@ function projectSource(relativePath) {
 test('marketplace detail and install wizard do not carry legacy install result props', () => {
   const detail = source('MarketplaceAppDetail.tsx');
   const wizard = source('MarketplaceInstallWizard.tsx');
+  const settings = source('MarketplaceAppSettingsDialog.tsx');
   const marketplaceTypes = projectSource('types/marketplace.ts');
 
   assert.doesNotMatch(detail, /\bInstallResult\b|installResult/);
   assert.doesNotMatch(wizard, /\bInstallResult\b|installResult|InstallResultCard|PostInstallGuideCard/);
   assert.doesNotMatch(detail, /<MarketplaceSetupPanel|<InstallPlanPreview/);
-  assert.match(wizard, /Installation choices/);
+  assert.match(wizard, /App configuration/);
+  assert.match(wizard, /appSpecificSetupInputs/);
+  assert.match(settings, /input\.tier === 'app_specific'/);
+  assert.match(settings, /Autark-OS manages the app name, access, storage, and backups safely/);
   assert.doesNotMatch(marketplaceTypes, /\bInstallResult\b|PostInstallGuide|ResolvedSetupField|ResolvedSetupIntegration/);
 });
 
@@ -95,8 +99,8 @@ test('dense launcher cards keep canonical app states visible and long app names 
   const list = source('MarketplaceAppList.tsx');
 
   assert.match(list, /line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-50/);
-  assert.match(list, /marketplaceCardToneClass\(app\)/);
-  assert.match(list, /\{app\.stateLabel\}/);
+  assert.match(list, /launcherCardAttentionClass\(app\)/);
+  assert.match(list, /app\.stateLabel/);
   assert.match(list, /aria-label=\{`Select \$\{app\.name\}`\}/);
   assert.match(list, /title=\{app\.name\}/);
 });

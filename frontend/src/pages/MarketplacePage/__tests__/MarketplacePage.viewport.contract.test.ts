@@ -7,16 +7,18 @@ const page = readFileSync(resolve(process.cwd(), 'src/pages/MarketplacePage/Mark
 
 test('Discover keeps its first-run guidance without duplicating global recommendations', () => {
   assert.doesNotMatch(page, /CanonicalRecommendedAction/);
-  assert.match(page, /\{showStartHere && \([\s\S]*<StarterAppHandoff/);
+  assert.match(page, /<MarketplaceBrowseSidebar/);
+  assert.match(page, /showStartHere=\{showStartHere\}/);
   assert.doesNotMatch(page, /Recommended path/);
 });
 
-test('Discover uses a compact header and compact first-run guidance before filters', () => {
-  assert.match(page, /<header className="mb-4 rounded-2xl[^"]* p-4/);
-  assert.match(page, /text-2xl font-bold[^"]*md:text-3xl/);
-  assert.match(page, /className="mb-4"[\s\S]*filterAriaLabel="Discover filters"/);
+test('Discover uses a compact bounded workspace with browse, catalog, and inspector regions', () => {
+  assert.match(page, /contained/);
+  assert.match(page, /lg:h-\[calc\(100dvh-7\.25rem\)\]/);
+  assert.match(page, /xl:grid-cols-\[12rem_minmax\(0,1fr\)_19rem\]/);
+  assert.match(page, /<MarketplaceCatalogToolbar/);
   assert.match(page, /const recommendation = recommendations\.find\(\(item\) => !item\.installed\) \?\? recommendations\[0\]/);
-  assert.match(page, /Start with \{recommendation\.app\.name\}/);
+  assert.match(page, /Start with one app/);
   assert.doesNotMatch(page, /recommendations\.map\(\(recommendation\) => \(/);
 });
 

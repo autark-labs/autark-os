@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { HelpCircle, TriangleAlert } from 'lucide-react';
+import { Settings2, TriangleAlert } from 'lucide-react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
-import { Button } from '@/components/ui/button';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -12,16 +11,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
-import type { DiscoverInstallIssue, DiscoverInstallPreview, DiscoverSetupInput, DiscoverSetupSchema } from '@/types/discover';
+import type { DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
+import { appSpecificSetupInputs } from './MarketplaceAppSettingsDialog';
 import { Config, FriendlyStat } from './MarketplacePage.shared';
 
 type InstallWizardProps = {
   app: MarketplaceApp;
+  hasAppSettings: boolean;
   hideTrigger?: boolean;
   installLocked: boolean;
   installOptions: InstallOptions;
@@ -31,7 +28,7 @@ type InstallWizardProps = {
   installPreview: DiscoverInstallPreview | null;
   onInstall: (options: InstallOptions) => Promise<void>;
   onRequestPlan: (options: InstallOptions) => Promise<void>;
-  onSetupAnswersChange: (answers: Record<string, unknown>) => void;
+  onOpenSettings: () => void;
   onOpenChange?: (open: boolean) => void;
   open?: boolean;
   planLoading: boolean;
@@ -40,7 +37,7 @@ type InstallWizardProps = {
   triggerLabel?: string;
 };
 
-export function InstallWizard({ app, hideTrigger = false, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onInstall, onOpenChange, onRequestPlan, onSetupAnswersChange, open: controlledOpen, planLoading, setupAnswers, setupSchema, triggerLabel = 'Customize' }: InstallWizardProps) {
+export function InstallWizard({ app, hasAppSettings, hideTrigger = false, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onInstall, onOpenChange, onOpenSettings, onRequestPlan, open: controlledOpen, planLoading, setupAnswers, setupSchema, triggerLabel = 'Customize' }: InstallWizardProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
   const setOpen = onOpenChange ?? setUncontrolledOpen;
@@ -52,6 +49,11 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
     setOpen(false);
   }
 
+  function openSettings() {
+    setOpen(false);
+    onOpenSettings();
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {!hideTrigger && (
@@ -59,22 +61,22 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
           {triggerLabel}
         </ProjectDarkControlButton>
       )}
-      <DialogContent className="max-h-[88vh] overflow-y-auto border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 sm:max-w-2xl">
+      <DialogContent className="max-h-[88vh] overflow-y-auto border-slate-600 bg-slate-800 text-slate-50 shadow-xl shadow-slate-950/20 sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl text-slate-50">Install {app.name}</DialogTitle>
-          <DialogDescription className="text-slate-400">Choose the basics. Autark-OS will use safe defaults unless you change them.</DialogDescription>
+          <DialogTitle className="text-xl text-slate-50">Review install for {app.name}</DialogTitle>
+          <DialogDescription className="text-slate-300">Review the plan before Autark-OS changes this server. Routine access, storage, and backup choices use safe defaults.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-5 overflow-y-auto pr-1">
           {installLocked && <InstallBlockedCard message={installStatusMessage} />}
           {requiresInstallCaution(app) && <InstallCaution app={app} />}
 
-          <InstallationChoicesForm answers={setupAnswers} issues={installPreview?.blockingIssues ?? []} schema={setupSchema} onAnswersChange={onSetupAnswersChange} />
+          <InstallSettingsSummary answers={setupAnswers} hasAppSettings={hasAppSettings} onOpenSettings={openSettings} schema={setupSchema} />
 
           <InstallImpactSummary app={app} installPlan={installPlan} installPreview={installPreview} />
 
           {installPlan && (
-            <Collapsible className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
+            <Collapsible className="rounded-lg border border-slate-600 bg-slate-700/45 p-4">
               <CollapsibleTrigger className="w-full cursor-pointer text-left font-bold text-slate-50">Technical details</CollapsibleTrigger>
               <CollapsibleContent>
               <div className="mt-4">
@@ -97,7 +99,7 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
 
         </div>
 
-        <DialogFooter className="border-sky-400/25 bg-slate-800">
+        <DialogFooter className="border-slate-600 bg-slate-700/45">
           <ProjectDarkControlButton onClick={() => onRequestPlan(installOptions)} type="button">
             {planLoading ? 'Checking...' : 'Preview'}
           </ProjectDarkControlButton>
@@ -112,101 +114,39 @@ export function InstallWizard({ app, hideTrigger = false, installLocked, install
   );
 }
 
-function InstallationChoicesForm({ answers, issues, onAnswersChange, schema }: { answers: Record<string, unknown>; issues: DiscoverInstallIssue[]; onAnswersChange: (answers: Record<string, unknown>) => void; schema: DiscoverSetupSchema }) {
-  const visibleInputs = schema.inputs.filter((input) => input.tier !== 'advanced' && shouldShowInput(input, answers));
-  const advancedInputs = schema.inputs.filter((input) => input.tier === 'advanced' && shouldShowInput(input, answers));
-
-  function updateAnswer(inputId: string, value: unknown) {
-    onAnswersChange({ ...answers, [inputId]: value });
-  }
+function InstallSettingsSummary({ answers, hasAppSettings, onOpenSettings, schema }: { answers: Record<string, unknown>; hasAppSettings: boolean; onOpenSettings: () => void; schema: DiscoverSetupSchema }) {
+  const settings = appSpecificSetupInputs(schema, answers);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-sky-400/25 bg-slate-900 text-slate-50">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-sky-400/25 bg-slate-800 p-4">
+    <section className="rounded-xl border border-slate-600 bg-slate-700/45 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="font-bold text-slate-50">Installation choices</h4>
-          <p className="mt-1 text-sm leading-6 text-slate-300">These choices need your attention before Autark-OS starts this app.</p>
+          <h4 className="font-bold text-white">App configuration</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-300">
+            {hasAppSettings ? 'Only app-specific choices are shown here. Access, storage, and backup protection use Autark-OS defaults.' : 'No app-specific choices are needed. Autark-OS will use safe defaults.'}
+          </p>
         </div>
-        <span className="rounded-full border border-sky-400/25 bg-slate-950 px-2.5 py-1 text-xs font-bold text-slate-300">Required</span>
-      </div>
-      <div className="grid gap-4 p-4">
-        {visibleInputs.length ? visibleInputs.map((input) => (
-          <InstallationChoiceField input={input} key={input.id} problem={issues.find((issue) => issue.fieldId === input.id)} value={answers[input.id]} onChange={(value) => updateAnswer(input.id, value)} />
-        )) : (
-          <p className="rounded-lg border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-300">No choices are needed for this app. Autark-OS will use safe defaults.</p>
-        )}
-        {advancedInputs.length > 0 && (
-          <Collapsible className="rounded-lg border border-sky-400/25 bg-slate-800 p-3">
-            <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-3 text-left text-sm font-bold text-slate-50">
-              Advanced install options
-              <span className="text-slate-400">Show</span>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="mt-3 grid gap-4">
-                {advancedInputs.map((input) => (
-                  <InstallationChoiceField input={input} key={input.id} problem={issues.find((issue) => issue.fieldId === input.id)} value={answers[input.id]} onChange={(value) => updateAnswer(input.id, value)} />
-                ))}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+        {hasAppSettings && (
+          <ProjectDarkControlButton onClick={onOpenSettings} size="sm" type="button">
+            <Settings2 className="size-3.5" />
+            App settings
+          </ProjectDarkControlButton>
         )}
       </div>
+      {hasAppSettings && (
+        <dl className="mt-3 grid gap-2 text-sm">
+          {settings.map((input) => <ConfigurationLine input={input.label} key={input.id} value={displaySetupValue(input.options, answers[input.id])} />)}
+        </dl>
+      )}
     </section>
   );
 }
 
-function InstallationChoiceField({ input, onChange, problem, value }: { input: DiscoverSetupInput; onChange: (value: unknown) => void; problem?: DiscoverInstallIssue; value: unknown }) {
-  const selectedOption = input.options?.find((option) => option.value === value);
-  const inputId = `install-choice-${input.id}`;
+function ConfigurationLine({ input, value }: { input: string; value: string }) {
   return (
-    <div className="grid gap-2">
-      <div className="flex items-center justify-between gap-3">
-        <label className="text-sm font-bold text-slate-50" htmlFor={inputId}>{input.label}</label>
-        {input.help && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-              <Button aria-label={`Explain ${input.label}`} className="size-7 rounded-full border-sky-400/25 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-slate-50" size="icon" type="button" variant="outline">
-                <HelpCircle className="size-3.5" />
-              </Button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-72 border border-sky-400/30 bg-slate-900 text-slate-100 shadow-xl shadow-slate-950/30">
-                <p className="text-sm leading-6">{input.help}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </div>
-      {input.type === 'choice' ? (
-        <>
-          <Select value={String(value ?? '')} onValueChange={onChange}>
-            <SelectTrigger className={cn('h-12 w-full border-sky-400/25 bg-slate-900 text-slate-50', problem && 'border-orange-400/40')} id={inputId}>
-              <SelectValue placeholder="Choose an option" />
-            </SelectTrigger>
-            <SelectContent className="border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
-              {input.options?.map((option) => (
-                <SelectItem className="focus:bg-slate-700 focus:text-white" key={option.value} value={option.value}>
-                  {option.label}{option.recommended ? ' (Recommended)' : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className={cn('text-xs leading-5 text-slate-300', problem && 'text-orange-200')}>{problem?.message || selectedOption?.description || 'Autark-OS will use this choice when it prepares the app.'}</p>
-        </>
-      ) : (
-        <>
-          <Input
-            className={cn('h-12 border-sky-400/25 bg-slate-900 text-slate-50 placeholder:text-slate-400', problem && 'border-orange-400/40')}
-            id={inputId}
-            inputMode={input.type === 'number-or-auto' ? 'numeric' : undefined}
-            onChange={(event) => onChange(input.type === 'number-or-auto' ? normalizePortValue(event.target.value) : event.target.value)}
-            placeholder={input.type === 'number-or-auto' ? 'Auto-select a safe port' : undefined}
-            type="text"
-            value={String(value ?? '')}
-          />
-          <p className={cn('text-xs leading-5 text-slate-300', problem && 'text-orange-200')}>{problem?.message || input.help || 'Autark-OS will use this value when it prepares the app.'}</p>
-        </>
-      )}
+    <div className="flex items-center justify-between gap-4 border-t border-slate-600 pt-2 first:border-t-0 first:pt-0">
+      <dt className="text-slate-300">{input}</dt>
+      <dd className="w-1/2 truncate text-right font-medium text-slate-50" title={value}>{value}</dd>
     </div>
   );
 }
@@ -227,7 +167,7 @@ function InstallImpactSummary({ app, installPlan, installPreview }: { app: Marke
   ];
 
   return (
-    <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
+    <section className="rounded-lg border border-slate-600 bg-slate-700/45 p-4">
       <h4 className="font-bold text-slate-50">What Autark-OS will do</h4>
       <ul className="mt-3 grid gap-2 pl-5 text-sm leading-6 text-slate-300">
         {items.map((item) => <li className="list-disc" key={item}>{item}</li>)}
@@ -312,17 +252,13 @@ function serviceKindLabel(kind: string) {
   return labels[kind] || kind.replaceAll('-', ' ');
 }
 
-function shouldShowInput(input: DiscoverSetupInput, answers: Record<string, unknown>) {
-  if (!input.showWhen || Object.keys(input.showWhen).length === 0) {
-    return true;
+function displaySetupValue(options: Array<{ label: string; value: string }>, value: unknown) {
+  const option = options.find((candidate) => candidate.value === value);
+  if (option) {
+    return option.label;
   }
-  return Object.entries(input.showWhen).every(([fieldId, expected]) => answers[fieldId] === expected);
-}
-
-function normalizePortValue(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.toLowerCase() === 'auto') {
-    return 'auto';
+  if (value === null || value === undefined || value === '') {
+    return 'Not selected';
   }
-  return Number(trimmed);
+  return String(value);
 }

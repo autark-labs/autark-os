@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Bell, Info, RefreshCw, Sparkles, X } from 'lucide-react';
-import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
-import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { PageShell } from '@/components/layout/PageShell';
-import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
@@ -53,7 +50,8 @@ import {
   starterAppsForMarketplace,
 } from './extensions/MarketplacePage.logic';
 import { MarketplaceAppDetail } from './MarketplaceAppDetail';
-import { MarketplaceAppList } from './MarketplaceAppList';
+import { hasAppSpecificSetup, MarketplaceAppSettingsDialog } from './MarketplaceAppSettingsDialog';
+import { MarketplaceAppList, MarketplaceCatalogToolbar } from './MarketplaceAppList';
 import { MarketplaceAppRail } from './MarketplaceAppRail';
 import { defaultAnswersFromSchema } from './MarketplaceSetupPanel';
 import {
@@ -95,6 +93,7 @@ function MarketplacePage() {
   const [marketplaceError, setMarketplaceError] = useState('');
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [duplicateAcknowledgedAppId, setDuplicateAcknowledgedAppId] = useState<string | null>(null);
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
   const detailTriggerRef = useRef<HTMLElement | null>(null);
@@ -276,6 +275,7 @@ function MarketplacePage() {
   }) as DiscoverAppView[], [catalogApps, hideInstalled, searchQuery, selectedCategory, sortBy]);
   const selectedAppInstalling = Boolean(installJob && !terminalJob(installJob) && installJob.subjectId === selectedApp?.id);
   const selectedAppInstallLocked = Boolean(selectedApp && installJob && !terminalJob(installJob) && installJob.subjectId !== selectedApp.id);
+  const selectedAppHasSettings = hasAppSpecificSetup(selectedView?.setupSchema ?? { appId: '', version: 1, inputs: [] }, setupAnswers);
   const installStatusMessage = selectedAppInstallLocked && installJob ? `${appNameForJob(installJob, apps)} is installing. Finish that install before starting another app.` : '';
   const starterRecommendations = useMemo(
     () => apps.length ? starterAppsForMarketplace(apps.map((view) => view.app), onboarding?.recommendedApps ?? [], installedById, doctor, storage) as StarterRecommendation[] : [],
@@ -362,7 +362,11 @@ function MarketplacePage() {
   }
 
   return (
-    <PageShell>
+    <PageShell
+      className="lg:h-[calc(100dvh-7.25rem)] lg:min-h-0"
+      contained
+      contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
+    >
       <DiscoverGuidedHeader
         appCount={catalogApps.length}
         lastRefreshAt={lastRefreshAt}
@@ -370,58 +374,58 @@ function MarketplacePage() {
         onRefresh={refreshDiscover}
       />
 
-      {discoverError && <DiscoverErrorState className="mb-5" message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
+      {discoverError && <DiscoverErrorState message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
       <InstallJobBanner apps={apps} installJob={installJob} selectedAppId={selectedApp.id} />
 
-      {showStartHere && (
-        <StarterAppHandoff
+      <section className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
+        <MarketplaceBrowseSidebar
+          canRestoreStartHere={canRestoreStartHere}
+          filterValue={discoverFilterValue}
+          filters={discoverFilters}
+          hideInstalled={hideInstalled}
+          onDismissStartHere={dismissStartHere}
+          onFilterChange={changeDiscoverFilter}
+          onRestoreStartHere={restoreStartHere}
+          onSelectRecommendation={openAppDetails}
+          onToggleHideInstalled={() => setHideInstalled((value) => !value)}
           recommendations={starterRecommendations}
-          onDismiss={dismissStartHere}
-          onSelect={openAppDetails}
+          showStartHere={showStartHere}
         />
-      )}
 
-      <SearchFilterBar
-        actions={(
-          <>
-            <ProjectDarkControlButton
-              className={cn(hideInstalled && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/15')}
-              onClick={() => setHideInstalled((value) => !value)}
-              type="button"
-            >
-              {hideInstalled ? 'Showing new apps only' : 'Hide installed'}
-            </ProjectDarkControlButton>
-            {canRestoreStartHere && (
-              <ProjectDarkControlButton onClick={restoreStartHere} type="button">
-                Show Start here
-              </ProjectDarkControlButton>
-            )}
-          </>
-        )}
-        className="mb-4"
-        filterAriaLabel="Discover filters"
-        filterValue={discoverFilterValue}
-        filters={discoverFilters}
-        onFilterChange={changeDiscoverFilter}
-        onSearchChange={setSearchQuery}
-        searchAriaLabel="Search Discover apps"
-        searchPlaceholder="Search by name, purpose, or category..."
-        searchValue={searchQuery}
-        wideLayout="2xl"
-      />
+        <section className="flex min-h-0 flex-col border-b border-sky-300/15 xl:border-b-0">
+          <MarketplaceCatalogToolbar
+            onSearchChange={setSearchQuery}
+            onSortChange={setSortBy}
+            searchValue={searchQuery}
+            sortBy={sortBy}
+          />
+          <MarketplaceAppList apps={visibleApps} installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null} onSelect={selectApp} selectedAppId={selectedView?.id ?? ''} />
+        </section>
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <MarketplaceAppList apps={visibleApps} installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null} modeLabel={showAdvancedMetrics ? 'All apps' : basicCatalogMode === 'all-safe' ? 'Ready apps' : 'Starter apps'} onSelect={selectApp} onSortChange={setSortBy} selectedAppId={selectedView?.id ?? ''} sortBy={sortBy} />
         {selectedView && (
           <MarketplaceAppRail
             appView={selectedView}
+            hasAppSettings={selectedAppHasSettings}
             installLocked={selectedAppInstallLocked}
             installStatusMessage={installStatusMessage}
             installing={selectedAppInstalling}
+            onConfigureSettings={() => setSettingsOpen(true)}
             onReviewDetails={() => openAppDetails(selectedView.id)}
           />
         )}
-      </div>
+      </section>
+
+      {selectedView && selectedAppHasSettings && (
+        <MarketplaceAppSettingsDialog
+          appName={selectedView.name}
+          answers={setupAnswers}
+          issues={installPreview?.blockingIssues}
+          onAnswersChange={changeSetupAnswers}
+          onOpenChange={setSettingsOpen}
+          open={settingsOpen}
+          schema={selectedView.setupSchema}
+        />
+      )}
 
       {detailView && (
         <MarketplaceAppDetail
@@ -440,11 +444,12 @@ function MarketplacePage() {
           onCreateBackup={createFirstBackup}
           onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(detailView.id)}
           onInstall={(options) => installApp(detailView.id, options)}
+          onOpenSettings={() => setSettingsOpen(true)}
           onReinstallCurrent={reinstallWithCurrentSettings}
           onRequestPlan={(options) => requestPlan(detailView.id, options)}
-          onSetupAnswersChange={changeSetupAnswers}
           planLoading={planLoading}
           recoveryMode={recoveryAppId === detailView.id ? recoveryMode : null}
+          hasAppSettings={selectedAppHasSettings}
           setupAnswers={setupAnswers}
           setupReady={installPreview?.valid ?? true}
           setupSchema={detailView.setupSchema}
@@ -459,11 +464,11 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
     return null;
   }
   if (!terminalJob(installJob)) {
-    return <JobProgress className="mb-5" job={installJob} subjectLabel={appNameForJob(installJob, apps)} />;
+    return <JobProgress job={installJob} subjectLabel={appNameForJob(installJob, apps)} />;
   }
   if (installJob.status === 'failed') {
     return (
-      <div className="mb-5 rounded-lg border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-200">
+      <div className="rounded-lg border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-200">
         <p className="font-semibold text-current">Install failed for {appNameForJob(installJob, apps)}</p>
         <p className="mt-1">{installJob.error?.message || 'Autark-OS could not finish the install.'}</p>
       </div>
@@ -471,7 +476,7 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
   }
   if (installJob.status === 'succeeded') {
     return (
-      <div className="mb-5 rounded-lg border border-emerald-300/35 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+      <div className="rounded-lg border border-emerald-300/35 bg-emerald-500/10 p-4 text-sm text-emerald-200">
         <p className="font-semibold text-current">{appNameForJob(installJob, apps)} is ready</p>
         <p className="mt-1">Open the app or create a first restore point before experimenting.</p>
       </div>
@@ -492,27 +497,21 @@ function DiscoverGuidedHeader({
   onRefresh: () => void;
 }) {
   return (
-    <header className="mb-4 rounded-2xl border border-sky-400/25 bg-slate-900 p-4 text-slate-50 shadow-lg shadow-slate-950/20">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex max-w-3xl gap-3">
+    <header className="rounded-2xl border border-sky-300/15 bg-[#07142b]/90 p-3 text-slate-50 shadow-xl shadow-slate-950/20 sm:p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
             <Sparkles className="size-5" />
           </span>
-          <div>
-            <MetadataBadge tone="info">Discover</MetadataBadge>
-            <h2 className="mt-2 text-2xl font-bold leading-none text-slate-50 md:text-3xl">Discover Apps</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-5 text-slate-400">
-              Install useful self-hosted apps without managing Docker by hand.
-            </p>
-          </div>
+          <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Discover</h1>
         </div>
 
-        <div className="flex flex-wrap gap-2 md:justify-end">
+        <div className="flex shrink-0 gap-2">
           <Dialog>
             <DialogTrigger asChild>
-              <ProjectDarkControlButton type="button">
+              <ProjectDarkControlButton aria-label="How installs work" size="icon" type="button">
                 <Info className="size-4" />
-                How installs work
+                <span className="sr-only">How installs work</span>
               </ProjectDarkControlButton>
             </DialogTrigger>
             <DialogContent className="border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30 sm:max-w-lg">
@@ -533,9 +532,9 @@ function DiscoverGuidedHeader({
             </DialogContent>
           </Dialog>
 
-          <ProjectDarkControlButton onClick={onRefresh} type="button">
+          <ProjectDarkControlButton aria-label="Refresh Discover" onClick={onRefresh} size="icon" type="button">
             <RefreshCw className="size-4" />
-            Refresh
+            <span className="sr-only">Refresh Discover</span>
           </ProjectDarkControlButton>
 
           <DropdownMenu>
@@ -575,38 +574,86 @@ function DiscoverGuidedHeader({
   );
 }
 
-function StarterAppHandoff({ onDismiss, onSelect, recommendations }: { onDismiss: () => void; onSelect: (appId: string) => void; recommendations: StarterRecommendation[] }) {
-  const recommendation = recommendations.find((item) => !item.installed) ?? recommendations[0];
-  if (!recommendation) {
-    return null;
-  }
+function MarketplaceBrowseSidebar({
+  canRestoreStartHere,
+  filterValue,
+  filters,
+  hideInstalled,
+  onDismissStartHere,
+  onFilterChange,
+  onRestoreStartHere,
+  onSelectRecommendation,
+  onToggleHideInstalled,
+  recommendations,
+  showStartHere,
+}: {
+  canRestoreStartHere: boolean;
+  filterValue: string;
+  filters: Array<{ label: string; value: string }>;
+  hideInstalled: boolean;
+  onDismissStartHere: () => void;
+  onFilterChange: (filter: string) => void;
+  onRestoreStartHere: () => void;
+  onSelectRecommendation: (appId: string) => void;
+  onToggleHideInstalled: () => void;
+  recommendations: StarterRecommendation[];
+  showStartHere: boolean;
+}) {
+  const recommendation = recommendations.find((item) => !item.installed) ?? recommendations[0] ?? null;
 
   return (
-    <section className="mb-4 rounded-2xl border border-cyan-300/35 bg-cyan-400/10 p-4 shadow-lg shadow-slate-950/20">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Start here</p>
-          <h3 className="mt-1 text-lg font-bold text-slate-50">Start with {recommendation.app.name}</h3>
-          <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-300">
-            {recommendation.notes[0] || 'A safe first app to review before installing.'}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <StatusBadge tone={recommendation.readiness === 'blocked' ? 'warning' : 'info'}>
-              {recommendation.readiness === 'blocked' ? 'Readiness review needed' : recommendation.readiness === 'review' ? 'Review first' : 'Ready to review'}
-            </StatusBadge>
-            <DisabledAction disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
-              <ProjectPrimaryButton disabled={recommendation.installed} onClick={() => onSelect(recommendation.app.id)} size="sm" type="button">
-                <Sparkles className="size-4" />
-                {recommendation.installed ? 'Already installed' : 'Review install'}
-              </ProjectPrimaryButton>
-            </DisabledAction>
-          </div>
-        </div>
-        <ProjectDarkControlButton aria-label="Hide Start here" onClick={onDismiss} size="icon" type="button">
-            <X className="size-4" />
-        </ProjectDarkControlButton>
+    <aside className="flex min-h-0 flex-col border-b border-sky-300/15 bg-slate-950/10 p-3 xl:border-b-0 xl:border-r">
+      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Browse</p>
+      <div aria-label="Discover filters" className="mt-2 grid gap-1">
+        {filters.map((filter) => (
+          <button
+            aria-pressed={filterValue === filter.value}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+              filterValue === filter.value ? 'bg-cyan-400/15 text-cyan-100' : 'text-slate-300 hover:bg-slate-800/70 hover:text-white',
+            )}
+            key={filter.value}
+            onClick={() => onFilterChange(filter.value)}
+            type="button"
+          >
+            <span className={cn('size-1.5 rounded-full', filterValue === filter.value ? 'bg-cyan-300' : 'bg-slate-500')} />
+            <span className="truncate">{filter.label}</span>
+          </button>
+        ))}
       </div>
-    </section>
+
+      <ProjectDarkControlButton
+        className={cn('mt-3 h-8 w-full justify-start px-2 text-xs', hideInstalled && 'border-cyan-300/45 bg-cyan-400/10 text-cyan-100')}
+        onClick={onToggleHideInstalled}
+        type="button"
+      >
+        {hideInstalled ? 'Showing new apps only' : 'Hide installed'}
+      </ProjectDarkControlButton>
+
+      {showStartHere && recommendation && (
+        <section className="mt-3 rounded-xl border border-cyan-300/25 bg-cyan-400/8 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-cyan-100">Start with one app</p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">{recommendation.notes[0] || 'A safe first app to review before installing.'}</p>
+            </div>
+            <button aria-label="Hide Start here" className="grid size-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={onDismissStartHere} type="button"><X className="size-3.5" /></button>
+          </div>
+          <DisabledAction disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
+            <ProjectPrimaryButton className="mt-3 h-8 w-full px-2 text-xs" disabled={recommendation.installed} onClick={() => onSelectRecommendation(recommendation.app.id)} type="button">
+              <Sparkles className="size-3.5" />
+              {recommendation.installed ? 'Already installed' : `Review ${recommendation.app.name}`}
+            </ProjectPrimaryButton>
+          </DisabledAction>
+        </section>
+      )}
+
+      {canRestoreStartHere && (
+        <ProjectDarkControlButton className="mt-auto h-8 w-full px-2 text-xs" onClick={onRestoreStartHere} type="button">
+          Show Start here
+        </ProjectDarkControlButton>
+      )}
+    </aside>
   );
 }
 

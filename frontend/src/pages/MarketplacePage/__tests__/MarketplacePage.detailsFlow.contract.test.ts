@@ -34,10 +34,10 @@ test('Discover keeps dense catalog selection in a persistent rail and opens full
   assert.match(page, /const wideRailLayout = useDiscoverRailLayout\(\)/);
   assert.match(page, /<MarketplaceAppRail/);
   assert.match(page, /onSelect=\{selectApp\}/);
-  assert.match(list, /grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-4/);
-  assert.match(list, /marketplaceCardToneClass\(app\)/);
-  assert.match(list, /\{app\.stateLabel\}/);
-  assert.match(rail, /appView\.stateDescription/);
+  assert.match(list, /grid-cols-\[repeat\(auto-fill,minmax\(11rem,1fr\)\)\]/);
+  assert.match(list, /launcherCardAttentionClass\(app\)/);
+  assert.match(list, /app\.stateLabel/);
+  assert.match(rail, /<MarketplaceAppDetailsCard/);
   assert.match(rail, /marketplacePrimaryRoute\(appView\)/);
   assert.match(rail, /<DisabledAction/);
   assert.match(page, /useDiscoverJobTracking/);

@@ -75,7 +75,7 @@ export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'primaryActi
     return null;
   }
   if (action.id === 'manage' || action.id === 'review_existing') {
-    return applicationRouteWithManagementPanel(action.href);
+    return applicationRouteWithManagementPanel(action.href) ?? null;
   }
   return null;
 }
@@ -219,31 +219,6 @@ export function marketplaceUpdateRank(lastUpdated: string) {
   if (value.includes('week')) return 2;
   if (value.includes('month')) return 3;
   return 4;
-}
-
-export function marketplaceCardToneClass(view: Pick<DiscoverAppView, 'cardTone' | 'state'> | null | undefined = null) {
-  const tone = view?.cardTone || cardToneForState(view?.state);
-  const tones = {
-    success: 'border-emerald-300/35 bg-emerald-500/10 hover:bg-emerald-500/15',
-    info: 'border-cyan-300/35 bg-cyan-400/10 hover:bg-cyan-400/15',
-    observed: 'border-orange-400/40 bg-orange-500/10 hover:bg-orange-500/15',
-    warning: 'border-orange-400/40 bg-orange-500/10 hover:bg-orange-500/15',
-    danger: 'border-red-400/35 bg-red-500/10 hover:bg-red-500/15',
-    neutral: 'border-sky-400/25 bg-slate-900 hover:bg-slate-700',
-    muted: 'border-sky-400/25 bg-slate-800 hover:bg-slate-700',
-  };
-  return tones[tone as keyof typeof tones] || tones.neutral;
-}
-
-function cardToneForState(state: string | null | undefined) {
-  if (state === 'installed_managed') return 'success';
-  if (state === 'pinned_external') return 'info';
-  if (state === 'found_on_server') return 'observed';
-  if (state === 'recoverable') return 'warning';
-  if (state === 'failed_install') return 'warning';
-  if (state === 'managed_elsewhere' || state === 'blocked') return 'danger';
-  if (state === 'coming_soon') return 'muted';
-  return 'neutral';
 }
 
 export function marketplaceActivityTone(level: string) {

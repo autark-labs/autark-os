@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
+import { Archive, ArrowLeft, CheckCircle2, Loader2, Settings2, TriangleAlert } from 'lucide-react';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,6 @@ import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { backupSafetyWarning } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
 import { currentJobStepText, terminalJob } from '@/repositories/jobRepository';
@@ -29,7 +21,8 @@ import {
   applicationRouteWithManagementPanel,
 } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { InstallWizard } from './MarketplaceInstallWizard';
-import { AppImage, InfoCard, marketplaceStatusTone, Stat, SupportBadge } from './MarketplacePage.shared';
+import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
+import { AppImage, InfoCard, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
 import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
 
 type AppDetailProps = {
@@ -44,13 +37,14 @@ type AppDetailProps = {
   installing: boolean;
   installedApp: DiscoverInstalledAppSummary | null;
   installPreview: DiscoverInstallPreview | null;
+  hasAppSettings: boolean;
   onBack: () => void;
   onCreateBackup: (appId: string) => Promise<void>;
   onDuplicateInstallAcknowledged: () => void;
   onInstall: (options: InstallOptions) => Promise<void>;
+  onOpenSettings: () => void;
   onReinstallCurrent: () => void | Promise<void>;
   onRequestPlan: (options: InstallOptions) => Promise<void>;
-  onSetupAnswersChange: (answers: Record<string, unknown>) => void;
   planLoading: boolean;
   recoveryMode?: string | null;
   setupAnswers: Record<string, unknown>;
@@ -58,7 +52,7 @@ type AppDetailProps = {
   setupSchema: DiscoverSetupSchema;
 };
 
-export function MarketplaceAppDetail({ app, appView, backupJob, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onReinstallCurrent, onRequestPlan, onSetupAnswersChange, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
+export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onOpenSettings, onReinstallCurrent, onRequestPlan, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
@@ -73,7 +67,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
     ? `${app.name} is already installing.`
     : installLocked
       ? installStatusMessage || 'Another install is active.'
-      : 'Finish the required install choices before installing.';
+      : 'Finish the required app settings before installing.';
 
   function openInstallReview() {
     setInstallReviewOpen(true);
@@ -149,8 +143,13 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
               </ProjectPrimaryButton>
             </DisabledAction>
           )}
-          <DocsSourceMenu app={app} />
-          {!isInstalled && <InstallWizard app={app} hideTrigger installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installStatusMessage={!setupReady ? 'Finish the required install choices before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onRequestPlan={onRequestPlan} onSetupAnswersChange={onSetupAnswersChange} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} setupSchema={setupSchema} />}
+          {hasAppSettings && (
+            <ProjectDarkControlButton onClick={onOpenSettings} type="button">
+              <Settings2 className="size-4" />
+              App settings
+            </ProjectDarkControlButton>
+          )}
+          {!isInstalled && <InstallWizard app={app} hasAppSettings={hasAppSettings} hideTrigger installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installStatusMessage={!setupReady ? 'Finish the required app settings before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onOpenSettings={onOpenSettings} onRequestPlan={onRequestPlan} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} setupSchema={setupSchema} />}
         </div>
 
         {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
@@ -177,82 +176,19 @@ export function MarketplaceAppDetail({ app, appView, backupJob, installJob, inst
           <InfoCard title="Best for" items={app.bestFor} />
         </div>
 
-        <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
-          <h4 className="font-bold text-slate-50">App details</h4>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <Stat label="Version" value={app.version || 'Unavailable'} />
-            <Stat label="Size" value={app.size || 'Unavailable'} />
-            <Stat label="Last updated" value={app.lastUpdated || 'Unavailable'} />
-            <Stat label="Source" value={app.source || 'Unavailable'} />
-            <Stat label="Maintainer" value={app.maintainer || 'Unavailable'} />
-            <Stat label="Downloads" value={app.downloads || 'Unavailable'} />
-          </div>
-        </section>
-
-        <Collapsible className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
-          <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between gap-3 text-left font-bold text-slate-50">
-            Advanced app info
-            <ChevronDown className="size-4 text-slate-400" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="mt-4 grid gap-4">
-              {app.technicalSummary && <p className="text-sm leading-6 text-slate-300">{app.technicalSummary}</p>}
-              {app.requirements.length > 0 && <InfoCard title="Requirements" items={app.requirements} />}
-              {app.includes.length > 0 && <InfoCard title="Included services" items={app.includes} />}
-              {app.usage.notes.length > 0 && <InfoCard title="Good to know" items={app.usage.notes} />}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+        <MarketplaceAppDetailsCard app={app} />
     </div>
   );
 
   return (
     <ResponsiveDetailsSheet
+      className="border-slate-600 bg-slate-800"
       model={{ description: app.description, title: app.name }}
       onOpenChange={(open) => !open && onBack()}
       open
     >
       {content}
     </ResponsiveDetailsSheet>
-  );
-}
-
-function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
-  if (!app.sourceUrl && !app.documentationUrl) {
-    return null;
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <ProjectDarkControlButton type="button">
-          Docs + source
-          <ChevronDown className="size-4" />
-        </ProjectDarkControlButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64 border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
-        <DropdownMenuLabel>{app.name}</DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-sky-400/20" />
-        {app.sourceUrl && (
-          <DropdownMenuItem asChild className="focus:bg-slate-700 focus:text-white">
-            <a href={app.sourceUrl} rel="noreferrer" target="_blank">
-              <ExternalLink className="mr-2 size-4" />
-              View source
-              <span className="ml-auto text-xs text-slate-400">{app.source}</span>
-            </a>
-          </DropdownMenuItem>
-        )}
-        {app.documentationUrl && (
-          <DropdownMenuItem asChild className="focus:bg-slate-700 focus:text-white">
-            <a href={app.documentationUrl} rel="noreferrer" target="_blank">
-              <BookOpen className="mr-2 size-4" />
-              Read docs
-              <span className="ml-auto text-xs text-slate-400">External</span>
-            </a>
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
