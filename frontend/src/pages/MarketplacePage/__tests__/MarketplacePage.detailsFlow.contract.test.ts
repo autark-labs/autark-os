@@ -18,10 +18,10 @@ test('Discover uses a route-backed detail selection and preserves catalog contex
   assert.match(page, /catalogScrollPositionRef\.current = window\.scrollY/);
   assert.match(page, /window\.scrollTo\(\{ top: catalogScrollPositionRef\.current \}\)/);
   assert.match(page, /detailTriggerRef\.current\?\.focus\(\)/);
-  assert.match(page, /\{detailView && \(/);
+  assert.match(page, /\{detailView && !wideRailLayout && \(/);
 });
 
-test('Discover keeps dense catalog selection in a persistent rail and opens full review in the shared details sheet', () => {
+test('Discover keeps details anchored to the persistent rail and reserves the shared sheet for narrow screens', () => {
   const detail = source('src/pages/MarketplacePage/MarketplaceAppDetail.tsx');
   const list = source('src/pages/MarketplacePage/MarketplaceAppList.tsx');
   const page = source('src/pages/MarketplacePage/MarketplacePage.tsx');
@@ -30,17 +30,51 @@ test('Discover keeps dense catalog selection in a persistent rail and opens full
 
   assert.match(detail, /<ResponsiveDetailsSheet/);
   assert.match(detail, /onOpenChange=\{\(open\) => !open && onBack\(\)\}/);
+  assert.match(detail, /<Tabs className="min-h-0 flex-1" defaultValue="overview">/);
+  assert.match(detail, /value="install">Install<\/TabsTrigger>/);
+  assert.match(detail, /value="details">Details<\/TabsTrigger>/);
   assert.match(detail, /<JobProgress/);
   assert.match(page, /const wideRailLayout = useDiscoverRailLayout\(\)/);
   assert.match(page, /<MarketplaceAppRail/);
+  assert.match(page, /\{detailView && !wideRailLayout && \(/);
   assert.match(page, /onSelect=\{selectApp\}/);
   assert.match(list, /grid-cols-\[repeat\(auto-fill,minmax\(11rem,1fr\)\)\]/);
   assert.match(list, /launcherCardAttentionClass\(app\)/);
   assert.match(list, /app\.stateLabel/);
   assert.match(rail, /<MarketplaceAppDetailsCard/);
+  assert.match(rail, /w-\[59\.5rem\] overflow-hidden/);
+  assert.match(rail, /right-\[calc\(17\.5rem-1px\)\]/);
+  assert.match(rail, /overflow-hidden rounded-l-2xl/);
+  assert.match(rail, /<Tabs className="min-h-0"/);
+  assert.match(rail, /onDetailsOpenChange/);
+  assert.match(rail, /onReviewInstall/);
+  assert.doesNotMatch(rail, /onReviewDetails/);
   assert.match(rail, /marketplacePrimaryRoute\(appView\)/);
   assert.match(rail, /<DisabledAction/);
   assert.match(page, /useDiscoverJobTracking/);
   assert.match(jobTracking, /latestActiveDiscoverJob/);
   assert.match(jobTracking, /useDiscoverJobQuery\(activeInstallJobId\)/);
+});
+
+test('Discover terminal install feedback can be dismissed without hiding active install progress', () => {
+  const page = source('src/pages/MarketplacePage/MarketplacePage.tsx');
+
+  assert.match(page, /const \[dismissedInstallJobId, setDismissedInstallJobId\]/);
+  assert.match(page, /dismissed=\{dismissedInstallJobId === installJob\?\.jobId\}/);
+  assert.match(page, /aria-label="Dismiss install result"/);
+  assert.match(page, /if \(dismissed \|\| !installJob \|\| installJob\.subjectId !== selectedAppId\)/);
+  assert.match(page, /if \(!terminalJob\(installJob\)\) \{/);
+});
+
+test('Discover install confirmation uses the approved plan review and requires explicit confirmation', () => {
+  const wizard = source('src/pages/MarketplacePage/MarketplaceInstallWizard.tsx');
+
+  assert.match(wizard, /Install plan/);
+  assert.match(wizard, /<InstallPlanStep icon=\{PackageOpen\}/);
+  assert.match(wizard, /<InstallPlanStep icon=\{LockKeyhole\}/);
+  assert.match(wizard, /<InstallConfigurationCallout/);
+  assert.match(wizard, /aria-label="Confirm install plan"/);
+  assert.match(wizard, /Confirm the install plan before starting\./);
+  assert.doesNotMatch(wizard, />Preview</);
+  assert.doesNotMatch(wizard, /<Tabs/);
 });

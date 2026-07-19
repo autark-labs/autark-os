@@ -17,12 +17,11 @@ export function MarketplaceAppDetailsCard({ app, className, compact = false }: {
       <div className="flex items-center justify-between gap-2">
         <div>
           <h4 className="text-sm font-semibold text-white">App details</h4>
-          {!compact && <p className="mt-1 text-xs leading-5 text-slate-300">The essentials stay visible; technical context is available when you need it.</p>}
         </div>
         <DocsSourceMenu app={app} />
       </div>
 
-      <dl className={cn('grid gap-x-4 gap-y-2 text-xs', compact ? 'mt-3' : 'mt-4 sm:grid-cols-2')}>
+      <dl className={cn('grid gap-x-5 gap-y-2 text-xs', compact ? 'mt-3' : 'mt-3 sm:grid-cols-2')}>
         <DetailLine label="Access" value={accessLabel(app.access.defaultMode)} />
         <DetailLine label="Backups" value="Enabled by default" />
         {!compact && <>
@@ -43,8 +42,8 @@ export function MarketplaceAppDetailsCard({ app, className, compact = false }: {
           <ChevronDown className="size-4" />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="mt-3 grid gap-3 text-xs leading-5 text-slate-300">
-            {app.technicalSummary && <p>{app.technicalSummary}</p>}
+          <div className="mt-3 grid gap-x-5 gap-y-3 rounded-lg bg-slate-900/45 p-3 text-xs leading-4 text-slate-300 sm:grid-cols-2">
+            {app.technicalSummary && <p className="sm:col-span-2">{app.technicalSummary}</p>}
             {app.requirements.length > 0 && <InfoList label="Requirements" values={app.requirements} />}
             {app.includes.length > 0 && <InfoList label="Included services" values={app.includes} />}
             {app.usage.notes.length > 0 && <InfoList label="Good to know" values={app.usage.notes} />}
@@ -105,10 +104,10 @@ function DetailLine({ label, value }: { label: string; value: string }) {
 
 function InfoList({ label, values }: { label: string; values: string[] }) {
   return (
-    <div>
+    <div className="min-w-0">
       <p className="font-semibold text-slate-100">{label}</p>
-      <ul className="mt-1 grid gap-1 pl-4">
-        {values.map((value) => <li className="list-disc" key={value}>{value}</li>)}
+      <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+        {values.map((value) => <li className="flex min-w-0 items-start gap-1.5" key={value}><span aria-hidden="true" className="mt-1.5 size-1 shrink-0 rounded-full bg-cyan-300" />{value}</li>)}
       </ul>
     </div>
   );

@@ -23,7 +23,7 @@ test('marketplace detail and install wizard do not carry legacy install result p
   assert.doesNotMatch(detail, /\bInstallResult\b|installResult/);
   assert.doesNotMatch(wizard, /\bInstallResult\b|installResult|InstallResultCard|PostInstallGuideCard/);
   assert.doesNotMatch(detail, /<MarketplaceSetupPanel|<InstallPlanPreview/);
-  assert.match(wizard, /App configuration/);
+  assert.match(wizard, /InstallConfigurationCallout/);
   assert.match(wizard, /appSpecificSetupInputs/);
   assert.match(settings, /input\.tier === 'app_specific'/);
   assert.match(settings, /Autark-OS manages the app name, access, storage, and backups safely/);

@@ -53,6 +53,7 @@ import { MarketplaceAppDetail } from './MarketplaceAppDetail';
 import { hasAppSpecificSetup, MarketplaceAppSettingsDialog } from './MarketplaceAppSettingsDialog';
 import { MarketplaceAppList, MarketplaceCatalogToolbar } from './MarketplaceAppList';
 import { MarketplaceAppRail } from './MarketplaceAppRail';
+import { InstallWizard } from './MarketplaceInstallWizard';
 import { defaultAnswersFromSchema } from './MarketplaceSetupPanel';
 import {
   marketplaceDetailId,
@@ -94,6 +95,9 @@ function MarketplacePage() {
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [installReviewOpen, setInstallReviewOpen] = useState(false);
+  const [dismissedInstallJobId, setDismissedInstallJobId] = useState<string | null>(null);
   const [duplicateAcknowledgedAppId, setDuplicateAcknowledgedAppId] = useState<string | null>(null);
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
   const detailTriggerRef = useRef<HTMLElement | null>(null);
@@ -147,7 +151,6 @@ function MarketplacePage() {
   const installPreview = installPreviewQuery.data ?? null;
   const installPlan = installPreview?.technicalDetails ?? null;
   const installOptions = installPreview?.installOptions ?? null;
-  const planLoading = installPreviewQuery.isFetching;
 
   const discoverError = marketplaceError || (appsQuery.error ? apiErrorMessage(appsQuery.error) : '');
 
@@ -196,6 +199,12 @@ function MarketplacePage() {
   }, [apps, detailAppId]);
 
   useEffect(() => {
+    if (wideRailLayout) {
+      setDetailsOpen(Boolean(detailView));
+    }
+  }, [detailView, wideRailLayout]);
+
+  useEffect(() => {
     if (previousDetailAppIdRef.current && !detailAppId) {
       window.requestAnimationFrame(() => {
         window.scrollTo({ top: catalogScrollPositionRef.current });
@@ -214,6 +223,7 @@ function MarketplacePage() {
 
   useEffect(() => {
     setDuplicateAcknowledgedAppId(null);
+    setInstallReviewOpen(false);
     const view = apps.find((nextApp) => nextApp.id === selectedAppId);
     if (view) {
       setSetupAnswers(defaultAnswersFromSchema(view.setupSchema));
@@ -305,6 +315,7 @@ function MarketplacePage() {
     detailTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     catalogScrollPositionRef.current = window.scrollY;
     setSelectedAppId(appId);
+    setDetailsOpen(true);
     setSearchParams(marketplaceSearchWithDetail(searchParams, appId));
   }
 
@@ -317,7 +328,16 @@ function MarketplacePage() {
   }
 
   function closeAppDetails() {
+    setDetailsOpen(false);
     setSearchParams(marketplaceSearchWithoutDetail(searchParams, Boolean(recoveryAppId)), { replace: true });
+  }
+
+  function openInstallReview() {
+    if (!selectedView || selectedView.installedApp) {
+      return;
+    }
+    setInstallReviewOpen(true);
+    void requestPlan(selectedView.id);
   }
 
   function changeDiscoverFilter(nextFilter: string) {
@@ -375,7 +395,13 @@ function MarketplacePage() {
       />
 
       {discoverError && <DiscoverErrorState message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
-      <InstallJobBanner apps={apps} installJob={installJob} selectedAppId={selectedApp.id} />
+      <InstallJobBanner
+        apps={apps}
+        dismissed={dismissedInstallJobId === installJob?.jobId}
+        installJob={installJob}
+        onDismiss={() => setDismissedInstallJobId(installJob?.jobId ?? null)}
+        selectedAppId={selectedApp.id}
+      />
 
       <section className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
         <MarketplaceBrowseSidebar
@@ -405,12 +431,18 @@ function MarketplacePage() {
         {selectedView && (
           <MarketplaceAppRail
             appView={selectedView}
+            detailsOpen={detailsOpen}
             hasAppSettings={selectedAppHasSettings}
             installLocked={selectedAppInstallLocked}
             installStatusMessage={installStatusMessage}
             installing={selectedAppInstalling}
             onConfigureSettings={() => setSettingsOpen(true)}
-            onReviewDetails={() => openAppDetails(selectedView.id)}
+            onDetailsOpenChange={(open) => open ? openAppDetails(selectedView.id) : closeAppDetails()}
+            onInstallSecondCopy={() => {
+              setDuplicateAcknowledgedAppId(selectedView.id);
+              openInstallReview();
+            }}
+            onReviewInstall={openInstallReview}
           />
         )}
       </section>
@@ -427,7 +459,7 @@ function MarketplacePage() {
         />
       )}
 
-      {detailView && (
+      {detailView && !wideRailLayout && (
         <MarketplaceAppDetail
           app={detailView.app}
           appView={detailView}
@@ -447,7 +479,6 @@ function MarketplacePage() {
           onOpenSettings={() => setSettingsOpen(true)}
           onReinstallCurrent={reinstallWithCurrentSettings}
           onRequestPlan={(options) => requestPlan(detailView.id, options)}
-          planLoading={planLoading}
           recoveryMode={recoveryAppId === detailView.id ? recoveryMode : null}
           hasAppSettings={selectedAppHasSettings}
           setupAnswers={setupAnswers}
@@ -455,12 +486,32 @@ function MarketplacePage() {
           setupSchema={detailView.setupSchema}
         />
       )}
+
+      {selectedView && wideRailLayout && !selectedView.installedApp && (
+        <InstallWizard
+          app={selectedView.app}
+          hasAppSettings={selectedAppHasSettings}
+          hideTrigger
+          installLocked={selectedAppInstallLocked || !(installPreview?.valid ?? true)}
+          installOptions={installOptions ?? fallbackInstallOptions}
+          installPlan={installPlan}
+          installPreview={installPreview}
+          installStatusMessage={!(installPreview?.valid ?? true) ? 'Finish the required app settings before installing.' : installStatusMessage}
+          installing={selectedAppInstalling}
+          onInstall={(options) => installApp(selectedView.id, options)}
+          onOpenChange={setInstallReviewOpen}
+          onOpenSettings={() => setSettingsOpen(true)}
+          open={installReviewOpen}
+          setupAnswers={setupAnswers}
+          setupSchema={selectedView.setupSchema}
+        />
+      )}
     </PageShell>
   );
 }
 
-function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverAppView[]; installJob: AutarkOsJob | null; selectedAppId: string }) {
-  if (!installJob || installJob.subjectId !== selectedAppId) {
+function InstallJobBanner({ apps, dismissed, installJob, onDismiss, selectedAppId }: { apps: DiscoverAppView[]; dismissed: boolean; installJob: AutarkOsJob | null; onDismiss: () => void; selectedAppId: string }) {
+  if (dismissed || !installJob || installJob.subjectId !== selectedAppId) {
     return null;
   }
   if (!terminalJob(installJob)) {
@@ -468,17 +519,27 @@ function InstallJobBanner({ apps, installJob, selectedAppId }: { apps: DiscoverA
   }
   if (installJob.status === 'failed') {
     return (
-      <div className="rounded-lg border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-200">
-        <p className="font-semibold text-current">Install failed for {appNameForJob(installJob, apps)}</p>
-        <p className="mt-1">{installJob.error?.message || 'Autark-OS could not finish the install.'}</p>
+      <div className="flex items-start justify-between gap-3 rounded-lg border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-200">
+        <div>
+          <p className="font-semibold text-current">Install failed for {appNameForJob(installJob, apps)}</p>
+          <p className="mt-1">{installJob.error?.message || 'Autark-OS could not finish the install.'}</p>
+        </div>
+        <button aria-label="Dismiss install result" className="grid size-7 shrink-0 place-items-center rounded-md text-red-100/80 transition hover:bg-red-200/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200" onClick={onDismiss} type="button">
+          <X className="size-4" />
+        </button>
       </div>
     );
   }
   if (installJob.status === 'succeeded') {
     return (
-      <div className="rounded-lg border border-emerald-300/35 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-        <p className="font-semibold text-current">{appNameForJob(installJob, apps)} is ready</p>
-        <p className="mt-1">Open the app or create a first restore point before experimenting.</p>
+      <div className="flex items-start justify-between gap-3 rounded-lg border border-emerald-300/35 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+        <div>
+          <p className="font-semibold text-current">{appNameForJob(installJob, apps)} is ready</p>
+          <p className="mt-1">Open the app or create a first restore point before experimenting.</p>
+        </div>
+        <button aria-label="Dismiss install result" className="grid size-7 shrink-0 place-items-center rounded-md text-emerald-100/80 transition hover:bg-emerald-200/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200" onClick={onDismiss} type="button">
+          <X className="size-4" />
+        </button>
       </div>
     );
   }

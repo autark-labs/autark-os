@@ -1,101 +1,204 @@
-import { ArrowRight, Loader2, Settings2, Sparkles } from 'lucide-react';
+import { ArrowRight, Loader2, Settings2, Sparkles, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import type { DiscoverAppView } from '@/types/discover';
 import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
 import { marketplacePrimaryRoute } from './extensions/MarketplacePage.logic';
-import { AppImage, marketplaceStatusTone } from './MarketplacePage.shared';
+import { AppImage, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
+import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
+import { applicationDeepLinkForObservedService, applicationRouteWithManagementPanel } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 
 type MarketplaceAppRailProps = {
   appView: DiscoverAppView;
+  detailsOpen: boolean;
   hasAppSettings: boolean;
   installLocked: boolean;
   installStatusMessage: string;
   installing: boolean;
   onConfigureSettings: () => void;
-  onReviewDetails: () => void;
+  onDetailsOpenChange: (open: boolean) => void;
+  onInstallSecondCopy: () => void;
+  onReviewInstall: () => void;
 };
 
-export function MarketplaceAppRail({ appView, hasAppSettings, installLocked, installStatusMessage, installing, onConfigureSettings, onReviewDetails }: MarketplaceAppRailProps) {
-  const actionRoute = marketplacePrimaryRoute(appView);
-  const actionDisabled = appView.primaryAction.disabled;
-  const actionReason = appView.primaryAction.reason || 'This app action is not available right now.';
-  const actionLabel = railActionLabel(appView, installing);
-  const attentionState = appView.statusTone === 'warning' || appView.statusTone === 'observed' || appView.statusTone === 'danger';
+export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, installLocked, installStatusMessage, installing, onConfigureSettings, onDetailsOpenChange, onInstallSecondCopy, onReviewInstall }: MarketplaceAppRailProps) {
+  const detailsPanelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const detailsPanel = detailsPanelRef.current;
+    if (!detailsPanel) {
+      return;
+    }
+    if (detailsOpen) {
+      detailsPanel.removeAttribute('inert');
+      return;
+    }
+    detailsPanel.setAttribute('inert', '');
+  }, [detailsOpen]);
 
   return (
-    <aside aria-label="Selected Discover app" className="hidden min-h-0 overflow-y-auto border-l border-sky-300/15 bg-slate-950/10 p-3 xl:block">
-      <section className="overflow-hidden rounded-2xl border border-sky-300/20 bg-[#0b1831] text-slate-50 shadow-lg shadow-slate-950/20">
-        <AppImage app={appView.app} presentation="artwork" className="h-32 border-sky-300/10" />
-        <div className="p-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-slate-400">{appView.categoryLabel}</p>
-              <h3 className="mt-1 line-clamp-2 break-words text-lg font-semibold leading-6 text-white">{appView.name}</h3>
-            </div>
-            <StatusBadge className="shrink-0" tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
-          </div>
-
-          <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-200">{appView.description}</p>
-
-          <RailPrimaryAction
-            actionDisabled={actionDisabled}
-            actionLabel={actionLabel}
-            actionReason={actionReason}
-            actionRoute={actionRoute}
-            attentionState={attentionState}
-            installing={installing}
-            onReviewDetails={onReviewDetails}
+    <aside aria-label="Selected Discover app" className="relative hidden min-h-0 border-l border-sky-300/15 bg-slate-950/10 p-3 xl:block">
+      <div className="relative z-30 h-full" onPointerDown={(event) => event.stopPropagation()}>
+        <div aria-hidden={!detailsOpen} className="pointer-events-none absolute inset-y-0 right-0 z-20 w-[59.5rem] overflow-hidden">
+          <MarketplaceAppDetailsPopover
+            appView={appView}
+            onClose={() => onDetailsOpenChange(false)}
+            onInstallSecondCopy={onInstallSecondCopy}
+            open={detailsOpen}
+            onPanelRef={(panel) => {
+              detailsPanelRef.current = panel;
+            }}
           />
-
-          <div className={cn('mt-2 grid gap-2', hasAppSettings && 'grid-cols-2')}>
-            <ProjectDarkControlButton className="h-8 px-2 text-xs" onClick={onReviewDetails} type="button">
-              Full details
-            </ProjectDarkControlButton>
-            {hasAppSettings ? (
-              <ProjectDarkControlButton className="h-8 px-2 text-xs" onClick={onConfigureSettings} type="button">
-                <Settings2 className="size-3.5" />
-                App settings
-              </ProjectDarkControlButton>
-            ) : null}
-          </div>
-
-          <MarketplaceAppDetailsCard app={appView.app} className="mt-3" compact />
-
-          {installLocked && (
-            <p className="mt-3 rounded-lg border border-orange-400/35 bg-orange-500/10 px-3 py-2 text-xs leading-5 text-orange-100">
-              {installStatusMessage || 'Another app is installing. You can still review this app while it finishes.'}
-            </p>
-          )}
         </div>
-      </section>
+
+        <section
+          className={cn(
+            'relative z-30 h-full overflow-y-auto rounded-2xl border border-sky-300/20 bg-[#0b1831] text-slate-50 shadow-lg shadow-slate-950/20 transition-[border-radius,box-shadow] duration-200 ease-out',
+            detailsOpen && 'rounded-l-none shadow-2xl shadow-cyan-950/50',
+          )}
+        >
+          <AppImage app={appView.app} presentation="artwork" className="h-32 border-sky-300/10" />
+          <div className="p-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-slate-400">{appView.categoryLabel}</p>
+                <h3 className="mt-1 line-clamp-2 break-words text-lg font-semibold leading-6 text-white">{appView.name}</h3>
+              </div>
+              <StatusBadge className="shrink-0" tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
+            </div>
+
+            <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-200">{appView.description}</p>
+
+            <RailPrimaryAction
+              appView={appView}
+              installLocked={installLocked}
+              installing={installing}
+              onReviewInstall={onReviewInstall}
+            />
+
+            <div className={cn('mt-2 grid gap-2', hasAppSettings && 'grid-cols-2')}>
+              <ProjectDarkControlButton className="h-8 px-2 text-xs" onClick={() => onDetailsOpenChange(!detailsOpen)} type="button">
+                {detailsOpen ? <X className="size-3.5" /> : <Settings2 className="size-3.5" />}
+                {detailsOpen ? 'Close details' : 'App details'}
+              </ProjectDarkControlButton>
+              {hasAppSettings ? (
+                <ProjectDarkControlButton className="h-8 px-2 text-xs" onClick={onConfigureSettings} type="button">
+                  <Settings2 className="size-3.5" />
+                  App settings
+                </ProjectDarkControlButton>
+              ) : null}
+            </div>
+
+            <MarketplaceAppDetailsCard app={appView.app} className="mt-3" compact />
+
+            {installLocked && (
+              <p className="mt-3 rounded-lg border border-orange-400/35 bg-orange-500/10 px-3 py-2 text-xs leading-5 text-orange-100">
+                {installStatusMessage || 'Another app is installing. You can still review this app while it finishes.'}
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
     </aside>
   );
 }
 
-function RailPrimaryAction({
-  actionDisabled,
-  actionLabel,
-  actionReason,
-  actionRoute,
-  attentionState,
-  installing,
-  onReviewDetails,
-}: {
-  actionDisabled: boolean;
-  actionLabel: string;
-  actionReason: string;
-  actionRoute: string | null;
-  attentionState: boolean;
-  installing: boolean;
-  onReviewDetails: () => void;
-}) {
+function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, onPanelRef, open }: { appView: DiscoverAppView; onClose: () => void; onInstallSecondCopy: () => void; onPanelRef: (panel: HTMLElement | null) => void; open: boolean }) {
+  const [tab, setTab] = useState('overview');
+  const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
+  const reviewExistingHref = appView.observedService
+    ? applicationDeepLinkForObservedService(appView.observedService, { panel: 'manage' })
+    : applicationRouteWithManagementPanel(appView.reviewExistingHref) ?? null;
+
+  useEffect(() => {
+    setTab('overview');
+  }, [appView.id]);
+
+  return (
+    <section
+      aria-hidden={!open}
+      aria-label="Discover app details"
+      className={cn(
+        'pointer-events-auto absolute right-[calc(17.5rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-hidden rounded-l-2xl border border-r-0 border-cyan-300/40 bg-slate-900 text-slate-50 shadow-2xl shadow-cyan-950/40 transition-transform duration-300 ease-out motion-reduce:transition-none',
+        open ? 'translate-x-0' : 'pointer-events-none translate-x-[calc(100%+19rem)]',
+      )}
+      ref={onPanelRef}
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-sky-400/20 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-white">App details</p>
+          <p className="mt-1 text-xs leading-5 text-sky-100/60">Everything you need to evaluate {appView.name} before installing it.</p>
+        </div>
+        <ProjectDarkControlButton aria-label="Close app details" onClick={onClose} size="icon" type="button">
+          <X className="size-4" />
+        </ProjectDarkControlButton>
+      </div>
+
+      <Tabs className="min-h-0" onValueChange={setTab} value={tab}>
+        <TabsList className="w-full justify-start overflow-x-auto rounded-none border-b border-sky-400/20 bg-slate-900 px-3 py-2" variant="line">
+          <TabsTrigger className="shrink-0 px-3 py-2 text-sky-100/60 data-active:text-white" value="overview">Overview</TabsTrigger>
+          <TabsTrigger className="shrink-0 px-3 py-2 text-sky-100/60 data-active:text-white" value="details">Details</TabsTrigger>
+        </TabsList>
+
+        <div className="p-4">
+          <TabsContent className="mt-0 grid gap-4" value="overview">
+            <div className="flex min-w-0 items-start gap-3">
+              <AppImage app={appView.app} size="large" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
+                  <SupportBadge level={appView.app.supportLevel} />
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{appView.app.plainLanguage}</p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AppFactList items={appView.app.highlights} title="Key features" />
+              <AppFactList items={appView.app.bestFor} title="Best for" />
+            </div>
+            {appView.installCopyWarningRequired && (
+              <ProjectDarkControlButton className="w-fit" onClick={() => setDuplicateWarningOpen(true)} type="button">
+                Install second copy
+              </ProjectDarkControlButton>
+            )}
+          </TabsContent>
+
+          <TabsContent className="mt-0" value="details">
+            <MarketplaceAppDetailsCard app={appView.app} />
+          </TabsContent>
+        </div>
+      </Tabs>
+
+      <DuplicateInstallWarningDialog appName={appView.name} onInstallCopy={onInstallSecondCopy} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={reviewExistingHref} />
+    </section>
+  );
+}
+
+function AppFactList({ items, title }: { items: string[]; title: string }) {
+  return (
+    <section className="rounded-xl border border-sky-300/15 bg-slate-800 p-4">
+      <h4 className="font-semibold text-slate-50">{title}</h4>
+      <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-slate-300">
+        {items.map((item) => <li className="flex gap-2" key={item}><span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-cyan-300" />{item}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function RailPrimaryAction({ appView, installLocked, installing, onReviewInstall }: { appView: DiscoverAppView; installLocked: boolean; installing: boolean; onReviewInstall: () => void }) {
+  const actionRoute = marketplacePrimaryRoute(appView);
+  const actionDisabled = appView.primaryAction.disabled || installLocked || installing;
+  const actionReason = appView.primaryAction.reason || (installing ? `${appView.name} is already installing.` : installLocked ? 'Another app is installing right now.' : 'This app action is not available right now.');
+  const actionLabel = railActionLabel(appView, installing, installLocked);
+  const attentionState = appView.statusTone === 'warning' || appView.statusTone === 'observed' || appView.statusTone === 'danger';
   const ButtonComponent = attentionState ? ProjectWarningButton : ProjectPrimaryButton;
 
-  if (actionRoute && !actionDisabled) {
+  if (actionRoute && !appView.primaryAction.disabled) {
     return (
       <ButtonComponent asChild className="mt-4 w-full">
         <Link to={actionRoute}>
@@ -108,7 +211,7 @@ function RailPrimaryAction({
 
   return (
     <DisabledAction className="mt-4 w-full" disabled={actionDisabled} reason={actionReason}>
-      <ButtonComponent className="w-full" disabled={actionDisabled} onClick={onReviewDetails} type="button">
+      <ButtonComponent className="w-full" disabled={actionDisabled} onClick={onReviewInstall} type="button">
         {installing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
         {actionLabel}
         {!installing && <ArrowRight className="size-4" />}
@@ -117,15 +220,10 @@ function RailPrimaryAction({
   );
 }
 
-function railActionLabel(appView: DiscoverAppView, installing: boolean) {
-  if (installing) {
-    return 'View install progress';
-  }
-  if (appView.primaryAction.id === 'review_setup') {
-    return 'Review install';
-  }
-  if (appView.primaryAction.id === 'manage') {
-    return 'View in My Apps';
-  }
+function railActionLabel(appView: DiscoverAppView, installing: boolean, installLocked: boolean) {
+  if (installing) return 'Installing...';
+  if (installLocked) return 'Install blocked';
+  if (appView.primaryAction.id === 'review_setup') return 'Review install';
+  if (appView.primaryAction.id === 'manage') return 'View in My Apps';
   return appView.primaryAction.label;
 }

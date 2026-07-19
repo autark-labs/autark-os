@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, ArrowLeft, CheckCircle2, Loader2, Settings2, TriangleAlert } from 'lucide-react';
+import { Archive, CheckCircle2, Loader2, Settings2, TriangleAlert } from 'lucide-react';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { backupSafetyWarning } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
 import { currentJobStepText, terminalJob } from '@/repositories/jobRepository';
@@ -22,7 +23,7 @@ import {
 } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { InstallWizard } from './MarketplaceInstallWizard';
 import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
-import { AppImage, InfoCard, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
+import { AppImage, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
 import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
 
 type AppDetailProps = {
@@ -45,14 +46,13 @@ type AppDetailProps = {
   onOpenSettings: () => void;
   onReinstallCurrent: () => void | Promise<void>;
   onRequestPlan: (options: InstallOptions) => Promise<void>;
-  planLoading: boolean;
   recoveryMode?: string | null;
   setupAnswers: Record<string, unknown>;
   setupReady: boolean;
   setupSchema: DiscoverSetupSchema;
 };
 
-export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onOpenSettings, onReinstallCurrent, onRequestPlan, planLoading, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
+export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, installJob, installedApp, installLocked, installOptions, installPlan, installPreview, installStatusMessage, installing, onBack, onCreateBackup, onDuplicateInstallAcknowledged, onInstall, onOpenSettings, onReinstallCurrent, onRequestPlan, recoveryMode, setupAnswers, setupReady, setupSchema }: AppDetailProps) {
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
@@ -84,34 +84,20 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
   }
 
   const content = (
-    <div className="grid gap-5">
-        <ProjectDarkControlButton className="w-fit" onClick={onBack} type="button">
-          <ArrowLeft className="size-4" />
-          Back to apps
-        </ProjectDarkControlButton>
-
-        <div className="grid gap-4 sm:grid-cols-[88px_minmax(0,1fr)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="grid gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <AppImage app={app} size="large" />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h3 className="text-2xl font-bold text-slate-50">{app.name}</h3>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
               <StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
               <SupportBadge level={app.supportLevel} />
             </div>
-            <p className="mt-2 text-sm text-slate-300">{app.description}</p>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-400">
-              <span>{app.category}</span>
-              <span>{app.difficulty}</span>
-              <span>{app.installTime}</span>
-            </div>
+            <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-300">{app.description}</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {app.tags.map((tag) => <MetadataBadge key={tag}>{tag}</MetadataBadge>)}
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className={cn('grid gap-2', hasAppSettings && 'sm:grid-cols-[minmax(0,1fr)_auto]')}>
           {isInstalled ? (
             <ProjectPrimaryButton asChild>
               <Link to={installedAppHref}>
@@ -120,26 +106,26 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
               </Link>
             </ProjectPrimaryButton>
           ) : needsExistingServiceReview ? (
-            <>
-              {reviewExistingHref ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {reviewExistingHref && (
                 <ProjectWarningButton asChild>
                   <Link to={reviewExistingHref}>
                     <TriangleAlert className="size-4" />
                     Review existing service
                   </Link>
                 </ProjectWarningButton>
-              ) : null}
+              )}
               <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
-                <ProjectDarkControlButton disabled={installDisabled} onClick={openDuplicateWarning} type="button">
+                <ProjectDarkControlButton className="w-full" disabled={installDisabled} onClick={openDuplicateWarning} type="button">
                   Install second copy
                 </ProjectDarkControlButton>
               </DisabledAction>
-            </>
+            </div>
           ) : (
             <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
-              <ProjectPrimaryButton disabled={installDisabled} onClick={openInstallReview} type="button">
+              <ProjectPrimaryButton className="w-full" disabled={installDisabled} onClick={openInstallReview} type="button">
                 {installing ? <Loader2 className="size-4 animate-spin" /> : null}
-                {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish install choices' : 'Install'}
+                {installing ? 'Installing...' : installLocked ? 'Install blocked' : !setupReady ? 'Finish install choices' : 'Review install'}
               </ProjectPrimaryButton>
             </DisabledAction>
           )}
@@ -149,46 +135,117 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
               App settings
             </ProjectDarkControlButton>
           )}
-          {!isInstalled && <InstallWizard app={app} hasAppSettings={hasAppSettings} hideTrigger installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installStatusMessage={!setupReady ? 'Finish the required app settings before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onOpenSettings={onOpenSettings} onRequestPlan={onRequestPlan} open={installReviewOpen} planLoading={planLoading} setupAnswers={setupAnswers} setupSchema={setupSchema} />}
+          {!isInstalled && <InstallWizard app={app} hasAppSettings={hasAppSettings} hideTrigger installLocked={installLocked || !setupReady} installOptions={installOptions} installPlan={installPlan} installPreview={installPreview} installStatusMessage={!setupReady ? 'Finish the required app settings before installing.' : installStatusMessage} installing={installing} onInstall={onInstall} onOpenChange={setInstallReviewOpen} onOpenSettings={onOpenSettings} open={installReviewOpen} setupAnswers={setupAnswers} setupSchema={setupSchema} />}
         </div>
+      </div>
 
-        {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
-        {needsExistingServiceReview && <ExistingServiceNotice appView={appView} reviewHref={reviewExistingHref} />}
-        {requiresInstallCaution(app) && !isInstalled && <InstallCautionNotice app={app} />}
-        <DuplicateInstallWarningDialog appName={app.name} onInstallCopy={acknowledgeDuplicateInstall} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={reviewExistingHref} />
-        {isInstalled && <InstalledAppNotice app={installedApp} manageHref={manageInstalledAppHref} />}
-        {isInstalled && recoveryMode && recoveryMode !== 'reset-reinstall' && (
-          <RecoveryInstallNotice
-            disabled={installLocked || installing}
-            mode={recoveryMode}
-            onReinstallCurrent={onReinstallCurrent}
-          />
+      <Tabs className="min-h-0 flex-1" defaultValue="overview">
+        <TabsList className="w-full justify-start overflow-x-auto rounded-lg border border-sky-300/15 bg-slate-950/25 p-1" variant="default">
+          <TabsTrigger className="shrink-0 text-xs" value="overview">Overview</TabsTrigger>
+          {!isInstalled && <TabsTrigger className="shrink-0 text-xs" value="install">Install</TabsTrigger>}
+          <TabsTrigger className="shrink-0 text-xs" value="details">Details</TabsTrigger>
+        </TabsList>
+
+        <TabsContent className="mt-4 grid gap-3" value="overview">
+          {installLocked && <InstallBlockedNotice message={installStatusMessage} />}
+          {needsExistingServiceReview && <ExistingServiceNotice appView={appView} reviewHref={reviewExistingHref} />}
+          {isInstalled && <InstalledAppNotice app={installedApp} manageHref={manageInstalledAppHref} />}
+          {isInstalled && recoveryMode && recoveryMode !== 'reset-reinstall' && (
+            <RecoveryInstallNotice
+              disabled={installLocked || installing}
+              mode={recoveryMode}
+              onReinstallCurrent={onReinstallCurrent}
+            />
+          )}
+          {(installJob || backupJob || installing) && <InlineInstallStatus app={app} backupJob={backupJob} installedApp={installedApp} installing={installing} job={installJob} onCreateBackup={onCreateBackup} />}
+          <AppOverview app={app} />
+        </TabsContent>
+
+        {!isInstalled && (
+          <TabsContent className="mt-4 grid gap-3" value="install">
+            {requiresInstallCaution(app) && <InstallCautionNotice app={app} />}
+            <InstallReadinessSummary app={app} hasAppSettings={hasAppSettings} />
+          </TabsContent>
         )}
-        {(installJob || backupJob || installing) && <InlineInstallStatus app={app} backupJob={backupJob} installedApp={installedApp} installing={installing} job={installJob} onCreateBackup={onCreateBackup} />}
 
-        <section className="rounded-lg border border-sky-400/25 bg-slate-800 p-4">
-          <h4 className="font-bold text-slate-50">About</h4>
-          <p className="mt-2 text-sm leading-6 text-slate-300">{app.plainLanguage}</p>
-        </section>
+        <TabsContent className="mt-4" value="details">
+          <MarketplaceAppDetailsCard app={app} />
+        </TabsContent>
+      </Tabs>
 
-        <div className="grid gap-4">
-          <InfoCard title="Key features" items={app.highlights} />
-          <InfoCard title="Best for" items={app.bestFor} />
-        </div>
-
-        <MarketplaceAppDetailsCard app={app} />
+      <DuplicateInstallWarningDialog appName={app.name} onInstallCopy={acknowledgeDuplicateInstall} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={reviewExistingHref} />
     </div>
   );
 
   return (
     <ResponsiveDetailsSheet
-      className="border-slate-600 bg-slate-800"
-      model={{ description: app.description, title: app.name }}
+      className="border-sky-300/30 bg-[#0b1831] sm:!max-w-xl lg:!max-w-[42rem]"
+      headerAccessory={<StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>}
+      model={{ description: `${app.category} · ${app.installTime}`, title: app.name }}
       onOpenChange={(open) => !open && onBack()}
       open
     >
       {content}
     </ResponsiveDetailsSheet>
+  );
+}
+
+function AppOverview({ app }: { app: MarketplaceApp }) {
+  return (
+    <>
+      <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-4">
+        <h4 className="font-semibold text-slate-50">About</h4>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{app.plainLanguage}</p>
+        {app.tags.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {app.tags.map((tag) => <MetadataBadge key={tag}>{tag}</MetadataBadge>)}
+          </div>
+        )}
+      </section>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <AppFactList items={app.highlights} title="Key features" />
+        <AppFactList items={app.bestFor} title="Best for" />
+      </div>
+    </>
+  );
+}
+
+function AppFactList({ items, title }: { items: string[]; title: string }) {
+  return (
+    <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-4">
+      <h4 className="font-semibold text-slate-50">{title}</h4>
+      <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-slate-300">
+        {items.map((item) => <li className="flex gap-2" key={item}><span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-cyan-300" />{item}</li>)}
+      </ul>
+    </section>
+  );
+}
+
+function InstallReadinessSummary({ app, hasAppSettings }: { app: MarketplaceApp; hasAppSettings: boolean }) {
+  return (
+    <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-semibold text-slate-50">Install readiness</h4>
+          <p className="mt-1 text-sm leading-5 text-slate-300">Review the final plan before Autark-OS changes this server.</p>
+        </div>
+        <span className="shrink-0 rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2 py-1 text-xs font-medium text-cyan-100">{hasAppSettings ? 'Configuration ready' : 'Safe defaults'}</span>
+      </div>
+      <dl className="mt-4 grid gap-2 text-sm">
+        <DrawerDetail label="Typical install" value={app.installTime} />
+        <DrawerDetail label="Ready when" value={app.health.successLabel} />
+        <DrawerDetail label="Backup protection" value="Included by default" />
+      </dl>
+    </section>
+  );
+}
+
+function DrawerDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-sky-300/10 pt-2 first:border-t-0 first:pt-0">
+      <dt className="text-slate-400">{label}</dt>
+      <dd className="max-w-[60%] truncate text-right font-medium text-slate-100" title={value}>{value}</dd>
+    </div>
   );
 }
 
@@ -214,7 +271,7 @@ function ExistingServiceNotice({ appView, reviewHref }: { appView: DiscoverAppVi
         <div>
           <h4 className="font-bold text-current">{appView.stateLabel}</h4>
           <p className="mt-1 leading-6 text-current/80">{appView.stateDescription}</p>
-          <p className="mt-2 leading-6 text-current/80">Autark-OS already sees this app on your system. Installing another copy can cause confusing behavior across your network, especially from phones, TVs, or other devices that discover services automatically. Pin or adopt the existing service when possible. Install a second copy only if you intentionally want two separate instances.</p>
+          <p className="mt-2 leading-6 text-current/80">Review or adopt the existing service before creating another copy.</p>
           {reviewHref && (
             <Button asChild className="mt-3" size="sm" variant="outline">
               <Link to={reviewHref}>Review existing service</Link>
