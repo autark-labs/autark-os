@@ -1,4 +1,4 @@
-import { ExternalLink, Loader2, Network, Pause, Play, RotateCw, Search, ShieldAlert, ShieldCheck, TimerReset } from 'lucide-react';
+import { ExternalLink, Loader2, Network, Pause, Play, RotateCw, Search, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { AppCardName } from '@/components/autark-os/AppCardName';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
@@ -57,15 +57,14 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
           <AdvancedEmptyState emptyState={emptyState} />
         ) : (
           <div data-testid="advanced-table-scroll-area" className="h-full min-h-0 overflow-auto overscroll-contain rounded-xl border border-app-border-muted bg-slate-950 px-2 pb-2">
-            <Table aria-hidden={managementOpen} className="min-w-[76rem] table-fixed border-separate border-spacing-y-2" containerClassName="overflow-visible" ref={tableRef}>
+            <Table aria-hidden={managementOpen} className="min-w-[74rem] table-fixed border-separate border-spacing-y-2" containerClassName="overflow-visible" ref={tableRef}>
               <colgroup>
-                <col className="w-96" />
+                <col className="w-72" />
+                <col className="w-32" />
+                <col className="w-40" />
+                <col className="w-32" />
                 <col className="w-36" />
-                <col className="w-56" />
-                <col className="w-40" />
-                <col className="w-40" />
-                <col className="w-48" />
-                <col />
+                <col className="w-80" />
               </colgroup>
               <TableHeader>
                 <TableRow className="h-10 border-transparent hover:bg-transparent">
@@ -74,7 +73,6 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
                   <TableHead className={tableHeadClass}>State</TableHead>
                   <TableHead className={tableHeadClass}>Access</TableHead>
                   <TableHead className={tableHeadClass}>Backup</TableHead>
-                  <TableHead className={tableHeadClass}>Recent activity</TableHead>
                   <TableHead className={cn(tableHeadClass, 'text-right')}>Controls</TableHead>
                 </TableRow>
               </TableHeader>
@@ -141,16 +139,10 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
       <TableCell className="h-16 px-3 py-0">
         {item.operationState.kind !== 'idle' ? (
           <CompactOperationStatus compact item={item} />
-        ) : (
-          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-            <ReadinessBadge item={item} />
-            <AttentionIndicator item={item} />
-          </div>
-        )}
+        ) : item.attentionState !== 'none' ? <AttentionIndicator item={item} /> : <ReadinessBadge item={item} />}
       </TableCell>
       <TableCell className="h-16 px-3 py-0"><TableMetadata icon={<Network aria-hidden="true" className="size-3.5" />} value={item.access} /></TableCell>
       <TableCell className="h-16 px-3 py-0"><BackupMetadata item={item} /></TableCell>
-      <TableCell className="h-16 px-3 py-0"><TableMetadata icon={<TimerReset aria-hidden="true" className="size-3.5" />} value={item.lastEvent || 'No recent activity'} /></TableCell>
       <TableCell className="h-16 rounded-r-xl px-3 py-0">
         <div className="flex h-16 justify-end gap-2 whitespace-nowrap">
           {item.href && (

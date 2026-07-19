@@ -25,7 +25,9 @@ test('My Apps renders canonical managed and linked collections without mixing in
   assert.match(advancedView, /table-fixed/);
   assert.match(advancedView, /sticky left-0/);
   assert.match(advancedView, /h-16/);
-  assert.match(advancedView, /Recent activity/);
+  assert.match(advancedView, /w-72/);
+  assert.match(advancedView, /w-40/);
+  assert.doesNotMatch(advancedView, /Recent activity/);
   assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
   assert.match(header, /title="My Apps"/);
   assert.match(header, /<AppWindow aria-hidden="true" className="size-5" \/>/);

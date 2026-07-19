@@ -29,6 +29,7 @@ test('My Apps basic cards use the compact homepage launcher treatment', async ({
   const tableScrollArea = page.getByTestId('advanced-table-scroll-area');
   const nameHeader = page.getByRole('columnheader', { name: 'Name' });
   await expect(nameHeader).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Recent activity' })).toHaveCount(0);
   await expect(nameHeader).toHaveCSS('position', 'sticky');
   await expect(nameHeader).toHaveCSS('left', '0px');
   await expect(page.locator('[data-slot="table-container"]').first()).toBeVisible();
