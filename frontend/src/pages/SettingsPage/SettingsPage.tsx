@@ -291,7 +291,7 @@ function SettingsPage({
       </AlertDialog>
 
       <AlertDialog open={Boolean(pendingNavigation)} onOpenChange={(open) => !open && setPendingNavigation(null)}>
-        <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100 min-w-20">
+        <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
           <AlertDialogHeader>
             <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">Your settings edits have not been saved. Keep editing or discard them before leaving this page.</AlertDialogDescription>
