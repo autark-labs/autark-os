@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,6 +28,35 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
     @Override
     public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
         return run(composeFile, projectName, "up", "-d");
+    }
+
+    @Override
+    public RuntimeModels.DockerComposeResult pull(Path composeFile, String projectName) {
+        return run(composeFile, projectName, "pull");
+    }
+
+    @Override
+    public Map<String, String> imageDigests(List<String> images) {
+        Map<String, String> resolved = new LinkedHashMap<>();
+        for (String image : images == null ? List.<String>of() : images) {
+            if (image == null || image.isBlank()) {
+                continue;
+            }
+            RuntimeModels.DockerComposeResult result = runCommand(List.of(
+                    "docker", "image", "inspect", "--format", "{{join .RepoDigests \"\\n\"}}", image));
+            if (!result.successful()) {
+                continue;
+            }
+            String digest = result.output().stream()
+                    .map(String::trim)
+                    .filter(value -> value.contains("@sha256:"))
+                    .findFirst()
+                    .orElse("");
+            if (!digest.isBlank()) {
+                resolved.put(image, digest);
+            }
+        }
+        return resolved;
     }
 
     @Override

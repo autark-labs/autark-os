@@ -120,8 +120,8 @@ public class InstalledAppsController {
     }
 
     @GetMapping("/{id}/update-plan")
-    public ResponseEntity<UpdateModels.AppUpdateCapability> updatePlan(@PathVariable String id) {
-        return appUpdatesUnavailable();
+    public UpdateModels.AppUpdatePlan updatePlan(@PathVariable String id) {
+        return appUpdateService.updatePlan(id);
     }
 
     @PostMapping("/{id}/start")
@@ -211,13 +211,60 @@ public class InstalledAppsController {
     }
 
     @PostMapping("/{id}/update")
-    public ResponseEntity<UpdateModels.AppUpdateCapability> update(@PathVariable String id) {
-        return appUpdatesUnavailable();
+    public ResponseEntity<?> update(@PathVariable String id) {
+        UpdateModels.AppUpdatePlan plan = appUpdateService.updatePlan(id);
+        if (!plan.canApply()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(plan);
+        }
+        AutarkOsJob active = activeLifecycleJob(id);
+        if (active != null) {
+            return ResponseEntity.ok(active);
+        }
+        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.UPDATE_APP, id, updateJobSteps(false), activeJob -> {
+            markUpdateProgress(activeJob.jobId(), updateJobSteps(false), "create_safety_checkpoint");
+            try {
+                appUpdateService.update(id, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(false), phase));
+                List<AutarkOsJobStep> completed = updateJobSteps(false).stream()
+                        .map(step -> AutarkOsJobStep.succeeded(step.id(), step.label(), step.label() + " completed."))
+                        .toList();
+                return AutarkOsJobOutcome.succeeded("Updated " + plan.appName() + " to " + plan.targetVersion() + ".", completed);
+            } finally {
+                applicationStateService.invalidate();
+            }
+        });
+        applicationStateService.invalidate();
+        return ResponseEntity.accepted().body(job);
+    }
+
+    @GetMapping("/{id}/rollback-plan")
+    public UpdateModels.AppUpdatePlan rollbackPlan(@PathVariable String id) {
+        return appUpdateService.rollbackPlan(id);
     }
 
     @PostMapping("/{id}/rollback")
-    public ResponseEntity<UpdateModels.AppUpdateCapability> rollback(@PathVariable String id) {
-        return appUpdatesUnavailable();
+    public ResponseEntity<?> rollback(@PathVariable String id) {
+        UpdateModels.AppUpdatePlan plan = appUpdateService.rollbackPlan(id);
+        if (!plan.canApply()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(plan);
+        }
+        AutarkOsJob active = activeLifecycleJob(id);
+        if (active != null) {
+            return ResponseEntity.ok(active);
+        }
+        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.ROLLBACK_APP, id, updateJobSteps(true), activeJob -> {
+            markUpdateProgress(activeJob.jobId(), updateJobSteps(true), "create_safety_checkpoint");
+            try {
+                appUpdateService.rollback(id, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(true), phase));
+                List<AutarkOsJobStep> completed = updateJobSteps(true).stream()
+                        .map(step -> AutarkOsJobStep.succeeded(step.id(), step.label(), step.label() + " completed."))
+                        .toList();
+                return AutarkOsJobOutcome.succeeded("Restored " + plan.appName() + " to " + plan.targetVersion() + ".", completed);
+            } finally {
+                applicationStateService.invalidate();
+            }
+        });
+        applicationStateService.invalidate();
+        return ResponseEntity.accepted().body(job);
     }
 
     @PostMapping("/{id}/private-access/enable")
@@ -264,10 +311,6 @@ public class InstalledAppsController {
     private <T> T refreshAfter(T result) {
         applicationStateService.invalidate();
         return result;
-    }
-
-    private ResponseEntity<UpdateModels.AppUpdateCapability> appUpdatesUnavailable() {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(appUpdateService.capability());
     }
 
     private AppActionResult refreshAfter(AppActionResult result) {
@@ -332,10 +375,53 @@ public class InstalledAppsController {
     private AutarkOsJob activeLifecycleJob(String id) {
         return jobService.list().stream()
                 .filter(job -> id.equals(job.subjectId()))
-                .filter(job -> List.of(AutarkOsStates.JobType.START_APP, AutarkOsStates.JobType.STOP_APP, AutarkOsStates.JobType.RESTART_APP, AutarkOsStates.JobType.REPAIR_APP).contains(job.type()))
+                .filter(job -> List.of(
+                        AutarkOsStates.JobType.START_APP,
+                        AutarkOsStates.JobType.STOP_APP,
+                        AutarkOsStates.JobType.RESTART_APP,
+                        AutarkOsStates.JobType.REPAIR_APP,
+                        AutarkOsStates.JobType.UPDATE_APP,
+                        AutarkOsStates.JobType.ROLLBACK_APP).contains(job.type()))
                 .filter(job -> AutarkOsStates.JobStatus.QUEUED.equals(job.status()) || AutarkOsStates.JobStatus.RUNNING.equals(job.status()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private List<AutarkOsJobStep> updateJobSteps(boolean rollback) {
+        List<AutarkOsJobStep> steps = new java.util.ArrayList<>();
+        steps.add(AutarkOsJobStep.pending("create_safety_checkpoint", "Create safety checkpoint"));
+        steps.add(AutarkOsJobStep.pending("snapshot_release", "Save current release"));
+        if (!rollback) {
+            steps.add(AutarkOsJobStep.pending("pull_release", "Download target release"));
+        }
+        steps.add(AutarkOsJobStep.pending("apply_release", rollback ? "Restore saved release" : "Apply target release"));
+        steps.add(AutarkOsJobStep.pending("verify_release", "Verify app health"));
+        return List.copyOf(steps);
+    }
+
+    private void markUpdateProgress(String jobId, List<AutarkOsJobStep> steps, String activeStepId) {
+        int activeIndex = -1;
+        for (int index = 0; index < steps.size(); index++) {
+            if (steps.get(index).id().equals(activeStepId)) {
+                activeIndex = index;
+                break;
+            }
+        }
+        if (activeIndex < 0) {
+            return;
+        }
+        List<AutarkOsJobStep> progress = new java.util.ArrayList<>();
+        for (int index = 0; index < steps.size(); index++) {
+            AutarkOsJobStep step = steps.get(index);
+            if (index < activeIndex) {
+                progress.add(AutarkOsJobStep.succeeded(step.id(), step.label(), step.label() + " completed."));
+            } else if (index == activeIndex) {
+                progress.add(AutarkOsJobStep.running(step.id(), step.label(), step.label() + " in progress."));
+            } else {
+                progress.add(step);
+            }
+        }
+        jobService.recordProgress(jobId, progress);
     }
 
     private AppRuntimeView waitForLifecycleReadiness(String id, String action, AppRuntimeView initial) {

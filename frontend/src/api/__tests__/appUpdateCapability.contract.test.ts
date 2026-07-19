@@ -9,13 +9,16 @@ function source(relativePath: string) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('the production frontend has no app update client, query, or update action types', () => {
+test('the production frontend exposes planned managed app update and rollback actions', () => {
   const client = source('src/api/InstalledAppsAPIClient.ts');
   const repository = source('src/repositories/applicationStateRepository.ts');
   const appTypes = source('src/types/app.ts');
 
-  assert.doesNotMatch(client, /\/api\/apps\/updates|updatePlan|updateApp|rollbackApp/);
+  assert.match(client, /\/api\/apps\/\$\{appId\}\/update-plan/);
+  assert.match(client, /\/api\/apps\/\$\{appId\}\/rollback-plan/);
+  assert.match(client, /\/api\/apps\/\$\{appId\}\/update/);
+  assert.match(client, /\/api\/apps\/\$\{appId\}\/rollback/);
   assert.doesNotMatch(repository, /useAppUpdatesQuery|appUpdatesQueryKey|invalidateAppUpdates/);
-  assert.doesNotMatch(appTypes, /AppUpdateStatus|AppUpdatePlan|AppUpdateResult/);
+  assert.match(appTypes, /AppUpdatePlan/);
   assert.equal(existsSync(resolve(root, 'src/pages/UpdatesPage')), false);
 });

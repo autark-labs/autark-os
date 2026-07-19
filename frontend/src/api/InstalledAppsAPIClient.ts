@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient';
-import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, InstallSettings, UninstallPlan } from '@/types/app';
+import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, InstallSettings, UninstallPlan } from '@/types/app';
 import type { AutarkOsJob } from '@/types/jobs';
 
 export type InstalledAppLifecycleAction = 'start' | 'stop' | 'restart';
@@ -48,6 +48,26 @@ export const InstalledAppsAPIClient = {
 
   async uninstallPlan(appId: string) {
     const response = await httpClient.get<UninstallPlan>(`/api/apps/${appId}/uninstall-plan`);
+    return response.data;
+  },
+
+  async updatePlan(appId: string) {
+    const response = await httpClient.get<AppUpdatePlan>(`/api/apps/${appId}/update-plan`);
+    return response.data;
+  },
+
+  async rollbackPlan(appId: string) {
+    const response = await httpClient.get<AppUpdatePlan>(`/api/apps/${appId}/rollback-plan`);
+    return response.data;
+  },
+
+  async update(appId: string) {
+    const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/update`);
+    return response.data;
+  },
+
+  async rollback(appId: string) {
+    const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/rollback`);
     return response.data;
   },
 

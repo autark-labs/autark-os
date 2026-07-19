@@ -69,6 +69,8 @@ public final class AutarkOsStates {
         public static final String REPAIRING = "repairing";
         public static final String BACKING_UP = "backing_up";
         public static final String RESTORING = "restoring";
+        public static final String UPDATING = "updating";
+        public static final String ROLLING_BACK = "rolling_back";
         public static final String UNINSTALLING = "uninstalling";
         public static final String FAILED = "failed";
 
@@ -96,6 +98,8 @@ public final class AutarkOsStates {
         public static final String BACKUP_VERIFY = "backup_verify";
         public static final String BACKUP_RESTORE = "backup_restore";
         public static final String UNINSTALL_APP = "uninstall_app";
+        public static final String UPDATE_APP = "update_app";
+        public static final String ROLLBACK_APP = "rollback_app";
 
         private JobType() {
         }

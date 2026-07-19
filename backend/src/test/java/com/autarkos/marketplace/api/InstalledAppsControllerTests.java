@@ -39,7 +39,7 @@ import com.autarkos.testsupport.JpaTestRepositories;
 class InstalledAppsControllerTests {
 
     @Test
-    void updateHttpRoutesAreExplicitlyUnsupportedAndDoNotReachLifecycleServices() throws Exception {
+    void unconfiguredUpdateRoutesRemainBlockedAndDoNotReachLifecycleServices() throws Exception {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         InstalledAppsController controller = new InstalledAppsController(
@@ -53,20 +53,20 @@ class InstalledAppsControllerTests {
         mvc.perform(MockMvcRequestBuilders.get("/api/apps/updates"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
                 .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unsupported\""));
-        for (String path : List.of("/api/apps/vaultwarden/update-plan", "/api/apps/vaultwarden/update", "/api/apps/vaultwarden/rollback")) {
-            var request = path.endsWith("update-plan")
-                    ? MockMvcRequestBuilders.get(path)
-                    : MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON);
-            mvc.perform(request)
+        mvc.perform(MockMvcRequestBuilders.get("/api/apps/vaultwarden/update-plan"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"status\":\"blocked\""));
+        for (String path : List.of("/api/apps/vaultwarden/update", "/api/apps/vaultwarden/rollback")) {
+            mvc.perform(MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(409))
-                    .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unsupported\""));
+                    .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"status\":\"blocked\""));
         }
 
         verifyNoUpdateWork(lifecycleService, applicationStateService);
     }
 
     @Test
-    void appUpdateEndpointsReturnAnExplicitUnsupportedCapabilityWithoutStartingWork() {
+    void unconfiguredAppUpdateServiceKeepsMutationsBlockedWithoutStartingWork() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
         AppUpdateService updateService = new AppUpdateService();
@@ -85,15 +85,12 @@ class InstalledAppsControllerTests {
 
         assertThat(listed.available()).isFalse();
         assertThat(listed.status()).isEqualTo("unsupported");
-        assertThat(plan.getStatusCode().value()).isEqualTo(409);
+        assertThat(plan.status()).isEqualTo("blocked");
         assertThat(update.getStatusCode().value()).isEqualTo(409);
         assertThat(rollback.getStatusCode().value()).isEqualTo(409);
-        assertThat(plan.getBody()).extracting(UpdateModels.AppUpdateCapability::reasonCode)
-                .isEqualTo(listed.reasonCode());
-        assertThat(update.getBody()).extracting(UpdateModels.AppUpdateCapability::reasonCode)
-                .isEqualTo(listed.reasonCode());
-        assertThat(rollback.getBody()).extracting(UpdateModels.AppUpdateCapability::reasonCode)
-                .isEqualTo(listed.reasonCode());
+        assertThat(plan.summary()).contains("preserve saved settings");
+        assertThat(update.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
+        assertThat(rollback.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         verifyNoUpdateWork(lifecycleService, applicationStateService);
     }
 

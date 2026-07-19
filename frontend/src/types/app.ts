@@ -34,7 +34,7 @@ export type BackendAppReadinessState = 'ready' | 'starting' | 'paused' | 'stoppe
 export type BackendAppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked' | string;
 
 export type BackendAppOperationState = {
-  kind: 'idle' | 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling' | 'failed' | string;
+  kind: 'idle' | 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling' | 'updating' | 'rolling_back' | 'failed' | string;
   label?: string | null;
   jobId?: string | null;
   currentStep?: string | null;
@@ -284,6 +284,24 @@ export type AppActionResult = {
   title?: string;
   nextAction?: string | null;
   jobId?: string | null;
+};
+
+export type AppUpdatePlan = {
+  appId: string;
+  appName: string;
+  operation: 'update' | 'rollback' | string;
+  status: 'available' | 'current' | 'blocked' | 'recovery_required' | string;
+  headline: string;
+  summary: string;
+  currentVersion: string;
+  targetVersion: string;
+  canApply: boolean;
+  safetyBackupRequired: boolean;
+  rollbackAvailable: boolean;
+  rollbackSnapshotId: string;
+  changes: string[];
+  blockedReasons: string[];
+  checkedAt: string;
 };
 
 export type AppReliabilityIssue = {

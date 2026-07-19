@@ -8,6 +8,8 @@ const MAJOR_ACTIVITY_ACTIONS = new Set([
   'backup_created',
   'restore_completed',
   'update_app',
+  'app_update_completed',
+  'app_rollback_completed',
   'tailscale_signed_in',
   'tailscale_signed_out',
   'setup_completed',

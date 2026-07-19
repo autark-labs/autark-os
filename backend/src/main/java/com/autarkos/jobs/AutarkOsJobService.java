@@ -27,7 +27,7 @@ public class AutarkOsJobService {
 
     private final AutarkOsJobRepository repository;
     private final Executor executor;
-    // Port allocation is probe-based, so an install must keep this lane until its complete operation returns.
+    // Install, update, and rollback all mutate a Compose project; keep them in one lane.
     private final Executor installationExecutor;
     private final boolean autoRun;
     private final boolean reconcileOnStartup;
@@ -133,7 +133,7 @@ public class AutarkOsJobService {
     }
 
     private void schedule(AutarkOsJob job) {
-        Executor jobExecutor = AutarkOsStates.JobType.INSTALL_APP.equals(job.type())
+        Executor jobExecutor = usesInstallationLane(job.type())
                 ? installationExecutor
                 : executor;
         jobExecutor.execute(() -> {
@@ -274,9 +274,18 @@ public class AutarkOsJobService {
     private String interruptedMessage(AutarkOsJob job) {
         return switch (job.type()) {
             case AutarkOsStates.JobType.INSTALL_APP -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";
+            case AutarkOsStates.JobType.UPDATE_APP -> "This app update was interrupted when Autark-OS stopped. Review My Apps and roll back the saved release before trying again.";
+            case AutarkOsStates.JobType.ROLLBACK_APP -> "This app rollback was interrupted when Autark-OS stopped. Review My Apps before starting another release action.";
             case "backup" -> "This backup was interrupted when Autark-OS stopped. Rerun the backup to create a fresh restore point.";
             default -> "This job was interrupted when Autark-OS stopped. Start it again if it is still needed.";
         };
+    }
+
+    private boolean usesInstallationLane(String type) {
+        return List.of(
+                AutarkOsStates.JobType.INSTALL_APP,
+                AutarkOsStates.JobType.UPDATE_APP,
+                AutarkOsStates.JobType.ROLLBACK_APP).contains(type);
     }
 
     private String safeMessage(RuntimeException exception) {

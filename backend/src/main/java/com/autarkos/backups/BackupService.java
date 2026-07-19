@@ -9,6 +9,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -138,6 +139,22 @@ public class BackupService {
         return recoveryOperations.runExclusive(
                 RecoveryOperationCoordinator.Operation.APP_BACKUP,
                 () -> runAppBackup(appId, "manual"));
+    }
+
+    /**
+     * Runs a verified cold backup and keeps the recovery-operation lease while
+     * the caller performs the related update or rollback. This prevents a
+     * backup, restore, or storage cleanup from racing a release change.
+     */
+    public <T> T runWithUpdateSafetyCheckpoint(
+            String appId,
+            RecoveryOperationCoordinator.Operation operation,
+            Function<BackupModels.BackupRunResult, T> action) {
+        if (operation != RecoveryOperationCoordinator.Operation.APP_UPDATE
+                && operation != RecoveryOperationCoordinator.Operation.APP_ROLLBACK) {
+            throw new IllegalArgumentException("Update safety checkpoints require an update or rollback operation.");
+        }
+        return recoveryOperations.runExclusive(operation, () -> action.apply(runAppBackup(appId, "update_safety")));
     }
 
     public BackupModels.BackupRunResult runAutomatic() {

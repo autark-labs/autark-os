@@ -327,6 +327,8 @@ function operationKind(type: string): AppOperationKind {
   if (type === 'backup' || type === 'backup_verify') return 'backing_up';
   if (type === 'backup_restore') return 'restoring';
   if (type === 'uninstall_app') return 'uninstalling';
+  if (type === 'update_app') return 'updating';
+  if (type === 'rollback_app') return 'rolling_back';
   return 'idle';
 }
 
@@ -338,6 +340,8 @@ function operationLabel(type: string) {
   if (type === 'install_app') return 'Installing';
   if (type === 'backup' || type === 'backup_verify') return 'Creating backup';
   if (type === 'backup_restore') return 'Restoring';
+  if (type === 'update_app') return 'Updating safely';
+  if (type === 'rollback_app') return 'Restoring previous release';
   if (type === 'uninstall_app') return 'Uninstalling safely';
   return 'Working';
 }

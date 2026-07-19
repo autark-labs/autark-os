@@ -123,6 +123,8 @@ function jobOperationLabel(type: string | null | undefined) {
       return 'Repair';
     case 'update_app':
       return 'Update';
+    case 'rollback_app':
+      return 'Rollback';
     default:
       return 'Autark-OS task';
   }

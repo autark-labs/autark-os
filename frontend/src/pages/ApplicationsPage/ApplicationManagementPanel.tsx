@@ -19,6 +19,7 @@ import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
 import { ApplicationRecoveryTab } from './managementTabs/ApplicationRecoveryTab';
 import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
 import { ApplicationTelemetryTab } from './managementTabs/ApplicationTelemetryTab';
+import { ApplicationUpdateSection } from './managementTabs/ApplicationUpdateSection';
 import { ObservedServiceCatalogMatchSection } from './managementTabs/ObservedServiceCatalogMatchSection';
 import { ObservedServiceManagementSection } from './managementTabs/ObservedServiceManagementSection';
 import type { ApplicationActionHandlers, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
@@ -30,11 +31,15 @@ type ApplicationManagementPanelProps = {
     | 'onDirtyChange'
     | 'onLoadObservedServiceAdoptionPlan'
     | 'onLoadUninstallPlan'
+    | 'onLoadUpdatePlan'
+    | 'onLoadRollbackPlan'
     | 'onMatchObservedService'
     | 'onPinObservedService'
     | 'onRepair'
     | 'onRestart'
     | 'onRunUninstall'
+    | 'onRunUpdate'
+    | 'onRunRollback'
     | 'onSaveSettings'
     | 'onSettingsPlanRequest'
     | 'onSetPrivateNetworkAccess'
@@ -106,6 +111,8 @@ export function ApplicationManagementPanel({
             </section>
 
             <ObservedServiceManagementSection actions={actions} item={item} />
+
+            <ApplicationUpdateSection actions={actions} item={item} />
 
             <DangerZone actions={actions} item={item} managed={managed} />
           </TabsContent>

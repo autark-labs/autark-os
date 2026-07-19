@@ -1,9 +1,9 @@
 import type { DestructiveActionPlan } from './ApplicationsPage.destructiveActions';
-import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUsageGuide } from '@/types/app';
+import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUpdatePlan, AppUsageGuide } from '@/types/app';
 import type { ObservedServiceAdoptionPlan } from '@/types/observedService';
 
 export type ApplicationRuntimeState = 'running' | 'starting' | 'paused' | 'needs_attention' | 'found' | 'shortcut';
-export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup';
+export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup' | 'update' | 'rollback';
 export type ApplicationSettingsAction = 'planning' | 'saving' | 'private_access';
 export type AppManagementState = 'managed' | 'found' | 'linked';
 export type AppReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown';
@@ -11,7 +11,7 @@ export type AppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked'
 export type AppOperationState =
   | { kind: 'idle' }
   | {
-    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'restoring' | 'uninstalling';
+    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'restoring' | 'uninstalling' | 'updating' | 'rolling_back';
     label: string;
     jobId?: string;
     currentStep?: string;
@@ -79,6 +79,8 @@ export type ApplicationActionHandlers = {
   onDirtyChange: (id: string, dirty: boolean) => void;
   onAdoptObservedService: (serviceId: string, confirmation: string) => Promise<void>;
   onLoadUninstallPlan: (id: string) => Promise<DestructiveActionPlan>;
+  onLoadUpdatePlan: (id: string) => Promise<AppUpdatePlan>;
+  onLoadRollbackPlan: (id: string) => Promise<AppUpdatePlan>;
   onLoadObservedServiceAdoptionPlan: (serviceId: string) => Promise<ObservedServiceAdoptionPlan>;
   onMatchObservedService: (serviceId: string, catalogAppId: string | null) => Promise<void>;
   onPinObservedService: (serviceId: string) => Promise<void>;
@@ -86,6 +88,8 @@ export type ApplicationActionHandlers = {
   onRestart: (id: string) => void;
   onRunNextAction: (id: string) => void;
   onRunUninstall: (id: string) => Promise<void>;
+  onRunUpdate: (id: string) => Promise<void>;
+  onRunRollback: (id: string) => Promise<void>;
   onSaveSettings: (id: string, values: ApplicationSettingsFormValues) => Promise<void>;
   onSettingsPlanRequest: (id: string, values: ApplicationSettingsFormValues) => Promise<ApplicationSettingsImpact | null>;
   onSetPrivateNetworkAccess: (id: string, enabled: boolean) => Promise<void>;

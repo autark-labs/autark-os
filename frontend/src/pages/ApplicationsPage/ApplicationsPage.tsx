@@ -53,7 +53,7 @@ import {
   type ApplicationCollectionFilter,
 } from './extensions/ApplicationsPage.presentation';
 
-type ManagedLifecycleAction = Exclude<ApplicationRuntimeAction, 'repair' | 'backup'>;
+type ManagedLifecycleAction = Extract<ApplicationRuntimeAction, 'start' | 'stop' | 'restart'>;
 const foundAppsPromptDismissalKey = 'autark-os.my-apps.found-apps-prompt-dismissed.v1';
 
 function readFoundAppsPromptDismissal() {
@@ -464,6 +464,64 @@ export const ApplicationsPage = () => {
     return mapUninstallPlanToDestructiveActionPlan(plan);
   }
 
+  async function loadUpdatePlan(appId: string) {
+    try {
+      return await InstalledAppsAPIClient.updatePlan(appId);
+    } catch (err) {
+      showActionErrorNotification(err, 'Update review unavailable');
+      throw err;
+    }
+  }
+
+  async function loadRollbackPlan(appId: string) {
+    try {
+      return await InstalledAppsAPIClient.rollbackPlan(appId);
+    } catch (err) {
+      showActionErrorNotification(err, 'Rollback review unavailable');
+      throw err;
+    }
+  }
+
+  async function runUpdate(appId: string) {
+    setAppActionLoading(appId, 'update');
+    try {
+      const job = await InstalledAppsAPIClient.update(appId);
+      syncCanonicalAppMutationResult(queryClient, job);
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'App update started',
+        message: 'Autark-OS saved a verified safety checkpoint and will keep showing release progress here.',
+      });
+    } catch (err) {
+      showActionErrorNotification(err, 'Update could not start');
+      throw err;
+    } finally {
+      setAppActionLoading(appId, null);
+    }
+  }
+
+  async function runRollback(appId: string) {
+    setAppActionLoading(appId, 'rollback');
+    try {
+      const job = await InstalledAppsAPIClient.rollback(appId);
+      syncCanonicalAppMutationResult(queryClient, job);
+      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
+      showActionNotification({
+        ok: true,
+        severity: 'info',
+        title: 'App rollback started',
+        message: 'Autark-OS created a fresh safety checkpoint and is restoring the saved release.',
+      });
+    } catch (err) {
+      showActionErrorNotification(err, 'Rollback could not start');
+      throw err;
+    } finally {
+      setAppActionLoading(appId, null);
+    }
+  }
+
   async function runUninstall(appId: string) {
     try {
       const job = await InstalledAppsAPIClient.uninstall(appId);
@@ -561,13 +619,17 @@ export const ApplicationsPage = () => {
     onAdoptObservedService: adoptObservedService,
     onDirtyChange: handleDirtyChange,
     onLoadObservedServiceAdoptionPlan: loadObservedServiceAdoptionPlan,
+    onLoadRollbackPlan: loadRollbackPlan,
     onLoadUninstallPlan: loadUninstallPlan,
+    onLoadUpdatePlan: loadUpdatePlan,
     onMatchObservedService: matchObservedService,
     onPinObservedService: pinObservedService,
     onRepair: handleRepair,
     onRestart: handleRestart,
     onRunNextAction: handleRunNextAction,
     onRunUninstall: runUninstall,
+    onRunRollback: runRollback,
+    onRunUpdate: runUpdate,
     onSaveSettings: saveApplicationSettings,
     onSettingsPlanRequest: requestSettingsPlan,
     onSetPrivateNetworkAccess: runPrivateNetworkAccessChange,

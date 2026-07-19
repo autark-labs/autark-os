@@ -130,6 +130,18 @@ function operationStateFromLocalAction(action: ApplicationRuntimeAction): AppOpe
       label: 'Creating backup',
     };
   }
+  if (action === 'update') {
+    return {
+      kind: 'updating',
+      label: 'Updating safely',
+    };
+  }
+  if (action === 'rollback') {
+    return {
+      kind: 'rolling_back',
+      label: 'Restoring previous release',
+    };
+  }
   return { kind: 'idle' };
 }
 
@@ -174,6 +186,22 @@ function operationStateFromJob(job: AutarkOsJob): AppOperationState {
       currentStep: currentJobStepText(job),
     };
   }
+  if (job.type === 'update_app') {
+    return {
+      kind: 'updating',
+      label: 'Updating safely',
+      jobId: job.jobId,
+      currentStep: currentJobStepText(job),
+    };
+  }
+  if (job.type === 'rollback_app') {
+    return {
+      kind: 'rolling_back',
+      label: 'Restoring previous release',
+      jobId: job.jobId,
+      currentStep: currentJobStepText(job),
+    };
+  }
   if (job.type === 'backup' || job.type === 'backup_verify') {
     return {
       kind: 'backing_up',
@@ -197,7 +225,7 @@ function jobsForItem(item: Pick<ApplicationSurfaceItem, 'id' | 'sourceId'>, jobs
   const itemIds = new Set([item?.id, item?.sourceId].filter((id): id is string => Boolean(id)));
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => jobTargetsItem(job, itemIds))
-    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app'].includes(job.type))
+    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app', 'update_app', 'rollback_app'].includes(job.type))
     .sort((left, right) => jobTime(right) - jobTime(left));
 }
 

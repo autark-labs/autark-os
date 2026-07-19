@@ -9,7 +9,7 @@ import com.autarkos.marketplace.install.AppUpdateService;
 class AppUpdateCapabilityTests {
 
     @Test
-    void managedAppUpdatesStayExplicitlyUnavailableUntilTheirSafetyContractExists() {
+    void standaloneCompatibilityStubStaysExplicitlyUnavailableOutsideTheConfiguredBackend() {
         var capability = new AppUpdateService().capability();
 
         assertThat(capability.available()).isFalse();

@@ -15,7 +15,7 @@ export type AutarkOsJobError = {
 
 export type AutarkOsJob = {
   jobId: string;
-  type: 'install_app' | 'repair_app' | 'start_app' | 'stop_app' | 'restart_app' | 'backup' | 'restore' | 'update_app' | string;
+  type: 'install_app' | 'repair_app' | 'start_app' | 'stop_app' | 'restart_app' | 'backup' | 'restore' | 'update_app' | 'rollback_app' | string;
   subjectId?: string | null;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string;
   currentStep?: string | null;

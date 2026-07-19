@@ -75,7 +75,9 @@ public class RecoveryOperationCoordinator {
         BACKUP_RETENTION("backup cleanup", "cleaning up older restore points"),
         STORAGE_CLEANUP("storage cleanup", "cleaning up unused app data"),
         BACKUP_DESTINATION_CHANGE("a backup destination change", "changing the backup destination"),
-        UNINSTALL_CHECKPOINT("an app uninstall", "creating an uninstall safety checkpoint");
+        UNINSTALL_CHECKPOINT("an app uninstall", "creating an uninstall safety checkpoint"),
+        APP_UPDATE("an app update", "updating an app safely"),
+        APP_ROLLBACK("an app rollback", "rolling an app back safely");
 
         private final String actionLabel;
         private final String inProgressLabel;
