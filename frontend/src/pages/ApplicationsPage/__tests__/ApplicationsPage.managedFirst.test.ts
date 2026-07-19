@@ -18,9 +18,9 @@ test('My Apps renders canonical managed and linked collections without mixing in
   assert.match(page, /<BasicApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(page, /<AdvancedApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(card, /<AppArtwork/);
-  assert.match(card, /h-\[218px\] w-\[13rem\]/);
+  assert.match(card, /h-56 w-48/);
   assert.match(card, /card\.setAttribute\('inert', ''\)/);
-  assert.match(card, /title=\{item\.name\}/);
+  assert.match(card, /<AppCardName/);
   assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
   assert.match(header, /title="My Apps"/);
   assert.match(header, /<AppWindow aria-hidden="true" className="size-5" \/>/);
@@ -29,7 +29,8 @@ test('My Apps renders canonical managed and linked collections without mixing in
 test('My Apps uses quiet status dots and compact action affordances on dark app cards', () => {
   assert.match(stateBadges, /<StatusBadge\s+appearance="solid"/);
   assert.match(stateBadges, /<MetadataBadge appearance="solid" tone="neutral">/);
-  assert.match(card, /<AttentionIndicator item=\{item\} className="absolute right-3 top-3 z-20" \/>/);
+  assert.match(card, /labelForManagementState\(item\.managementState\)/);
+  assert.match(card, /statusLabel\(item\)/);
   assert.match(card, /DropdownMenuContent/);
   assert.match(card, /aria-label=\{`Open \$\{item\.name\}`\}/);
 });

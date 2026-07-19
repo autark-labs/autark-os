@@ -98,9 +98,9 @@ test('marketplace hides dead link controls when an app lacks URLs or review targ
 test('dense launcher cards keep canonical app states visible and long app names readable', () => {
   const list = source('MarketplaceAppList.tsx');
 
-  assert.match(list, /line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-50/);
+  assert.match(list, /<AppCardName/);
   assert.match(list, /launcherCardAttentionClass\(app\)/);
   assert.match(list, /app\.stateLabel/);
   assert.match(list, /aria-label=\{`Select \$\{app\.name\}`\}/);
-  assert.match(list, /title=\{app\.name\}/);
+  assert.match(list, /aria-label=\{`Review \$\{app\.name\}`\}/);
 });

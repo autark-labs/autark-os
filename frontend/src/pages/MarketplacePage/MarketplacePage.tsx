@@ -421,14 +421,14 @@ function MarketplacePage() {
         selectedAppId={selectedApp.id}
       />
 
-      <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-app-border-muted bg-app-surface/90 shadow-xl shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
+      <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 shadow-lg shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
         <MarketplaceBrowseSidebar
           filterValue={discoverFilterValue}
           filters={discoverFilters}
           onFilterChange={changeDiscoverFilter}
         />
 
-        <section className="flex min-h-0 flex-col border-b border-app-border-muted xl:border-b-0">
+        <section className="flex min-h-0 flex-col border-b border-sky-300/15 xl:border-b-0">
           <MarketplaceCatalogToolbar
             onSearchChange={setSearchQuery}
             onSortChange={setSortBy}
@@ -454,7 +454,7 @@ function MarketplacePage() {
         {detailsOpen && (
           <button
             aria-label="Close app details backdrop"
-            className="absolute inset-0 z-20 bg-app-surface/35 backdrop-blur-sm"
+            className="absolute inset-0 z-20 bg-slate-950/35 backdrop-blur-sm"
             onClick={closeAppDetails}
             type="button"
           />
@@ -602,7 +602,7 @@ function DiscoverGuidedHeader({
         <div className="flex shrink-0 gap-2">
           <Dialog>
             <DialogTrigger asChild>
-              <ProjectDarkControlButton aria-label="How installs work" size="icon" type="button">
+          <ProjectDarkControlButton aria-label="How installs work" className="border-sky-300/15 bg-slate-950/25 text-sky-100/70 hover:border-cyan-300/30 hover:bg-slate-950/40 hover:text-white" size="icon" type="button">
                 <Info className="size-4" />
                 <span className="sr-only">How installs work</span>
               </ProjectDarkControlButton>
@@ -625,35 +625,35 @@ function DiscoverGuidedHeader({
             </DialogContent>
           </Dialog>
 
-          <ProjectDarkControlButton aria-label="Refresh Discover" onClick={onRefresh} size="icon" type="button">
+          <ProjectDarkControlButton aria-label="Refresh Discover" className="border-sky-300/15 bg-slate-950/25 text-sky-100/70 hover:border-cyan-300/30 hover:bg-slate-950/40 hover:text-white" onClick={onRefresh} size="icon" type="button">
             <RefreshCw className="size-4" />
             <span className="sr-only">Refresh Discover</span>
           </ProjectDarkControlButton>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <ProjectDarkControlButton aria-label="Discover activity" size="icon" type="button">
+              <ProjectDarkControlButton aria-label="Discover activity" className="border-sky-300/15 bg-slate-950/25 text-sky-100/70 hover:border-cyan-300/30 hover:bg-slate-950/40 hover:text-white" size="icon" type="button">
                 <Bell className="size-4" />
               </ProjectDarkControlButton>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72 border-sky-400/30 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
+            <DropdownMenuContent align="end" className="w-72 border-sky-300/20 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
               <DropdownMenuLabel>Discover activity</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-sky-400/20" />
+              <DropdownMenuSeparator className="bg-sky-300/15" />
               <div className="grid max-h-80 gap-2 overflow-y-auto px-2 py-1.5 text-sm">
-                <div className="rounded-md border border-sky-400/25 bg-slate-800 p-2 text-xs text-slate-400">
+                <div className="rounded-md border border-sky-300/15 bg-slate-800 p-2 text-xs text-sky-100/65">
                   {appCount} apps shown - Last checked {lastRefreshAt ? lastRefreshAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not yet'}
                 </div>
                 {marketplaceActivity.length ? marketplaceActivity.map((event) => (
-                  <div className="rounded-md border border-sky-400/25 bg-slate-800 p-2" key={event.id}>
+                  <div className="rounded-md border border-sky-300/15 bg-slate-800 p-2" key={event.id}>
                     <div className="flex items-center justify-between gap-2">
                       <span className={cn('text-xs font-semibold uppercase tracking-wide', marketplaceActivityTone(event.level))}>{event.outcome.replace('_', ' ')}</span>
-                      <span className="text-xs text-slate-400">{formatMarketplaceActivityTime(event.createdAt)}</span>
+                      <span className="text-xs text-sky-100/60">{formatMarketplaceActivityTime(event.createdAt)}</span>
                     </div>
                     <p className="mt-1 font-medium text-slate-50">{event.title}</p>
-                    {event.message && <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{event.message}</p>}
+                    {event.message && <p className="mt-1 line-clamp-2 text-xs leading-5 text-sky-100/60">{event.message}</p>}
                   </div>
                 )) : (
-                  <div className="rounded-md border border-sky-400/25 bg-slate-800 p-3 text-sm text-slate-400">
+                  <div className="rounded-md border border-sky-300/15 bg-slate-800 p-3 text-sm text-sky-100/65">
                     No Discover activity has been recorded yet.
                   </div>
                 )}
@@ -677,21 +677,21 @@ function MarketplaceBrowseSidebar({
   onFilterChange: (filter: string) => void;
 }) {
   return (
-    <aside className="flex min-h-0 flex-col border-b border-app-border-muted bg-app-surface/10 p-3 xl:border-b-0 xl:border-r">
-      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-app-text-muted">Browse</p>
+    <aside className="flex min-h-0 flex-col border-b border-sky-300/15 bg-slate-950/30 p-3 xl:border-b-0 xl:border-r">
+      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-sky-100/65">Browse</p>
       <div aria-label="Discover filters" className="mt-2 grid gap-1">
         {filters.map((filter) => (
           <button
             aria-pressed={filterValue === filter.value}
             className={cn(
-              'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent',
-              filterValue === filter.value ? 'bg-app-accent/15 text-app-text' : 'text-app-text-secondary hover:bg-app-panel-hover hover:text-app-text',
+              'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
+              filterValue === filter.value ? 'bg-cyan-300/15 text-cyan-100' : 'text-sky-100/70 hover:bg-slate-800 hover:text-white',
             )}
             key={filter.value}
             onClick={() => onFilterChange(filter.value)}
             type="button"
           >
-            <span className={cn('size-1.5 rounded-full', filterValue === filter.value ? 'bg-app-accent' : 'bg-app-text-muted')} />
+            <span className={cn('size-1.5 rounded-full', filterValue === filter.value ? 'bg-cyan-200' : 'bg-sky-100/55')} />
             <span className="truncate">{filter.label}</span>
           </button>
         ))}

@@ -21,6 +21,7 @@ import type { HomeSystemMetric } from '../extensions/OverviewPage.systemStatus';
 import { managedAppIconUrl } from '../extensions/OverviewPage.appTiles';
 import { applicationDeepLinkForManagedApp } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { AppArtwork } from '@/components/autark-os/AppArtwork';
+import { AppCardName } from '@/components/autark-os/AppCardName';
 
 
 export function InstalledAppsLauncher({ apps }: { apps: AppInstanceView[] }) {
@@ -50,39 +51,48 @@ function InstalledAppCard({ app, index }: { app: AppInstanceView; index: number 
   const iconUrl = managedAppIconUrl(app);
   const status = appStatus(app.userStatus);
   return (
-    <article className="group relative min-w-0 overflow-hidden rounded-xl border border-sky-300/20 bg-[#102644] shadow-lg shadow-slate-950/20 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-[#173455] hover:shadow-xl hover:shadow-cyan-950/30" role="listitem">
+    <article className="group/app-card relative h-56 min-w-0 overflow-hidden rounded-xl border border-sky-200/20 bg-app-card-harbor text-slate-50 shadow-lg shadow-slate-950/20 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-app-card-harbor-hover hover:shadow-xl hover:shadow-cyan-950/30" role="listitem">
       <a
         aria-label={`Open ${app.name}`}
-        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300/80"
+        className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/80"
         href={openUrl || detailRoute}
         rel={openUrl ? 'noreferrer' : undefined}
         target={openUrl ? '_blank' : undefined}
-      >
-        <AppArtwork className="h-28 transition duration-300 group-hover:scale-[1.02] sm:h-32" iconUrl={iconUrl} index={index} name={app.name} />
-        <div className="space-y-1 px-3 pb-3 pt-2">
-          <p className="m-0 truncate text-sm font-semibold text-white">{app.name}</p>
-          <p className="m-0 truncate text-xs text-slate-400">{app.category}</p>
-          <div className="flex items-center gap-1.5 pt-1 text-[0.7rem] font-medium text-slate-300">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn('size-1.5 rounded-full', status.tone === 'success' ? 'bg-emerald-400' : status.tone === 'warning' ? 'bg-amber-400' : 'bg-slate-500')} />
-              <span>{status.label}</span>
-            </span>
+      />
+      <div className="pointer-events-none relative z-10 flex h-full flex-col">
+        <AppArtwork
+          className="h-36 shrink-0 border-b border-sky-200/20"
+          iconUrl={iconUrl}
+          index={index}
+          name={app.name}
+          overlay={(
+            <>
+              <span className="absolute left-2 top-2 z-20 rounded-full border border-slate-950/35 bg-slate-950/55 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">Managed app</span>
+              <div className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center gap-0.5">
+                <a
+                  aria-label={`Open ${app.name}`}
+                  className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
+                  href={openUrl || detailRoute}
+                  rel={openUrl ? 'noreferrer' : undefined}
+                  target={openUrl ? '_blank' : undefined}
+                >
+                  <ExternalLink aria-hidden="true" className="size-3.5" />
+                </a>
+                <Link aria-label={`${app.name} management actions`} className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80" to={detailRoute}>
+                  <MoreVertical className="size-3.5" />
+                </Link>
+              </div>
+            </>
+          )}
+        />
+        <div className="flex min-h-0 flex-1 flex-col px-3 pb-2 pt-2">
+          <AppCardName className="text-sm font-semibold text-white" name={app.name} />
+          <p className="m-0 truncate text-xs text-slate-200/70">{app.category}</p>
+          <div className="mt-auto flex items-center gap-1.5 border-t border-sky-200/10 pt-2 text-[0.7rem] font-medium text-slate-300">
+            <span className={cn('size-1.5 rounded-full', status.tone === 'success' ? 'bg-emerald-400' : status.tone === 'warning' ? 'bg-amber-400' : 'bg-slate-500')} />
+            <span>{status.label}</span>
           </div>
         </div>
-      </a>
-      <div className="absolute bottom-2.5 right-2.5 z-20 flex items-center gap-1">
-        <a
-          aria-label={`Open ${app.name}`}
-          className="inline-flex size-6 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
-          href={openUrl || detailRoute}
-          rel={openUrl ? 'noreferrer' : undefined}
-          target={openUrl ? '_blank' : undefined}
-        >
-          <ExternalLink aria-hidden="true" className="size-3.5" />
-        </a>
-        <Link aria-label={`${app.name} management actions`} className="inline-flex size-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80" to={detailRoute}>
-          <MoreVertical className="size-3.5" />
-        </Link>
       </div>
     </article>
   );

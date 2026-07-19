@@ -65,7 +65,7 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
   }, [detailsOpen, onDetailsOpenChange]);
 
   return (
-    <aside aria-label="Selected Discover app" className="relative z-30 hidden min-h-0 border-l border-app-border-muted bg-app-surface/10 p-3 xl:block">
+    <aside aria-label="Selected Discover app" className="relative z-30 hidden min-h-0 border-l border-sky-300/15 bg-slate-950/20 p-3 xl:block">
       <div className="relative z-30 h-full" onPointerDown={(event) => event.stopPropagation()}>
         <div aria-hidden={!detailsOpen} className="pointer-events-none absolute inset-y-0 right-0 z-20 w-[59.5rem] overflow-hidden">
           <MarketplaceAppDetailsPopover
@@ -81,7 +81,7 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
 
         <section
           className={cn(
-            'relative z-30 h-full overflow-y-auto rounded-2xl border border-app-border-muted bg-app-panel text-app-text shadow-lg shadow-slate-950/20 transition-[border-radius,box-shadow] duration-200 ease-out',
+            'relative z-30 h-full overflow-y-auto rounded-2xl border border-sky-300/20 bg-slate-900 text-slate-50 shadow-lg shadow-slate-950/20 transition-[border-radius,box-shadow] duration-200 ease-out',
             detailsOpen && 'rounded-l-none shadow-2xl shadow-cyan-950/50',
           )}
         >
@@ -89,13 +89,13 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
           <div className="p-4">
             <div className="flex min-w-0 items-start gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-app-text-muted">{appView.categoryLabel}</p>
-                <h3 className="mt-1 line-clamp-2 break-words text-lg font-semibold leading-6 text-app-text">{appView.name}</h3>
+                <p className="text-xs text-sky-100/60">{appView.categoryLabel}</p>
+                <h3 className="mt-1 line-clamp-2 break-words text-lg font-semibold leading-6 text-white">{appView.name}</h3>
               </div>
               <StatusBadge className="shrink-0" tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
             </div>
 
-            <p className="mt-3 line-clamp-2 text-sm leading-6 text-app-text-secondary">{appView.description}</p>
+            <p className="mt-3 line-clamp-2 text-sm leading-6 text-sky-100/70">{appView.description}</p>
 
             <RailPrimaryAction
               appView={appView}
@@ -147,17 +147,17 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
       aria-hidden={!open}
       aria-label="Discover app details"
       className={cn(
-        'pointer-events-auto absolute right-[calc(17.5rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-hidden rounded-l-2xl border border-r-0 bg-app-panel text-app-text transition-transform duration-300 ease-out motion-reduce:transition-none',
+        'pointer-events-auto absolute right-[calc(17.5rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-hidden rounded-l-2xl border border-r-0 bg-slate-900 text-slate-50 transition-transform duration-300 ease-out motion-reduce:transition-none',
         open
-          ? 'translate-x-0 border-app-border-strong shadow-2xl shadow-slate-950/40'
+          ? 'translate-x-0 border-sky-300/30 shadow-2xl shadow-slate-950/40'
           : 'pointer-events-none translate-x-[calc(100%+19rem)] border-transparent shadow-none',
       )}
       ref={onPanelRef}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-app-border-muted px-4 py-3">
+      <div className="flex items-start justify-between gap-3 border-b border-sky-300/15 px-4 py-3">
         <div>
-          <p className="text-sm font-semibold text-app-text">App details</p>
-          <p className="mt-1 text-xs leading-5 text-app-text-muted">Everything you need to evaluate {appView.name} before installing it.</p>
+          <p className="text-sm font-semibold text-white">App details</p>
+          <p className="mt-1 text-xs leading-5 text-sky-100/60">Everything you need to evaluate {appView.name} before installing it.</p>
         </div>
         <ProjectDarkControlButton aria-label="Close app details" onClick={onClose} size="icon" type="button">
           <X className="size-4" />
@@ -165,9 +165,9 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
       </div>
 
       <Tabs className="min-h-0" onValueChange={setTab} value={tab}>
-        <TabsList className="w-full justify-start overflow-x-auto rounded-none border-b border-app-border-muted bg-app-panel px-3 py-2" variant="line">
-          <TabsTrigger className="shrink-0 px-3 py-2 text-app-text-muted data-active:text-app-text" value="overview">Overview</TabsTrigger>
-          <TabsTrigger className="shrink-0 px-3 py-2 text-app-text-muted data-active:text-app-text" value="details">Details</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto rounded-none border-b border-sky-300/15 bg-slate-900 px-3 py-2" variant="line">
+          <TabsTrigger className="shrink-0 px-3 py-2 text-sky-100/60 data-active:text-white" value="overview">Overview</TabsTrigger>
+          <TabsTrigger className="shrink-0 px-3 py-2 text-sky-100/60 data-active:text-white" value="details">Details</TabsTrigger>
         </TabsList>
 
         <div className="p-4">
@@ -179,7 +179,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
                   <StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
                   <SupportBadge level={appView.app.supportLevel} />
                 </div>
-                <p className="mt-2 text-sm leading-6 text-app-text-secondary">{appView.app.plainLanguage}</p>
+                <p className="mt-2 text-sm leading-6 text-sky-100/70">{appView.app.plainLanguage}</p>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -206,10 +206,10 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
 
 function AppFactList({ items, title }: { items: string[]; title: string }) {
   return (
-    <section className="rounded-xl border border-app-border-muted bg-app-panel-muted p-4">
-      <h4 className="font-semibold text-app-text">{title}</h4>
-      <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-app-text-secondary">
-        {items.map((item) => <li className="flex gap-2" key={item}><span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-app-accent" />{item}</li>)}
+    <section className="rounded-xl border border-sky-300/15 bg-slate-950/30 p-4">
+      <h4 className="font-semibold text-white">{title}</h4>
+      <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-sky-100/70">
+        {items.map((item) => <li className="flex gap-2" key={item}><span aria-hidden="true" className="mt-2 size-1 shrink-0 rounded-full bg-cyan-300" />{item}</li>)}
       </ul>
     </section>
   );

@@ -14,6 +14,13 @@ test('My Apps basic cards use the compact homepage launcher treatment', async ({
   await page.getByRole('button', { name: /Vaultwarden with a deliberately long.*actions/i }).click();
   await expect(page.getByRole('menuitem', { name: /Restart app/i })).toBeVisible();
   await page.keyboard.press('Escape');
+  const appCard = manageButton.locator('..');
+  await appCard.getByText('Vaultwarden with a deliberately long self-hosted service name', { exact: true }).hover();
+  const copyName = appCard.getByRole('button', { name: /Copy Vaultwarden with a deliberately long self-hosted service name/i });
+  await expect(copyName).toHaveCSS('opacity', '1');
+  await copyName.click();
+  await expect(copyName).toHaveAttribute('data-copied', 'true');
+  await expect(page.getByText('App name copied')).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
   await page.screenshot({ path: 'test-results/my-apps-basic-final.png', fullPage: false });

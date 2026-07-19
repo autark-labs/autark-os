@@ -5,7 +5,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { AppArtwork } from '@/components/autark-os/AppArtwork';
-import { AttentionIndicator, labelForReadiness } from './AppStateBadges';
+import { AppCardName } from '@/components/autark-os/AppCardName';
+import { labelForManagementState, labelForReadiness } from './AppStateBadges';
 import { applicationDeepLinkForSurfaceItem } from '../extensions/ApplicationsPage.deepLinks';
 import { runtimeActionDisabled, runtimeActionDisabledReason } from '../extensions/ApplicationsPage.operations';
 import type { ApplicationRuntimeAction, ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
@@ -51,10 +52,10 @@ export function ApplicationCard({
     <Card
       aria-hidden={managementOpen}
       className={cn(
-        'relative h-[218px] w-[13rem] overflow-hidden rounded-xl border border-sky-300/20 bg-[#102644] !py-0 !gap-0 text-slate-50 shadow-lg shadow-slate-950/20 ring-0 transition duration-200',
-        !managementOpen && 'cursor-pointer hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-[#173455] hover:shadow-xl hover:shadow-cyan-950/30',
+        'group/app-card relative h-56 w-48 overflow-hidden rounded-xl border border-sky-200/20 bg-app-card-harbor !gap-0 !py-0 text-slate-50 shadow-lg shadow-slate-950/20 ring-0 transition duration-200',
+        !managementOpen && 'cursor-pointer hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-app-card-harbor-hover hover:shadow-xl hover:shadow-cyan-950/30',
         managementOpen && 'pointer-events-none cursor-default',
-        selected && 'z-10 border-cyan-300/80 shadow-xl shadow-cyan-950/30 ring-1 ring-cyan-300/45',
+        selected && 'z-10 border-cyan-100/85 shadow-xl shadow-cyan-200/20 ring-1 ring-cyan-100/55',
       )}
       ref={cardRef}
       size="sm"
@@ -70,75 +71,80 @@ export function ApplicationCard({
       </button>
 
       <div className="pointer-events-none relative z-10 flex h-full flex-col">
-        <div className="relative shrink-0">
-          <AppArtwork className="h-32 transition duration-300 group-hover:scale-[1.02]" iconUrl={item.iconUrl} index={item.id.length} name={item.name} />
-          <span className="absolute left-3 top-3 z-30 rounded-full border border-slate-950/40 bg-slate-950/65 px-2 py-1 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">
-            {item.managementState === 'linked' ? 'Linked' : 'Managed app'}
-          </span>
-        </div>
+        <AppArtwork
+          className="h-36 shrink-0 border-b border-sky-200/20 transition duration-300 group-hover/app-card:scale-[1.02]"
+          iconUrl={item.iconUrl}
+          index={item.id.length}
+          name={item.name}
+          overlay={(
+            <>
+              <span className="absolute left-2 top-2 z-20 rounded-full border border-slate-950/35 bg-slate-950/55 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">
+                {labelForManagementState(item.managementState)}
+              </span>
+              <DropdownMenu>
+                <div className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center gap-0.5">
+                  {item.href ? (
+                    <a
+                      aria-label={`Open ${item.name}`}
+                      className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
+                      href={item.href}
+                      onClick={(event) => event.stopPropagation()}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      <ExternalLink className="size-3.5" />
+                    </a>
+                  ) : null}
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      aria-label={`${item.name} actions`}
+                      className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
+                      disabled={managementOpen}
+                      onClick={(event) => event.stopPropagation()}
+                      type="button"
+                    >
+                      <MoreVertical className="size-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                </div>
+                <DropdownMenuContent align="end" className="min-w-44 border-sky-300/20 bg-app-surface text-slate-100" onClick={(event) => event.stopPropagation()}>
+                  <DropdownMenuLabel className="text-xs text-slate-400">{item.name}</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-sky-300/10" />
+                  {actions.map((action) => action.href ? (
+                    <DropdownMenuItem asChild key={action.id}>
+                      <a href={action.href} rel="noreferrer" target={action.href.startsWith('/') ? undefined : '_blank'}>{action.label}</a>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      disabled={action.disabled}
+                      key={action.id}
+                      onSelect={() => onAction?.(item, action.id)}
+                      title={action.reason || undefined}
+                    >
+                      {action.label}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator className="bg-sky-300/10" />
+                  <DropdownMenuItem asChild>
+                    <Link to={manageHref}>Manage details</Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          )}
+        />
         <div className="flex min-h-0 flex-1 flex-col px-3 pb-2 pt-2">
-          <p className="m-0 truncate text-sm font-semibold text-white" title={item.name}>{item.name}</p>
+          <AppCardName className="text-sm font-semibold text-white" name={item.name} />
           <p className="m-0 truncate text-xs text-slate-400">{item.category || 'App'}</p>
           <div className="mt-auto flex items-center justify-between gap-2 border-t border-sky-300/10 pt-2 text-[0.7rem] font-medium">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className={cn('size-1.5 shrink-0 rounded-full', readinessTone(item))} />
               <span className={cn(readinessTextTone(item))}>{statusLabel(item)}</span>
             </span>
-
-            <DropdownMenu>
-              <div className="pointer-events-auto flex shrink-0 items-center gap-1">
-                {item.href ? (
-                  <a
-                    aria-label={`Open ${item.name}`}
-                    className="inline-flex size-6 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
-                    href={item.href}
-                    onClick={(event) => event.stopPropagation()}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    <ExternalLink className="size-3.5" />
-                  </a>
-                ) : null}
-                <DropdownMenuTrigger asChild>
-                  <button
-                    aria-label={`${item.name} actions`}
-                    className="inline-flex size-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80"
-                    disabled={managementOpen}
-                    onClick={(event) => event.stopPropagation()}
-                    type="button"
-                  >
-                    <MoreVertical className="size-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
-              </div>
-              <DropdownMenuContent align="end" className="min-w-44 border-sky-300/20 bg-[#0b1831] text-slate-100" onClick={(event) => event.stopPropagation()}>
-                <DropdownMenuLabel className="text-xs text-slate-400">{item.name}</DropdownMenuLabel>
-                <DropdownMenuSeparator className="bg-sky-300/10" />
-                {actions.map((action) => action.href ? (
-                  <DropdownMenuItem asChild key={action.id}>
-                    <a href={action.href} rel="noreferrer" target={action.href.startsWith('/') ? undefined : '_blank'}>{action.label}</a>
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem
-                    disabled={action.disabled}
-                    key={action.id}
-                    onSelect={() => onAction?.(item, action.id)}
-                    title={action.reason || undefined}
-                  >
-                    {action.label}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator className="bg-sky-300/10" />
-                <DropdownMenuItem asChild>
-                  <Link to={manageHref}>Manage details</Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <span className="truncate text-slate-200/65">{item.managementState === 'managed' ? `${item.access} · ${item.backup}` : item.access}</span>
           </div>
         </div>
       </div>
-
-      {item.attentionState !== 'none' && <AttentionIndicator item={item} className="absolute right-3 top-3 z-20" />}
     </Card>
   );
 }

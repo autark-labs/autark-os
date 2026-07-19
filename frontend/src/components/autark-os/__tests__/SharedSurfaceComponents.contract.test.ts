@@ -14,6 +14,7 @@ test('shared surface components provide typed accessible primitives', () => {
     'PageLoadingState',
     'PageLoadError',
     'StatusBadge',
+    'AppCardName',
     'CopyField',
     'RecommendedActionCard',
     'FoundAppsPrompt',
@@ -29,6 +30,7 @@ test('shared surface components provide typed accessible primitives', () => {
   const loading = source('src/components/autark-os/PageLoadingState.tsx');
   const error = source('src/components/autark-os/PageLoadError.tsx');
   const status = source('src/components/autark-os/StatusBadge.tsx');
+  const appCardName = source('src/components/autark-os/AppCardName.tsx');
   const metadata = source('src/components/autark-os/MetadataBadge.tsx');
   const variants = source('src/components/primitives/SemanticVariants.ts');
   const buttons = source('src/components/primitives/ProjectButtons.tsx');
@@ -59,6 +61,9 @@ test('shared surface components provide typed accessible primitives', () => {
   assert.match(buttons, /semanticPrimaryActionClass/);
   assert.match(baseButton, /semanticDisabledClass/);
   assert.match(status, /StatusBadgeAppearance = 'soft' \| 'solid'/);
+  assert.match(appCardName, /copyText\(name\)/);
+  assert.match(appCardName, /TooltipContent/);
+  assert.match(appCardName, /copied \? <Check/);
   assert.match(metadata, /MetadataBadgeAppearance = 'soft' \| 'solid'/);
   assert.match(copy, /export type CopyFieldModel/);
   assert.match(copy, /CopyTextButton/);
@@ -89,7 +94,7 @@ test('active pages delegate status and metadata badges to the shared semantic pr
   for (const page of pages) {
     const content = source(page);
     assert.doesNotMatch(content, /from ['"]@\/components\/ui\/badge['"]/);
-    assert.match(content, /(StatusBadge|MetadataBadge|semanticStatusVariants)/, `${page} should use a shared semantic visual primitive`);
+    assert.match(content, /(StatusBadge|MetadataBadge|semanticStatusVariants|AppCardName|DisabledAction)/, `${page} should use a shared semantic visual primitive`);
   }
 });
 

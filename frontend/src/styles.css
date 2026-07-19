@@ -21,6 +21,9 @@
   --app-panel: var(--color-slate-900);
   --app-panel-muted: var(--color-slate-800);
   --app-panel-hover: var(--color-slate-700);
+  --app-card-harbor: color-mix(in srgb, var(--app-panel-muted) 82%, var(--app-accent));
+  --app-card-harbor-hover: color-mix(in srgb, var(--app-panel-muted) 68%, var(--app-accent));
+  --app-card-harbor-icon: color-mix(in srgb, var(--app-card-harbor) 76%, var(--app-accent));
   --app-border: var(--color-sky-400);
   --app-border-muted: rgb(56 189 248 / 0.25);
   --app-border-strong: rgb(56 189 248 / 0.4);
@@ -313,6 +316,9 @@
   --color-app-panel: var(--app-panel);
   --color-app-panel-muted: var(--app-panel-muted);
   --color-app-panel-hover: var(--app-panel-hover);
+  --color-app-card-harbor: var(--app-card-harbor);
+  --color-app-card-harbor-hover: var(--app-card-harbor-hover);
+  --color-app-card-harbor-icon: var(--app-card-harbor-icon);
   --color-app-border: var(--app-border);
   --color-app-border-muted: var(--app-border-muted);
   --color-app-border-strong: var(--app-border-strong);

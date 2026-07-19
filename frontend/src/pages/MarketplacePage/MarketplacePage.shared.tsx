@@ -1,29 +1,35 @@
 import { Check, ShieldCheck, TriangleAlert } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { AppArtwork } from '@/components/autark-os/AppArtwork';
 import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { MarketplaceApp } from '@/types/marketplace';
 
-export function AppImage({ app, className, presentation = 'icon', size = 'default' }: { app: MarketplaceApp; className?: string; presentation?: 'icon' | 'artwork'; size?: 'default' | 'large' }) {
+export function AppImage({ app, className, overlay, presentation = 'icon', size = 'default' }: { app: MarketplaceApp; className?: string; overlay?: ReactNode; presentation?: 'icon' | 'artwork' | 'launcher'; size?: 'default' | 'large' }) {
+  if (presentation === 'launcher') {
+    return <AppArtwork className={cn('h-24 w-full', className)} iconUrl={app.image} index={app.name.length} name={app.name} overlay={overlay} />;
+  }
+
   if (presentation === 'artwork') {
     return (
-      <span className={cn('relative grid h-24 w-full place-items-center overflow-hidden border-b border-app-border-muted bg-gradient-to-br from-app-panel-hover to-app-panel', className)}>
-        <span className="absolute inset-0 bg-gradient-to-t from-app-surface/30 to-transparent" />
+      <span className={cn('relative grid h-24 w-full place-items-center overflow-hidden border-b border-sky-300/15 bg-gradient-to-br from-slate-800 to-slate-900', className)}>
+        <span className="absolute inset-0 bg-gradient-to-t from-slate-950/30 to-transparent" />
         {app.image ? (
           <img alt="" className="relative size-14 object-contain drop-shadow-lg" src={app.image} />
         ) : (
-          <span className="relative grid size-14 place-items-center rounded-2xl border border-app-border-muted bg-app-panel-muted text-lg font-bold text-app-accent shadow-lg shadow-slate-950/20">{app.name.slice(0, 1)}</span>
+          <span className="relative grid size-14 place-items-center rounded-2xl border border-sky-300/15 bg-slate-900 text-lg font-bold text-cyan-200 shadow-lg shadow-slate-950/20">{app.name.slice(0, 1)}</span>
         )}
       </span>
     );
   }
 
   return (
-    <span className={cn('grid shrink-0 place-items-center overflow-hidden rounded-lg border border-app-border-muted bg-app-panel-muted shadow-lg shadow-slate-950/15', size === 'large' ? 'size-22' : 'size-14', className)}>
+    <span className={cn('grid shrink-0 place-items-center overflow-hidden rounded-lg border border-sky-300/15 bg-slate-800 shadow-lg shadow-slate-950/15', size === 'large' ? 'size-22' : 'size-14', className)}>
       {app.image ? (
         <img alt="" className="h-full w-full object-contain p-2" src={app.image} />
       ) : (
-        <span className="text-lg font-bold text-app-accent">{app.name.slice(0, 1)}</span>
+        <span className="text-lg font-bold text-cyan-200">{app.name.slice(0, 1)}</span>
       )}
     </span>
   );

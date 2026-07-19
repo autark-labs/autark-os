@@ -20,7 +20,7 @@ export function BasicApplicationsView({ actionLoadingByItemId, emptyState, items
 
   return (
     <section className="relative h-full min-h-0">
-      <div className="grid h-full min-h-0 grid-cols-[repeat(auto-fill,13rem)] content-start items-start justify-start gap-3 overflow-y-auto overscroll-contain pr-1">
+      <div className="grid h-full min-h-0 grid-cols-[repeat(auto-fill,12rem)] content-start items-start justify-start gap-3 overflow-y-auto overscroll-contain pr-1">
         {items.map((item) => (
           <ApplicationCard
             key={item.id}
