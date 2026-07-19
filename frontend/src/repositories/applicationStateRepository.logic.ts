@@ -6,7 +6,7 @@ import type {
   AppRuntimeView,
   BackendAppOperationState,
 } from '@/types/app';
-import type { ApplicationState } from '@/types/applicationState';
+import type { ApplicationState, ApplicationStateFreshness } from '@/types/applicationState';
 import type { AppOwnershipView } from '@/types/appOwnership';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { ObservedServiceAction, ObservedServiceView } from '@/types/observedService';
@@ -48,7 +48,57 @@ export function ownershipViews(state?: ApplicationState | null): AppOwnershipVie
 }
 
 export function applicationStateUpdatedAt(state?: ApplicationState | null) {
-  return state?.updatedAt ? new Date(state.updatedAt) : null;
+  if (!state?.updatedAt) {
+    return null;
+  }
+  const updatedAt = new Date(state.updatedAt);
+  return Number.isNaN(updatedAt.getTime()) ? null : updatedAt;
+}
+
+export function applicationStateFreshness(
+  state?: ApplicationState | null,
+  options: { transportError?: unknown } = {},
+): ApplicationStateFreshness {
+  const lastSuccessfulUpdate = applicationStateUpdatedAt(state);
+  const hasUsableData = Boolean(lastSuccessfulUpdate);
+  const refreshStatus = state?.refreshStatus?.trim().toLowerCase() ?? '';
+  const canonicalRefreshFailed = refreshStatus === 'error' || refreshStatus === 'failed' || Boolean(state?.lastError?.trim());
+  const refreshStatusUnknown = Boolean(refreshStatus && !['idle', 'running', 'stale', 'error', 'failed'].includes(refreshStatus));
+  const refreshFailed = canonicalRefreshFailed || Boolean(options.transportError);
+
+  if (!hasUsableData) {
+    return {
+      hasUsableData: false,
+      isCurrent: false,
+      lastSuccessfulUpdate: null,
+      phase: refreshFailed ? 'unavailable' : 'checking',
+    };
+  }
+
+  if (refreshFailed || refreshStatusUnknown || state?.stale || refreshStatus === 'stale') {
+    return {
+      hasUsableData: true,
+      isCurrent: false,
+      lastSuccessfulUpdate,
+      phase: refreshStatus === 'running' && !refreshFailed ? 'refreshing' : 'stale',
+    };
+  }
+
+  if (refreshStatus === 'running') {
+    return {
+      hasUsableData: true,
+      isCurrent: false,
+      lastSuccessfulUpdate,
+      phase: 'refreshing',
+    };
+  }
+
+  return {
+    hasUsableData: true,
+    isCurrent: true,
+    lastSuccessfulUpdate,
+    phase: 'current',
+  };
 }
 
 export function telemetryByAppId(state?: ApplicationState | null): Record<string, AppTelemetry> {

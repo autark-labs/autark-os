@@ -71,6 +71,8 @@ class ApplicationStateServiceTests {
 
         assertThat(managedCalls).hasValue(0);
         assertThat(service.snapshot().refreshStatus()).isEqualTo("stale");
+        assertThat(service.snapshot().updatedAt()).isNull();
+        assertThat(service.snapshot().stale()).isTrue();
     }
 
     @Test
@@ -94,6 +96,52 @@ class ApplicationStateServiceTests {
         assertThat(cached).isSameAs(refreshed);
         assertThat(cached.refreshStatus()).isEqualTo("idle");
         assertThat(cached.stale()).isFalse();
+    }
+
+    @Test
+    void failedInitialRefreshDoesNotMakeTheEmptySnapshotLookSuccessful() {
+        ApplicationStateService service = new ApplicationStateService(
+                () -> {
+                    throw new IllegalStateException("Docker inventory unavailable");
+                },
+                List::of,
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"));
+
+        ApplicationState failed = service.refreshNow();
+
+        assertThat(failed.managedApps()).isEmpty();
+        assertThat(failed.updatedAt()).isNull();
+        assertThat(failed.refreshStatus()).isEqualTo("error");
+        assertThat(failed.stale()).isTrue();
+        assertThat(failed.lastError()).isEqualTo("Docker inventory unavailable");
+    }
+
+    @Test
+    void failedRefreshPreservesTheLastSuccessfulSnapshotAndMarksItStale() {
+        AtomicReference<RuntimeException> failure = new AtomicReference<>();
+        ApplicationStateService service = new ApplicationStateService(
+                () -> {
+                    if (failure.get() != null) {
+                        throw failure.get();
+                    }
+                    return List.of(appInstance());
+                },
+                List::of,
+                new ObservedServiceService(repository(), noScan()),
+                null,
+                () -> Instant.parse("2026-06-21T12:00:00Z"));
+        ApplicationState successful = service.refreshNow();
+        failure.set(new IllegalStateException("Docker inventory unavailable"));
+
+        ApplicationState failed = service.refreshNow();
+
+        assertThat(failed.managedApps()).isEqualTo(successful.managedApps());
+        assertThat(failed.updatedAt()).isEqualTo(successful.updatedAt());
+        assertThat(failed.refreshStatus()).isEqualTo("error");
+        assertThat(failed.stale()).isTrue();
+        assertThat(failed.lastError()).isEqualTo("Docker inventory unavailable");
     }
 
     @Test

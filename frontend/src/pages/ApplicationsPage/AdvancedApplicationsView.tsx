@@ -121,7 +121,7 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
   );
 
   return (
-    <TableRow className={rowClassName}>
+    <TableRow className={rowClassName} onClick={() => !managementOpen && onSelect(item.id)}>
       <TableCell className={pinnedCellClassName}>
         <div className="flex h-16 min-w-0 items-center gap-3">
           <ApplicationIcon item={item} size="sm" tone="harbor" />

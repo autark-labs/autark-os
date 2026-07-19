@@ -43,10 +43,11 @@ export const discoverQueryKeys = {
   readiness: ['discover', 'readiness'] as const,
 };
 
-export function useDiscoverAppsQuery() {
+export function useDiscoverAppsQuery(applicationStateUpdatedAt: string | null, enabled = true) {
   return useQuery<DiscoverAppView[]>({
-    queryKey: discoverQueryKeys.apps,
+    queryKey: [...discoverQueryKeys.apps, applicationStateUpdatedAt ?? 'unavailable'],
     queryFn: () => DiscoverAPIClient.listApps(),
+    enabled,
     refetchInterval: 30_000,
     staleTime: 10_000,
   });

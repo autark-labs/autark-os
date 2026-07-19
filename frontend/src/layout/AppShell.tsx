@@ -5,6 +5,7 @@ import MobileAppBar from './MobileAppBar';
 import Sidebar from './Sidebar';
 import SystemStatusHeader from './SystemStatusHeader';
 import { AppNotificationsProvider } from '@/components/autark-os/NotificationCenter';
+import { ApplicationStateNotice } from '@/components/autark-os/ApplicationStateNotice';
 
 const sidebarCollapsedStorageKey = 'autark-os.sidebarCollapsed';
 
@@ -39,6 +40,7 @@ function AppShell() {
             <SystemStatusHeader />
           </div>
           <div className="p-4 md:p-5 2xl:px-6">
+            <ApplicationStateNotice className="mb-3" />
             <Outlet />
           </div>
         </main>

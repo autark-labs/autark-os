@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { ApplicationStateAPIClient } from '@/api/ApplicationStateAPIClient';
-import type { ApplicationState } from '@/types/applicationState';
+import type { ApplicationState, ApplicationStateFreshness } from '@/types/applicationState';
 import {
   accessByAppId,
   appNeedsAttentionFromCanonicalState,
+  applicationStateFreshness,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
   catalogAppIsManaged,
@@ -29,6 +30,7 @@ import type { AutarkOsJob } from '@/types/jobs';
 export {
   accessByAppId,
   appNeedsAttentionFromCanonicalState,
+  applicationStateFreshness,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
   catalogAppIsManaged,
@@ -51,18 +53,25 @@ export type ApplicationStateRepositoryView = {
   accessByAppId: Record<string, AppAccessCheck>;
   apps: AppRuntimeView[];
   foundServices: ObservedServiceView[];
+  freshness: ApplicationStateFreshness;
   healthByAppId: Record<string, AppHealthSnapshot>;
+  lastError: string | null;
   observedServices: ObservedServiceView[];
   ownershipViews: AppOwnershipView[];
   pinnedExternalServices: ObservedServiceView[];
+  refreshStatus: string;
+  stale: boolean;
   telemetryByAppId: Record<string, AppTelemetry>;
   updatedAt: Date | null;
 };
 
 export function useApplicationStateQuery() {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: applicationStateQueryKey,
-    queryFn: () => ApplicationStateAPIClient.get(),
+    queryFn: () => ApplicationStateAPIClient.get({
+      refresh: !queryClient.getQueryData<ApplicationState>(applicationStateQueryKey),
+    }),
     refetchInterval: 10_000,
     staleTime: 10_000,
   });
@@ -86,19 +95,25 @@ export function useApplicationStateRepository(): ApplicationStateRepositoryView 
   const query = useApplicationStateQuery();
   const refreshMutation = useRefreshApplicationStateMutation();
   const state = query.data;
+  const error = refreshMutation.error ?? query.error;
+  const freshness = applicationStateFreshness(state, { transportError: error });
   return {
     accessByAppId: accessByAppId(state),
     applicationState: state,
     apps: managedRuntimeApps(state),
-    error: query.error,
+    error,
     foundServices: foundServices(state),
+    freshness,
     healthByAppId: healthByAppId(state),
     isFetching: query.isFetching || refreshMutation.isPending,
     isLoading: query.isLoading,
+    lastError: state?.lastError?.trim() || null,
     observedServices: observedServices(state),
     ownershipViews: ownershipViews(state),
     pinnedExternalServices: pinnedExternalServices(state),
+    refreshStatus: state?.refreshStatus || (state ? 'unknown' : 'stale'),
     refresh: async () => refreshMutation.mutateAsync(),
+    stale: state?.stale ?? !state,
     telemetryByAppId: telemetryByAppId(state),
     updatedAt: applicationStateUpdatedAt(state),
   };

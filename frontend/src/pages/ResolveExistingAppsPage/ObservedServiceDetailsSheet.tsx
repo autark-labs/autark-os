@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { ApplicationStateNotice } from '@/components/autark-os/ApplicationStateNotice';
 import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
 import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { showActionErrorNotification } from '@/lib/actionNotifications';
@@ -113,6 +114,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
       titleClassName="font-black"
     >
         <div className="grid gap-5">
+          <ApplicationStateNotice />
           {localError && (
             <Alert className="border-red-300/25 bg-red-500/10 text-red-100">
               <ShieldAlert className="size-4" />

@@ -8,7 +8,6 @@ import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
 import { PageShell } from '@/components/layout/PageShell';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
-import { Surface } from '@/components/primitives/Surface';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -632,50 +631,46 @@ export const ApplicationsPage = () => {
           searchPlaceholder="Search managed and linked apps"
           searchValue={query}
         />
-
-        {(appState.isLoading || Boolean(appState.error)) && (
-          <Surface className="px-3 py-2 text-sm text-sky-100/80" tone="muted">
-            {appState.isLoading ? 'Loading managed and linked apps.' : 'Could not load the current app list.'}
-          </Surface>
-        )}
       </div>
 
-      <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
-        {viewMode === 'basic' ? (
-          <BasicApplicationsView
-            actionLoadingByItemId={actionLoadingByAppId}
-            emptyState={emptyState}
-            items={visibleItems}
-            managementOpen={managementOpen}
-            onAction={handleCardAction}
-            onSelect={handleSelectItem}
-            selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
-          />
-        ) : (
-          <div className="min-h-0 overflow-hidden">
-            <AdvancedApplicationsView
-              actions={actions}
+      {appState.freshness.hasUsableData && (
+        <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+          {viewMode === 'basic' ? (
+            <BasicApplicationsView
               actionLoadingByItemId={actionLoadingByAppId}
               emptyState={emptyState}
               items={visibleItems}
               managementOpen={managementOpen}
+              onAction={handleCardAction}
               onSelect={handleSelectItem}
               selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
             />
-          </div>
-        )}
+          ) : (
+            <div className="min-h-0 overflow-hidden">
+              <AdvancedApplicationsView
+                actions={actions}
+                actionLoadingByItemId={actionLoadingByAppId}
+                emptyState={emptyState}
+                items={visibleItems}
+                managementOpen={managementOpen}
+                onSelect={handleSelectItem}
+                selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
+              />
+            </div>
+          )}
 
-        <ApplicationDetailsRail
-          actions={actions}
-          actionLoadingByItemId={actionLoadingByAppId}
-          item={selectedItem}
-          managementOpen={managementOpen}
-          canCloseManagement={canCloseManagement}
-          onManagementOpenChange={handleManagementOpenChange}
-          settingsLoadingByItemId={settingsLoadingByAppId}
-          ref={railRef}
-        />
-      </section>
+          <ApplicationDetailsRail
+            actions={actions}
+            actionLoadingByItemId={actionLoadingByAppId}
+            item={selectedItem}
+            managementOpen={managementOpen}
+            canCloseManagement={canCloseManagement}
+            onManagementOpenChange={handleManagementOpenChange}
+            settingsLoadingByItemId={settingsLoadingByAppId}
+            ref={railRef}
+          />
+        </section>
+      )}
     </PageShell>
   );
 };

@@ -122,7 +122,7 @@ public class ApplicationStateService {
                 List.of(),
                 List.of(),
                 List.of(),
-                now,
+                null,
                 AutarkOsStates.SnapshotState.STALE,
                 null,
                 null,

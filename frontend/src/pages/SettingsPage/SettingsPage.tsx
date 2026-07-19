@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
+import { ApplicationStateNotice } from '@/components/autark-os/ApplicationStateNotice';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
@@ -175,6 +176,7 @@ function SettingsPage({
 
   return (
     <PageShell contained={embedded} className={embedded ? 'min-h-0 flex-1 bg-app-panel' : undefined} contentClassName={embedded ? 'min-h-0 !gap-0 !overflow-hidden !p-0' : undefined}>
+      {embedded && <ApplicationStateNotice className="m-3 mb-0" />}
       {embedded ? (
         <SettingsWorkbench
           activeGroupId={activeGroupId}
@@ -353,7 +355,7 @@ function SettingsWorkbench({
   const ActiveGroupIcon = groupIcons[activeGroupId];
 
   return (
-    <section aria-label="Autark-OS settings" className="flex h-full min-h-0 overflow-hidden bg-app-panel text-slate-50">
+    <section aria-label="Autark-OS settings" className="flex min-h-0 flex-1 overflow-hidden bg-app-panel text-slate-50">
       <aside className="hidden w-52 shrink-0 flex-col border-r border-sky-300/15 bg-slate-950/30 p-3 sm:flex">
         <div className="flex items-center gap-2 px-2 py-2">
           <span className="grid size-7 place-items-center rounded-lg bg-cyan-300 text-slate-950"><Settings className="size-4" /></span>

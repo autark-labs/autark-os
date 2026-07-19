@@ -18,7 +18,7 @@ export function AppArtwork({ className, iconUrl, index = 0, name, overlay }: { c
   return (
     <div className={cn('relative flex items-center justify-center overflow-hidden bg-gradient-to-br', appArtworkGradients[index % appArtworkGradients.length], className)}>
 
-      <span className="relative z-10 grid size-28 place-items-center rounded-3xl border border-sky-100/25 bg-radial-[at_center] from-slate-200 to-slate-400/60 text-cyan-100 shadow-lg shadow-slate-950/20">
+      <span className="relative z-10 grid size-28 place-items-center rounded-3xl border border-sky-100/25 bg-radial-[at_center] from-slate-200 to-slate-600/70 text-cyan-100 shadow-lg shadow-slate-950/20">
         {!imageUrl ? <Sparkles aria-hidden="true" className="size-12 text-purple-400" /> : null}
         {imageUrl ? (
           <img

@@ -3,6 +3,7 @@ import { test } from 'vitest';
 import {
   accessByAppId,
   appNeedsAttentionFromCanonicalState,
+  applicationStateFreshness,
   applicationStateUpdatedAt,
   catalogAppIsManaged,
   displayStatusFromCanonicalState,
@@ -20,8 +21,89 @@ import {
   setObservedServicePinnedInState,
   telemetryByAppId,
 } from '../applicationStateRepository.logic';
+import type { ApplicationState } from '@/types/applicationState';
 
 const updatedAt = '2026-06-21T12:00:00Z';
+
+test('freshness keeps an initial empty snapshot distinct from a successful empty inventory', () => {
+  const initial = applicationStateFreshness(applicationState({
+    refreshStatus: 'stale',
+    stale: true,
+    updatedAt: null,
+  }));
+  const successfulEmpty = applicationStateFreshness(applicationState());
+
+  assert.deepEqual(initial, {
+    hasUsableData: false,
+    isCurrent: false,
+    lastSuccessfulUpdate: null,
+    phase: 'checking',
+  });
+  assert.equal(successfulEmpty.hasUsableData, true);
+  assert.equal(successfulEmpty.isCurrent, true);
+  assert.equal(successfulEmpty.phase, 'current');
+});
+
+test('freshness exposes a failed first refresh as unavailable instead of healthy empty data', () => {
+  const freshness = applicationStateFreshness(applicationState({
+    lastError: 'Docker inventory unavailable',
+    refreshStatus: 'error',
+    stale: true,
+    updatedAt: null,
+  }));
+
+  assert.equal(freshness.hasUsableData, false);
+  assert.equal(freshness.isCurrent, false);
+  assert.equal(freshness.phase, 'unavailable');
+});
+
+test('freshness preserves usable old data while clearly marking canonical and transport failures stale', () => {
+  const canonicalFailure = applicationStateFreshness(applicationState({
+    lastError: 'Docker inventory unavailable',
+    refreshStatus: 'error',
+    stale: true,
+  }));
+  const transportFailure = applicationStateFreshness(applicationState(), {
+    transportError: new Error('Request failed'),
+  });
+
+  assert.equal(canonicalFailure.hasUsableData, true);
+  assert.equal(canonicalFailure.isCurrent, false);
+  assert.equal(canonicalFailure.phase, 'stale');
+  assert.equal(transportFailure.hasUsableData, true);
+  assert.equal(transportFailure.isCurrent, false);
+  assert.equal(transportFailure.phase, 'stale');
+});
+
+test('freshness distinguishes an active canonical refresh from stale and current snapshots', () => {
+  const refreshing = applicationStateFreshness(applicationState({
+    refreshStatus: 'running',
+    stale: true,
+  }));
+
+  assert.equal(refreshing.hasUsableData, true);
+  assert.equal(refreshing.isCurrent, false);
+  assert.equal(refreshing.phase, 'refreshing');
+});
+
+test('freshness treats malformed timestamps and unknown backend statuses conservatively', () => {
+  const malformedTimestamp = applicationStateFreshness(applicationState({
+    updatedAt: 'not-a-timestamp',
+  }));
+  const unknownStatus = applicationStateFreshness(applicationState({
+    refreshStatus: 'mystery',
+  }));
+  const legacyFailure = applicationStateFreshness(applicationState({
+    refreshStatus: 'failed',
+  }));
+
+  assert.equal(malformedTimestamp.hasUsableData, false);
+  assert.equal(malformedTimestamp.phase, 'checking');
+  assert.equal(unknownStatus.isCurrent, false);
+  assert.equal(unknownStatus.phase, 'stale');
+  assert.equal(legacyFailure.isCurrent, false);
+  assert.equal(legacyFailure.phase, 'stale');
+});
 
 test('repository selectors expose canonical app-state slices', () => {
   const state = {
@@ -40,6 +122,25 @@ test('repository selectors expose canonical app-state slices', () => {
   assert.deepEqual(ownershipViews(state).map((view) => view.catalogAppId), ['vaultwarden']);
   assert.equal(applicationStateUpdatedAt(state)?.getTime(), new Date(updatedAt).getTime());
 });
+
+function applicationState(overrides: Partial<ApplicationState> = {}): ApplicationState {
+  return {
+    foundServices: [],
+    managedApps: [],
+    observedServices: [],
+    ownershipViews: [],
+    pinnedExternalServices: [],
+    runtimeApps: [],
+    updatedAt,
+    stale: false,
+    refreshStatus: 'idle',
+    refreshStartedAt: updatedAt,
+    refreshCompletedAt: updatedAt,
+    nextRefreshAt: '2026-06-21T12:00:10Z',
+    lastError: null,
+    ...overrides,
+  };
+}
 
 test('repository falls back from managed app instances when runtime apps are not present', () => {
   const state = {

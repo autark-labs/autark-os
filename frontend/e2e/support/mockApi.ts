@@ -1,6 +1,6 @@
 import type { Page, Route } from 'playwright/test';
 
-export type FixtureScenario = 'ready' | 'idle' | 'onboarding' | 'loading' | 'empty' | 'error' | 'auth-unclaimed' | 'auth-claimed';
+export type FixtureScenario = 'ready' | 'idle' | 'onboarding' | 'loading' | 'empty' | 'error' | 'app-state-stale' | 'app-state-unavailable' | 'auth-unclaimed' | 'auth-claimed';
 
 const authSetupCode = 'TEST-LOCAL-CODE';
 const authPassword = 'correct horse battery';
@@ -479,7 +479,27 @@ const restorePlan = { restorePointId: restorePoint.id, scope: 'app', source: 'au
 
 function defaultResponse(pathname: string, method: string, scenario: FixtureScenario) {
   const onboarding = scenario === 'onboarding' ? onboardingIncomplete : onboardingComplete;
-  const currentAppState = scenario === 'empty' ? emptyAppState : appState;
+  const currentAppState = scenario === 'empty'
+    ? emptyAppState
+    : scenario === 'app-state-stale'
+      ? {
+          ...appState,
+          updatedAt: '2025-01-15T11:45:00.000Z',
+          stale: true,
+          refreshStatus: 'error',
+          refreshCompletedAt: fixedAt,
+          lastError: 'Docker inventory unavailable',
+        }
+      : scenario === 'app-state-unavailable'
+        ? {
+            ...emptyAppState,
+            updatedAt: null,
+            stale: true,
+            refreshStatus: 'error',
+            refreshCompletedAt: fixedAt,
+            lastError: 'Docker inventory unavailable',
+          }
+        : appState;
   const jobs = scenario === 'idle' ? [] : [activeJob];
   if (pathname === '/api/admin/security/status') return { devMode: true, claimed: true, authRequired: false, message: 'Fixture mode', setupCodeCommand: 'sudo autark-os admin setup-code', passwordResetCommand: 'sudo autark-os admin reset-password' };
   if (pathname === '/api/system/onboarding') return onboarding;
@@ -532,6 +552,7 @@ async function fulfill(route: Route, body: unknown, status = 200, headers: Recor
 
 export async function installMockApi(page: Page, scenario: FixtureScenario = 'ready') {
   let authenticated = false;
+  let applicationStateRecovered = false;
   let claimed = scenario !== 'auth-unclaimed';
   const authScenario = scenario === 'auth-unclaimed' || scenario === 'auth-claimed';
   await page.addInitScript(({ now }) => {
@@ -593,6 +614,19 @@ export async function installMockApi(page: Page, scenario: FixtureScenario = 're
     }
     if (scenario === 'error' && url.pathname === '/api/system/storage') {
       await fulfill(route, { message: 'Fixture storage service is unavailable.' }, 503);
+      return;
+    }
+    if (
+      (scenario === 'app-state-stale' || scenario === 'app-state-unavailable')
+      && url.pathname === '/api/application-state/refresh'
+      && request.method() === 'POST'
+    ) {
+      applicationStateRecovered = true;
+      await fulfill(route, appState);
+      return;
+    }
+    if (applicationStateRecovered && url.pathname === '/api/application-state') {
+      await fulfill(route, appState);
       return;
     }
 

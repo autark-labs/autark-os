@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ExternalLink, Pin, RefreshCw, ShieldAlert } from 'lucide-react';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
-import { apiErrorMessage } from '@/api/httpClient';
 import { PageShell } from '@/components/layout/PageShell';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
@@ -34,7 +33,7 @@ function ResolveExistingAppsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const services = appState.observedServices;
-  const error = localError || (appState.error ? apiErrorMessage(appState.error, 'Existing apps could not be loaded.') : null);
+  const error = localError;
   const visibleServices = useMemo(() => visibleResolveExistingServices(services) as ObservedServiceView[], [services]);
 
   useEffect(() => {
@@ -116,7 +115,7 @@ function ResolveExistingAppsPage() {
 
       {appState.isLoading ? (
         <PageLoadingState className="min-h-[22rem]" model={{ description: 'Checking observed services and ownership state.', title: 'Loading existing apps' }} />
-      ) : (
+      ) : appState.freshness.hasUsableData ? (
         <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(360px,0.8fr)_minmax(0,1.2fr)]">
           <ResolvePanel>
             <div>
@@ -151,7 +150,7 @@ function ResolveExistingAppsPage() {
             service={selectedService}
           />
         </div>
-      )}
+      ) : null}
 
       <ObservedServiceDetailsSheet
         onActionComplete={handleObservedServiceResult}

@@ -63,7 +63,10 @@ export function AppCardName({ className, name, onSelect, selectAriaLabel }: AppC
                 aria-label={selectAriaLabel || `Manage ${name}`}
                 className={cn('block w-full truncate text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80', className)}
                 onBlur={() => setIsNameHovered(false)}
-                onClick={onSelect}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect();
+                }}
                 onFocus={() => {
                   updateOverflow();
                   setIsNameHovered(true);

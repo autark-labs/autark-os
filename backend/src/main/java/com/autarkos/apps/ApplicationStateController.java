@@ -18,7 +18,7 @@ public class ApplicationStateController {
 
     @GetMapping
     public ApplicationState state(@RequestParam(defaultValue = "false") boolean refresh) {
-        return service.snapshot();
+        return refresh ? service.refreshNow() : service.snapshot();
     }
 
     @PostMapping("/refresh")

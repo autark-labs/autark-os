@@ -134,7 +134,12 @@ export function ApplicationCard({
           )}
         />
         <div className="flex min-h-0 flex-1 flex-col px-3 pb-2 pt-2">
-          <AppCardName className="text-sm font-semibold text-white" name={item.name} />
+          <AppCardName
+            className="text-sm font-semibold text-white"
+            name={item.name}
+            onSelect={() => onSelect(item.id)}
+            selectAriaLabel={`Select ${item.name}`}
+          />
           <p className="m-0 truncate text-xs text-slate-400">{item.category || 'App'}</p>
           <div className="mt-auto flex items-center justify-between gap-2 border-t border-sky-300/10 pt-2 text-[0.7rem] font-medium">
             <span className="flex min-w-0 items-center gap-1.5">

@@ -9,11 +9,20 @@ export type ApplicationState = {
   pinnedExternalServices: ObservedServiceView[];
   foundServices: ObservedServiceView[];
   ownershipViews: AppOwnershipView[];
-  updatedAt: string;
+  updatedAt: string | null;
   stale?: boolean;
-  refreshStatus?: 'idle' | 'running' | 'failed' | string;
+  refreshStatus?: 'idle' | 'running' | 'stale' | 'error' | string;
   refreshStartedAt?: string | null;
   refreshCompletedAt?: string | null;
   nextRefreshAt?: string | null;
   lastError?: string | null;
+};
+
+export type ApplicationStateFreshnessPhase = 'checking' | 'current' | 'refreshing' | 'stale' | 'unavailable';
+
+export type ApplicationStateFreshness = {
+  hasUsableData: boolean;
+  isCurrent: boolean;
+  lastSuccessfulUpdate: Date | null;
+  phase: ApplicationStateFreshnessPhase;
 };

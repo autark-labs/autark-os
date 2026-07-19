@@ -24,6 +24,7 @@ import {
 import { apiErrorMessage } from '@/api/httpClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
+import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import {
   useDiscoverAppsQuery,
   useDiscoverBackupMutation,
@@ -82,6 +83,7 @@ function DiscoverErrorState({ message, onRetry, title = 'Discover needs attentio
 
 function MarketplacePage() {
   const { showAdvancedMetrics } = useProjectSettings();
+  const applicationState = useApplicationStateRepository();
   const wideRailLayout = useDiscoverRailLayout();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -106,7 +108,10 @@ function MarketplacePage() {
   const recoveryMode = searchParams.get('mode');
   const explicitDetailAppId = marketplaceDetailId(searchParams);
   const detailAppId = explicitDetailAppId ?? recoveryAppId;
-  const appsQuery = useDiscoverAppsQuery();
+  const appsQuery = useDiscoverAppsQuery(
+    applicationState.applicationState?.updatedAt ?? null,
+    applicationState.freshness.hasUsableData,
+  );
   const activityQuery = useMarketplaceActivityQuery();
   const readinessQuery = useDiscoverReadinessQuery();
   const installMutation = useDiscoverInstallMutation();
@@ -234,6 +239,10 @@ function MarketplacePage() {
     if (!appId) {
       return;
     }
+    if (!applicationState.freshness.isCurrent) {
+      setMarketplaceError('Refresh app information before reviewing or starting an install.');
+      return;
+    }
     const app = apps.find((candidate) => candidate.id === appId);
     if (mode === 'install' && appId === selectedApp?.id && installPreview && !installPreview.valid) {
       setMarketplaceError(installPreview.blockingIssues[0]?.message || 'Finish setup choices before installing.');
@@ -283,9 +292,14 @@ function MarketplacePage() {
     statusFilter,
   }) as DiscoverAppView[], [catalogApps, searchQuery, selectedCategory, sortBy, statusFilter]);
   const selectedAppInstalling = Boolean(installJob && !terminalJob(installJob) && installJob.subjectId === selectedApp?.id);
-  const selectedAppInstallLocked = Boolean(selectedApp && installJob && !terminalJob(installJob) && installJob.subjectId !== selectedApp.id);
+  const selectedAppInstallLocked = !applicationState.freshness.isCurrent
+    || Boolean(selectedApp && installJob && !terminalJob(installJob) && installJob.subjectId !== selectedApp.id);
   const selectedAppHasSettings = hasAppSpecificSetup(selectedView?.setupSchema ?? { appId: '', version: 1, inputs: [] }, setupAnswers);
-  const installStatusMessage = selectedAppInstallLocked && installJob ? `${appNameForJob(installJob, apps)} is installing. Finish that install before starting another app.` : '';
+  const installStatusMessage = !applicationState.freshness.isCurrent
+    ? 'Refresh app information before reviewing or starting an install.'
+    : selectedAppInstallLocked && installJob
+      ? `${appNameForJob(installJob, apps)} is installing. Finish that install before starting another app.`
+      : '';
   const starterRecommendations = useMemo(
     () => apps.length ? starterAppsForMarketplace(apps.map((view) => view.app), onboarding?.recommendedApps ?? [], installedById, doctor, storage) as StarterRecommendation[] : [],
     [apps, doctor, installedById, onboarding?.recommendedApps, storage],

@@ -25,7 +25,7 @@ function OverviewPage() {
         summaryAvailability={summaryAvailability}
         summary={home.summary}
       >
-        <InstalledAppsLauncher apps={readyApps} />
+        {appState.freshness.hasUsableData && <InstalledAppsLauncher apps={readyApps} />}
       </HomeHero>
 
       <DashboardSummaryGrid
