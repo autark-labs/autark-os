@@ -14,6 +14,7 @@ grep -q 'actions/upload-artifact@v6' "${workflow}"
 grep -q 'actions/download-artifact@v8' "${workflow}"
 grep -q 'compose-release-manifest.py compose' "${workflow}"
 grep -q 'compose-release-manifest.py validate' "${workflow}"
+grep -q 'release-workflow-contract-test.sh' "${workflow}"
 grep -q 'autark-os-cli-admin-session-test.sh' "${workflow}"
 grep -q 'autark-os-admin-recovery-test.sh' "${workflow}"
 grep -q 'autark-os-installer-support-bundle-test.sh' "${workflow}"
@@ -31,9 +32,16 @@ grep -q 'expected_build_sha = sys.argv\[3\]' "${workflow}"
 grep -q 'expected_build_date = sys.argv\[4\]' "${workflow}"
 grep -q 'docs/GETTING_STARTED.md' "${workflow}"
 grep -q '/usr/share/doc/autark-os/GETTING_STARTED.md' "${workflow}"
+grep -Fq 'dpkg-deb -c "${artifact_dir}/autark-os_${VERSION}_${ARCHITECTURE}.deb" >"${deb_contents}"' "${workflow}"
+grep -Fq "grep -Fq './usr/share/doc/autark-os/GETTING_STARTED.md' \"\${deb_contents}\"" "${workflow}"
 
 if grep -q -- '--clobber' "${workflow}"; then
   printf 'Release workflow must never overwrite existing release assets.\n' >&2
+  exit 1
+fi
+
+if grep -Eq 'dpkg-deb[[:space:]]+-c.*[|][[:space:]]*grep[[:space:]]+-[^[:space:]]*q' "${workflow}"; then
+  printf 'Release workflow must not stop dpkg-deb early with grep -q under pipefail.\n' >&2
   exit 1
 fi
 

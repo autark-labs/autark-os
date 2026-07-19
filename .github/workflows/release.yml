@@ -207,6 +207,7 @@ jobs:
       - name: Run installer and release contracts
         run: |
           set -euo pipefail
+          bash scripts/tests/release-workflow-contract-test.sh
           bash scripts/tests/release-architecture-integrity-test.sh
           bash scripts/tests/release-bundle-contract-test.sh
           bash scripts/tests/release-runtime-smoke-test.sh
@@ -272,7 +273,9 @@ jobs:
           test -f "${bundle_dir}/docs/THIRD_PARTY_NOTICES.md"
           grep -q "^Source revision: ${GITHUB_SHA}$" "${bundle_dir}/docs/RELEASE_NOTES.md"
           grep -q '^## Known Limitations$' "${bundle_dir}/docs/RELEASE_NOTES.md"
-          dpkg-deb -c "${artifact_dir}/autark-os_${VERSION}_${ARCHITECTURE}.deb" | grep -q './usr/share/doc/autark-os/GETTING_STARTED.md'
+          deb_contents="${RUNNER_TEMP}/autark-os-${VERSION}-${ARCHITECTURE}-deb-contents.txt"
+          dpkg-deb -c "${artifact_dir}/autark-os_${VERSION}_${ARCHITECTURE}.deb" >"${deb_contents}"
+          grep -Fq './usr/share/doc/autark-os/GETTING_STARTED.md' "${deb_contents}"
 
       - name: Retain architecture build output
         uses: actions/upload-artifact@v6
