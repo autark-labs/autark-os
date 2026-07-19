@@ -59,6 +59,10 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 ReadWritePaths=${runtime_dir} ${log_dir} ${config_dir}
 ENV
+chmod 0755 "${install_dir}"
+chmod 0640 "${config_dir}/autark-os.env"
+chmod 0644 "${service_file}"
+chmod 0640 "${sudoers_file}"
 
 cat >"${fake_bin}/id" <<'SH'
 #!/usr/bin/env bash

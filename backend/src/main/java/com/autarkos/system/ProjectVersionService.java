@@ -1,10 +1,13 @@
 package com.autarkos.system;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -17,11 +20,16 @@ public class ProjectVersionService {
     private final InstanceIdentityService identityService;
     private final ReleaseIdentity packagedIdentity;
 
+    @Autowired
     public ProjectVersionService(RuntimeLayout runtimeLayout, ProjectSettingsService settingsService, InstanceIdentityService identityService) {
+        this(runtimeLayout, settingsService, identityService, packagedArtifact());
+    }
+
+    ProjectVersionService(RuntimeLayout runtimeLayout, ProjectSettingsService settingsService, InstanceIdentityService identityService, Path packagedArtifact) {
         this.runtimeLayout = runtimeLayout;
         this.settingsService = settingsService;
         this.identityService = identityService;
-        this.packagedIdentity = readPackagedIdentity();
+        this.packagedIdentity = readPackagedIdentity(packagedArtifact);
     }
 
     public ProjectVersionInfo info() {
@@ -51,19 +59,38 @@ public class ProjectVersionService {
         return firstPresent(System.getenv("AUTARK_OS_BACKEND_JAR"), "/opt/autark-os/backend/autark-os-backend.jar");
     }
 
-    private ReleaseIdentity readPackagedIdentity() {
+    private static Path packagedArtifact() {
+        String classPath = System.getProperty("java.class.path", "");
+        if (!classPath.isBlank() && !classPath.contains(File.pathSeparator)) {
+            Path candidate = Path.of(classPath).toAbsolutePath().normalize();
+            if (candidate.toString().endsWith(".jar") && Files.isRegularFile(candidate)) {
+                return candidate;
+            }
+        }
         try {
-            Path artifact = Path.of(ProjectVersionService.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-            if (!artifact.toString().endsWith(".jar")) {
-                return ReleaseIdentity.empty();
+            Path candidate = Path.of(ProjectVersionService.class.getProtectionDomain().getCodeSource().getLocation().toURI())
+                    .toAbsolutePath()
+                    .normalize();
+            if (candidate.toString().endsWith(".jar") && Files.isRegularFile(candidate)) {
+                return candidate;
             }
-            try (JarFile jar = new JarFile(artifact.toFile())) {
-                Attributes attributes = jar.getManifest().getMainAttributes();
-                return new ReleaseIdentity(
-                        attributes.getValue("Implementation-Version"),
-                        attributes.getValue("Autark-OS-Build-Sha"),
-                        attributes.getValue("Autark-OS-Build-Date"));
-            }
+        } catch (Exception ignored) {
+            // Development classpaths and nested class locations use environment
+            // fallbacks instead of packaged manifest metadata.
+        }
+        return null;
+    }
+
+    private ReleaseIdentity readPackagedIdentity(Path artifact) {
+        if (artifact == null) {
+            return ReleaseIdentity.empty();
+        }
+        try (JarFile jar = new JarFile(artifact.toFile())) {
+            Attributes attributes = jar.getManifest().getMainAttributes();
+            return new ReleaseIdentity(
+                    attributes.getValue("Implementation-Version"),
+                    attributes.getValue("Autark-OS-Build-Sha"),
+                    attributes.getValue("Autark-OS-Build-Date"));
         } catch (Exception ignored) {
             return ReleaseIdentity.empty();
         }

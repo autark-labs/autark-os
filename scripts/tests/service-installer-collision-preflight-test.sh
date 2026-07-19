@@ -92,6 +92,7 @@ AUTARK_OS_CONFIG_DIR="${check_config}" \
 AUTARK_OS_INSTALL_DIR="${check_install}" \
 AUTARK_OS_LOG_DIR="${check_logs}" \
 AUTARK_OS_SERVICE_FILE="${tmp_dir}/check-autark-os.service" \
+AUTARK_OS_SUDOERS_FILE="${tmp_dir}/check-sudoers" \
   "${repo_root}/scripts/install-autark-os-service.sh" --check >"${tmp_dir}/check.out"
 
 grep -q 'Autark-OS version:.*9.8.7-beta.6' "${tmp_dir}/check.out"
@@ -110,6 +111,7 @@ if PATH="${check_bin}:/usr/bin:/bin" \
   AUTARK_OS_INSTALL_DIR="${check_install}" \
   AUTARK_OS_LOG_DIR="${check_logs}" \
   AUTARK_OS_SERVICE_FILE="${tmp_dir}/check-autark-os.service" \
+  AUTARK_OS_SUDOERS_FILE="${tmp_dir}/check-sudoers" \
   "${repo_root}/scripts/install-autark-os-service.sh" --check >"${tmp_dir}/mismatched-check.out" 2>&1; then
   printf 'Expected an installed release identity mismatch to fail service verification.\n' >&2
   exit 1

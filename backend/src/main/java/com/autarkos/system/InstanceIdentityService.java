@@ -45,7 +45,7 @@ public class InstanceIdentityService {
         this.objectMapper = new ObjectMapper();
     }
 
-    public AutarkOsIdentity current() {
+    public synchronized AutarkOsIdentity current() {
         if (Files.exists(runtimeLayout.identityPath())) {
             return readExisting();
         }

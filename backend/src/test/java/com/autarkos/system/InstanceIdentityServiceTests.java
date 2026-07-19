@@ -6,6 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -70,6 +75,30 @@ class InstanceIdentityServiceTests {
 
         assertThat(identity.instanceId()).isEqualTo("pos_created");
         assertThat(Files.isDirectory(runtimeLayout.configRoot())).isTrue();
+    }
+
+    @Test
+    void createsOneStableIdentityWhenFirstAccessIsConcurrent() {
+        RuntimeLayout runtimeLayout = runtimeLayout(tempDir.resolve("concurrent/runtime"));
+        AtomicInteger generatedIds = new AtomicInteger();
+        InstanceIdentityService service = new InstanceIdentityService(
+                runtimeLayout,
+                () -> "Concurrent Host",
+                () -> "pos_concurrent_" + generatedIds.incrementAndGet(),
+                () -> Instant.parse("2026-06-20T12:00:00Z"));
+        var executor = Executors.newFixedThreadPool(8);
+
+        try {
+            List<CompletableFuture<AutarkOsIdentity>> calls = IntStream.range(0, 8)
+                    .mapToObj(ignored -> CompletableFuture.supplyAsync(service::current, executor))
+                    .toList();
+            List<AutarkOsIdentity> identities = calls.stream().map(CompletableFuture::join).toList();
+
+            assertThat(identities).containsOnly(identities.getFirst());
+            assertThat(generatedIds).hasValue(1);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

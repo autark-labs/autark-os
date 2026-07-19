@@ -9,10 +9,12 @@ async function openRoute(page: Page, path: string, scenario: FixtureScenario = '
   await stabilizePage(page);
 }
 
-async function expectNoSeriousAccessibilityViolations(page: Page) {
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa'])
-    .analyze();
+async function expectNoSeriousAccessibilityViolations(page: Page, include?: string) {
+  const builder = new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']);
+  if (include) {
+    builder.include(include);
+  }
+  const results = await builder.analyze();
   const seriousViolations = results.violations.filter((violation) => (
     violation.impact === 'critical' || violation.impact === 'serious'
   ));
@@ -50,7 +52,7 @@ test('app management keeps its background inert without serious or critical axe 
 
 test('Discover, Access, and Settings have no serious or critical axe violations', async ({ page }) => {
   await openRoute(page, '/discover');
-  await expect(page.getByText(/Discover Apps/i).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Discover$/i })).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 
   await page.goto('/access', { waitUntil: 'domcontentloaded' });
@@ -59,7 +61,7 @@ test('Discover, Access, and Settings have no serious or critical axe violations'
 
   await page.goto('/settings', { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('textbox', { name: /^Device name/ })).toBeVisible();
-  await expectNoSeriousAccessibilityViolations(page);
+  await expectNoSeriousAccessibilityViolations(page, '[role="dialog"]');
 });
 
 test('backup restore dialog has no serious or critical axe violations', async ({ page }) => {

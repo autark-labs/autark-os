@@ -141,7 +141,7 @@ export function ApplicationCard({
               <span className={cn('size-1.5 shrink-0 rounded-full', readinessTone(item))} />
               <span className={cn(readinessTextTone(item))}>{statusLabel(item)}</span>
             </span>
-            <span className="truncate text-slate-200/65">{item.managementState === 'managed' ? `${item.access} · ${item.backup}` : item.access}</span>
+            <span className="truncate text-slate-200/65">{item.managementState === 'managed' ? `${item.access}` : item.access}</span>
           </div>
         </div>
       </div>

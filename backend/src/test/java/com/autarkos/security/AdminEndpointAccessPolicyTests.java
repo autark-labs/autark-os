@@ -14,6 +14,7 @@ class AdminEndpointAccessPolicyTests {
     void classifiesPublicLocalAndAuthenticatedContractsExplicitly() {
         assertThat(policy.accessMode("GET", "/api/health")).isEqualTo(AccessMode.PUBLIC);
         assertThat(policy.accessMode("GET", "/api/admin/security/status")).isEqualTo(AccessMode.PUBLIC);
+        assertThat(policy.accessMode("GET", "/api/system/version")).isEqualTo(AccessMode.PUBLIC);
         assertThat(policy.accessMode("POST", "/api/admin/security/claim")).isEqualTo(AccessMode.PUBLIC);
         assertThat(policy.accessMode("POST", "/api/admin/security/login")).isEqualTo(AccessMode.PUBLIC);
         assertThat(policy.accessMode("POST", "/api/admin/security/local/reset-password")).isEqualTo(AccessMode.LOCAL_ADMIN);
@@ -29,6 +30,7 @@ class AdminEndpointAccessPolicyTests {
     @Test
     void doesNotTreatOtherMethodsOrSecuritySubpathsAsPublic() {
         assertThat(policy.accessMode("POST", "/api/health")).isEqualTo(AccessMode.AUTHENTICATED);
+        assertThat(policy.accessMode("POST", "/api/system/version")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("GET", "/api/admin/security/claim")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("POST", "/api/admin/security/anything-else")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("OPTIONS", "/api/apps")).isEqualTo(AccessMode.AUTHENTICATED);

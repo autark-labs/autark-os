@@ -13,13 +13,13 @@ const routes: RouteCase[] = [
   { name: 'setup', path: '/setup', expected: /Set up Autark-OS/i, scenario: 'onboarding' },
   { name: 'My Apps', path: '/apps', expected: /My Apps/i },
   { name: 'found apps', path: '/apps/found', expected: /Resolve Existing Apps/i },
-  { name: 'Discover', path: '/discover', expected: /Discover Apps/i },
+  { name: 'Discover', path: '/discover', expected: /^Discover$/i },
   { name: 'Access', path: '/access', expected: /^Access$/i },
   { name: 'Backups', path: '/backups', expected: /^Backups$/i },
   { name: 'Autark Pro', path: '/pro', expected: /Autark Pro is being built/i },
   { name: 'Storage', path: '/storage', expected: /^Storage$/i },
-  { name: 'Settings', path: '/settings', expected: /Autark-OS controls/i },
-  { name: 'Diagnostics', path: '/diagnostics', expected: /Autark-OS Diagnostics/i },
+  { name: 'Settings', path: '/settings', expected: /Appliance settings/i },
+  { name: 'Diagnostics', path: '/diagnostics', expected: /^Diagnostics$/i },
 ];
 
 async function openRoute(page: Page, route: RouteCase) {

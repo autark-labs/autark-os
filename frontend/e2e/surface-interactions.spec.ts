@@ -56,7 +56,7 @@ test('wide view opens global popovers, app management, and the Discover dialog',
   await expectNoHorizontalOverflow(page);
 
   await openReadyRoute(page, '/discover', { width: 1280, height: 960 });
-  await expect(page.getByText(/Discover Apps/i).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Discover$/i })).toBeVisible();
   await page.getByRole('button', { name: /How installs work/i }).click();
   await expect(page.getByRole('dialog')).toContainText(/How Autark-OS installs apps/i);
   await expectNoHorizontalOverflow(page);
@@ -75,7 +75,7 @@ test('wide view opens global popovers, app management, and the Discover dialog',
 
   await openReadyRoute(page, '/settings', { width: 1280, height: 960 });
   await page.getByRole('textbox', { name: /^Device name/ }).fill('Fixture Home Server updated');
-  await page.getByRole('button', { name: /^Refresh$/i }).click();
+  await page.getByRole('button', { name: /^Refresh settings$/i }).click();
   await expect(page.getByRole('alertdialog')).toContainText(/Discard unsaved changes/i);
   await expectNoHorizontalOverflow(page);
 });

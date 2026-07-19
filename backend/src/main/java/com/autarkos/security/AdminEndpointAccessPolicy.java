@@ -9,7 +9,9 @@ public class AdminEndpointAccessPolicy {
         if (path == null || !path.startsWith("/api/")) {
             return AccessMode.NOT_API;
         }
-        if (isRead(method) && ("/api/health".equals(path) || "/api/admin/security/status".equals(path))) {
+        if (isRead(method) && ("/api/health".equals(path)
+                || "/api/admin/security/status".equals(path)
+                || "/api/system/version".equals(path))) {
             return AccessMode.PUBLIC;
         }
         if ("POST".equalsIgnoreCase(method)

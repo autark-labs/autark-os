@@ -102,9 +102,51 @@ jobs:
             printf 'published_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >>"${GITHUB_OUTPUT}"
 
+  browser-regression:
+    name: Browser regression gate
+    needs: prepare
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install Yarn 1
+        run: npm install --global yarn@1.22.22
+        working-directory: .
+
+      - name: Install frontend dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install the Chromium test browser
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run browser regression coverage
+        run: yarn test:e2e
+
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-playwright-report
+          path: frontend/playwright-report
+          if-no-files-found: ignore
+          retention-days: 14
+
   build:
     name: Build ${{ matrix.architecture }} artifacts
-    needs: prepare
+    needs:
+      - prepare
+      - browser-regression
     strategy:
       fail-fast: false
       matrix:

@@ -57,14 +57,14 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
           <AdvancedEmptyState emptyState={emptyState} />
         ) : (
           <div aria-label="Installed apps table" data-testid="advanced-table-scroll-area" role="region" tabIndex={0} className="h-full min-h-0 overflow-auto overscroll-contain rounded-xl border border-app-border-muted bg-slate-950 px-2 pb-2">
-            <Table aria-hidden={managementOpen} className="min-w-[74rem] table-fixed border-separate border-spacing-y-2" containerClassName="overflow-visible" ref={tableRef}>
+            <Table aria-hidden={managementOpen} className="min-w-[41rem] table-fixed border-separate border-spacing-y-2" containerClassName="overflow-visible" ref={tableRef}>
               <colgroup>
-                <col className="w-72" />
-                <col className="w-32" />
-                <col className="w-40" />
-                <col className="w-32" />
                 <col className="w-36" />
-                <col className="w-80" />
+                <col className="w-28" />
+                <col className="w-24" />
+                <col className="w-20" />
+                <col className="w-20" />
+                <col className="w-36" />
               </colgroup>
               <TableHeader>
                 <TableRow className="h-10 border-transparent hover:bg-transparent">
@@ -144,64 +144,58 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
       <TableCell className="h-16 px-3 py-0"><TableMetadata icon={<Network aria-hidden="true" className="size-3.5" />} value={item.access} /></TableCell>
       <TableCell className="h-16 px-3 py-0"><BackupMetadata item={item} /></TableCell>
       <TableCell className="h-16 rounded-r-xl px-3 py-0">
-        <div className="flex h-16 justify-end gap-2 whitespace-nowrap">
+        <div className="flex h-16 justify-end gap-1 whitespace-nowrap">
           {item.href && (
-            <ApplicationOpenButton asChild className="my-auto h-8 px-2.5" size="sm">
-              <a href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank">
-                <ExternalLink data-icon="inline-start" />
-                Open
+            <ApplicationOpenButton asChild className="my-auto size-8 px-0" size="icon-sm">
+              <a aria-label={`Open ${item.name}`} href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank" title={`Open ${item.name}`}>
+                <ExternalLink />
               </a>
             </ApplicationOpenButton>
           )}
           {item.managementState === 'managed' && (
             primaryRuntimeActionLoading ? (
               <DisabledAction disabled reason={disabledReason(loadingAction)}>
-                <ApplicationDarkControlButton disabled className="my-auto h-8 px-2.5" size="sm" type="button">
-                  <Loader2 className="animate-spin" data-icon="inline-start" />
-                  {runtimeActionLabel(loadingAction)}
+                <ApplicationDarkControlButton aria-label={runtimeActionLabel(loadingAction)} disabled className="my-auto size-8 px-0" size="icon-sm" title={runtimeActionLabel(loadingAction)} type="button">
+                  <Loader2 className="animate-spin" />
                 </ApplicationDarkControlButton>
               </DisabledAction>
             ) : item.readinessState === 'paused' || item.readinessState === 'stopped' ? (
               <DisabledAction disabled={actionDisabled('start')} reason={disabledReason('start')}>
-                <ApplicationDarkControlButton disabled={actionDisabled('start')} className="my-auto h-8 px-2.5" onClick={(event) => {
+                <ApplicationDarkControlButton aria-label={`Start ${item.name}`} disabled={actionDisabled('start')} className="my-auto size-8 px-0" onClick={(event) => {
                   event.stopPropagation();
                   actions.onStart(item.id);
-                }} size="sm" type="button">
-                  <Play data-icon="inline-start" />
-                  Start
+                }} size="icon-sm" title={`Start ${item.name}`} type="button">
+                  <Play />
                 </ApplicationDarkControlButton>
               </DisabledAction>
             ) : (
               <DisabledAction disabled={actionDisabled('stop')} reason={disabledReason('stop')}>
-                <ApplicationDarkControlButton disabled={actionDisabled('stop')} className="my-auto h-8 px-2.5" onClick={(event) => {
+                <ApplicationDarkControlButton aria-label={`Pause ${item.name}`} disabled={actionDisabled('stop')} className="my-auto size-8 px-0" onClick={(event) => {
                   event.stopPropagation();
                   actions.onStop(item.id);
-                }} size="sm" type="button">
-                  <Pause data-icon="inline-start" />
-                  Pause
+                }} size="icon-sm" title={`Pause ${item.name}`} type="button">
+                  <Pause />
                 </ApplicationDarkControlButton>
               </DisabledAction>
             )
           )}
           {item.managementState === 'managed' && (
             <DisabledAction disabled={actionDisabled('restart')} reason={disabledReason('restart')}>
-              <ApplicationDarkControlButton disabled={actionDisabled('restart')} className="my-auto h-8 px-2.5" onClick={(event) => {
+              <ApplicationDarkControlButton aria-label={`${loadingAction === 'restart' ? 'Restarting' : 'Restart'} ${item.name}`} disabled={actionDisabled('restart')} className="my-auto size-8 px-0" onClick={(event) => {
                 event.stopPropagation();
                 actions.onRestart(item.id);
-              }} size="sm" type="button">
-                {loadingAction === 'restart' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <RotateCw data-icon="inline-start" />}
-                {loadingAction === 'restart' ? 'Restarting' : 'Restart'}
+              }} size="icon-sm" title={`${loadingAction === 'restart' ? 'Restarting' : 'Restart'} ${item.name}`} type="button">
+                {loadingAction === 'restart' ? <Loader2 className="animate-spin" /> : <RotateCw />}
               </ApplicationDarkControlButton>
             </DisabledAction>
           )}
           {item.managementState === 'managed' && (
             <DisabledAction disabled={actionDisabled('backup')} reason={disabledReason('backup')}>
-              <ApplicationDarkControlButton disabled={actionDisabled('backup')} className="my-auto h-8 px-2.5" onClick={(event) => {
+              <ApplicationDarkControlButton aria-label={`${loadingAction === 'backup' ? 'Backing up' : 'Back up'} ${item.name}`} disabled={actionDisabled('backup')} className="my-auto size-8 px-0" onClick={(event) => {
                 event.stopPropagation();
                 actions.onCreateBackup(item.id);
-              }} size="sm" type="button">
-                {loadingAction === 'backup' ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <ShieldCheck data-icon="inline-start" />}
-                {loadingAction === 'backup' ? 'Backing up' : 'Backup'}
+              }} size="icon-sm" title={`${loadingAction === 'backup' ? 'Backing up' : 'Back up'} ${item.name}`} type="button">
+                {loadingAction === 'backup' ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
               </ApplicationDarkControlButton>
             </DisabledAction>
           )}

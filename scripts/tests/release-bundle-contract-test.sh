@@ -118,6 +118,18 @@ if AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=other-build-sha "${re
 fi
 grep -q "does not match requested release build SHA" "${mismatch_output}"
 
+date_mismatch_output="${tmp_dir}/date-mismatch.out"
+if AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha AUTARK_OS_BUILD_DATE=2026-01-02T00:00:00Z "${repo_root}/scripts/build-release-bundle.sh" \
+  --skip-build \
+  --version 1.2.3 \
+  --channel beta \
+  --architecture "${architecture}" \
+  --output-dir "${tmp_dir}/date-mismatch" >"${date_mismatch_output}" 2>&1; then
+  printf 'Expected --skip-build to reject a backend jar from a different build date.\n' >&2
+  exit 1
+fi
+grep -q "does not match requested release build date" "${date_mismatch_output}"
+
 python3 - "${bundle_dir}" <<'PY'
 from pathlib import Path
 import sys

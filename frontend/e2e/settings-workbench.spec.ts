@@ -1,4 +1,4 @@
-import { expect, test } from 'playwright/test';
+import { expect, test, type Locator } from 'playwright/test';
 import { installMockApi, stabilizePage } from './support/mockApi';
 
 async function openSettings(page: Parameters<typeof installMockApi>[0]) {
@@ -7,6 +7,18 @@ async function openSettings(page: Parameters<typeof installMockApi>[0]) {
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   await stabilizePage(page);
   await page.getByRole('button', { name: 'Open settings' }).click();
+}
+
+async function expectActionsWithinDialog(dialog: Locator) {
+  const dialogBounds = await dialog.boundingBox();
+  expect(dialogBounds, 'confirmation dialog should be rendered').not.toBeNull();
+
+  for (const actionName of ['Keep editing', 'Discard changes', 'Save and close']) {
+    const actionBounds = await dialog.getByRole('button', { name: actionName }).boundingBox();
+    expect(actionBounds, `${actionName} should be rendered`).not.toBeNull();
+    expect(actionBounds!.x).toBeGreaterThanOrEqual(dialogBounds!.x);
+    expect(actionBounds!.x + actionBounds!.width).toBeLessThanOrEqual(dialogBounds!.x + dialogBounds!.width);
+  }
 }
 
 test('Settings workbench keeps a fixed dialog while only its workspace scrolls', async ({ page }) => {
@@ -40,7 +52,9 @@ test('Settings workbench uses the same guarded close flow for backdrop and close
   const bounds = await dialog.boundingBox();
   expect(bounds, 'settings dialog should be rendered').not.toBeNull();
   await page.mouse.click(bounds!.x - 8, bounds!.y + bounds!.height / 2);
-  await expect(page.getByRole('alertdialog')).toContainText('Save settings before closing?');
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation).toContainText('Save settings before closing?');
+  await expectActionsWithinDialog(confirmation);
   await page.getByRole('button', { name: 'Keep editing' }).click();
   await expect(dialog).toBeVisible();
 

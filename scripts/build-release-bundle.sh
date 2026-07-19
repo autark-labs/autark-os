@@ -222,7 +222,9 @@ parse_args() {
     OUTPUT_DIR="${REPO_ROOT}/${OUTPUT_DIR}"
   fi
   [[ -n "${BUILD_SHA}" ]] || BUILD_SHA="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || printf unknown)"
-  [[ -n "${BUILD_DATE}" ]] || BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if [[ -z "${BUILD_DATE}" && ( "${SKIP_BUILD}" -ne 1 || "${DRY_RUN}" -eq 1 ) ]]; then
+    BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  fi
   [[ -n "${RELEASE_NOTES_URL}" ]] || RELEASE_NOTES_URL="https://github.com/autark-labs/autark-os/releases/tag/v${VERSION}"
   if [[ "${SKIP_BUILD}" -eq 1 && "${DRY_RUN}" -eq 0 ]]; then
     [[ "${VERSION_WAS_PROVIDED}" -eq 1 ]] || die "--skip-build requires an explicit --version or AUTARK_OS_VERSION."
@@ -263,6 +265,11 @@ verify_backend_jar_identity() {
   [[ -n "${jar_sha}" && "${jar_sha}" != "development" && "${jar_sha}" != "unknown" ]] || die "Backend jar is missing a release build SHA. Rebuild without --skip-build."
   [[ "${jar_sha}" == "${BUILD_SHA}" ]] || die "Backend jar build SHA '${jar_sha}' does not match requested release build SHA '${BUILD_SHA}'."
   [[ -n "${jar_date}" && "${jar_date}" != "development" ]] || die "Backend jar is missing a release build date. Rebuild without --skip-build."
+  if [[ -n "${BUILD_DATE}" ]]; then
+    [[ "${jar_date}" == "${BUILD_DATE}" ]] || die "Backend jar build date '${jar_date}' does not match requested release build date '${BUILD_DATE}'."
+  else
+    BUILD_DATE="${jar_date}"
+  fi
 }
 
 build_runtime() {

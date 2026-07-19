@@ -3,10 +3,12 @@ set -Eeuo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source_file="${repo_root}/frontend/src/pages/MarketplacePage/MarketplacePage.tsx"
+app_list_file="${repo_root}/frontend/src/pages/MarketplacePage/MarketplaceAppList.tsx"
 repository_file="${repo_root}/frontend/src/repositories/discoverRepository.ts"
 logic_file="${repo_root}/frontend/src/pages/MarketplacePage/extensions/MarketplacePage.logic.ts"
 
-grep -q "Start here" "${source_file}"
+grep -q "Start with" "${app_list_file}"
+grep -q 'aria-label="Starter app recommendation"' "${app_list_file}"
 grep -q "starterRecommendations" "${source_file}"
 grep -q "useDiscoverReadinessQuery" "${source_file}"
 grep -q "openAppDetails" "${source_file}"

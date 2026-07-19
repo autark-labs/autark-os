@@ -640,7 +640,7 @@ export const ApplicationsPage = () => {
         )}
       </div>
 
-      <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
         {viewMode === 'basic' ? (
           <BasicApplicationsView
             actionLoadingByItemId={actionLoadingByAppId}

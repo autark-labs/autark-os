@@ -25,6 +25,7 @@ class AdminSecurityFilterTests {
         assertAllowed(filter, "GET", "/api/health");
         assertAllowed(filter, "HEAD", "/api/health");
         assertAllowed(filter, "GET", "/api/admin/security/status");
+        assertAllowed(filter, "GET", "/api/system/version");
         assertAllowed(filter, "POST", "/api/admin/security/claim");
         assertAllowed(filter, "POST", "/api/admin/security/login");
         assertAllowed(filter, "GET", "/home");

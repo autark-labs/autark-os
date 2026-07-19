@@ -23,6 +23,7 @@ class AdminControllerRoutePolicyTests {
     private static final Set<String> PUBLIC_ROUTES = Set.of(
             "GET /api/health",
             "GET /api/admin/security/status",
+            "GET /api/system/version",
             "POST /api/admin/security/claim",
             "POST /api/admin/security/login");
     private static final Set<String> LOCAL_ADMIN_ROUTES = Set.of(

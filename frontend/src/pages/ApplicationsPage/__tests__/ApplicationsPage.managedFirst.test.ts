@@ -25,8 +25,10 @@ test('My Apps renders canonical managed and linked collections without mixing in
   assert.match(advancedView, /table-fixed/);
   assert.match(advancedView, /sticky left-0/);
   assert.match(advancedView, /h-16/);
-  assert.match(advancedView, /w-72/);
-  assert.match(advancedView, /w-40/);
+  assert.match(advancedView, /min-w-\[41rem\]/);
+  assert.match(advancedView, /<col className="w-36" \/>[\s\S]*<col className="w-28" \/>[\s\S]*<col className="w-24" \/>[\s\S]*<col className="w-20" \/>/);
+  assert.doesNotMatch(advancedView, /min-w-\[74rem\]/);
+  assert.match(page, /lg:grid-cols-\[minmax\(0,1fr\)_19rem\]/);
   assert.doesNotMatch(advancedView, /Recent activity/);
   assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
   assert.match(header, /title="My Apps"/);
