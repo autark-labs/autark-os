@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils';
 import type { ApplicationSurfaceItem } from './ApplicationsPage.types';
 
 type ApplicationIconSize = 'sm' | 'md' | 'lg';
+type ApplicationIconTone = 'harbor' | 'light';
 
 const iconSizeClasses: Record<ApplicationIconSize, { frame: string; image: string; fallback: string }> = {
   sm: {
@@ -21,15 +22,19 @@ const iconSizeClasses: Record<ApplicationIconSize, { frame: string; image: strin
   },
 };
 
-export function ApplicationIcon({ item, size = 'md' }: { item: ApplicationSurfaceItem; size?: ApplicationIconSize }) {
+export function ApplicationIcon({ item, size = 'md', tone = 'light' }: { item: ApplicationSurfaceItem; size?: ApplicationIconSize; tone?: ApplicationIconTone }) {
   const classes = iconSizeClasses[size];
 
   return (
-    <div className={cn('grid shrink-0 place-items-center border border-sky-300 bg-white', classes.frame)}>
+    <div className={cn(
+      'grid shrink-0 place-items-center border',
+      tone === 'harbor' ? 'border-sky-100/25 bg-app-card-harbor-icon' : 'border-sky-300 bg-white',
+      classes.frame,
+    )}>
       {item.iconUrl ? (
         <img alt="" className={cn('object-contain', classes.image)} src={item.iconUrl} />
       ) : (
-        <span className={cn('font-semibold text-slate-700', classes.fallback)}>
+        <span className={cn('font-semibold', tone === 'harbor' ? 'text-sky-100' : 'text-slate-700', classes.fallback)}>
           {item.name.slice(0, 2).toUpperCase()}
         </span>
       )}

@@ -8,6 +8,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { showActionNotification, showJobNotification } from '@/lib/actionNotifications';
+import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import {
   useBackupReportRepository,
   useBackupJobsQuery,
@@ -366,19 +367,12 @@ function backupAppIconUrls(
 
   return Object.fromEntries(backupApps.map((app) => [
     app.appId,
-    imageUrl(managedIconByAppId.get(app.appId))
-      || imageUrl(runtimeImageByAppId.get(app.appId))
-      || catalogAppIconUrl(app.appId),
+    preferredAppImageUrl(
+      managedIconByAppId.get(app.appId),
+      runtimeImageByAppId.get(app.appId),
+      catalogAppImageUrl(app.appId),
+    ),
   ]));
-}
-
-function imageUrl(value: string | null | undefined) {
-  const url = value?.trim() || '';
-  return /^(?:\/|https?:\/\/|data:image\/)/.test(url) ? url : null;
-}
-
-function catalogAppIconUrl(appId: string) {
-  return /^[a-z0-9][a-z0-9-]*$/.test(appId) ? `/app-images/${appId}.svg` : null;
 }
 
 function BackupJobBanner({ job }: { job: AutarkOsJob }) {

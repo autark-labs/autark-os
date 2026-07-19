@@ -5,6 +5,7 @@ import {
 } from '@/repositories/applicationStateRepository';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
 import type { ObservedServiceView } from '@/types/observedService';
+import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import type {
   AppAttentionState,
   AppOperationState,
@@ -67,7 +68,7 @@ function managedAppSurfaceItem(
     category: app.category || 'App',
     description: app.description || app.category || 'Managed app',
     href: primaryOpenUrl(app),
-    iconUrl: app.image || undefined,
+    iconUrl: preferredAppImageUrl(app.image, catalogAppImageUrl(app.appId)) || undefined,
     id: app.appId,
     kind: 'managed',
     lastEvent: app.recentEvents?.[0]?.message || health?.message || app.remediation?.summary || undefined,
@@ -111,6 +112,14 @@ function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSu
     description: service.userStatusDescription || service.category || 'Found service',
     href: service.url || undefined,
     id: `observed:${service.id}`,
+    iconUrl: preferredAppImageUrl(
+      service.metadata?.iconUrl,
+      service.metadata?.icon,
+      service.metadata?.appIcon,
+      service.metadata?.imageUrl,
+      service.metadata?.catalogImage,
+      catalogAppImageUrl(service.catalogAppId),
+    ) || undefined,
     kind: pinned ? 'pinned' : 'observed',
     lastEvent: service.userStatusLabel || undefined,
     links: observedLinks(service),

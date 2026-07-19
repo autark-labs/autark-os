@@ -1,4 +1,5 @@
 import { MonitorSmartphone, ShieldCheck } from 'lucide-react';
+import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import type { AppRuntimeView } from '@/types/app';
 import type { ObservedServiceView } from '@/types/observedService';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationItem, PrivateAccessReconciliationReport, TailscaleDevice, TailscaleStatus } from '@/types/network';
@@ -213,28 +214,18 @@ export function buildReachabilityServices({
 }
 
 function managedAppIconUrl(app: AppRuntimeView) {
-  return nonBlank(app.image);
+  return preferredAppImageUrl(app.image, catalogAppImageUrl(app.appId));
 }
 
 function observedServiceIconUrl(service: ObservedServiceView) {
-  return nonBlank(service.metadata?.iconUrl)
-    || nonBlank(service.metadata?.icon)
-    || nonBlank(service.metadata?.appIcon)
-    || nonBlank(service.metadata?.imageUrl)
-    || nonBlank(service.metadata?.catalogImage)
-    || catalogIconUrl(service.catalogAppId);
-}
-
-function catalogIconUrl(catalogAppId: string | null | undefined) {
-  const appId = nonBlank(catalogAppId);
-  if (!appId || !/^[a-z0-9][a-z0-9-]*$/.test(appId)) {
-    return null;
-  }
-  return `/app-images/${appId}.svg`;
-}
-
-function nonBlank(value: unknown) {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+  return preferredAppImageUrl(
+    service.metadata?.iconUrl,
+    service.metadata?.icon,
+    service.metadata?.appIcon,
+    service.metadata?.imageUrl,
+    service.metadata?.catalogImage,
+    catalogAppImageUrl(service.catalogAppId),
+  );
 }
 
 function reachabilityIssue(app: AppRuntimeView, reconciliationItem: PrivateAccessReconciliationItem | null) {

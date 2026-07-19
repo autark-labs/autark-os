@@ -77,7 +77,7 @@ test('applications page uses split behavior states instead of a single app statu
   assert.match(advanced, /ManagementBadge item=\{item\}/);
   assert.match(advanced, /ReadinessBadge item=\{item\}/);
   assert.match(advanced, /AttentionIndicator item=\{item\}/);
-  assert.match(advanced, /CompactOperationStatus item=\{item\}/);
+  assert.match(advanced, /CompactOperationStatus compact item=\{item\}/);
   assert.match(advanced, /item\.managementState === 'managed'/);
   assert.doesNotMatch(advanced, /item\.kind === 'managed'/);
 

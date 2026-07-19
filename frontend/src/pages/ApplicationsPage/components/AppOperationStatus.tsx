@@ -2,12 +2,25 @@ import { AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
-export function CompactOperationStatus({ className, item }: { className?: string; item: ApplicationSurfaceItem }) {
+export function CompactOperationStatus({ className, compact = false, item }: { className?: string; compact?: boolean; item: ApplicationSurfaceItem }) {
   if (item.operationState.kind === 'idle') {
     return null;
   }
 
   const failed = item.operationState.kind === 'failed';
+
+  if (compact) {
+    const detail = item.operationState.kind === 'failed'
+      ? item.operationState.message || 'Open details to review this app operation.'
+      : item.operationState.currentStep || 'Autark-OS is working on this app.';
+
+    return (
+      <div className={cn('flex min-w-0 items-center gap-1.5 text-xs font-semibold', failed ? 'text-red-200' : 'text-cyan-100', className)} title={detail}>
+        {failed ? <AlertTriangle aria-hidden="true" className="size-3.5 shrink-0" /> : <Loader2 aria-hidden="true" className="size-3.5 shrink-0 animate-spin" />}
+        <span className="truncate">{item.operationState.label}</span>
+      </div>
+    );
+  }
 
   return (
     <div

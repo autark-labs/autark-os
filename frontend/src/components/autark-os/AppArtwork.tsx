@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Sparkles } from 'lucide-react';
+import { renderableAppImageUrl } from '@/lib/appImage';
 import { cn } from '@/lib/utils';
 
 const appArtworkGradients = [
@@ -12,13 +13,22 @@ const appArtworkGradients = [
 ];
 
 export function AppArtwork({ className, iconUrl, index = 0, name, overlay }: { className?: string; iconUrl?: string | null; index?: number; name: string; overlay?: ReactNode }) {
+  const imageUrl = renderableAppImageUrl(iconUrl);
+
   return (
     <div className={cn('relative flex items-center justify-center overflow-hidden bg-gradient-to-br', appArtworkGradients[index % appArtworkGradients.length], className)}>
       <span aria-hidden="true" className="absolute -right-8 top-0 size-32 rounded-full bg-cyan-100/30 blur-3xl" />
       <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-slate-950/25 via-transparent to-white/5" />
       <span className="relative z-10 grid size-28 place-items-center rounded-3xl border border-sky-100/25 bg-app-card-harbor-icon text-cyan-100 shadow-lg shadow-slate-950/20">
-        <Sparkles aria-hidden="true" className="size-12" />
-        {iconUrl && <img alt="" className="absolute size-12 object-contain" onError={(event) => { event.currentTarget.style.display = 'none'; }} src={iconUrl} />}
+        {!imageUrl ? <Sparkles aria-hidden="true" className="size-12" /> : null}
+        {imageUrl ? (
+          <img
+            alt=""
+            className="absolute inset-0 size-full object-contain p-1.5"
+            onError={(event) => { event.currentTarget.style.display = 'none'; }}
+            src={imageUrl}
+          />
+        ) : null}
       </span>
       {overlay}
       <span className="sr-only">{name} artwork</span>

@@ -30,7 +30,17 @@ test('My Apps basic cards use the compact homepage launcher treatment', async ({
   const nameHeader = page.getByRole('columnheader', { name: 'Name' });
   await expect(nameHeader).toBeVisible();
   await expect(nameHeader).toHaveCSS('position', 'sticky');
+  await expect(nameHeader).toHaveCSS('left', '0px');
   await expect(page.locator('[data-slot="table-container"]').first()).toBeVisible();
+  const advancedName = page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long self-hosted service name/i });
+  await advancedName.hover();
+  const advancedCopy = page.getByRole('button', { name: /Copy Vaultwarden with a deliberately long self-hosted service name/i });
+  await expect(advancedCopy).toHaveCSS('opacity', '1');
+  await advancedName.click();
+  await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
+  const fixedRow = tableScrollArea.locator('tbody tr').first();
+  await expect(fixedRow).toHaveCSS('height', '64px');
+  await expect.poll(() => advancedName.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
   await tableScrollArea.evaluate((element) => {
     const tableBody = element.querySelector('tbody');
     const sourceRow = tableBody?.querySelector('tr');

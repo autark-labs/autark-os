@@ -64,6 +64,8 @@ test('shared surface components provide typed accessible primitives', () => {
   assert.match(appCardName, /copyText\(name\)/);
   assert.match(appCardName, /TooltipContent/);
   assert.match(appCardName, /copied \? <Check/);
+  assert.match(appCardName, /onSelect\?: \(\) => void/);
+  assert.match(appCardName, /selectAriaLabel/);
   assert.match(metadata, /MetadataBadgeAppearance = 'soft' \| 'solid'/);
   assert.match(copy, /export type CopyFieldModel/);
   assert.match(copy, /CopyTextButton/);

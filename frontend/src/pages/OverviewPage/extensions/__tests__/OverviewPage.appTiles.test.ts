@@ -10,7 +10,7 @@ import {
 
 test('managed app tile uses its canonical app icon', () => {
   assert.equal(managedAppIconUrl({ icon: '/app-images/pi-hole.svg' }), '/app-images/pi-hole.svg');
-  assert.equal(managedAppIconUrl({ icon: '' }), null);
+  assert.equal(managedAppIconUrl({ appId: 'vaultwarden', image: 'vaultwarden/server:1.36.0' }), '/app-images/vaultwarden.svg');
 });
 
 test('pinned observed service tile uses known service or catalog icon', () => {

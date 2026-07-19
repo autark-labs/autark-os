@@ -8,11 +8,13 @@ import { cn } from '@/lib/utils';
 type AppCardNameProps = {
   className?: string;
   name: string;
+  onSelect?: () => void;
+  selectAriaLabel?: string;
 };
 
 /** A compact app title that reveals clipped names and supports quick copying. */
-export function AppCardName({ className, name }: AppCardNameProps) {
-  const nameRef = useRef<HTMLSpanElement>(null);
+export function AppCardName({ className, name, onSelect, selectAriaLabel }: AppCardNameProps) {
+  const nameRef = useRef<HTMLElement | null>(null);
   const resetCopiedTimerRef = useRef<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [isNameHovered, setIsNameHovered] = useState(false);
@@ -27,6 +29,10 @@ export function AppCardName({ className, name }: AppCardNameProps) {
   function updateOverflow() {
     const element = nameRef.current;
     setIsOverflowing(Boolean(element && element.scrollWidth > element.clientWidth));
+  }
+
+  function setNameRef(element: HTMLElement | null) {
+    nameRef.current = element;
   }
 
   async function copyName(event: React.MouseEvent<HTMLButtonElement>) {
@@ -52,17 +58,39 @@ export function AppCardName({ className, name }: AppCardNameProps) {
       <div className="group/app-name pointer-events-auto relative min-w-0">
         <Tooltip open={isNameHovered && isOverflowing}>
           <TooltipTrigger asChild>
-            <span
-              className={cn('block truncate', className)}
-              onMouseEnter={() => {
-                updateOverflow();
-                setIsNameHovered(true);
-              }}
-              onMouseLeave={() => setIsNameHovered(false)}
-              ref={nameRef}
-            >
-              {name}
-            </span>
+            {onSelect ? (
+              <button
+                aria-label={selectAriaLabel || `Manage ${name}`}
+                className={cn('block w-full truncate text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80', className)}
+                onBlur={() => setIsNameHovered(false)}
+                onClick={onSelect}
+                onFocus={() => {
+                  updateOverflow();
+                  setIsNameHovered(true);
+                }}
+                onMouseEnter={() => {
+                  updateOverflow();
+                  setIsNameHovered(true);
+                }}
+                onMouseLeave={() => setIsNameHovered(false)}
+                ref={setNameRef}
+                type="button"
+              >
+                {name}
+              </button>
+            ) : (
+              <span
+                className={cn('block truncate', className)}
+                onMouseEnter={() => {
+                  updateOverflow();
+                  setIsNameHovered(true);
+                }}
+                onMouseLeave={() => setIsNameHovered(false)}
+                ref={setNameRef}
+              >
+                {name}
+              </span>
+            )}
           </TooltipTrigger>
           <TooltipContent className="max-w-sm border-sky-100/30 bg-slate-950 px-3 py-2 text-slate-50 shadow-xl shadow-slate-950/35" side="bottom" sideOffset={8}>
             <span className="break-words">{name}</span>
