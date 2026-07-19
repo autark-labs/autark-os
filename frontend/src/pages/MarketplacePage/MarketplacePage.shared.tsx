@@ -7,23 +7,23 @@ import type { MarketplaceApp } from '@/types/marketplace';
 export function AppImage({ app, className, presentation = 'icon', size = 'default' }: { app: MarketplaceApp; className?: string; presentation?: 'icon' | 'artwork'; size?: 'default' | 'large' }) {
   if (presentation === 'artwork') {
     return (
-      <span className={cn('relative grid h-24 w-full place-items-center overflow-hidden border-b border-sky-300/10 bg-gradient-to-br from-[#173455] to-[#102644]', className)}>
-        <span className="absolute inset-0 bg-gradient-to-t from-slate-950/20 to-transparent" />
+      <span className={cn('relative grid h-24 w-full place-items-center overflow-hidden border-b border-app-border-muted bg-gradient-to-br from-app-panel-hover to-app-panel', className)}>
+        <span className="absolute inset-0 bg-gradient-to-t from-app-surface/30 to-transparent" />
         {app.image ? (
           <img alt="" className="relative size-14 object-contain drop-shadow-lg" src={app.image} />
         ) : (
-          <span className="relative grid size-14 place-items-center rounded-2xl border border-slate-400/40 bg-slate-800 text-lg font-bold text-cyan-100 shadow-lg shadow-slate-950/20">{app.name.slice(0, 1)}</span>
+          <span className="relative grid size-14 place-items-center rounded-2xl border border-app-border-muted bg-app-panel-muted text-lg font-bold text-app-accent shadow-lg shadow-slate-950/20">{app.name.slice(0, 1)}</span>
         )}
       </span>
     );
   }
 
   return (
-    <span className={cn('grid shrink-0 place-items-center overflow-hidden rounded-lg border border-slate-500 bg-slate-700 shadow-lg shadow-slate-950/15', size === 'large' ? 'size-22' : 'size-14', className)}>
+    <span className={cn('grid shrink-0 place-items-center overflow-hidden rounded-lg border border-app-border-muted bg-app-panel-muted shadow-lg shadow-slate-950/15', size === 'large' ? 'size-22' : 'size-14', className)}>
       {app.image ? (
         <img alt="" className="h-full w-full object-contain p-2" src={app.image} />
       ) : (
-        <span className="text-lg font-bold text-cyan-200">{app.name.slice(0, 1)}</span>
+        <span className="text-lg font-bold text-app-accent">{app.name.slice(0, 1)}</span>
       )}
     </span>
   );

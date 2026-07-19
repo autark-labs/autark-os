@@ -51,6 +51,7 @@ test('Discover keeps details anchored to the persistent rail and reserves the sh
   assert.match(rail, /document\.removeEventListener\('pointerdown', handlePointerDown, true\)/);
   assert.match(rail, /data-discover-details-toggle/);
   assert.match(rail, /border-transparent shadow-none/);
+  assert.match(rail, /transition-transform duration-300/);
   assert.match(rail, /onReviewInstall/);
   assert.doesNotMatch(rail, /onReviewDetails/);
   assert.match(rail, /marketplacePrimaryRoute\(appView\)/);

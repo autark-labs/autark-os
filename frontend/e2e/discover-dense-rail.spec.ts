@@ -13,6 +13,12 @@ test('wide Discover keeps a selected app in the dense launcher detail rail', asy
 
   const rail = page.getByLabel('Selected Discover app');
   await expect(rail).toContainText('Vaultwarden');
+  await page.getByRole('button', { name: 'Filter app status' }).click();
+  await page.getByRole('menuitemradio', { name: 'Installed' }).click();
+  await expect(page.getByRole('button', { name: 'Select Vaultwarden' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Select Immich' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filter app status' }).click();
+  await page.getByRole('menuitemradio', { name: 'All statuses' }).click();
   await page.getByRole('button', { name: 'Select Immich' }).click();
   await expect(rail).toContainText('Immich');
   await expect(page.getByRole('dialog')).toHaveCount(0);

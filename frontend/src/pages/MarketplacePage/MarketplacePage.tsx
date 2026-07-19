@@ -37,7 +37,7 @@ import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
-import { categories } from './extensions/MarketplacePage.constants';
+import { categories, type MarketplaceStatusFilter } from './extensions/MarketplacePage.constants';
 import {
   START_HERE_DISMISSAL_KEY,
   formatMarketplaceActivityTime,
@@ -88,7 +88,7 @@ function MarketplacePage() {
   const [selectedAppId, setSelectedAppId] = useState('vaultwarden');
   const [sortBy, setSortBy] = useState('Recommended');
   const [searchQuery, setSearchQuery] = useState('');
-  const [hideInstalled, setHideInstalled] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<MarketplaceStatusFilter>('all');
   const [basicCatalogMode, setBasicCatalogMode] = useState<'starter' | 'all-safe'>('starter');
   const [marketplaceError, setMarketplaceError] = useState('');
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
@@ -277,11 +277,11 @@ function MarketplacePage() {
 
   const visibleApps = useMemo(() => marketplaceVisibleAppViews({
     views: catalogApps,
-    hideInstalled,
     searchQuery,
     selectedCategory,
     sortBy,
-  }) as DiscoverAppView[], [catalogApps, hideInstalled, searchQuery, selectedCategory, sortBy]);
+    statusFilter,
+  }) as DiscoverAppView[], [catalogApps, searchQuery, selectedCategory, sortBy, statusFilter]);
   const selectedAppInstalling = Boolean(installJob && !terminalJob(installJob) && installJob.subjectId === selectedApp?.id);
   const selectedAppInstallLocked = Boolean(selectedApp && installJob && !terminalJob(installJob) && installJob.subjectId !== selectedApp.id);
   const selectedAppHasSettings = hasAppSpecificSetup(selectedView?.setupSchema ?? { appId: '', version: 1, inputs: [] }, setupAnswers);
@@ -299,6 +299,7 @@ function MarketplacePage() {
     !showAdvancedMetrics
     && basicCatalogMode === 'starter'
     && !searchQuery.trim()
+    && statusFilter === 'all'
     && showStartHere
     && vaultwardenRecommendation,
   );
@@ -306,6 +307,7 @@ function MarketplacePage() {
     !showAdvancedMetrics
     && basicCatalogMode === 'starter'
     && !searchQuery.trim()
+    && statusFilter === 'all'
     && startHereDismissed
     && vaultwardenRecommendation,
   );
@@ -419,21 +421,21 @@ function MarketplacePage() {
         selectedAppId={selectedApp.id}
       />
 
-      <section className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
+      <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-app-border-muted bg-app-surface/90 shadow-xl shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
         <MarketplaceBrowseSidebar
           filterValue={discoverFilterValue}
           filters={discoverFilters}
-          hideInstalled={hideInstalled}
           onFilterChange={changeDiscoverFilter}
-          onToggleHideInstalled={() => setHideInstalled((value) => !value)}
         />
 
-        <section className="flex min-h-0 flex-col border-b border-sky-300/15 xl:border-b-0">
+        <section className="flex min-h-0 flex-col border-b border-app-border-muted xl:border-b-0">
           <MarketplaceCatalogToolbar
             onSearchChange={setSearchQuery}
             onSortChange={setSortBy}
+            onStatusFilterChange={setStatusFilter}
             searchValue={searchQuery}
             sortBy={sortBy}
+            statusFilter={statusFilter}
           />
           <MarketplaceAppList
             apps={visibleApps}
@@ -448,6 +450,15 @@ function MarketplacePage() {
             } : null}
           />
         </section>
+
+        {detailsOpen && (
+          <button
+            aria-label="Close app details backdrop"
+            className="absolute inset-0 z-20 bg-app-surface/35 backdrop-blur-sm"
+            onClick={closeAppDetails}
+            type="button"
+          />
+        )}
 
         {selectedView && (
           <MarketplaceAppRail
@@ -659,44 +670,33 @@ function DiscoverGuidedHeader({
 function MarketplaceBrowseSidebar({
   filterValue,
   filters,
-  hideInstalled,
   onFilterChange,
-  onToggleHideInstalled,
 }: {
   filterValue: string;
   filters: Array<{ label: string; value: string }>;
-  hideInstalled: boolean;
   onFilterChange: (filter: string) => void;
-  onToggleHideInstalled: () => void;
 }) {
   return (
-    <aside className="flex min-h-0 flex-col border-b border-sky-300/15 bg-slate-950/10 p-3 xl:border-b-0 xl:border-r">
-      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Browse</p>
+    <aside className="flex min-h-0 flex-col border-b border-app-border-muted bg-app-surface/10 p-3 xl:border-b-0 xl:border-r">
+      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-app-text-muted">Browse</p>
       <div aria-label="Discover filters" className="mt-2 grid gap-1">
         {filters.map((filter) => (
           <button
             aria-pressed={filterValue === filter.value}
             className={cn(
-              'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300',
-              filterValue === filter.value ? 'bg-cyan-400/15 text-cyan-100' : 'text-slate-300 hover:bg-slate-800/70 hover:text-white',
+              'flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent',
+              filterValue === filter.value ? 'bg-app-accent/15 text-app-text' : 'text-app-text-secondary hover:bg-app-panel-hover hover:text-app-text',
             )}
             key={filter.value}
             onClick={() => onFilterChange(filter.value)}
             type="button"
           >
-            <span className={cn('size-1.5 rounded-full', filterValue === filter.value ? 'bg-cyan-300' : 'bg-slate-500')} />
+            <span className={cn('size-1.5 rounded-full', filterValue === filter.value ? 'bg-app-accent' : 'bg-app-text-muted')} />
             <span className="truncate">{filter.label}</span>
           </button>
         ))}
       </div>
 
-      <ProjectDarkControlButton
-        className={cn('mt-3 h-8 w-full justify-start px-2 text-xs', hideInstalled && 'border-cyan-300/45 bg-cyan-400/10 text-cyan-100')}
-        onClick={onToggleHideInstalled}
-        type="button"
-      >
-        {hideInstalled ? 'New apps only' : 'Hide installed'}
-      </ProjectDarkControlButton>
     </aside>
   );
 }

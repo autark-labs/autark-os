@@ -4,6 +4,7 @@ import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/exte
 import type { DiscoverAppView, DiscoverInstalledAppSummary } from '@/types/discover';
 import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
 import type { StorageReport, SystemDoctorStatus } from '@/types/system';
+import type { MarketplaceStatusFilter } from './MarketplacePage.constants';
 
 /**
  * @param {{ apps?: unknown[]; hideInstalled?: boolean; installedAppIds?: Set<string>; searchQuery?: string; selectedCategory?: string; sortBy?: string }} params
@@ -23,6 +24,7 @@ type MarketplaceVisibleAppViewsParams = {
   searchQuery?: string;
   selectedCategory?: string;
   sortBy?: string;
+  statusFilter?: MarketplaceStatusFilter;
 };
 
 type StarterAppContext = {
@@ -54,6 +56,7 @@ export function marketplaceVisibleAppViews({
   searchQuery = '',
   selectedCategory = 'All',
   sortBy = 'Recommended',
+  statusFilter = 'all',
 }: MarketplaceVisibleAppViewsParams = {}) {
   const appOrder = new Map(marketplaceVisibleApps({
     apps: views.map((view) => view.app),
@@ -66,7 +69,21 @@ export function marketplaceVisibleAppViews({
   return views
     .filter((view) => appOrder.has(view.app.id))
     .filter((view) => !hideInstalled || view.state !== 'installed_managed')
+    .filter((view) => marketplaceStatusMatches(view, statusFilter))
     .sort((left, right) => (appOrder.get(left.app.id) ?? 0) - (appOrder.get(right.app.id) ?? 0));
+}
+
+export function marketplaceStatusMatches(view: Pick<DiscoverAppView, 'state'>, statusFilter: MarketplaceStatusFilter) {
+  if (statusFilter === 'installed') {
+    return view.state === 'installed_managed';
+  }
+  if (statusFilter === 'pinned') {
+    return view.state === 'pinned_external';
+  }
+  if (statusFilter === 'available') {
+    return view.state === 'available';
+  }
+  return true;
 }
 
 export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'primaryAction'> | null | undefined = null) {

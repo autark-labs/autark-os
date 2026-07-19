@@ -69,6 +69,19 @@ test('marketplaceVisibleAppViews hides only canonical current-instance installs'
   assert.deepEqual(visible.map((view) => view.id), ['homepage', 'jellyfin']);
 });
 
+test('marketplaceVisibleAppViews filters canonical availability, installs, and pinned services', () => {
+  const views = [
+    { id: 'available', name: 'Available', state: 'available', app: app({ id: 'available' }) },
+    { id: 'installed', name: 'Installed', state: 'installed_managed', app: app({ id: 'installed' }) },
+    { id: 'pinned', name: 'Pinned', state: 'pinned_external', app: app({ id: 'pinned' }) },
+    { id: 'found', name: 'Found', state: 'found_on_server', app: app({ id: 'found' }) },
+  ];
+
+  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'available' }).map((view) => view.id), ['available']);
+  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'installed' }).map((view) => view.id), ['installed']);
+  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'pinned' }).map((view) => view.id), ['pinned']);
+});
+
 test('marketplacePrimaryRoute follows My Apps management and existing-service actions', () => {
   assert.equal(marketplacePrimaryRoute({
     primaryAction: { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false },

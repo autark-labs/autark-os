@@ -67,7 +67,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
           <section
             aria-hidden={!managementOpen}
             className={cn(
-              'pointer-events-auto absolute right-[calc(22rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-y-auto rounded-l-2xl border border-r-0 bg-slate-900 text-slate-50 transition-[transform,border-color,box-shadow] duration-300 ease-out motion-reduce:transition-none',
+              'pointer-events-auto absolute right-[calc(22rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-y-auto rounded-l-2xl border border-r-0 bg-slate-900 text-slate-50 transition-transform duration-300 ease-out motion-reduce:transition-none',
               managementOpen
                 ? 'translate-x-0 border-cyan-300/40 shadow-2xl shadow-cyan-950/40'
                 : 'pointer-events-none translate-x-[calc(100%+22rem)] border-transparent shadow-none',

@@ -50,6 +50,7 @@ test('management drawer is masked and borderless while it is collapsed', () => {
   assert.match(rail, /w-\[64rem\] overflow-hidden/);
   assert.match(rail, /right-\[calc\(22rem-1px\)\]/);
   assert.match(rail, /border-transparent shadow-none/);
+  assert.match(rail, /transition-transform duration-300/);
 });
 
 test('empty selection is not cleared after a deep-link effect schedules a real selection', () => {

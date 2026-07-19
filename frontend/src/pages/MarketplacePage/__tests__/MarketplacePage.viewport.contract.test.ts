@@ -23,6 +23,9 @@ test('Discover uses a compact bounded workspace with browse, catalog, and inspec
   assert.match(page, /lg:h-\[calc\(100dvh-7\.25rem\)\]/);
   assert.match(page, /xl:grid-cols-\[12rem_minmax\(0,1fr\)_19rem\]/);
   assert.match(page, /<MarketplaceCatalogToolbar/);
+  assert.match(page, /statusFilter=\{statusFilter\}/);
+  assert.match(page, /onStatusFilterChange=\{setStatusFilter\}/);
+  assert.doesNotMatch(page, /Showing new apps only|Hide installed/);
   assert.match(page, /<MarketplaceAppList/);
   assert.match(page, /starterGuidance=\{starterGuidanceVisible/);
   assert.doesNotMatch(page, /function MarketplaceBrowseSidebar\([\s\S]*Start with one app/);
