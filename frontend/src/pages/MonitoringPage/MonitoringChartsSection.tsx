@@ -37,6 +37,7 @@ type AppTrendPoint = {
 type MonitoringChartsSectionProps = {
   appTrendData: AppTrendPoint[];
   categoryData: ChartPoint[];
+  compact?: boolean;
   history: MonitoringHistory | null;
   hostTrendData: HostTrendPoint[];
   levelData: ChartPoint[];
@@ -51,6 +52,7 @@ const MonitoringInset = ProjectInset;
 export default function MonitoringChartsSection({
   appTrendData,
   categoryData,
+  compact = false,
   history,
   hostTrendData,
   levelData,
@@ -59,16 +61,17 @@ export default function MonitoringChartsSection({
   resourceData,
 }: MonitoringChartsSectionProps) {
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+    <div className={cn('grid', compact ? 'gap-3' : 'gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]')}>
       <AutarkOsMetricsPanel
         appTrendData={appTrendData}
         categoryData={categoryData}
+        compact={compact}
         history={history}
         levelData={levelData}
         reliability={reliability}
         resourceData={resourceData}
       />
-      <DeviceInstrumentationPanel history={history} hostTrendData={hostTrendData} metrics={metrics} />
+      <DeviceInstrumentationPanel compact={compact} history={history} hostTrendData={hostTrendData} metrics={metrics} />
     </div>
   );
 }
@@ -76,6 +79,7 @@ export default function MonitoringChartsSection({
 function AutarkOsMetricsPanel({
   appTrendData,
   categoryData,
+  compact,
   history,
   levelData,
   reliability,
@@ -83,6 +87,7 @@ function AutarkOsMetricsPanel({
 }: {
   appTrendData: AppTrendPoint[];
   categoryData: ChartPoint[];
+  compact: boolean;
   history: MonitoringHistory | null;
   levelData: ChartPoint[];
   reliability: AppReliabilitySummary | null;
@@ -106,7 +111,7 @@ function AutarkOsMetricsPanel({
         <MetadataBadge tone="info">{history?.windowLabel || 'Last 60 minutes'}</MetadataBadge>
       </div>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className={cn('mt-5 grid gap-4', !compact && 'lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]')}>
         <div className="grid gap-4">
           <MonitoringInset className="p-4">
             <div className="flex items-center justify-between gap-3">
@@ -234,10 +239,12 @@ function AutarkOsMetricsPanel({
 }
 
 function DeviceInstrumentationPanel({
+  compact,
   history,
   hostTrendData,
   metrics,
 }: {
+  compact: boolean;
   history: MonitoringHistory | null;
   hostTrendData: HostTrendPoint[];
   metrics: SystemMetrics | null;
@@ -246,7 +253,7 @@ function DeviceInstrumentationPanel({
   const runtimeUsedBytes = metrics ? metrics.runtimeTotalBytes - metrics.runtimeUsableBytes : 0;
 
   return (
-    <MonitoringPanel>
+    <MonitoringPanel className={cn(compact && 'p-4')}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">

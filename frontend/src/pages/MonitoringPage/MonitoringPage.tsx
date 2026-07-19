@@ -1,16 +1,10 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Download, HeartPulse, Loader2, ShieldCheck, Wrench } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
-import { RefreshStatus } from '@/components/RefreshStatus';
-import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
-import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
-import { ProjectPanel, Surface } from '@/components/primitives/Surface';
+import { ProjectPanel } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
-import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useMonitoringDiagnosticsMutation, useMonitoringRepository } from '@/repositories/monitoringRepository';
 import {
@@ -20,7 +14,7 @@ import {
   buildLevelData,
   buildResourceData,
 } from './extensions/MonitoringPage.viewModels';
-import { MonitoringActivityFeed, SystemActivitySummary } from './MonitoringActivitySections';
+import { MonitoringActivityWorkspace } from './MonitoringActivitySections';
 
 const levelFilters = ['all', 'error', 'warning', 'success', 'info'];
 const categoryFilters = ['all', 'install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
@@ -63,105 +57,52 @@ function MonitoringPage() {
     }
   }
 
-  const recentFailures = monitoring.activity.filter((event) => event.level === 'error' || event.outcome === 'failed');
-  const recentFixes = monitoring.activity.filter((event) => event.category === 'repair' && event.level === 'success');
-  const reliability = monitoring.reliability;
   const categoryData = useMemo(() => buildCategoryData(monitoring.activity), [monitoring.activity]);
   const levelData = useMemo(() => buildLevelData(monitoring.activity), [monitoring.activity]);
   const resourceData = useMemo(() => buildResourceData(appState.telemetryByAppId), [appState.telemetryByAppId]);
   const hostTrendData = useMemo(() => buildHostTrendData(monitoring.history?.hostSamples ?? []), [monitoring.history]);
   const appTrendData = useMemo(() => buildAppTrendData(monitoring.history?.appSamples ?? []), [monitoring.history]);
-  const highlightedIssue = reliability?.issues[0] ?? null;
 
   return (
-    <PageShell>
-      <Surface className="overflow-hidden" tone="panel">
-        <div className="border-b border-sky-400/20 bg-slate-900 p-6 md:p-7">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Monitoring</p>
-              <h1 className="mt-2 text-3xl font-black leading-none text-white md:text-5xl">System Activity</h1>
-              <p className="mt-3 max-w-3xl text-sm text-slate-300 md:text-base">
-                See what Autark-OS is checking, fixing, and waiting on in the background.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {showAdvancedMetrics && (
-                <DisabledAction disabled={diagnosticsMutation.isPending} reason="Diagnostics export is already being prepared.">
-                  <ProjectDarkControlButton disabled={diagnosticsMutation.isPending} onClick={() => void exportDiagnostics()} type="button">
-                    {diagnosticsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                    Export diagnostics
-                  </ProjectDarkControlButton>
-                </DisabledAction>
-              )}
-              <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])} refreshing={monitoring.isFetching || appState.isFetching} tone="info" updatedAt={appState.updatedAt ?? monitoring.updatedAt} />
-            </div>
-          </div>
-        </div>
-
-        {error && <MonitoringErrorState message={error} onRetry={() => void monitoring.refresh()} />}
-
-        <div className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
-          <SignalCard
-            icon={postureIcon(reliability?.posture)}
-            label="System posture"
-            value={reliability?.headline || (monitoring.isLoading ? 'Checking' : 'No apps yet')}
-            detail={reliability?.summary || 'Autark-OS will summarize app stability here.'}
-            tone={postureTone(reliability?.posture)}
-          />
-          <SignalCard
-            icon={HeartPulse}
-            label="Healthy apps"
-            value={reliability ? `${reliability.readyApps}/${reliability.totalApps}` : '0/0'}
-            detail={reliability ? `${reliability.needsAttentionApps + reliability.unavailableApps} need attention.` : 'Install apps to begin health tracking.'}
-            tone="green"
-          />
-          <SignalCard
-            icon={Wrench}
-            label="Automatic fixes"
-            value={`${reliability?.recentSuccessfulRepairs ?? recentFixes.length}`}
-            detail={`${reliability?.recentFailedRepairs ?? recentFailures.length} items still need review.`}
-            tone={(reliability?.recentFailedRepairs ?? recentFailures.length) > 0 ? 'orange' : 'cyan'}
-          />
-          <SignalCard
-            icon={AlertTriangle}
-            label="Needs attention"
-            value={`${recentFailures.length}`}
-            detail={recentFailures[0]?.title || 'No recent activity needs attention.'}
-            tone={recentFailures.length > 0 ? 'red' : 'slate'}
-          />
-        </div>
-      </Surface>
-
-      <SystemActivitySummary highlightedIssue={highlightedIssue} recentFixes={recentFixes} recentEvents={monitoring.activity.slice(0, 5)} reliability={reliability} timeZone={timeZone} />
-
-      {showAdvancedMetrics && (
-        <Suspense fallback={<MonitoringChartsFallback />}>
-          <MonitoringChartsSection
-            appTrendData={appTrendData}
-            categoryData={categoryData}
-            history={monitoring.history}
-            hostTrendData={hostTrendData}
-            levelData={levelData}
-            metrics={monitoring.metrics}
-            reliability={reliability}
-            resourceData={resourceData}
-          />
-        </Suspense>
-      )}
-
-      <MonitoringActivityFeed
+    <PageShell
+      className="xl:h-[calc(100dvh-7.25rem)] xl:min-h-0"
+      contained
+      contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
+    >
+      {error && <MonitoringErrorState message={error} onRetry={() => void monitoring.refresh()} />}
+      <MonitoringActivityWorkspace
         activity={monitoring.activity}
+        advancedMetrics={showAdvancedMetrics ? (
+          <Suspense fallback={<MonitoringChartsFallback />}>
+            <MonitoringChartsSection
+              appTrendData={appTrendData}
+              categoryData={categoryData}
+              compact
+              history={monitoring.history}
+              hostTrendData={hostTrendData}
+              levelData={levelData}
+              metrics={monitoring.metrics}
+              reliability={monitoring.reliability}
+              resourceData={resourceData}
+            />
+          </Suspense>
+        ) : null}
         category={category}
         categoryFilters={categoryFilters}
+        diagnosticsExporting={diagnosticsMutation.isPending}
         isLoading={monitoring.isLoading}
         level={level}
         levelFilters={levelFilters}
+        metrics={monitoring.metrics}
         onCategoryChange={setCategory}
+        onExportDiagnostics={() => void exportDiagnostics()}
         onLevelChange={setLevel}
-        reliability={reliability}
+        onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])}
+        refreshing={monitoring.isFetching || appState.isFetching}
+        reliability={monitoring.reliability}
         showAdvancedMetrics={showAdvancedMetrics}
         timeZone={timeZone}
+        updatedAt={appState.updatedAt ?? monitoring.updatedAt}
       />
     </PageShell>
   );
@@ -180,51 +121,8 @@ function MonitoringChartsFallback() {
   );
 }
 
-function SignalCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'red' | 'slate' | 'cyan'; value: string; }) {
-  const tones = {
-    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-200',
-    orange: 'border-orange-400/45 bg-orange-500/10 text-orange-200',
-    red: 'border-red-400/40 bg-red-500/10 text-red-200',
-    slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
-    cyan: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
-  };
-  return (
-    <div className={cn('rounded-lg border p-4', tones[tone])}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-bold uppercase text-current/70">{label}</p>
-        <Icon className="size-4" />
-      </div>
-      <p className="mt-3 line-clamp-2 text-xl font-black text-white">{value}</p>
-      <p className="mt-1 line-clamp-2 text-xs text-current/75">{detail}</p>
-    </div>
-  );
-}
-
 function MonitoringErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <PageLoadError className="rounded-none border-x-0 border-t-0 px-6 py-4" model={{ message, title: 'Monitoring data could not refresh' }} onRetry={onRetry} />;
-}
-
-function postureIcon(posture?: string) {
-  if (posture === 'healthy') {
-    return CheckCircle2;
-  }
-  if (posture === 'critical') {
-    return AlertTriangle;
-  }
-  return ShieldCheck;
-}
-
-function postureTone(posture?: string): 'green' | 'orange' | 'red' | 'slate' | 'cyan' {
-  if (posture === 'healthy') {
-    return 'green';
-  }
-  if (posture === 'critical') {
-    return 'red';
-  }
-  if (posture === 'warning') {
-    return 'orange';
-  }
-  return 'cyan';
+  return <PageLoadError className="shrink-0 px-4 py-3" model={{ message, title: 'Monitoring data could not refresh' }} onRetry={onRetry} />;
 }
 
 export default MonitoringPage;

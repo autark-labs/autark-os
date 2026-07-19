@@ -1,390 +1,525 @@
-import { useState } from 'react';
-import { Activity, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock3, Filter, HeartPulse, ShieldCheck, Wrench } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Clock3,
+  Cpu,
+  Download,
+  Filter,
+  HardDrive,
+  HeartPulse,
+  Info,
+  MemoryStick,
+  PackageOpen,
+  ShieldCheck,
+  Wrench,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
-import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
-import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
-import { semanticStatusVariants } from '@/components/primitives/SemanticVariants';
+import { RefreshStatus } from '@/components/RefreshStatus';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
+import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
+import { ProjectInset, Surface } from '@/components/primitives/Surface';
 import { buildAppRemediationFromIssue } from '@/lib/appRemediation';
 import { cn } from '@/lib/utils';
 import type { ActivityLog } from '@/types/activity';
 import type { AppReliabilityIssue, AppReliabilitySummary } from '@/types/app';
+import type { SystemMetrics } from '@/types/system';
 import { humanize } from './extensions/MonitoringPage.viewModels';
 
-type MonitoringActivityFeedProps = {
+type ActivityWorkspaceTab = 'all' | 'attention' | 'repairs' | 'apps' | 'metrics';
+
+type MonitoringActivityWorkspaceProps = {
   activity: ActivityLog[];
+  advancedMetrics: ReactNode;
   category: string;
   categoryFilters: string[];
+  diagnosticsExporting: boolean;
   isLoading: boolean;
+  level: string;
+  levelFilters: string[];
+  metrics: SystemMetrics | null;
+  onCategoryChange: (value: string) => void;
+  onExportDiagnostics: () => void;
+  onLevelChange: (value: string) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
+  reliability: AppReliabilitySummary | null;
+  showAdvancedMetrics: boolean;
+  timeZone: string;
+  updatedAt: Date | null;
+};
+
+const tabLabels: Record<ActivityWorkspaceTab, string> = {
+  all: 'All activity',
+  apps: 'App activity',
+  attention: 'Needs attention',
+  metrics: 'System metrics',
+  repairs: 'Repairs',
+};
+
+const categoryLabels: Record<string, string> = {
+  access: 'Access',
+  api: 'API',
+  backup: 'Backups',
+  health: 'Health',
+  install: 'Apps',
+  repair: 'Repairs',
+  system: 'System',
+};
+
+export function MonitoringActivityWorkspace({
+  activity,
+  advancedMetrics,
+  category,
+  categoryFilters,
+  diagnosticsExporting,
+  isLoading,
+  level,
+  levelFilters,
+  metrics,
+  onCategoryChange,
+  onExportDiagnostics,
+  onLevelChange,
+  onRefresh,
+  refreshing,
+  reliability,
+  showAdvancedMetrics,
+  timeZone,
+  updatedAt,
+}: MonitoringActivityWorkspaceProps) {
+  const [activeTab, setActiveTab] = useState<ActivityWorkspaceTab>('all');
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const attentionEvents = useMemo(() => activity.filter(needsAttention), [activity]);
+  const visibleEvents = useMemo(() => eventsForTab(activity, activeTab), [activity, activeTab]);
+  const selectedEvent = activity.find((event) => event.id === selectedEventId)
+    ?? visibleEvents[0]
+    ?? activity[0]
+    ?? null;
+  const attentionCount = reliability?.issues.length ?? attentionEvents.length;
+  const recentRepairCount = reliability?.recentSuccessfulRepairs ?? activity.filter((event) => event.category === 'repair' && event.level === 'success').length;
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-3">
+      <ActivityWorkspaceHeader
+        attentionCount={attentionCount}
+        diagnosticsExporting={diagnosticsExporting}
+        lastEvent={activity[0] ?? null}
+        onExportDiagnostics={onExportDiagnostics}
+        onRefresh={onRefresh}
+        recentRepairCount={recentRepairCount}
+        refreshing={refreshing}
+        reliability={reliability}
+        showAdvancedMetrics={showAdvancedMetrics}
+        timeZone={timeZone}
+        updatedAt={updatedAt}
+      />
+
+      <Tabs
+        className="min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)_18rem]"
+        onValueChange={(value) => setActiveTab(value as ActivityWorkspaceTab)}
+        orientation="vertical"
+        value={activeTab}
+      >
+        <ActivityWorkspaceNavigation attentionCount={attentionCount} showAdvancedMetrics={showAdvancedMetrics} />
+
+        <section className="flex min-h-0 flex-col overflow-hidden bg-slate-900/40">
+          {activeTab !== 'metrics' && (
+            <ActivityFilterBar
+              category={category}
+              categoryFilters={categoryFilters}
+              level={level}
+              levelFilters={levelFilters}
+              onCategoryChange={onCategoryChange}
+              onLevelChange={onLevelChange}
+            />
+          )}
+
+          <TabsContent className="m-0 h-full min-h-0" value="all">
+            <ActivityEventWorkspace
+              description="The latest visible work Autark-OS has done for apps, backups, access, and repairs."
+              events={visibleEvents}
+              isLoading={isLoading}
+              onSelect={setSelectedEventId}
+              selectedEventId={selectedEvent?.id ?? null}
+              timeZone={timeZone}
+              title={tabLabels.all}
+            />
+          </TabsContent>
+
+          <TabsContent className="m-0 h-full min-h-0" value="attention">
+            <ActivityEventWorkspace
+              description="Events that need a review or could not be repaired automatically."
+              events={visibleEvents}
+              isLoading={isLoading}
+              onSelect={setSelectedEventId}
+              selectedEventId={selectedEvent?.id ?? null}
+              timeZone={timeZone}
+              title={tabLabels.attention}
+            />
+          </TabsContent>
+
+          <TabsContent className="m-0 h-full min-h-0" value="repairs">
+            <ActivityEventWorkspace
+              description="Safe repairs and recovery attempts performed by Autark-OS."
+              events={visibleEvents}
+              isLoading={isLoading}
+              onSelect={setSelectedEventId}
+              selectedEventId={selectedEvent?.id ?? null}
+              timeZone={timeZone}
+              title={tabLabels.repairs}
+            />
+          </TabsContent>
+
+          <TabsContent className="m-0 h-full min-h-0" value="apps">
+            <ActivityEventWorkspace
+              description="Events linked to installed apps on this Autark-OS instance."
+              events={visibleEvents}
+              isLoading={isLoading}
+              onSelect={setSelectedEventId}
+              selectedEventId={selectedEvent?.id ?? null}
+              timeZone={timeZone}
+              title={tabLabels.apps}
+            />
+          </TabsContent>
+
+          {showAdvancedMetrics && (
+            <TabsContent className="m-0 h-full min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4" value="metrics">
+              <SystemMetricsWorkspace metrics={metrics}>{advancedMetrics}</SystemMetricsWorkspace>
+            </TabsContent>
+          )}
+        </section>
+
+        <ActivityAttentionRail event={selectedEvent} issues={reliability?.issues ?? []} showAdvancedMetrics={showAdvancedMetrics} timeZone={timeZone} />
+      </Tabs>
+    </section>
+  );
+}
+
+function ActivityWorkspaceHeader({
+  attentionCount,
+  diagnosticsExporting,
+  lastEvent,
+  onExportDiagnostics,
+  onRefresh,
+  recentRepairCount,
+  refreshing,
+  reliability,
+  showAdvancedMetrics,
+  timeZone,
+  updatedAt,
+}: {
+  attentionCount: number;
+  diagnosticsExporting: boolean;
+  lastEvent: ActivityLog | null;
+  onExportDiagnostics: () => void;
+  onRefresh: () => void;
+  recentRepairCount: number;
+  refreshing: boolean;
+  reliability: AppReliabilitySummary | null;
+  showAdvancedMetrics: boolean;
+  timeZone: string;
+  updatedAt: Date | null;
+}) {
+  return (
+    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-panel shadow-xl shadow-slate-950/20" tone="panel">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
+            <Activity aria-hidden="true" className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Activity Log</h1>
+              {reliability && <StatusBadge tone={postureBadgeTone(reliability.posture)}>{reliability.headline}</StatusBadge>}
+            </div>
+            <p className="mt-1 text-sm text-sky-100/70">A clear history of your server and apps.</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <HeaderMetric label="Last event">
+            <LocalizedDateTime className="block truncate text-xs font-semibold text-white" model={{ empty: 'Waiting', timeZone, value: lastEvent?.createdAt }} />
+          </HeaderMetric>
+          <HeaderMetric label="Needs review" tone={attentionCount > 0 ? 'warning' : 'neutral'} value={`${attentionCount}`} />
+          <HeaderMetric label="Auto-fixed" tone="success" value={`${recentRepairCount}`} />
+          {showAdvancedMetrics && (
+            <DisabledAction disabled={diagnosticsExporting} reason="Diagnostics export is already being prepared.">
+              <ProjectDarkControlButton className="h-9 px-2.5 text-xs" disabled={diagnosticsExporting} onClick={onExportDiagnostics} type="button">
+                <Download aria-hidden="true" className="size-3.5" />
+                Export
+              </ProjectDarkControlButton>
+            </DisabledAction>
+          )}
+          <RefreshStatus className="pl-1" intervalLabel="Updates every 10s" onRefresh={onRefresh} refreshing={refreshing} showButton tone="info" updatedAt={updatedAt} />
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+function HeaderMetric({ children, label, tone = 'neutral', value }: { children?: ReactNode; label: string; tone?: 'neutral' | 'success' | 'warning'; value?: string }) {
+  return (
+    <span className={cn(
+      'hidden min-w-[5.3rem] rounded-xl border px-2.5 py-1.5 sm:block',
+      tone === 'success' && 'border-emerald-300/20 bg-emerald-400/5',
+      tone === 'warning' && 'border-amber-300/20 bg-amber-400/5',
+      tone === 'neutral' && 'border-sky-300/15 bg-slate-950/25',
+    )}>
+      <span className="block text-[0.62rem] text-sky-100/55">{label}</span>
+      {children ?? <span className={cn('block text-xs font-semibold text-white', tone === 'success' && 'text-emerald-100', tone === 'warning' && 'text-amber-100')}>{value}</span>}
+    </span>
+  );
+}
+
+function ActivityWorkspaceNavigation({ attentionCount, showAdvancedMetrics }: { attentionCount: number; showAdvancedMetrics: boolean }) {
+  const tabs: Array<{ icon: LucideIcon; label: string; value: Exclude<ActivityWorkspaceTab, 'metrics'> | 'metrics' }> = [
+    { icon: Activity, label: tabLabels.all, value: 'all' },
+    { icon: AlertTriangle, label: tabLabels.attention, value: 'attention' },
+    { icon: Wrench, label: tabLabels.repairs, value: 'repairs' },
+    { icon: PackageOpen, label: tabLabels.apps, value: 'apps' },
+  ];
+  if (showAdvancedMetrics) tabs.push({ icon: BarChart3, label: tabLabels.metrics, value: 'metrics' });
+
+  return (
+    <aside className="shrink-0 border-b border-sky-300/15 bg-slate-950/20 p-3 xl:min-h-0 xl:border-r xl:border-b-0">
+      <p className="px-1 text-xs font-semibold uppercase tracking-wide text-sky-100/55">Views</p>
+      <TabsList className="mt-2 w-full items-stretch gap-1 rounded-none bg-transparent p-0" variant="line">
+        {tabs.map((tab) => <ActivityTabTrigger attentionCount={attentionCount} key={tab.value} tab={tab} />)}
+      </TabsList>
+      <div className="mt-4 border-t border-sky-300/15 pt-3">
+        <p className="px-1 text-xs font-semibold uppercase tracking-wide text-sky-100/55">Apps</p>
+        <Link className="mt-2 flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-sky-100/70 transition hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70" to="/apps">
+          <PackageOpen aria-hidden="true" className="size-3.5 text-cyan-200" />
+          <span className="min-w-0 flex-1">View My Apps</span>
+          <ChevronRight aria-hidden="true" className="size-3.5 text-sky-100/35" />
+        </Link>
+      </div>
+    </aside>
+  );
+}
+
+function ActivityTabTrigger({ attentionCount, tab }: { attentionCount: number; tab: { icon: LucideIcon; label: string; value: ActivityWorkspaceTab } }) {
+  const Icon = tab.icon;
+  return (
+    <TabsTrigger className="h-auto min-h-10 rounded-lg border-0 px-2 py-2 text-left data-active:bg-cyan-300/15 data-active:text-cyan-100" value={tab.value}>
+      <Icon aria-hidden="true" className="size-3.5" />
+      <span className="min-w-0 flex-1 truncate">{tab.label}</span>
+      {tab.value === 'attention' && attentionCount > 0 && <span aria-label={`${attentionCount} needs review`} className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-100">{attentionCount}</span>}
+    </TabsTrigger>
+  );
+}
+
+function ActivityFilterBar({ category, categoryFilters, level, levelFilters, onCategoryChange, onLevelChange }: {
+  category: string;
+  categoryFilters: string[];
   level: string;
   levelFilters: string[];
   onCategoryChange: (value: string) => void;
   onLevelChange: (value: string) => void;
-  reliability: AppReliabilitySummary | null;
-  showAdvancedMetrics: boolean;
-  timeZone: string;
-};
-
-const MonitoringPanel = ProjectPanel;
-const MonitoringInset = ProjectInset;
-
-export function SystemActivitySummary({
-  highlightedIssue,
-  recentEvents,
-  recentFixes,
-  reliability,
-  timeZone,
-}: {
-  highlightedIssue: AppReliabilityIssue | null;
-  recentEvents: ActivityLog[];
-  recentFixes: ActivityLog[];
-  reliability: AppReliabilitySummary | null;
-  timeZone: string;
 }) {
   return (
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <MonitoringPanel>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Activity className="size-5 text-cyan-200" />
-              <h2 className="text-xl font-black text-white">What Autark-OS is doing</h2>
-            </div>
-            <p className="mt-1 text-sm text-slate-400">Recent checks, background repairs, and app activity in plain language.</p>
-          </div>
-          <MetadataBadge tone="info">{recentEvents.length} recent</MetadataBadge>
-        </div>
-        <div className="mt-5 grid gap-3">
-          {recentEvents.length ? recentEvents.map((event) => <CompactActivityItem event={event} key={event.id} timeZone={timeZone} />) : (
-            <EmptyState compact title="No recent activity" description="Autark-OS has not logged visible work for the current filters yet." />
-          )}
-        </div>
-      </MonitoringPanel>
-
-      <div className="grid gap-5">
-        <MonitoringPanel>
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg border border-emerald-300/20 bg-emerald-500/10 text-emerald-200">
-              <HeartPulse className="size-5" />
-            </span>
-            <div>
-              <h2 className="text-lg font-black text-white">App health summary</h2>
-              <p className="mt-1 text-sm text-slate-400">{reliability?.summary || 'Health checks appear here after apps are installed.'}</p>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <MiniCount label="Ready" tone="green" value={`${reliability?.readyApps ?? 0}`} />
-            <MiniCount label="Starting" tone="orange" value={`${reliability?.startingApps ?? 0}`} />
-            <MiniCount label="Review" tone="red" value={`${(reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)}`} />
-          </div>
-        </MonitoringPanel>
-
-        <MonitoringPanel>
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg border border-cyan-300/35 bg-cyan-400/10 text-cyan-100">
-              <Wrench className="size-5" />
-            </span>
-            <div>
-              <h2 className="text-lg font-black text-white">Automatic fixes</h2>
-              <p className="mt-1 text-sm text-slate-400">{recentFixes.length ? 'Recent safe repairs Autark-OS completed.' : 'No automatic repairs were needed recently.'}</p>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-2">
-            {recentFixes.slice(0, 3).map((event) => <CompactActivityItem event={event} key={event.id} timeZone={timeZone} />)}
-            {!recentFixes.length && <EmptyState compact title="Quiet is good" description="Autark-OS will list safe repair work here when it happens." />}
-          </div>
-        </MonitoringPanel>
-
-        <HighlightedIssueCard issue={highlightedIssue} />
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-sky-300/15 px-3 py-2.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-1">
+        <span className="inline-flex h-8 items-center gap-1.5 px-1.5 text-xs font-semibold text-sky-100/55"><Filter aria-hidden="true" className="size-3.5" />Filter</span>
+        {levelFilters.map((option) => <button aria-pressed={level === option} className={cn('h-8 rounded-lg px-2.5 text-xs font-medium capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70', level === option ? 'bg-cyan-300 text-slate-950' : 'text-sky-100/65 hover:bg-slate-800 hover:text-white')} key={option} onClick={() => onLevelChange(option)} type="button">{levelLabel(option)}</button>)}
       </div>
-    </section>
-  );
-}
-
-export function MonitoringActivityFeed({
-  activity,
-  category,
-  categoryFilters,
-  isLoading,
-  level,
-  levelFilters,
-  onCategoryChange,
-  onLevelChange,
-  reliability,
-  showAdvancedMetrics,
-  timeZone,
-}: MonitoringActivityFeedProps) {
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <MonitoringPanel>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <Activity className="size-5 text-cyan-200" />
-              <h2 className="text-xl font-black text-white">Recent activity</h2>
-            </div>
-            <p className="mt-1 text-sm text-slate-400">{showAdvancedMetrics ? 'Install progress, health checks, repairs, private access changes, and backend warnings.' : 'The latest visible work Autark-OS has done for apps, backups, access, and repairs.'}</p>
-          </div>
-          <MetadataBadge>{activity.length} events</MetadataBadge>
-        </div>
-
-        {showAdvancedMetrics && (
-          <MonitoringInset className="mt-5 grid gap-3">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-              <Filter className="size-3.5" />
-              Filters
-            </div>
-            <FilterBar label="Level" options={levelFilters} value={level} onChange={onLevelChange} />
-            <FilterBar label="Category" options={categoryFilters} value={category} onChange={onCategoryChange} />
-          </MonitoringInset>
-        )}
-
-        <div className="mt-5 flex max-h-[680px] flex-col gap-3 overflow-y-auto pr-2 [scrollbar-color:rgba(103,232,249,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
-          {isLoading ? (
-            <EmptyState title="Loading activity" description="Autark-OS is checking recent events." />
-          ) : activity.length ? (
-            activity.map((event) => (
-              <ActivityRow
-                event={event}
-                expanded={expandedId === event.id}
-                key={event.id}
-                onToggle={() => setExpandedId((current) => current === event.id ? null : event.id)}
-                showAdvancedMetrics={showAdvancedMetrics}
-                timeZone={timeZone}
-              />
-            ))
-          ) : (
-            <EmptyState title="No activity found" description="Try another filter, or install an app to start recording activity." />
-          )}
-        </div>
-      </MonitoringPanel>
-
-      <aside className="flex flex-col gap-5">
-        <MonitoringPanel>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black text-white">Needs attention</h2>
-              <p className="mt-1 text-sm text-slate-400">Apps Autark-OS cannot fully fix on its own.</p>
-            </div>
-            <StatusBadge tone={(reliability?.issues.length ?? 0) > 0 ? 'warning' : 'success'}>
-              {reliability?.issues.length ?? 0}
-            </StatusBadge>
-          </div>
-          <div className="mt-4 grid gap-3">
-            {reliability?.issues.length ? reliability.issues.map((issue) => <IssueCard issue={issue} key={`${issue.appId}-${issue.status}`} />) : (
-              <EmptyState title="No active issues" description="Autark-OS has not found any app stability issues." compact />
-            )}
-          </div>
-        </MonitoringPanel>
-
-        <MonitoringPanel>
-          <h2 className="text-lg font-black text-white">What gets logged</h2>
-          <div className="mt-4 grid gap-3 text-sm text-slate-300">
-            <GuideRow icon={CheckCircle2} title="Successful work" text="Installs, repairs, access updates, and app checks that completed." />
-            <GuideRow icon={AlertTriangle} title="Needs attention" text="Problems Autark-OS detected or could not safely repair." />
-            <GuideRow icon={ShieldCheck} title="Background repair" text="Safe restart and private-link repair attempts performed by the guardian." />
-            <GuideRow icon={Clock3} title="Timing" text="This page refreshes automatically every few seconds while it is open." />
-          </div>
-        </MonitoringPanel>
-      </aside>
+      <Select onValueChange={onCategoryChange} value={category}>
+        <SelectTrigger aria-label="Filter activity by category" className="h-8 border-sky-300/20 bg-slate-950/25 text-xs text-sky-100/75" size="sm"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {categoryFilters.map((option) => <SelectItem key={option} value={option}>{option === 'all' ? 'All categories' : categoryLabels[option] ?? humanize(option)}</SelectItem>)}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
 
-function CompactActivityItem({ event, timeZone }: { event: ActivityLog; timeZone: string }) {
+function ActivityEventWorkspace({ description, events, isLoading, onSelect, selectedEventId, timeZone, title }: {
+  description: string;
+  events: ActivityLog[];
+  isLoading: boolean;
+  onSelect: (id: number) => void;
+  selectedEventId: number | null;
+  timeZone: string;
+  title: string;
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col p-3 sm:p-4">
+      <div className="mb-2 flex shrink-0 items-start justify-between gap-3">
+        <div><h2 className="text-sm font-semibold text-white">{title}</h2><p className="mt-0.5 text-xs leading-5 text-sky-100/55">{description}</p></div>
+        <MetadataBadge tone="info">{events.length} events</MetadataBadge>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-sky-300/15 bg-slate-950/25 [scrollbar-color:rgba(103,232,249,0.55)_rgba(15,23,42,0.8)] [scrollbar-width:thin]">
+        {isLoading ? <EmptyState className="m-3" title="Loading activity" description="Autark-OS is checking recent events." />
+          : events.length ? events.map((event) => <ActivityEventRow event={event} key={event.id} onSelect={() => onSelect(event.id)} selected={event.id === selectedEventId} timeZone={timeZone} />)
+            : <EmptyState className="m-3" title="No activity found" description="Try another filter, or install an app to start recording activity." />}
+      </div>
+    </div>
+  );
+}
+
+function ActivityEventRow({ event, onSelect, selected, timeZone }: { event: ActivityLog; onSelect: () => void; selected: boolean; timeZone: string }) {
   const Icon = eventIcon(event);
   return (
-    <div className={cn('flex gap-3 rounded-lg border bg-slate-900/45 p-3 text-sm', eventTone(event))}>
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-slate-950/70">
-        <Icon className="size-4" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate font-semibold text-white">{event.title}</p>
-        <p className="mt-1 line-clamp-2 text-slate-300">{event.message}</p>
-        <LocalizedDateTime className="mt-1 text-xs text-slate-500" model={{ timeZone, value: event.createdAt }} />
-      </div>
-    </div>
+    <button className={cn('flex w-full items-center gap-3 border-b border-sky-300/10 px-3 py-2.5 text-left transition last:border-b-0 hover:bg-slate-800/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70', selected && 'bg-cyan-400/10')} onClick={onSelect} type="button">
+      <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border', eventIconTone(event))}><Icon aria-hidden="true" className="size-4" /></span>
+      <span className="min-w-0 flex-1"><span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-semibold text-white">{event.title}</span>{event.appId && <span className="hidden truncate text-xs text-sky-100/55 sm:inline">{event.appId}</span>}</span><span className="mt-0.5 block truncate text-xs text-sky-100/60">{event.message}</span></span>
+      <span className="hidden shrink-0 text-right sm:block"><span className="block text-[0.65rem] font-semibold uppercase tracking-wide text-sky-100/45">{categoryLabels[event.category] ?? humanize(event.category)}</span><LocalizedDateTime className="mt-0.5 block text-xs text-sky-100/60" model={{ timeZone, value: event.createdAt }} /></span>
+      <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-sky-100/30" />
+    </button>
   );
 }
 
-function HighlightedIssueCard({ issue }: { issue: AppReliabilityIssue | null }) {
-  if (!issue) {
-    return (
-      <section className="rounded-xl border border-emerald-300/20 bg-emerald-500/10 p-5 text-emerald-100 shadow-xl shadow-slate-950/30">
-        <div className="flex gap-3">
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
-          <div>
-            <h2 className="font-black text-white">No highlighted issue</h2>
-            <p className="mt-1 text-sm text-emerald-100/80">Autark-OS has not found an app issue that needs action right now.</p>
-          </div>
-        </div>
+function ActivityAttentionRail({ event, issues, showAdvancedMetrics, timeZone }: { event: ActivityLog | null; issues: AppReliabilityIssue[]; showAdvancedMetrics: boolean; timeZone: string }) {
+  const highlightedIssue = issues[0] ?? null;
+  return (
+    <aside className="min-h-0 overflow-y-auto bg-slate-950/20 p-3 xl:border-l xl:border-sky-300/15">
+      <h2 className="text-sm font-semibold text-white">Needs attention</h2>
+      {highlightedIssue ? <AttentionIssueCard issue={highlightedIssue} remainingCount={issues.length - 1} /> : <NoAttentionCard />}
+      <section className="mt-4 border-t border-sky-300/15 pt-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-sky-100/55">Selected activity</p>
+        {event ? <SelectedActivityDetail event={event} showAdvancedMetrics={showAdvancedMetrics} timeZone={timeZone} /> : <p className="mt-2 text-xs leading-5 text-sky-100/60">Select an event to read its context.</p>}
       </section>
-    );
-  }
+      <ProjectInset className="mt-4 border border-sky-300/15 bg-slate-900/55 text-xs leading-5 text-sky-100/60"><span className="font-semibold text-sky-100">Quiet by default.</span> Routine events remain in the history; only actionable changes are highlighted here.</ProjectInset>
+    </aside>
+  );
+}
 
+function AttentionIssueCard({ issue, remainingCount }: { issue: AppReliabilityIssue; remainingCount: number }) {
   const remediation = buildAppRemediationFromIssue(issue);
   const destination = remediation?.safeAction.kind === 'link' ? remediation.safeAction.to : '/apps';
   return (
-    <section className="rounded-xl border border-orange-400/45 bg-orange-500/10 p-5 text-orange-200 shadow-xl shadow-slate-950/30">
-      <div className="flex gap-3">
-        <AlertTriangle className="mt-0.5 size-5 shrink-0" />
-        <div>
-          <h2 className="font-black text-white">{remediation?.title || `Review ${issue.appName}`}</h2>
-          <p className="mt-1 text-sm text-orange-100/80">{remediation?.summary || issue.message}</p>
-          <p className="mt-2 text-xs text-orange-100/70">{remediation?.nextStep || issue.suggestedAction}</p>
-          <ProjectDarkControlButton asChild className="mt-4 border-orange-300/30 text-orange-100" size="sm">
-            <Link to={destination}>{remediation?.safeAction.label || 'Open Applications'} <ChevronRight className="size-4" /></Link>
-          </ProjectDarkControlButton>
-        </div>
-      </div>
+    <section className="mt-3 rounded-xl border border-amber-300/25 bg-amber-400/5 p-3">
+      <div className="flex gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg border border-amber-300/25 bg-amber-400/10 text-amber-100"><AlertTriangle aria-hidden="true" className="size-3.5" /></span><div className="min-w-0"><p className="text-xs font-semibold text-amber-100">Review available</p><h3 className="mt-0.5 text-sm font-semibold text-white">{remediation?.title || `Review ${issue.appName}`}</h3></div></div>
+      <p className="mt-3 text-xs leading-5 text-amber-100/75">{remediation?.summary || issue.message}</p>
+      <ProjectDarkControlButton asChild className="mt-3 h-8 w-full border-amber-300/30 px-2.5 text-xs text-amber-100" size="sm"><Link to={destination}>{remediation?.safeAction.label || 'Open My Apps'} <ChevronRight aria-hidden="true" className="size-3.5" /></Link></ProjectDarkControlButton>
+      {remainingCount > 0 && <Link className="mt-2 block text-center text-xs font-medium text-amber-100/80 hover:text-amber-50" to="/apps">{remainingCount} more item{remainingCount === 1 ? '' : 's'} in My Apps</Link>}
     </section>
   );
 }
 
-function MiniCount({ label, tone, value }: { label: string; tone: 'green' | 'orange' | 'red'; value: string }) {
-  const statusTone: StatusBadgeTone = tone === 'green' ? 'success' : tone === 'orange' ? 'warning' : 'danger';
-  return (
-    <div className={cn('rounded-lg p-3', semanticStatusVariants({ tone: statusTone }))}>
-      <p className="text-xl font-black text-white">{value}</p>
-      <p className="mt-1 text-xs font-bold uppercase text-current/70">{label}</p>
-    </div>
-  );
+function NoAttentionCard() {
+  return <section className="mt-3 rounded-xl border border-emerald-300/20 bg-emerald-400/5 p-3"><div className="flex gap-2"><span className="grid size-7 shrink-0 place-items-center rounded-lg border border-emerald-300/25 bg-emerald-400/10 text-emerald-100"><CheckCircle2 aria-hidden="true" className="size-3.5" /></span><div><p className="text-sm font-semibold text-white">Nothing needs attention</p><p className="mt-1 text-xs leading-5 text-emerald-100/75">Autark-OS has not found an app issue that needs action right now.</p></div></div></section>;
 }
 
-function FilterBar({ label, onChange, options, value }: { label: string; options: string[]; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="w-16 text-xs font-semibold text-slate-500">{label}</span>
-      {options.map((option) => (
-        <button
-          className={cn(
-            'rounded-full border px-3 py-1.5 text-xs font-semibold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70',
-            value === option
-              ? 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100'
-              : 'border-sky-400/25 bg-slate-800 text-slate-400 hover:border-cyan-300/45 hover:text-slate-200',
-          )}
-          key={option}
-          onClick={() => onChange(option)}
-          type="button"
-        >
-          {option.replace('_', ' ')}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function ActivityRow({ event, expanded, onToggle, showAdvancedMetrics, timeZone }: { event: ActivityLog; expanded: boolean; onToggle: () => void; showAdvancedMetrics: boolean; timeZone: string }) {
+function SelectedActivityDetail({ event, showAdvancedMetrics, timeZone }: { event: ActivityLog; showAdvancedMetrics: boolean; timeZone: string }) {
   const Icon = eventIcon(event);
   return (
-    <article className={cn('rounded-lg border bg-slate-900/45 transition', eventTone(event))}>
-      <button className="grid w-full gap-3 rounded-lg p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:grid-cols-[auto_minmax(0,1fr)_130px_auto] sm:items-start" onClick={onToggle} type="button">
-        <span className="grid size-10 place-items-center rounded-lg border border-sky-400/25 bg-slate-950/70">
-          <Icon className="size-4" />
-        </span>
-        <span className="min-w-0">
-          <span className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-white">{event.title}</span>
-            <StatusBadge className="text-[11px] capitalize" tone={badgeTone(event.level)}>{event.category}</StatusBadge>
-            {event.appId && <MetadataBadge>{event.appId}</MetadataBadge>}
-          </span>
-          <span className="mt-1 block text-sm text-slate-300">{event.message}</span>
-        </span>
-        <LocalizedDateTime className="text-xs text-slate-500 sm:text-right" model={{ timeZone, value: event.createdAt }} />
-        <span className="text-slate-400">{expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</span>
-      </button>
-      {expanded && showAdvancedMetrics && (
-        <div className="border-t border-white/10 px-4 py-3 text-sm">
-          <div className="grid gap-3 md:grid-cols-3">
-            <Detail label="Action" value={event.action} />
-            <Detail label="Outcome" value={humanize(event.outcome)} />
-            <Detail label="Level" value={humanize(event.level)} />
-          </div>
-          {event.details && (
-            <pre className="mt-3 max-h-48 overflow-auto rounded-lg border border-slate-800 bg-slate-950/80 p-3 text-xs text-slate-300">{event.details}</pre>
-          )}
-        </div>
-      )}
-    </article>
-  );
-}
-
-function IssueCard({ issue }: { issue: AppReliabilityIssue }) {
-  const remediation = buildAppRemediationFromIssue(issue);
-  return (
-    <div className="rounded-lg border border-orange-400/45 bg-orange-500/10 p-4 text-sm text-orange-200">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-bold text-white">{issue.appName}</p>
-          <p className="mt-1">{remediation?.summary || issue.message}</p>
-        </div>
-        <StatusBadge tone="warning">{issue.status}</StatusBadge>
-      </div>
-      <p className="mt-3 text-xs text-orange-100/75">{remediation?.nextStep || issue.suggestedAction}</p>
-      {issue.detail && remediation?.summary !== issue.detail && <p className="mt-2 text-xs text-orange-100/60">{issue.detail}</p>}
+    <div className="mt-2 rounded-xl border border-sky-300/15 bg-slate-900 p-3">
+      <div className="flex gap-2"><span className={cn('grid size-7 shrink-0 place-items-center rounded-lg border', eventIconTone(event))}><Icon aria-hidden="true" className="size-3.5" /></span><div className="min-w-0"><p className={cn('text-xs font-semibold', eventTextTone(event))}>{humanize(event.category)}</p><h3 className="mt-0.5 text-sm font-semibold text-white">{event.title}</h3></div></div>
+      <p className="mt-3 text-xs leading-5 text-sky-100/65">{event.message}</p>
+      <div className="mt-3 grid gap-1.5 border-t border-sky-300/15 pt-3"><RailFact icon={Clock3} label="Recorded" value={<LocalizedDateTime className="font-semibold text-white" model={{ timeZone, value: event.createdAt }} />} /><RailFact icon={event.appId ? PackageOpen : Activity} label={event.appId ? 'Related app' : 'Scope'} value={event.appId || 'This server'} /><RailFact icon={event.category === 'repair' ? Wrench : Info} label="Type" value={humanize(event.category)} /></div>
+      {showAdvancedMetrics && <AdvancedEventDetail event={event} />}
     </div>
   );
 }
 
-function GuideRow({ icon: Icon, text, title }: { icon: LucideIcon; text: string; title: string }) {
+function AdvancedEventDetail({ event }: { event: ActivityLog }) {
   return (
-    <MonitoringInset className="flex gap-3">
-      <Icon className="mt-0.5 size-4 text-cyan-200" />
-      <div>
-        <p className="font-bold text-white">{title}</p>
-        <p className="mt-1 text-xs text-slate-400">{text}</p>
-      </div>
-    </MonitoringInset>
+    <Collapsible className="mt-3 border-t border-sky-300/15 pt-3">
+      <CollapsibleTrigger className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-sky-300/20 bg-slate-950/25 px-2.5 text-xs font-semibold text-sky-100 hover:border-cyan-300/30 hover:text-white"><Info aria-hidden="true" className="size-3.5" />Technical detail <ChevronDown aria-hidden="true" className="size-3.5" /></CollapsibleTrigger>
+      <CollapsibleContent className="mt-2 grid gap-2"><RailFact label="Action" value={humanize(event.action)} /><RailFact label="Outcome" value={humanize(event.outcome)} /><RailFact label="Level" value={humanize(event.level)} />{event.details && <pre className="max-h-40 overflow-auto rounded-lg border border-slate-800 bg-slate-950/80 p-2 text-[0.68rem] leading-5 text-slate-300">{event.details}</pre>}</CollapsibleContent>
+    </Collapsible>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function RailFact({ icon: Icon, label, value }: { icon?: LucideIcon; label: string; value: ReactNode }) {
+  return <div className="flex items-center gap-2 text-xs">{Icon && <Icon aria-hidden="true" className="size-3.5 text-sky-100/45" />}<span className="text-sky-100/55">{label}</span><span className="ml-auto min-w-0 truncate text-right font-semibold text-white">{value}</span></div>;
+}
+
+function SystemMetricsWorkspace({ children, metrics }: { children: ReactNode; metrics: SystemMetrics | null }) {
+  const memoryUsedBytes = metrics ? metrics.totalMemoryBytes - metrics.freeMemoryBytes : 0;
+  const runtimeUsedBytes = metrics ? metrics.runtimeTotalBytes - metrics.runtimeUsableBytes : 0;
   return (
-    <MonitoringInset>
-      <p className="text-xs font-bold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-slate-200">{value || 'None'}</p>
-    </MonitoringInset>
+    <div className="grid min-h-full content-start gap-3">
+      <div><h2 className="text-base font-semibold text-white">System metrics</h2><p className="mt-1 text-xs leading-5 text-sky-100/60">Current readings and recent trends for this server.</p></div>
+      <section className="grid gap-2 sm:grid-cols-3" aria-label="Current system metrics">
+        <SystemMetricCard detail={metrics ? `${metrics.availableProcessors} cores available` : 'Waiting for a sample'} icon={Cpu} label="Device CPU" tone="info" value={percentLabel(metrics?.systemCpuPercent)} />
+        <SystemMetricCard detail={metrics ? `${formatMetricBytes(memoryUsedBytes)} used of ${formatMetricBytes(metrics.totalMemoryBytes)}` : 'Waiting for a sample'} icon={MemoryStick} label="Memory" tone="info" value={percentLabel(metrics?.usedMemoryPercent)} />
+        <SystemMetricCard detail={metrics ? `${formatMetricBytes(runtimeUsedBytes)} used of ${formatMetricBytes(metrics.runtimeTotalBytes)}` : 'Waiting for a sample'} icon={HardDrive} label="Autark-OS disk" tone="warning" value={percentLabel(metrics?.runtimeUsedPercent)} />
+      </section>
+      {children}
+    </div>
   );
+}
+
+function SystemMetricCard({ detail, icon: Icon, label, tone, value }: { detail: string; icon: LucideIcon; label: string; tone: 'info' | 'warning'; value: string }) {
+  return <ProjectInset className={cn('border p-3', tone === 'warning' ? 'border-amber-300/20 bg-amber-400/5' : 'border-cyan-300/15 bg-cyan-400/5')}><div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-sky-100/65">{label}</p><Icon aria-hidden="true" className={cn('size-3.5', tone === 'warning' ? 'text-amber-100' : 'text-cyan-100')} /></div><p className="mt-1 text-xl font-semibold text-white">{value}</p><p className="mt-1 truncate text-[0.68rem] text-sky-100/55">{detail}</p></ProjectInset>;
+}
+
+function eventsForTab(events: ActivityLog[], tab: ActivityWorkspaceTab) {
+  if (tab === 'attention') return events.filter(needsAttention);
+  if (tab === 'repairs') return events.filter((event) => event.category === 'repair');
+  if (tab === 'apps') return events.filter((event) => Boolean(event.appId));
+  return events;
+}
+
+function needsAttention(event: ActivityLog) {
+  return event.level === 'error' || event.level === 'warning' || event.outcome === 'failed' || event.outcome === 'needs_attention';
 }
 
 function eventIcon(event: ActivityLog) {
-  if (event.level === 'error') {
-    return AlertTriangle;
-  }
-  if (event.category === 'repair') {
-    return Wrench;
-  }
-  if (event.category === 'health') {
-    return HeartPulse;
-  }
-  if (event.level === 'success') {
-    return CheckCircle2;
-  }
+  if (event.level === 'error') return AlertTriangle;
+  if (event.category === 'repair') return Wrench;
+  if (event.category === 'health') return HeartPulse;
+  if (event.category === 'access') return ShieldCheck;
+  if (event.level === 'success') return CheckCircle2;
   return Activity;
 }
 
-function eventTone(event: ActivityLog) {
-  if (event.level === 'error' || event.outcome === 'failed') {
-    return semanticStatusVariants({ tone: 'danger' });
-  }
-  if (event.level === 'warning' || event.outcome === 'needs_attention') {
-    return semanticStatusVariants({ tone: 'warning' });
-  }
-  if (event.level === 'success') {
-    return semanticStatusVariants({ tone: 'success' });
-  }
-  return semanticStatusVariants({ tone: 'neutral' });
+function eventIconTone(event: ActivityLog) {
+  if (event.level === 'error' || event.outcome === 'failed') return 'border-rose-300/25 bg-rose-400/10 text-rose-100';
+  if (event.level === 'warning' || event.outcome === 'needs_attention') return 'border-amber-300/25 bg-amber-400/10 text-amber-100';
+  if (event.level === 'success') return 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100';
+  return 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100';
 }
 
-function badgeTone(level: string): StatusBadgeTone {
-  if (level === 'error') return 'danger';
-  if (level === 'warning') return 'warning';
-  if (level === 'success') return 'success';
+function eventTextTone(event: ActivityLog) {
+  if (event.level === 'error' || event.outcome === 'failed') return 'text-rose-100';
+  if (event.level === 'warning' || event.outcome === 'needs_attention') return 'text-amber-100';
+  if (event.level === 'success') return 'text-emerald-100';
+  return 'text-cyan-100';
+}
+
+function postureBadgeTone(posture: string): StatusBadgeTone {
+  if (posture === 'healthy') return 'success';
+  if (posture === 'critical') return 'danger';
+  if (posture === 'warning') return 'warning';
   return 'neutral';
+}
+
+function levelLabel(level: string) {
+  if (level === 'all') return 'All levels';
+  if (level === 'warning') return 'Needs review';
+  if (level === 'success') return 'Completed';
+  if (level === 'info') return 'Updates';
+  return humanize(level);
+}
+
+function percentLabel(value: number | null | undefined) {
+  return typeof value === 'number' && value >= 0 ? `${Math.round(value)}%` : 'Waiting';
+}
+
+function formatMetricBytes(value: number) {
+  if (!Number.isFinite(value) || value < 0) return 'Not reported';
+  if (value < 1024) return `${value} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let current = value / 1024;
+  let unit = 0;
+  while (current >= 1024 && unit < units.length - 1) {
+    current /= 1024;
+    unit += 1;
+  }
+  return `${current >= 10 ? current.toFixed(0) : current.toFixed(1)} ${units[unit]}`;
 }
