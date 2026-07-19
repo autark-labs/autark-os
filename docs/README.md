@@ -22,6 +22,9 @@ The repository README is the public overview. These guides focus on installing, 
 - [Technical installation](./technical-installation.md): release artifacts, supported hosts, preflight checks, runtime storage, and installed paths.
 - [Portable and offline installation](./offline-install.md): verify and install copied release artifacts without downloading during setup.
 - [Service and storage reference](./service-user-installation.md): the installed service, durable data paths, systemd, Docker access, and Tailscale operator setup.
+- [Autark Pro CE invariants](./pro/ce-invariants.md): release-blocking rules that keep Community Edition complete when Pro is absent or unhealthy.
+- [Autark Pro repository inventory](./pro/repository-inventory.md): public/private ownership, current integration seams, and prototype boundaries.
+- [Architecture decisions](./adr/ADR-001-autark-pro-module-model.md): the optional module model, privilege boundary, and service separation.
 - [Support policy](../SUPPORT.md): what Autark Labs can help with and when to contact an upstream app project.
 - [Security reporting](../SECURITY.md): how to report a security issue without exposing credentials publicly.
 - [Third-party notices](./third-party-notices.md): where to find the included runtime and dependency inventories.
