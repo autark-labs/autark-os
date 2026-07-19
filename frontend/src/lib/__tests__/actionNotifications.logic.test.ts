@@ -76,6 +76,22 @@ test('maps running backup jobs to non-sticky progress notifications', () => {
   assert.equal(notification.sticky, false);
 });
 
+test('maps queued installs to honest waiting notifications', () => {
+  const notification = actionNotificationFromJob({
+    jobId: 'job-install',
+    type: 'install_app',
+    subjectId: 'jellyfin',
+    status: 'queued',
+    currentStep: 'start_app',
+    steps: [{ id: 'start_app', label: 'Starting Jellyfin', status: 'pending', message: '' }],
+  });
+
+  assert.equal(notification.severity, 'info');
+  assert.equal(notification.title, 'Install queued');
+  assert.equal(notification.message, 'jellyfin is waiting to install. Autark-OS installs one app at a time to keep its network setup safe.');
+  assert.equal(notification.sticky, false);
+});
+
 test('maps succeeded backup jobs to concise success notifications', () => {
   const notification = actionNotificationFromJob({
     jobId: 'job-2',

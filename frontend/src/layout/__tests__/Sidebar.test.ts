@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sidebarUpdateIndicator } from './Sidebar';
+import { sidebarUpdateIndicator } from '../Sidebar';
 
 describe('sidebarUpdateIndicator', () => {
   it('does not claim an update exists when the release channel has not been checked', () => {

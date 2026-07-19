@@ -11,6 +11,7 @@ import {
   jobProgressPercent,
   jobTypeLabel,
   latestActiveJob,
+  queuedJobText,
   terminalJob,
 } from './jobRepository.logic';
 
@@ -24,6 +25,7 @@ export {
   jobProgressPercent,
   jobTypeLabel,
   latestActiveJob,
+  queuedJobText,
   terminalJob,
 };
 

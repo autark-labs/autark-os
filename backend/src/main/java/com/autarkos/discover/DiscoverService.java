@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import com.autarkos.apps.AppOwnershipState;
 import com.autarkos.apps.AppOwnershipView;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobService;
@@ -118,7 +119,7 @@ public class DiscoverService {
         }
         DiscoverSetupModels.DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, answersRequest);
         setupService.persist(appId, manifest.id(), answers);
-        AutarkOsJob job = jobService.startWithJob("install_app", appId, installJobSteps(manifest.name()), activeJob -> {
+        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.INSTALL_APP, appId, installJobSteps(manifest.name()), activeJob -> {
             List<AutarkOsJobStep> liveSteps = new ArrayList<>();
             InstallOptionsRequest installOptions = installOptions(preview.installOptions(), request);
             InstallModels.InstallResult result = marketplaceInstallService.install(manifest, installOptions, step -> {

@@ -4,11 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.Executor;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
@@ -28,6 +33,87 @@ class AutarkOsJobServiceTests {
         assertThat(second.jobId()).isEqualTo(first.jobId());
         assertThat(service.list()).hasSize(1);
         assertThat(service.findById(first.jobId()).orElseThrow().status()).isEqualTo("queued");
+    }
+
+    @Test
+    void serializesInstallJobsForDifferentAppsWithoutHoldingBackOtherJobTypes() {
+        RecordingExecutor executor = new RecordingExecutor();
+        AutarkOsJobService service = service(executor, true);
+        List<String> completedOperations = new ArrayList<>();
+
+        AutarkOsJob firstInstall = service.start(
+                AutarkOsStates.JobType.INSTALL_APP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("start_app", "Starting Vaultwarden")),
+                () -> {
+                    completedOperations.add("vaultwarden");
+                    return AutarkOsJobOutcome.succeeded("Vaultwarden installed.");
+                });
+        AutarkOsJob secondInstall = service.start(
+                AutarkOsStates.JobType.INSTALL_APP,
+                "jellyfin",
+                List.of(AutarkOsJobStep.pending("start_app", "Starting Jellyfin")),
+                () -> {
+                    completedOperations.add("jellyfin");
+                    return AutarkOsJobOutcome.succeeded("Jellyfin installed.");
+                });
+        AutarkOsJob backup = service.start(
+                AutarkOsStates.JobType.BACKUP,
+                "homepage",
+                List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
+                () -> {
+                    completedOperations.add("backup");
+                    return AutarkOsJobOutcome.succeeded("Backup complete.");
+                });
+
+        assertThat(executor.queuedTaskCount()).isEqualTo(2);
+        assertThat(service.findById(firstInstall.jobId()).orElseThrow().status()).isEqualTo("queued");
+        assertThat(service.findById(secondInstall.jobId()).orElseThrow().status()).isEqualTo("queued");
+
+        executor.runNext();
+
+        assertThat(completedOperations).containsExactly("vaultwarden");
+        assertThat(service.findById(firstInstall.jobId()).orElseThrow().status()).isEqualTo("succeeded");
+        assertThat(service.findById(secondInstall.jobId()).orElseThrow().status()).isEqualTo("queued");
+        assertThat(executor.queuedTaskCount()).isEqualTo(2);
+
+        executor.runNext();
+        executor.runNext();
+
+        assertThat(completedOperations).containsExactly("vaultwarden", "backup", "jellyfin");
+        assertThat(service.findById(secondInstall.jobId()).orElseThrow().status()).isEqualTo("succeeded");
+        assertThat(service.findById(backup.jobId()).orElseThrow().status()).isEqualTo("succeeded");
+    }
+
+    @Test
+    void cancelledInstallDoesNotRunAfterWaitingForAnotherAppInstall() {
+        RecordingExecutor executor = new RecordingExecutor();
+        AutarkOsJobService service = service(executor, true);
+        List<String> completedInstalls = new ArrayList<>();
+
+        service.start(
+                AutarkOsStates.JobType.INSTALL_APP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("start_app", "Starting Vaultwarden")),
+                () -> {
+                    completedInstalls.add("vaultwarden");
+                    return AutarkOsJobOutcome.succeeded("Vaultwarden installed.");
+                });
+        AutarkOsJob waitingInstall = service.start(
+                AutarkOsStates.JobType.INSTALL_APP,
+                "jellyfin",
+                List.of(AutarkOsJobStep.pending("start_app", "Starting Jellyfin")),
+                () -> {
+                    completedInstalls.add("jellyfin");
+                    return AutarkOsJobOutcome.succeeded("Jellyfin installed.");
+                });
+
+        service.cancel(waitingInstall.jobId());
+        executor.runNext();
+        executor.runNext();
+
+        assertThat(completedInstalls).containsExactly("vaultwarden");
+        assertThat(service.findById(waitingInstall.jobId()).orElseThrow().status()).isEqualTo("cancelled");
     }
 
     @Test
@@ -117,9 +203,31 @@ class AutarkOsJobServiceTests {
     }
 
     private AutarkOsJobService service() {
+        return service(Runnable::run, false);
+    }
+
+    private AutarkOsJobService service(Executor executor, boolean autoRun) {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
         AutarkOsJobRepository repository = JpaTestRepositories.jobRepository(new RuntimeLayout(properties));
-        return new AutarkOsJobService(repository, Runnable::run, false, () -> Instant.parse("2026-06-20T12:00:00Z"));
+        return new AutarkOsJobService(repository, executor, autoRun, () -> Instant.parse("2026-06-20T12:00:00Z"));
+    }
+
+    private static final class RecordingExecutor implements Executor {
+
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+
+        @Override
+        public void execute(Runnable command) {
+            tasks.add(command);
+        }
+
+        private int queuedTaskCount() {
+            return tasks.size();
+        }
+
+        private void runNext() {
+            tasks.remove().run();
+        }
     }
 }

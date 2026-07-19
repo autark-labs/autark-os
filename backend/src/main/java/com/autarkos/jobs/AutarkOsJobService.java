@@ -1,10 +1,12 @@
 package com.autarkos.jobs;
 
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -17,6 +19,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AutarkOsStates;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -24,6 +27,8 @@ public class AutarkOsJobService {
 
     private final AutarkOsJobRepository repository;
     private final Executor executor;
+    // Port allocation is probe-based, so an install must keep this lane until its complete operation returns.
+    private final Executor installationExecutor;
     private final boolean autoRun;
     private final boolean reconcileOnStartup;
     private final Supplier<Instant> clock;
@@ -46,6 +51,7 @@ public class AutarkOsJobService {
     AutarkOsJobService(AutarkOsJobRepository repository, Executor executor, boolean autoRun, Supplier<Instant> clock, boolean reconcileOnStartup) {
         this.repository = repository;
         this.executor = executor;
+        this.installationExecutor = new SerialExecutor(executor);
         this.autoRun = autoRun;
         this.clock = clock;
         this.reconcileOnStartup = reconcileOnStartup;
@@ -64,12 +70,7 @@ public class AutarkOsJobService {
         Runnable task = () -> run(job, operation);
         queuedTasks.put(job.jobId(), task);
         if (autoRun) {
-            executor.execute(() -> {
-                Runnable queued = queuedTasks.remove(job.jobId());
-                if (queued != null) {
-                    queued.run();
-                }
-            });
+            schedule(job);
         }
         return job;
     }
@@ -112,9 +113,23 @@ public class AutarkOsJobService {
     }
 
     public void runQueuedJobsNow() {
-        List<Runnable> tasks = new ArrayList<>(queuedTasks.values());
-        queuedTasks.clear();
-        tasks.forEach(Runnable::run);
+        List<AutarkOsJob> jobs = new ArrayList<>(queuedTasks.keySet()).stream()
+                .map(this::findById)
+                .flatMap(Optional::stream)
+                .toList();
+        jobs.forEach(this::schedule);
+    }
+
+    private void schedule(AutarkOsJob job) {
+        Executor jobExecutor = AutarkOsStates.JobType.INSTALL_APP.equals(job.type())
+                ? installationExecutor
+                : executor;
+        jobExecutor.execute(() -> {
+            Runnable queued = queuedTasks.remove(job.jobId());
+            if (queued != null) {
+                queued.run();
+            }
+        });
     }
 
     private void run(AutarkOsJob job, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
@@ -231,7 +246,7 @@ public class AutarkOsJobService {
 
     private String interruptedMessage(AutarkOsJob job) {
         return switch (job.type()) {
-            case "install_app" -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";
+            case AutarkOsStates.JobType.INSTALL_APP -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";
             case "backup" -> "This backup was interrupted when Autark-OS stopped. Rerun the backup to create a fresh restore point.";
             default -> "This job was interrupted when Autark-OS stopped. Start it again if it is still needed.";
         };
@@ -241,5 +256,37 @@ public class AutarkOsJobService {
         return exception.getMessage() == null || exception.getMessage().isBlank()
                 ? "Autark-OS could not finish this job."
                 : exception.getMessage();
+    }
+
+    private static final class SerialExecutor implements Executor {
+
+        private final Executor delegate;
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+        private Runnable activeTask;
+
+        private SerialExecutor(Executor delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public synchronized void execute(Runnable command) {
+            tasks.add(() -> {
+                try {
+                    command.run();
+                } finally {
+                    scheduleNext();
+                }
+            });
+            if (activeTask == null) {
+                scheduleNext();
+            }
+        }
+
+        private synchronized void scheduleNext() {
+            activeTask = tasks.poll();
+            if (activeTask != null) {
+                delegate.execute(activeTask);
+            }
+        }
     }
 }

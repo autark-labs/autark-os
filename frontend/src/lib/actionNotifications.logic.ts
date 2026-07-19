@@ -1,3 +1,5 @@
+import { queuedJobText } from '../repositories/jobRepository.logic';
+
 const TERMINAL_ERROR_STATUSES = new Set(['failed', 'error']);
 const INFO_STATUSES = new Set(['skipped', 'cancelled', 'canceled']);
 
@@ -64,11 +66,14 @@ export function actionNotificationFromJob(job: ActionNotificationJob = {}) {
   const status = String(job.status || '').toLowerCase();
   const failed = status === 'failed';
   const succeeded = status === 'succeeded';
-  const title = `${jobOperationLabel(type)} ${failed ? 'failed' : succeeded ? 'completed' : 'started'}`;
+  const queued = status === 'queued';
+  const title = `${jobOperationLabel(type)} ${failed ? 'failed' : succeeded ? 'completed' : queued ? 'queued' : 'started'}`;
   const step = currentStep(job);
   const message = failed
     ? job.error?.message || `${jobOperationLabel(type)} could not finish.`
-    : step?.message || step?.label || jobSubjectMessage(job);
+    : queued
+      ? queuedJobText(job)
+      : step?.message || step?.label || jobSubjectMessage(job);
   const severity = failed ? 'error' : succeeded ? 'success' : 'info';
   return {
     severity,

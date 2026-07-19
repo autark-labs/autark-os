@@ -87,6 +87,7 @@ public final class AutarkOsStates {
     }
 
     public static final class JobType {
+        public static final String INSTALL_APP = "install_app";
         public static final String START_APP = "start_app";
         public static final String STOP_APP = "stop_app";
         public static final String RESTART_APP = "restart_app";

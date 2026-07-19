@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, CheckCircle2, Loader2, Settings2, TriangleAlert } from 'lucide-react';
+import { Archive, CheckCircle2, Clock3, Loader2, Settings2, TriangleAlert } from 'lucide-react';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { backupSafetyWarning } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
-import { currentJobStepText, terminalJob } from '@/repositories/jobRepository';
+import { currentJobStepText, queuedJobText, terminalJob } from '@/repositories/jobRepository';
 import type { DiscoverAppView, DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
@@ -369,19 +369,21 @@ function InlineInstallStatus({
   onCreateBackup: (appId: string) => Promise<void>;
 }) {
   if (job) {
-    const running = !terminalJob(job);
+    const active = !terminalJob(job);
+    const queued = job.status === 'queued';
+    const running = active && !queued;
     const succeeded = job.status === 'succeeded';
     const failed = job.status === 'failed';
     return (
       <section className={cn('rounded-lg border p-4', succeeded ? 'border-emerald-300/35 bg-emerald-500/10' : failed ? 'border-red-400/35 bg-red-500/10' : 'border-cyan-300/35 bg-cyan-400/10')}>
         <div className="flex items-start gap-3">
-          {running ? <Loader2 className="mt-0.5 size-5 animate-spin text-cyan-200" /> : succeeded ? <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" /> : <TriangleAlert className="mt-0.5 size-5 text-red-200" />}
+          {queued ? <Clock3 className="mt-0.5 size-5 text-cyan-200" /> : running ? <Loader2 className="mt-0.5 size-5 animate-spin text-cyan-200" /> : succeeded ? <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" /> : <TriangleAlert className="mt-0.5 size-5 text-red-200" />}
           <div className="min-w-0 flex-1">
-            <h4 className="font-bold text-slate-50">{succeeded ? `${app.name} is ready` : failed ? `${app.name} did not finish installing` : `Installing ${app.name}`}</h4>
+            <h4 className="font-bold text-slate-50">{succeeded ? `${app.name} is ready` : failed ? `${app.name} did not finish installing` : queued ? `${app.name} is waiting to install` : `Installing ${app.name}`}</h4>
             <p className={cn('mt-1 text-sm', succeeded ? 'text-emerald-200' : failed ? 'text-red-200' : 'text-cyan-200')}>
-              {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Autark-OS stopped before making this app available.' : currentJobStepText(job, 'Autark-OS is working on this job.')}
+              {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Autark-OS stopped before making this app available.' : queued ? queuedJobText(job, app.name) : currentJobStepText(job, 'Autark-OS is working on this job.')}
             </p>
-            {running && <JobProgress className="mt-4" job={job} subjectLabel={app.name} />}
+            {active && <JobProgress className="mt-4" job={job} subjectLabel={app.name} />}
             <JobStepList job={job} />
             {succeeded && (
               <div className="mt-4 flex flex-wrap gap-2">

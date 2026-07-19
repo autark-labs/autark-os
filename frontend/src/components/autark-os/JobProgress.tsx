@@ -7,6 +7,7 @@ import {
   currentJobStepText,
   jobProgressPercent,
   jobTypeLabel,
+  queuedJobText,
   terminalJob,
 } from '@/repositories/jobRepository';
 
@@ -23,7 +24,9 @@ export function JobProgress({ className, compact = false, job, subjectLabel }: J
   const failed = job.status === 'failed';
   const succeeded = job.status === 'succeeded';
   const cancelled = job.status === 'cancelled';
-  const running = !terminalJob(job);
+  const active = !terminalJob(job);
+  const queued = job.status === 'queued';
+  const running = active && !queued;
 
   return (
     <section className={cn(
@@ -31,11 +34,11 @@ export function JobProgress({ className, compact = false, job, subjectLabel }: J
       failed && 'border-red-400/35 bg-red-500/10 text-red-200',
       succeeded && 'border-emerald-300/25 bg-emerald-500/10 text-emerald-200',
       cancelled && 'border-sky-400/25 bg-slate-800 text-slate-300',
-      running && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
+      active && 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
       className,
     )}
       aria-atomic="true"
-      aria-live={running ? 'polite' : undefined}
+      aria-live={active ? 'polite' : undefined}
       aria-label={`${jobTypeLabel(job.type)}${subjectLabel ? ` for ${subjectLabel}` : ''}: ${job.status.replaceAll('_', ' ')}`}
     >
       <div className="flex items-start gap-3">
@@ -52,12 +55,16 @@ export function JobProgress({ className, compact = false, job, subjectLabel }: J
             </span>
           </div>
           <p className="m-0 mt-1 text-current/80">
-            {failed ? job.error?.message || 'Autark-OS could not finish this job.' : currentJobStepText(job, running ? 'Autark-OS is working.' : terminalSummary(job))}
+            {failed
+              ? job.error?.message || 'Autark-OS could not finish this job.'
+              : queued
+                ? queuedJobText(job, subjectLabel)
+                : currentJobStepText(job, running ? 'Autark-OS is working.' : terminalSummary(job))}
           </p>
           {!compact && (
             <>
               <Progress aria-label={`${jobTypeLabel(job.type)} progress`} className="mt-3 bg-slate-800 [&_[data-slot=progress-indicator]]:bg-cyan-300" value={progress} />
-              {currentStep?.label && (
+              {!queued && currentStep?.label && (
                 <p className="m-0 mt-2 text-xs text-current/65">
                   Current step: {currentStep.label}
                 </p>

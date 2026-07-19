@@ -58,6 +58,17 @@ export function currentJobStepText(job?: AutarkOsJob | null, fallback = '') {
   return step?.message || step?.label || fallback;
 }
 
+export function queuedJobText(
+  job?: { subjectId?: string | null; type?: string | null } | null,
+  subjectLabel?: string,
+) {
+  const subject = subjectLabel || job?.subjectId || '';
+  if (job?.type === 'install_app') {
+    return `${subject ? `${subject} is` : 'This app is'} waiting to install. Autark-OS installs one app at a time to keep its network setup safe.`;
+  }
+  return `${jobTypeLabel(job?.type)}${subject ? ` for ${subject}` : ''} is waiting to start.`;
+}
+
 export function jobProgressPercent(job?: AutarkOsJob | null) {
   const steps = Array.isArray(job?.steps) ? job.steps : [];
   if (!steps.length) {

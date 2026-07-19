@@ -9,6 +9,7 @@ import {
   jobProgressPercent,
   jobTypeLabel,
   latestActiveJob,
+  queuedJobText,
   terminalJob,
 } from '../jobRepository.logic';
 
@@ -78,6 +79,13 @@ test('job progress and current step derive stable user-facing progress', () => {
   assert.equal(jobProgressPercent({ ...running, status: 'succeeded' }), 100);
   assert.equal(jobTypeLabel('backup_verify'), 'Backup verification');
   assert.equal(jobTypeLabel('uninstall_app'), 'Uninstall');
+});
+
+test('queued install copy explains the serialized safety boundary', () => {
+  assert.equal(
+    queuedJobText(job('install', 'install_app', 'vaultwarden', 'queued', '2026-06-21T12:00:00Z'), 'Vaultwarden'),
+    'Vaultwarden is waiting to install. Autark-OS installs one app at a time to keep its network setup safe.',
+  );
 });
 
 function job(jobId, type, subjectId, status, updatedAt) {
