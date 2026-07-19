@@ -23,6 +23,7 @@ export default defineConfig({
     colorScheme: 'dark',
     locale: 'en-US',
     screenshot: 'only-on-failure',
+    timezoneId: 'America/Chicago',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
