@@ -67,7 +67,7 @@ export function DocsSourceMenu({ app }: { app: MarketplaceApp }) {
           <ChevronDown className="size-3.5" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60 border-sky-300/20 bg-[#0b1831] text-slate-50 shadow-xl shadow-slate-950/20">
+      <DropdownMenuContent align="end" className="w-60 border-sky-300/20 bg-app-overlay-panel text-slate-50 shadow-xl shadow-slate-950/20">
         <DropdownMenuLabel>{app.name}</DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-sky-300/10" />
         {app.documentationUrl && (

@@ -179,7 +179,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
 
   return (
     <ResponsiveDetailsSheet
-      className="border-sky-300/30 bg-[#0b1831] sm:!max-w-xl lg:!max-w-[42rem]"
+      className="border-sky-300/30 bg-app-overlay-panel sm:!max-w-xl lg:!max-w-[42rem]"
       headerAccessory={<StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>}
       model={{ description: `${app.category} · ${app.installTime}`, title: app.name }}
       onOpenChange={(open) => !open && onBack()}

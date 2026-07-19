@@ -370,7 +370,7 @@ function DiagnosticsNotebook({
 
 function DiagnosticsNotebookHeader({ headline, onRefresh, refreshing }: { headline: string; onRefresh: () => void; refreshing: boolean }) {
   return (
-    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20" tone="panel">
+    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
@@ -418,7 +418,7 @@ function NotebookTabTrigger({ entry }: { entry: { icon: LucideIcon; id: Diagnost
     <TabsTrigger className="h-auto min-h-10 rounded-lg border-0 px-2 py-2 text-left data-active:bg-cyan-300/15 data-active:text-cyan-100" value={entry.id}>
       <span className={cn('grid size-6 shrink-0 place-items-center rounded-md border', notebookIconClasses(entry.tone))}><Icon aria-hidden="true" className="size-3.5" /></span>
       <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-      {entry.tone === 'watch' && <span aria-label="Needs attention" className="size-1.5 rounded-full bg-amber-300" />}
+      {entry.tone === 'watch' && <span aria-hidden="true" className="size-1.5 rounded-full bg-amber-300" />}
     </TabsTrigger>
   );
 }

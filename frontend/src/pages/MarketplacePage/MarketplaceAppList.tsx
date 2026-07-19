@@ -238,5 +238,5 @@ function AppStatusDot({ installing, tone }: { installing: boolean; tone: ReturnT
           ? 'bg-app-info'
           : 'bg-app-text-muted';
 
-  return <span aria-label="App status" className={cn('size-2 shrink-0 rounded-full', toneClass)} />;
+  return <span aria-hidden="true" className={cn('size-2 shrink-0 rounded-full', toneClass)} />;
 }

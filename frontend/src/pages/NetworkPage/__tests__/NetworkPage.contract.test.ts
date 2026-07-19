@@ -54,7 +54,7 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(page, /AccessPageHeader/);
   assert.match(page, /<Network aria-hidden="true" className="size-5" \/>/);
   assert.match(page, /<Surface as="header"/);
-  assert.match(page, /bg-\[#07142b\]\/90/);
+  assert.match(page, /bg-app-header-surface\/90/);
   assert.match(matrix, /className\?: string/);
   assert.match(matrix, /xl:grid-rows-\[auto_minmax\(0,1fr\)\]/);
   assert.match(matrix, /xl:\[contain:layout_paint\]/);

@@ -69,7 +69,7 @@ export function InstallWizard({ app, hasAppSettings, hideTrigger = false, instal
           {triggerLabel}
         </ProjectDarkControlButton>
       )}
-      <DialogContent className="max-h-[88vh] overflow-y-auto border-sky-300/25 bg-[#0b1831] text-slate-50 shadow-2xl shadow-slate-950/40 sm:max-w-xl">
+      <DialogContent className="max-h-[88vh] overflow-y-auto border-sky-300/25 bg-app-overlay-panel text-slate-50 shadow-2xl shadow-slate-950/40 sm:max-w-xl">
         <DialogHeader className="pr-8">
           <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100/65">Install plan</p>
           <DialogTitle className="text-2xl text-slate-50">Install {app.name}</DialogTitle>

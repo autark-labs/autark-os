@@ -172,7 +172,7 @@ function StorageCapacityHeader({ freeBytes, onRefresh, refreshing, updatedAt, us
   usedPercent: number;
 }) {
   return (
-    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20" tone="panel">
+    <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
@@ -533,7 +533,7 @@ function WorkspaceHeading({ description, icon: Icon, title }: { description: str
 }
 
 function StorageAppIcon({ appName, className, iconUrl }: { appName: string; className?: string; iconUrl: string | null }) {
-  return <span aria-label={`${appName} icon`} className={cn('relative grid size-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200', className)}><AppWindow aria-hidden="true" className="size-3.5" />{iconUrl && <img alt="" className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = 'none'; }} src={iconUrl} />}</span>;
+  return <span aria-hidden="true" className={cn('relative grid size-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200', className)}><AppWindow aria-hidden="true" className="size-3.5" />{iconUrl && <img alt="" className="absolute inset-0 size-full object-contain p-1" onError={(event) => { event.currentTarget.style.display = 'none'; }} src={iconUrl} />}</span>;
 }
 
 function DetailFact({ label, value }: { label: string; value: string }) {

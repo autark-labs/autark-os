@@ -21,6 +21,8 @@
   --app-panel: var(--color-slate-900);
   --app-panel-muted: var(--color-slate-800);
   --app-panel-hover: var(--color-slate-700);
+  --app-header-surface: #07142b;
+  --app-overlay-panel: #0b1831;
   --app-card-harbor: color-mix(in srgb, var(--app-panel-muted) 82%, var(--app-accent));
   --app-card-harbor-hover: color-mix(in srgb, var(--app-panel-muted) 68%, var(--app-accent));
   --app-card-harbor-icon: color-mix(in srgb, var(--app-card-harbor) 76%, var(--app-accent));
@@ -60,6 +62,7 @@
   --app-shadow-md: 0 18px 54px rgb(2 6 23 / 0.2);
   --app-shadow-lg: 0 28px 90px rgb(2 6 23 / 0.28);
   --app-shadow-sidebar: 10px 0 42px rgb(2 6 23 / 0.28);
+  --app-shadow-pinned-column: 12px 0 20px rgb(2 6 23 / 0.3);
   --app-brand-gradient: linear-gradient(135deg, var(--color-cyan-300) 0%, var(--color-sky-500) 58%, var(--color-cyan-200) 100%);
   --app-hero-default:
     radial-gradient(circle at top left, rgb(34 211 238 / 0.16), transparent 30%),
@@ -126,6 +129,8 @@
   --app-panel: #0a1b2d;
   --app-panel-muted: #102b44;
   --app-panel-hover: #17405f;
+  --app-header-surface: var(--app-panel);
+  --app-overlay-panel: var(--app-panel);
   --app-border: #38bdf8;
   --app-border-muted: rgb(56 189 248 / 0.26);
   --app-border-strong: rgb(56 189 248 / 0.46);
@@ -184,6 +189,8 @@
   --app-panel: #0a2119;
   --app-panel-muted: #123429;
   --app-panel-hover: #1b4b3b;
+  --app-header-surface: var(--app-panel);
+  --app-overlay-panel: var(--app-panel);
   --app-border: #34d399;
   --app-border-muted: rgb(52 211 153 / 0.26);
   --app-border-strong: rgb(52 211 153 / 0.46);
@@ -242,6 +249,8 @@
   --app-panel: #24110a;
   --app-panel-muted: #392015;
   --app-panel-hover: #57301f;
+  --app-header-surface: var(--app-panel);
+  --app-overlay-panel: var(--app-panel);
   --app-border: #fb923c;
   --app-border-muted: rgb(251 146 60 / 0.26);
   --app-border-strong: rgb(251 146 60 / 0.46);
@@ -316,6 +325,8 @@
   --color-app-panel: var(--app-panel);
   --color-app-panel-muted: var(--app-panel-muted);
   --color-app-panel-hover: var(--app-panel-hover);
+  --color-app-header-surface: var(--app-header-surface);
+  --color-app-overlay-panel: var(--app-overlay-panel);
   --color-app-card-harbor: var(--app-card-harbor);
   --color-app-card-harbor-hover: var(--app-card-harbor-hover);
   --color-app-card-harbor-icon: var(--app-card-harbor-icon);
@@ -351,6 +362,7 @@
   --color-app-disabled-surface: var(--app-disabled-surface);
   --color-app-disabled-border: var(--app-disabled-border);
   --color-app-disabled-text: var(--app-disabled-text);
+  --shadow-app-pinned-column: var(--app-shadow-pinned-column);
   --background-image-app-hero-default: var(--app-hero-default);
 }
 

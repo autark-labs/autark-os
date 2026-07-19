@@ -18,7 +18,7 @@ backend/.gradle/
 
 # Node / Vite
 frontend/node_modules/
-frontend/development/
+/frontend/development/
 frontend/dist/
 frontend/.vite/
 frontend/.env.local
@@ -43,10 +43,7 @@ runtime/autark-os/autark-os.db
 *.db-shm
 *.db-wal
 
-# Local screenshots and smoke-test captures
+# Local screenshots, planning, and assistant workspace
 screenshots/
-docs/development
-/docs/development
-docs/current-app-state
-.superpowers
-docs/superpowers
+/docs/development/
+/.superpowers/

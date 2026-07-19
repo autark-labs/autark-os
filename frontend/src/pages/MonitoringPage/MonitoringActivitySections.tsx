@@ -316,7 +316,7 @@ function ActivityTabTrigger({ attentionCount, tab }: { attentionCount: number; t
     <TabsTrigger className="h-auto min-h-10 rounded-lg border-0 px-2 py-2 text-left data-active:bg-cyan-300/15 data-active:text-cyan-100" value={tab.value}>
       <Icon aria-hidden="true" className="size-3.5" />
       <span className="min-w-0 flex-1 truncate">{tab.label}</span>
-      {tab.value === 'attention' && attentionCount > 0 && <span aria-label={`${attentionCount} needs review`} className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-100">{attentionCount}</span>}
+      {tab.value === 'attention' && attentionCount > 0 && <span className="rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-100">{attentionCount}</span>}
     </TabsTrigger>
   );
 }

@@ -590,7 +590,7 @@ function DiscoverGuidedHeader({
   onRefresh: () => void;
 }) {
   return (
-    <header className="rounded-2xl border border-sky-300/15 bg-[#07142b]/90 p-3 text-slate-50 shadow-xl shadow-slate-950/20 sm:p-4">
+    <header className="rounded-2xl border border-sky-300/15 bg-app-header-surface/90 p-3 text-slate-50 shadow-xl shadow-slate-950/20 sm:p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">

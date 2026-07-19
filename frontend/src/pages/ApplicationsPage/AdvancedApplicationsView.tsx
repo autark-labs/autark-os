@@ -56,7 +56,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
         {!items.length ? (
           <AdvancedEmptyState emptyState={emptyState} />
         ) : (
-          <div data-testid="advanced-table-scroll-area" className="h-full min-h-0 overflow-auto overscroll-contain rounded-xl border border-app-border-muted bg-slate-950 px-2 pb-2">
+          <div aria-label="Installed apps table" data-testid="advanced-table-scroll-area" role="region" tabIndex={0} className="h-full min-h-0 overflow-auto overscroll-contain rounded-xl border border-app-border-muted bg-slate-950 px-2 pb-2">
             <Table aria-hidden={managementOpen} className="min-w-[74rem] table-fixed border-separate border-spacing-y-2" containerClassName="overflow-visible" ref={tableRef}>
               <colgroup>
                 <col className="w-72" />
@@ -68,7 +68,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
               </colgroup>
               <TableHeader>
                 <TableRow className="h-10 border-transparent hover:bg-transparent">
-                  <TableHead className={cn(tableHeadClass, 'sticky left-0 z-30 bg-slate-950 px-3 shadow-[12px_0_20px_rgb(2_6_23_/_0.3)]')}>Name</TableHead>
+                  <TableHead className={cn(tableHeadClass, 'sticky left-0 z-30 bg-slate-950 px-3 shadow-app-pinned-column')}>Name</TableHead>
                   <TableHead className={tableHeadClass}>Type</TableHead>
                   <TableHead className={tableHeadClass}>State</TableHead>
                   <TableHead className={tableHeadClass}>Access</TableHead>
@@ -115,7 +115,7 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
     selected && 'bg-app-card-harbor-hover ring-1 ring-cyan-100/60 shadow-xl shadow-cyan-200/15',
   );
   const pinnedCellClassName = cn(
-    'sticky left-0 z-10 h-16 rounded-l-xl bg-app-card-harbor px-3 py-0 shadow-[12px_0_20px_rgb(2_6_23_/_0.3)]',
+    'sticky left-0 z-10 h-16 rounded-l-xl bg-app-card-harbor px-3 py-0 shadow-app-pinned-column',
     !managementOpen && 'group-hover/app-card:bg-app-card-harbor-hover',
     selected && 'bg-app-card-harbor-hover',
   );

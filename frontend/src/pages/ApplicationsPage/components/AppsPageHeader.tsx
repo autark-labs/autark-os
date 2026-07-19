@@ -18,7 +18,7 @@ export function AppsPageHeader({ attentionCount, linkedCount, managedCount }: Ap
   const values = { attention: attentionCount, linked: linkedCount, managed: managedCount };
 
   return (
-    <Surface as="header" className="overflow-hidden border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20" tone="panel">
+    <Surface as="header" className="overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
