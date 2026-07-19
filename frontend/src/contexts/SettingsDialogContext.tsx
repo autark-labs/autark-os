@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import SettingsPage from '@/pages/SettingsPage/SettingsPage';
@@ -14,33 +14,45 @@ export function SettingsDialogProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState<SettingsGroupId>('general');
+  const closeSettings = useCallback(() => setOpen(false), []);
+  const requestDismissRef = useRef<() => void>(closeSettings);
+
+  const registerDismissRequest = useCallback((requestDismiss: () => void) => {
+    requestDismissRef.current = requestDismiss;
+  }, []);
+
+  const requestDismiss = useCallback(() => {
+    requestDismissRef.current();
+  }, []);
 
   const openSettings = useCallback((nextGroup: SettingsGroupId = 'general') => {
+    requestDismissRef.current = closeSettings;
     setGroup(nextGroup);
     setOpen(true);
-  }, []);
+  }, [closeSettings]);
 
   useEffect(() => {
     if (new URLSearchParams(location.search).get('settings') === 'open') {
+      requestDismissRef.current = closeSettings;
       setOpen(true);
     }
-  }, [location.search]);
+  }, [closeSettings, location.search]);
 
   const value = useMemo(() => ({ openSettings }), [openSettings]);
 
   return (
     <SettingsDialogContext.Provider value={value}>
       {children}
-      <Dialog onOpenChange={(nextOpen) => nextOpen && setOpen(true)} open={open}>
+      <Dialog onOpenChange={(nextOpen) => (nextOpen ? setOpen(true) : requestDismiss())} open={open}>
         <DialogContent
           aria-describedby={undefined}
-          className="flex h-[min(90dvh,54rem)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden border-sky-400/30 bg-slate-800 p-0 text-slate-50 sm:max-w-5xl"
-          onEscapeKeyDown={(event) => event.preventDefault()}
-          onPointerDownOutside={(event) => event.preventDefault()}
+          className="flex h-[calc(100dvh-1rem)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden border-sky-400/30 bg-app-panel p-0 text-slate-50 sm:h-[min(90dvh,48rem)] sm:max-w-5xl"
+          onEscapeKeyDown={(event) => { event.preventDefault(); requestDismiss(); }}
+          onPointerDownOutside={(event) => { event.preventDefault(); requestDismiss(); }}
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">Autark-OS settings</DialogTitle>
-          <SettingsPage embedded initialGroup={group} key={group} onRequestClose={() => setOpen(false)} />
+          <SettingsPage embedded initialGroup={group} key={group} onRequestClose={closeSettings} onRequestDismiss={registerDismissRequest} />
         </DialogContent>
       </Dialog>
     </SettingsDialogContext.Provider>

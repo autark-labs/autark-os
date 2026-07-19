@@ -13,7 +13,7 @@ export const settingsSectionIds = [
 export type SettingsSection = (typeof settingsSectionIds)[number];
 
 type SettingsGroup = {
-  id: 'general' | 'backups' | 'network' | 'advanced';
+  id: 'general' | 'apps' | 'backups' | 'network' | 'advanced';
   label: string;
   description: string;
   sections: SettingsSection[];
@@ -23,8 +23,14 @@ export const settingsGroups: SettingsGroup[] = [
   {
     id: 'general',
     label: 'General',
-    description: 'Identity, host behavior, and app defaults',
-    sections: ['general', 'system', 'applications'],
+    description: 'Identity and local time',
+    sections: ['general'],
+  },
+  {
+    id: 'apps',
+    label: 'Apps',
+    description: 'Managed app defaults and repair behavior',
+    sections: ['applications'],
   },
   {
     id: 'backups',
@@ -41,8 +47,8 @@ export const settingsGroups: SettingsGroup[] = [
   {
     id: 'advanced',
     label: 'Advanced',
-    description: 'Low-level host details and support checks',
-    sections: ['advanced'],
+    description: 'Host details and support checks',
+    sections: ['system', 'advanced'],
   },
 ];
 

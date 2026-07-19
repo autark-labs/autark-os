@@ -7,28 +7,29 @@ import { settingsGroups, sectionsForGroup, defaultSettingsGroup, visibleSettings
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-test('consolidates settings into four top-level groups', () => {
-  assert.deepEqual(settingsGroups.map((group) => group.id), ['general', 'backups', 'network', 'advanced']);
+test('consolidates settings into five focused top-level groups', () => {
+  assert.deepEqual(settingsGroups.map((group) => group.id), ['general', 'apps', 'backups', 'network', 'advanced']);
 });
 
 test('keeps everyday settings out of the advanced group', () => {
-  assert.deepEqual(sectionsForGroup('general'), ['general', 'system', 'applications']);
+  assert.deepEqual(sectionsForGroup('general'), ['general']);
+  assert.deepEqual(sectionsForGroup('apps'), ['applications']);
   assert.deepEqual(sectionsForGroup('backups'), ['backups', 'storage']);
   assert.deepEqual(sectionsForGroup('network'), ['network', 'remote-access', 'security']);
 });
 
 test('places low-frequency technical settings in advanced', () => {
-  assert.deepEqual(sectionsForGroup('advanced'), ['advanced']);
+  assert.deepEqual(sectionsForGroup('advanced'), ['system', 'advanced']);
 });
 
 test('falls back to the general group for unknown values', () => {
   assert.equal(defaultSettingsGroup('missing'), 'general');
-  assert.deepEqual(sectionsForGroup('missing'), ['general', 'system', 'applications']);
+  assert.deepEqual(sectionsForGroup('missing'), ['general']);
 });
 
 test('can hide advanced group for simplified views', () => {
-  assert.deepEqual(visibleSettingsGroups(false).map((group) => group.id), ['general', 'backups', 'network']);
-  assert.deepEqual(visibleSettingsGroups(true).map((group) => group.id), ['general', 'backups', 'network', 'advanced']);
+  assert.deepEqual(visibleSettingsGroups(false).map((group) => group.id), ['general', 'apps', 'backups', 'network']);
+  assert.deepEqual(visibleSettingsGroups(true).map((group) => group.id), ['general', 'apps', 'backups', 'network', 'advanced']);
 });
 
 test('does not expose unfinished MVP settings controls', () => {
