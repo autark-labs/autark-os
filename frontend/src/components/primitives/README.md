@@ -28,7 +28,7 @@ Raw Tailwind colors are acceptable for local status meaning. Shared surface, pan
 
 ## Current Reference Pages
 
-Applications uses `PageShell`, `PageHeader`, `Surface`, `MetricCard`, `ProjectEmptyState`, shared Autark-OS button primitives, and application-specific card wrappers.
+Applications uses `PageShell`, `PageHeader`, `Surface`, `ProjectEmptyState`, shared Autark-OS button primitives, and application-specific card wrappers.
 
 `SearchFilterBar` is the shared search and segmented-filter row used by Applications and Discover. Use it when a page needs a primary text search plus a small set of mutually exclusive filters, with page-specific actions passed through the `actions` slot.
 

@@ -45,8 +45,8 @@ test('new reachability operations cannot be cleared by an older timeout', () => 
   assert.match(page, /loadingServiceIds/);
 });
 
-test('private-access setup guidance directs users to the shared header Tailscale control', () => {
+test('Access no longer duplicates private-access setup guidance in the page body', () => {
   const page = source('src/pages/NetworkPage/NetworkPage.tsx');
 
-  assert.match(page, /Use the Tailscale control in the app header/);
+  assert.doesNotMatch(page, /Use the Tailscale control in the app header/);
 });

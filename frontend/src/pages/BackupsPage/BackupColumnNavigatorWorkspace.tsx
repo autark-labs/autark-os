@@ -330,7 +330,7 @@ function FolderColumn({
         <p className="mt-3 px-2 text-xs font-semibold uppercase tracking-wide text-sky-100/65">App backups</p>
         {apps.map((app) => <FolderButton app={app} appIconUrl={appIconUrlById[app.appId]} active={directory === appDirectoryKey(app.appId)} count={restorePoints.filter((point) => point.appId === app.appId).length} icon={app.status === 'protected' ? Folder : CircleAlert} key={app.appId} label={app.appName} onClick={() => onChooseDirectory(appDirectoryKey(app.appId))} />)}
       </nav>
-      {attentionMessage && <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-400/5 p-3"><div className="flex items-center gap-2 text-amber-200"><CircleAlert className="size-3.5" /><span className="text-xs font-semibold">{attentionMessage}</span></div><p className="mt-1 text-xs leading-5 text-sky-100/60">Select an app folder to see its backup state and next action.</p></div>}
+      {/* {attentionMessage && <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-400/5 p-3"><div className="flex items-center gap-2 text-amber-200"><CircleAlert className="size-3.5" /><span className="text-xs font-semibold">{attentionMessage}</span></div><p className="mt-1 text-xs leading-5 text-sky-100/60">Select an app folder to see its backup state and next action.</p></div>} */}
     </aside>
   );
 }

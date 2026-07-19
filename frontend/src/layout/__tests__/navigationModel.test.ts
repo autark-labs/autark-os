@@ -40,7 +40,7 @@ test('primary navigation remains within MVP scope', () => {
   assert.equal(primaryNavigation.find((item) => item.id === 'pro')?.to, '/pro');
 });
 
-test('operational pages removed from basic nav remain reachable through contextual links', () => {
-  assert.match(source('src/pages/BackupsPage/BackupsPage.tsx'), /to="\/storage"/);
+test('operational pages removed from basic nav retain their explicit advanced routes', () => {
+  assert.equal(advancedNavigation.some((item) => item.to === '/storage'), true);
   assert.match(source('src/layout/Sidebar.tsx'), /openSettings/);
 });

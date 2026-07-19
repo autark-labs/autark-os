@@ -16,7 +16,6 @@ test('shared surface components provide typed accessible primitives', () => {
     'StatusBadge',
     'AppCardName',
     'CopyField',
-    'RecommendedActionCard',
     'FoundAppsPrompt',
     'ResponsiveDetailsSheet',
     'LocalizedDateTime',

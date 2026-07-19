@@ -38,7 +38,7 @@ import {
   useAccessNetworkRepository,
   useRemoveStalePrivateAccessMutation,
 } from '@/repositories/networkRepository';
-import type { PrivateAccessReconciliationReport, TailscaleStatus } from '@/types/network';
+import type { PrivateAccessReconciliationReport } from '@/types/network';
 import { HostSetupPanel } from './HostSetupPanel';
 import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';

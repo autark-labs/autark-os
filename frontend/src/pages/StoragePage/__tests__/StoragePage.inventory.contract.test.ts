@@ -27,7 +27,8 @@ test('storage app rows use live application artwork with a safe fallback', () =>
   const workspace = source('src/pages/StoragePage/StorageCapacityRibbonWorkspace.tsx');
 
   assert.match(page, /storageAppIconUrls/);
-  assert.match(page, /catalogAppIconUrl/);
+  assert.match(page, /catalogAppImageUrl/);
+  assert.match(page, /preferredAppImageUrl/);
   assert.match(workspace, /function StorageAppIcon/);
   assert.match(workspace, /appIconUrlById/);
 });
