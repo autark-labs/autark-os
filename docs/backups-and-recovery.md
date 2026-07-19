@@ -28,6 +28,12 @@ Autark-OS periodically removes old routine history and completed job records to 
 
 New backups pause when the selected destination has less than 512 MB free. Free space or reconnect the approved backup drive, then try again.
 
+Managed app updates and rollbacks use the same verified-backup safety model.
+The app must have backups enabled and a ready destination before an eligible
+image-only release change can start. Autark-OS creates a fresh verified safety
+checkpoint for the operation; an older restore point by itself does not bypass
+that requirement.
+
 ## Restore safely
 
 1. Open **Backups** and find the restore point.

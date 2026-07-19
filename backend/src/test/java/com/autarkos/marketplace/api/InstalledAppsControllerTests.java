@@ -52,7 +52,7 @@ class InstalledAppsControllerTests {
 
         mvc.perform(MockMvcRequestBuilders.get("/api/apps/updates"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
-                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unsupported\""));
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unavailable\"", "\"reasonCode\":\"managed_updates_not_configured\""));
         mvc.perform(MockMvcRequestBuilders.get("/api/apps/vaultwarden/update-plan"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
                 .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"status\":\"blocked\""));
@@ -84,11 +84,11 @@ class InstalledAppsControllerTests {
         var rollback = controller.rollback("vaultwarden");
 
         assertThat(listed.available()).isFalse();
-        assertThat(listed.status()).isEqualTo("unsupported");
+        assertThat(listed.status()).isEqualTo("unavailable");
         assertThat(plan.status()).isEqualTo("blocked");
         assertThat(update.getStatusCode().value()).isEqualTo(409);
         assertThat(rollback.getStatusCode().value()).isEqualTo(409);
-        assertThat(plan.summary()).contains("preserve saved settings");
+        assertThat(plan.summary()).contains("not configured");
         assertThat(update.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         assertThat(rollback.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         verifyNoUpdateWork(lifecycleService, applicationStateService);

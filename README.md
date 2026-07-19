@@ -32,7 +32,8 @@ The current beta path supports Debian packages, portable installers, and local r
 - Discovers apps and services already running on the host.
 - Installs supported catalog apps with guided install plans.
 - Shows app readiness, access links, backup status, and recovery actions.
-- Starts, pauses, restarts, repairs, backs up, restores, and uninstalls managed apps.
+- Starts, pauses, restarts, repairs, backs up, restores, updates, rolls back, and uninstalls managed apps.
+- Applies eligible app updates as reviewed, backup-gated image changes while keeping the previous release available for rollback.
 - Keeps local app data under an Autark-OS runtime directory.
 - Uses Tailscale for private links when the host is signed in and configured.
 - Preserves data by default around risky actions.
@@ -161,6 +162,8 @@ docs/          Installation, operation, recovery, and technical-admin guides
 - Artifact signing is reserved but not finished.
 - Dependency automation is focused on Debian, Ubuntu, and Raspberry Pi OS.
 - App catalog coverage is still early and should be tested app by app.
+- Managed app updates currently support image-only catalog releases. Changes to ports, storage, environment, service topology, or backup contracts are blocked instead of migrated automatically.
+- Managed app health verification is conservative during beta. A target release that is not ready when checked is rolled back; do not repeatedly retry it without reviewing Activity or Diagnostics.
 - Public network exposure should remain an intentional advanced workflow.
 
 Autark-OS is being built as a guided runtime, not a generic infrastructure dashboard. The product should stay calm, clear, and honest about app ownership, readiness, safety, and recovery.

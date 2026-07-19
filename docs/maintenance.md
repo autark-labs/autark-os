@@ -52,10 +52,42 @@ autark-os update rollback
 Application updates are separate. Updating Autark-OS does not silently update
 Vaultwarden, Jellyfin, or other managed applications.
 
-Managed application updates are currently unavailable. This is intentional:
-Autark-OS will not offer an update until it can preserve each app's saved
-settings, storage, access configuration, secrets, and recovery state through a
-reversible update process.
+## Update or roll back a managed app
+
+Open **My Apps**, select a managed app, and open **Manage app**. In the
+**Overview** tab, use **Review update** to see the current release, target
+release, safety steps, and any reason the update is blocked. Autark-OS does not
+update managed apps silently.
+
+The current managed update path is deliberately narrow:
+
+- The catalog release may change container images, but not ports, storage
+  mappings, environment, service topology, access layout, or backup contracts.
+- Saved ports, storage choices, access settings, backup policy, generated
+  secrets, and application data remain unchanged by an eligible image update.
+- The app must be owned by this Autark-OS instance and healthy before the
+  release change starts.
+- Backups must be enabled and the configured backup destination must be ready.
+- Autark-OS creates and verifies a safety checkpoint before applying the
+  release.
+- Current and target images are resolved to immutable digests.
+- The previous Compose file, manifest, metadata, and image identities are kept
+  as a release snapshot.
+- If the target release fails verification, Autark-OS restores the saved
+  release automatically and records the result in Activity.
+
+Health verification is conservative during beta. If a target release is not
+ready when Autark-OS checks it, the saved release is restored. Review Activity
+or Diagnostics before retrying a rolled-back release.
+
+After a successful managed update, choose the rollback control beside
+**Review update** to review the retained previous release. Rollback creates a
+fresh verified safety checkpoint before restoring it. A rollback is available
+only when Autark-OS has a retained release snapshot.
+
+An update plan is blocked when the catalog requires a settings or data
+migration. This is a safety boundary, not a repair failure. Keep using the
+current release until Autark-OS provides a migration-specific plan.
 
 ## Uninstall without deleting app data
 

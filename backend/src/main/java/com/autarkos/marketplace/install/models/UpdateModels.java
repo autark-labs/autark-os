@@ -18,10 +18,10 @@ public final class UpdateModels {
         public static AppUpdateCapability unavailable() {
             return new AppUpdateCapability(
                     false,
-                    "unsupported",
-                    "App updates are not available yet",
-                    "Autark-OS keeps managed app updates disabled until it can preserve saved settings, secrets, access, and recovery state through a reversible update job.",
-                    "settings_preserving_updates_not_implemented",
+                    "unavailable",
+                    "Managed app updates are unavailable",
+                    "The managed update service is not configured in this runtime. Restart Autark-OS and review Diagnostics if this continues.",
+                    "managed_updates_not_configured",
                     Instant.now());
         }
 

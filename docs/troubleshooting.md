@@ -56,6 +56,19 @@ The reset revokes existing sessions but preserves apps, settings, backups, Docke
 
 Open **My Apps**, select the app, and read the recommended action. Use **Repair** only after reviewing the message. If the app is protected, create or confirm a restore point before making a risky change.
 
+## A managed app update is blocked or rolled back
+
+Open **My Apps**, select the app, open **Manage app**, and review the **App
+release** message in the **Overview** tab. An update is intentionally blocked
+when backups are not ready, the app is unhealthy, immutable image identities
+cannot be resolved, or the new catalog release changes more than container
+images.
+
+If Autark-OS reports that it rolled the release back, the target release did
+not pass verification and the saved previous release was restored. Do not
+repeatedly retry it. Confirm that the app is healthy, keep the retained release
+snapshot, and generate a support report from **Diagnostics**.
+
 ## Private links do not work
 
 Open **Access** and check the app's private-link state. **Verified** means Autark-OS found a live Tailscale Serve HTTPS endpoint that points to the app's expected local port. **Needs repair** means the private-link preference is saved, but Autark-OS will keep using the working local link until the live route is fixed.

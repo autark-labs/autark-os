@@ -13,8 +13,8 @@ class AppUpdateCapabilityTests {
         var capability = new AppUpdateService().capability();
 
         assertThat(capability.available()).isFalse();
-        assertThat(capability.status()).isEqualTo("unsupported");
-        assertThat(capability.reasonCode()).isEqualTo("settings_preserving_updates_not_implemented");
-        assertThat(capability.summary()).contains("saved settings", "secrets", "reversible update job");
+        assertThat(capability.status()).isEqualTo("unavailable");
+        assertThat(capability.reasonCode()).isEqualTo("managed_updates_not_configured");
+        assertThat(capability.summary()).contains("not configured", "Diagnostics");
     }
 }

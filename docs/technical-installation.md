@@ -130,4 +130,6 @@ autark-os repair --plan
 autark-os repair --apply
 ```
 
-For beta updates, safe uninstall, and recovery guidance, see [Maintenance](./maintenance.md). For service or storage details, see [Service and storage reference](./service-user-installation.md).
+For Autark-OS updates, managed-app image updates and rollbacks, safe uninstall,
+and recovery guidance, see [Maintenance](./maintenance.md). For service or
+storage details, see [Service and storage reference](./service-user-installation.md).

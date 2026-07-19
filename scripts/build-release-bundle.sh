@@ -460,6 +460,9 @@ confirming it and keep a verified backup where one is available.
   by Raspberry Pi OS 13 and also supported on Pi OS 12.
 - Managed application data, backups, Docker, and the host Tailscale identity
   are preserved by a normal Autark-OS update.
+- Eligible managed-app image updates are reviewed separately in My Apps,
+  require a verified safety checkpoint, and retain the previous release for
+  rollback.
 
 ## Known Limitations
 
@@ -468,6 +471,11 @@ confirming it and keep a verified backup where one is available.
 - Tailscale is optional and private links require a connected Tailscale host.
 - App catalog coverage is still early; review each app's install plan and
   backup state before relying on it.
+- Managed-app updates currently support image-only catalog releases. Changes
+  to ports, storage, environment, service topology, or backup contracts remain
+  blocked until a migration-specific plan exists.
+- Managed-app health verification is conservative during beta. A target that
+  is not ready when checked is rolled back to the saved release.
 - Backups are not described as encrypted. Only restore points shown as verified
   should be treated as ready for recovery.
 

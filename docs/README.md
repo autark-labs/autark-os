@@ -8,13 +8,13 @@ The repository README is the public overview. These guides focus on installing, 
 
 - [Install Autark-OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
 - [First run](./first-run.md): finish setup, install a first app, and understand app ownership labels.
-- [Getting started and recovery](./getting-started.md): keep the essential opening, update, recovery, and support commands close at hand.
+- [Getting started and recovery](./getting-started.md): keep the essential appliance and managed-app update, recovery, and support actions close at hand.
 - [Administrator access and recovery](./security-and-admin-access.md): claim the appliance, understand sessions, reset a lost password, and use safe remote access.
 
 ## Use And Recover
 
 - [Backups and recovery](./backups-and-recovery.md): create, verify, and restore restore points.
-- [Maintenance](./maintenance.md): repair apps, apply beta updates, and uninstall safely.
+- [Maintenance](./maintenance.md): repair apps, update Autark-OS, review managed-app releases and rollbacks, and uninstall safely.
 - [Troubleshooting](./troubleshooting.md): solve common problems and collect a support report.
 
 ## Technical Administration

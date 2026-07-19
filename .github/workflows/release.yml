@@ -247,17 +247,23 @@ jobs:
           set -euo pipefail
           artifact_dir="release/ci-${VERSION}-${ARCHITECTURE}"
           (cd "${artifact_dir}" && sha256sum -c SHA256SUMS --ignore-missing)
-          python3 - "${artifact_dir}/autark-os-artifacts.json" "${ARCHITECTURE}" <<'PY'
+          python3 - \
+            "${artifact_dir}/autark-os-artifacts.json" \
+            "${ARCHITECTURE}" \
+            "${GITHUB_SHA}" \
+            "${{ needs.prepare.outputs.published_at }}" <<'PY'
           import json
           import sys
 
           manifest = json.load(open(sys.argv[1], encoding="utf-8"))
           architecture = sys.argv[2]
+          expected_build_sha = sys.argv[3]
+          expected_build_date = sys.argv[4]
           assert manifest["schemaVersion"] == 2
           assert manifest["artifactArchitecture"] == architecture
           assert manifest["runtimeArchitecture"] == architecture
-          assert manifest["buildSha"] == "${GITHUB_SHA}"
-          assert manifest["buildDate"] == "${{ needs.prepare.outputs.published_at }}"
+          assert manifest["buildSha"] == expected_build_sha
+          assert manifest["buildDate"] == expected_build_date
           PY
           bundle_dir="${artifact_dir}/autark-os-${VERSION}-${ARCHITECTURE}"
           test -f "${bundle_dir}/docs/GETTING_STARTED.md"

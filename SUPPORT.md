@@ -21,7 +21,8 @@ unredacted contents of your server configuration.
 - Installing, updating, uninstalling, and recovering Autark-OS.
 - Defects in Autark-OS itself, including its documented installer, service,
   supported catalog definitions, and user interface.
-- Understanding the documented backup, restore, and private-access flows.
+- Understanding the documented backup, restore, managed-app update and
+  rollback, and private-access flows.
 
 ## What Is Outside Product Support
 

@@ -35,10 +35,20 @@ sudo autark-os admin reset-password
 `autark-os update` shows a plan, asks for confirmation, and restores the
 previous program files and local database if the new release is unhealthy.
 Use `autark-os update check`, `plan`, `status`, or `rollback` for a scoped
-update action. The normal uninstall preserves managed app data, backups, and
-the local database; permanent data deletion needs the explicit command shown
-by the uninstall plan. Password recovery signs out existing sessions but does
-not remove apps, backups, or data.
+Autark-OS update action.
+
+Managed application updates are reviewed separately in **My Apps**. Select a
+managed app, open **Manage app**, and use **Review update** in the **Overview**
+tab. Autark-OS currently applies image-only catalog releases: it requires a
+ready backup destination and verified safety checkpoint, pins container images
+by digest, and keeps the previous release for rollback. A release that changes
+ports, storage, environment, service topology, or backup contracts is blocked
+for review rather than migrated automatically.
+
+The normal uninstall preserves managed app data, backups, and the local
+database; permanent data deletion needs the explicit command shown by the
+uninstall plan. Password recovery signs out existing sessions but does not
+remove apps, backups, or data.
 
 ## Private Access And Backups
 
