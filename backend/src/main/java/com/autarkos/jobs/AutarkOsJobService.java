@@ -34,6 +34,7 @@ public class AutarkOsJobService {
     private final Supplier<Instant> clock;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ConcurrentHashMap<String, Runnable> queuedTasks = new ConcurrentHashMap<>();
+    private final Object jobStartTransition = new Object();
 
     @Autowired
     public AutarkOsJobService(AutarkOsJobRepository repository, @Value("${autark-os.jobs.reconcile-on-startup:true}") boolean reconcileOnStartup) {
@@ -91,13 +92,24 @@ public class AutarkOsJobService {
     }
 
     public Optional<AutarkOsJob> cancel(String jobId) {
-        queuedTasks.remove(jobId);
-        return findById(jobId).map(job -> {
-            if ("succeeded".equals(job.status()) || "failed".equals(job.status()) || "cancelled".equals(job.status())) {
-                return job;
+        synchronized (jobStartTransition) {
+            Optional<AutarkOsJob> existing = findById(jobId);
+            if (existing.isEmpty()) {
+                return Optional.empty();
             }
-            return cancelJob(jobId);
-        });
+            AutarkOsJob job = existing.get();
+            if (terminalStatus(job.status())) {
+                return Optional.of(job);
+            }
+            if (!AutarkOsStates.JobStatus.QUEUED.equals(job.status())) {
+                throw new JobCancellationConflictException(job.status());
+            }
+            Runnable cancelledTask = queuedTasks.remove(jobId);
+            if (cancelledTask == null) {
+                throw new JobCancellationConflictException("starting");
+            }
+            return Optional.of(cancelJob(jobId));
+        }
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -125,17 +137,32 @@ public class AutarkOsJobService {
                 ? installationExecutor
                 : executor;
         jobExecutor.execute(() -> {
-            Runnable queued = queuedTasks.remove(job.jobId());
+            Runnable queued = claimQueuedTask(job);
             if (queued != null) {
                 queued.run();
             }
         });
     }
 
+    private Runnable claimQueuedTask(AutarkOsJob job) {
+        synchronized (jobStartTransition) {
+            Runnable queued = queuedTasks.remove(job.jobId());
+            if (queued == null) {
+                return null;
+            }
+            try {
+                String firstStepId = job.steps().isEmpty() ? "" : job.steps().getFirst().id();
+                markRunning(job.jobId(), firstStepId);
+                return queued;
+            } catch (RuntimeException exception) {
+                fail(job.jobId(), "job_failed", safeMessage(exception), Map.of("exception", exception.getClass().getSimpleName()));
+                return null;
+            }
+        }
+    }
+
     private void run(AutarkOsJob job, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
         try {
-            String firstStepId = job.steps().isEmpty() ? "" : job.steps().getFirst().id();
-            markRunning(job.jobId(), firstStepId);
             AutarkOsJobOutcome outcome = operation.apply(job);
             if ("failed".equals(outcome.status())) {
                 fail(job.jobId(), "job_failed", outcome.message(), Map.of(), outcome.steps());
@@ -256,6 +283,13 @@ public class AutarkOsJobService {
         return exception.getMessage() == null || exception.getMessage().isBlank()
                 ? "Autark-OS could not finish this job."
                 : exception.getMessage();
+    }
+
+    private boolean terminalStatus(String status) {
+        return AutarkOsStates.JobStatus.SUCCEEDED.equals(status)
+                || AutarkOsStates.JobStatus.FAILED.equals(status)
+                || AutarkOsStates.JobStatus.CANCELLED.equals(status)
+                || AutarkOsStates.JobStatus.CANCELED.equals(status);
     }
 
     private static final class SerialExecutor implements Executor {

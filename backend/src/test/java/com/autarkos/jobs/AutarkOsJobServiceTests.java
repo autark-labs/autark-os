@@ -8,7 +8,11 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -114,6 +118,57 @@ class AutarkOsJobServiceTests {
 
         assertThat(completedInstalls).containsExactly("vaultwarden");
         assertThat(service.findById(waitingInstall.jobId()).orElseThrow().status()).isEqualTo("cancelled");
+    }
+
+    @Test
+    void rejectsCancellationAfterOperationStartsAndPreservesItsFinalOutcome() throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        CountDownLatch operationStarted = new CountDownLatch(1);
+        CountDownLatch releaseOperation = new CountDownLatch(1);
+        try {
+            AutarkOsJobService service = service(executor, true);
+            AutarkOsJob job = service.start(
+                    AutarkOsStates.JobType.BACKUP,
+                    "vaultwarden",
+                    List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
+                    () -> {
+                        operationStarted.countDown();
+                        await(releaseOperation);
+                        return AutarkOsJobOutcome.succeeded("Backup complete.");
+                    });
+
+            assertThat(operationStarted.await(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(service.findById(job.jobId()).orElseThrow().status()).isEqualTo("running");
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.cancel(job.jobId()))
+                    .isInstanceOf(JobCancellationConflictException.class)
+                    .hasMessageContaining("cannot be cancelled safely");
+            assertThat(service.findById(job.jobId()).orElseThrow().status()).isEqualTo("running");
+
+            releaseOperation.countDown();
+            executor.shutdown();
+            assertThat(executor.awaitTermination(2, TimeUnit.SECONDS)).isTrue();
+            assertThat(service.findById(job.jobId()).orElseThrow().status()).isEqualTo("succeeded");
+        } finally {
+            releaseOperation.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void cancellationOfTerminalJobReturnsExistingOutcome() {
+        AutarkOsJobService service = service();
+        AutarkOsJob job = service.start(
+                AutarkOsStates.JobType.BACKUP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
+                () -> AutarkOsJobOutcome.succeeded("Backup complete."));
+
+        service.runQueuedJobsNow();
+        AutarkOsJob completed = service.findById(job.jobId()).orElseThrow();
+        AutarkOsJob result = service.cancel(job.jobId()).orElseThrow();
+
+        assertThat(result.status()).isEqualTo("succeeded");
+        assertThat(result.updatedAt()).isEqualTo(completed.updatedAt());
     }
 
     @Test
@@ -228,6 +283,17 @@ class AutarkOsJobServiceTests {
 
         private void runNext() {
             tasks.remove().run();
+        }
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(2, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out waiting for the test operation to continue.");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for the test operation.", exception);
         }
     }
 }

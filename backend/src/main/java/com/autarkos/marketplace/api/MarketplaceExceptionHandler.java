@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.backups.RecoveryOperationConflictException;
+import com.autarkos.jobs.JobCancellationConflictException;
 import com.autarkos.marketplace.catalog.ManifestValidationException;
 import com.autarkos.marketplace.install.DuplicateInstallAcknowledgementRequiredException;
 import com.autarkos.marketplace.install.InstallationException;
@@ -55,6 +56,23 @@ public class MarketplaceExceptionHandler {
                 "recovery_operation_conflict",
                 exception.getMessage(),
                 List.of("Wait for the current operation to finish, then try again."),
+                Instant.now()));
+    }
+
+    @ExceptionHandler(JobCancellationConflictException.class)
+    public ResponseEntity<ApiError> jobCancellationConflict(JobCancellationConflictException exception) {
+        activityLogService.warning(
+                "system",
+                "job_cancellation_rejected",
+                "Job cancellation was rejected",
+                exception.getMessage(),
+                null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(
+                "job_cancellation_not_available",
+                exception.getMessage(),
+                List.of(
+                        "Current status: " + exception.currentStatus() + ".",
+                        "Wait for the current job to finish before starting another action."),
                 Instant.now()));
     }
 
