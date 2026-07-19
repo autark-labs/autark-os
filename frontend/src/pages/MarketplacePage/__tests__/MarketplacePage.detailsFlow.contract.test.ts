@@ -47,6 +47,10 @@ test('Discover keeps details anchored to the persistent rail and reserves the sh
   assert.match(rail, /overflow-hidden rounded-l-2xl/);
   assert.match(rail, /<Tabs className="min-h-0"/);
   assert.match(rail, /onDetailsOpenChange/);
+  assert.match(rail, /document\.addEventListener\('pointerdown', handlePointerDown, true\)/);
+  assert.match(rail, /document\.removeEventListener\('pointerdown', handlePointerDown, true\)/);
+  assert.match(rail, /data-discover-details-toggle/);
+  assert.match(rail, /border-transparent shadow-none/);
   assert.match(rail, /onReviewInstall/);
   assert.doesNotMatch(rail, /onReviewDetails/);
   assert.match(rail, /marketplacePrimaryRoute\(appView\)/);

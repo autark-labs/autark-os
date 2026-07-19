@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Bell, Info, RefreshCw, Sparkles, X } from 'lucide-react';
 import { PageShell } from '@/components/layout/PageShell';
-import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
@@ -292,7 +291,24 @@ function MarketplacePage() {
     [apps, doctor, installedById, onboarding?.recommendedApps, storage],
   );
   const showStartHere = shouldShowStartHereSection(starterRecommendations, startHereDismissed);
-  const canRestoreStartHere = startHereDismissed && shouldShowStartHereSection(starterRecommendations, false);
+  const vaultwardenRecommendation = useMemo(
+    () => starterRecommendations.find((recommendation) => recommendation.app.id === 'vaultwarden' && !recommendation.installed) ?? null,
+    [starterRecommendations],
+  );
+  const starterGuidanceVisible = Boolean(
+    !showAdvancedMetrics
+    && basicCatalogMode === 'starter'
+    && !searchQuery.trim()
+    && showStartHere
+    && vaultwardenRecommendation,
+  );
+  const canRestoreStarterGuidance = Boolean(
+    !showAdvancedMetrics
+    && basicCatalogMode === 'starter'
+    && !searchQuery.trim()
+    && startHereDismissed
+    && vaultwardenRecommendation,
+  );
   const discoverFilters = useMemo(
     () => showAdvancedMetrics
       ? categories.map((category) => ({ label: category, value: category }))
@@ -405,17 +421,11 @@ function MarketplacePage() {
 
       <section className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/15 bg-[#07142b]/90 shadow-xl shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
         <MarketplaceBrowseSidebar
-          canRestoreStartHere={canRestoreStartHere}
           filterValue={discoverFilterValue}
           filters={discoverFilters}
           hideInstalled={hideInstalled}
-          onDismissStartHere={dismissStartHere}
           onFilterChange={changeDiscoverFilter}
-          onRestoreStartHere={restoreStartHere}
-          onSelectRecommendation={openAppDetails}
           onToggleHideInstalled={() => setHideInstalled((value) => !value)}
-          recommendations={starterRecommendations}
-          showStartHere={showStartHere}
         />
 
         <section className="flex min-h-0 flex-col border-b border-sky-300/15 xl:border-b-0">
@@ -425,7 +435,18 @@ function MarketplacePage() {
             searchValue={searchQuery}
             sortBy={sortBy}
           />
-          <MarketplaceAppList apps={visibleApps} installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null} onSelect={selectApp} selectedAppId={selectedView?.id ?? ''} />
+          <MarketplaceAppList
+            apps={visibleApps}
+            installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null}
+            onRestoreStarterGuidance={canRestoreStarterGuidance ? restoreStartHere : undefined}
+            onSelect={selectApp}
+            selectedAppId={selectedView?.id ?? ''}
+            starterGuidance={starterGuidanceVisible && vaultwardenRecommendation ? {
+              appName: vaultwardenRecommendation.app.name,
+              onDismiss: dismissStartHere,
+              onReview: () => openAppDetails(vaultwardenRecommendation.app.id),
+            } : null}
+          />
         </section>
 
         {selectedView && (
@@ -636,32 +657,18 @@ function DiscoverGuidedHeader({
 }
 
 function MarketplaceBrowseSidebar({
-  canRestoreStartHere,
   filterValue,
   filters,
   hideInstalled,
-  onDismissStartHere,
   onFilterChange,
-  onRestoreStartHere,
-  onSelectRecommendation,
   onToggleHideInstalled,
-  recommendations,
-  showStartHere,
 }: {
-  canRestoreStartHere: boolean;
   filterValue: string;
   filters: Array<{ label: string; value: string }>;
   hideInstalled: boolean;
-  onDismissStartHere: () => void;
   onFilterChange: (filter: string) => void;
-  onRestoreStartHere: () => void;
-  onSelectRecommendation: (appId: string) => void;
   onToggleHideInstalled: () => void;
-  recommendations: StarterRecommendation[];
-  showStartHere: boolean;
 }) {
-  const recommendation = recommendations.find((item) => !item.installed) ?? recommendations[0] ?? null;
-
   return (
     <aside className="flex min-h-0 flex-col border-b border-sky-300/15 bg-slate-950/10 p-3 xl:border-b-0 xl:border-r">
       <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Browse</p>
@@ -688,32 +695,8 @@ function MarketplaceBrowseSidebar({
         onClick={onToggleHideInstalled}
         type="button"
       >
-        {hideInstalled ? 'Showing new apps only' : 'Hide installed'}
+        {hideInstalled ? 'New apps only' : 'Hide installed'}
       </ProjectDarkControlButton>
-
-      {showStartHere && recommendation && (
-        <section className="mt-3 rounded-xl border border-cyan-300/25 bg-cyan-400/8 p-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-cyan-100">Start with one app</p>
-              <p className="mt-1 text-xs leading-5 text-slate-300">{recommendation.notes[0] || 'A safe first app to review before installing.'}</p>
-            </div>
-            <button aria-label="Hide Start here" className="grid size-6 shrink-0 place-items-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={onDismissStartHere} type="button"><X className="size-3.5" /></button>
-          </div>
-          <DisabledAction disabled={recommendation.installed} reason="This recommended app is already installed. Open it from My Apps.">
-            <ProjectPrimaryButton className="mt-3 h-8 w-full px-2 text-xs" disabled={recommendation.installed} onClick={() => onSelectRecommendation(recommendation.app.id)} type="button">
-              <Sparkles className="size-3.5" />
-              {recommendation.installed ? 'Already installed' : `Review ${recommendation.app.name}`}
-            </ProjectPrimaryButton>
-          </DisabledAction>
-        </section>
-      )}
-
-      {canRestoreStartHere && (
-        <ProjectDarkControlButton className="mt-auto h-8 w-full px-2 text-xs" onClick={onRestoreStartHere} type="button">
-          Show Start here
-        </ProjectDarkControlButton>
-      )}
     </aside>
   );
 }

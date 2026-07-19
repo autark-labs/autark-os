@@ -44,6 +44,14 @@ test('management outside click listener runs in capture phase before child stopP
   assert.match(page, /document\.removeEventListener\('pointerdown', handlePointerDown, true\)/);
 });
 
+test('management drawer is masked and borderless while it is collapsed', () => {
+  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+
+  assert.match(rail, /w-\[64rem\] overflow-hidden/);
+  assert.match(rail, /right-\[calc\(22rem-1px\)\]/);
+  assert.match(rail, /border-transparent shadow-none/);
+});
+
 test('empty selection is not cleared after a deep-link effect schedules a real selection', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 

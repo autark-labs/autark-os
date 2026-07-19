@@ -1,4 +1,4 @@
-import { ChevronDown, ExternalLink, Loader2, Search, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, ExternalLink, Loader2, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import {
   DropdownMenu,
@@ -18,7 +18,13 @@ import { AppImage, marketplaceStatusTone } from './MarketplacePage.shared';
 type MarketplaceAppListProps = {
   apps: DiscoverAppView[];
   installingAppId?: string | null;
+  onRestoreStarterGuidance?: () => void;
   selectedAppId: string;
+  starterGuidance?: {
+    appName: string;
+    onDismiss: () => void;
+    onReview: () => void;
+  } | null;
   onSelect: (appId: string) => void;
 };
 
@@ -68,11 +74,12 @@ export function MarketplaceCatalogToolbar({ onSearchChange, onSortChange, search
   );
 }
 
-export function MarketplaceAppList({ apps, installingAppId = null, selectedAppId, onSelect }: MarketplaceAppListProps) {
+export function MarketplaceAppList({ apps, installingAppId = null, onRestoreStarterGuidance, selectedAppId, starterGuidance = null, onSelect }: MarketplaceAppListProps) {
   return (
     <section aria-label="Discover app catalog" className="flex min-h-0 flex-1 flex-col p-3">
+      {starterGuidance ? <StarterGuidance {...starterGuidance} /> : onRestoreStarterGuidance ? <RestoreStarterGuidance onRestore={onRestoreStarterGuidance} /> : null}
       {apps.length ? (
-        <div className="grid min-h-0 grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-3 overflow-y-auto overscroll-contain pr-1">
+        <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] content-start gap-3 overflow-y-auto overscroll-contain pr-1">
           {apps.map((app) => (
             <DenseLauncherCard
               app={app}
@@ -89,6 +96,40 @@ export function MarketplaceAppList({ apps, installingAppId = null, selectedAppId
         </div>
       )}
     </section>
+  );
+}
+
+function StarterGuidance({ appName, onDismiss, onReview }: NonNullable<MarketplaceAppListProps['starterGuidance']>) {
+  return (
+    <section aria-label="Starter app recommendation" className="mb-3 flex shrink-0 items-center justify-between gap-3 rounded-xl border border-cyan-300/20 bg-cyan-400/8 px-3 py-2.5">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-cyan-300/12 text-cyan-100">
+          <Sparkles aria-hidden="true" className="size-3.5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-cyan-50">Start with {appName}</p>
+          <p className="mt-0.5 text-xs leading-4 text-slate-300">A private password manager and a gentle first app to try on your server.</p>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        <button className="rounded-md px-2 py-1 text-xs font-medium text-cyan-100 transition hover:bg-cyan-300/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={onReview} type="button">
+          Review
+        </button>
+        <button aria-label="Hide starter recommendation" className="grid size-6 place-items-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={onDismiss} type="button">
+          <X aria-hidden="true" className="size-3.5" />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function RestoreStarterGuidance({ onRestore }: { onRestore: () => void }) {
+  return (
+    <div className="mb-2 flex shrink-0 justify-end">
+      <button className="rounded-md px-2 py-1 text-xs text-slate-400 transition hover:bg-slate-800 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" onClick={onRestore} type="button">
+        Show starter tip
+      </button>
+    </div>
   );
 }
 

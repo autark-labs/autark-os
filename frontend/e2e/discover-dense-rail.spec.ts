@@ -25,6 +25,10 @@ test('wide Discover keeps a selected app in the dense launcher detail rail', asy
   await expect(detailDrawer).toBeVisible();
   await expect(detailDrawer.getByRole('tab', { name: 'Overview' })).toBeVisible();
   await expect(detailDrawer.getByRole('tab', { name: 'Details' })).toBeVisible();
+  await rail.getByRole('heading', { name: 'Immich' }).click();
+  await expect(detailDrawer).toHaveAttribute('aria-hidden', 'true');
+  await page.getByRole('button', { name: 'App details' }).click();
+  await expect(detailDrawer).toHaveAttribute('aria-hidden', 'false');
   await detailDrawer.getByRole('tab', { name: 'Details' }).click();
   await expect(detailDrawer).toContainText('App details');
   await detailDrawer.getByRole('button', { name: 'Advanced app info' }).click();

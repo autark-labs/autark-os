@@ -41,6 +41,29 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
     detailsPanel.setAttribute('inert', '');
   }, [detailsOpen]);
 
+  useEffect(() => {
+    if (!detailsOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || detailsPanelRef.current?.contains(target)) {
+        return;
+      }
+      if (target instanceof HTMLElement && target.closest('[data-discover-details-toggle], [data-slot="dialog-content"], [data-slot="dialog-overlay"]')) {
+        return;
+      }
+
+      onDetailsOpenChange(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+    };
+  }, [detailsOpen, onDetailsOpenChange]);
+
   return (
     <aside aria-label="Selected Discover app" className="relative hidden min-h-0 border-l border-sky-300/15 bg-slate-950/10 p-3 xl:block">
       <div className="relative z-30 h-full" onPointerDown={(event) => event.stopPropagation()}>
@@ -82,7 +105,7 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
             />
 
             <div className={cn('mt-2 grid gap-2', hasAppSettings && 'grid-cols-2')}>
-              <ProjectDarkControlButton className="h-8 px-2 text-xs" onClick={() => onDetailsOpenChange(!detailsOpen)} type="button">
+              <ProjectDarkControlButton className="h-8 px-2 text-xs" data-discover-details-toggle onClick={() => onDetailsOpenChange(!detailsOpen)} type="button">
                 {detailsOpen ? <X className="size-3.5" /> : <Settings2 className="size-3.5" />}
                 {detailsOpen ? 'Close details' : 'App details'}
               </ProjectDarkControlButton>
@@ -124,8 +147,10 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
       aria-hidden={!open}
       aria-label="Discover app details"
       className={cn(
-        'pointer-events-auto absolute right-[calc(17.5rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-hidden rounded-l-2xl border border-r-0 border-cyan-300/40 bg-slate-900 text-slate-50 shadow-2xl shadow-cyan-950/40 transition-transform duration-300 ease-out motion-reduce:transition-none',
-        open ? 'translate-x-0' : 'pointer-events-none translate-x-[calc(100%+19rem)]',
+        'pointer-events-auto absolute right-[calc(17.5rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-hidden rounded-l-2xl border border-r-0 bg-slate-900 text-slate-50 transition-[transform,border-color,box-shadow] duration-300 ease-out motion-reduce:transition-none',
+        open
+          ? 'translate-x-0 border-cyan-300/40 shadow-2xl shadow-cyan-950/40'
+          : 'pointer-events-none translate-x-[calc(100%+19rem)] border-transparent shadow-none',
       )}
       ref={onPanelRef}
     >

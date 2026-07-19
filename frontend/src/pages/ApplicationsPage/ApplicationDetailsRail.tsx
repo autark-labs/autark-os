@@ -63,27 +63,31 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
       ref={ref}
     >
       {item && (
-        <section
-          aria-hidden={!managementOpen}
-          className={cn(
-            'absolute right-[calc(100%-1px)] top-0 z-20 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-y-auto rounded-l-2xl border border-r-0 border-cyan-300/40 bg-slate-900 text-slate-50 shadow-2xl shadow-cyan-950/40 transition-transform duration-300 ease-out motion-reduce:transition-none',
-            managementOpen ? 'translate-x-0' : 'pointer-events-none translate-x-[calc(100%+22rem)]',
-          )}
-          ref={managementDrawerRef}
-        >
-          <div className="border-b border-sky-400/20 px-3 py-3">
-            <p className="text-sm font-semibold text-white">Management</p>
-            <p className="text-xs leading-5 text-sky-100/60">Focused controls, settings, links, and diagnostics for the selected item.</p>
-          </div>
-          <ApplicationManagementPanel
-            actions={actions}
-            item={item}
-            onTabValueChange={setManagementTab}
-            settingsLoadingAction={settingsLoadingByItemId[item.id] ?? null}
-            tabValue={managementTab}
-            variant="rail"
-          />
-        </section>
+        <div aria-hidden={!managementOpen} className="pointer-events-none absolute inset-y-0 right-0 z-20 w-[64rem] overflow-hidden">
+          <section
+            aria-hidden={!managementOpen}
+            className={cn(
+              'pointer-events-auto absolute right-[calc(22rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-y-auto rounded-l-2xl border border-r-0 bg-slate-900 text-slate-50 transition-[transform,border-color,box-shadow] duration-300 ease-out motion-reduce:transition-none',
+              managementOpen
+                ? 'translate-x-0 border-cyan-300/40 shadow-2xl shadow-cyan-950/40'
+                : 'pointer-events-none translate-x-[calc(100%+22rem)] border-transparent shadow-none',
+            )}
+            ref={managementDrawerRef}
+          >
+            <div className="border-b border-sky-400/20 px-3 py-3">
+              <p className="text-sm font-semibold text-white">Management</p>
+              <p className="text-xs leading-5 text-sky-100/60">Focused controls, settings, links, and diagnostics for the selected item.</p>
+            </div>
+            <ApplicationManagementPanel
+              actions={actions}
+              item={item}
+              onTabValueChange={setManagementTab}
+              settingsLoadingAction={settingsLoadingByItemId[item.id] ?? null}
+              tabValue={managementTab}
+              variant="rail"
+            />
+          </section>
+        </div>
       )}
 
       <Card
