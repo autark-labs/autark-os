@@ -303,7 +303,7 @@ function SettingsPage({
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={closeConfirmationOpen} onOpenChange={setCloseConfirmationOpen}>
-        <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
+        <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100 sm:!max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Save settings before closing?</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-400">Your changes have not been saved yet.</AlertDialogDescription>
@@ -359,7 +359,7 @@ function SettingsWorkbench({
           <span className="grid size-7 place-items-center rounded-lg bg-cyan-300 text-slate-950"><Settings className="size-4" /></span>
           <span className="text-sm font-semibold text-white">Settings</span>
         </div>
-        <p className="px-2 pb-2 pt-5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-sky-100/45">Appliance controls</p>
+        <p className="px-2 pb-2 pt-5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-sky-100/60">Appliance controls</p>
         <nav aria-label="Settings categories" className="grid gap-1">
           {topLevelSettingsGroups.map((group) => {
             const groupId = group.id as SettingsGroupId;
@@ -376,8 +376,8 @@ function SettingsWorkbench({
                 onClick={() => onSelectGroup(groupId)}
                 type="button"
               >
-                <Icon className={cn('size-4 shrink-0', active ? 'text-cyan-200' : 'text-sky-100/45')} />
-                <span className="min-w-0"><span className="block text-sm font-medium">{group.label}</span><span className="block truncate text-[0.68rem] text-sky-100/45">{group.description}</span></span>
+                <Icon className={cn('size-4 shrink-0', active ? 'text-cyan-200' : 'text-sky-100/60')} />
+                <span className="min-w-0"><span className="block text-sm font-medium">{group.label}</span><span className="block truncate text-[0.68rem] text-sky-100/60">{group.description}</span></span>
               </button>
             );
           })}
