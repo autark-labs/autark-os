@@ -1,0 +1,17 @@
+package com.autarkos.pro.model;
+
+public enum ProModuleState {
+    NOT_INSTALLED,
+    RELEASE_AVAILABLE,
+    DOWNLOADING,
+    VERIFYING,
+    STARTING_CANDIDATE,
+    HEALTH_CHECKING,
+    ACTIVE,
+    DEGRADED,
+    ROLLING_BACK,
+    RETAINED_USE,
+    UPDATE_INELIGIBLE,
+    REMOVING,
+    ERROR
+}

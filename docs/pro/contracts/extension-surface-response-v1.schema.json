@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/extensions/v1/surface-response.schema.json",
+  "title": "Extension surface response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "surface", "continuationToken", "payload"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "surface": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]{1,127}$"
+    },
+    "continuationToken": {
+      "oneOf": [
+        { "$ref": "https://contracts.autark-os.org/pro/v1/common-v1.schema.json#/$defs/base64Url" },
+        { "type": "null" }
+      ]
+    },
+    "payload": {
+      "type": "object",
+      "description": "Opaque to Community Edition; interpreted only by the installed extension browser module."
+    }
+  }
+}

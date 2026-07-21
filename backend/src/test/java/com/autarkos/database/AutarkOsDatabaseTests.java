@@ -1,13 +1,18 @@
 package com.autarkos.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Locale;
+import java.util.Set;
+
+import javax.sql.DataSource;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,6 +51,46 @@ class AutarkOsDatabaseTests {
             assertThat(columnExists(statement, "installed_apps", "updated_at")).isTrue();
             assertThat(columnExists(statement, "app_health", "startup_grace")).isTrue();
             assertThat(columnExists(statement, "app_backups", "restore_confidence")).isTrue();
+            assertThat(tableExists(statement, "pro_entitlement_cache")).isTrue();
+            assertThat(tableExists(statement, "pro_release_state")).isTrue();
+            assertThat(tableExists(statement, "pro_release_history")).isTrue();
+            assertThat(tableExists(statement, "extension_state")).isTrue();
+            assertThat(columnExists(
+                    statement,
+                    "extension_state",
+                    "opaque_state")).isTrue();
+            assertThat(tableExists(
+                    statement,
+                    "pro_guardian_analysis_runs")).isFalse();
+            assertThat(tableExists(
+                    statement,
+                    "pro_guardian_findings")).isFalse();
+        }
+        if (Files.getFileStore(runtimeLayout.databasePath())
+                .supportsFileAttributeView("posix")) {
+            assertThat(Files.getPosixFilePermissions(runtimeLayout.databasePath()))
+                    .isEqualTo(Set.of(
+                            PosixFilePermission.OWNER_READ,
+                            PosixFilePermission.OWNER_WRITE));
+        }
+    }
+
+    @Test
+    void configuredDataSourceBoundsConcurrentWriterWaits() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        AutarkOsDatabase database = new AutarkOsDatabase(runtimeLayout);
+        DataSource dataSource = new AutarkOsDataSourceConfiguration()
+                .dataSource(runtimeLayout, database);
+
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement();
+                ResultSet result =
+                        statement.executeQuery("pragma busy_timeout")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getInt(1))
+                    .isEqualTo(
+                            AutarkOsDataSourceConfiguration
+                                    .SQLITE_BUSY_TIMEOUT_MILLIS);
         }
     }
 
@@ -57,6 +102,42 @@ class AutarkOsDatabaseTests {
         assertThat(databaseSource)
                 .doesNotContain("ensurecolumn")
                 .doesNotContain("alter table");
+    }
+
+    @Test
+    void rejectsUnboundedOrUnredactedProRefreshMetadata() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        AutarkOsDatabase database = new AutarkOsDatabase(runtimeLayout);
+        database.migrate();
+
+        try (Connection connection = database.connection();
+                Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    insert into pro_entitlement_cache(
+                        cache_id,
+                        schema_version,
+                        consecutive_failures,
+                        created_at,
+                        updated_at
+                    ) values (
+                        1,
+                        '1',
+                        0,
+                        '2026-07-19T12:00:00Z',
+                        '2026-07-19T12:00:00Z'
+                    )
+                    """);
+
+            assertThatThrownBy(() -> statement.executeUpdate("""
+                    update pro_entitlement_cache
+                    set last_failure_category = 'remote-message',
+                        consecutive_failures = 31
+                    where cache_id = 1
+                    """))
+                    .isInstanceOf(java.sql.SQLException.class)
+                    .hasMessageContaining(
+                            "invalid Pro entitlement refresh metadata");
+        }
     }
 
     @Test

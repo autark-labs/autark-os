@@ -33,6 +33,34 @@ public class RuntimeLayout {
         return configRoot().resolve("identity.json").normalize();
     }
 
+    public Path proConfigRoot() {
+        return configRoot().resolve("pro").normalize();
+    }
+
+    public Path proDeviceIdentityPath() {
+        return proConfigRoot().resolve("device-identity.json").normalize();
+    }
+
+    public Path proAgentRoot() {
+        return runtimeRoot().resolve("pro-agent").normalize();
+    }
+
+    public Path proAgentSecretRoot() {
+        return proAgentRoot().resolve("secrets").normalize();
+    }
+
+    public Path proAgentApiCredentialPath() {
+        return proAgentSecretRoot()
+                .resolve("agent-api-token")
+                .normalize();
+    }
+
+    public Path proRegistryPullRoot() {
+        return proAgentRoot()
+                .resolve("registry-pulls")
+                .normalize();
+    }
+
     public String appPath(String appId, String relativePath) {
         return appRoot(appId).resolve(relativePath).normalize().toString();
     }

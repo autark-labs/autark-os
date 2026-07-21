@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: Autark-OS Private Extension Host Contract
+  version: 1.0.0
+  description: Generic authenticated contract between CE and an installed private extension.
+servers:
+  - url: http://autark-pro-agent:8080
+security:
+  - agentToken: []
+paths:
+  /v1/status:
+    get:
+      operationId: getExtensionStatus
+      responses:
+        "200":
+          description: Extension readiness and host-contract compatibility.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/agent-status-v1.schema.json
+  /v1/ui/manifest:
+    get:
+      operationId: getExtensionUiManifest
+      responses:
+        "200":
+          description: Browser entrypoint bound to this component version.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/extension-ui-manifest-v1.schema.json
+  /v1/ui/assets/{assetName}:
+    get:
+      operationId: getExtensionUiAsset
+      parameters:
+        - in: path
+          name: assetName
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9._-]{1,128}$
+      responses:
+        "200":
+          description: Immutable browser module asset.
+          content:
+            text/javascript:
+              schema:
+                type: string
+  /v1/surfaces/render:
+    post:
+      operationId: renderExtensionSurface
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/extension-surface-request-v1.schema.json
+      responses:
+        "200":
+          description: Opaque payload for the private browser module.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/extension-surface-response-v1.schema.json
+components:
+  securitySchemes:
+    agentToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-per-install-token

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "repository": "autark-labs/autark-os-pro-client",
+  "workflow": ".github/workflows/release.yml",
+  "trigger": "push",
+  "channels": [
+    "development",
+    "staging",
+    "beta",
+    "stable"
+  ]
+}

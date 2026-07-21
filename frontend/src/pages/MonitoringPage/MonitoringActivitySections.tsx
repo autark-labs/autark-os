@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -38,7 +38,7 @@ import type { AppReliabilityIssue, AppReliabilitySummary } from '@/types/app';
 import type { SystemMetrics } from '@/types/system';
 import { humanize } from './extensions/MonitoringPage.viewModels';
 
-type ActivityWorkspaceTab = 'all' | 'attention' | 'repairs' | 'apps' | 'metrics';
+type ActivityWorkspaceTab = 'all' | 'attention' | 'repairs' | 'apps' | 'pro' | 'metrics';
 
 type MonitoringActivityWorkspaceProps = {
   activity: ActivityLog[];
@@ -66,6 +66,7 @@ const tabLabels: Record<ActivityWorkspaceTab, string> = {
   apps: 'App activity',
   attention: 'Needs attention',
   metrics: 'System metrics',
+  pro: 'Pro lifecycle',
   repairs: 'Repairs',
 };
 
@@ -75,6 +76,7 @@ const categoryLabels: Record<string, string> = {
   backup: 'Backups',
   health: 'Health',
   install: 'Apps',
+  pro: 'Autark Pro',
   repair: 'Repairs',
   system: 'System',
 };
@@ -99,7 +101,9 @@ export function MonitoringActivityWorkspace({
   timeZone,
   updatedAt,
 }: MonitoringActivityWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<ActivityWorkspaceTab>('all');
+  const [activeTab, setActiveTab] = useState<ActivityWorkspaceTab>(
+    category === 'pro' ? 'pro' : 'all',
+  );
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const attentionEvents = useMemo(() => activity.filter(needsAttention), [activity]);
   const visibleEvents = useMemo(() => eventsForTab(activity, activeTab), [activity, activeTab]);
@@ -109,6 +113,25 @@ export function MonitoringActivityWorkspace({
     ?? null;
   const attentionCount = reliability?.issues.length ?? attentionEvents.length;
   const recentRepairCount = reliability?.recentSuccessfulRepairs ?? activity.filter((event) => event.category === 'repair' && event.level === 'success').length;
+
+  useEffect(() => {
+    if (category === 'pro') setActiveTab('pro');
+  }, [category]);
+
+  function changeTab(value: string) {
+    const next = value as ActivityWorkspaceTab;
+    if (activeTab === 'pro' && next !== 'pro' && category === 'pro') {
+      onCategoryChange('all');
+    } else if (next === 'pro' && category !== 'pro') {
+      onCategoryChange('pro');
+    }
+    setActiveTab(next);
+  }
+
+  function changeCategory(value: string) {
+    if (activeTab === 'pro' && value !== 'pro') setActiveTab('all');
+    onCategoryChange(value);
+  }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
@@ -128,7 +151,7 @@ export function MonitoringActivityWorkspace({
 
       <Tabs
         className="min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)_18rem]"
-        onValueChange={(value) => setActiveTab(value as ActivityWorkspaceTab)}
+        onValueChange={changeTab}
         orientation="vertical"
         value={activeTab}
       >
@@ -141,7 +164,7 @@ export function MonitoringActivityWorkspace({
               categoryFilters={categoryFilters}
               level={level}
               levelFilters={levelFilters}
-              onCategoryChange={onCategoryChange}
+              onCategoryChange={changeCategory}
               onLevelChange={onLevelChange}
             />
           )}
@@ -191,6 +214,18 @@ export function MonitoringActivityWorkspace({
               selectedEventId={selectedEvent?.id ?? null}
               timeZone={timeZone}
               title={tabLabels.apps}
+            />
+          </TabsContent>
+
+          <TabsContent className="m-0 h-full min-h-0" value="pro">
+            <ActivityEventWorkspace
+              description="Activation, entitlement, release verification, agent cutover, rollback, and removal checkpoints."
+              events={visibleEvents}
+              isLoading={isLoading}
+              onSelect={setSelectedEventId}
+              selectedEventId={selectedEvent?.id ?? null}
+              timeZone={timeZone}
+              title={tabLabels.pro}
             />
           </TabsContent>
 
@@ -289,6 +324,7 @@ function ActivityWorkspaceNavigation({ attentionCount, showAdvancedMetrics }: { 
     { icon: AlertTriangle, label: tabLabels.attention, value: 'attention' },
     { icon: Wrench, label: tabLabels.repairs, value: 'repairs' },
     { icon: PackageOpen, label: tabLabels.apps, value: 'apps' },
+    { icon: ShieldCheck, label: tabLabels.pro, value: 'pro' },
   ];
   if (showAdvancedMetrics) tabs.push({ icon: BarChart3, label: tabLabels.metrics, value: 'metrics' });
 
@@ -420,7 +456,7 @@ function SelectedActivityDetail({ event, showAdvancedMetrics, timeZone }: { even
       <div className="flex gap-2"><span className={cn('grid size-7 shrink-0 place-items-center rounded-lg border', eventIconTone(event))}><Icon aria-hidden="true" className="size-3.5" /></span><div className="min-w-0"><p className={cn('text-xs font-semibold', eventTextTone(event))}>{humanize(event.category)}</p><h3 className="mt-0.5 text-sm font-semibold text-white">{event.title}</h3></div></div>
       <p className="mt-3 text-xs leading-5 text-sky-100/65">{event.message}</p>
       <div className="mt-3 grid gap-1.5 border-t border-sky-300/15 pt-3"><RailFact icon={Clock3} label="Recorded" value={<LocalizedDateTime className="font-semibold text-white" model={{ timeZone, value: event.createdAt }} />} /><RailFact icon={event.appId ? PackageOpen : Activity} label={event.appId ? 'Related app' : 'Scope'} value={event.appId || 'This server'} /><RailFact icon={event.category === 'repair' ? Wrench : Info} label="Type" value={humanize(event.category)} /></div>
-      {showAdvancedMetrics && <AdvancedEventDetail event={event} />}
+      {(showAdvancedMetrics || event.category === 'pro') && <AdvancedEventDetail event={event} />}
     </div>
   );
 }
@@ -462,6 +498,7 @@ function eventsForTab(events: ActivityLog[], tab: ActivityWorkspaceTab) {
   if (tab === 'attention') return events.filter(needsAttention);
   if (tab === 'repairs') return events.filter((event) => event.category === 'repair');
   if (tab === 'apps') return events.filter((event) => Boolean(event.appId));
+  if (tab === 'pro') return events.filter((event) => event.category === 'pro');
   return events;
 }
 
@@ -474,6 +511,7 @@ function eventIcon(event: ActivityLog) {
   if (event.category === 'repair') return Wrench;
   if (event.category === 'health') return HeartPulse;
   if (event.category === 'access') return ShieldCheck;
+  if (event.category === 'pro') return ShieldCheck;
   if (event.level === 'success') return CheckCircle2;
   return Activity;
 }

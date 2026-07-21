@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1",
+  "state": "ACTIVE",
+  "plan": "pro_home",
+  "features": [
+    "autark-pro.extension"
+  ],
+  "updatesThrough": "2029-07-19T12:00:00Z",
+  "serviceLeaseExpiresAt": "2026-07-20T12:00:00Z",
+  "lastVerifiedServerTime": "2026-07-19T12:00:00Z",
+  "localUseAllowed": true,
+  "updatesAllowed": true,
+  "hostedServicesAllowed": true,
+  "grantFingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "reasonCode": "none"
+}

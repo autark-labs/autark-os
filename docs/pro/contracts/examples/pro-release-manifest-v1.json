@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1",
+  "sequence": 7,
+  "createdAt": "2026-07-19T12:00:00Z",
+  "expiresAt": "2026-07-26T12:00:00Z",
+  "releaseChannel": "staging",
+  "component": "autark-pro-agent",
+  "version": "0.1.0",
+  "repository": "registry.staging.autarklabs.com/autark-pro-agent",
+  "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "architecture": "linux/amd64",
+  "publishedAt": "2026-07-19T11:30:00Z",
+  "minimumCoreVersion": "0.1.0",
+  "maximumCoreVersion": null,
+  "agentApiRange": "1.x",
+  "rolloutGroup": "prototype",
+  "features": [
+    "autark-pro.extension"
+  ],
+  "signingKeyId": "staging-release-2026-01"
+}

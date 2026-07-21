@@ -10,6 +10,7 @@ import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/pri
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { ExtensionSlot } from '@/extensions/ExtensionSlot';
 import { backupSafetyChecklist } from '@/lib/backupSafety';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
@@ -101,6 +102,11 @@ function StoragePage() {
         contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
       >
         {error && report && <StorageErrorState message={error} onDismiss={() => setDismissedError(error)} onRetry={refreshStorage} />}
+        <ExtensionSlot
+          className="shrink-0 px-3 pt-3"
+          extensionId="autark-pro"
+          surface="storage.insights"
+        />
         {report ? (
           <StorageCapacityRibbonWorkspace
             copiedPathId={copiedPathId}

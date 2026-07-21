@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/pro-entitlement-status.schema.json",
+  "title": "ProEntitlementStatus v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "state",
+    "features",
+    "localUseAllowed",
+    "updatesAllowed",
+    "hostedServicesAllowed",
+    "reasonCode"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "state": {
+      "$ref": "common-v1.schema.json#/$defs/entitlementState"
+    },
+    "plan": {
+      "type": ["string", "null"],
+      "maxLength": 64
+    },
+    "features": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common-v1.schema.json#/$defs/featureId"
+      }
+    },
+    "updatesThrough": {
+      "oneOf": [
+        {
+          "$ref": "common-v1.schema.json#/$defs/dateTime"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "serviceLeaseExpiresAt": {
+      "oneOf": [
+        {
+          "$ref": "common-v1.schema.json#/$defs/dateTime"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lastVerifiedServerTime": {
+      "oneOf": [
+        {
+          "$ref": "common-v1.schema.json#/$defs/dateTime"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "localUseAllowed": {
+      "type": "boolean"
+    },
+    "updatesAllowed": {
+      "type": "boolean"
+    },
+    "hostedServicesAllowed": {
+      "type": "boolean"
+    },
+    "grantFingerprint": {
+      "oneOf": [
+        {
+          "$ref": "common-v1.schema.json#/$defs/fingerprint"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reasonCode": {
+      "enum": [
+        "none",
+        "not_activated",
+        "maintenance_ended",
+        "lease_expired",
+        "lease_suspended",
+        "lease_revoked",
+        "grant_revoked",
+        "invalid_signature",
+        "device_mismatch",
+        "unknown_schema",
+        "unknown_feature",
+        "clock_rollback",
+        "internal_error"
+      ]
+    }
+  }
+}

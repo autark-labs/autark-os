@@ -6,6 +6,7 @@ import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
+import { ExtensionSlot } from '@/extensions/ExtensionSlot';
 import {
   Dialog,
   DialogContent,
@@ -424,6 +425,12 @@ function MarketplacePage() {
         lastRefreshAt={lastRefreshAt}
         marketplaceActivity={marketplaceActivity}
         onRefresh={refreshDiscover}
+      />
+
+      <ExtensionSlot
+        className="shrink-0"
+        extensionId="autark-pro"
+        surface="discover.insights"
       />
 
       {discoverError && <DiscoverErrorState message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}

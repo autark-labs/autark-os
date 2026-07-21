@@ -16,7 +16,7 @@ const routes: RouteCase[] = [
   { name: 'Discover', path: '/discover', expected: /^Discover$/i },
   { name: 'Access', path: '/access', expected: /^Access$/i },
   { name: 'Backups', path: '/backups', expected: /^Backups$/i },
-  { name: 'Autark Pro', path: '/pro', expected: /Autark Pro is being built/i },
+  { name: 'Autark Pro', path: '/pro', expected: /^Autark Pro$/i },
   { name: 'Storage', path: '/storage', expected: /^Storage$/i },
   { name: 'Settings', path: '/settings', expected: /Appliance settings/i },
   { name: 'Diagnostics', path: '/diagnostics', expected: /^Diagnostics$/i },

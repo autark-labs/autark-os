@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1",
+  "componentVersion": "0.1.0",
+  "apiVersion": "1",
+  "supportedSnapshotSchemaVersions": ["1"],
+  "supportedSurfaceSchemaVersions": ["1"],
+  "state": "ready",
+  "ready": true,
+  "reasonCode": "none",
+  "startedAt": "2026-07-19T12:00:00Z"
+}

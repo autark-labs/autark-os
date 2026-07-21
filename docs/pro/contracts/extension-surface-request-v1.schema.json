@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/extensions/v1/surface-request.schema.json",
+  "title": "Extension surface request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "surface", "snapshot", "continuationToken"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "surface": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]{1,127}$"
+    },
+    "snapshot": {
+      "$ref": "https://contracts.autark-os.org/pro/v1/normalized-host-snapshot.schema.json"
+    },
+    "continuationToken": {
+      "oneOf": [
+        { "$ref": "https://contracts.autark-os.org/pro/v1/common-v1.schema.json#/$defs/base64Url" },
+        { "type": "null" }
+      ]
+    }
+  }
+}

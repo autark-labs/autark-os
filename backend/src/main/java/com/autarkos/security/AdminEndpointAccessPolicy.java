@@ -18,7 +18,9 @@ public class AdminEndpointAccessPolicy {
                 && ("/api/admin/security/claim".equals(path) || "/api/admin/security/login".equals(path))) {
             return AccessMode.PUBLIC;
         }
-        if ("POST".equalsIgnoreCase(method) && "/api/admin/security/local/reset-password".equals(path)) {
+        if ("POST".equalsIgnoreCase(method)
+                && ("/api/admin/security/local/reset-password".equals(path)
+                        || "/api/v1/pro/identity/local/rotate-installation".equals(path))) {
             return AccessMode.LOCAL_ADMIN;
         }
         return AccessMode.AUTHENTICATED;

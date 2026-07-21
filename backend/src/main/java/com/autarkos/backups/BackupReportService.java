@@ -152,6 +152,9 @@ class BackupReportService {
                 "protected".equals(status),
                 policy.frequency(),
                 policy.retention(),
+                Math.toIntExact(Math.min(
+                        Integer.MAX_VALUE,
+                        backupRepository.countByAppId(app.appId()))),
                 contract,
                 app.runtimePath(),
                 dataSize,

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "leaseId": "44444444-4444-4444-8444-444444444444",
+  "grantId": "33333333-3333-4333-8333-333333333333",
+  "deviceId": "11111111-1111-4111-8111-111111111111",
+  "devicePublicKeyFingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "features": [
+    "autark-pro.extension"
+  ],
+  "services": [
+    "release-check",
+    "registry",
+    "compatibility-feed"
+  ],
+  "status": "active",
+  "issuer": "autark-pro-staging",
+  "issuedAt": "2026-07-19T12:00:00Z",
+  "renewAfter": "2026-07-20T00:00:00Z",
+  "expiresAt": "2026-07-20T12:00:00Z",
+  "serverTime": "2026-07-19T12:00:00Z",
+  "keyId": "staging-entitlement-2026-01"
+}

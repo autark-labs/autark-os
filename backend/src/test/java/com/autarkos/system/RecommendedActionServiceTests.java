@@ -61,6 +61,62 @@ class RecommendedActionServiceTests {
         assertThat(service.current().id()).isEqualTo("warning-app");
     }
 
+    @Test
+    void mergesExtensionRecommendationsWithoutDisplacingHigherPriorityCeSafety() {
+        RecommendedAction guardian = new RecommendedAction(
+                "guardian-finding",
+                "critical",
+                "Guardian finding",
+                "Review this condition.",
+                Optional.of(AutarkOsAction.route(
+                        "review-guardian",
+                        "Review in Guardian",
+                        "/pro?finding=id")),
+                Optional.empty(),
+                List.of("guardian:id"));
+        RecommendedActionContributor contributor = () ->
+                Optional.of(new RecommendedActionContribution(
+                        15,
+                        guardian));
+        RecommendedActionService withoutCeIssue =
+                new RecommendedActionService(
+                        (Supplier<SystemSummaryModels.SystemSummary>)
+                                () -> summary(true, List.of()),
+                        List.of(contributor));
+        RecommendedActionService withDockerIssue =
+                new RecommendedActionService(
+                        (Supplier<SystemSummaryModels.SystemSummary>)
+                                () -> summary(true, List.of(
+                                        issue(
+                                                "docker",
+                                                "critical",
+                                                "docker_unavailable"))),
+                        List.of(contributor));
+
+        assertThat(withoutCeIssue.current().id())
+                .isEqualTo("guardian-finding");
+        assertThat(withDockerIssue.current().id())
+                .isEqualTo("docker");
+    }
+
+    @Test
+    void contributorFailuresCannotBreakTheCeRecommendation() {
+        RecommendedActionContributor failed = () -> {
+            throw new IllegalStateException("private failure");
+        };
+        RecommendedActionService service =
+                new RecommendedActionService(
+                        (Supplier<SystemSummaryModels.SystemSummary>)
+                                () -> summary(true, List.of(
+                                        issue(
+                                                "backup",
+                                                "info",
+                                                "backup_enabled_no_restore_point"))),
+                        List.of(failed));
+
+        assertThat(service.current().id()).isEqualTo("backup");
+    }
+
     private RecommendedActionService service(SystemSummaryModels.SystemSummary summary) {
         return new RecommendedActionService((Supplier<SystemSummaryModels.SystemSummary>) () -> summary);
     }

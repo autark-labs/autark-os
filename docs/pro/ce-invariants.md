@@ -46,6 +46,7 @@ agent malformed, module degraded, and retained use where applicable.
 
 ## Review Rule
 
-Each Pro story records the applicable checklist results in
-`docs/pro/implementation-status.md`. If a story cannot satisfy an invariant, stop
-the story and change the design; do not weaken this document or hide the failure.
+Each Pro story records the applicable checklist results in the private Pro
+development tracker. This public repository records only the integration
+boundary. If a story cannot satisfy an invariant, stop the story and change the
+design; do not weaken this document or hide the failure.

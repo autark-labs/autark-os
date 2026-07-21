@@ -13,7 +13,10 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties =
+                "autark-os.runtime-root=build/test-runtime/app-images-context")
 class AppImageStaticResourceTests {
 
     @LocalServerPort

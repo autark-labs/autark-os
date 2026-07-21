@@ -19,12 +19,15 @@ test('Activity Log uses a bounded A1 workspace while retaining event, attention,
   assert.match(page, /advancedMetrics=/);
   assert.match(page, /<MonitoringChartsSection/);
 
-  assert.match(workspace, /ActivityWorkspaceTab = 'all' \| 'attention' \| 'repairs' \| 'apps' \| 'metrics'/);
+  assert.match(workspace, /ActivityWorkspaceTab = 'all' \| 'attention' \| 'repairs' \| 'apps' \| 'pro' \| 'metrics'/);
   assert.match(workspace, /System metrics/);
   assert.match(workspace, /Needs attention/);
   assert.match(workspace, /ActivityFilterBar/);
   assert.match(workspace, /SelectTrigger aria-label="Filter activity by category"/);
   assert.match(workspace, /Selected activity/);
   assert.match(workspace, /Technical detail/);
+  assert.match(workspace, /Pro lifecycle/);
+  assert.match(workspace, /event\.category === 'pro'/);
+  assert.match(page, /searchParams\.get\('category'\) === 'pro'/);
   assert.match(workspace, /overflow-y-auto/);
 });

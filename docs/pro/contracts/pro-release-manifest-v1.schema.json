@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/pro-release-manifest.schema.json",
+  "title": "ProReleaseManifest payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sequence",
+    "createdAt",
+    "expiresAt",
+    "releaseChannel",
+    "component",
+    "version",
+    "repository",
+    "digest",
+    "architecture",
+    "publishedAt",
+    "minimumCoreVersion",
+    "agentApiRange",
+    "rolloutGroup",
+    "features",
+    "signingKeyId"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "createdAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "expiresAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "releaseChannel": {
+      "$ref": "common-v1.schema.json#/$defs/releaseChannel"
+    },
+    "component": {
+      "const": "autark-pro-agent"
+    },
+    "version": {
+      "$ref": "common-v1.schema.json#/$defs/semver"
+    },
+    "repository": {
+      "type": "string",
+      "pattern": "^[a-z0-9.-]+(?::[0-9]+)?/[a-z0-9._/-]+$",
+      "maxLength": 255
+    },
+    "digest": {
+      "$ref": "common-v1.schema.json#/$defs/digest"
+    },
+    "architecture": {
+      "$ref": "common-v1.schema.json#/$defs/architecture"
+    },
+    "publishedAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "minimumCoreVersion": {
+      "$ref": "common-v1.schema.json#/$defs/semver"
+    },
+    "maximumCoreVersion": {
+      "oneOf": [
+        {
+          "$ref": "common-v1.schema.json#/$defs/semver"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "agentApiRange": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.x$",
+      "maxLength": 16
+    },
+    "rolloutGroup": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
+    "features": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common-v1.schema.json#/$defs/featureId"
+      }
+    },
+    "signingKeyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,128}$"
+    }
+  }
+}

@@ -27,7 +27,7 @@ frontend/playwright-report/
 frontend/test-results/
 
 # Release bundles and generated installers
-release/
+/release/
 
 # Logs
 *.log
@@ -36,9 +36,9 @@ yarn-debug.log*
 yarn-error.log*
 
 # Local Autark-OS runtime data
-runtime/
-runtime/**/*
-runtime/autark-os/autark-os.db
+/runtime/
+/runtime/**/*
+/runtime/autark-os/autark-os.db
 *.db
 *.db-shm
 *.db-wal
@@ -46,4 +46,5 @@ runtime/autark-os/autark-os.db
 # Local screenshots, planning, and assistant workspace
 screenshots/
 /docs/development/
+/build/
 /.superpowers/

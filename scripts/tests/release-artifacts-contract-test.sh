@@ -37,11 +37,13 @@ artifact_manifest="${artifacts_dir}/autark-os-artifacts.json"
 grep -q '^AUTARK_OS_VERSION=3.4.5$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_BUILD_SHA=artifacts-build-sha$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_BUILD_DATE=2026-01-01T00:00:00Z$' "${bundle_dir}/autark-os-release.env"
+[[ -x "${bundle_dir}/tools/cosign" ]]
 
 tar -tzf "${tarball}" >/tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/scripts/autark-os$' /tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/scripts/autark-os-fileops$' /tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/backend/autark-os-backend.jar$' /tmp/autark-os-tarball-contents.txt
+grep -q '^autark-os-3.4.5-amd64/tools/cosign$' /tmp/autark-os-tarball-contents.txt
 
 dpkg-deb --info "${deb}" >/tmp/autark-os-deb-info.txt
 grep -q 'Package: autark-os' /tmp/autark-os-deb-info.txt
@@ -54,6 +56,7 @@ dpkg-deb -c "${deb}" >/tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/backend/autark-os-backend.jar' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/scripts/autark-os' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/scripts/autark-os-fileops' /tmp/autark-os-deb-contents.txt
+grep -q './usr/lib/autark-os/release/tools/cosign' /tmp/autark-os-deb-contents.txt
 grep -q './usr/share/doc/autark-os/GETTING_STARTED.md' /tmp/autark-os-deb-contents.txt
 grep -q './usr/share/doc/autark-os/RELEASE_NOTES.md' /tmp/autark-os-deb-contents.txt
 grep -q './usr/share/doc/autark-os/LICENSE.md' /tmp/autark-os-deb-contents.txt
@@ -104,6 +107,7 @@ extract_dir="${tmp_dir}/run-extract"
 [[ -x "${extract_dir}/scripts/bootstrap-autark-os.sh" ]]
 [[ -f "${extract_dir}/scripts/supported-host-matrix.env" ]]
 [[ -f "${extract_dir}/backend/autark-os-backend.jar" ]]
+[[ -x "${extract_dir}/tools/cosign" ]]
 [[ -f "${extract_dir}/docs/GETTING_STARTED.md" ]]
 [[ -f "${extract_dir}/docs/RELEASE_NOTES.md" ]]
 [[ -f "${extract_dir}/docs/LICENSE.md" ]]

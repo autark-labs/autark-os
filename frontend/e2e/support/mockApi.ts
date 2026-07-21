@@ -469,6 +469,8 @@ const reconciliation = {
 };
 
 const metrics = { deviceName: systemSummary.deviceName, runAsUser: 'autark', osName: 'Ubuntu', osVersion: '24.04', osArchitecture: 'x86_64', javaVersion: '21', availableProcessors: 4, systemCpuPercent: 12.4, processCpuPercent: 1.1, systemLoadAverage: 0.42, totalMemoryBytes: 8_000_000_000, freeMemoryBytes: 4_200_000_000, usedMemoryPercent: 47.5, runtimeRoot: '/var/lib/autark-os', runtimeTotalBytes: 1_000_000_000_000, runtimeUsableBytes: 430_000_000_000, runtimeUsedPercent: 9, checkedAt: fixedAt };
+const appReliability = { posture: 'healthy', headline: 'Managed apps are ready', summary: 'The fixture app is responding normally.', totalApps: 1, readyApps: 1, startingApps: 0, pausedApps: 0, needsAttentionApps: 0, unavailableApps: 0, privateApps: 1, autoRepairEnabledApps: 1, recentSuccessfulRepairs: 0, recentFailedRepairs: 0, issues: [], recentActivity: [], checkedAt: fixedAt };
+const monitoringHistory = { windowMinutes: 60, retentionMinutes: 1440, windowLabel: 'Last 60 minutes', hostSamples: [], appSamples: [], checkedAt: fixedAt };
 const version = { version: '0.9.0-fixture', buildSha: 'fixture', buildDate: fixedAt, installPath: '/opt/autark-os', runtimePath: '/var/lib/autark-os', backendJar: '/opt/autark-os/autark-os.jar', updateChannel: 'stable', updateStatus: 'current', updateMessage: 'This fixture is current.', checkedAt: fixedAt };
 const settings = { deviceName: systemSummary.deviceName, timeZone: 'America/Chicago', language: 'en', temperatureUnit: 'fahrenheit', dateFormat: 'MMM d, yyyy', timeFormat: '12-hour', startOnBoot: true, telemetryEnabled: false, defaultInstallAccess: 'local-and-private', automaticRepairEnabled: true, automaticBackupsEnabled: true, backupFrequency: 'daily', backupRetentionDays: 14, backupTime: '03:00', updateChannel: 'stable', showAdvancedMetrics: true, updatedAt: fixedAt };
 const activity = [{ id: 1, level: 'success', category: 'backup', action: 'backup_completed', title: 'Vaultwarden backup verified', message: 'A verified restore point is ready.', appId: 'vaultwarden', outcome: 'completed', details: 'Fixture event', createdAt: fixedAt }];
@@ -502,11 +504,32 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
         : appState;
   const jobs = scenario === 'idle' ? [] : [activeJob];
   if (pathname === '/api/admin/security/status') return { devMode: true, claimed: true, authRequired: false, message: 'Fixture mode', setupCodeCommand: 'sudo autark-os admin setup-code', passwordResetCommand: 'sudo autark-os admin reset-password' };
+  if (pathname === '/api/v1/pro/status') return {
+    schemaVersion: '1',
+    entitlement: {
+      schemaVersion: '1', state: 'NOT_ACTIVATED', plan: null, features: [], updatesThrough: null,
+      serviceLeaseExpiresAt: null, lastVerifiedServerTime: null, localUseAllowed: false,
+      updatesAllowed: false, hostedServicesAllowed: false, grantFingerprint: null,
+      reasonCode: 'not_activated',
+    },
+    device: { deviceId: '', installationId: '', publicKeyFingerprint: '', registered: false },
+    activation: { state: 'idle', activationId: null, expiresAt: null },
+    module: {
+      state: 'NOT_INSTALLED', componentVersion: null, activeDigest: null, previousDigest: null,
+      health: 'not-checked', jobId: null, errorCode: null,
+    },
+    refresh: {
+      inProgress: false, lastAttemptAt: null, lastSuccessAt: null, nextAttemptAt: null,
+      lastFailureCategory: null, consecutiveFailures: 0,
+    },
+  };
   if (pathname === '/api/system/onboarding') return onboarding;
   if (pathname === '/api/application-state' || pathname === '/api/application-state/refresh') return currentAppState;
   if (pathname === '/api/system-summary') return systemSummary;
   if (pathname === '/api/recommended-action') return { id: 'review-storage', severity: 'warning', title: 'Review unused data', body: 'A small unused folder can be reviewed before cleanup.', primaryAction: action('review-storage', 'Review storage', '/storage'), secondaryAction: null, sourceIssueIds: ['storage-orphan'], dismissible: true };
   if (pathname === '/api/activity') return activity;
+  if (pathname === '/api/apps/reliability') return appReliability;
+  if (pathname === '/api/monitoring/history') return monitoringHistory;
   if (pathname === '/api/jobs') return jobs;
   if (pathname.startsWith('/api/jobs/')) return jobs[0] ?? { ...activeJob, status: 'succeeded' };
   if (pathname === '/api/system/doctor') return doctor;

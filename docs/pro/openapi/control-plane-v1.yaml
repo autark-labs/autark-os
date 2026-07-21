@@ -1,0 +1,364 @@
+openapi: 3.1.0
+info:
+  title: Autark Pro Control Plane
+  version: 1.0.0
+  description: Versioned appliance-to-control-plane contract for activation, entitlement, releases, and scoped registry access.
+servers:
+  - url: https://staging.invalid/functions/v1
+    description: Placeholder only; production artifacts must inject an approved HTTPS endpoint.
+paths:
+  /activate:
+    post:
+      operationId: startActivation
+      summary: Exchange a one-time code for a short-lived activation ticket.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - schemaVersion
+                - method
+                - value
+              properties:
+                schemaVersion:
+                  const: "1"
+                method:
+                  const: activation_code
+                value:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+      responses:
+        "200":
+          description: Short-lived opaque activation ticket.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - schemaVersion
+                  - activationTicket
+                  - expiresAt
+                  - requestId
+                properties:
+                  schemaVersion:
+                    const: "1"
+                  activationTicket:
+                    type: string
+                    minLength: 32
+                    maxLength: 4096
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  requestId:
+                    type: string
+                    format: uuid
+        default:
+          $ref: "#/components/responses/Error"
+  /device-challenges:
+    post:
+      operationId: createDeviceChallenge
+      summary: Create a single-use registration or renewal nonce.
+      security:
+        - activationTicket: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - schemaVersion
+                - purpose
+                - deviceId
+              properties:
+                schemaVersion:
+                  const: "1"
+                purpose:
+                  enum:
+                    - register
+                    - entitlement_renew
+                    - release_check
+                    - registry_token
+                deviceId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: A bounded single-use nonce.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - schemaVersion
+                  - nonce
+                  - issuedAt
+                  - expiresAt
+                  - requestId
+                properties:
+                  schemaVersion:
+                    const: "1"
+                  nonce:
+                    type: string
+                    pattern: "^[A-Za-z0-9_-]{32,256}$"
+                  issuedAt:
+                    type: string
+                    format: date-time
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  requestId:
+                    type: string
+                    format: uuid
+        default:
+          $ref: "#/components/responses/Error"
+  /devices/register:
+    post:
+      operationId: registerDevice
+      summary: Register a device after verifying its activation ticket and signed challenge.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../contracts/device-registration-request-v1.schema.json"
+      responses:
+        "200":
+          description: Idempotent device registration result.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - schemaVersion
+                  - registrationId
+                  - deviceId
+                  - entitlementPath
+                  - requestId
+                properties:
+                  schemaVersion:
+                    const: "1"
+                  registrationId:
+                    type: string
+                    format: uuid
+                  deviceId:
+                    type: string
+                    format: uuid
+                  entitlementPath:
+                    const: /entitlements/renew
+                  requestId:
+                    type: string
+                    format: uuid
+        default:
+          $ref: "#/components/responses/Error"
+  /entitlements/renew:
+    post:
+      operationId: renewEntitlements
+      summary: Return the latest signed durable grant and short-lived online lease.
+      requestBody:
+        $ref: "#/components/requestBodies/DeviceProof"
+      responses:
+        "200":
+          description: Signed JWS flattened documents.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - schemaVersion
+                  - durableProductGrant
+                  - onlineServiceLease
+                  - serverTime
+                  - requestId
+                properties:
+                  schemaVersion:
+                    const: "1"
+                  durableProductGrant:
+                    $ref: "../contracts/common-v1.schema.json#/$defs/signedEnvelope"
+                  onlineServiceLease:
+                    $ref: "../contracts/common-v1.schema.json#/$defs/signedEnvelope"
+                  serverTime:
+                    type: string
+                    format: date-time
+                  requestId:
+                    type: string
+                    format: uuid
+        default:
+          $ref: "#/components/responses/Error"
+  /releases-check:
+    post:
+      operationId: checkRelease
+      summary: Return the exact signed release manifest assigned to the device.
+      requestBody:
+        $ref: "#/components/requestBodies/DeviceProof"
+      responses:
+        "200":
+          description: Assigned signed manifest or an explicit no-release result.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - schemaVersion
+                  - release
+                  - serverTime
+                  - requestId
+                properties:
+                  schemaVersion:
+                    const: "1"
+                  release:
+                    oneOf:
+                      - $ref: "../contracts/common-v1.schema.json#/$defs/signedEnvelope"
+                      - type: "null"
+                  serverTime:
+                    type: string
+                    format: date-time
+                  requestId:
+                    type: string
+                    format: uuid
+        default:
+          $ref: "#/components/responses/Error"
+  /registry-token:
+    post:
+      operationId: issueRegistryCredential
+      summary: Issue a short-lived pull-only credential for an assigned digest.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - schemaVersion
+                - challengeProof
+                - component
+                - repository
+                - digest
+              properties:
+                schemaVersion:
+                  const: "1"
+                challengeProof:
+                  $ref: "../contracts/common-v1.schema.json#/$defs/signedEnvelope"
+                component:
+                  const: autark-pro-agent
+                repository:
+                  type: string
+                  maxLength: 255
+                digest:
+                  $ref: "../contracts/common-v1.schema.json#/$defs/digest"
+      responses:
+        "200":
+          description: A repository-scoped credential that must be discarded after use.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - schemaVersion
+                  - credentialId
+                  - credentialType
+                  - username
+                  - secret
+                  - repository
+                  - digest
+                  - expiresAt
+                  - serverTime
+                  - requestId
+                properties:
+                  schemaVersion:
+                    const: "1"
+                  credentialId:
+                    type: string
+                    format: uuid
+                  credentialType:
+                    const: bearer
+                  username:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+                    pattern: "^[A-Za-z0-9._-]+$"
+                  secret:
+                    type: string
+                    minLength: 5
+                    maxLength: 16384
+                    pattern: "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+                  repository:
+                    type: string
+                    minLength: 3
+                    maxLength: 255
+                    pattern: "^[a-z0-9.-]+(?::[0-9]+)?/[a-z0-9._/-]+$"
+                  digest:
+                    $ref: "../contracts/common-v1.schema.json#/$defs/digest"
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  serverTime:
+                    type: string
+                    format: date-time
+                  requestId:
+                    type: string
+                    format: uuid
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  securitySchemes:
+    activationTicket:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque activation ticket
+  requestBodies:
+    DeviceProof:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - schemaVersion
+              - challengeProof
+            properties:
+              schemaVersion:
+                const: "1"
+              challengeProof:
+                $ref: "../contracts/common-v1.schema.json#/$defs/signedEnvelope"
+  responses:
+    Error:
+      description: Stable non-secret error response.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - error
+            properties:
+              error:
+                type: object
+                additionalProperties: false
+                required:
+                  - code
+                  - message
+                  - requestId
+                properties:
+                  code:
+                    $ref: "../contracts/common-v1.schema.json#/$defs/errorCode"
+                  message:
+                    type: string
+                    maxLength: 512
+                  requestId:
+                    type: string
+                    pattern: "^[A-Za-z0-9._-]{1,128}$"

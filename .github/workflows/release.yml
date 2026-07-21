@@ -113,6 +113,10 @@ jobs:
       - name: Check out release source
         uses: actions/checkout@v5
 
+      - name: Check Pro public/private repository boundary
+        working-directory: .
+        run: bash scripts/check-pro-public-boundary.sh
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -129,6 +133,10 @@ jobs:
 
       - name: Install the Chromium test browser
         run: yarn playwright install --with-deps chromium
+
+      - name: Validate Pro development simulator contracts
+        working-directory: .
+        run: node --test tools/pro-simulator/server.test.mjs
 
       - name: Run browser regression coverage
         run: yarn test:e2e
@@ -218,6 +226,7 @@ jobs:
           bash scripts/tests/autark-os-safe-uninstall-flow-test.sh
           bash scripts/tests/autark-os-cli-admin-session-test.sh
           bash scripts/tests/autark-os-admin-recovery-test.sh
+          bash scripts/tests/autark-os-pro-identity-recovery-test.sh
           bash scripts/tests/autark-os-installer-support-bundle-test.sh
           bash scripts/tests/service-hardening-contract-test.sh
           bash scripts/tests/service-hardening-drift-test.sh

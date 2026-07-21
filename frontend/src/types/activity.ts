@@ -1,7 +1,7 @@
 export type ActivityLog = {
   id: number;
   level: 'info' | 'success' | 'warning' | 'error' | string;
-  category: 'install' | 'health' | 'repair' | 'access' | 'backup' | 'system' | 'api' | string;
+  category: 'install' | 'health' | 'repair' | 'access' | 'backup' | 'system' | 'api' | 'pro' | string;
   action: string;
   title: string;
   message: string;

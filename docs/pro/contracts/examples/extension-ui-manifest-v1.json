@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1",
+  "extensionId": "autark-pro",
+  "componentVersion": "0.1.0",
+  "entrypoint": "entry.js",
+  "entrypointSha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "surfaces": ["pro.dashboard", "storage.insights", "discover.insights"]
+}

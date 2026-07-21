@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageShell } from '@/components/layout/PageShell';
@@ -17,17 +18,20 @@ import {
 import { MonitoringActivityWorkspace } from './MonitoringActivitySections';
 
 const levelFilters = ['all', 'error', 'warning', 'success', 'info'];
-const categoryFilters = ['all', 'install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
+const categoryFilters = ['all', 'pro', 'install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
 const MonitoringChartsSection = lazy(() => import('./MonitoringChartsSection'));
 
 const MonitoringPanel = ProjectPanel;
 
 function MonitoringPage() {
   const { settings, showAdvancedMetrics } = useProjectSettings();
+  const [searchParams, setSearchParams] = useSearchParams();
   const timeZone = settings?.timeZone || 'UTC';
   const appState = useApplicationStateRepository();
   const [level, setLevel] = useState('all');
-  const [category, setCategory] = useState('all');
+  const [category, setCategory] = useState(
+    searchParams.get('category') === 'pro' ? 'pro' : 'all',
+  );
   const [actionError, setActionError] = useState<string | null>(null);
 
   const filters = useMemo(() => ({
@@ -38,6 +42,16 @@ function MonitoringPage() {
   const monitoring = useMonitoringRepository(filters);
   const diagnosticsMutation = useMonitoringDiagnosticsMutation();
   const error = actionError ?? (monitoring.error ? apiErrorMessage(monitoring.error, 'Monitoring data could not be loaded.') : null);
+
+  function changeCategory(value: string) {
+    setCategory(value);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value === 'all') next.delete('category');
+      else next.set('category', value);
+      return next;
+    }, { replace: true });
+  }
 
   async function exportDiagnostics() {
     setActionError(null);
@@ -94,7 +108,7 @@ function MonitoringPage() {
         level={level}
         levelFilters={levelFilters}
         metrics={monitoring.metrics}
-        onCategoryChange={setCategory}
+        onCategoryChange={changeCategory}
         onExportDiagnostics={() => void exportDiagnostics()}
         onLevelChange={setLevel}
         onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])}

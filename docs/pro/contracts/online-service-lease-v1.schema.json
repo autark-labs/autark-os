@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/online-service-lease.schema.json",
+  "title": "OnlineServiceLease payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "leaseId",
+    "grantId",
+    "deviceId",
+    "devicePublicKeyFingerprint",
+    "features",
+    "services",
+    "status",
+    "issuer",
+    "issuedAt",
+    "renewAfter",
+    "expiresAt",
+    "serverTime",
+    "keyId"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "leaseId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "grantId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "deviceId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "devicePublicKeyFingerprint": {
+      "$ref": "common-v1.schema.json#/$defs/fingerprint"
+    },
+    "features": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common-v1.schema.json#/$defs/featureId"
+      }
+    },
+    "services": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "release-check",
+          "registry",
+          "compatibility-feed",
+          "hosted-relay",
+          "push",
+          "support-coordination"
+        ]
+      }
+    },
+    "status": {
+      "enum": ["active", "suspended", "revoked"]
+    },
+    "issuer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "issuedAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "renewAfter": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "expiresAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "serverTime": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,128}$"
+    }
+  }
+}

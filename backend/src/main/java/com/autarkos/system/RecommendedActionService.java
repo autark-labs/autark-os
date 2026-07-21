@@ -16,13 +16,30 @@ import com.autarkos.api.AutarkOsIssue;
 public class RecommendedActionService implements RecommendedActionProvider {
 
     private final Supplier<SystemSummaryModels.SystemSummary> systemSummary;
+    private final List<RecommendedActionContributor> contributors;
+
     @Autowired
-    public RecommendedActionService(SystemSummaryProvider systemSummaryProvider) {
-        this((Supplier<SystemSummaryModels.SystemSummary>) systemSummaryProvider::summary);
+    public RecommendedActionService(
+            SystemSummaryProvider systemSummaryProvider,
+            List<RecommendedActionContributor> contributors) {
+        this(
+                (Supplier<SystemSummaryModels.SystemSummary>)
+                        systemSummaryProvider::summary,
+                contributors);
     }
 
     public RecommendedActionService(Supplier<SystemSummaryModels.SystemSummary> systemSummary) {
+        this(systemSummary, List.of());
+    }
+
+    RecommendedActionService(
+            Supplier<SystemSummaryModels.SystemSummary> systemSummary,
+            List<RecommendedActionContributor> contributors) {
         this.systemSummary = systemSummary;
+        this.contributors =
+                contributors == null
+                        ? List.of()
+                        : List.copyOf(contributors);
     }
 
     @Override
@@ -39,11 +56,38 @@ public class RecommendedActionService implements RecommendedActionProvider {
                     List.of());
         }
 
-        return summary.issues().stream()
+        Optional<RecommendationCandidate> ce =
+                summary.issues().stream()
                 .sorted(Comparator.comparingInt(this::priority))
-                .map(this::fromIssue)
                 .findFirst()
+                .map(issue -> new RecommendationCandidate(
+                        priority(issue),
+                        fromIssue(issue)));
+        Optional<RecommendationCandidate> contributed =
+                contributors.stream()
+                        .map(this::safeContribution)
+                        .flatMap(Optional::stream)
+                        .map(value -> new RecommendationCandidate(
+                                value.priority(),
+                                value.action()))
+                        .min(Comparator.comparingInt(
+                                RecommendationCandidate::priority));
+        return java.util.stream.Stream.of(ce, contributed)
+                .flatMap(Optional::stream)
+                .min(Comparator.comparingInt(
+                        RecommendationCandidate::priority))
+                .map(RecommendationCandidate::action)
                 .orElseGet(this::none);
+    }
+
+    private Optional<RecommendedActionContribution>
+            safeContribution(
+                    RecommendedActionContributor contributor) {
+        try {
+            return contributor.current();
+        } catch (RuntimeException exception) {
+            return Optional.empty();
+        }
     }
 
     private RecommendedAction fromIssue(AutarkOsIssue issue) {
@@ -81,5 +125,10 @@ public class RecommendedActionService implements RecommendedActionProvider {
                 Optional.empty(),
                 Optional.empty(),
                 List.of());
+    }
+
+    private record RecommendationCandidate(
+            int priority,
+            RecommendedAction action) {
     }
 }

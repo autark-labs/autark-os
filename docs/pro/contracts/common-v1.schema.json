@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/common-v1.schema.json",
+  "title": "Autark Pro common contract definitions",
+  "$defs": {
+    "schemaVersion": {
+      "const": "1"
+    },
+    "featureId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]{1,127}$",
+      "maxLength": 128
+    },
+    "entitlementState": {
+      "enum": [
+        "NOT_ACTIVATED",
+        "ACTIVATING",
+        "ACTIVE",
+        "ONLINE_GRACE",
+        "RETAINED_USE",
+        "SUSPENDED_ONLINE",
+        "REVOKED",
+        "INVALID",
+        "ERROR"
+      ]
+    },
+    "moduleState": {
+      "enum": [
+        "NOT_INSTALLED",
+        "RELEASE_AVAILABLE",
+        "DOWNLOADING",
+        "VERIFYING",
+        "STARTING_CANDIDATE",
+        "HEALTH_CHECKING",
+        "ACTIVE",
+        "DEGRADED",
+        "ROLLING_BACK",
+        "RETAINED_USE",
+        "UPDATE_INELIGIBLE",
+        "REMOVING",
+        "ERROR"
+      ]
+    },
+    "releaseChannel": {
+      "enum": ["development", "staging", "beta", "stable"]
+    },
+    "architecture": {
+      "enum": ["linux/amd64", "linux/arm64"]
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "maxLength": 128
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "base64Url": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "maxLength": 262144
+    },
+    "errorCode": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "signedEnvelope": {
+      "type": "object",
+      "description": "RFC 7515 JWS Flattened JSON Serialization. The protected header MUST contain alg=EdDSA, kid, and an allowlisted typ.",
+      "additionalProperties": false,
+      "required": ["payload", "protected", "signature"],
+      "properties": {
+        "payload": {
+          "$ref": "#/$defs/base64Url"
+        },
+        "protected": {
+          "$ref": "#/$defs/base64Url"
+        },
+        "signature": {
+          "$ref": "#/$defs/base64Url"
+        }
+      }
+    },
+    "ed25519PublicJwk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["crv", "kty", "x"],
+      "properties": {
+        "crv": {
+          "const": "Ed25519"
+        },
+        "kty": {
+          "const": "OKP"
+        },
+        "x": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    }
+  }
+}

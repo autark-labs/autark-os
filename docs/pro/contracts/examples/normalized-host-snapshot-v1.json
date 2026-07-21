@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "1",
+  "snapshotId": "66666666-6666-4666-8666-666666666666",
+  "generatedAt": "2026-07-19T12:00:00Z",
+  "system": {
+    "coreVersion": "0.1.0",
+    "architecture": "linux/amd64",
+    "hostReadiness": "available",
+    "tailscaleReadiness": "available"
+  },
+  "apps": [
+    {
+      "resourceRef": "app:0123456789abcdef01234567",
+      "displayName": "Vaultwarden",
+      "lifecycleState": "running",
+      "readiness": "available",
+      "updateAvailable": true,
+      "recentFailureCount": 0,
+      "repairCount": 0,
+      "jobConflict": null
+    }
+  ],
+  "foundServices": {
+    "found": 0,
+    "pinned": 0,
+    "recoverable": 0,
+    "blocked": 0,
+    "conflictCategories": []
+  },
+  "access": [
+    {
+      "resourceRef": "app:0123456789abcdef01234567",
+      "intent": "private",
+      "reachability": "available",
+      "mappingState": "current"
+    }
+  ],
+  "backups": {
+    "availability": "available",
+    "destination": {
+      "destinationRef": "backup-destination:primary",
+      "availability": "available"
+    },
+    "apps": [
+      {
+      "resourceRef": "app:0123456789abcdef01234567",
+      "coverage": "included",
+      "scheduleState": "configured",
+      "scheduleFrequency": "daily",
+      "lastRestorePointAt": "2026-07-19T02:00:00Z",
+      "lastVerificationAt": "2026-07-19T03:00:00Z",
+      "lastVerificationResult": "passed",
+      "recentFailureCount": 0,
+      "operationState": "idle",
+      "restoreEvidence": "observed",
+      "lastSuccessfulRestoreAt": "2026-07-18T04:00:00Z",
+      "retainedRestorePointCount": 7
+      }
+    ]
+  },
+  "storage": {
+    "availability": "available",
+    "totalBytes": 1000000000000,
+    "usedBytes": 400000000000,
+    "appDataBytes": 100500000000,
+    "backupTotalBytes": 1000000000000,
+    "backupVolumeUsedBytes": 310000000000,
+    "backupUsedBytes": 200500000000,
+    "apps": [
+      {
+        "resourceRef": "app:0123456789abcdef01234567",
+        "usedBytes": 500000000
+      }
+    ],
+    "orphanBytes": 0
+  },
+  "metrics": {
+    "availability": "available",
+    "cpuPercent": 7.5,
+    "memoryUsedPercent": 35.2,
+    "diskUsedPercent": 40.0
+  },
+  "configuration": [
+    {
+      "fieldId": "backup.frequency",
+      "resourceRef": "app:0123456789abcdef01234567",
+      "value": "daily"
+    }
+  ],
+  "recentMutations": [
+    {
+      "method": "PATCH",
+      "path": "/api/backups/settings",
+      "observedAt": "2026-07-19T03:00:00Z",
+      "correlationId": "event_01"
+    }
+  ],
+  "recentEvents": [
+    {
+      "category": "backup",
+      "outcome": "completed",
+      "observedAt": "2026-07-19T03:00:00Z",
+      "correlationId": "job_backup_01",
+      "resourceRef": "app:0123456789abcdef01234567"
+    }
+  ],
+  "partial": false
+}

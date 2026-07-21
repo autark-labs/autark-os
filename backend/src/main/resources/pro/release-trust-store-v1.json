@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "keys": [
+    {
+      "keyId": "staging-release-2026-01",
+      "algorithm": "Ed25519",
+      "publicKey": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "5VYiPRdS1txtULTAdbtm-4PdxzE6-Q-sst3HrhNE5Cg"
+      }
+    }
+  ]
+}

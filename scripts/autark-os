@@ -29,6 +29,7 @@ Commands:
   doctor     Check host setup, service health, and core API readiness. Use --json for scripts.
   setup      Start or resume the first-boot setup flow.
   admin      Show the local setup code or reset the administrator password.
+  pro        Show public Pro device identity or rotate the installation identity.
   repair     Check installed Autark-OS and print recovery actions.
   update     Run the unified Autark-OS update flow or one scoped stage.
   uninstall  Remove Autark-OS service paths through the guided uninstall flow.
@@ -538,6 +539,116 @@ ADMIN_USAGE
       ;;
     *)
       die "Unknown admin command: ${1}. Run 'autark-os admin --help'."
+      ;;
+  esac
+}
+
+pro_identity_file() {
+  printf '%s/config/pro/device-identity.json\n' "$(installed_runtime_root)"
+}
+
+pro_identity_command() {
+  require_local_root
+  local identity_file device_id installation_id fingerprint mode
+  identity_file="$(pro_identity_file)"
+  [[ -f "${identity_file}" && ! -L "${identity_file}" && -r "${identity_file}" ]] \
+    || die "The protected Pro device identity is unavailable. Start or repair Autark-OS, then retry."
+  if has_command stat; then
+    mode="$(stat -c '%a' "${identity_file}" 2>/dev/null || true)"
+    [[ -z "${mode}" || "${mode}" == "600" ]] \
+      || die "The protected Pro device identity must have mode 0600. Refusing to read broader permissions."
+  fi
+  device_id="$(json_value deviceId "${identity_file}")"
+  installation_id="$(json_value installationId "${identity_file}")"
+  fingerprint="$(json_value publicKeyFingerprint "${identity_file}")"
+  [[ -n "${device_id}" && -n "${installation_id}" && -n "${fingerprint}" ]] \
+    || die "The protected Pro device identity is corrupt. Restore it; no replacement key was generated."
+  printf 'Device ID: %s\n' "${device_id}"
+  printf 'Installation ID: %s\n' "${installation_id}"
+  printf 'Public key fingerprint: %s\n' "${fingerprint}"
+}
+
+pro_rotate_installation_id_command() {
+  require_local_root
+  local confirmation="" runtime_root local_secret_file local_secret base_url response_file header_file body http_status
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --confirm)
+        shift
+        [[ $# -gt 0 ]] || die "--confirm requires ROTATE-INSTALLATION-IDENTITY."
+        confirmation="$1"
+        ;;
+      --confirm=*)
+        confirmation="${1#*=}"
+        ;;
+      *)
+        die "Usage: autark-os pro rotate-installation-id --confirm ROTATE-INSTALLATION-IDENTITY"
+        ;;
+    esac
+    shift
+  done
+  [[ "${confirmation}" == "ROTATE-INSTALLATION-IDENTITY" ]] \
+    || die "Installation identity rotation requires --confirm ROTATE-INSTALLATION-IDENTITY. No changes were made."
+
+  runtime_root="$(installed_runtime_root)"
+  local_secret_file="${runtime_root}/config/admin-local-secret"
+  [[ -r "${local_secret_file}" ]] \
+    || die "The local administrator recovery credential is missing. Start or repair Autark-OS, then retry."
+  local_secret="$(head -n 1 "${local_secret_file}" 2>/dev/null || true)"
+  [[ -n "${local_secret}" ]] \
+    || die "The local administrator recovery credential is empty. Repair Autark-OS, then retry."
+
+  base_url="http://127.0.0.1:$(resolve_port)"
+  response_file="$(mktemp)"
+  header_file="$(mktemp)"
+  chmod 600 "${response_file}" "${header_file}" 2>/dev/null || true
+  printf 'X-Autark-OS-Local-Secret: %s\n' "${local_secret}" >"${header_file}"
+  body='{"confirmation":"ROTATE-INSTALLATION-IDENTITY"}'
+  http_status="$(printf '%s' "${body}" | curl -sS -o "${response_file}" -w '%{http_code}' -X POST -H 'Content-Type: application/json' -H "@${header_file}" --data-binary @- "${base_url}/api/v1/pro/identity/local/rotate-installation" || true)"
+  rm -f "${header_file}"
+  if [[ "${http_status}" != "200" || "$(json_bool ok "${response_file}")" != "true" ]]; then
+    local message
+    message="$(json_value message "${response_file}")"
+    rm -f "${response_file}"
+    die "${message:-Autark-OS could not rotate the installation identity. Check 'autark-os status' and retry.}"
+  fi
+  local device_id installation_id
+  device_id="$(json_value deviceId "${response_file}")"
+  installation_id="$(json_value installationId "${response_file}")"
+  rm -f "${response_file}"
+  log "Installation identity rotated. The device signing key was preserved."
+  log "Device ID: ${device_id}"
+  log "New installation ID: ${installation_id}"
+}
+
+pro_command() {
+  case "${1:-help}" in
+    identity)
+      shift || true
+      [[ $# -eq 0 ]] || die "Usage: autark-os pro identity"
+      pro_identity_command
+      ;;
+    rotate-installation-id)
+      shift || true
+      pro_rotate_installation_id_command "$@"
+      ;;
+    help|-h|--help)
+      cat <<PRO_USAGE
+Usage: autark-os pro <command>
+
+Local Pro identity recovery commands:
+  identity
+      Print public device identity metadata. Requires sudo/root.
+  rotate-installation-id --confirm ROTATE-INSTALLATION-IDENTITY
+      Rotate only the installation ID through the loopback recovery endpoint.
+      The device ID and Ed25519 signing key are preserved. Requires sudo/root.
+
+There is no automatic device-key rotation command. Restore a lost or corrupt
+protected identity file instead of silently orphaning its entitlement.
+PRO_USAGE
+      ;;
+    *)
+      die "Unknown Pro command: ${1}. Run 'autark-os pro --help'."
       ;;
   esac
 }
@@ -2759,6 +2870,10 @@ case "${1:-help}" in
   admin)
     shift || true
     admin_command "$@"
+    ;;
+  pro)
+    shift || true
+    pro_command "$@"
     ;;
   repair)
     shift || true

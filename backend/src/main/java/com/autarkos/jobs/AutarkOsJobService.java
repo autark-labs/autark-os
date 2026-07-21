@@ -63,13 +63,16 @@ public class AutarkOsJobService {
     }
 
     public AutarkOsJob startWithJob(String type, String subjectId, List<AutarkOsJobStep> steps, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
-        Optional<AutarkOsJob> active = activeFor(type, subjectId);
-        if (active.isPresent()) {
-            return active.get();
+        AutarkOsJob job;
+        synchronized (jobStartTransition) {
+            Optional<AutarkOsJob> active = activeFor(type, subjectId);
+            if (active.isPresent()) {
+                return active.get();
+            }
+            job = create(type, subjectId, steps);
+            Runnable task = () -> run(job, operation);
+            queuedTasks.put(job.jobId(), task);
         }
-        AutarkOsJob job = create(type, subjectId, steps);
-        Runnable task = () -> run(job, operation);
-        queuedTasks.put(job.jobId(), task);
         if (autoRun) {
             schedule(job);
         }
@@ -87,8 +90,16 @@ public class AutarkOsJobService {
     }
 
     public AutarkOsJob recordProgress(String jobId, List<AutarkOsJobStep> steps) {
-        String currentStep = steps == null || steps.isEmpty() ? currentStep(jobId) : steps.getLast().id();
-        return update(jobId, "running", currentStep, steps == null ? List.of() : steps, null, null, Map.of());
+        List<AutarkOsJobStep> safeSteps =
+                steps == null ? List.of() : steps;
+        return update(
+                jobId,
+                "running",
+                progressStep(jobId, safeSteps),
+                safeSteps,
+                null,
+                null,
+                Map.of());
     }
 
     public Optional<AutarkOsJob> cancel(String jobId) {
@@ -177,6 +188,30 @@ public class AutarkOsJobService {
     private Optional<AutarkOsJob> activeFor(String type, String subjectId) {
         return repository.activeFor(AutarkOsJobs.clean(type, "job"), AutarkOsJobs.blankToNull(subjectId))
                 .map(this::toDomain);
+    }
+
+    private String progressStep(
+            String jobId,
+            List<AutarkOsJobStep> steps) {
+        if (steps.isEmpty()) {
+            return currentStep(jobId);
+        }
+        return steps.stream()
+                .filter(step -> AutarkOsStates.JobStatus.RUNNING.equals(
+                        step.status()))
+                .findFirst()
+                .or(() -> steps.stream()
+                        .filter(step ->
+                                AutarkOsStates.JobStatus.FAILED.equals(
+                                        step.status()))
+                        .findFirst())
+                .or(() -> steps.stream()
+                        .filter(step ->
+                                AutarkOsStates.JobStatus.PENDING.equals(
+                                        step.status()))
+                        .findFirst())
+                .orElse(steps.getLast())
+                .id();
     }
 
     private AutarkOsJob create(String type, String subjectId, List<AutarkOsJobStep> steps) {
@@ -276,6 +311,7 @@ public class AutarkOsJobService {
             case AutarkOsStates.JobType.INSTALL_APP -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";
             case AutarkOsStates.JobType.UPDATE_APP -> "This app update was interrupted when Autark-OS stopped. Review My Apps and roll back the saved release before trying again.";
             case AutarkOsStates.JobType.ROLLBACK_APP -> "This app rollback was interrupted when Autark-OS stopped. Review My Apps before starting another release action.";
+            case "pro_module_change" -> "This Autark Pro module operation was interrupted. Its persisted state will be recovered safely.";
             case "backup" -> "This backup was interrupted when Autark-OS stopped. Rerun the backup to create a fresh restore point.";
             default -> "This job was interrupted when Autark-OS stopped. Start it again if it is still needed.";
         };
@@ -285,7 +321,8 @@ public class AutarkOsJobService {
         return List.of(
                 AutarkOsStates.JobType.INSTALL_APP,
                 AutarkOsStates.JobType.UPDATE_APP,
-                AutarkOsStates.JobType.ROLLBACK_APP).contains(type);
+                AutarkOsStates.JobType.ROLLBACK_APP,
+                "pro_module_change").contains(type);
     }
 
     private String safeMessage(RuntimeException exception) {

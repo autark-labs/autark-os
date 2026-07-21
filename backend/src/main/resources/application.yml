@@ -34,3 +34,14 @@ autark-os:
     attention-record-days: 180
     initial-delay-ms: 90000
     interval-ms: 21600000
+
+autark:
+  pro:
+    entitlement:
+      online-grace: 14d
+      retry-base: 1m
+      retry-maximum: 1h
+      renewal-jitter-maximum: 30m
+      scheduler-enabled: true
+      scheduler-initial-delay-ms: 30000
+      scheduler-interval-ms: 60000

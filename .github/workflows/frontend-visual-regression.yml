@@ -32,6 +32,10 @@ jobs:
       - name: Install the Chromium test browser
         run: yarn playwright install --with-deps chromium
 
+      - name: Validate Pro development simulator contracts
+        working-directory: .
+        run: node --test tools/pro-simulator/server.test.mjs
+
       - name: Run browser regression coverage
         run: yarn test:e2e
 

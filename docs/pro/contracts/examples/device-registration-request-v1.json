@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "idempotencyKey": "55555555-5555-4555-8555-555555555555",
+  "activationTicket": "test_activation_ticket_that_is_not_a_production_secret",
+  "publicKey": {
+    "crv": "Ed25519",
+    "kty": "OKP",
+    "x": "11qYAYdk9J9mRuqW5bY6XzP5Q8jmYd6Q8Q8nXh0rj1A"
+  },
+  "challengeProof": {
+    "payload": "ZXhhbXBsZS1kZXZpY2UtY2hhbGxlbmdlLXBheWxvYWQ",
+    "protected": "ZXhhbXBsZS1wcm90ZWN0ZWQtaGVhZGVy",
+    "signature": "ZXhhbXBsZS10ZXN0LXNpZ25hdHVyZS1ub3QtdmFsaWQtZm9yLXByb2R1Y3Rpb24"
+  }
+}

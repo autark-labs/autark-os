@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/durable-product-grant.schema.json",
+  "title": "DurableProductGrant payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "grantId",
+    "deviceId",
+    "installationId",
+    "devicePublicKeyFingerprint",
+    "plan",
+    "features",
+    "releaseChannel",
+    "issuer",
+    "issuedAt",
+    "updatesThrough",
+    "localUse",
+    "keyId"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "grantId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "deviceId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "installationId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "devicePublicKeyFingerprint": {
+      "$ref": "common-v1.schema.json#/$defs/fingerprint"
+    },
+    "plan": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "features": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "common-v1.schema.json#/$defs/featureId"
+      }
+    },
+    "releaseChannel": {
+      "$ref": "common-v1.schema.json#/$defs/releaseChannel"
+    },
+    "issuer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "issuedAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "updatesThrough": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "localUse": {
+      "const": "perpetual"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,128}$"
+    }
+  }
+}

@@ -42,13 +42,37 @@ public class ActivityLogService {
     }
 
     public void api(String method, String path, int status, long durationMs) {
+        api(method, path, status, durationMs, null);
+    }
+
+    public void api(
+            String method,
+            String path,
+            int status,
+            long durationMs,
+            String correlationId) {
         String level = status >= 500 ? "error" : status >= 400 ? "warning" : "info";
         String outcome = status >= 400 ? "failed" : "completed";
         String title = requestTitle(method, path);
         String message = status >= 400
                 ? "Request finished with status " + status + "."
                 : "Request completed.";
-        record(level, "api", method + " " + path, title, message, null, outcome, "status=" + status + ";durationMs=" + durationMs);
+        String correlation = correlationId == null
+                || !correlationId.matches(
+                        "^[A-Za-z0-9._-]{1,128}$")
+                                ? ""
+                                : ";correlationId=" + correlationId;
+        record(
+                level,
+                "api",
+                method + " " + path,
+                title,
+                message,
+                null,
+                outcome,
+                "status=" + status
+                        + ";durationMs=" + durationMs
+                        + correlation);
     }
 
     public List<ActivityLog> recent(int limit) {

@@ -44,6 +44,7 @@ test('Activity Log keeps activity, attention, and system metrics in one bounded 
   await page.route('**/api/activity*', async (route) => {
     await route.fulfill({
       body: JSON.stringify([
+        { id: 12, level: 'success', category: 'pro', action: 'cutover', title: 'Pro agent cutover completed', message: 'Autark-OS recorded a cutover event with outcome completed.', appId: null, outcome: 'completed', details: '{"component":"autark-pro-agent","digestPrefix":"sha256:aaaaaaaaaaaa","outcome":"completed"}', createdAt: fixedAt },
         { id: 11, level: 'warning', category: 'system', action: 'review_storage', title: 'Storage review is available', message: 'An unused folder can be reviewed safely.', appId: null, outcome: 'needs_attention', details: 'Fixture warning detail', createdAt: fixedAt },
         { id: 10, level: 'success', category: 'repair', action: 'restart_worker', title: 'App recovered automatically', message: 'Paperless-ngx is responding again.', appId: 'paperless-ngx', outcome: 'completed', details: 'Fixture repair detail', createdAt: '2025-01-15T11:54:00.000Z' },
         { id: 9, level: 'success', category: 'backup', action: 'verify_backup', title: 'Backup verified', message: 'A restore point is ready.', appId: 'vaultwarden', outcome: 'completed', details: 'Fixture backup detail', createdAt: '2025-01-15T11:42:00.000Z' },
@@ -62,9 +63,18 @@ test('Activity Log keeps activity, attention, and system metrics in one bounded 
   await expect(page.getByText('Storage review is available').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'All levels' })).toHaveAttribute('aria-pressed', 'true');
 
+  await page.getByRole('tab', { name: 'Pro lifecycle' }).click();
+  await expect(page.getByRole('tab', { name: 'Pro lifecycle' })).toHaveAttribute('data-state', 'active');
+  await expect(page.getByText('Pro agent cutover completed').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Technical detail/ })).toBeVisible();
+
   await page.getByRole('tab', { name: 'System metrics' }).click();
   await expect(page.getByText('Device CPU')).toBeVisible();
   await expect(page.getByText('Autark-OS disk')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Autark-OS metrics' })).toBeVisible();
   await expectNoHorizontalOverflow(page);
+
+  await page.goto('/activity?category=pro', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('tab', { name: 'Pro lifecycle' })).toHaveAttribute('data-state', 'active');
+  await expect(page.getByText('Pro agent cutover completed').first()).toBeVisible();
 });

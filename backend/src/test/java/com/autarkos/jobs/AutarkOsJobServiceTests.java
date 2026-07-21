@@ -9,10 +9,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,6 +39,44 @@ class AutarkOsJobServiceTests {
         assertThat(second.jobId()).isEqualTo(first.jobId());
         assertThat(service.list()).hasSize(1);
         assertThat(service.findById(first.jobId()).orElseThrow().status()).isEqualTo("queued");
+    }
+
+    @Test
+    void concurrentDuplicateProChangesCollapseIntoOneDurableJob()
+            throws Exception {
+        AutarkOsJobService service = service();
+        ExecutorService callers = Executors.newFixedThreadPool(8);
+        CountDownLatch ready = new CountDownLatch(8);
+        CountDownLatch start = new CountDownLatch(1);
+        var jobIds = ConcurrentHashMap.<String>newKeySet();
+        try {
+            var futures = IntStream.range(0, 8)
+                    .mapToObj(index -> callers.submit(() -> {
+                        ready.countDown();
+                        await(start);
+                        jobIds.add(service.start(
+                                "pro_module_change",
+                                "autark-pro-agent",
+                                List.of(AutarkOsJobStep.pending(
+                                        "check_release",
+                                        "Check assigned release")),
+                                () -> AutarkOsJobOutcome.succeeded(
+                                        "Checked."))
+                                .jobId());
+                    }))
+                    .toList();
+            assertThat(ready.await(2, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            for (var future : futures) {
+                future.get(2, TimeUnit.SECONDS);
+            }
+        } finally {
+            start.countDown();
+            callers.shutdownNow();
+        }
+
+        assertThat(jobIds).hasSize(1);
+        assertThat(service.list()).hasSize(1);
     }
 
     @Test
@@ -255,6 +295,57 @@ class AutarkOsJobServiceTests {
         assertThat(running.status()).isEqualTo("running");
         assertThat(running.currentStep()).isEqualTo("prepare");
         assertThat(running.steps()).extracting(AutarkOsJobStep::label).containsExactly("Preparing app");
+    }
+
+    @Test
+    void liveProgressSelectsTheRunningOrNextPendingStep() {
+        AutarkOsJobService service = service();
+        AutarkOsJob job = service.start(
+                "pro_module_change",
+                "autark-pro-agent",
+                List.of(
+                        AutarkOsJobStep.pending(
+                                "download",
+                                "Download image"),
+                        AutarkOsJobStep.pending(
+                                "verify",
+                                "Verify image"),
+                        AutarkOsJobStep.pending(
+                                "activate",
+                                "Activate image")),
+                () -> AutarkOsJobOutcome.succeeded("Installed."));
+
+        AutarkOsJob downloading = service.recordProgress(
+                job.jobId(),
+                List.of(
+                        AutarkOsJobStep.running(
+                                "download",
+                                "Download image",
+                                "Downloading."),
+                        AutarkOsJobStep.pending(
+                                "verify",
+                                "Verify image"),
+                        AutarkOsJobStep.pending(
+                                "activate",
+                                "Activate image")));
+        assertThat(downloading.currentStep())
+                .isEqualTo("download");
+
+        AutarkOsJob betweenSteps = service.recordProgress(
+                job.jobId(),
+                List.of(
+                        AutarkOsJobStep.succeeded(
+                                "download",
+                                "Download image",
+                                "Downloaded."),
+                        AutarkOsJobStep.pending(
+                                "verify",
+                                "Verify image"),
+                        AutarkOsJobStep.pending(
+                                "activate",
+                                "Activate image")));
+        assertThat(betweenSteps.currentStep())
+                .isEqualTo("verify");
     }
 
     private AutarkOsJobService service() {

@@ -23,6 +23,10 @@ LICENSE_SOURCE="${REPO_ROOT}/LICENSE.md"
 COMMERCIAL_LICENSE_SOURCE="${REPO_ROOT}/COMMERCIAL-LICENSE.md"
 SUPPORT_SOURCE="${REPO_ROOT}/SUPPORT.md"
 SECURITY_SOURCE="${REPO_ROOT}/SECURITY.md"
+COSIGN_VERSION="3.1.2"
+COSIGN_AMD64_SHA256="f7622ed3cf22e55e1ae6377c080979ff77a22da9981c11df222a2e444991e7cf"
+COSIGN_ARM64_SHA256="90e7ae0b5dfd60f20816b52c012addf7fc055ebcc7bea4ce81c428ca8518c302"
+COSIGN_LICENSE_SOURCE="${REPO_ROOT}/docs/third-party-licenses/dashboard-icons-Apache-2.0.txt"
 [[ -r "${HOST_MATRIX_FILE}" ]] || { printf '[autark-os release] error: supported host policy is missing: %s\n' "${HOST_MATRIX_FILE}" >&2; exit 1; }
 # shellcheck source=supported-host-matrix.env
 source "${HOST_MATRIX_FILE}"
@@ -50,6 +54,8 @@ The bundle layout is:
   autark-os-release.env
   SHA256SUMS
   backend/autark-os-backend.jar
+  tools/cosign
+  tools/cosign-LICENSE
   scripts/bootstrap-autark-os.sh
   scripts/supported-host-matrix.env
   scripts/install-autark-os-service.sh
@@ -121,6 +127,70 @@ verify_runtime_architecture() {
   local detected
   detected="$(runtime_architecture "${java_binary}")"
   [[ "${detected}" == "${ARTIFACT_ARCHITECTURE}" ]] || die "Bundled Java runtime is ${detected}, but this artifact is declared ${ARTIFACT_ARCHITECTURE}."
+}
+
+prepare_cosign() {
+  local target="${OUTPUT_DIR}/tools/cosign"
+  local expected_sha source_url cache_root cached
+  case "${ARTIFACT_ARCHITECTURE}" in
+    amd64) expected_sha="${COSIGN_AMD64_SHA256}" ;;
+    arm64) expected_sha="${COSIGN_ARM64_SHA256}" ;;
+    *) die "Cosign is unavailable for ${ARTIFACT_ARCHITECTURE}." ;;
+  esac
+  source_url="https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-${ARTIFACT_ARCHITECTURE}"
+  cache_root="${AUTARK_OS_TOOL_CACHE:-${XDG_CACHE_HOME:-${HOME:-/tmp}/.cache}/autark-os}/cosign/v${COSIGN_VERSION}"
+  cached="${cache_root}/cosign-linux-${ARTIFACT_ARCHITECTURE}"
+  run_cmd mkdir -p "${OUTPUT_DIR}/tools"
+  if [[ -n "${AUTARK_OS_COSIGN_BINARY:-}" ]]; then
+    [[ "${DRY_RUN}" -eq 1 || -r "${AUTARK_OS_COSIGN_BINARY}" ]] ||
+      die "AUTARK_OS_COSIGN_BINARY is not readable: ${AUTARK_OS_COSIGN_BINARY}"
+    run_cmd cp "${AUTARK_OS_COSIGN_BINARY}" "${target}"
+  else
+    has_command curl || die "curl is required to retrieve pinned Cosign ${COSIGN_VERSION}."
+    if [[ "${DRY_RUN}" -eq 0 ]] &&
+      [[ -r "${cached}" ]] &&
+      printf '%s  %s\n' "${expected_sha}" "${cached}" |
+        sha256sum --check --status; then
+      cp "${cached}" "${target}"
+    elif [[ "${DRY_RUN}" -eq 0 ]]; then
+      mkdir -p "${cache_root}"
+      local download
+      download="$(mktemp "${cache_root}/.cosign-download.XXXXXX")"
+      if ! curl --fail --location --silent --show-error \
+        "${source_url}" \
+        --output "${download}"; then
+        rm -f "${download}"
+        die "Could not retrieve pinned Cosign ${COSIGN_VERSION}."
+      fi
+      if ! printf '%s  %s\n' "${expected_sha}" "${download}" |
+        sha256sum --check --status; then
+        rm -f "${download}"
+        die "Downloaded Cosign ${COSIGN_VERSION} checksum verification failed."
+      fi
+      chmod 0755 "${download}"
+      mv "${download}" "${cached}"
+      cp "${cached}" "${target}"
+    else
+      run_cmd curl --fail --location --silent --show-error \
+        "${source_url}" \
+        --output "${target}"
+    fi
+  fi
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    printf '%s  %s\n' "${expected_sha}" "${target}" |
+      sha256sum --check --status ||
+      die "Pinned Cosign ${COSIGN_VERSION} checksum verification failed."
+    chmod 0755 "${target}"
+    local detected
+    detected="$(runtime_architecture "${target}")"
+    [[ "${detected}" == "${ARTIFACT_ARCHITECTURE}" ]] ||
+      die "Bundled Cosign is ${detected}, but this artifact is ${ARTIFACT_ARCHITECTURE}."
+  else
+    run_cmd chmod 0755 "${target}"
+  fi
+  [[ "${DRY_RUN}" -eq 1 || -r "${COSIGN_LICENSE_SOURCE}" ]] ||
+    die "Cosign Apache-2.0 license text is missing."
+  run_cmd cp "${COSIGN_LICENSE_SOURCE}" "${OUTPUT_DIR}/tools/cosign-LICENSE"
 }
 
 run_cmd() {
@@ -309,6 +379,7 @@ AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
 AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
 AUTARK_OS_ARTIFACT_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
 AUTARK_OS_RUNTIME_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
+AUTARK_OS_COSIGN_VERSION=${COSIGN_VERSION}
 AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}
 AUTARK_OS_MIN_MEMORY_MB=${AUTARK_OS_MIN_MEMORY_MB}
 AUTARK_OS_MIN_DISK_KB=${AUTARK_OS_MIN_DISK_KB}
@@ -323,6 +394,7 @@ AUTARK_OS_UPDATE_CHANNEL=${CHANNEL}
 AUTARK_OS_RELEASE_NOTES_URL=${RELEASE_NOTES_URL}
 AUTARK_OS_ARTIFACT_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
 AUTARK_OS_RUNTIME_ARCHITECTURE=${ARTIFACT_ARCHITECTURE}
+AUTARK_OS_COSIGN_VERSION=${COSIGN_VERSION}
 AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}
 AUTARK_OS_MIN_MEMORY_MB=${AUTARK_OS_MIN_MEMORY_MB}
 AUTARK_OS_MIN_DISK_KB=${AUTARK_OS_MIN_DISK_KB}
@@ -383,6 +455,8 @@ write_release_json() {
   "artifacts": [
     "backend/autark-os-backend.jar",
     "runtime/bin/java",
+    "tools/cosign",
+    "tools/cosign-LICENSE",
     "scripts/bootstrap-autark-os.sh",
     "scripts/install-autark-os-service.sh",
     "scripts/install-autark-os.sh",
@@ -545,6 +619,7 @@ create_bundle() {
   run_cmd mkdir -p "${OUTPUT_DIR}/backend" "${OUTPUT_DIR}/scripts"
   build_runtime
   verify_runtime_architecture
+  prepare_cosign
   run_cmd cp "${jar}" "${OUTPUT_DIR}/backend/autark-os-backend.jar"
   run_cmd cp "${SCRIPT_DIR}/bootstrap-autark-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh"
   run_cmd cp "${SCRIPT_DIR}/supported-host-matrix.env" "${OUTPUT_DIR}/scripts/supported-host-matrix.env"
@@ -564,12 +639,12 @@ create_bundle() {
   write_metadata
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '+ cd %q && find backend runtime scripts docs \\( -type f -o -type l \\) -print0 | sort -z | xargs -0 sha256sum; sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
+    printf '+ cd %q && find backend runtime tools scripts docs \\( -type f -o -type l \\) -print0 | sort -z | xargs -0 sha256sum; sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
   else
     (
       cd "${OUTPUT_DIR}"
       {
-        find backend runtime scripts docs \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum
+        find backend runtime tools scripts docs \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum
         sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json
       } >SHA256SUMS
     )

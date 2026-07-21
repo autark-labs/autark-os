@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/device-operation-challenge.schema.json",
+  "title": "Registered device operation challenge payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "nonce",
+    "purpose",
+    "deviceId",
+    "issuedAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32,256}$"
+    },
+    "purpose": {
+      "enum": [
+        "entitlement_renew",
+        "release_check",
+        "registry_token"
+      ]
+    },
+    "deviceId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "issuedAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "expiresAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    }
+  }
+}

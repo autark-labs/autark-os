@@ -1,6 +1,7 @@
 package com.autarkos.activity;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -9,6 +10,44 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface ActivityLogRepository extends JpaRepository<ActivityLogEntity, Long> {
+
+    Optional<ActivityLogEntity> findByEventKey(String eventKey);
+
+    @Modifying
+    @Query(value = """
+            insert or ignore into activity_logs (
+                level,
+                category,
+                action,
+                title,
+                message,
+                app_id,
+                outcome,
+                details,
+                created_at,
+                event_key
+            ) values (
+                :level,
+                'pro',
+                :action,
+                :title,
+                :message,
+                null,
+                :outcome,
+                :details,
+                :createdAt,
+                :eventKey
+            )
+            """, nativeQuery = true)
+    int insertProAudit(
+            @Param("level") String level,
+            @Param("action") String action,
+            @Param("title") String title,
+            @Param("message") String message,
+            @Param("outcome") String outcome,
+            @Param("details") String details,
+            @Param("createdAt") String createdAt,
+            @Param("eventKey") String eventKey);
 
     @Query(value = "select * from activity_logs order by created_at desc, id desc limit :limit", nativeQuery = true)
     List<ActivityLogEntity> recent(@Param("limit") int limit);
@@ -31,11 +70,21 @@ public interface ActivityLogRepository extends JpaRepository<ActivityLogEntity, 
 
     @Modifying
     @Transactional
-    @Query(value = "delete from activity_logs where level in ('info', 'success') and created_at < :cutoff", nativeQuery = true)
+    @Query(value = """
+            delete from activity_logs
+            where level in ('info', 'success')
+              and category <> 'pro'
+              and created_at < :cutoff
+            """, nativeQuery = true)
     int deleteRoutineBefore(@Param("cutoff") String cutoff);
 
     @Modifying
     @Transactional
-    @Query(value = "delete from activity_logs where level in ('warning', 'error') and created_at < :cutoff", nativeQuery = true)
+    @Query(value = """
+            delete from activity_logs
+            where level in ('warning', 'error')
+              and category <> 'pro'
+              and created_at < :cutoff
+            """, nativeQuery = true)
     int deleteAttentionBefore(@Param("cutoff") String cutoff);
 }

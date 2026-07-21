@@ -11,6 +11,9 @@ import com.autarkos.system.SystemCommandRunner;
 @Component
 public class ProcessHostDockerContainerDiscovery implements HostDockerContainerDiscovery {
 
+    static final String PRO_MANAGED_LABEL =
+            "com.autarkos.pro.managed";
+
     private final SystemCommandRunner commandRunner;
 
     public ProcessHostDockerContainerDiscovery(SystemCommandRunner commandRunner) {
@@ -31,6 +34,9 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
         return result.outputLines().stream()
                 .map(this::container)
                 .filter(container -> !container.name().isBlank())
+                .filter(container -> !"true".equals(
+                        container.labels().get(
+                                PRO_MANAGED_LABEL)))
                 .toList();
     }
 

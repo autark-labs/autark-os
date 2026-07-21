@@ -30,6 +30,8 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-fileops" ]]
 [[ -x "${bundle_dir}/runtime/bin/java" ]]
+[[ -x "${bundle_dir}/tools/cosign" ]]
+[[ -f "${bundle_dir}/tools/cosign-LICENSE" ]]
 [[ -f "${bundle_dir}/docs/GETTING_STARTED.md" ]]
 [[ -f "${bundle_dir}/docs/RELEASE_NOTES.md" ]]
 [[ -f "${bundle_dir}/docs/LICENSE.md" ]]
@@ -49,6 +51,7 @@ grep -q '^AUTARK_OS_UPDATE_CHANNEL=beta$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_RELEASE_NOTES_URL=https://example.invalid/autark-os/1.2.3$' "${bundle_dir}/autark-os-release.env"
 grep -q "^AUTARK_OS_ARTIFACT_ARCHITECTURE=${architecture}$" "${bundle_dir}/autark-os-release.env"
 grep -q "^AUTARK_OS_RUNTIME_ARCHITECTURE=${architecture}$" "${bundle_dir}/autark-os-release.env"
+grep -q '^AUTARK_OS_COSIGN_VERSION=3.1.2$' "${bundle_dir}/autark-os-release.env"
 grep -q '^AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=2$' "${bundle_dir}/autark-os-release.env"
 grep -q 'autark-os-release.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'autark-os-provenance.json' "${bundle_dir}/SHA256SUMS"
@@ -59,6 +62,8 @@ grep -q 'docs/GETTING_STARTED.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/RELEASE_NOTES.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/LICENSE.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'runtime/bin/java' "${bundle_dir}/SHA256SUMS"
+grep -q 'tools/cosign' "${bundle_dir}/SHA256SUMS"
+grep -q 'tools/cosign-LICENSE' "${bundle_dir}/SHA256SUMS"
 grep -q '^SuccessExitStatus=143$' "${bundle_dir}/scripts/install-autark-os-service.sh"
 
 python3 - "${bundle_dir}/autark-os-release.json" "${bundle_dir}/autark-os-provenance.json" <<'PY'
@@ -84,6 +89,8 @@ assert release["supportedHosts"]["raspbian"]["versions"] == ["11", "12", "13"]
 assert release["supportedHosts"]["raspbian"]["architectures"] == ["arm64"]
 assert "backend/autark-os-backend.jar" in release["artifacts"]
 assert "runtime/bin/java" in release["artifacts"]
+assert "tools/cosign" in release["artifacts"]
+assert "tools/cosign-LICENSE" in release["artifacts"]
 assert "scripts/autark-os-gui-installer.sh" in release["artifacts"]
 assert "scripts/autark-os-fileops" in release["artifacts"]
 assert "docs/GETTING_STARTED.md" in release["artifacts"]

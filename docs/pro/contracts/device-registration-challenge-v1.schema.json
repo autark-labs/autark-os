@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/device-registration-challenge.schema.json",
+  "title": "Device registration challenge payload v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "nonce",
+    "deviceId",
+    "installationId",
+    "publicKeyFingerprint",
+    "architecture",
+    "coreVersion",
+    "issuedAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "nonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32,256}$"
+    },
+    "deviceId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "installationId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "publicKeyFingerprint": {
+      "$ref": "common-v1.schema.json#/$defs/fingerprint"
+    },
+    "architecture": {
+      "$ref": "common-v1.schema.json#/$defs/architecture"
+    },
+    "coreVersion": {
+      "$ref": "common-v1.schema.json#/$defs/semver"
+    },
+    "issuedAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "expiresAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    }
+  }
+}

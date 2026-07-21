@@ -15,6 +15,7 @@ public final class BackupModels {
             boolean protectedByBackups,
             String backupFrequency,
             int backupRetention,
+            int retainedRestorePointCount,
             BackupContract backupContract,
             String runtimePath,
             long dataSizeBytes,

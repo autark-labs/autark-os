@@ -15,7 +15,8 @@ import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.plan.InstallPlan;
 import com.autarkos.marketplace.plan.InstallPlanService;
 
-@SpringBootTest
+@SpringBootTest(properties =
+        "autark-os.runtime-root=build/test-runtime/catalog-context")
 class MarketplaceCatalogServiceTests {
 
     @Autowired
@@ -79,7 +80,8 @@ class MarketplaceCatalogServiceTests {
 
         assertThat(plan.appId()).isEqualTo("vaultwarden");
         assertThat(plan.friendly().willCreate()).contains("A protected runtime folder for Vaultwarden");
-        assertThat(plan.technical().runtimeRoot()).endsWith("runtime/autark-os/apps/vaultwarden");
+        assertThat(plan.technical().runtimeRoot())
+                .endsWith("/apps/vaultwarden");
         assertThat(plan.technical().labels()).contains("autark-os.managed=true", "autark-os.app-id=vaultwarden");
     }
 

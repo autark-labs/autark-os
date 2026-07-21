@@ -42,10 +42,37 @@ public class ActivityLogEntity {
     @Column(name = "created_at", nullable = false)
     private String createdAt;
 
+    @Column(name = "event_key")
+    private String eventKey;
+
     protected ActivityLogEntity() {
     }
 
     public ActivityLogEntity(String level, String category, String action, String title, String message, String appId, String outcome, String details, String createdAt) {
+        this(
+                level,
+                category,
+                action,
+                title,
+                message,
+                appId,
+                outcome,
+                details,
+                createdAt,
+                null);
+    }
+
+    public ActivityLogEntity(
+            String level,
+            String category,
+            String action,
+            String title,
+            String message,
+            String appId,
+            String outcome,
+            String details,
+            String createdAt,
+            String eventKey) {
         this.level = level;
         this.category = category;
         this.action = action;
@@ -55,6 +82,7 @@ public class ActivityLogEntity {
         this.outcome = outcome;
         this.details = details;
         this.createdAt = createdAt;
+        this.eventKey = eventKey;
     }
 
     public Long id() {
@@ -95,5 +123,9 @@ public class ActivityLogEntity {
 
     public String createdAt() {
         return createdAt;
+    }
+
+    public String eventKey() {
+        return eventKey;
     }
 }

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1",
+  "nonce": "bm9uY2VfZm9yX3JlZ2lzdGVyZWRfZGV2aWNlXzEyMzQ1Njc4OTA",
+  "purpose": "entitlement_renew",
+  "deviceId": "11111111-1111-4111-8111-111111111111",
+  "issuedAt": "2026-07-19T12:00:00.000Z",
+  "expiresAt": "2026-07-19T12:05:00.000Z"
+}

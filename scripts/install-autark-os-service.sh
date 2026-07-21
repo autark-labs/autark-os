@@ -21,6 +21,7 @@ AUTARK_OS_BUILD_DATE="${AUTARK_OS_BUILD_DATE:-}"
 AUTARK_OS_UPDATE_CHANNEL="${AUTARK_OS_UPDATE_CHANNEL:-beta}"
 AUTARK_OS_INSTALL_METHOD="${AUTARK_OS_INSTALL_METHOD:-portable}"
 AUTARK_OS_UPDATE_REPOSITORY="${AUTARK_OS_UPDATE_REPOSITORY:-autark-labs/autark-os}"
+COSIGN_EXECUTABLE="${AUTARK_OS_COSIGN_EXECUTABLE:-${INSTALL_DIR}/bin/cosign}"
 
 DRY_RUN=0
 CHECK_ONLY=0
@@ -41,6 +42,7 @@ INSTALLED_BOOTSTRAP="${INSTALL_DIR}/bin/bootstrap-autark-os.sh"
 INSTALLED_HOST_MATRIX="${INSTALL_DIR}/bin/supported-host-matrix.env"
 INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
 INSTALLED_RELEASE_METADATA_DIR="${INSTALL_DIR}/release-metadata"
+COSIGN_SOURCE="${REPO_ROOT}/tools/cosign"
 
 usage() {
   cat <<USAGE
@@ -68,7 +70,7 @@ Environment overrides:
   AUTARK_OS_FILEOPS_HELPER, AUTARK_OS_SUDOERS_FILE, AUTARK_OS_VERSION,
   AUTARK_OS_BUILD_SHA, AUTARK_OS_BUILD_DATE, AUTARK_OS_UPDATE_CHANNEL,
   AUTARK_OS_INSTALL_METHOD, AUTARK_OS_UPDATE_REPOSITORY,
-  AUTARK_OS_DOCUMENTATION_DIR
+  AUTARK_OS_DOCUMENTATION_DIR, AUTARK_OS_COSIGN_EXECUTABLE
 USAGE
 }
 
@@ -121,6 +123,8 @@ refresh_derived_paths() {
   INSTALLED_HOST_MATRIX="${INSTALL_DIR}/bin/supported-host-matrix.env"
   INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
   INSTALLED_RELEASE_METADATA_DIR="${INSTALL_DIR}/release-metadata"
+  COSIGN_EXECUTABLE="${AUTARK_OS_COSIGN_EXECUTABLE:-${INSTALL_DIR}/bin/cosign}"
+  COSIGN_SOURCE="${REPO_ROOT}/tools/cosign"
 }
 
 require_absolute_path() {
@@ -242,6 +246,7 @@ parse_args() {
     shift
   done
   refresh_derived_paths
+  require_absolute_path "AUTARK_OS_COSIGN_EXECUTABLE" "${COSIGN_EXECUTABLE}"
 }
 
 require_root_or_reexec() {
@@ -253,7 +258,7 @@ require_root_or_reexec() {
   fi
   command_exists sudo || die "This installer needs root privileges. Install sudo or rerun as root."
   log "Requesting administrator privileges."
-  exec sudo --preserve-env=AUTARK_OS_USER,AUTARK_OS_GROUP,AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_FILEOPS_HELPER,AUTARK_OS_SUDOERS_FILE,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_DOCUMENTATION_DIR,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
+  exec sudo --preserve-env=AUTARK_OS_USER,AUTARK_OS_GROUP,AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_FILEOPS_HELPER,AUTARK_OS_SUDOERS_FILE,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_DOCUMENTATION_DIR,AUTARK_OS_COSIGN_EXECUTABLE,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
 }
 
 status_line() {
@@ -360,6 +365,11 @@ check_state() {
   else
     status_line "Installer helpers" "missing (${INSTALLED_BOOTSTRAP}, ${INSTALLED_HOST_MATRIX})"
   fi
+  if [[ -x "${COSIGN_EXECUTABLE}" ]]; then
+    status_line "Pro image verifier" "present (${COSIGN_EXECUTABLE})"
+  else
+    status_line "Pro image verifier" "unavailable (${COSIGN_EXECUTABLE}); CE remains available"
+  fi
 
   if [[ -f "${SERVICE_FILE}" ]]; then
     status_line "Systemd unit" "${SERVICE_FILE}"
@@ -425,6 +435,9 @@ check_state() {
     check_root_owned_path "Autark-OS command" "${INSTALLED_CLI}" "required"
     check_root_owned_path "Bootstrap helper" "${INSTALLED_BOOTSTRAP}" "required"
     check_root_owned_path "Host support matrix" "${INSTALLED_HOST_MATRIX}" "required"
+    if [[ -e "${COSIGN_EXECUTABLE}" ]]; then
+      check_root_owned_path "Pro image verifier" "${COSIGN_EXECUTABLE}" "optional"
+    fi
     check_root_owned_path "Installed backend" "${TARGET_BACKEND_JAR}" "required"
     check_root_owned_path "Program directory" "${INSTALL_DIR}" "required"
     check_root_owned_path "Service unit" "${SERVICE_FILE}" "required"
@@ -688,6 +701,17 @@ install_fileops_helper() {
   log "Installed Autark-OS file operations helper to ${INSTALLED_FILEOPS_HELPER}."
 }
 
+install_cosign() {
+  if [[ ! -f "${COSIGN_SOURCE}" ]]; then
+    warn "Pinned Cosign verifier is missing from ${COSIGN_SOURCE}. Community Edition remains available, but Autark Pro image activation will fail closed."
+    return 0
+  fi
+  [[ -x "${COSIGN_SOURCE}" ]] ||
+    die "Pinned Cosign verifier is not executable: ${COSIGN_SOURCE}"
+  run install -D -o root -g root -m 0755 "${COSIGN_SOURCE}" "${COSIGN_EXECUTABLE}"
+  log "Installed the Autark Pro image verifier to ${COSIGN_EXECUTABLE}."
+}
+
 configure_fileops_privilege() {
   local sudoers_dir
   sudoers_dir="$(dirname "${SUDOERS_FILE}")"
@@ -869,7 +893,7 @@ write_env_file() {
   local tmp_file
   tmp_file="$(mktemp)"
   if [[ -f "${env_file}" ]]; then
-    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_FILEOPS_HELPER|AUTARK_OS_FILEOPS_HELPER_SHA256|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
+    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_FILEOPS_HELPER|AUTARK_OS_FILEOPS_HELPER_SHA256|AUTARK_OS_COSIGN_EXECUTABLE|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
   fi
   if command_exists sha256sum; then
     fileops_helper_sha="$(sha256sum "${INSTALLED_FILEOPS_HELPER}" | awk '{print $1}')"
@@ -884,6 +908,7 @@ AUTARK_OS_LOG_DIR=${LOG_DIR}
 AUTARK_OS_BACKEND_JAR=${TARGET_BACKEND_JAR}
 AUTARK_OS_FILEOPS_HELPER=${INSTALLED_FILEOPS_HELPER}
 AUTARK_OS_FILEOPS_HELPER_SHA256=${fileops_helper_sha}
+AUTARK_OS_COSIGN_EXECUTABLE=${COSIGN_EXECUTABLE}
 AUTARK_OS_VERSION=${AUTARK_OS_VERSION}
 AUTARK_OS_BUILD_SHA=$(build_sha)
 AUTARK_OS_BUILD_DATE=$(build_date)
@@ -1002,6 +1027,7 @@ main() {
   install_setup_script
   install_cli
   install_fileops_helper
+  install_cosign
   configure_fileops_privilege
   configure_docker_access
   configure_tailscale_operator

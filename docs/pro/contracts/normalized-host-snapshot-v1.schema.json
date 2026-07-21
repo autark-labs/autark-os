@@ -1,0 +1,487 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/normalized-host-snapshot.schema.json",
+  "title": "NormalizedHostSnapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "snapshotId",
+    "generatedAt",
+    "system",
+    "apps",
+    "foundServices",
+    "access",
+    "backups",
+    "storage",
+    "metrics",
+    "configuration",
+    "recentMutations",
+    "recentEvents",
+    "partial"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "snapshotId": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "generatedAt": {
+      "$ref": "common-v1.schema.json#/$defs/dateTime"
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coreVersion", "architecture", "hostReadiness", "tailscaleReadiness"],
+      "properties": {
+        "coreVersion": {
+          "$ref": "common-v1.schema.json#/$defs/semver"
+        },
+        "architecture": {
+          "$ref": "common-v1.schema.json#/$defs/architecture"
+        },
+        "hostReadiness": {
+          "$ref": "#/$defs/availability"
+        },
+        "tailscaleReadiness": {
+          "$ref": "#/$defs/availability"
+        }
+      }
+    },
+    "apps": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/app"
+      }
+    },
+    "foundServices": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["found", "pinned", "recoverable", "blocked", "conflictCategories"],
+      "properties": {
+        "found": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pinned": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recoverable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blocked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "conflictCategories": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,63}$"
+          }
+        }
+      }
+    },
+    "access": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/access"
+      }
+    },
+    "backups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availability", "destination", "apps"],
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
+        "destination": {
+          "$ref": "#/$defs/backupDestination"
+        },
+        "apps": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/appBackup"
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "availability",
+        "totalBytes",
+        "usedBytes",
+        "appDataBytes",
+        "backupTotalBytes",
+        "backupVolumeUsedBytes",
+        "backupUsedBytes",
+        "apps",
+        "orphanBytes"
+      ],
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
+        "totalBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "usedBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "appDataBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "backupTotalBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "backupVolumeUsedBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "backupUsedBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "apps": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "$ref": "#/$defs/appStorage"
+          }
+        },
+        "orphanBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availability", "cpuPercent", "memoryUsedPercent", "diskUsedPercent"],
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/availability"
+        },
+        "cpuPercent": {
+          "$ref": "#/$defs/nullablePercent"
+        },
+        "memoryUsedPercent": {
+          "$ref": "#/$defs/nullablePercent"
+        },
+        "diskUsedPercent": {
+          "$ref": "#/$defs/nullablePercent"
+        }
+      }
+    },
+    "recentEvents": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "configuration": {
+      "type": "array",
+      "maxItems": 2048,
+      "items": {
+        "$ref": "#/$defs/configuration"
+      }
+    },
+    "recentMutations": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/mutation"
+      }
+    },
+    "partial": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "availability": {
+      "enum": ["available", "degraded", "unavailable", "unknown"]
+    },
+    "nullablePercent": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100
+    },
+    "resourceRef": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}:[A-Za-z0-9._-]{1,128}$"
+    },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourceRef",
+        "displayName",
+        "lifecycleState",
+        "readiness",
+        "updateAvailable",
+        "recentFailureCount",
+        "repairCount",
+        "jobConflict"
+      ],
+      "properties": {
+        "resourceRef": {
+          "$ref": "#/$defs/resourceRef"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "lifecycleState": {
+          "enum": ["running", "starting", "paused", "stopped", "failed", "unknown"]
+        },
+        "readiness": {
+          "$ref": "#/$defs/availability"
+        },
+        "updateAvailable": {
+          "type": ["boolean", "null"]
+        },
+        "recentFailureCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repairCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "jobConflict": {
+          "type": ["string", "null"],
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        }
+      }
+    },
+    "access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resourceRef", "intent", "reachability", "mappingState"],
+      "properties": {
+        "resourceRef": {
+          "$ref": "#/$defs/resourceRef"
+        },
+        "intent": {
+          "enum": ["lan", "private", "server-only", "public", "unknown"]
+        },
+        "reachability": {
+          "$ref": "#/$defs/availability"
+        },
+        "mappingState": {
+          "enum": ["current", "stale", "missing", "not-applicable", "unknown"]
+        }
+      }
+    },
+    "backupDestination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["destinationRef", "availability"],
+      "properties": {
+        "destinationRef": {
+          "type": ["string", "null"],
+          "pattern": "^backup-destination:[A-Za-z0-9._-]{1,128}$"
+        },
+        "availability": {
+          "$ref": "#/$defs/availability"
+        }
+      }
+    },
+    "appBackup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourceRef",
+        "coverage",
+        "scheduleState",
+        "scheduleFrequency",
+        "lastRestorePointAt",
+        "lastVerificationAt",
+        "lastVerificationResult",
+        "recentFailureCount",
+        "operationState",
+        "restoreEvidence",
+        "lastSuccessfulRestoreAt",
+        "retainedRestorePointCount"
+      ],
+      "properties": {
+        "resourceRef": {
+          "$ref": "#/$defs/resourceRef"
+        },
+        "coverage": {
+          "enum": ["included", "excluded-intentionally", "missing", "unknown"]
+        },
+        "scheduleState": {
+          "enum": ["configured", "disabled", "missing", "unknown"]
+        },
+        "scheduleFrequency": {
+          "enum": ["hourly", "daily", "weekly", "unknown"]
+        },
+        "lastRestorePointAt": {
+          "oneOf": [
+            {
+              "$ref": "common-v1.schema.json#/$defs/dateTime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastVerificationAt": {
+          "oneOf": [
+            {
+              "$ref": "common-v1.schema.json#/$defs/dateTime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lastVerificationResult": {
+          "enum": ["passed", "failed", "not-run", "unknown"]
+        },
+        "recentFailureCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operationState": {
+          "enum": ["idle", "active", "blocked", "unknown"]
+        },
+        "restoreEvidence": {
+          "enum": ["observed", "not-observed", "unknown"]
+        },
+        "lastSuccessfulRestoreAt": {
+          "oneOf": [
+            {
+              "$ref": "common-v1.schema.json#/$defs/dateTime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retainedRestorePointCount": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "appStorage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourceRef",
+        "usedBytes"
+      ],
+      "properties": {
+        "resourceRef": {
+          "$ref": "#/$defs/resourceRef"
+        },
+        "usedBytes": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fieldId",
+        "resourceRef",
+        "value"
+      ],
+      "properties": {
+        "fieldId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]{0,127}$"
+        },
+        "resourceRef": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/resourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "path", "observedAt", "correlationId"],
+      "properties": {
+        "method": {
+          "enum": ["POST", "PUT", "PATCH", "DELETE"]
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/api/[A-Za-z0-9._~!$&'()*+,;=:@%/-]{1,255}$"
+        },
+        "observedAt": {
+          "$ref": "common-v1.schema.json#/$defs/dateTime"
+        },
+        "correlationId": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9._-]{1,128}$"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "outcome", "observedAt", "correlationId", "resourceRef"],
+      "properties": {
+        "category": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "outcome": {
+          "enum": ["completed", "failed", "needs_attention", "unknown"]
+        },
+        "observedAt": {
+          "$ref": "common-v1.schema.json#/$defs/dateTime"
+        },
+        "correlationId": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Za-z0-9._-]{1,128}$"
+        },
+        "resourceRef": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/resourceRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

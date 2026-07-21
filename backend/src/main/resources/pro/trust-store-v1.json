@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "keys": [
+    {
+      "keyId": "staging-entitlement-2026-01",
+      "algorithm": "Ed25519",
+      "publicKey": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "JZvy1UHZoVBTZ4J9gUJMc_LTCHOLNL0XpZb0A2yz66Y"
+      }
+    }
+  ]
+}

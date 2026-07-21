@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,21 @@ import org.springframework.stereotype.Component;
 public class SystemCommandRunner {
 
     public CommandExecutionResult run(List<String> command) {
-        ProcessBuilder processBuilder = process(command);
+        return runWithEnvironment(command, null);
+    }
+
+    public CommandExecutionResult run(
+            List<String> command,
+            Map<String, String> environment) {
+        return runWithEnvironment(
+                command,
+                Map.copyOf(environment));
+    }
+
+    private CommandExecutionResult runWithEnvironment(
+            List<String> command,
+            Map<String, String> environment) {
+        ProcessBuilder processBuilder = process(command, environment);
         try {
             Process process = processBuilder.start();
             int exitCode = process.waitFor();
@@ -32,7 +47,21 @@ public class SystemCommandRunner {
     }
 
     public CommandExecutionResult run(List<String> command, Duration timeout, String timeoutMessage, String interruptedMessage) {
-        ProcessBuilder processBuilder = process(command);
+        return run(
+                command,
+                null,
+                timeout,
+                timeoutMessage,
+                interruptedMessage);
+    }
+
+    public CommandExecutionResult run(
+            List<String> command,
+            Map<String, String> environment,
+            Duration timeout,
+            String timeoutMessage,
+            String interruptedMessage) {
+        ProcessBuilder processBuilder = process(command, environment);
         try {
             Process process = processBuilder.start();
             if (!process.waitFor(timeout.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)) {
@@ -53,8 +82,14 @@ public class SystemCommandRunner {
         return run(List.of(command), timeout, timeoutMessage, interruptedMessage);
     }
 
-    private ProcessBuilder process(List<String> command) {
+    private ProcessBuilder process(
+            List<String> command,
+            Map<String, String> environment) {
         ProcessBuilder processBuilder = new ProcessBuilder(command);
+        if (environment != null) {
+            processBuilder.environment().clear();
+            processBuilder.environment().putAll(environment);
+        }
         processBuilder.redirectErrorStream(true);
         return processBuilder;
     }

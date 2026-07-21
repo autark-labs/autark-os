@@ -29,6 +29,9 @@ import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.devices.DeviceTrustRepository;
+import com.autarkos.pro.entitlement.JpaProEntitlementStore;
+import com.autarkos.pro.entitlement.ProEntitlementRepository;
+import com.autarkos.pro.entitlement.SqliteProEntitlementRepository;
 import com.autarkos.system.ProjectSettingsRepository;
 
 public final class JpaTestRepositories {
@@ -67,6 +70,11 @@ public final class JpaTestRepositories {
         return context(layout).getBean(InstalledAppRepository.class);
     }
 
+    public static ProEntitlementRepository proEntitlementRepository(
+            RuntimeLayout layout) {
+        return context(layout).getBean(ProEntitlementRepository.class);
+    }
+
     private static synchronized ConfigurableApplicationContext context(RuntimeLayout layout) {
         String runtimeRoot = layout.runtimeRoot().toString();
         ConfigurableApplicationContext existing = CONTEXTS.get(runtimeRoot);
@@ -102,7 +110,8 @@ public final class JpaTestRepositories {
             DeviceTrustRepository.class,
             DiscoverSetupRepository.class,
             ObservedServiceRepository.class,
-            InstalledAppRepository.class
+            InstalledAppRepository.class,
+            JpaProEntitlementStore.class
     })
     @Import(AutarkOsDataSourceConfiguration.class)
     static class JpaRepositoryTestConfiguration {
@@ -130,7 +139,8 @@ public final class JpaTestRepositories {
                     "com.autarkos.network.devices",
                     "com.autarkos.discover",
                     "com.autarkos.host",
-                    "com.autarkos.marketplace.install");
+                    "com.autarkos.marketplace.install",
+                    "com.autarkos.pro.entitlement");
             factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
             factory.setJpaPropertyMap(Map.of(
                     "hibernate.hbm2ddl.auto", "none",
@@ -141,6 +151,12 @@ public final class JpaTestRepositories {
         @Bean
         PlatformTransactionManager transactionManager(EntityManagerFactory entityManagerFactory) {
             return new JpaTransactionManager(entityManagerFactory);
+        }
+
+        @Bean
+        ProEntitlementRepository proEntitlementRepository(
+                JpaProEntitlementStore store) {
+            return new SqliteProEntitlementRepository(store);
         }
     }
 }

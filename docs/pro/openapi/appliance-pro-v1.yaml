@@ -1,0 +1,114 @@
+openapi: 3.1.0
+info:
+  title: Autark-OS Extension Lifecycle API
+  version: 1.0.0
+  description: Administrator-authenticated lifecycle and browser-host endpoints exposed by CE.
+servers:
+  - url: /
+paths:
+  /api/v1/pro/status:
+    get:
+      operationId: getPrivateExtensionLifecycleStatus
+      responses:
+        "200":
+          description: Device entitlement and signed extension lifecycle status.
+  /api/v1/pro/activation/start:
+    post:
+      operationId: startPrivateExtensionActivation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [activationCode]
+              properties:
+                activationCode:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+      responses:
+        "200":
+          description: Activation challenge accepted.
+  /api/v1/pro/activation/complete:
+    post:
+      operationId: completePrivateExtensionActivation
+      responses:
+        "200":
+          description: Signed entitlement verified and cached.
+  /api/v1/pro/entitlement/refresh:
+    post:
+      operationId: refreshPrivateExtensionEntitlement
+      responses:
+        "200":
+          description: Latest verified lifecycle status.
+  /api/v1/pro/module/check:
+    post:
+      operationId: checkPrivateExtensionRelease
+      responses:
+        "200":
+          description: Durable lifecycle job.
+  /api/v1/pro/module/install:
+    post:
+      operationId: installPrivateExtensionRelease
+      responses:
+        "200":
+          description: Durable verified install or update job.
+  /api/v1/pro/module/remove:
+    post:
+      operationId: removePrivateExtensionRelease
+      responses:
+        "200":
+          description: Durable removal job.
+  /api/v1/extensions/{extensionId}/ui-manifest:
+    get:
+      operationId: getHostedExtensionManifest
+      parameters:
+        - $ref: "#/components/parameters/ExtensionId"
+      responses:
+        "200":
+          description: Manifest from the active signed image.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/extension-ui-manifest-v1.schema.json
+        "404":
+          description: Extension is absent or unhealthy.
+  /api/v1/extensions/{extensionId}/assets/{assetName}:
+    get:
+      operationId: getVerifiedHostedExtensionAsset
+      parameters:
+        - $ref: "#/components/parameters/ExtensionId"
+        - in: path
+          name: assetName
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9._-]{1,128}$
+      responses:
+        "200":
+          description: Hash-verified immutable browser module.
+  /api/v1/extensions/{extensionId}/surfaces/{surface}:
+    get:
+      operationId: getHostedExtensionSurface
+      parameters:
+        - $ref: "#/components/parameters/ExtensionId"
+        - in: path
+          name: surface
+          required: true
+          schema:
+            type: string
+            pattern: ^[a-z][a-z0-9.-]{1,127}$
+      responses:
+        "200":
+          description: Opaque JSON for the installed extension browser module.
+components:
+  parameters:
+    ExtensionId:
+      in: path
+      name: extensionId
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z][a-z0-9-]{1,127}$

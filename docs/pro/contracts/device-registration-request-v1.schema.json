@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/device-registration-request.schema.json",
+  "title": "DeviceRegistrationRequest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "idempotencyKey",
+    "activationTicket",
+    "publicKey",
+    "challengeProof"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common-v1.schema.json#/$defs/schemaVersion"
+    },
+    "idempotencyKey": {
+      "$ref": "common-v1.schema.json#/$defs/uuid"
+    },
+    "activationTicket": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 4096
+    },
+    "publicKey": {
+      "$ref": "common-v1.schema.json#/$defs/ed25519PublicJwk"
+    },
+    "challengeProof": {
+      "$ref": "common-v1.schema.json#/$defs/signedEnvelope"
+    }
+  }
+}

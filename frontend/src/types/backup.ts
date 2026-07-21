@@ -36,6 +36,7 @@ export type AppBackupStatus = {
   protectedByBackups: boolean;
   backupFrequency: string;
   backupRetention: number;
+  retainedRestorePointCount: number;
   backupContract: BackupContract;
   runtimePath: string;
   dataSizeBytes: number;

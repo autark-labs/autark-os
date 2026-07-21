@@ -30,3 +30,12 @@ The bundled application artwork in `frontend/public/app-images` and
 
 Dashboard Icons is licensed under the Apache License, Version 2.0. A copy is
 included in `docs/third-party-licenses/dashboard-icons-Apache-2.0.txt`.
+
+## Sigstore Cosign
+
+Portable release bundles include the pinned
+[Sigstore Cosign](https://github.com/sigstore/cosign) command-line verifier.
+Autark-OS uses it to verify the short-lived GitHub Actions signing identity and
+release annotations on an exact Autark Pro agent image digest before
+activation. Cosign is licensed under the Apache License, Version 2.0; its
+license is included in release bundles as `tools/cosign-LICENSE`.
