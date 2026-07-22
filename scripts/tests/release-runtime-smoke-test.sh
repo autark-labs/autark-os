@@ -44,6 +44,7 @@ AUTARK_OS_BACKEND_JAR="${real_jar}" AUTARK_OS_BUILD_SHA="${jar_sha}" "${repo_roo
   --output-dir "${bundle_dir}" >/dev/null
 
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^java.compiler@'
+"${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.crypto.ec@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
 
 AUTARK_OS_RUNTIME_ROOT="${tmp_dir}/runtime-data" \

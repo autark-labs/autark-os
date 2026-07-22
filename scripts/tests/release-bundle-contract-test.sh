@@ -42,6 +42,7 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -f "${bundle_dir}/docs/SUPPORT.md" ]]
 [[ -f "${bundle_dir}/docs/SECURITY.md" ]]
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^java.compiler@'
+"${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.crypto.ec@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
 
 grep -q '^AUTARK_OS_VERSION=1.2.3$' "${bundle_dir}/autark-os-release.env"
