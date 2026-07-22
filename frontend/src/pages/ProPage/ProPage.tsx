@@ -11,17 +11,20 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { terminalJob, useAutarkOsJobQuery } from '@/repositories/jobRepository';
 import {
   useActivateProMutation,
+  useCheckProModuleReleaseMutation,
   useContinueProActivationMutation,
   useInstallOrUpdateProModuleMutation,
   useProStatusRepository,
   useRefreshProEntitlementMutation,
 } from '@/repositories/proRepository';
+import { proReleaseAction } from './proReleaseAction';
 
 function ProPage() {
   const statusQuery = useProStatusRepository();
   const activate = useActivateProMutation();
   const continueActivation = useContinueProActivationMutation();
   const refresh = useRefreshProEntitlementMutation();
+  const checkRelease = useCheckProModuleReleaseMutation();
   const install = useInstallOrUpdateProModuleMutation();
   const status = statusQuery.data ?? null;
   const moduleJob = useAutarkOsJobQuery(status?.module?.jobId ?? null);
@@ -30,6 +33,7 @@ function ProPage() {
   const busy = activate.isPending
     || continueActivation.isPending
     || refresh.isPending
+    || checkRelease.isPending
     || install.isPending
     || Boolean(moduleJob.data && !terminalJob(moduleJob.data));
 
@@ -84,6 +88,14 @@ function ProPage() {
     });
   }
 
+  function checkForExtensionRelease() {
+    setActionError(null);
+    checkRelease.mutate(undefined, {
+      onError: (error) => handleError(error, 'Pro release check failed'),
+      onSuccess: () => notify('Pro release check queued', 'Autark-OS will verify the assigned signed release before installation.'),
+    });
+  }
+
   function handleError(error: unknown, title: string) {
     const message = apiErrorMessage(error, `${title}.`);
     setActionError(message);
@@ -95,8 +107,11 @@ function ProPage() {
 
   const hasEntitlement = !['NOT_ACTIVATED', 'ACTIVATING']
     .includes(status.entitlement.state);
-  const canInstall = status.entitlement.localUseAllowed
-    && status.entitlement.updatesAllowed;
+  const releaseAction = proReleaseAction(
+    status.entitlement.localUseAllowed,
+    status.entitlement.updatesAllowed,
+    status.module.state,
+  );
   const extensionActive = Boolean(
     status.entitlement.localUseAllowed
     && status.module.activeDigest
@@ -131,9 +146,7 @@ function ProPage() {
                 />
                 <LifecycleValue
                   label="Private extension"
-                  value={extensionActive
-                    ? status.module.componentVersion ?? 'Installed'
-                    : formatLifecycleToken(status.module.state)}
+                  value={formatModuleLifecycle(status.module.state, status.module.componentVersion, extensionActive)}
                 />
               </dl>
               <div className="mt-6 flex flex-wrap gap-3">
@@ -143,10 +156,16 @@ function ProPage() {
                     Continue activation
                   </ProjectPrimaryButton>
                 )}
-                {canInstall && !extensionActive && (
+                {releaseAction === 'check' && (
+                  <ProjectPrimaryButton disabled={busy} onClick={checkForExtensionRelease} type="button">
+                    {busy ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                    Check for update
+                  </ProjectPrimaryButton>
+                )}
+                {releaseAction === 'install' && (
                   <ProjectPrimaryButton disabled={busy} onClick={installExtension} type="button">
                     {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
-                    Install private extension
+                    {status.module.activeDigest ? 'Update private extension' : 'Install private extension'}
                   </ProjectPrimaryButton>
                 )}
                 {hasEntitlement && (
@@ -237,6 +256,12 @@ function formatLifecycleDate(value: string | null) {
     month: 'short',
     year: 'numeric',
   }).format(date);
+}
+
+function formatModuleLifecycle(state: string, componentVersion: string | null, extensionActive: boolean) {
+  if (state === 'RELEASE_AVAILABLE' && componentVersion) return `${componentVersion} available`;
+  if (extensionActive) return componentVersion ?? 'Installed';
+  return formatLifecycleToken(state);
 }
 
 function LoadingState() {
