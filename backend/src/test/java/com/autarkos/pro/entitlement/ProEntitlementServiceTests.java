@@ -127,6 +127,36 @@ class ProEntitlementServiceTests {
     }
 
     @Test
+    void evaluatesSuccessfulRefreshAtCompletionAfterTrustedServerTimeArrives() {
+        MutableClock clock = new MutableClock(LOCAL_NOW);
+        Instant serverTime = LOCAL_NOW.plusSeconds(1);
+        Instant completedAt = LOCAL_NOW.plusSeconds(2);
+        controlPlane.documents = documents(serverTime, '5', '6');
+        controlPlane.afterRenew = () -> clock.set(completedAt);
+        ProAuditService audit = mock(ProAuditService.class);
+        List<ProAuditEvent> events = new ArrayList<>();
+        doAnswer(invocation -> {
+            events.add(invocation.getArgument(0));
+            return null;
+        }).when(audit).recordRequired(any(ProAuditEvent.class));
+
+        ProStatusResponse result = service(audit, clock).refresh();
+
+        assertThat(result.entitlement().state())
+                .isEqualTo(ProEntitlementState.ACTIVE);
+        assertThat(result.entitlement().reasonCode()).isEqualTo("none");
+        assertThat(repository.load().orElseThrow().lastRefreshSuccessAt())
+                .isEqualTo(completedAt);
+        assertThat(events.stream()
+                        .filter(event ->
+                                event.type()
+                                        == ProAuditEventType.ENTITLEMENT_REFRESH
+                                        && "completed".equals(event.outcome()))
+                        .map(ProAuditEvent::reasonCode))
+                .containsExactly("none");
+    }
+
+    @Test
     void deduplicatesConcurrentRefreshRequests() throws Exception {
         ProEntitlementService service = service();
         controlPlane.prepareBlockedRenewal();
@@ -388,6 +418,12 @@ class ProEntitlementServiceTests {
 
     private ProEntitlementService service(
             ProAuditService audit) {
+        return service(audit, Clock.fixed(LOCAL_NOW, ZoneOffset.UTC));
+    }
+
+    private ProEntitlementService service(
+            ProAuditService audit,
+            Clock clock) {
         ProTrustStore trustStore = new ProTrustStore() {
             @Override
             public PublicKey verificationKey(String requestedKeyId) {
@@ -412,7 +448,7 @@ class ProEntitlementServiceTests {
                 new ServiceLeaseVerifier(trustStore),
                 new ProEntitlementStateReducer(),
                 audit,
-                Clock.fixed(LOCAL_NOW, ZoneOffset.UTC),
+                clock,
                 bound -> 0,
                 Duration.ofDays(14),
                 Duration.ofMinutes(1),
@@ -580,6 +616,7 @@ class ProEntitlementServiceTests {
         private volatile EntitlementDocuments documents;
         private volatile RuntimeException renewalFailure;
         private volatile boolean blockRenewal;
+        private volatile Runnable afterRenew = () -> { };
 
         private FakeControlPlane(EntitlementDocuments documents) {
             this.documents = documents;
@@ -655,6 +692,7 @@ class ProEntitlementServiceTests {
             if (renewalFailure != null) {
                 throw renewalFailure;
             }
+            afterRenew.run();
             EntitlementDocuments current = documents;
             return new EntitlementDocuments(
                     current.schemaVersion(),
@@ -690,6 +728,37 @@ class ProEntitlementServiceTests {
                     LOCAL_NOW,
                     LOCAL_NOW.plus(Duration.ofMinutes(5)),
                     requestId);
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private final AtomicReference<Instant> current;
+
+        private MutableClock(Instant current) {
+            this.current = new AtomicReference<>(current);
+        }
+
+        private void set(Instant instant) {
+            current.set(instant);
+        }
+
+        @Override
+        public java.time.ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(java.time.ZoneId zone) {
+            if (!ZoneOffset.UTC.equals(zone)) {
+                throw new IllegalArgumentException("Only UTC is supported by this test clock.");
+            }
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return current.get();
         }
     }
 }

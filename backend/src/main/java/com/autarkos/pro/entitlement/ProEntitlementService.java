@@ -529,12 +529,13 @@ public class ProEntitlementService {
                             identity,
                             grant.grant());
             validateResponse(documents, grant, lease, original, identity);
-            Instant nextAttempt = nextSuccessfulRefresh(now, lease);
+            Instant completedAt = clock.instant();
+            Instant nextAttempt = nextSuccessfulRefresh(completedAt, lease);
             ProEntitlementStatus refreshedEntitlement = reducer.reduce(
                     grant,
                     lease,
                     identity,
-                    now,
+                    completedAt,
                     documents.serverTime(),
                     onlineGrace);
             audit(
@@ -576,9 +577,9 @@ public class ProEntitlementService {
                         lease,
                         documents.serverTime(),
                         nextAttempt,
-                        now));
+                        completedAt));
             }
-            return response(saved, identity, false, now);
+            return response(saved, identity, false, completedAt);
         } catch (RuntimeException exception) {
             if (exception instanceof ProAuditException) {
                 throw exception;
