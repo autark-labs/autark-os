@@ -98,6 +98,13 @@ in order:
 
 Failure at any step leaves the candidate without routing authority.
 
+The signed candidate envelope, digest, fingerprint, sequence, and trusted
+release-check server time are persisted as one authority tuple. Install-time
+reverification uses the later of that checkpoint and the current entitlement
+checkpoint, so a restart cannot weaken expiry or future-manifest checks.
+Incomplete legacy tuples are discarded while their accepted sequence floor is
+retained.
+
 ## Atomic cutover and recovery
 
 The router holds one immutable endpoint in an atomic reference. The runtime

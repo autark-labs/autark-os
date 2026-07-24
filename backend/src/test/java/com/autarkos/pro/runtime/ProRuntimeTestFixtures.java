@@ -39,6 +39,7 @@ final class ProRuntimeTestFixtures {
                         List.of("autark-pro.extension"),
                         "release-test-key"),
                 "sha256:" + "c".repeat(64),
-                new SignedEnvelopeV1("eA", "eA", "eA"));
+                new SignedEnvelopeV1("eA", "eA", "eA"),
+                Instant.parse("2026-07-19T12:00:00Z"));
     }
 }

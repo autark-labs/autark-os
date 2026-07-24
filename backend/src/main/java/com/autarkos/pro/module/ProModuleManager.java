@@ -807,19 +807,21 @@ public class ProModuleManager implements ProModuleStatusProvider {
         return new ProModuleCandidate(
                 verified.manifest(),
                 verified.fingerprint(),
-                result.release());
+                result.release(),
+                trustedNow);
     }
 
     private ProModuleCandidate verifyPersistedCandidate(
             ProModuleSnapshot snapshot,
             ProModuleAuthorization authorization) {
-        Instant trustedNow =
-                authorization.entitlement().lastVerifiedServerTime();
-        if (trustedNow == null) {
+        if (snapshot.candidateVerifiedServerTime() == null) {
             throw new ProModuleException(
-                    "trusted_time_unavailable",
-                    "Verified server time is required for a Pro update.");
+                    "persisted_candidate_invalid",
+                    "Persisted Pro release authority is invalid.");
         }
+        Instant trustedNow = latestTrustedTime(
+                snapshot.candidateVerifiedServerTime(),
+                authorization.entitlement().lastVerifiedServerTime());
         ReleaseManifestVerifier.VerifiedRelease verified =
                 manifestVerifier.verifyForDownload(
                         snapshot.candidateEnvelope(),
@@ -838,7 +840,8 @@ public class ProModuleManager implements ProModuleStatusProvider {
         return new ProModuleCandidate(
                 verified.manifest(),
                 verified.fingerprint(),
-                snapshot.candidateEnvelope());
+                snapshot.candidateEnvelope(),
+                snapshot.candidateVerifiedServerTime());
     }
 
     private ReleaseManifestVerifier.VerificationContext verificationContext(
@@ -1267,6 +1270,7 @@ public class ProModuleManager implements ProModuleStatusProvider {
                 null,
                 null,
                 null,
+                null,
                 snapshot.acceptedManifestSequence(),
                 "not-checked",
                 "removed",
@@ -1554,6 +1558,17 @@ public class ProModuleManager implements ProModuleStatusProvider {
                     "Control-plane time did not advance monotonically.");
         }
         return candidate;
+    }
+
+    private static Instant latestTrustedTime(
+            Instant candidateVerifiedServerTime,
+            Instant entitlementVerifiedServerTime) {
+        if (entitlementVerifiedServerTime == null
+                || candidateVerifiedServerTime.isAfter(
+                        entitlementVerifiedServerTime)) {
+            return candidateVerifiedServerTime;
+        }
+        return entitlementVerifiedServerTime;
     }
 
     private static String installOperation(ProModuleSnapshot snapshot) {

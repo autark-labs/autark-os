@@ -75,6 +75,7 @@ public class SqliteProModuleRepository implements ProModuleRepository {
                     candidate_envelope_payload = ?,
                     candidate_envelope_protected = ?,
                     candidate_envelope_signature = ?,
+                    candidate_verified_server_time = ?,
                     accepted_manifest_sequence = ?,
                     health = ?,
                     last_health_result = ?,
@@ -178,6 +179,7 @@ public class SqliteProModuleRepository implements ProModuleRepository {
                 nullableLong(result, "candidate_manifest_sequence"),
                 result.getString("candidate_manifest_fingerprint"),
                 envelope,
+                nullableInstant(result, "candidate_verified_server_time"),
                 nullableLong(result, "accepted_manifest_sequence"),
                 result.getString("health"),
                 result.getString("last_health_result"),
@@ -225,18 +227,23 @@ public class SqliteProModuleRepository implements ProModuleRepository {
                 snapshot.candidateEnvelope() == null
                         ? null
                         : snapshot.candidateEnvelope().signature());
-        nullableLong(statement, 21, snapshot.acceptedManifestSequence());
-        statement.setString(22, snapshot.health());
-        statement.setString(23, snapshot.lastHealthResult());
         statement.setString(
-                24,
+                21,
+                snapshot.candidateVerifiedServerTime() == null
+                        ? null
+                        : snapshot.candidateVerifiedServerTime().toString());
+        nullableLong(statement, 22, snapshot.acceptedManifestSequence());
+        statement.setString(23, snapshot.health());
+        statement.setString(24, snapshot.lastHealthResult());
+        statement.setString(
+                25,
                 snapshot.lastSuccessfulTransitionAt() == null
                         ? null
                         : snapshot.lastSuccessfulTransitionAt().toString());
-        statement.setString(25, snapshot.lastErrorCode());
-        statement.setString(26, snapshot.lastErrorMessage());
-        statement.setString(27, snapshot.updatedAt().toString());
-        statement.setLong(28, snapshot.revision());
+        statement.setString(26, snapshot.lastErrorCode());
+        statement.setString(27, snapshot.lastErrorMessage());
+        statement.setString(28, snapshot.updatedAt().toString());
+        statement.setLong(29, snapshot.revision());
     }
 
     private static void requireSnapshot(ProModuleSnapshot snapshot) {
@@ -278,7 +285,8 @@ public class SqliteProModuleRepository implements ProModuleRepository {
                 && snapshot.candidateAgentApiRange() == null
                 && snapshot.candidateManifestSequence() == null
                 && snapshot.candidateManifestFingerprint() == null
-                && snapshot.candidateEnvelope() == null;
+                && snapshot.candidateEnvelope() == null
+                && snapshot.candidateVerifiedServerTime() == null;
         boolean present = snapshot.candidateDigest() != null
                 && snapshot.candidateVersion() != null
                 && snapshot.candidateAgentApiRange() != null
@@ -288,7 +296,8 @@ public class SqliteProModuleRepository implements ProModuleRepository {
                 && snapshot.candidateEnvelope() != null
                 && snapshot.candidateEnvelope().payload() != null
                 && snapshot.candidateEnvelope().protectedHeader() != null
-                && snapshot.candidateEnvelope().signature() != null;
+                && snapshot.candidateEnvelope().signature() != null
+                && snapshot.candidateVerifiedServerTime() != null;
         return absent || present;
     }
 

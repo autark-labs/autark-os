@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -49,6 +50,8 @@ class SqliteProModuleRepositoryTests {
                 .isEqualTo(candidate.manifest().digest());
         assertThat(restored.candidateEnvelope())
                 .isEqualTo(candidate.envelope());
+        assertThat(restored.candidateVerifiedServerTime())
+                .isEqualTo(candidate.verifiedServerTime());
         assertThat(restored.acceptedManifestSequence()).isEqualTo(7);
         assertThat(restored.revision()).isEqualTo(available.revision());
 
@@ -260,6 +263,82 @@ class SqliteProModuleRepositoryTests {
                         com.autarkos.pro.model.ProModuleState.ACTIVE);
     }
 
+    @Test
+    void v28DiscardsCandidateWithoutPersistedTrustedTime()
+            throws Exception {
+        String url = "jdbc:sqlite:"
+                + directory.resolve("candidate-upgrade.db");
+        Flyway.configure()
+                .dataSource(url, null, null)
+                .baselineOnMigrate(true)
+                .baselineVersion("0")
+                .target(MigrationVersion.fromVersion("27"))
+                .load()
+                .migrate();
+        SQLiteDataSource dataSource = new SQLiteDataSource();
+        dataSource.setUrl(url);
+        ProModuleCandidate candidate = candidate();
+        try (Connection connection = dataSource.getConnection();
+                var update = connection.prepareStatement("""
+                        update pro_module_state
+                        set state = 'RELEASE_AVAILABLE',
+                            operation = 'install',
+                            candidate_digest = ?,
+                            candidate_version = ?,
+                            candidate_agent_api_range = ?,
+                            candidate_manifest_sequence = ?,
+                            candidate_manifest_fingerprint = ?,
+                            candidate_envelope_payload = ?,
+                            candidate_envelope_protected = ?,
+                            candidate_envelope_signature = ?,
+                            accepted_manifest_sequence = ?
+                        where singleton_id = 1
+                        """)) {
+            update.setString(1, candidate.manifest().digest());
+            update.setString(2, candidate.manifest().version());
+            update.setString(3, candidate.manifest().agentApiRange());
+            update.setLong(4, candidate.manifest().sequence());
+            update.setString(5, candidate.fingerprint());
+            update.setString(6, candidate.envelope().payload());
+            update.setString(
+                    7,
+                    candidate.envelope().protectedHeader());
+            update.setString(8, candidate.envelope().signature());
+            update.setLong(9, candidate.manifest().sequence());
+            update.executeUpdate();
+        }
+
+        Flyway.configure()
+                .dataSource(url, null, null)
+                .load()
+                .migrate();
+
+        ProModuleSnapshot migrated =
+                new SqliteProModuleRepository(dataSource).load();
+        assertThat(migrated.state())
+                .isEqualTo(
+                        com.autarkos.pro.model.ProModuleState.NOT_INSTALLED);
+        assertThat(migrated.candidateDigest()).isNull();
+        assertThat(migrated.candidateVerifiedServerTime()).isNull();
+        assertThat(migrated.acceptedManifestSequence()).isEqualTo(7);
+        assertThat(migrated.lastHealthResult())
+                .isEqualTo("candidate_authority_migrated");
+
+        assertThatThrownBy(() -> {
+            try (Connection connection = dataSource.getConnection();
+                    var update = connection.prepareStatement("""
+                            update pro_module_state
+                            set candidate_verified_server_time = ?
+                            where singleton_id = 1
+                            """)) {
+                update.setString(
+                        1,
+                        candidate.verifiedServerTime().toString());
+                update.executeUpdate();
+            }
+        }).isInstanceOf(SQLException.class);
+    }
+
     private SQLiteDataSource dataSource() {
         String url = "jdbc:sqlite:"
                 + directory.resolve("autark-os.db");
@@ -303,6 +382,7 @@ class SqliteProModuleRepositoryTests {
                         List.of("autark-pro.extension"),
                         "release-test-key"),
                 "sha256:" + fingerprintCharacter.repeat(64),
-                new SignedEnvelopeV1("eA", "eA", "eA"));
+                new SignedEnvelopeV1("eA", "eA", "eA"),
+                Instant.parse("2026-07-19T12:00:00Z"));
     }
 }

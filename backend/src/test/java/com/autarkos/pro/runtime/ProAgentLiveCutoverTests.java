@@ -159,7 +159,8 @@ class ProAgentLiveCutoverTests {
                         List.of("autark-pro.extension"),
                         "release-test-key"),
                 "sha256:" + "f".repeat(64),
-                new SignedEnvelopeV1("eA", "eA", "eA"));
+                new SignedEnvelopeV1("eA", "eA", "eA"),
+                now);
     }
 
     private static String required(String name) {

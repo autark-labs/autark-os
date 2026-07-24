@@ -121,6 +121,39 @@ class ProModuleManagerTests {
     }
 
     @Test
+    void persistedCandidateRetainsReleaseCheckTrustedTimeForInstall() {
+        Instant staleEntitlementTime = NOW.minus(Duration.ofHours(8));
+        InMemoryRepository repository =
+                new InMemoryRepository(
+                        ProModuleSnapshot.notInstalled(NOW));
+        FakeRuntime runtime = new FakeRuntime(repository, true);
+        Fixture fixture = fixture(repository, runtime, false);
+        ProModuleManager.ProModuleAuthorization authorization =
+                authorization(staleEntitlementTime);
+
+        AutarkOsJob check =
+                fixture.manager.checkForRelease(authorization);
+        fixture.jobs.runQueuedJobsNow();
+
+        assertThat(fixture.jobs.findById(check.jobId()).orElseThrow()
+                .status()).isEqualTo("succeeded");
+        assertThat(repository.load().candidateVerifiedServerTime())
+                .isEqualTo(NOW);
+
+        AutarkOsJob install =
+                fixture.manager.installOrUpdate(authorization);
+        fixture.jobs.runQueuedJobsNow();
+
+        assertThat(fixture.jobs.findById(install.jobId()).orElseThrow()
+                .status()).isEqualTo("succeeded");
+        assertThat(fixture.verifier.contexts)
+                .extracting(
+                        ReleaseManifestVerifier.VerificationContext::trustedNow)
+                .containsExactly(NOW, NOW);
+        assertThat(runtime.calls).contains("download", "activate");
+    }
+
+    @Test
     void installAuditsEveryRuntimeBoundaryWithCompletedCutover() {
         InMemoryRepository repository =
                 new InMemoryRepository(
@@ -735,8 +768,17 @@ class ProModuleManagerTests {
     }
 
     private static ProModuleManager.ProModuleAuthorization authorization() {
+        return authorization(NOW);
+    }
+
+    private static ProModuleManager.ProModuleAuthorization authorization(
+            Instant lastVerifiedServerTime) {
         return new ProModuleManager.ProModuleAuthorization(
-                entitlement(ProEntitlementState.ACTIVE, true, true),
+                entitlement(
+                        ProEntitlementState.ACTIVE,
+                        true,
+                        true,
+                        lastVerifiedServerTime),
                 "staging");
     }
 
@@ -744,6 +786,14 @@ class ProModuleManagerTests {
             ProEntitlementState state,
             boolean localUse,
             boolean updates) {
+        return entitlement(state, localUse, updates, NOW);
+    }
+
+    private static ProEntitlementStatus entitlement(
+            ProEntitlementState state,
+            boolean localUse,
+            boolean updates,
+            Instant lastVerifiedServerTime) {
         return new ProEntitlementStatus(
                 "1",
                 state,
@@ -752,7 +802,7 @@ class ProModuleManagerTests {
                         "autark-pro.extension"),
                 NOW.plus(Duration.ofDays(365)),
                 NOW.plus(Duration.ofHours(24)),
-                NOW,
+                lastVerifiedServerTime,
                 localUse,
                 updates,
                 updates,
@@ -797,6 +847,7 @@ class ProModuleManagerTests {
                 candidate ? CANDIDATE.manifest().sequence() : null,
                 candidate ? CANDIDATE.fingerprint() : null,
                 candidate ? CANDIDATE.envelope() : null,
+                candidate ? CANDIDATE.verifiedServerTime() : null,
                 7L,
                 active ? "healthy" : "not-checked",
                 active ? "healthy" : null,
@@ -1113,6 +1164,8 @@ class ProModuleManagerTests {
 
         private final boolean reject;
         private int knownGoodCalls;
+        private final List<VerificationContext> contexts =
+                new ArrayList<>();
 
         private StubManifestVerifier(boolean reject) {
             super(new EmptyTrustStore(), new EmptyReleaseState(),
@@ -1124,6 +1177,7 @@ class ProModuleManagerTests {
         public VerifiedRelease verifyForDownload(
                 SignedEnvelopeV1 envelope,
                 VerificationContext context) {
+            contexts.add(context);
             if (reject) {
                 throw new com.autarkos.pro.model.ProContractVerificationException(
                         "invalid_signature",
@@ -1131,6 +1185,12 @@ class ProModuleManagerTests {
             }
             assertThat(context.expectedDigest())
                     .isIn(null, CANDIDATE.manifest().digest());
+            if (CANDIDATE.manifest().createdAt()
+                    .isAfter(context.trustedNow().plusSeconds(300))) {
+                throw new com.autarkos.pro.model.ProContractVerificationException(
+                        "manifest_from_future",
+                        "Release manifest is not valid yet.");
+            }
             return new VerifiedRelease(
                     CANDIDATE.manifest(),
                     CANDIDATE.fingerprint(),
