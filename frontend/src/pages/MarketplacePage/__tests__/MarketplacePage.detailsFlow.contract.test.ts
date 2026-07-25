@@ -45,7 +45,8 @@ test('Discover keeps details anchored to the persistent rail and reserves the sh
   assert.match(rail, /w-\[59\.5rem\] overflow-hidden/);
   assert.match(rail, /right-\[calc\(17\.5rem-1px\)\]/);
   assert.match(rail, /overflow-hidden rounded-l-2xl/);
-  assert.match(rail, /<Tabs className="min-h-0"/);
+  assert.match(rail, /<Tabs className="flex min-h-0 flex-1 flex-col"/);
+  assert.match(rail, /min-h-0 flex-1 overflow-y-auto p-4/);
   assert.match(rail, /onDetailsOpenChange/);
   assert.match(rail, /document\.addEventListener\('pointerdown', handlePointerDown, true\)/);
   assert.match(rail, /document\.removeEventListener\('pointerdown', handlePointerDown, true\)/);

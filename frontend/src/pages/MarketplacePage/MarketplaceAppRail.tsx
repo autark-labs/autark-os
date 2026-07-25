@@ -147,7 +147,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
       aria-hidden={!open}
       aria-label="Discover app details"
       className={cn(
-        'pointer-events-auto absolute right-[calc(17.5rem-1px)] top-0 h-full w-[42rem] max-w-[calc(100vw-24rem)] overflow-hidden rounded-l-2xl border border-r-0 bg-slate-900 text-slate-50 transition-transform duration-300 ease-out motion-reduce:transition-none',
+        'pointer-events-auto absolute right-[calc(17.5rem-1px)] top-0 flex h-full w-[42rem] max-w-[calc(100vw-24rem)] flex-col overflow-hidden rounded-l-2xl border border-r-0 bg-slate-900 text-slate-50 transition-transform duration-300 ease-out motion-reduce:transition-none',
         open
           ? 'translate-x-0 border-sky-300/30 shadow-2xl shadow-slate-950/40'
           : 'pointer-events-none translate-x-[calc(100%+19rem)] border-transparent shadow-none',
@@ -164,13 +164,13 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
         </ProjectDarkControlButton>
       </div>
 
-      <Tabs className="min-h-0" onValueChange={setTab} value={tab}>
+      <Tabs className="flex min-h-0 flex-1 flex-col" onValueChange={setTab} value={tab}>
         <TabsList className="w-full justify-start overflow-x-auto rounded-none border-b border-sky-300/15 bg-slate-900 px-3 py-2" variant="line">
           <TabsTrigger className="shrink-0 px-3 py-2 text-sky-100/60 data-active:text-white" value="overview">Overview</TabsTrigger>
           <TabsTrigger className="shrink-0 px-3 py-2 text-sky-100/60 data-active:text-white" value="details">Details</TabsTrigger>
         </TabsList>
 
-        <div className="p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <TabsContent className="mt-0 grid gap-4" value="overview">
             <div className="flex min-w-0 items-start gap-3">
               <AppImage app={appView.app} size="large" />
