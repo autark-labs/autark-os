@@ -922,7 +922,16 @@ install_runtime_image() {
     rm -rf "${TARGET_RUNTIME_DIR}"
     cp -a "${RUNTIME_IMAGE_SOURCE}" "${TARGET_RUNTIME_DIR}"
     chown -R root:root "${TARGET_RUNTIME_DIR}"
-    chmod -R go-w "${TARGET_RUNTIME_DIR}"
+    # Do not preserve a restrictive builder umask into the runtime. The service
+    # account needs traversal/read access, while only the known Java launch
+    # helpers need execute permissions.
+    find "${TARGET_RUNTIME_DIR}" -type d -exec chmod 0755 {} +
+    find "${TARGET_RUNTIME_DIR}" -type f -exec chmod 0644 {} +
+    chmod 0755 \
+      "${TARGET_RUNTIME_DIR}/bin/java" \
+      "${TARGET_RUNTIME_DIR}/bin/keytool" \
+      "${TARGET_RUNTIME_DIR}/lib/jexec" \
+      "${TARGET_RUNTIME_DIR}/lib/jspawnhelper"
   fi
   JAVA_BIN="${TARGET_RUNTIME_DIR}/bin/java"
 }

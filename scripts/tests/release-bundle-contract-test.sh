@@ -7,6 +7,10 @@ jar_dir="${repo_root}/backend/build/libs"
 fake_jar="${jar_dir}/autark-os-backend-contract-test.jar"
 trap 'rm -rf "${tmp_dir}"; rm -f "${fake_jar}"' EXIT
 
+# Release CI loads signing material with a restrictive umask. Build under that
+# condition so a non-root service can still execute the packaged runtime.
+umask 077
+
 python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
   --output "${fake_jar}" \
   --version 1.2.3 \
@@ -43,6 +47,27 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -f "${bundle_dir}/docs/SUPPORT.md" ]]
 [[ -f "${bundle_dir}/docs/SECURITY.md" ]]
 [[ -f "${bundle_dir}/docs/RELEASE_SIGNING.md" ]]
+python3 - "${bundle_dir}" <<'PY'
+from pathlib import Path
+import stat
+import sys
+
+bundle = Path(sys.argv[1])
+for path in [bundle, *bundle.rglob("*")]:
+    if path.is_dir():
+        assert stat.S_IMODE(path.stat().st_mode) == 0o755, path
+for relative in [
+    "runtime/bin/java",
+    "runtime/bin/keytool",
+    "runtime/lib/jexec",
+    "runtime/lib/jspawnhelper",
+    "tools/cosign",
+    "scripts/autark-os",
+]:
+    assert stat.S_IMODE((bundle / relative).stat().st_mode) == 0o755, relative
+for relative in ["backend/autark-os-backend.jar", "docs/GETTING_STARTED.md"]:
+    assert stat.S_IMODE((bundle / relative).stat().st_mode) == 0o644, relative
+PY
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^java.compiler@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.crypto.ec@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
@@ -220,6 +245,7 @@ assert str(private_key) not in (bundle / "SHA256SUMS").read_text(encoding="utf-8
 assert not any(path.name.endswith(".key") for path in bundle.rglob("*"))
 PY
 (cd "${signed_bundle_dir}" && sha256sum -c SHA256SUMS >/dev/null)
+grep -q 'keys/core-update-release.pub' "${signed_bundle_dir}/SHA256SUMS"
 
 production_policy_output="${tmp_dir}/production-policy.out"
 if AUTARK_OS_RELEASE_SIGNATURE_MODE=signed \

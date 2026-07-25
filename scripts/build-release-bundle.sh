@@ -723,6 +723,29 @@ sign_checksum_manifest() {
   [[ -s "${OUTPUT_DIR}/SHA256SUMS.sigstore.json" ]] || die "Cosign did not produce a release checksum signature bundle."
 }
 
+normalize_release_permissions() {
+  # CI materializes signing inputs with a restrictive umask. A release bundle is
+  # not secret, and the installed service runs as an unprivileged account, so
+  # every runtime directory must be traversable and every shared runtime file
+  # readable after extraction. Keep the small, known executable surface
+  # explicit instead of inheriting build-host file modes.
+  run_cmd find "${OUTPUT_DIR}" -type d -exec chmod 0755 {} +
+  run_cmd find "${OUTPUT_DIR}" -type f -exec chmod 0644 {} +
+  run_cmd chmod 0755 \
+    "${OUTPUT_DIR}/runtime/bin/java" \
+    "${OUTPUT_DIR}/runtime/bin/keytool" \
+    "${OUTPUT_DIR}/runtime/lib/jexec" \
+    "${OUTPUT_DIR}/runtime/lib/jspawnhelper" \
+    "${OUTPUT_DIR}/tools/cosign" \
+    "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh" \
+    "${OUTPUT_DIR}/scripts/install-autark-os-service.sh" \
+    "${OUTPUT_DIR}/scripts/install-autark-os.sh" \
+    "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh" \
+    "${OUTPUT_DIR}/scripts/autark-os" \
+    "${OUTPUT_DIR}/scripts/autark-os-fileops" \
+    "${OUTPUT_DIR}/scripts/autark-os-update-helper"
+}
+
 create_bundle() {
   local jar
   jar="$(find_backend_jar)"
@@ -748,23 +771,21 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/autark-os-update-helper" "${OUTPUT_DIR}/scripts/autark-os-update-helper"
   copy_release_docs "${jar}"
   prepare_release_signing_key
-  run_cmd chmod +x \
-    "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh" \
-    "${OUTPUT_DIR}/scripts/install-autark-os-service.sh" \
-    "${OUTPUT_DIR}/scripts/install-autark-os.sh" \
-    "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh" \
-    "${OUTPUT_DIR}/scripts/autark-os" \
-    "${OUTPUT_DIR}/scripts/autark-os-fileops" \
-    "${OUTPUT_DIR}/scripts/autark-os-update-helper"
   write_metadata
+  normalize_release_permissions
+
+  local checksum_roots=(backend runtime tools scripts docs)
+  [[ ! -d "${OUTPUT_DIR}/keys" ]] || checksum_roots+=(keys)
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
-    printf '+ cd %q && find backend runtime tools scripts docs \\( -type f -o -type l \\) -print0 | sort -z | xargs -0 sha256sum; sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n' "${OUTPUT_DIR}"
+    printf '+ cd %q && find' "${OUTPUT_DIR}"
+    printf ' %q' "${checksum_roots[@]}"
+    printf ' \\( -type f -o -type l \\) -print0 | sort -z | xargs -0 sha256sum; sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json > SHA256SUMS\n'
   else
     (
       cd "${OUTPUT_DIR}"
       {
-        find backend runtime tools scripts docs \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum
+        find "${checksum_roots[@]}" \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum
         sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json
       } >SHA256SUMS
     )
