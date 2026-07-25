@@ -62,6 +62,7 @@ class ProModuleTransitionPolicyTests {
         put(expected, ProModuleState.ACTIVE,
                 ProModuleState.RELEASE_AVAILABLE,
                 ProModuleState.DEGRADED,
+                ProModuleState.ROLLING_BACK,
                 ProModuleState.RETAINED_USE,
                 ProModuleState.UPDATE_INELIGIBLE,
                 ProModuleState.REMOVING,

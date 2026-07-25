@@ -207,6 +207,141 @@ class ProModuleManagerTests {
     }
 
     @Test
+    void completedCutoverAuditFailureRollsBackFirstInstall() {
+        InMemoryRepository repository =
+                new InMemoryRepository(
+                        ProModuleSnapshot.notInstalled(NOW));
+        FakeRuntime runtime = new FakeRuntime(repository, true);
+        ProAuditService audit = mock(ProAuditService.class);
+        doAnswer(invocation -> {
+            ProAuditEvent event = invocation.getArgument(0);
+            if (event.type() == ProAuditEventType.CUTOVER
+                    && "completed".equals(event.outcome())) {
+                throw new ProAuditException(
+                        new IllegalStateException("audit unavailable"));
+            }
+            return null;
+        }).when(audit).recordRequired(any(ProAuditEvent.class));
+        Fixture fixture = fixture(
+                repository,
+                runtime,
+                false,
+                true,
+                Duration.ofDays(7),
+                audit);
+
+        AutarkOsJob job =
+                fixture.manager.installOrUpdate(authorization());
+        fixture.jobs.runQueuedJobsNow();
+
+        assertThat(fixture.jobs.findById(job.jobId()).orElseThrow()
+                .status()).isEqualTo("failed");
+        assertThat(runtime.calls).containsSubsequence(
+                "activate",
+                "rollback");
+        assertThat(repository.load().state())
+                .isEqualTo(ProModuleState.NOT_INSTALLED);
+        assertThat(repository.load().activeDigest()).isNull();
+        assertThat(repository.load().operation()).isNull();
+        assertThat(fixture.verifier.knownGoodCalls).isZero();
+        assertThat(repository.history)
+                .extracting(ProModuleSnapshot::operation)
+                .contains("cutover");
+    }
+
+    @Test
+    void completedCutoverAuditFailureRestoresPreviousUpdate() {
+        InMemoryRepository repository = new InMemoryRepository(
+                activeSnapshot(ProModuleState.ACTIVE, false));
+        FakeRuntime runtime = new FakeRuntime(repository, true);
+        ProAuditService audit = mock(ProAuditService.class);
+        doAnswer(invocation -> {
+            ProAuditEvent event = invocation.getArgument(0);
+            if (event.type() == ProAuditEventType.CUTOVER
+                    && "completed".equals(event.outcome())) {
+                throw new ProAuditException(
+                        new IllegalStateException("audit unavailable"));
+            }
+            return null;
+        }).when(audit).recordRequired(any(ProAuditEvent.class));
+        Fixture fixture = fixture(
+                repository,
+                runtime,
+                false,
+                true,
+                Duration.ofDays(7),
+                audit);
+
+        AutarkOsJob job =
+                fixture.manager.installOrUpdate(authorization());
+        fixture.jobs.runQueuedJobsNow();
+
+        assertThat(fixture.jobs.findById(job.jobId()).orElseThrow()
+                .status()).isEqualTo("failed");
+        assertThat(repository.load().state()).isEqualTo(ProModuleState.ACTIVE);
+        assertThat(repository.load().activeDigest()).isEqualTo(ACTIVE_DIGEST);
+        assertThat(repository.load().previousDigest()).isNull();
+        assertThat(repository.load().operation()).isNull();
+        assertThat(runtime.calls).containsSubsequence(
+                "activate",
+                "rollback");
+    }
+
+    @Test
+    void knownGoodFailureRollsBackMarkedCutover() {
+        InMemoryRepository repository = new InMemoryRepository(
+                activeSnapshot(ProModuleState.ACTIVE, false));
+        FakeRuntime runtime = new FakeRuntime(repository, true);
+        Fixture fixture = fixture(repository, runtime, false);
+        fixture.verifier.failKnownGood();
+
+        AutarkOsJob job =
+                fixture.manager.installOrUpdate(authorization());
+        fixture.jobs.runQueuedJobsNow();
+
+        assertThat(fixture.jobs.findById(job.jobId()).orElseThrow()
+                .status()).isEqualTo("failed");
+        assertThat(repository.load().state()).isEqualTo(ProModuleState.ACTIVE);
+        assertThat(repository.load().activeDigest()).isEqualTo(ACTIVE_DIGEST);
+        assertThat(repository.load().previousDigest()).isNull();
+        assertThat(repository.load().operation()).isNull();
+        assertThat(runtime.calls).containsSubsequence(
+                "activate",
+                "rollback");
+    }
+
+    @Test
+    void startupRecoversMarkedCutoverToPreviousGeneration() {
+        ProModuleSnapshot marked = snapshot(
+                ProModuleState.HEALTH_CHECKING,
+                true,
+                true).activateCandidate(
+                        "cutover-job",
+                        "healthy",
+                        NOW).withState(
+                                ProModuleState.ACTIVE,
+                                "cutover",
+                                "cutover-job",
+                                "healthy",
+                                "healthy",
+                                null,
+                                null,
+                                NOW);
+        InMemoryRepository repository = new InMemoryRepository(marked);
+        FakeRuntime runtime = new FakeRuntime(repository, true);
+        Fixture fixture = fixture(repository, runtime, false);
+
+        ProModuleSnapshot recovered =
+                fixture.manager.recoverInterruptedState();
+
+        assertThat(recovered.state()).isEqualTo(ProModuleState.ACTIVE);
+        assertThat(recovered.activeDigest()).isEqualTo(ACTIVE_DIGEST);
+        assertThat(recovered.previousDigest()).isNull();
+        assertThat(recovered.operation()).isNull();
+        assertThat(runtime.calls).containsExactly("rollback", "reconcile");
+    }
+
+    @Test
     void requiredAuditFailureStopsBeforeRuntimeDownload() {
         InMemoryRepository repository =
                 new InMemoryRepository(
@@ -1065,7 +1200,12 @@ class ProModuleManagerTests {
                 String activeDigest,
                 String previousDigest,
                 String candidateDigest) {
-            assertState(ProModuleState.ROLLING_BACK);
+            ProModuleSnapshot snapshot = repository.load();
+            assertThat(snapshot.state() == ProModuleState.ROLLING_BACK
+                    || (snapshot.state() == ProModuleState.ACTIVE
+                            && "cutover".equals(snapshot.operation())
+                            && snapshot.previousDigest() == null))
+                    .isTrue();
             calls.add("rollback");
         }
 
@@ -1164,6 +1304,7 @@ class ProModuleManagerTests {
 
         private final boolean reject;
         private int knownGoodCalls;
+        private boolean failKnownGood;
         private final List<VerificationContext> contexts =
                 new ArrayList<>();
 
@@ -1171,6 +1312,10 @@ class ProModuleManagerTests {
             super(new EmptyTrustStore(), new EmptyReleaseState(),
                     CANDIDATE.manifest().repository());
             this.reject = reject;
+        }
+
+        private void failKnownGood() {
+            failKnownGood = true;
         }
 
         @Override
@@ -1202,6 +1347,11 @@ class ProModuleManagerTests {
                 VerifiedRelease release,
                 Instant knownGoodAt) {
             knownGoodCalls++;
+            if (failKnownGood) {
+                throw new ProModuleException(
+                        "known_good_write_failed",
+                        "Known-good release state is unavailable.");
+            }
         }
     }
 

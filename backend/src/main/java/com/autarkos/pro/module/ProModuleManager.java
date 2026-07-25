@@ -43,6 +43,7 @@ public class ProModuleManager implements ProModuleStatusProvider {
 
     static final String JOB_TYPE = "pro_module_change";
     static final String JOB_SUBJECT = "autark-pro-agent";
+    private static final String CUTOVER_OPERATION = "cutover";
     private static final Pattern ERROR_CODE =
             Pattern.compile("^[a-z][a-z0-9_]{1,63}$");
     private static final List<ProModuleState> IN_PROGRESS = List.of(
@@ -345,15 +346,19 @@ public class ProModuleManager implements ProModuleStatusProvider {
         try {
             ProModuleSnapshot snapshot = safeLoad();
             try {
-                ProModuleSnapshot recovered = switch (snapshot.state()) {
-                    case DOWNLOADING, VERIFYING ->
-                            unwindDownload(snapshot);
-                    case STARTING_CANDIDATE, HEALTH_CHECKING ->
-                            recoverCandidate(snapshot);
-                    case ROLLING_BACK -> finishRollback(snapshot);
-                    case REMOVING -> finishRemoval(snapshot);
-                    default -> snapshot;
-                };
+                ProModuleSnapshot recovered = isCutoverMarked(snapshot)
+                        ? rollbackMarkedCutover(
+                                snapshot,
+                                "interrupted_cutover")
+                        : switch (snapshot.state()) {
+                            case DOWNLOADING, VERIFYING ->
+                                    unwindDownload(snapshot);
+                            case STARTING_CANDIDATE, HEALTH_CHECKING ->
+                                    recoverCandidate(snapshot);
+                            case ROLLING_BACK -> finishRollback(snapshot);
+                            case REMOVING -> finishRemoval(snapshot);
+                            default -> snapshot;
+                        };
                 runtime.reconcileRouting(
                         recovered.activeDigest());
                 return recovered;
@@ -389,6 +394,10 @@ public class ProModuleManager implements ProModuleStatusProvider {
         }
         try {
             ProModuleSnapshot snapshot = safeLoad();
+            if (isCutoverMarked(snapshot)) {
+                rollbackMarkedCutover(snapshot, "cutover_recovery");
+                return;
+            }
             if (snapshot.activeDigest() == null
                     || !List.of(
                                     ProModuleState.ACTIVE,
@@ -663,12 +672,29 @@ public class ProModuleManager implements ProModuleStatusProvider {
                     ProAuditEventType.CUTOVER,
                     "started",
                     "healthy");
+            snapshot = repository.save(snapshot.withState(
+                    ProModuleState.HEALTH_CHECKING,
+                    CUTOVER_OPERATION,
+                    job.jobId(),
+                    "healthy",
+                    safeReason(health.reasonCode()),
+                    null,
+                    null,
+                    clock.instant()));
             runtime.activateCandidate(candidate);
             ProModuleSnapshot active = repository.save(
                     snapshot.activateCandidate(
                             job.jobId(),
                             safeReason(health.reasonCode()),
-                            clock.instant()));
+                            clock.instant()).withState(
+                                    ProModuleState.ACTIVE,
+                                    CUTOVER_OPERATION,
+                                    job.jobId(),
+                                    "healthy",
+                                    safeReason(health.reasonCode()),
+                                    null,
+                                    null,
+                                    clock.instant()));
             audit(
                     active,
                     ProModuleState.ACTIVE,
@@ -681,6 +707,15 @@ public class ProModuleManager implements ProModuleStatusProvider {
                             candidate.fingerprint(),
                             ReleaseStateRepository.AcceptanceResult.IDEMPOTENT),
                     clock.instant());
+            active = repository.save(active.withState(
+                    ProModuleState.ACTIVE,
+                    null,
+                    job.jobId(),
+                    "healthy",
+                    safeReason(health.reasonCode()),
+                    null,
+                    null,
+                    clock.instant()));
             progress.succeed("activate", "Verified candidate activated.");
             progress.begin(
                     "retain_rollback",
@@ -695,7 +730,19 @@ public class ProModuleManager implements ProModuleStatusProvider {
                     progress.steps());
         } catch (RuntimeException exception) {
             ProModuleSnapshot current = safeLoad();
-            if (List.of(
+            if (isCutoverMarked(current)) {
+                try {
+                    return rollbackMarkedCutover(
+                            current,
+                            progress,
+                            errorCode(exception));
+                } catch (RuntimeException rollbackFailure) {
+                    persistFailure(
+                            safeLoad(),
+                            "rollback_failed",
+                            "Autark Pro rollback needs attention.");
+                }
+            } else if (List.of(
                             ProModuleState.STARTING_CANDIDATE,
                             ProModuleState.HEALTH_CHECKING,
                             ProModuleState.ROLLING_BACK)
@@ -1130,6 +1177,82 @@ public class ProModuleManager implements ProModuleStatusProvider {
         return finishRollback(rolling);
     }
 
+    private ProModuleSnapshot rollbackMarkedCutover(
+            ProModuleSnapshot snapshot,
+            String reason) {
+        if (snapshot.state() == ProModuleState.ACTIVE
+                && snapshot.previousDigest() == null) {
+            runtime.rollback(null, null, snapshot.activeDigest());
+            ProModuleSnapshot removed = removedAfterMarkedCutover(
+                    snapshot,
+                    snapshot.jobId());
+            auditRecoveredCutoverRollback(
+                    removed,
+                    ProModuleState.NOT_INSTALLED,
+                    reason);
+            return repository.save(removed);
+        }
+
+        ProModuleSnapshot rolling = transitionWithoutAudit(
+                snapshot,
+                ProModuleState.ROLLING_BACK,
+                "rollback",
+                snapshot.jobId(),
+                "failed",
+                reason);
+        if (snapshot.state() == ProModuleState.ACTIVE) {
+            runtime.rollback(
+                    rolling.previousDigest(),
+                    null,
+                    rolling.activeDigest());
+            ProModuleSnapshot restored = rolling.restorePrevious(
+                    rolling.jobId(),
+                    reason,
+                    clock.instant());
+            auditRecoveredCutoverRollback(
+                    restored,
+                    ProModuleState.ACTIVE,
+                    reason);
+            resetActiveFailures(restored.activeDigest());
+            return repository.save(restored);
+        }
+
+        runtime.rollback(
+                rolling.activeDigest(),
+                rolling.previousDigest(),
+                rolling.candidateDigest());
+        ProModuleSnapshot restored = restoredAfterRollback(
+                rolling,
+                rolling.jobId(),
+                reason);
+        auditRecoveredCutoverRollback(restored, restored.state(), reason);
+        return repository.save(restored);
+    }
+
+    private AutarkOsJobOutcome rollbackMarkedCutover(
+            ProModuleSnapshot snapshot,
+            Progress progress,
+            String failureCode) {
+        progress.fail(
+                "activate",
+                "Candidate activation could not be recorded safely.");
+        progress.begin("rollback", "Restoring known-good runtime.");
+        ProModuleSnapshot restored = rollbackMarkedCutover(
+                snapshot,
+                "cutover_recovery");
+        progress.succeed("rollback", "Known-good runtime restored.");
+        return AutarkOsJobOutcome.failed(
+                "The candidate was rejected and the known-good runtime was restored.",
+                progress.failCurrent(
+                        "Candidate rejected: "
+                                + safeReason(failureCode)
+                                + "."));
+    }
+
+    private static boolean isCutoverMarked(ProModuleSnapshot snapshot) {
+        return CUTOVER_OPERATION.equals(snapshot.operation());
+    }
+
     private ProModuleSnapshot finishRollback(
             ProModuleSnapshot snapshot) {
         audit(
@@ -1250,6 +1373,18 @@ public class ProModuleManager implements ProModuleStatusProvider {
         transitions.requireAllowed(
                 snapshot.state(),
                 ProModuleState.NOT_INSTALLED);
+        return clearedModuleState(snapshot, jobId);
+    }
+
+    private ProModuleSnapshot removedAfterMarkedCutover(
+            ProModuleSnapshot snapshot,
+            String jobId) {
+        return clearedModuleState(snapshot, jobId);
+    }
+
+    private ProModuleSnapshot clearedModuleState(
+            ProModuleSnapshot snapshot,
+            String jobId) {
         Instant now = clock.instant();
         return new ProModuleSnapshot(
                 ProModuleState.NOT_INSTALLED,
@@ -1304,6 +1439,42 @@ public class ProModuleManager implements ProModuleStatusProvider {
                 null,
                 null,
                 clock.instant()));
+    }
+
+    private ProModuleSnapshot transitionWithoutAudit(
+            ProModuleSnapshot snapshot,
+            ProModuleState next,
+            String operation,
+            String jobId,
+            String health,
+            String healthResult) {
+        transitions.requireAllowed(snapshot.state(), next);
+        return repository.save(snapshot.withState(
+                next,
+                operation,
+                jobId,
+                health,
+                healthResult,
+                null,
+                null,
+                clock.instant()));
+    }
+
+    private void auditRecoveredCutoverRollback(
+            ProModuleSnapshot snapshot,
+            ProModuleState next,
+            String reason) {
+        try {
+            audit(
+                    snapshot,
+                    next,
+                    ProAuditEventType.ROLLBACK,
+                    "completed",
+                    safeAuditReason(reason));
+        } catch (RuntimeException ignored) {
+            // The failed cutover audit triggered this safe runtime recovery.
+            // Never re-strand a routed candidate while retrying its audit.
+        }
     }
 
     private void audit(

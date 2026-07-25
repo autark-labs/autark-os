@@ -73,6 +73,7 @@ public final class ProModuleTransitionPolicy {
         allow(values, ProModuleState.ACTIVE,
                 ProModuleState.RELEASE_AVAILABLE,
                 ProModuleState.DEGRADED,
+                ProModuleState.ROLLING_BACK,
                 ProModuleState.RETAINED_USE,
                 ProModuleState.UPDATE_INELIGIBLE,
                 ProModuleState.REMOVING,
