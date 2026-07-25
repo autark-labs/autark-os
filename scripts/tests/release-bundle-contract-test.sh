@@ -29,6 +29,7 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -x "${bundle_dir}/scripts/install-autark-os.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-fileops" ]]
+[[ -x "${bundle_dir}/scripts/autark-os-update-helper" ]]
 [[ -x "${bundle_dir}/runtime/bin/java" ]]
 [[ -x "${bundle_dir}/tools/cosign" ]]
 [[ -f "${bundle_dir}/tools/cosign-LICENSE" ]]
@@ -59,6 +60,7 @@ grep -q 'autark-os-provenance.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/install-autark-os.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-gui-installer.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-fileops' "${bundle_dir}/SHA256SUMS"
+grep -q 'scripts/autark-os-update-helper' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/GETTING_STARTED.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/RELEASE_NOTES.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/LICENSE.md' "${bundle_dir}/SHA256SUMS"
@@ -94,6 +96,7 @@ assert "tools/cosign" in release["artifacts"]
 assert "tools/cosign-LICENSE" in release["artifacts"]
 assert "scripts/autark-os-gui-installer.sh" in release["artifacts"]
 assert "scripts/autark-os-fileops" in release["artifacts"]
+assert "scripts/autark-os-update-helper" in release["artifacts"]
 assert "docs/GETTING_STARTED.md" in release["artifacts"]
 assert "docs/RELEASE_NOTES.md" in release["artifacts"]
 assert "docs/LICENSE.md" in release["artifacts"]
@@ -152,7 +155,7 @@ listed = {
 actual = {
     str(path.relative_to(bundle))
     for path in bundle.rglob("*")
-    if (path.is_file() or path.is_symlink()) and path.name != "SHA256SUMS"
+    if (path.is_file() or path.is_symlink()) and path.name not in {"SHA256SUMS", "SHA256SUMS.sig"}
 }
 assert listed == actual, (sorted(listed - actual), sorted(actual - listed))
 PY

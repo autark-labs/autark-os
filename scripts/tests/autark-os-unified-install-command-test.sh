@@ -85,6 +85,7 @@ architecture="$(dpkg --print-architecture)"
 mkdir -p "${bundle_dir}/scripts" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin"
 cp "${repo_root}/scripts/autark-os" "${bundle_dir}/scripts/autark-os"
 cp "${repo_root}/scripts/autark-os-fileops" "${bundle_dir}/scripts/autark-os-fileops"
+cp "${repo_root}/scripts/autark-os-update-helper" "${bundle_dir}/scripts/autark-os-update-helper"
 cp "${repo_root}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cp "${repo_root}/scripts/install-autark-os-service.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
 cp "${repo_root}/scripts/supported-host-matrix.env" "${bundle_dir}/scripts/supported-host-matrix.env"
@@ -99,7 +100,7 @@ AUTARK_OS_ARTIFACT_ARCHITECTURE=${architecture}
 AUTARK_OS_RUNTIME_ARCHITECTURE=${architecture}
 ENV
 printf '{"schemaVersion":2,"artifactArchitecture":"%s"}\n' "${architecture}" >"${bundle_dir}/autark-os-release.json"
-chmod +x "${bundle_dir}/scripts/autark-os" "${bundle_dir}/scripts/autark-os-fileops" "${bundle_dir}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
+chmod +x "${bundle_dir}/scripts/autark-os" "${bundle_dir}/scripts/autark-os-fileops" "${bundle_dir}/scripts/autark-os-update-helper" "${bundle_dir}/scripts/bootstrap-autark-os.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
 
 fake_file_bin="${tmp_dir}/fake-file-bin"
 mkdir -p "${fake_file_bin}"
@@ -133,7 +134,7 @@ assert plan["artifact"]["backendJar"].endswith("/backend/autark-os-backend.jar")
 PY
 
 printf 'autark-os-release.env\n' >"${bundle_dir}/SHA256SUMS"
-(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/supported-host-matrix.env autark-os-release.env autark-os-release.json > SHA256SUMS)
+(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/autark-os-update-helper scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh scripts/supported-host-matrix.env autark-os-release.env autark-os-release.json > SHA256SUMS)
 
 single_command_output="$(PATH="${fake_file_bin}:${PATH}" "${bundle_dir}/scripts/autark-os" install \
   --dry-run \
@@ -156,6 +157,7 @@ prompt_bundle="${tmp_dir}/prompt-bundle"
 mkdir -p "${prompt_bundle}/scripts" "${prompt_bundle}/backend" "${prompt_bundle}/runtime/bin"
 cp "${repo_root}/scripts/autark-os" "${prompt_bundle}/scripts/autark-os"
 cp "${repo_root}/scripts/autark-os-fileops" "${prompt_bundle}/scripts/autark-os-fileops"
+cp "${repo_root}/scripts/autark-os-update-helper" "${prompt_bundle}/scripts/autark-os-update-helper"
 cp "${repo_root}/scripts/install-autark-os-service.sh" "${prompt_bundle}/scripts/install-autark-os-service.sh"
 cp "${fake_jar}" "${prompt_bundle}/backend/autark-os-backend.jar"
 cp "${bundle_dir}/runtime/bin/java" "${prompt_bundle}/runtime/bin/java"
@@ -164,8 +166,8 @@ cat >"${prompt_bundle}/scripts/bootstrap-autark-os.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"${AUTARK_OS_BOOTSTRAP_ARGS_FILE}"
 SH
-chmod +x "${prompt_bundle}/scripts/autark-os" "${prompt_bundle}/scripts/bootstrap-autark-os.sh"
-(cd "${prompt_bundle}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json >SHA256SUMS)
+chmod +x "${prompt_bundle}/scripts/autark-os" "${prompt_bundle}/scripts/autark-os-update-helper" "${prompt_bundle}/scripts/bootstrap-autark-os.sh"
+(cd "${prompt_bundle}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/autark-os-update-helper scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json >SHA256SUMS)
 
 args_file="${tmp_dir}/bootstrap-args.txt"
 if AUTARK_OS_BOOTSTRAP_ARGS_FILE="${args_file}" printf 'n\n' | "${prompt_bundle}/scripts/autark-os" install >/tmp/autark-os-prompt-decline.out 2>&1; then

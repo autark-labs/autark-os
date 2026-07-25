@@ -1083,7 +1083,7 @@ verify_release_bundle() {
   for required_file in \
     autark-os-release.json SHA256SUMS \
     backend/autark-os-backend.jar runtime/bin/java \
-    scripts/autark-os scripts/autark-os-fileops \
+    scripts/autark-os scripts/autark-os-fileops scripts/autark-os-update-helper \
     scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh; do
     [[ -r "${bundle_dir}/${required_file}" ]] || die "Release bundle is incomplete: ${bundle_dir}/${required_file}"
   done
@@ -1558,7 +1558,7 @@ install_release_bundle_files_only() {
   rm -rf "${UPDATE_INSTALL_DIR}/runtime"
   cp -a "${bundle_dir}/runtime" "${UPDATE_INSTALL_DIR}/runtime" || return 1
   local script_name
-  for script_name in autark-os autark-os-fileops bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh supported-host-matrix.env; do
+  for script_name in autark-os autark-os-fileops autark-os-update-helper bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh supported-host-matrix.env; do
     [[ -f "${bundle_dir}/scripts/${script_name}" ]] || continue
     cp "${bundle_dir}/scripts/${script_name}" "${UPDATE_INSTALL_DIR}/bin/${script_name}" || return 1
     if [[ "${script_name}" == "supported-host-matrix.env" ]]; then

@@ -106,6 +106,7 @@ printf 'new backend\n' >"${bundle_dir}/backend/autark-os-backend.jar"
 printf 'new runtime\n' >"${bundle_dir}/runtime/bin/java"
 printf 'new cli\n' >"${bundle_dir}/scripts/autark-os"
 printf 'new fileops\n' >"${bundle_dir}/scripts/autark-os-fileops"
+printf 'new core update helper\n' >"${bundle_dir}/scripts/autark-os-update-helper"
 printf 'new bootstrap\n' >"${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cat >"${bundle_dir}/scripts/install-autark-os-service.sh" <<'SH'
 #!/usr/bin/env bash
@@ -138,7 +139,7 @@ cat >"${bundle_dir}/autark-os-release.json" <<JSON
 JSON
 (cd "${bundle_dir}" && sha256sum \
   backend/autark-os-backend.jar runtime/bin/java \
-  scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
+  scripts/autark-os scripts/autark-os-fileops scripts/autark-os-update-helper scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
   autark-os-release.json >SHA256SUMS)
 
 rollback_output="${tmp_dir}/rollback.out"

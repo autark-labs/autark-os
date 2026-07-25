@@ -63,6 +63,7 @@ The bundle layout is:
   scripts/autark-os-gui-installer.sh
   scripts/autark-os
   scripts/autark-os-fileops
+  scripts/autark-os-update-helper
   docs/GETTING_STARTED.md
   docs/RELEASE_NOTES.md
   docs/LICENSE.md
@@ -463,6 +464,7 @@ write_release_json() {
     "scripts/autark-os-gui-installer.sh",
     "scripts/autark-os",
     "scripts/autark-os-fileops",
+    "scripts/autark-os-update-helper",
     "docs/GETTING_STARTED.md",
     "docs/RELEASE_NOTES.md",
     "docs/LICENSE.md",
@@ -628,6 +630,7 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/autark-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os" "${OUTPUT_DIR}/scripts/autark-os"
   run_cmd cp "${SCRIPT_DIR}/autark-os-fileops" "${OUTPUT_DIR}/scripts/autark-os-fileops"
+  run_cmd cp "${SCRIPT_DIR}/autark-os-update-helper" "${OUTPUT_DIR}/scripts/autark-os-update-helper"
   copy_release_docs "${jar}"
   run_cmd chmod +x \
     "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh" \
@@ -635,7 +638,8 @@ create_bundle() {
     "${OUTPUT_DIR}/scripts/install-autark-os.sh" \
     "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh" \
     "${OUTPUT_DIR}/scripts/autark-os" \
-    "${OUTPUT_DIR}/scripts/autark-os-fileops"
+    "${OUTPUT_DIR}/scripts/autark-os-fileops" \
+    "${OUTPUT_DIR}/scripts/autark-os-update-helper"
   write_metadata
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then

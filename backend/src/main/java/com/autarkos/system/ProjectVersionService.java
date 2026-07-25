@@ -47,7 +47,7 @@ public class ProjectVersionService {
                 backendJar(),
                 settings.updateChannel(),
                 "check_required",
-                "Run autark-os update to check, review, and install a verified release with automatic health rollback.",
+                "Use Settings > Advanced > System updates to review and install a verified release with automatic health rollback.",
                 Instant.now());
     }
 

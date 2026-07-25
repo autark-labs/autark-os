@@ -7,6 +7,7 @@ export const settingsSectionIds = [
   'applications',
   'security',
   'remote-access',
+  'updates',
   'advanced',
 ] as const;
 
@@ -48,7 +49,7 @@ export const settingsGroups: SettingsGroup[] = [
     id: 'advanced',
     label: 'Advanced',
     description: 'Host details and support checks',
-    sections: ['system', 'advanced'],
+    sections: ['system', 'updates', 'advanced'],
   },
 ];
 

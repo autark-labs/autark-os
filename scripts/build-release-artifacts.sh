@@ -466,7 +466,7 @@ package_deb() {
   mkdir -p "${payload_dir}" "${documentation_dir}" "${deb_root}/DEBIAN"
   cp -a "${BUNDLE_DIR}/." "${payload_dir}/"
   cp -a "${BUNDLE_DIR}/docs/." "${documentation_dir}/"
-  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os" "${payload_dir}/scripts/autark-os-fileops"
+  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os" "${payload_dir}/scripts/autark-os-fileops" "${payload_dir}/scripts/autark-os-update-helper"
   size_kb="$(installed_size_kb "${deb_root}/usr")"
   write_deb_control "${deb_root}" "${size_kb}"
   write_deb_scripts "${deb_root}"

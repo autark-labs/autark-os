@@ -70,3 +70,24 @@ test('Settings workbench uses the same guarded close flow for backdrop and close
   await page.mouse.click(cleanBounds!.x - 8, cleanBounds!.y + cleanBounds!.height / 2);
   await expect(cleanDialog).toHaveCount(0);
 });
+
+test('Settings exposes signed core updates through the browser workflow', async ({ page }) => {
+  await openSettings(page);
+
+  const dialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
+  await dialog.getByRole('button', { name: /Advanced.*Host details and support checks/i }).click();
+
+  await expect(dialog.getByText('Protected core updater', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Stage and verify', exact: true })).toBeVisible();
+  await dialog.locator('#core-update-bundle').setInputFiles({
+    name: 'autark-os-0.9.1-arm64.tar.gz',
+    mimeType: 'application/gzip',
+    buffer: Buffer.from('fixture signed release'),
+  });
+  await dialog.getByRole('button', { name: 'Stage and verify', exact: true }).click();
+  await expect(dialog.getByText('Reviewed release', { exact: true })).toBeVisible();
+  const confirmation = dialog.getByLabel('Type INSTALL-AUTARK-OS-0.9.1 to authorize this exact release');
+  await confirmation.fill('INSTALL-AUTARK-OS-0.9.1');
+  await expect(dialog.getByRole('button', { name: 'Install signed release', exact: true })).toBeEnabled();
+  await expect(dialog.getByText(/Recovery media and `autark-os update` remain emergency operator paths/i)).toBeVisible();
+});

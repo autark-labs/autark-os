@@ -58,7 +58,7 @@ If it reports hardening or ownership drift, rerun the same installer with your n
 
 The reviewed hardening profile requires systemd 247 or newer. The installer checks that before changing service files, so an unsupported host leaves its current install in place for normal update rollback or recovery. Use a supported Debian, Ubuntu, or Raspberry Pi OS release rather than manually removing hardening directives.
 
-The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `autark-os version` reads the live backend when it is reachable and falls back to that env file when the service is stopped. The service check also compares that metadata with the backend JAR that is actually installed. If it reports a release-identity mismatch, run `sudo autark-os update` to replace the installed files from a verified release, or ask support to review the output.
+The installer writes version/build metadata to `/etc/autark-os/autark-os.env`. `autark-os version` reads the live backend when it is reachable and falls back to that env file when the service is stopped. The service check also compares that metadata with the backend JAR that is actually installed. If it reports a release-identity mismatch, use **Settings → Advanced → System updates** to review and apply a verified release. `autark-os update` remains an emergency operator/recovery path, not the normal product workflow.
 
 ## Local Administrator Credentials
 

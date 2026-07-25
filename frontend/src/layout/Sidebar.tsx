@@ -59,7 +59,7 @@ export function sidebarUpdateIndicator(updateStatus?: string) {
   if (updateStatus === 'available') {
     return { label: 'Update available', tone: 'available' as const };
   }
-  return { label: 'Run autark-os update', tone: 'check' as const };
+  return { label: 'Check updates in Settings', tone: 'check' as const };
 }
 
 function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {

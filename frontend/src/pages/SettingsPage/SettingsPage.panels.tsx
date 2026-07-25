@@ -1,5 +1,8 @@
-import { AlertTriangle, CheckCircle2, Copy, HelpCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, HelpCircle, LoaderCircle, RefreshCw, Upload } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { apiErrorMessage } from '@/api/httpClient';
+import { SystemAPIClient } from '@/api/SystemAPIClient';
+import { JobProgress } from '@/components/autark-os/JobProgress';
 import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,12 +22,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
+import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { BackupDestination, BackupSettingsSummary } from '@/types/backup';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
+import type { CoreUpdateStatus } from '@/types/system';
+import { terminalJob, useAutarkOsJobQuery } from '@/repositories/jobRepository';
 import type { SettingsSection } from './SettingsPage.sections';
 
 type SettingHelp = {
@@ -110,6 +115,8 @@ export function SettingsPanelBySection({ advancedChecks, apps, backupDestination
       return <NetworkPanel setup={setup} />;
     case 'remote-access':
       return <RemoteAccessPanel apps={apps} setup={setup} />;
+    case 'updates':
+      return <CoreUpdatePanel />;
     case 'security':
       return <SecurityPanel setup={setup} />;
     case 'advanced':
@@ -117,6 +124,129 @@ export function SettingsPanelBySection({ advancedChecks, apps, backupDestination
     default:
       return null;
   }
+}
+
+function CoreUpdatePanel() {
+  const [status, setStatus] = useState<CoreUpdateStatus | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const job = useAutarkOsJobQuery(status?.jobId ?? null);
+  const candidate = status?.candidate ?? null;
+  const confirmationPhrase = candidate ? `INSTALL-AUTARK-OS-${candidate.version}` : '';
+  const applying = status?.status === 'applying' || Boolean(job.data && !terminalJob(job.data));
+
+  async function refresh() {
+    try {
+      setStatus(await SystemAPIClient.coreUpdateStatus());
+      setError(null);
+    } catch (refreshError) {
+      setError(apiErrorMessage(refreshError, 'The protected update helper could not be reached.'));
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  useEffect(() => {
+    if (!applying) return undefined;
+    const timer = window.setInterval(() => void refresh(), 2_000);
+    return () => window.clearInterval(timer);
+  }, [applying]);
+
+  async function stage() {
+    if (!file) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await SystemAPIClient.stageCoreUpdateBundle(file);
+      setStatus(next);
+      setConfirmation('');
+    } catch (stageError) {
+      setError(apiErrorMessage(stageError, 'The release bundle could not be staged and verified.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function apply() {
+    if (!candidate) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updateJob = await SystemAPIClient.applyCoreUpdate({
+        bundleId: candidate.bundleId,
+        candidateIdentity: candidate.identity,
+        confirmation,
+      });
+      setStatus((current) => current ? { ...current, jobId: updateJob.jobId, status: 'applying' } : current);
+    } catch (applyError) {
+      setError(apiErrorMessage(applyError, 'The signed release could not be approved for installation.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function repair() {
+    setBusy(true);
+    setError(null);
+    try {
+      await SystemAPIClient.repairSupported();
+      await refresh();
+    } catch (repairError) {
+      setError(apiErrorMessage(repairError, 'The supported service repair could not be started.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SettingsGroup description="Install a verified Autark-OS release without opening a terminal. Managed app data, backups, Docker, and your private-network identity are preserved." title="System updates">
+      <div className="grid gap-4">
+        <div className="rounded-xl border border-cyan-300/20 bg-slate-950/30 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-semibold text-white">Protected core updater</h3>
+              <p className="mt-1 text-sm leading-6 text-slate-400">{status?.message || 'Checking the protected update helper.'}</p>
+            </div>
+            <ProjectDarkControlButton disabled={busy} onClick={() => void refresh()} size="sm" type="button"><RefreshCw className="size-4" />Refresh</ProjectDarkControlButton>
+          </div>
+          {status?.repairAvailable && <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100"><span>The root-owned update helper or its narrow policy needs repair.</span><ProjectWarningButton disabled={busy} onClick={() => void repair()} size="sm" type="button">Repair supported service</ProjectWarningButton></div>}
+        </div>
+
+        {status?.helperAvailable && !applying && (
+          <label className="grid gap-2 rounded-xl border border-slate-700 bg-slate-950/25 p-4 text-sm font-medium text-slate-100" htmlFor="core-update-bundle">
+            Choose signed release bundle
+            <span className="font-normal leading-6 text-slate-400">Download the architecture-matched Autark-OS release bundle, then choose its `.tar.gz` file here. The helper rejects unsigned, tampered, replayed, or wrong-architecture bundles.</span>
+            <div className="flex flex-wrap items-center gap-3"><Input accept="application/gzip,.gz,.tgz" id="core-update-bundle" onChange={(event) => setFile(event.target.files?.[0] ?? null)} type="file" /><ProjectPrimaryButton disabled={!file || busy} onClick={() => void stage()} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <Upload className="size-4" />}Stage and verify</ProjectPrimaryButton></div>
+          </label>
+        )}
+
+        {candidate && (
+          <div className="rounded-xl border border-cyan-300/20 bg-cyan-400/5 p-4 text-sm">
+            <h3 className="font-semibold text-white">Reviewed release</h3>
+            <dl className="mt-3 grid gap-3 sm:grid-cols-3"><UpdateValue label="Version" value={candidate.version} /><UpdateValue label="Architecture" value={candidate.architecture} /><UpdateValue label="Signed identity" value={abbreviateUpdateIdentity(candidate.identity)} /></dl>
+            {status?.status === 'verified' && <div className="mt-4 grid gap-3"><p className="leading-6 text-slate-300">Autark-OS will snapshot the current release, stop only its own service, install this exact signed bundle, start it, and automatically restore the snapshot if health verification fails.</p><label className="grid gap-2 font-medium text-white" htmlFor="core-update-confirmation">Type {confirmationPhrase} to authorize this exact release<Input autoComplete="off" id="core-update-confirmation" onChange={(event) => setConfirmation(event.target.value)} value={confirmation} /></label><ProjectWarningButton disabled={busy || confirmation !== confirmationPhrase} onClick={() => void apply()} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : null}Install signed release</ProjectWarningButton></div>}
+          </div>
+        )}
+
+        {applying && <div className="rounded-xl border border-cyan-300/25 bg-cyan-400/10 p-4 text-sm leading-6 text-cyan-50" role="status">Autark-OS is applying the reviewed release. This page may reconnect while the protected worker verifies health or restores the prior release.</div>}
+        {job.data && <JobProgress job={job.data} subjectLabel="Autark-OS core update" />}
+        {error && <p className="rounded-lg border border-red-400/35 bg-red-500/10 p-3 text-sm text-red-100" role="alert">{error}</p>}
+        <p className="text-xs leading-5 text-slate-500">Recovery media and `autark-os update` remain emergency operator paths. Normal appliance updates happen here after an authenticated administrator explicitly confirms the exact signed release.</p>
+      </div>
+    </SettingsGroup>
+  );
+}
+
+function UpdateValue({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2"><dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">{label}</dt><dd className="mt-1 break-all font-medium text-slate-100">{value}</dd></div>;
+}
+
+function abbreviateUpdateIdentity(value: string) {
+  return value.length > 28 ? `${value.slice(0, 14)}…${value.slice(-10)}` : value;
 }
 
 function GeneralPanel({ draft, onUpdate }: PanelProps) {

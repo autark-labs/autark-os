@@ -123,6 +123,33 @@ public class AutarkOsJobService {
         }
     }
 
+    /**
+     * Reconciles a bounded external worker after this JVM was restarted. Only
+     * callers that own the named job type may use it; it never executes a
+     * command or requeues work.
+     */
+    public Optional<AutarkOsJob> reconcileExternalOutcome(
+            String jobId,
+            String expectedType,
+            AutarkOsJobOutcome outcome) {
+        Optional<AutarkOsJob> existing = findById(jobId);
+        if (existing.isEmpty() || !expectedType.equals(existing.get().type())) {
+            return Optional.empty();
+        }
+        AutarkOsJobOutcome safe = outcome == null
+                ? AutarkOsJobOutcome.failed("The external worker did not report an outcome.", List.of())
+                : outcome;
+        if ("failed".equals(safe.status())) {
+            return Optional.of(fail(
+                    jobId,
+                    "external_worker_failed",
+                    safe.message(),
+                    Map.of(),
+                    safe.steps()));
+        }
+        return Optional.of(succeed(jobId, safe.message(), safe.steps()));
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     public void reconcileInterruptedJobs() {
         if (!reconcileOnStartup) {

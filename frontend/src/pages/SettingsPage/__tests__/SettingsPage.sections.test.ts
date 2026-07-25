@@ -19,7 +19,7 @@ test('keeps everyday settings out of the advanced group', () => {
 });
 
 test('places low-frequency technical settings in advanced', () => {
-  assert.deepEqual(sectionsForGroup('advanced'), ['system', 'advanced']);
+  assert.deepEqual(sectionsForGroup('advanced'), ['system', 'updates', 'advanced']);
 });
 
 test('falls back to the general group for unknown values', () => {
@@ -32,12 +32,12 @@ test('can hide advanced group for simplified views', () => {
   assert.deepEqual(visibleSettingsGroups(true).map((group) => group.id), ['general', 'apps', 'backups', 'network', 'advanced']);
 });
 
-test('does not expose unfinished MVP settings controls', () => {
+test('keeps only implemented update controls in the advanced settings surface', () => {
   const page = readFileSync(resolve(here, '../SettingsPage.tsx'), 'utf8');
   const sections = readFileSync(resolve(here, '../SettingsPage.sections.ts'), 'utf8');
 
-  assert.doesNotMatch(page, /Show advanced disk info|Coming soon|Audit logging|Update channel|Update checks|UpdatesPanel/);
-  assert.doesNotMatch(sections, /updates|Update channel/);
+  assert.doesNotMatch(page, /Show advanced disk info|Coming soon|Audit logging|Update channel|Update checks/);
+  assert.match(sections, /'updates'/);
 });
 
 test('keeps storage-only preferences out of the free settings surface', () => {

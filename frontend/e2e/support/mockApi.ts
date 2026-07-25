@@ -537,6 +537,14 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
   if (pathname === '/api/system/setup-status') return setupStatus;
   if (pathname === '/api/system/metrics') return metrics;
   if (pathname === '/api/system/storage') return storageReport;
+  if (pathname.startsWith('/api/system/core-update')) {
+    if (method === 'POST') {
+      return pathname.endsWith('/apply')
+        ? { jobId: 'core-update-fixture', type: 'core_update', subjectId: 'autark-os', status: 'running', currentStep: 'apply', steps: [], createdAt: fixedAt, updatedAt: fixedAt, completedAt: null, message: 'Fixture update started.' }
+        : { schemaVersion: '1', status: 'verified', helperAvailable: true, repairAvailable: false, message: 'Release checksums and trusted signature verified. Review and confirm installation.', candidate: { bundleId: 'a'.repeat(32), identity: 'sha256:fixture-signed-release', version: '0.9.1', architecture: 'arm64' }, jobId: null, updatedAt: fixedAt };
+    }
+    return { schemaVersion: '1', status: 'ready', helperAvailable: true, repairAvailable: false, message: 'No core update is in progress.', candidate: null, jobId: null, updatedAt: fixedAt };
+  }
   if (pathname === '/api/system/settings') return method === 'PUT' ? { settings, appDefaults: { ok: true, severity: 'success', title: 'Settings saved', message: 'Fixture settings saved.', updatedApps: 1, completedAt: fixedAt } } : settings;
   if (pathname === '/api/system/version') return version;
   if (pathname === '/api/system/support/summary') return supportSummary;

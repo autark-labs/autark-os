@@ -4,7 +4,7 @@ import { sidebarUpdateIndicator } from '../Sidebar';
 describe('sidebarUpdateIndicator', () => {
   it('does not claim an update exists when the release channel has not been checked', () => {
     expect(sidebarUpdateIndicator('check_required')).toEqual({
-      label: 'Run autark-os update',
+      label: 'Check updates in Settings',
       tone: 'check',
     });
   });

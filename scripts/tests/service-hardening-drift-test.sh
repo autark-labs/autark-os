@@ -15,9 +15,11 @@ sudoers_file="${tmp_dir}/autark-os-fileops"
 fake_bin="${tmp_dir}/bin"
 service_user="autarkos-test"
 helper="${install_dir}/bin/autark-os-fileops"
+update_helper="${install_dir}/bin/autark-os-update-helper"
 
 mkdir -p "${runtime_dir}" "${config_dir}" "${install_dir}/backend" "${install_dir}/bin" "${log_dir}" "${fake_bin}"
 printf '#!/usr/bin/env bash\nexit 0\n' >"${helper}"
+printf '#!/usr/bin/env bash\nexit 0\n' >"${update_helper}"
 printf '#!/usr/bin/env bash\nexit 0\n' >"${install_dir}/bin/autark-os"
 printf '#!/usr/bin/env bash\nexit 0\n' >"${install_dir}/bin/bootstrap-autark-os.sh"
 printf 'host matrix\n' >"${install_dir}/bin/supported-host-matrix.env"
@@ -26,18 +28,21 @@ python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
   --version 0.0.1-SNAPSHOT \
   --build-sha development \
   --build-date unknown
-chmod 0755 "${helper}" "${install_dir}/bin/autark-os" "${install_dir}/bin/bootstrap-autark-os.sh"
+chmod 0755 "${helper}" "${update_helper}" "${install_dir}/bin/autark-os" "${install_dir}/bin/bootstrap-autark-os.sh"
 chmod 0644 "${install_dir}/bin/supported-host-matrix.env" "${install_dir}/backend/autark-os-backend.jar"
 
 helper_sha="$(sha256sum "${helper}" | awk '{print $1}')"
+update_helper_sha="$(sha256sum "${update_helper}" | awk '{print $1}')"
 cat >"${config_dir}/autark-os.env" <<ENV
 AUTARK_OS_VERSION=0.0.1-SNAPSHOT
 AUTARK_OS_BUILD_SHA=development
 AUTARK_OS_BUILD_DATE=unknown
 AUTARK_OS_FILEOPS_HELPER_SHA256=${helper_sha}
+AUTARK_OS_CORE_UPDATE_HELPER_SHA256=${update_helper_sha}
 ENV
 cat >"${sudoers_file}" <<ENV
 ${service_user} ALL=(root) NOPASSWD: ${helper} *
+${service_user} ALL=(root) NOPASSWD: ${update_helper} *
 ENV
 cat >"${service_file}" <<ENV
 [Service]
@@ -125,7 +130,7 @@ if check_service >"${tmp_dir}/sudoers-drift.out" 2>&1; then
   exit 1
 fi
 grep -q 'helper allow-list differs' "${tmp_dir}/sudoers-drift.out"
-printf '%s\n' "${service_user} ALL=(root) NOPASSWD: ${helper} *" >"${sudoers_file}"
+printf '%s\n' "${service_user} ALL=(root) NOPASSWD: ${helper} *" "${service_user} ALL=(root) NOPASSWD: ${update_helper} *" >"${sudoers_file}"
 
 if AUTARK_OS_TEST_GROUPS="${service_user} docker wheel" check_service >"${tmp_dir}/group-drift.out" 2>&1; then
   echo "expected an unexpected service-user group to fail the service check" >&2
@@ -139,3 +144,11 @@ if check_service >"${tmp_dir}/checksum-drift.out" 2>&1; then
   exit 1
 fi
 grep -q 'checksum differs' "${tmp_dir}/checksum-drift.out"
+sed -i '$d' "${helper}"
+
+printf '# tampered\n' >>"${update_helper}"
+if check_service >"${tmp_dir}/update-helper-checksum-drift.out" 2>&1; then
+  echo "expected a tampered core update helper to fail the service check" >&2
+  exit 1
+fi
+grep -q 'Core update helper identity.*checksum differs' "${tmp_dir}/update-helper-checksum-drift.out"

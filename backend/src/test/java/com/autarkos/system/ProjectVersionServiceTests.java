@@ -44,7 +44,7 @@ class ProjectVersionServiceTests {
 
         assertThat(version.updateStatus()).isEqualTo("check_required");
         assertThat(version.updateMessage())
-                .contains("autark-os update")
+                .contains("Settings > Advanced > System updates")
                 .doesNotContain("cannot check for or install updates");
     }
 
