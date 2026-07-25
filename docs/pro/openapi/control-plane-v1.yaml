@@ -4,8 +4,8 @@ info:
   version: 1.0.0
   description: Versioned appliance-to-control-plane contract for activation, entitlement, releases, and scoped registry access.
 servers:
-  - url: https://staging.invalid/functions/v1
-    description: Placeholder only; production artifacts must inject an approved HTTPS endpoint.
+  - url: https://api.autarklabs.com/v1
+    description: The only production hosted API origin. Staging uses its separately approved Autark API domain; clients must not target the provider implementation.
 paths:
   /activate:
     post:
@@ -120,7 +120,7 @@ paths:
                     format: uuid
         default:
           $ref: "#/components/responses/Error"
-  /devices/register:
+  /devices-register:
     post:
       operationId: registerDevice
       summary: Register a device after verifying its activation ticket and signed challenge.
@@ -154,7 +154,7 @@ paths:
                     type: string
                     format: uuid
                   entitlementPath:
-                    const: /entitlements/renew
+                    const: /entitlements-renew
                   requestId:
                     type: string
                     format: uuid
