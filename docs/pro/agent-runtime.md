@@ -129,11 +129,11 @@ passes health verification.
 
 ## Live verification
 
-`scripts/check-pro-agent-client.sh` starts the real private Go image with the
+`scripts/check-pro-agent-client.sh <exact-private-agent-image-reference>` starts the real private Go image with the
 hardened profile and proves the public Java client against its authenticated
 status, manifest, entrypoint, and surface routes.
 
-`scripts/check-pro-agent-cutover.sh` publishes that image and an intentionally
+`scripts/check-pro-agent-cutover.sh <exact-private-agent-image-reference> <component-version>` publishes that image and an intentionally
 broken fixture to a temporary local registry by immutable digest. It performs a
 real healthy cutover, attempts the broken candidate, restores the healthy
 route, and rechecks active health. Neither test publishes an agent port.

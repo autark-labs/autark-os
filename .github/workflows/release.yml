@@ -164,6 +164,7 @@ jobs:
           - architecture: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    environment: ${{ needs.prepare.outputs.channel == 'stable' && 'core-release-production' || 'core-release-staging' }}
     steps:
       - name: Check out release source
         uses: actions/checkout@v5
@@ -210,12 +211,23 @@ jobs:
           AUTARK_OS_BUILD_VERSION: ${{ needs.prepare.outputs.version }}
           AUTARK_OS_BUILD_SHA: ${{ github.sha }}
           AUTARK_OS_BUILD_DATE: ${{ needs.prepare.outputs.published_at }}
+          AUTARK_OS_PRIVATE_SOURCEMAPS: "1"
         run: ./gradlew test bootJar --console=plain
+
+      - name: Retain private frontend source maps
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: autark-os-private-source-maps-${{ matrix.architecture }}
+          path: frontend/dist/**/*.map
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Run installer and release contracts
         run: |
           set -euo pipefail
           bash scripts/tests/release-workflow-contract-test.sh
+          bash scripts/tests/release-source-map-contract-test.sh
           bash scripts/tests/release-architecture-integrity-test.sh
           bash scripts/tests/release-bundle-contract-test.sh
           bash scripts/tests/release-runtime-smoke-test.sh
@@ -238,10 +250,23 @@ jobs:
           CHANNEL: ${{ needs.prepare.outputs.channel }}
           RELEASE_NOTES_URL: ${{ needs.prepare.outputs.release_notes_url }}
           ARCHITECTURE: ${{ matrix.architecture }}
+          AUTARK_OS_RELEASE_SIGNATURE_MODE: signed
+          AUTARK_OS_RELEASE_TRUST_ENVIRONMENT: ${{ needs.prepare.outputs.channel == 'stable' && 'production' || 'staging' }}
+          AUTARK_OS_RELEASE_SIGNING_KEY_ID: ${{ vars.AUTARK_OS_RELEASE_SIGNING_KEY_ID }}
+          AUTARK_OS_RELEASE_TRUST_ROOT_SHA256: ${{ vars.AUTARK_OS_RELEASE_TRUST_ROOT_SHA256 }}
+          AUTARK_OS_RELEASE_ORIGIN: ${{ vars.AUTARK_OS_RELEASE_ORIGIN }}
+          AUTARK_OS_RELEASE_SIGNING_PRIVATE_KEY: ${{ runner.temp }}/autark-os-release-signing.key
+          AUTARK_OS_RELEASE_SIGNING_PUBLIC_KEY: ${{ runner.temp }}/autark-os-release-signing.pub
+          COSIGN_PASSWORD: ${{ secrets.AUTARK_OS_RELEASE_SIGNING_PASSWORD }}
           AUTARK_OS_BUILD_SHA: ${{ github.sha }}
           AUTARK_OS_BUILD_DATE: ${{ needs.prepare.outputs.published_at }}
         run: |
           set -euo pipefail
+          umask 077
+          printf '%s' '${{ secrets.AUTARK_OS_RELEASE_SIGNING_PRIVATE_KEY_B64 }}' | base64 --decode >"${RUNNER_TEMP}/autark-os-release-signing.key"
+          printf '%s' '${{ secrets.AUTARK_OS_RELEASE_SIGNING_PUBLIC_KEY_B64 }}' | base64 --decode >"${RUNNER_TEMP}/autark-os-release-signing.pub"
+          test -s "${RUNNER_TEMP}/autark-os-release-signing.key"
+          test -s "${RUNNER_TEMP}/autark-os-release-signing.pub"
           scripts/build-release-artifacts.sh \
             --skip-build \
             --version "${VERSION}" \
@@ -283,6 +308,10 @@ jobs:
           test -f "${bundle_dir}/docs/THIRD_PARTY_NOTICES.md"
           grep -q "^Source revision: ${GITHUB_SHA}$" "${bundle_dir}/docs/RELEASE_NOTES.md"
           grep -q '^## Known Limitations$' "${bundle_dir}/docs/RELEASE_NOTES.md"
+          if unzip -Z1 "${bundle_dir}/backend/autark-os-backend.jar" | grep -Eq '\\.map$'; then
+            printf 'Release backend jar must not ship frontend source maps.\n' >&2
+            exit 1
+          fi
           deb_contents="${RUNNER_TEMP}/autark-os-${VERSION}-${ARCHITECTURE}-deb-contents.txt"
           dpkg-deb -c "${artifact_dir}/autark-os_${VERSION}_${ARCHITECTURE}.deb" >"${deb_contents}"
           grep -Fq './usr/share/doc/autark-os/GETTING_STARTED.md' "${deb_contents}"

@@ -33,5 +33,7 @@ grep -Fq 'Installed service permissions or hardening directives have drifted' "$
 grep -Fq 'AUTARK_OS_FILEOPS_HELPER_SHA256' "${installer}"
 grep -Fq 'AUTARK_OS_CORE_UPDATE_HELPER_SHA256' "${installer}"
 grep -Fq 'autark-os-update-helper' "${installer}"
+grep -Fq 'install_core_update_signing_key' "${installer}"
+grep -Fq 'core-update-release.pub' "${installer}"
 grep -Fq 'checksum differs' "${installer}"
 grep -Fq 'systemd 247 or newer' "${installer}"

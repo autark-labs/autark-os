@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="${1:-autark-pro-agent:pro111}"
+IMAGE="${1:-}"
 NAME="autark-pro-agent-client-check"
 NETWORK="autark-pro-agent-client-check"
 DIGEST="sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
@@ -11,6 +11,18 @@ AGENT_ROOT="${RUNTIME_ROOT}/pro-agent"
 SECRET_DIRECTORY="${AGENT_ROOT}/secrets"
 TOKEN_FILE="${SECRET_DIRECTORY}/agent-api-token"
 TOKEN="0123456789abcdefghijklmnopqrstuvwxyz_ABCD-E"
+
+if [[ -z "${IMAGE}" ]]; then
+    echo "Usage: $0 <exact-private-agent-image-reference>" >&2
+    echo "Pass the image built from the current private-agent head or an immutable digest reference." >&2
+    exit 64
+fi
+case "${IMAGE}" in
+    *:latest|*:pro111)
+        echo "Refusing stale or mutable private-agent image reference: ${IMAGE}" >&2
+        exit 64
+        ;;
+esac
 
 cleanup() {
     docker rm --force "${NAME}" >/dev/null 2>&1 || true

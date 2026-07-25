@@ -44,6 +44,9 @@ export default defineConfig({
     exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
   build: {
+    // CI may retain hidden maps as a private debugging artifact. Production
+    // bundles never advertise or ship those maps with the appliance.
+    sourcemap: process.env.AUTARK_OS_PRIVATE_SOURCEMAPS === '1' ? 'hidden' : false,
     rollupOptions: {
       output: {
         manualChunks,

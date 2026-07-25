@@ -25,10 +25,10 @@ The helper accepts only these named operations:
 Release archives are unpacked with absolute paths, `..`, links, devices,
 duplicate files, member counts, compressed size, and expanded size rejected.
 Every payload regular file must be covered exactly once by `SHA256SUMS` before
-the helper reads its release manifest. The checksum manifest and detached
-`SHA256SUMS.sig` are intentionally excluded from that set, avoiding a circular
-signature dependency; the helper verifies the detached signature over the exact
-checksum manifest separately. Browser installation then also requires a trusted
+the helper reads its release manifest. The checksum manifest and Sigstore
+`SHA256SUMS.sigstore.json` bundle are intentionally excluded from that set,
+avoiding a circular signature dependency; the helper verifies the signed bundle
+over the exact checksum manifest separately. Browser installation then also requires a trusted
 signature, a matching host architecture, and a non-expired one-time approval.
 A second use, changed digest, missing approval, wrong architecture, unsigned
 bundle, malformed archive, or helper restart fails closed.
@@ -44,12 +44,19 @@ own health-gated rollback.
 
 The helper requires the root-owned trusted public key configured by
 `AUTARK_OS_CORE_UPDATE_SIGNING_KEY` and the root-owned pinned verifier configured
-by `AUTARK_OS_CORE_UPDATE_VERIFIER`. It rejects the current development
-`signatureStatus: unsigned-reserved` format deliberately. Release CI must set
-`signatureStatus` to `signed` and ship `SHA256SUMS.sig` only after the verifier
-has signed the exact checksum manifest. That publication wiring is tracked by
-the release-trust work; browser update capability remains unavailable rather
-than weakening to checksum-only installation until it is present.
+by `AUTARK_OS_CORE_UPDATE_VERIFIER`. It rejects the development
+`signatureStatus: unsigned-reserved` format deliberately. Signed release CI
+ships `keys/core-update-release.pub` and signs the completed `SHA256SUMS` as
+`SHA256SUMS.sigstore.json`; the installer copies that public key to the root-owned
+configuration directory. Private signing material never enters the bundle.
+
+Release policy distinguishes local, staging, and production trust contexts.
+Staging is restricted to signed beta releases with a `staging-*` key id.
+Production is restricted to signed stable releases with a `production-*` key
+id and a configured public-key SHA-256 trust-root pin. A staging identity,
+origin, or trust root is rejected before a production bundle is built. The
+offline release documentation also includes `RELEASE_SIGNING.md` with the
+protected GitHub environment configuration and rotation procedure.
 
 The service installer installs the helper root-owned, records its checksum in
 the root-owned environment file, and writes a separate narrow sudoers command

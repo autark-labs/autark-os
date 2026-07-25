@@ -728,6 +728,21 @@ install_core_update_helper() {
   log "Installed Autark-OS core update helper to ${INSTALLED_CORE_UPDATE_HELPER}."
 }
 
+install_core_update_signing_key() {
+  local key_source="${REPO_ROOT}/keys/core-update-release.pub"
+  local installed_key="${CONFIG_DIR}/core-update-release.pub"
+  if [[ ! -f "${key_source}" ]]; then
+    if [[ -f "${installed_key}" ]]; then
+      log "The release does not carry a core-update trust key; preserving the existing root-owned key."
+    else
+      warn "The release does not carry a core-update trust key. Browser-delivered core updates remain unavailable until a signed release is installed."
+    fi
+    return 0
+  fi
+  run install -o root -g root -m 0644 "${key_source}" "${installed_key}"
+  log "Installed the root-owned core-update trust key to ${installed_key}."
+}
+
 install_cosign() {
   if [[ ! -f "${COSIGN_SOURCE}" ]]; then
     warn "Pinned Cosign verifier is missing from ${COSIGN_SOURCE}. Community Edition remains available, but Autark Pro image activation will fail closed."
@@ -882,6 +897,7 @@ install_release_docs() {
     THIRD_PARTY_FRONTEND_LOCK.txt
     SUPPORT.md
     SECURITY.md
+    RELEASE_SIGNING.md
   )
   if [[ ! -d "${docs_source}" ]]; then
     warn "Release documentation is missing from ${docs_source}."
@@ -1063,6 +1079,7 @@ main() {
   install_cli
   install_fileops_helper
   install_core_update_helper
+  install_core_update_signing_key
   install_cosign
   configure_fileops_privilege
   configure_docker_access

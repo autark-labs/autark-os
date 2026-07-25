@@ -62,6 +62,7 @@ tasks.register('copyFrontendAssets', Sync) {
 	dependsOn tasks.named('buildFrontend')
 	from(frontendDistDir) {
 		exclude 'app-images/**'
+		exclude '**/*.map'
 	}
 	into generatedFrontendResources.map { it.dir('static') }
 }

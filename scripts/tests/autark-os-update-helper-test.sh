@@ -71,7 +71,7 @@ unsafe_state.mkdir(mode=0o755)
 expect("unsafe_state_path", lambda: module.state_paths(unsafe_runtime))
 
 
-# Build a signed-shape release bundle. The detached signature is deliberately
+# Build a signed-shape release bundle. The Sigstore signature bundle is deliberately
 # excluded from SHA256SUMS and verified against it separately.
 release = root / "release"
 release.mkdir()
@@ -83,7 +83,7 @@ release_json = {
 }
 (release / "autark-os-release.json").write_text(json.dumps(release_json), encoding="utf-8")
 (release / "payload.txt").write_text("payload", encoding="utf-8")
-(release / "SHA256SUMS.sig").write_text("detached", encoding="utf-8")
+(release / "SHA256SUMS.sigstore.json").write_text("signed bundle", encoding="utf-8")
 checksums = []
 for path in (release / "autark-os-release.json", release / "payload.txt"):
     checksums.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}")
@@ -143,7 +143,7 @@ assert module.load_state(state_file)["status"] == "failed"
 
 
 # The verifier is invoked with fixed arguments, never browser supplied command
-# text, and only after the detached signature is present.
+# text, and only after the signed bundle is present.
 key = root / "release.pub"
 verifier = root / "cosign"
 key.write_text("public key", encoding="utf-8")
@@ -152,7 +152,7 @@ completed = subprocess.CompletedProcess([], 0, stdout="", stderr="")
 with patch.object(module, "require_regular_root_owned"), patch.object(module.subprocess, "run", return_value=completed) as run:
     module.verify_signature(release, key, verifier)
 run.assert_called_once_with(
-    [str(verifier), "verify-blob", "--key", str(key), "--signature", str(release / "SHA256SUMS.sig"), str(release / "SHA256SUMS")],
+    [str(verifier), "verify-blob", "--key", str(key), "--bundle", str(release / "SHA256SUMS.sigstore.json"), str(release / "SHA256SUMS")],
     capture_output=True,
     text=True,
     timeout=45,

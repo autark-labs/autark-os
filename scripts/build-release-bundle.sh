@@ -8,6 +8,13 @@ RELEASE_NOTES_URL="${AUTARK_OS_RELEASE_NOTES_URL:-}"
 ARTIFACT_ARCHITECTURE="${AUTARK_OS_ARTIFACT_ARCHITECTURE:-}"
 BUILD_SHA="${AUTARK_OS_BUILD_SHA:-}"
 BUILD_DATE="${AUTARK_OS_BUILD_DATE:-}"
+RELEASE_SIGNATURE_MODE="${AUTARK_OS_RELEASE_SIGNATURE_MODE:-unsigned-reserved}"
+RELEASE_SIGNING_PRIVATE_KEY="${AUTARK_OS_RELEASE_SIGNING_PRIVATE_KEY:-}"
+RELEASE_SIGNING_PUBLIC_KEY="${AUTARK_OS_RELEASE_SIGNING_PUBLIC_KEY:-}"
+RELEASE_SIGNING_KEY_ID="${AUTARK_OS_RELEASE_SIGNING_KEY_ID:-}"
+RELEASE_TRUST_ENVIRONMENT="${AUTARK_OS_RELEASE_TRUST_ENVIRONMENT:-local}"
+RELEASE_TRUST_ROOT_SHA256="${AUTARK_OS_RELEASE_TRUST_ROOT_SHA256:-}"
+RELEASE_ORIGIN="${AUTARK_OS_RELEASE_ORIGIN:-}"
 VERSION_WAS_PROVIDED=0
 BUILD_SHA_WAS_PROVIDED=0
 [[ -n "${AUTARK_OS_VERSION:-}" ]] && VERSION_WAS_PROVIDED=1
@@ -53,6 +60,8 @@ Options:
 The bundle layout is:
   autark-os-release.env
   SHA256SUMS
+  SHA256SUMS.sigstore.json (signed release bundles only)
+  keys/core-update-release.pub (signed release bundles only)
   backend/autark-os-backend.jar
   tools/cosign
   tools/cosign-LICENSE
@@ -301,6 +310,65 @@ parse_args() {
     [[ "${VERSION_WAS_PROVIDED}" -eq 1 ]] || die "--skip-build requires an explicit --version or AUTARK_OS_VERSION."
     [[ "${BUILD_SHA_WAS_PROVIDED}" -eq 1 ]] || die "--skip-build requires an explicit --build-sha or AUTARK_OS_BUILD_SHA."
   fi
+  validate_release_signing_configuration
+}
+
+validate_release_signing_configuration() {
+  case "${RELEASE_SIGNATURE_MODE}" in
+    unsigned-reserved)
+      [[ -z "${RELEASE_SIGNING_PRIVATE_KEY}" && -z "${RELEASE_SIGNING_PUBLIC_KEY}" && -z "${RELEASE_SIGNING_KEY_ID}" ]] ||
+        die "Unsigned release bundles must not receive signing material. Set AUTARK_OS_RELEASE_SIGNATURE_MODE=signed."
+      ;;
+    signed)
+      [[ "${CHANNEL}" == "beta" || "${CHANNEL}" == "stable" ]] ||
+        die "Signed release bundles require the beta or stable channel."
+      [[ "${RELEASE_SIGNING_KEY_ID}" =~ ^[A-Za-z0-9._-]{1,128}$ ]] ||
+        die "AUTARK_OS_RELEASE_SIGNING_KEY_ID must be a safe non-empty key identifier."
+      [[ -n "${RELEASE_SIGNING_PRIVATE_KEY}" && -r "${RELEASE_SIGNING_PRIVATE_KEY}" ]] ||
+        die "AUTARK_OS_RELEASE_SIGNING_PRIVATE_KEY must name a readable private signing key."
+      [[ -n "${RELEASE_SIGNING_PUBLIC_KEY}" && -r "${RELEASE_SIGNING_PUBLIC_KEY}" ]] ||
+        die "AUTARK_OS_RELEASE_SIGNING_PUBLIC_KEY must name a readable public signing key."
+      ;;
+    *)
+      die "AUTARK_OS_RELEASE_SIGNATURE_MODE must be unsigned-reserved or signed."
+      ;;
+  esac
+
+  case "${RELEASE_TRUST_ENVIRONMENT}" in
+    local)
+      ;;
+    staging)
+      [[ "${RELEASE_SIGNATURE_MODE}" == "signed" && "${CHANNEL}" == "beta" ]] ||
+        die "Staging releases must be signed beta releases."
+      [[ "${RELEASE_SIGNING_KEY_ID}" == staging-* ]] ||
+        die "Staging releases must use a staging-* signing key identifier."
+      [[ "${RELEASE_ORIGIN}" == https://*staging* ]] ||
+        die "Staging releases require an HTTPS staging release origin."
+      [[ "${RELEASE_TRUST_ROOT_SHA256}" =~ ^[a-fA-F0-9]{64}$ ]] ||
+        die "Staging releases require AUTARK_OS_RELEASE_TRUST_ROOT_SHA256."
+      local staging_trust_root_sha
+      staging_trust_root_sha="$(sha256sum "${RELEASE_SIGNING_PUBLIC_KEY}" | awk '{print $1}')"
+      [[ "${staging_trust_root_sha,,}" == "${RELEASE_TRUST_ROOT_SHA256,,}" ]] ||
+        die "Staging signing public key does not match AUTARK_OS_RELEASE_TRUST_ROOT_SHA256."
+      ;;
+    production)
+      [[ "${RELEASE_SIGNATURE_MODE}" == "signed" && "${CHANNEL}" == "stable" ]] ||
+        die "Production releases must be signed stable releases."
+      [[ "${RELEASE_SIGNING_KEY_ID}" == production-* ]] ||
+        die "Production releases must use a production-* signing key identifier."
+      [[ "${RELEASE_SIGNING_KEY_ID}" != *staging* && "${RELEASE_ORIGIN}" == https://* && "${RELEASE_ORIGIN}" != *staging* ]] ||
+        die "Production releases must not use staging identities or origins."
+      [[ "${RELEASE_TRUST_ROOT_SHA256}" =~ ^[a-fA-F0-9]{64}$ ]] ||
+        die "Production releases require AUTARK_OS_RELEASE_TRUST_ROOT_SHA256."
+      local trust_root_sha
+      trust_root_sha="$(sha256sum "${RELEASE_SIGNING_PUBLIC_KEY}" | awk '{print $1}')"
+      [[ "${trust_root_sha,,}" == "${RELEASE_TRUST_ROOT_SHA256,,}" ]] ||
+        die "Production signing public key does not match AUTARK_OS_RELEASE_TRUST_ROOT_SHA256."
+      ;;
+    *)
+      die "AUTARK_OS_RELEASE_TRUST_ENVIRONMENT must be local, staging, or production."
+      ;;
+  esac
 }
 
 find_backend_jar() {
@@ -384,6 +452,8 @@ AUTARK_OS_COSIGN_VERSION=${COSIGN_VERSION}
 AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}
 AUTARK_OS_MIN_MEMORY_MB=${AUTARK_OS_MIN_MEMORY_MB}
 AUTARK_OS_MIN_DISK_KB=${AUTARK_OS_MIN_DISK_KB}
+AUTARK_OS_RELEASE_SIGNATURE_MODE=${RELEASE_SIGNATURE_MODE}
+AUTARK_OS_RELEASE_SIGNING_KEY_ID=${RELEASE_SIGNING_KEY_ID}
 META
     return 0
   fi
@@ -399,6 +469,8 @@ AUTARK_OS_COSIGN_VERSION=${COSIGN_VERSION}
 AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION=${AUTARK_OS_SUPPORTED_HOST_POLICY_VERSION}
 AUTARK_OS_MIN_MEMORY_MB=${AUTARK_OS_MIN_MEMORY_MB}
 AUTARK_OS_MIN_DISK_KB=${AUTARK_OS_MIN_DISK_KB}
+AUTARK_OS_RELEASE_SIGNATURE_MODE=${RELEASE_SIGNATURE_MODE}
+AUTARK_OS_RELEASE_SIGNING_KEY_ID=${RELEASE_SIGNING_KEY_ID}
 META
   write_release_json "${BUILD_SHA}" "${BUILD_DATE}"
   write_provenance_json "${BUILD_SHA}" "${BUILD_DATE}"
@@ -472,9 +544,12 @@ write_release_json() {
     "docs/THIRD_PARTY_COMPONENTS.txt",
     "docs/THIRD_PARTY_FRONTEND_LOCK.txt",
     "docs/SUPPORT.md",
-    "docs/SECURITY.md"
+    "docs/SECURITY.md",
+    "docs/RELEASE_SIGNING.md"$(signature_artifact_json)
   ],
-  "signatureStatus": "unsigned-reserved"
+  "signatureStatus": "${RELEASE_SIGNATURE_MODE}",
+  "signatureKeyId": $(json_string_or_null "${RELEASE_SIGNING_KEY_ID}"),
+  "trustEnvironment": "${RELEASE_TRUST_ENVIRONMENT}"
 }
 JSON
 }
@@ -492,9 +567,26 @@ write_provenance_json() {
   "artifactArchitecture": "${ARTIFACT_ARCHITECTURE}",
   "runtimeArchitecture": "${ARTIFACT_ARCHITECTURE}",
   "source": "local-worktree",
-  "signatureStatus": "unsigned-reserved"
+  "signatureStatus": "${RELEASE_SIGNATURE_MODE}",
+  "signatureKeyId": $(json_string_or_null "${RELEASE_SIGNING_KEY_ID}"),
+  "trustEnvironment": "${RELEASE_TRUST_ENVIRONMENT}"
 }
 JSON
+}
+
+json_string_or_null() {
+  local value="$1"
+  if [[ -z "${value}" ]]; then
+    printf 'null'
+  else
+    printf '"%s"' "${value}"
+  fi
+}
+
+signature_artifact_json() {
+  if [[ "${RELEASE_SIGNATURE_MODE}" == "signed" ]]; then
+    printf ',\n    "keys/core-update-release.pub"'
+  fi
 }
 
 release_commit_summaries() {
@@ -582,7 +674,8 @@ copy_release_docs() {
     "${LICENSE_SOURCE}" \
     "${COMMERCIAL_LICENSE_SOURCE}" \
     "${SUPPORT_SOURCE}" \
-    "${SECURITY_SOURCE}"; do
+    "${SECURITY_SOURCE}" \
+    "${REPO_ROOT}/docs/security/release-signing.md"; do
     [[ -r "${required_source}" ]] || die "Required release documentation is missing: ${required_source}"
   done
   run_cmd mkdir -p "${docs_dir}"
@@ -592,6 +685,7 @@ copy_release_docs() {
   run_cmd cp "${COMMERCIAL_LICENSE_SOURCE}" "${docs_dir}/COMMERCIAL-LICENSE.md"
   run_cmd cp "${SUPPORT_SOURCE}" "${docs_dir}/SUPPORT.md"
   run_cmd cp "${SECURITY_SOURCE}" "${docs_dir}/SECURITY.md"
+  run_cmd cp "${REPO_ROOT}/docs/security/release-signing.md" "${docs_dir}/RELEASE_SIGNING.md"
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     printf '+ write %q/RELEASE_NOTES.md and third-party dependency inventories\n' "${docs_dir}"
     return 0
@@ -606,6 +700,27 @@ copy_release_docs() {
   else
     printf '# Frontend dependency lockfile was not available in this source checkout.\n' >"${docs_dir}/THIRD_PARTY_FRONTEND_LOCK.txt"
   fi
+}
+
+prepare_release_signing_key() {
+  [[ "${RELEASE_SIGNATURE_MODE}" == "signed" ]] || return 0
+  run_cmd mkdir -p "${OUTPUT_DIR}/keys"
+  run_cmd install -m 0644 "${RELEASE_SIGNING_PUBLIC_KEY}" "${OUTPUT_DIR}/keys/core-update-release.pub"
+}
+
+sign_checksum_manifest() {
+  [[ "${RELEASE_SIGNATURE_MODE}" == "signed" ]] || return 0
+  [[ "${DRY_RUN}" -eq 0 ]] || {
+    printf '+ %q sign-blob --key %q --bundle %q %q\n' \
+      "${OUTPUT_DIR}/tools/cosign" "${RELEASE_SIGNING_PRIVATE_KEY}" \
+      "${OUTPUT_DIR}/SHA256SUMS.sigstore.json" "${OUTPUT_DIR}/SHA256SUMS"
+    return 0
+  }
+  "${OUTPUT_DIR}/tools/cosign" sign-blob \
+    --key "${RELEASE_SIGNING_PRIVATE_KEY}" \
+    --bundle "${OUTPUT_DIR}/SHA256SUMS.sigstore.json" \
+    "${OUTPUT_DIR}/SHA256SUMS" >/dev/null
+  [[ -s "${OUTPUT_DIR}/SHA256SUMS.sigstore.json" ]] || die "Cosign did not produce a release checksum signature bundle."
 }
 
 create_bundle() {
@@ -632,6 +747,7 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/autark-os-fileops" "${OUTPUT_DIR}/scripts/autark-os-fileops"
   run_cmd cp "${SCRIPT_DIR}/autark-os-update-helper" "${OUTPUT_DIR}/scripts/autark-os-update-helper"
   copy_release_docs "${jar}"
+  prepare_release_signing_key
   run_cmd chmod +x \
     "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh" \
     "${OUTPUT_DIR}/scripts/install-autark-os-service.sh" \
@@ -652,6 +768,7 @@ create_bundle() {
         sha256sum autark-os-release.env autark-os-release.json autark-os-provenance.json
       } >SHA256SUMS
     )
+    sign_checksum_manifest
   fi
 }
 

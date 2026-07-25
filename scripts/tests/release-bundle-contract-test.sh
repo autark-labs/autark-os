@@ -42,6 +42,7 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -f "${bundle_dir}/docs/THIRD_PARTY_FRONTEND_LOCK.txt" ]]
 [[ -f "${bundle_dir}/docs/SUPPORT.md" ]]
 [[ -f "${bundle_dir}/docs/SECURITY.md" ]]
+[[ -f "${bundle_dir}/docs/RELEASE_SIGNING.md" ]]
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^java.compiler@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.crypto.ec@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
@@ -100,12 +101,15 @@ assert "scripts/autark-os-update-helper" in release["artifacts"]
 assert "docs/GETTING_STARTED.md" in release["artifacts"]
 assert "docs/RELEASE_NOTES.md" in release["artifacts"]
 assert "docs/LICENSE.md" in release["artifacts"]
+assert "docs/RELEASE_SIGNING.md" in release["artifacts"]
 assert provenance["schemaVersion"] == 2
 assert provenance["buildSha"] == release["buildSha"]
 assert provenance["buildDate"] == release["buildDate"]
 assert provenance["artifactArchitecture"] == release["artifactArchitecture"]
 assert provenance["runtimeArchitecture"] == release["runtimeArchitecture"]
 assert provenance["signatureStatus"] == "unsigned-reserved"
+assert release["signatureKeyId"] is None
+assert release["trustEnvironment"] == "local"
 PY
 
 grep -q '^# Autark-OS: Getting Started And Recovery$' "${bundle_dir}/docs/GETTING_STARTED.md"
@@ -155,11 +159,86 @@ listed = {
 actual = {
     str(path.relative_to(bundle))
     for path in bundle.rglob("*")
-    if (path.is_file() or path.is_symlink()) and path.name not in {"SHA256SUMS", "SHA256SUMS.sig"}
+    if (path.is_file() or path.is_symlink()) and path.name not in {"SHA256SUMS", "SHA256SUMS.sigstore.json"}
 }
 assert listed == actual, (sorted(listed - actual), sorted(actual - listed))
 PY
 (cd "${bundle_dir}" && sha256sum -c SHA256SUMS >/dev/null)
+
+# A release intended for browser installation includes only a public trust root,
+# signs the exact checksum manifest after it is complete, and remains verifiable
+# with the pinned bundled verifier.
+signing_prefix="${tmp_dir}/core-update-contract"
+COSIGN_PASSWORD=contract-release-password "${bundle_dir}/tools/cosign" generate-key-pair --output-key-prefix "${signing_prefix}" >/dev/null
+signed_bundle_dir="${tmp_dir}/autark-os-1.2.3-signed"
+COSIGN_PASSWORD=contract-release-password \
+  AUTARK_OS_BACKEND_JAR="${fake_jar}" \
+  AUTARK_OS_BUILD_SHA=contract-build-sha \
+  AUTARK_OS_COSIGN_BINARY="${bundle_dir}/tools/cosign" \
+  AUTARK_OS_RELEASE_SIGNATURE_MODE=signed \
+  AUTARK_OS_RELEASE_SIGNING_PRIVATE_KEY="${signing_prefix}.key" \
+  AUTARK_OS_RELEASE_SIGNING_PUBLIC_KEY="${signing_prefix}.pub" \
+  AUTARK_OS_RELEASE_SIGNING_KEY_ID=staging-core-update-2026-01 \
+  AUTARK_OS_RELEASE_TRUST_ENVIRONMENT=staging \
+  AUTARK_OS_RELEASE_TRUST_ROOT_SHA256="$(sha256sum "${signing_prefix}.pub" | awk '{print $1}')" \
+  AUTARK_OS_RELEASE_ORIGIN=https://api.staging.autarklabs.com/v1 \
+  "${repo_root}/scripts/build-release-bundle.sh" \
+    --skip-build \
+    --version 1.2.3 \
+    --channel beta \
+    --architecture "${architecture}" \
+    --release-notes-url https://example.invalid/autark-os/1.2.3 \
+    --output-dir "${signed_bundle_dir}" >/dev/null
+
+[[ -f "${signed_bundle_dir}/keys/core-update-release.pub" ]]
+[[ -s "${signed_bundle_dir}/SHA256SUMS.sigstore.json" ]]
+cmp -s "${signing_prefix}.pub" "${signed_bundle_dir}/keys/core-update-release.pub"
+"${signed_bundle_dir}/tools/cosign" verify-blob \
+  --key "${signed_bundle_dir}/keys/core-update-release.pub" \
+  --bundle "${signed_bundle_dir}/SHA256SUMS.sigstore.json" \
+  "${signed_bundle_dir}/SHA256SUMS" >/dev/null
+python3 - "${signed_bundle_dir}/autark-os-release.json" "${signed_bundle_dir}/autark-os-provenance.json" <<'PY'
+import json
+import sys
+
+release = json.load(open(sys.argv[1], encoding="utf-8"))
+provenance = json.load(open(sys.argv[2], encoding="utf-8"))
+assert release["signatureStatus"] == "signed"
+assert release["signatureKeyId"] == "staging-core-update-2026-01"
+assert release["trustEnvironment"] == "staging"
+assert "keys/core-update-release.pub" in release["artifacts"]
+assert provenance["signatureStatus"] == "signed"
+assert provenance["signatureKeyId"] == release["signatureKeyId"]
+PY
+python3 - "${signed_bundle_dir}" "${signing_prefix}.key" <<'PY'
+from pathlib import Path
+import sys
+
+bundle = Path(sys.argv[1])
+private_key = Path(sys.argv[2]).resolve()
+assert str(private_key) not in (bundle / "SHA256SUMS").read_text(encoding="utf-8")
+assert not any(path.name.endswith(".key") for path in bundle.rglob("*"))
+PY
+(cd "${signed_bundle_dir}" && sha256sum -c SHA256SUMS >/dev/null)
+
+production_policy_output="${tmp_dir}/production-policy.out"
+if AUTARK_OS_RELEASE_SIGNATURE_MODE=signed \
+  AUTARK_OS_RELEASE_SIGNING_PRIVATE_KEY="${signing_prefix}.key" \
+  AUTARK_OS_RELEASE_SIGNING_PUBLIC_KEY="${signing_prefix}.pub" \
+  AUTARK_OS_RELEASE_SIGNING_KEY_ID=staging-core-update-2026-01 \
+  AUTARK_OS_RELEASE_TRUST_ENVIRONMENT=production \
+  AUTARK_OS_RELEASE_TRUST_ROOT_SHA256="$(sha256sum "${signing_prefix}.pub" | awk '{print $1}')" \
+  AUTARK_OS_RELEASE_ORIGIN=https://api.staging.autarklabs.com/v1 \
+  "${repo_root}/scripts/build-release-bundle.sh" \
+    --dry-run \
+    --version 1.2.3 \
+    --channel stable \
+    --architecture "${architecture}" \
+    --build-sha contract-build-sha >"${production_policy_output}" 2>&1; then
+  printf 'Expected production release policy to reject a staging signing identity.\n' >&2
+  exit 1
+fi
+grep -q 'must use a production-\* signing key identifier' "${production_policy_output}"
 
 plan_json="$("${bundle_dir}/scripts/bootstrap-autark-os.sh" --plan --json --release-bundle "${bundle_dir}")"
 PLAN_JSON="${plan_json}" EXPECTED_ARCHITECTURE="${architecture}" python3 - <<'PY'

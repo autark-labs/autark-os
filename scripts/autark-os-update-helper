@@ -263,13 +263,13 @@ def verify_checksums(bundle: Path) -> str:
                 or path.is_absolute() or ".." in path.parts or relative in listed):
             fail("invalid_checksums", "The selected release bundle has an invalid checksum manifest.")
         listed[relative] = digest.lower()
-    # A detached signature is intentionally outside SHA256SUMS: including it
+    # The Sigstore bundle is intentionally outside SHA256SUMS: including it
     # would create a circular checksum/signature dependency. It is verified
     # separately against this exact checksum manifest below.
     actual = sorted(
         str(path.relative_to(bundle))
         for path in bundle.rglob("*")
-        if path.is_file() and path.name not in {"SHA256SUMS", "SHA256SUMS.sig"}
+        if path.is_file() and path.name not in {"SHA256SUMS", "SHA256SUMS.sigstore.json"}
     )
     if sorted(listed) != actual:
         fail("invalid_checksums", "The selected release bundle checksum manifest does not cover exactly its files.")
@@ -303,13 +303,13 @@ def verify_signature(bundle: Path, key: Path, verifier: Path) -> None:
     release = read_release(bundle)
     if release.get("signatureStatus") != "signed":
         fail("unsigned_bundle", "The selected release bundle is not signed for browser installation.")
-    signature = bundle / "SHA256SUMS.sig"
+    signature = bundle / "SHA256SUMS.sigstore.json"
     require_regular_root_owned(key, "signing_key_missing")
     require_regular_root_owned(verifier, "verifier_missing")
     if not signature.is_file() or signature.is_symlink():
-        fail("signature_missing", "The selected release bundle is missing its signed checksum manifest.")
+        fail("signature_missing", "The selected release bundle is missing its signed checksum bundle.")
     result = subprocess.run(
-        [str(verifier), "verify-blob", "--key", str(key), "--signature", str(signature), str(bundle / "SHA256SUMS")],
+        [str(verifier), "verify-blob", "--key", str(key), "--bundle", str(signature), str(bundle / "SHA256SUMS")],
         capture_output=True,
         text=True,
         timeout=45,

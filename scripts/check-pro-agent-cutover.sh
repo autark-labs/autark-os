@@ -2,13 +2,29 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HEALTHY_IMAGE="${1:-autark-pro-agent:pro111}"
-HEALTHY_VERSION="${2:-0.1.0}"
+HEALTHY_IMAGE="${1:-}"
+HEALTHY_VERSION="${2:-}"
 REGISTRY_NAME="autark-pro-agent-cutover-registry"
 RUNTIME_ROOT="$(mktemp -d)"
 REPOSITORY=""
 HEALTHY_REFERENCE=""
 BROKEN_REFERENCE=""
+
+if [[ -z "${HEALTHY_IMAGE}" || -z "${HEALTHY_VERSION}" ]]; then
+    echo "Usage: $0 <exact-private-agent-image-reference> <component-version>" >&2
+    echo "Pass the image built from the current private-agent head or an immutable digest reference." >&2
+    exit 64
+fi
+case "${HEALTHY_IMAGE}" in
+    *:latest|*:pro111)
+        echo "Refusing stale or mutable private-agent image reference: ${HEALTHY_IMAGE}" >&2
+        exit 64
+        ;;
+esac
+[[ "${HEALTHY_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
+    echo "Invalid private-agent component version: ${HEALTHY_VERSION}" >&2
+    exit 64
+}
 
 cleanup() {
     docker rm --force \
