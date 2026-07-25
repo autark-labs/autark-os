@@ -35,6 +35,18 @@ export interface ProActivationStartResult {
   message: string;
 }
 
+export interface ProDeactivationResult {
+  schemaVersion: '1';
+  deactivated: boolean;
+  localEntitlementRemoved: boolean;
+  onlineAccessDisabled: boolean;
+  localModuleDataRemoved: boolean;
+  accountAssociationRemoved: boolean;
+  deviceIdentityRemoved: boolean;
+  message: string;
+  completedAt: string;
+}
+
 export const ProAPIClient = {
   async status() {
     const response = await httpClient.get<unknown>('/api/v1/pro/status');
@@ -74,9 +86,25 @@ export const ProAPIClient = {
     return response.data;
   },
 
-  async removeModule() {
-    const response = await httpClient.post<AutarkOsJob>('/api/v1/pro/module/remove');
+  async removeModule(confirmation: string) {
+    const response = await httpClient.post<AutarkOsJob>(
+      '/api/v1/pro/module/remove',
+      { confirmation },
+    );
     return response.data;
+  },
+
+  async deactivate(request: {
+    acknowledgeAccountAssociationRetained: boolean;
+    acknowledgeModuleDataRetained: boolean;
+    confirmation: string;
+  }) {
+    const response = await httpClient.post<unknown>('/api/v1/pro/deactivate', {
+      acknowledgeAccountAssociationRetained: request.acknowledgeAccountAssociationRetained,
+      acknowledgeModuleDataRetained: request.acknowledgeModuleDataRetained,
+      confirmation: request.confirmation,
+    });
+    return parseProDeactivationResult(response.data);
   },
 };
 
@@ -151,10 +179,14 @@ function validModule(value: unknown) {
     && nullableString(value.componentVersion)
     && nullableString(value.activeDigest)
     && nullableString(value.previousDigest)
+    && nullableString(value.previousComponentVersion)
+    && nullableString(value.candidateVersion)
     && typeof value.health === 'string'
     && healthStates.has(value.health)
     && nullableString(value.jobId)
-    && nullableString(value.errorCode);
+    && nullableString(value.errorCode)
+    && nullableString(value.lastSuccessfulTransitionAt)
+    && nullableString(value.lastTransitionAt);
 }
 
 function validRefresh(value: unknown) {
@@ -166,6 +198,22 @@ function validRefresh(value: unknown) {
     && nullableString(value.lastFailureCategory)
     && Number.isInteger(value.consecutiveFailures)
     && Number(value.consecutiveFailures) >= 0;
+}
+
+function parseProDeactivationResult(value: unknown): ProDeactivationResult {
+  if (!isRecord(value)
+    || value.schemaVersion !== '1'
+    || typeof value.deactivated !== 'boolean'
+    || typeof value.localEntitlementRemoved !== 'boolean'
+    || typeof value.onlineAccessDisabled !== 'boolean'
+    || typeof value.localModuleDataRemoved !== 'boolean'
+    || typeof value.accountAssociationRemoved !== 'boolean'
+    || typeof value.deviceIdentityRemoved !== 'boolean'
+    || typeof value.message !== 'string'
+    || typeof value.completedAt !== 'string') {
+    throw new TypeError('The local deactivation result is invalid.');
+  }
+  return value as unknown as ProDeactivationResult;
 }
 
 function nullableString(value: unknown): value is string | null {

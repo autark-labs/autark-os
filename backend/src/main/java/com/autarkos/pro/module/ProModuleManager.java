@@ -1805,14 +1805,16 @@ public class ProModuleManager implements ProModuleStatusProvider {
             ProModuleSnapshot snapshot) {
         return new ProStatusResponse.ModuleStatus(
                 snapshot.state(),
-                snapshot.componentVersion() == null
-                        ? snapshot.candidateVersion()
-                        : snapshot.componentVersion(),
+                snapshot.componentVersion(),
                 snapshot.activeDigest(),
                 snapshot.previousDigest(),
+                snapshot.previousComponentVersion(),
+                snapshot.candidateVersion(),
                 snapshot.health(),
                 snapshot.jobId(),
-                snapshot.lastErrorCode());
+                snapshot.lastErrorCode(),
+                snapshot.lastSuccessfulTransitionAt(),
+                snapshot.updatedAt());
     }
 
     private static List<AutarkOsJobStep> checkSteps() {

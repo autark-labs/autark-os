@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   ProAPIClient,
+  type ProDeactivationResult,
   type ProStatusResponse,
 } from '@/api/pro';
 import type { AutarkOsJob } from '@/types/jobs';
@@ -91,10 +92,25 @@ export function useInstallOrUpdateProModuleMutation() {
 
 export function useRemoveProModuleMutation() {
   const queryClient = useQueryClient();
-  return useMutation<AutarkOsJob>({
-    mutationFn: () => ProAPIClient.removeModule(),
+  return useMutation<AutarkOsJob, unknown, string>({
+    mutationFn: (confirmation) => ProAPIClient.removeModule(confirmation),
     onSuccess: (job) => cacheProModuleJob(queryClient, job),
     onSettled: () => invalidateProModuleLifecycle(queryClient),
+  });
+}
+
+export function useDeactivateProMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ProDeactivationResult, unknown, {
+    acknowledgeAccountAssociationRetained: boolean;
+    acknowledgeModuleDataRetained: boolean;
+    confirmation: string;
+  }>({
+    mutationFn: (request) => ProAPIClient.deactivate(request),
+    onSettled: () => {
+      void invalidateProStatus(queryClient);
+      void invalidateAutarkOsJobs(queryClient);
+    },
   });
 }
 

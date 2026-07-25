@@ -2,6 +2,7 @@ package com.autarkos.pro.entitlement;
 
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +15,9 @@ import com.autarkos.pro.module.ProModuleManager;
 @RestController
 @RequestMapping("/api/v1/pro")
 public class ProEntitlementController {
+
+    public static final String MODULE_REMOVAL_CONFIRMATION =
+            "REMOVE-AUTARK-PRO";
 
     private final ProEntitlementService service;
     private final ProModuleManager moduleManager;
@@ -62,7 +66,16 @@ public class ProEntitlementController {
     }
 
     @PostMapping("/module/remove")
-    public AutarkOsJob removeModule() {
+    public AutarkOsJob removeModule(
+            @RequestBody ModuleRemovalRequest request) {
+        if (request == null
+                || !MODULE_REMOVAL_CONFIRMATION.equals(
+                        request.confirmation())) {
+            throw new ProEntitlementApiException(
+                    "module_removal_confirmation_required",
+                    "Removing the private extension requires the exact confirmation phrase.",
+                    HttpStatus.BAD_REQUEST);
+        }
         return moduleManager.remove();
     }
 
@@ -86,5 +99,8 @@ public class ProEntitlementController {
             String confirmation,
             boolean acknowledgeModuleDataRetained,
             boolean acknowledgeAccountAssociationRetained) {
+    }
+
+    public record ModuleRemovalRequest(String confirmation) {
     }
 }

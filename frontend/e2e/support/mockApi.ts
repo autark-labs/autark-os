@@ -516,7 +516,8 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
     activation: { state: 'idle', activationId: null, expiresAt: null },
     module: {
       state: 'NOT_INSTALLED', componentVersion: null, activeDigest: null, previousDigest: null,
-      health: 'not-checked', jobId: null, errorCode: null,
+      previousComponentVersion: null, candidateVersion: null, health: 'not-checked', jobId: null,
+      errorCode: null, lastSuccessfulTransitionAt: null, lastTransitionAt: null,
     },
     refresh: {
       inProgress: false, lastAttemptAt: null, lastSuccessAt: null, nextAttemptAt: null,

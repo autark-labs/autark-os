@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
 
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobStep;
@@ -38,12 +39,36 @@ class ProEntitlementControllerTests {
 
         assertThat(controller.checkModuleRelease()).isSameAs(job);
         assertThat(controller.installOrUpdateModule()).isSameAs(job);
-        assertThat(controller.removeModule()).isSameAs(job);
+        assertThat(controller.removeModule(
+                new ProEntitlementController.ModuleRemovalRequest(
+                        ProEntitlementController.MODULE_REMOVAL_CONFIRMATION)))
+                .isSameAs(job);
 
         verify(service, times(2)).moduleAuthorization();
         verify(manager).checkForRelease(authorization);
         verify(manager).installOrUpdate(authorization);
         verify(manager).remove();
+    }
+
+    @Test
+    void moduleRemovalRequiresTheExactServerValidatedConfirmation() {
+        ProEntitlementService service = mock(ProEntitlementService.class);
+        ProModuleManager manager = mock(ProModuleManager.class);
+        ProEntitlementController controller = new ProEntitlementController(
+                service, manager);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                controller.removeModule(
+                        new ProEntitlementController.ModuleRemovalRequest(
+                                "remove")))
+                .isInstanceOf(ProEntitlementApiException.class)
+                .satisfies(exception -> {
+                    ProEntitlementApiException api =
+                            (ProEntitlementApiException) exception;
+                    assertThat(api.code()).isEqualTo(
+                            "module_removal_confirmation_required");
+                    assertThat(api.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+                });
     }
 
     private static AutarkOsJob job() {

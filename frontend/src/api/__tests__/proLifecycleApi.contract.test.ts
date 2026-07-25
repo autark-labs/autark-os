@@ -34,9 +34,13 @@ function statusFixture() {
       componentVersion: '1.2.3',
       activeDigest: `sha256:${'a'.repeat(64)}`,
       previousDigest: null,
+      previousComponentVersion: null,
+      candidateVersion: null,
       health: 'healthy',
       jobId: null,
       errorCode: null,
+      lastSuccessfulTransitionAt: '2026-07-21T12:00:00Z',
+      lastTransitionAt: '2026-07-21T12:00:00Z',
     },
     refresh: {
       inProgress: false,

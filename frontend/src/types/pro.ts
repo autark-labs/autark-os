@@ -29,9 +29,13 @@ export interface ProModuleStatus {
   componentVersion: string | null;
   activeDigest: string | null;
   previousDigest: string | null;
+  previousComponentVersion: string | null;
+  candidateVersion: string | null;
   health: 'not-checked' | 'healthy' | 'degraded' | 'failed';
   jobId: string | null;
   errorCode: string | null;
+  lastSuccessfulTransitionAt: string | null;
+  lastTransitionAt: string | null;
 }
 
 export interface ProEntitlementStatus {

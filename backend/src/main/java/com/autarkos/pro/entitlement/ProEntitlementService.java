@@ -71,7 +71,11 @@ public class ProEntitlementService {
                     null,
                     null,
                     null,
+                    null,
+                    null,
                     "not-checked",
+                    null,
+                    null,
                     null,
                     null);
     private final AtomicReference<CompletableFuture<ProStatusResponse>> refreshInFlight =
@@ -1057,9 +1061,13 @@ public class ProEntitlementService {
                     null,
                     null,
                     null,
+                    null,
+                    null,
                     "failed",
                     null,
-                    "module_state_unavailable");
+                    "module_state_unavailable",
+                    null,
+                    null);
         }
     }
 

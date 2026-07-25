@@ -32,9 +32,13 @@ public record ProStatusResponse(
             String componentVersion,
             String activeDigest,
             String previousDigest,
+            String previousComponentVersion,
+            String candidateVersion,
             String health,
             String jobId,
-            String errorCode) {
+            String errorCode,
+            Instant lastSuccessfulTransitionAt,
+            Instant lastTransitionAt) {
     }
 
     public record RefreshStatus(

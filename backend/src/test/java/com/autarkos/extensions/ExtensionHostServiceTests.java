@@ -260,7 +260,11 @@ class ExtensionHostServiceTests {
                 digest == null ? null : "1.2.3",
                 digest,
                 null,
+                null,
+                null,
                 health == null ? "not-checked" : health,
+                null,
+                null,
                 null,
                 null);
     }
