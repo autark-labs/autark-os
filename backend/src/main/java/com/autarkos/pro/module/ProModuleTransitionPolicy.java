@@ -108,6 +108,7 @@ public final class ProModuleTransitionPolicy {
                 ProModuleState.ERROR);
         allow(values, ProModuleState.ERROR,
                 ProModuleState.NOT_INSTALLED,
+                ProModuleState.ACTIVE,
                 ProModuleState.RELEASE_AVAILABLE,
                 ProModuleState.ROLLING_BACK,
                 ProModuleState.REMOVING,

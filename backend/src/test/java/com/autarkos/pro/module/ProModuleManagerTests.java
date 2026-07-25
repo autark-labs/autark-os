@@ -154,6 +154,26 @@ class ProModuleManagerTests {
     }
 
     @Test
+    void verifiedCurrentReleaseRecoversAnErroredActiveRuntime() {
+        InMemoryRepository repository = new InMemoryRepository(
+                erroredCurrentReleaseSnapshot());
+        FakeRuntime runtime = new FakeRuntime(repository, true);
+        Fixture fixture = fixture(repository, runtime, false);
+
+        AutarkOsJob check = fixture.manager.checkForRelease(authorization());
+        fixture.jobs.runQueuedJobsNow();
+
+        assertThat(fixture.jobs.findById(check.jobId()).orElseThrow()
+                .status()).isEqualTo("succeeded");
+        assertThat(repository.load().state()).isEqualTo(ProModuleState.ACTIVE);
+        assertThat(repository.load().activeDigest())
+                .isEqualTo(CANDIDATE.manifest().digest());
+        assertThat(repository.load().candidateDigest()).isNull();
+        assertThat(repository.load().lastErrorCode()).isNull();
+        assertThat(runtime.calls).isEmpty();
+    }
+
+    @Test
     void installAuditsEveryRuntimeBoundaryWithCompletedCutover() {
         InMemoryRepository repository =
                 new InMemoryRepository(
@@ -949,6 +969,37 @@ class ProModuleManagerTests {
             ProModuleState state,
             boolean candidate) {
         return snapshot(state, true, candidate);
+    }
+
+    private static ProModuleSnapshot erroredCurrentReleaseSnapshot() {
+        return new ProModuleSnapshot(
+                ProModuleState.ERROR,
+                null,
+                null,
+                "autark-pro-agent",
+                CANDIDATE.manifest().version(),
+                CANDIDATE.manifest().agentApiRange(),
+                CANDIDATE.manifest().digest(),
+                CANDIDATE.fingerprint(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                CANDIDATE.manifest().sequence(),
+                "failed",
+                "prior_check_failed",
+                NOW.minusSeconds(60),
+                "invalid_module_transition",
+                "Autark Pro could not check for a release.",
+                0,
+                NOW);
     }
 
     private static ProModuleSnapshot snapshot(

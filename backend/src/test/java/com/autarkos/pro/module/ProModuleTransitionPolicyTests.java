@@ -97,6 +97,7 @@ class ProModuleTransitionPolicyTests {
                 ProModuleState.ERROR);
         put(expected, ProModuleState.ERROR,
                 ProModuleState.NOT_INSTALLED,
+                ProModuleState.ACTIVE,
                 ProModuleState.RELEASE_AVAILABLE,
                 ProModuleState.ROLLING_BACK,
                 ProModuleState.REMOVING,
