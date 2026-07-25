@@ -6,6 +6,7 @@ import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ExtensionSlot } from '@/extensions/ExtensionSlot';
 import {
   Dialog,
@@ -442,7 +443,8 @@ function MarketplacePage() {
         selectedAppId={selectedApp.id}
       />
 
-      <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 shadow-lg shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
+      <ExtensionActionTarget actionId="review-app" className="min-h-0 flex-1" routeId="discover">
+        <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 shadow-lg shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
         <MarketplaceBrowseSidebar
           filterValue={discoverFilterValue}
           filters={discoverFilters}
@@ -498,7 +500,8 @@ function MarketplacePage() {
             onReviewInstall={openInstallReview}
           />
         )}
-      </section>
+        </section>
+      </ExtensionActionTarget>
 
       {selectedView && selectedAppHasSettings && (
         <MarketplaceAppSettingsDialog

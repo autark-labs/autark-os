@@ -18,34 +18,75 @@ export type ExtensionModule = {
   mount(context: ExtensionHostContext): Promise<void | (() => void)> | void | (() => void);
 };
 
+export type ExtensionLoadFailureKind = 'starting' | 'incompatible' | 'unhealthy' | 'unexpected';
+
+export class ExtensionLoadError extends Error {
+  readonly kind: ExtensionLoadFailureKind;
+
+  constructor(kind: ExtensionLoadFailureKind) {
+    super(kind);
+    this.kind = kind;
+  }
+}
+
 const moduleCache = new Map<string, Promise<ExtensionModule>>();
 
 export async function discoverExtension(
   extensionId: string,
   surface: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<{ apiBase: string; module: ExtensionModule } | null> {
   const apiBase = `/api/v1/extensions/${encodeURIComponent(extensionId)}`;
-  const response = await fetch(`${apiBase}/ui-manifest`, {
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase}/ui-manifest`, {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+      signal: options.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ExtensionLoadError('unhealthy');
+  }
   if (response.status === 404) return null;
-  if (!response.ok) throw new Error('The installed extension manifest is unavailable.');
+  if (!response.ok) throw new ExtensionLoadError(failureForStatus(response.status));
 
-  const manifest: unknown = await response.json();
-  if (!isManifest(manifest, extensionId) || !manifest.surfaces.includes(surface)) return null;
+  let manifest: unknown;
+  try {
+    manifest = await response.json();
+  } catch {
+    throw new ExtensionLoadError('incompatible');
+  }
+  if (!isManifest(manifest, extensionId)) throw new ExtensionLoadError('incompatible');
+  if (!manifest.surfaces.includes(surface)) return null;
 
   const entrypointUrl = `${apiBase}/assets/${encodeURIComponent(manifest.entrypoint)}?digest=${encodeURIComponent(manifest.entrypointSha256)}`;
   let modulePromise = moduleCache.get(entrypointUrl);
   if (!modulePromise) {
-    modulePromise = import(/* @vite-ignore */ entrypointUrl).then((candidate: unknown) => {
-      if (!isExtensionModule(candidate)) throw new Error('The extension entrypoint is invalid.');
-      return candidate;
-    });
+    modulePromise = import(/* @vite-ignore */ entrypointUrl)
+      .then((candidate: unknown) => {
+        if (!isExtensionModule(candidate)) throw new ExtensionLoadError('incompatible');
+        return candidate;
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ExtensionLoadError) throw error;
+        throw new ExtensionLoadError('unhealthy');
+      });
     moduleCache.set(entrypointUrl, modulePromise);
     modulePromise.catch(() => moduleCache.delete(entrypointUrl));
   }
   return { apiBase, module: await modulePromise };
+}
+
+export function extensionLoadFailureKind(error: unknown): ExtensionLoadFailureKind {
+  return error instanceof ExtensionLoadError ? error.kind : 'unexpected';
+}
+
+function failureForStatus(status: number): ExtensionLoadFailureKind {
+  if (status === 409 || status === 412 || status === 422) return 'incompatible';
+  if (status === 425 || status === 503) return 'starting';
+  if (status === 502 || status === 504) return 'unhealthy';
+  return 'unexpected';
 }
 
 function isManifest(value: unknown, extensionId: string): value is ExtensionUiManifest {

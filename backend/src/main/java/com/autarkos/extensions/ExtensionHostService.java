@@ -127,9 +127,7 @@ public final class ExtensionHostService {
                 || response.stateSchemaVersion() != STATE_SCHEMA_VERSION
                 || !Set.of("new", "compatible", "reset")
                         .contains(response.stateCompatibility())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "The installed extension returned an invalid surface.");
+            throw incompatible();
         }
         if (response.continuationToken() != null) {
             state.saveCanonical(
@@ -150,6 +148,30 @@ public final class ExtensionHostService {
                 new ExtensionStateStatus(
                         response.stateSchemaVersion(),
                         compatibility));
+    }
+
+    /**
+     * Private browser modules can request only fixed CE-owned navigation pairs.
+     * The rejected values are intentionally not recorded so a compromised
+     * module cannot add browser-controlled content to a durable audit trail.
+     */
+    public void recordNavigationRejection(String extensionId) {
+        ActiveExtension active = requireActive(extensionId);
+        String digestPrefix = active.digest().substring(
+                "sha256:".length(), 19);
+        audit.recordRequired(new ProAuditEvent(
+                "extension-navigation-rejected:" + digestPrefix,
+                ProAuditEventType.EXTENSION_NAVIGATION_REJECTED,
+                null,
+                "autark-pro-extension",
+                active.componentVersion(),
+                active.digest(),
+                null,
+                null,
+                "recorded",
+                "unrecognized_navigation",
+                null,
+                null));
     }
 
     private ActiveExtension requireActive(String extensionId) {
@@ -212,9 +234,7 @@ public final class ExtensionHostService {
                 || !Objects.equals(
                         active.componentVersion(),
                         manifest.componentVersion())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "The installed extension manifest did not match the active release.");
+            throw incompatible();
         }
     }
 
@@ -232,6 +252,12 @@ public final class ExtensionHostService {
         return new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
                 "The requested extension is not installed.");
+    }
+
+    private static ResponseStatusException incompatible() {
+        return new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "The installed extension is not compatible with this Autark-OS release.");
     }
 
     private static <T> T call(ExtensionCall<T> operation) {

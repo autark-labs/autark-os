@@ -19,6 +19,7 @@ import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, Surface } from '@/components/primitives/Surface';
 import {
@@ -178,7 +179,8 @@ function SettingsPage({
     <PageShell contained={embedded} className={embedded ? 'min-h-0 flex-1 bg-app-panel' : undefined} contentClassName={embedded ? 'min-h-0 !gap-0 !overflow-hidden !p-0' : undefined}>
       {embedded && <ApplicationStateNotice className="m-3 mb-0" />}
       {embedded ? (
-        <SettingsWorkbench
+        <ExtensionActionTarget actionId="review-pro" className="flex min-h-0 flex-1" routeId="settings">
+          <SettingsWorkbench
           activeGroupId={activeGroupId}
           activeGroupMeta={activeGroupMeta}
           activePanelContent={activePanelContent}
@@ -192,8 +194,9 @@ function SettingsPage({
           refreshing={refreshing}
           saveError={saveError}
           saving={saving}
-          setupHeadline={state.setup?.headline}
-        />
+            setupHeadline={state.setup?.headline}
+          />
+        </ExtensionActionTarget>
       ) : (
         <>
           <Surface as="header" className="sticky top-0 z-10 shrink-0 overflow-hidden" tone="panel">

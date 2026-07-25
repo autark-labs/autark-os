@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -54,5 +55,12 @@ public final class ExtensionHostController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(service.render(extensionId, surface));
+    }
+
+    @PostMapping("/navigation-rejections")
+    public ResponseEntity<Void> navigationRejection(
+            @PathVariable String extensionId) {
+        service.recordNavigationRejection(extensionId);
+        return ResponseEntity.noContent().build();
     }
 }

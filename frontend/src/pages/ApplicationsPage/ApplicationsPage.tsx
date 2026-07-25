@@ -7,6 +7,7 @@ import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
 import { PageShell } from '@/components/layout/PageShell';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -656,7 +657,9 @@ export const ApplicationsPage = () => {
       contained
       contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
     >
-      <AppsPageHeader attentionCount={attentionCount} linkedCount={linkedCount} managedCount={managedCount} />
+      <ExtensionActionTarget actionId="review-app" routeId="apps">
+        <AppsPageHeader attentionCount={attentionCount} linkedCount={linkedCount} managedCount={managedCount} />
+      </ExtensionActionTarget>
 
       {showFoundAppsPrompt && (
         <FoundAppsPrompt className="gap-2 p-3" model={{ count: foundServices.length, reviewHref: '/apps/found' }} onDismiss={dismissFoundAppsPrompt} />

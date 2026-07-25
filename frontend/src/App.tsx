@@ -250,12 +250,16 @@ function SetupRoute({ onComplete }: { onComplete: () => void }) {
 }
 
 function SettingsLegacyRoute() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { openSettings } = useSettingsDialog();
   useEffect(() => {
     openSettings();
-    navigate(`${appRoutes.home}?settings=open`, { replace: true });
-  }, [navigate, openSettings]);
+    navigate(`${appRoutes.home}?settings=open`, {
+      replace: true,
+      state: location.state,
+    });
+  }, [location.state, navigate, openSettings]);
   return null;
 }
 

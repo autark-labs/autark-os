@@ -224,6 +224,8 @@ public class ProAuditService {
             case REMOVAL -> "Pro module removal";
             case RETAINED_USE -> "Pro retained use";
             case EXTENSION_STATE_RESET -> "Pro private analysis state";
+            case EXTENSION_NAVIGATION_REJECTED ->
+                    "Pro private navigation";
             case MODULE_STATE_TRANSITION ->
                     "Pro module state";
         };

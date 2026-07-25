@@ -171,7 +171,7 @@ class ExtensionHostServiceTests {
         assertThatThrownBy(() ->
                 fixture.service().manifest("autark-pro"))
                 .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("502");
+                .hasMessageContaining("409");
 
         when(fixture.entitlements().status()).thenReturn(
                 status(false, DIGEST, "healthy"));
@@ -185,6 +185,15 @@ class ExtensionHostServiceTests {
                         "autark-pro", "entry.js"))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("502");
+    }
+
+    @Test
+    void recordsRejectedPrivateNavigationWithoutBrowserControlledFields() {
+        Fixture fixture = fixture();
+
+        fixture.service().recordNavigationRejection("autark-pro");
+
+        verify(fixture.audit()).recordRequired(any(ProAuditEvent.class));
     }
 
     private static Fixture fixture() {

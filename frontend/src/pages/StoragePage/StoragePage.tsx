@@ -10,6 +10,7 @@ import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/pri
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ExtensionSlot } from '@/extensions/ExtensionSlot';
 import { backupSafetyChecklist } from '@/lib/backupSafety';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
@@ -107,7 +108,8 @@ function StoragePage() {
           extensionId="autark-pro"
           surface="storage.insights"
         />
-        {report ? (
+        <ExtensionActionTarget actionId="review-storage" className="min-h-0 flex-1" routeId="storage">
+          {report ? (
           <StorageCapacityRibbonWorkspace
             copiedPathId={copiedPathId}
             appIconUrlById={appIconUrlById}
@@ -119,9 +121,10 @@ function StoragePage() {
             showAdvancedMetrics={showAdvancedMetrics}
             updatedAt={storage.updatedAt}
           />
-        ) : (
-          <StorageUnavailableState message={currentError} onRetry={refreshStorage} />
-        )}
+          ) : (
+            <StorageUnavailableState message={currentError} onRetry={refreshStorage} />
+          )}
+        </ExtensionActionTarget>
       </PageShell>
 
       <CleanupDialog

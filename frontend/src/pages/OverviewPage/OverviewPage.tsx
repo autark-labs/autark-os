@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { HomeHero } from './components/HomeHero';
 import { DashboardSummaryGrid, InstalledAppsLauncher } from './components/HomeDashboardPanels';
 import { PageShell } from '@/components/layout/PageShell';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useHomeRepository } from '@/repositories/homeRepository';
 import { homeSummaryAvailability, homeSystemMetrics } from './extensions/OverviewPage.systemStatus';
@@ -20,13 +21,15 @@ function OverviewPage() {
 
   return (
     <PageShell>
-      <HomeHero
-        deviceName={deviceName}
-        summaryAvailability={summaryAvailability}
-        summary={home.summary}
-      >
-        {appState.freshness.hasUsableData && <InstalledAppsLauncher apps={readyApps} />}
-      </HomeHero>
+      <ExtensionActionTarget actionId="review-pro" routeId="home">
+        <HomeHero
+          deviceName={deviceName}
+          summaryAvailability={summaryAvailability}
+          summary={home.summary}
+        >
+          {appState.freshness.hasUsableData && <InstalledAppsLauncher apps={readyApps} />}
+        </HomeHero>
+      </ExtensionActionTarget>
 
       <DashboardSummaryGrid
         metrics={systemMetrics}

@@ -23,6 +23,7 @@ class AdminEndpointAccessPolicyTests {
         assertThat(policy.accessMode("GET", "/api/v1/extensions/autark-pro/ui-manifest")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("GET", "/api/v1/extensions/autark-pro/assets/entry.js")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("GET", "/api/v1/extensions/autark-pro/surfaces/pro.dashboard")).isEqualTo(AccessMode.AUTHENTICATED);
+        assertThat(policy.accessMode("POST", "/api/v1/extensions/autark-pro/navigation-rejections")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("POST", "/api/v1/pro/activation/start")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("POST", "/api/v1/pro/activation/complete")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("POST", "/api/v1/pro/entitlement/refresh")).isEqualTo(AccessMode.AUTHENTICATED);

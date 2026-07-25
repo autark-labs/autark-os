@@ -6,6 +6,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { ProjectPanel } from '@/components/primitives/Surface';
 import { Input } from '@/components/ui/input';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ExtensionSlot } from '@/extensions/ExtensionSlot';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { terminalJob, useAutarkOsJobQuery } from '@/repositories/jobRepository';
@@ -120,7 +121,8 @@ function ProPage() {
 
   return (
     <PageShell>
-      <ProjectPanel className="overflow-hidden p-0">
+      <ExtensionActionTarget actionId="review-pro" routeId="pro">
+        <ProjectPanel className="overflow-hidden p-0">
         <div className="bg-app-hero-default p-6 md:p-8">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="max-w-3xl">
@@ -181,7 +183,8 @@ function ProPage() {
             </span>
           </div>
         </div>
-      </ProjectPanel>
+        </ProjectPanel>
+      </ExtensionActionTarget>
 
       {!hasEntitlement && !status.activation.activationId && (
         <ProjectPanel>

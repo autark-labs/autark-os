@@ -25,6 +25,15 @@ describe('private extension browser boundary', () => {
     expect(loader).not.toMatch(/agent-api-token|Authorization|autark-pro-agent:8080/);
   });
 
+  it('keeps private navigation inside CE-owned route and action pairs', () => {
+    const slot = source('src/extensions/ExtensionSlot.tsx');
+    const navigation = source('src/extensions/extensionNavigation.ts');
+    expect(slot).toContain('resolveExtensionNavigation(routeId, actionId)');
+    expect(slot).toContain('recordRejectedExtensionNavigation(extensionId)');
+    expect(navigation).toContain("'storage:review-storage'");
+    expect(navigation).not.toContain('window.location');
+  });
+
   it('does not compile private feature presentation into the CE Pro page', () => {
     const page = source('src/pages/ProPage/ProPage.tsx');
     expect(page).toContain('<ExtensionSlot');

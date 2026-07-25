@@ -11,6 +11,7 @@ import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/Status
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
@@ -176,8 +177,9 @@ function SupportPage() {
       contained
       contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
     >
-      <DiagnosticsNotebook
-        activeSection={activeSection}
+      <ExtensionActionTarget actionId="review-diagnostics" className="min-h-0 flex-1" routeId="diagnostics">
+        <DiagnosticsNotebook
+          activeSection={activeSection}
         bundle={state.bundle}
         bundleBusy={bundleBusy}
         conflict={conflict}
@@ -219,8 +221,9 @@ function SupportPage() {
         showAdvancedMetrics={showAdvancedMetrics}
         summary={summary}
         summaryRows={summaryRows}
-        tailscaleCheck={tailscaleCheck?.message || summary?.tailscaleStatus || 'Unknown'}
-      />
+          tailscaleCheck={tailscaleCheck?.message || summary?.tailscaleStatus || 'Unknown'}
+        />
+      </ExtensionActionTarget>
     </PageShell>
   );
 }

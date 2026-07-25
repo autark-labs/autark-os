@@ -22,6 +22,7 @@ public enum ProAuditEventType {
     REMOVAL("removal"),
     RETAINED_USE("retained_use"),
     EXTENSION_STATE_RESET("extension_state_reset"),
+    EXTENSION_NAVIGATION_REJECTED("extension_navigation_rejected"),
     MODULE_STATE_TRANSITION("module_state_transition");
 
     private final String wireValue;

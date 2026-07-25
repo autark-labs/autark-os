@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { apiErrorMessage } from '@/api/httpClient';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageShell } from '@/components/layout/PageShell';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectPanel } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -84,8 +85,9 @@ function MonitoringPage() {
       contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
     >
       {error && <MonitoringErrorState message={error} onRetry={() => void monitoring.refresh()} />}
-      <MonitoringActivityWorkspace
-        activity={monitoring.activity}
+      <ExtensionActionTarget actionId="review-activity" className="min-h-0 flex-1" routeId="activity">
+        <MonitoringActivityWorkspace
+          activity={monitoring.activity}
         advancedMetrics={showAdvancedMetrics ? (
           <Suspense fallback={<MonitoringChartsFallback />}>
             <MonitoringChartsSection
@@ -116,8 +118,9 @@ function MonitoringPage() {
         reliability={monitoring.reliability}
         showAdvancedMetrics={showAdvancedMetrics}
         timeZone={timeZone}
-        updatedAt={appState.updatedAt ?? monitoring.updatedAt}
-      />
+          updatedAt={appState.updatedAt ?? monitoring.updatedAt}
+        />
+      </ExtensionActionTarget>
     </PageShell>
   );
 }

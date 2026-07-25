@@ -6,6 +6,7 @@ import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { PageShell } from '@/components/layout/PageShell';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { Surface } from '@/components/primitives/Surface';
@@ -279,13 +280,15 @@ function NetworkPage() {
       contained
       contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
     >
-      <AccessPageHeader
-        needsReviewCount={needsReviewCount}
-        onRefresh={refreshAll}
-        refreshing={pageRefreshing}
-        serviceCount={reachabilityServices.length}
-        updatedAt={appState.updatedAt ?? network.updatedAt}
-      />
+      <ExtensionActionTarget actionId="review-access" routeId="access">
+        <AccessPageHeader
+          needsReviewCount={needsReviewCount}
+          onRefresh={refreshAll}
+          refreshing={pageRefreshing}
+          serviceCount={reachabilityServices.length}
+          updatedAt={appState.updatedAt ?? network.updatedAt}
+        />
+      </ExtensionActionTarget>
 
       {pageError && <AccessPageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
 

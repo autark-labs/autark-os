@@ -5,6 +5,7 @@ import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
+import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { showActionNotification, showJobNotification } from '@/lib/actionNotifications';
@@ -317,7 +318,8 @@ function BackupsPage() {
       {pageError && <BackupsErrorState message={pageError} onRetry={() => void backupReport.refresh()} />}
       {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
       {report && (
-        <BackupColumnNavigatorWorkspace
+        <ExtensionActionTarget actionId="review-backups" className="min-h-0 flex-1" routeId="backups">
+          <BackupColumnNavigatorWorkspace
           appIconUrlById={appIconUrlById}
           appBackupAvailability={appBackupOperationAvailability}
           fullBackupAvailability={fullBackupAvailability}
@@ -335,7 +337,8 @@ function BackupsPage() {
           routineBackupAvailability={routineBackupAvailability}
           running={running}
           verifyAvailability={verifyAvailability}
-        />
+          />
+        </ExtensionActionTarget>
       )}
 
       <RestoreFlowDialog
