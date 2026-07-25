@@ -1,19 +1,20 @@
 # Autark Pro Prototype Known Limitations
 
-These limitations apply to `0.2.0-staging.1`. They are explicit release
-boundaries, not production guarantees.
+These limitations apply to the staging prototype using CE `0.9.1-beta.7` at
+`5143bf3` and private agent `0.2.0-staging.6` at `5ed5a20`. They are explicit
+release boundaries, not production guarantees.
 
 ## Release and operations
 
 - The build is a private staging prototype, not generally available or
   production-ready.
-- The public staging registry must have real DNS, TLS, a Distribution v3 token
-  policy, and a read-only registry public JWKS before a staging release can be
-  installed.
-- A protected GitHub OIDC tag run must publish and verify the real
+- The public staging registry has real DNS, TLS, a token-authenticated
+  Distribution endpoint, and a read-only registry public JWKS. It is a single
+  disk-backed staging service, not a production highly available registry.
+- Protected GitHub OIDC tag runs published and verified the recorded staging
   multi-architecture index, SBOMs, provenance, signatures, scans, and
-  control-plane manifest. A local keyed-signature harness is not remote release
-  evidence.
+  control-plane manifest. New releases still require the same protected proof;
+  local keyed-signature harnesses are not remote release evidence.
 - The prototype has exact per-device assignments, but no percentage rollout,
   cohort engine, pause/resume dashboard, signed withdrawal document, or fleet
   observability. Those controls belong to PRO-502.
@@ -51,9 +52,10 @@ boundaries, not production guarantees.
 
 ## Runtime and platform
 
-- AMD64 lifecycle execution is native in the local gate. ARM64 startup and API
-  behavior are proven under pinned QEMU user-mode, not as native performance or
-  long-duration stability evidence.
+- AMD64 lifecycle execution is native in the local gate. A native ARM64 Pi has
+  completed staging install, unhealthy-candidate rollback, CE restart, and a
+  later healthy cutover. Pinned QEMU user-mode remains a portable automated
+  harness; neither path establishes long-duration performance evidence.
 - The agent depends on the host Docker daemon, kernel, default seccomp, and
   AppArmor configuration. A root or Docker-daemon compromise is outside its
   container boundary.
@@ -63,7 +65,8 @@ boundaries, not production guarantees.
 - Only the current API/schema v1 prototype combination is supported. There is
   no backward-compatibility commitment yet.
 - Private surface analysis currently runs on demand when a hosted surface is
-  opened or refreshed.
+  opened or refreshed. It is not a durable scheduler or canonical finding
+  history.
 
 ## Security and privacy
 
