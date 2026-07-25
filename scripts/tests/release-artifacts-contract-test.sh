@@ -13,13 +13,16 @@ python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
   --build-sha artifacts-build-sha
 
 artifacts_dir="${tmp_dir}/artifacts"
-AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=artifacts-build-sha "${repo_root}/scripts/build-release-artifacts.sh" \
-  --skip-build \
-  --version 3.4.5 \
-  --channel beta \
-  --architecture amd64 \
-  --release-notes-url https://example.invalid/autark-os/3.4.5 \
-  --output-dir "${artifacts_dir}" >/dev/null
+(
+  umask 077
+  AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=artifacts-build-sha "${repo_root}/scripts/build-release-artifacts.sh" \
+    --skip-build \
+    --version 3.4.5 \
+    --channel beta \
+    --architecture amd64 \
+    --release-notes-url https://example.invalid/autark-os/3.4.5 \
+    --output-dir "${artifacts_dir}" >/dev/null
+)
 
 bundle_dir="${artifacts_dir}/autark-os-3.4.5-amd64"
 tarball="${artifacts_dir}/autark-os-3.4.5-amd64.tar.gz"
