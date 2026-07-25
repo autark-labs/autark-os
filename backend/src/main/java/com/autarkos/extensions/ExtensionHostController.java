@@ -11,8 +11,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
 @RestController
 @RequestMapping("/api/v1/extensions/{extensionId}")
 public final class ExtensionHostController {
@@ -50,7 +48,7 @@ public final class ExtensionHostController {
     }
 
     @GetMapping("/surfaces/{surface}")
-    public ResponseEntity<JsonNode> surface(
+    public ResponseEntity<ExtensionSurfaceResult> surface(
             @PathVariable String extensionId,
             @PathVariable String surface) {
         return ResponseEntity.ok()

@@ -216,6 +216,8 @@ class HttpProAgentClientTests {
                 {
                   "schemaVersion":"1",
                   "surface":"pro.dashboard",
+                  "stateSchemaVersion":1,
+                  "stateCompatibility":"compatible",
                   "continuationToken":"opaque_next_state",
                   "payload":{"sections":[],"findings":[]}
                 }

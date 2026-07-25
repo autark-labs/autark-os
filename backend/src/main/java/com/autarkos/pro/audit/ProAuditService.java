@@ -50,6 +50,7 @@ public class ProAuditService {
                             + "activation.?code).*");
     private static final Set<String> COMPONENTS = Set.of(
             "autark-pro-agent",
+            "autark-pro-extension",
             "device",
             "entitlement",
             "registry",
@@ -222,6 +223,7 @@ public class ProAuditService {
             case ROLLBACK -> "Pro agent rollback";
             case REMOVAL -> "Pro module removal";
             case RETAINED_USE -> "Pro retained use";
+            case EXTENSION_STATE_RESET -> "Pro private analysis state";
             case MODULE_STATE_TRANSITION ->
                     "Pro module state";
         };

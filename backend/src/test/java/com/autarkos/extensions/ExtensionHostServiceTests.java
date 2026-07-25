@@ -3,9 +3,11 @@ package com.autarkos.extensions;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +22,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.autarkos.pro.agent.ProAgentClientRouter;
+import com.autarkos.pro.audit.ProAuditEvent;
+import com.autarkos.pro.audit.ProAuditService;
 import com.autarkos.pro.entitlement.ProEntitlementService;
 import com.autarkos.pro.entitlement.ProStatusResponse;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
@@ -37,12 +41,11 @@ class ExtensionHostServiceTests {
                     .getBytes(StandardCharsets.UTF_8);
 
     @Test
-    void bindsManifestAssetAndOpaqueStateToTheActiveDigest() {
+    void bindsManifestAssetAndCanonicalOpaqueStateToTheActiveDigest() {
         Fixture fixture = fixture();
         var payload = JsonNodeFactory.instance.objectNode()
                 .put("private", true);
-        when(fixture.state().load(
-                        "autark-pro", DIGEST, "storage.insights"))
+        when(fixture.state().loadCanonical("autark-pro", DIGEST))
                 .thenReturn(Optional.empty());
         when(fixture.agent().renderSurface(
                         eq("storage.insights"),
@@ -51,6 +54,8 @@ class ExtensionHostServiceTests {
                 .thenReturn(new ExtensionSurfaceEnvelope(
                         "1",
                         "storage.insights",
+                        1,
+                        "new",
                         "opaque_next_state",
                         payload));
 
@@ -60,15 +65,94 @@ class ExtensionHostServiceTests {
                         "autark-pro", "entry.js").contents())
                 .isEqualTo(ENTRYPOINT);
         assertThat(fixture.service().render(
-                        "autark-pro", "storage.insights"))
+                        "autark-pro", "storage.insights").payload())
                 .isEqualTo(payload);
-        verify(fixture.state()).clearOtherDigests(
-                "autark-pro", DIGEST);
-        verify(fixture.state()).save(
+        verify(fixture.state()).cleanupExpired(
+                eq("autark-pro"), anySet(), any(Instant.class));
+        verify(fixture.state()).saveCanonical(
                 "autark-pro",
                 DIGEST,
-                "storage.insights",
+                1,
                 "opaque_next_state");
+    }
+
+    @Test
+    void projectsEverySurfaceFromOneCanonicalStateSequence() {
+        Fixture fixture = fixture();
+        var payload = JsonNodeFactory.instance.objectNode()
+                .put("private", true);
+        when(fixture.state().loadCanonical("autark-pro", DIGEST))
+                .thenReturn(
+                        Optional.empty(),
+                        Optional.of(new ExtensionStateStore.ExtensionState(
+                                "opaque_storage_state", 1)));
+        when(fixture.agent().renderSurface(
+                        eq("storage.insights"),
+                        any(NormalizedHostSnapshot.class),
+                        isNull()))
+                .thenReturn(envelope("storage.insights", "new", payload));
+        when(fixture.agent().renderSurface(
+                        eq("discover.insights"),
+                        any(NormalizedHostSnapshot.class),
+                        eq("opaque_storage_state")))
+                .thenReturn(envelope(
+                        "discover.insights", "compatible", payload));
+
+        fixture.service().render("autark-pro", "storage.insights");
+        fixture.service().render("autark-pro", "discover.insights");
+
+        verify(fixture.agent()).renderSurface(
+                eq("discover.insights"),
+                any(NormalizedHostSnapshot.class),
+                eq("opaque_storage_state"));
+        verify(fixture.state(), times(2)).saveCanonical(
+                "autark-pro", DIGEST, 1, "opaque_next_state");
+    }
+
+    @Test
+    void resetsLegacySurfaceTokensWithAnAuditedStateNotice() {
+        Fixture fixture = fixture();
+        var payload = JsonNodeFactory.instance.objectNode()
+                .put("private", true);
+        when(fixture.state().hasLegacySurfaceState("autark-pro", DIGEST))
+                .thenReturn(true);
+        when(fixture.state().loadCanonical("autark-pro", DIGEST))
+                .thenReturn(Optional.empty());
+        when(fixture.agent().renderSurface(
+                        eq("storage.insights"),
+                        any(NormalizedHostSnapshot.class),
+                        isNull()))
+                .thenReturn(envelope("storage.insights", "new", payload));
+
+        ExtensionSurfaceResult result = fixture.service().render(
+                "autark-pro", "storage.insights");
+
+        assertThat(result.state().compatibility()).isEqualTo("reset");
+        verify(fixture.state()).resetLegacySurfaceState(
+                "autark-pro", DIGEST);
+        verify(fixture.audit()).recordRequired(any(ProAuditEvent.class));
+    }
+
+    @Test
+    void resetsAnIncompatibleCanonicalStateBeforeCallingTheAgent() {
+        Fixture fixture = fixture();
+        var payload = JsonNodeFactory.instance.objectNode()
+                .put("private", true);
+        when(fixture.state().loadCanonical("autark-pro", DIGEST))
+                .thenReturn(Optional.of(new ExtensionStateStore.ExtensionState(
+                        "unsupported_state", 2)));
+        when(fixture.agent().renderSurface(
+                        eq("storage.insights"),
+                        any(NormalizedHostSnapshot.class),
+                        isNull()))
+                .thenReturn(envelope("storage.insights", "new", payload));
+
+        ExtensionSurfaceResult result = fixture.service().render(
+                "autark-pro", "storage.insights");
+
+        assertThat(result.state().compatibility()).isEqualTo("reset");
+        verify(fixture.state()).clearCanonical("autark-pro", DIGEST);
+        verify(fixture.audit()).recordRequired(any(ProAuditEvent.class));
     }
 
     @Test
@@ -110,6 +194,7 @@ class ExtensionHostServiceTests {
         NormalizedHostSnapshotAssembler snapshots =
                 mock(NormalizedHostSnapshotAssembler.class);
         ExtensionStateStore state = mock(ExtensionStateStore.class);
+        ProAuditService audit = mock(ProAuditService.class);
         when(entitlements.status()).thenReturn(
                 status(true, DIGEST, "healthy"));
         when(agent.uiManifest()).thenReturn(
@@ -119,10 +204,11 @@ class ExtensionHostServiceTests {
                 mock(NormalizedHostSnapshot.class));
         return new Fixture(
                 new ExtensionHostService(
-                        agent, entitlements, snapshots, state),
+                        agent, entitlements, snapshots, state, audit),
                 agent,
                 entitlements,
-                state);
+                state,
+                audit);
     }
 
     private static ProStatusResponse status(
@@ -185,6 +271,15 @@ class ExtensionHostServiceTests {
                         "discover.insights"));
     }
 
+    private static ExtensionSurfaceEnvelope envelope(
+            String surface,
+            String compatibility,
+            com.fasterxml.jackson.databind.JsonNode payload) {
+        return new ExtensionSurfaceEnvelope(
+                "1", surface, 1, compatibility,
+                "opaque_next_state", payload);
+    }
+
     private static String sha256(byte[] contents) {
         try {
             return "sha256:" + HexFormat.of().formatHex(
@@ -206,6 +301,7 @@ class ExtensionHostServiceTests {
             ExtensionHostService service,
             ProAgentClientRouter agent,
             ProEntitlementService entitlements,
-            ExtensionStateStore state) {
+            ExtensionStateStore state,
+            ProAuditService audit) {
     }
 }

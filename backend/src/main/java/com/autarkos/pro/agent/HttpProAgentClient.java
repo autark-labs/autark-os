@@ -378,6 +378,9 @@ public final class HttpProAgentClient implements ProAgentClient {
                 || !expectedSurface.equals(response.surface())
                 || response.payload() == null
                 || response.payload().isNull()
+                || response.stateSchemaVersion() != 1
+                || !List.of("new", "compatible", "reset")
+                        .contains(response.stateCompatibility())
                 || (response.continuationToken() != null
                         && (response.continuationToken().length() > 262144
                                 || !response.continuationToken()

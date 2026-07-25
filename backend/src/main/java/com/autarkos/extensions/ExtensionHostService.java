@@ -2,7 +2,10 @@ package com.autarkos.extensions;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HexFormat;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -13,10 +16,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.autarkos.pro.agent.ProAgentClientException;
 import com.autarkos.pro.agent.ProAgentClientRouter;
+import com.autarkos.pro.audit.ProAuditEvent;
+import com.autarkos.pro.audit.ProAuditEventType;
+import com.autarkos.pro.audit.ProAuditService;
 import com.autarkos.pro.entitlement.ProEntitlementService;
 import com.autarkos.pro.entitlement.ProStatusResponse;
 import com.autarkos.pro.snapshot.NormalizedHostSnapshotAssembler;
-import com.fasterxml.jackson.databind.JsonNode;
 
 @Service
 public final class ExtensionHostService {
@@ -27,6 +32,8 @@ public final class ExtensionHostService {
             Pattern.compile("^[a-zA-Z0-9._-]{1,128}$");
     private static final Pattern SURFACE_ID =
             Pattern.compile("^[a-z][a-z0-9.-]{1,127}$");
+    private static final int STATE_SCHEMA_VERSION = 1;
+    private static final Duration STATE_RETENTION = Duration.ofDays(7);
     private static final Set<String> HOSTED_EXTENSIONS =
             Set.of(PRO_EXTENSION_ID);
 
@@ -34,16 +41,19 @@ public final class ExtensionHostService {
     private final ProEntitlementService entitlements;
     private final NormalizedHostSnapshotAssembler snapshots;
     private final ExtensionStateStore state;
+    private final ProAuditService audit;
 
     public ExtensionHostService(
             ProAgentClientRouter agent,
             ProEntitlementService entitlements,
             NormalizedHostSnapshotAssembler snapshots,
-            ExtensionStateStore state) {
+            ExtensionStateStore state,
+            ProAuditService audit) {
         this.agent = Objects.requireNonNull(agent);
         this.entitlements = Objects.requireNonNull(entitlements);
         this.snapshots = Objects.requireNonNull(snapshots);
         this.state = Objects.requireNonNull(state);
+        this.audit = Objects.requireNonNull(audit);
     }
 
     public ExtensionUiManifest manifest(String extensionId) {
@@ -73,7 +83,7 @@ public final class ExtensionHostService {
         return new VerifiedAsset(contents, digest);
     }
 
-    public synchronized JsonNode render(
+    public synchronized ExtensionSurfaceResult render(
             String extensionId,
             String surface) {
         if (surface == null || !SURFACE_ID.matcher(surface).matches()) {
@@ -85,28 +95,61 @@ public final class ExtensionHostService {
         if (!manifest.surfaces().contains(surface)) {
             throw notFound();
         }
-        state.clearOtherDigests(active.extensionId(), active.digest());
-        String continuation = state.load(
-                active.extensionId(), active.digest(), surface)
-                .orElse(null);
+        cleanupState(active);
+        boolean resetState = state.hasLegacySurfaceState(
+                active.extensionId(), active.digest());
+        if (resetState) {
+            auditStateReset(active, "legacy_surface_state");
+            state.resetLegacySurfaceState(
+                    active.extensionId(), active.digest());
+        }
+        ExtensionStateStore.ExtensionState previous =
+                state.loadCanonical(
+                        active.extensionId(), active.digest())
+                        .orElse(null);
+        if (previous != null
+                && previous.schemaVersion() != STATE_SCHEMA_VERSION) {
+            auditStateReset(active, "incompatible_state_schema");
+            state.clearCanonical(active.extensionId(), active.digest());
+            previous = null;
+            resetState = true;
+        }
+        String continuation = previous == null
+                ? null
+                : previous.opaqueState();
         ExtensionSurfaceEnvelope response = call(() ->
                 agent.renderSurface(
                         surface,
                         snapshots.assemble(),
                         continuation));
-        if (!surface.equals(response.surface()) || response.payload() == null) {
+        if (!surface.equals(response.surface())
+                || response.payload() == null
+                || response.stateSchemaVersion() != STATE_SCHEMA_VERSION
+                || !Set.of("new", "compatible", "reset")
+                        .contains(response.stateCompatibility())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_GATEWAY,
                     "The installed extension returned an invalid surface.");
         }
         if (response.continuationToken() != null) {
-            state.save(
+            state.saveCanonical(
                     active.extensionId(),
                     active.digest(),
-                    surface,
+                    response.stateSchemaVersion(),
                     response.continuationToken());
         }
-        return response.payload();
+        String compatibility = resetState
+                ? "reset"
+                : response.stateCompatibility();
+        if ("reset".equals(response.stateCompatibility())
+                && !resetState) {
+            auditStateReset(active, "incompatible_state_schema");
+        }
+        return new ExtensionSurfaceResult(
+                response.payload(),
+                new ExtensionStateStatus(
+                        response.stateSchemaVersion(),
+                        compatibility));
     }
 
     private ActiveExtension requireActive(String extensionId) {
@@ -125,7 +168,40 @@ public final class ExtensionHostService {
         return new ActiveExtension(
                 extensionId,
                 module.activeDigest(),
+                module.previousDigest(),
                 module.componentVersion());
+    }
+
+    private void cleanupState(ActiveExtension active) {
+        Set<String> retained = new HashSet<>();
+        retained.add(active.digest());
+        if (active.previousDigest() != null) {
+            retained.add(active.previousDigest());
+        }
+        state.cleanupExpired(
+                active.extensionId(),
+                retained,
+                Instant.now().minus(STATE_RETENTION));
+    }
+
+    private void auditStateReset(
+            ActiveExtension active,
+            String reasonCode) {
+        String digestPrefix = active.digest().substring(
+                "sha256:".length(), 19);
+        audit.recordRequired(new ProAuditEvent(
+                "extension-state-reset:" + digestPrefix,
+                ProAuditEventType.EXTENSION_STATE_RESET,
+                null,
+                "autark-pro-extension",
+                active.componentVersion(),
+                active.digest(),
+                null,
+                null,
+                "recorded",
+                reasonCode,
+                null,
+                null));
     }
 
     private static void requireBoundManifest(
@@ -177,6 +253,7 @@ public final class ExtensionHostService {
     private record ActiveExtension(
             String extensionId,
             String digest,
+            String previousDigest,
             String componentVersion) {
     }
 

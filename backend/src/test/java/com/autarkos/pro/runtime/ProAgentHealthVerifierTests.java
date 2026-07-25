@@ -165,7 +165,7 @@ class ProAgentHealthVerifierTests {
         when(client.renderSurface(
                         any(), anyString(), any(), nullable(String.class)))
                 .thenReturn(new ExtensionSurfaceEnvelope(
-                        "1", "pro.dashboard", null,
+                        "1", "pro.dashboard", 1, "new", null,
                         JsonNodeFactory.instance.objectNode()));
         return client;
     }
