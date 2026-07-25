@@ -20,7 +20,7 @@ for directive in \
   'RestrictRealtime=true' \
   'SystemCallArchitectures=native' \
   'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' \
-  'CapabilityBoundingSet=' \
+  'CapabilityBoundingSet=CAP_SETGID CAP_SETUID' \
   'AmbientCapabilities=' \
   'UMask=0077'; do
   grep -Fxq "${directive}" "${installer}"

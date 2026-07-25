@@ -491,7 +491,7 @@ check_state() {
         'RestrictRealtime=true'
         'SystemCallArchitectures=native'
         'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6'
-        'CapabilityBoundingSet='
+        'CapabilityBoundingSet=CAP_SETGID CAP_SETUID'
         'AmbientCapabilities='
       )
       local directive
@@ -1015,10 +1015,11 @@ ExecStart=${JAVA_BIN} -jar ${TARGET_BACKEND_JAR}
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=5
-# The bounded root helper is invoked through sudo for restore, cleanup, and
-# Tailscale operator repair. sudo needs to retain its setuid transition, so
-# NoNewPrivileges cannot be enabled until that helper becomes a dedicated root
-# service. All other compatible sandboxing remains enabled below.
+# The bounded root helper is invoked through sudo for restore, cleanup, core
+# updates, and Tailscale operator repair. sudo needs its setuid/setgid
+# transition, so retain only those two capabilities in the bounding set and do
+# not enable NoNewPrivileges until the helper becomes a dedicated root service.
+# All other compatible sandboxing remains enabled below.
 NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
@@ -1033,7 +1034,7 @@ LockPersonality=true
 RestrictRealtime=true
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-CapabilityBoundingSet=
+CapabilityBoundingSet=CAP_SETGID CAP_SETUID
 AmbientCapabilities=
 UMask=0077
 # The root helper also writes the root-owned approved-backup destination file.
