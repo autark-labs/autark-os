@@ -12,19 +12,19 @@ test('consolidates settings into five focused top-level groups', () => {
 });
 
 test('keeps everyday settings out of the advanced group', () => {
-  assert.deepEqual(sectionsForGroup('general'), ['general']);
+  assert.deepEqual(sectionsForGroup('general'), ['general', 'updates']);
   assert.deepEqual(sectionsForGroup('apps'), ['applications']);
   assert.deepEqual(sectionsForGroup('backups'), ['backups', 'storage']);
   assert.deepEqual(sectionsForGroup('network'), ['network', 'remote-access', 'security']);
 });
 
 test('places low-frequency technical settings in advanced', () => {
-  assert.deepEqual(sectionsForGroup('advanced'), ['system', 'updates', 'advanced']);
+  assert.deepEqual(sectionsForGroup('advanced'), ['system', 'advanced']);
 });
 
 test('falls back to the general group for unknown values', () => {
   assert.equal(defaultSettingsGroup('missing'), 'general');
-  assert.deepEqual(sectionsForGroup('missing'), ['general']);
+  assert.deepEqual(sectionsForGroup('missing'), ['general', 'updates']);
 });
 
 test('can hide advanced group for simplified views', () => {
@@ -32,12 +32,15 @@ test('can hide advanced group for simplified views', () => {
   assert.deepEqual(visibleSettingsGroups(true).map((group) => group.id), ['general', 'apps', 'backups', 'network', 'advanced']);
 });
 
-test('keeps only implemented update controls in the advanced settings surface', () => {
+test('keeps the managed update action in the everyday settings surface', () => {
   const page = readFileSync(resolve(here, '../SettingsPage.tsx'), 'utf8');
   const sections = readFileSync(resolve(here, '../SettingsPage.sections.ts'), 'utf8');
+  const panels = readFileSync(resolve(here, '../SettingsPage.panels.tsx'), 'utf8');
 
   assert.doesNotMatch(page, /Show advanced disk info|Coming soon|Audit logging|Update channel|Update checks/);
   assert.match(sections, /'updates'/);
+  assert.match(panels, /Update now/);
+  assert.doesNotMatch(panels, /type="file"|Stage and verify|INSTALL-AUTARK-OS|release bundle/);
 });
 
 test('keeps storage-only preferences out of the free settings surface', () => {

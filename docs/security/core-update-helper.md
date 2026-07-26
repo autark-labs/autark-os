@@ -20,7 +20,10 @@ The helper accepts only these named operations:
 
 1. `status` and `health` return redacted durable state.
 2. `stage` accepts only a generated bundle id and reads the corresponding gzip
-   archive from the fixed runtime inbox.
+   archive from the fixed runtime inbox. The ordinary service places only the
+   architecture-matched artifact selected from the configured published Autark
+   release channel in that inbox; the browser cannot upload a file or choose a
+   URL.
 3. `inspect` and `verify` read only the protected staged copy.
 4. `approve` records a short-lived, one-time approval bound to the exact
    SHA-256 identity of the signed `SHA256SUMS` manifest and the durable job id.
@@ -36,8 +39,8 @@ Every payload regular file must be covered exactly once by `SHA256SUMS` before
 the helper reads its release manifest. The checksum manifest and Sigstore
 `SHA256SUMS.sigstore.json` bundle are intentionally excluded from that set,
 avoiding a circular signature dependency; the helper verifies the signed bundle
-over the exact checksum manifest separately. Browser installation then also requires a trusted
-signature, a matching host architecture, and a non-expired one-time approval.
+over the exact checksum manifest separately. Managed installation also requires
+a trusted signature, a matching host architecture, and a non-expired one-time approval.
 A second use, changed digest, missing approval, wrong architecture, unsigned
 bundle, malformed archive, or helper restart fails closed.
 
@@ -70,5 +73,9 @@ The service installer installs the helper root-owned, records its checksum in
 the root-owned environment file, and writes a separate narrow sudoers command
 rule alongside the existing bounded file-operations helper. If ownership,
 checksum, policy, verifier, or signing key is missing, the API returns a guided
-repair state. **Settings → Advanced → System updates** is the normal update
-flow. Recovery media and `autark-os update` remain emergency operator tools.
+repair state. **Settings → General → Software updates** checks the configured
+published channel and offers one **Update now** action. Release discovery,
+download, checksum verification, signature verification, privilege transition,
+installation, health checking, and rollback remain behind that action.
+Recovery media and `autark-os update` remain emergency operator tools and are
+not exposed as ordinary product controls.

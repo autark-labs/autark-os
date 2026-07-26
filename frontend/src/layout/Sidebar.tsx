@@ -59,7 +59,7 @@ export function sidebarUpdateIndicator(updateStatus?: string) {
   if (updateStatus === 'available') {
     return { label: 'Update available', tone: 'available' as const };
   }
-  return { label: 'Check updates in Settings', tone: 'check' as const };
+  return null;
 }
 
 function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
@@ -217,15 +217,14 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             <span className={cn('size-2 rounded-full', setupReady ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} />
             <span>{setupReady ? 'Ready for your apps' : 'Setup needs attention'}</span>
           </div>
-          <div className="flex items-center gap-2">
+          {updateIndicator && <div className="flex items-center gap-2">
             <span className={cn(
               'size-2 rounded-full',
               updateIndicator.tone === 'current' && 'bg-cyan-300 shadow-lg shadow-cyan-400/30',
               updateIndicator.tone === 'available' && 'bg-orange-500 shadow-lg shadow-orange-500/30',
-              updateIndicator.tone === 'check' && 'bg-slate-400 shadow-lg shadow-slate-500/20',
             )} />
             <span>{updateIndicator.label}</span>
-          </div>
+          </div>}
         </div>
         <div className="mt-3 grid gap-2">
           <div className="flex items-center justify-between gap-2 text-xs text-slate-400">

@@ -1,21 +1,19 @@
 package com.autarkos.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.mock.web.MockMultipartFile;
-
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -36,7 +34,8 @@ class CoreUpdateServiceTests {
         assertThat(status.status()).isEqualTo("repair_required");
         assertThat(status.helperAvailable()).isFalse();
         assertThat(status.repairAvailable()).isTrue();
-        assertThat(status.message()).contains("protected update helper repaired");
+        assertThat(status.message()).contains("repair its update service");
+        assertThat(status.installedVersion()).isEqualTo("0.9.1");
     }
 
     @Test
@@ -65,57 +64,98 @@ class CoreUpdateServiceTests {
         assertThat(status.status()).isEqualTo("repair_required");
         assertThat(status.helperAvailable()).isFalse();
         assertThat(status.repairAvailable()).isFalse();
-        assertThat(status.message()).contains("release signing is not configured");
+        assertThat(status.message()).contains("cannot verify published Autark-OS releases");
     }
 
     @Test
-    void stagesOnlyOpaqueUploadThenVerifiesTheSameGeneratedBundleId()
+    void checkReturnsOneSimplePublishedUpdate() {
+        RecordingReleaseSource releases = releases(Optional.of(release("0.9.2")));
+        CoreUpdateService service = service(
+                new RecordingHelper(
+                        result("ready", "", "", "", ""),
+                        result("ready", "", "", "", "")),
+                releases);
+
+        CoreUpdateModels.Status status = service.check();
+
+        assertThat(status.status()).isEqualTo("update_available");
+        assertThat(status.installedVersion()).isEqualTo("0.9.1");
+        assertThat(status.availableRelease().version()).isEqualTo("0.9.2");
+        assertThat(status.message()).isEqualTo("Autark-OS 0.9.2 is ready to install.");
+    }
+
+    @Test
+    void checkSaysCurrentWhenNoPublishedUpdateIsNewer() {
+        CoreUpdateService service = service(
+                new RecordingHelper(
+                        result("ready", "", "", "", ""),
+                        result("ready", "", "", "", "")),
+                releases(Optional.empty()));
+
+        CoreUpdateModels.Status status = service.check();
+
+        assertThat(status.status()).isEqualTo("current");
+        assertThat(status.availableRelease()).isNull();
+        assertThat(status.message()).isEqualTo("Autark-OS is up to date.");
+    }
+
+    @Test
+    void managedInstallDownloadsThenStagesAndVerifiesAnOpaqueBundleId()
             throws Exception {
         RecordingHelper helper = new RecordingHelper(
                 result("staged", "$bundle", "bundle-identity", "0.9.2", "arm64"),
-                result("verified", "$bundle", "bundle-identity", "0.9.2", "arm64"));
-        CoreUpdateService service = service(helper);
-        MockMultipartFile upload = new MockMultipartFile(
-                "bundle", "anything.tar.gz", "application/gzip",
-                new ByteArrayInputStream("release".getBytes(StandardCharsets.UTF_8)));
+                result("verified", "$bundle", "bundle-identity", "0.9.2", "arm64"),
+                approval("approval-id"));
+        RecordingReleaseSource releases = releases(Optional.of(release("0.9.2")));
+        AutarkOsJobService jobs = mock(AutarkOsJobService.class);
+        CoreUpdateService service = new CoreUpdateService(
+                runtimeLayout(),
+                jobs,
+                helper,
+                releases,
+                new ObjectMapper());
 
-        CoreUpdateModels.Status status = service.stage(upload);
+        service.apply(new CoreUpdateModels.ApplyRequest("0.9.2"));
 
-        assertThat(status.status()).isEqualTo("verified");
-        assertThat(status.candidate().identity()).isEqualTo("sha256:bundle-identity");
-        assertThat(helper.operations()).containsExactly("stage", "verify");
-        String stagedBundleId = helper.arguments().getFirst().get(1);
-        assertThat(stagedBundleId).matches("[a-f0-9]{32}");
-        assertThat(helper.arguments().get(1)).containsExactly("--bundle-id", stagedBundleId);
-        assertThat(tempDir.resolve("runtime/core-update-inbox").resolve(stagedBundleId + ".tar.gz"))
-                .exists();
-    }
-
-    @Test
-    void applyRejectsChangedIdentityAndWrongOneTimeConfirmation() {
-        RecordingHelper helper = new RecordingHelper(
-                result("verified", "a".repeat(32), "reviewed", "0.9.2", "arm64"),
-                result("verified", "a".repeat(32), "reviewed", "0.9.2", "arm64"));
-        CoreUpdateService service = service(helper);
-
-        assertThatThrownBy(() -> service.apply(new CoreUpdateModels.ApplyRequest(
-                "a".repeat(32), "sha256:other", "INSTALL-AUTARK-OS-0.9.2")))
-                .isInstanceOf(CoreUpdateException.class)
-                .hasMessageContaining("changed after review");
-        assertThatThrownBy(() -> service.apply(new CoreUpdateModels.ApplyRequest(
-                "a".repeat(32), "sha256:reviewed", "yes")))
-                .isInstanceOf(CoreUpdateException.class)
-                .hasMessageContaining("exact update confirmation");
+        assertThat(releases.checked()).isEqualTo(1);
     }
 
     private CoreUpdateService service(CoreUpdateService.HelperRunner helper) {
-        AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
-        properties.setRuntimeRoot(tempDir.resolve("runtime").toString());
+        return service(helper, releases(Optional.empty()));
+    }
+
+    private CoreUpdateService service(
+            CoreUpdateService.HelperRunner helper,
+            CoreUpdateService.ReleaseSource releases) {
         return new CoreUpdateService(
-                new RuntimeLayout(properties),
+                runtimeLayout(),
                 mock(AutarkOsJobService.class),
                 helper,
+                releases,
                 new ObjectMapper());
+    }
+
+    private RuntimeLayout runtimeLayout() {
+        AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
+        properties.setRuntimeRoot(tempDir.resolve("runtime").toString());
+        return new RuntimeLayout(properties);
+    }
+
+    private static RecordingReleaseSource releases(
+            Optional<CoreUpdateService.ManagedRelease> release) {
+        return new RecordingReleaseSource(release);
+    }
+
+    private static CoreUpdateService.ManagedRelease release(String version) {
+        return new CoreUpdateService.ManagedRelease(
+                version,
+                "beta",
+                "https://github.com/autark-labs/autark-os/releases/tag/v" + version,
+                "arm64",
+                URI.create("https://github.com/autark-labs/autark-os/releases/download/v" + version
+                        + "/autark-os-" + version + "-arm64.tar.gz"),
+                "a".repeat(64),
+                7);
     }
 
     private static CoreUpdateService.HelperResult result(
@@ -128,6 +168,51 @@ class CoreUpdateServiceTests {
                 {"schemaVersion":1,"status":"%s","message":"safe","updatedAt":"2026-07-24T00:00:00Z","candidate":{"bundleId":"%s","identity":"sha256:%s","version":"%s","architecture":"%s"}}
                 """.formatted(status, bundleId, identity, version, architecture);
         return new CoreUpdateService.HelperResult(true, false, json);
+    }
+
+    private static CoreUpdateService.HelperResult approval(String approvalId) {
+        return new CoreUpdateService.HelperResult(
+                true,
+                false,
+                "{\"status\":\"approved\",\"approvalId\":\"" + approvalId + "\"}");
+    }
+
+    private static class RecordingReleaseSource
+            implements CoreUpdateService.ReleaseSource {
+        private final Optional<CoreUpdateService.ManagedRelease> release;
+        private int checked;
+
+        private RecordingReleaseSource(
+                Optional<CoreUpdateService.ManagedRelease> release) {
+            this.release = release;
+        }
+
+        @Override
+        public CoreUpdateService.ReleaseContext context() {
+            return new CoreUpdateService.ReleaseContext("0.9.1", "beta", "arm64");
+        }
+
+        @Override
+        public Optional<CoreUpdateService.ManagedRelease> findUpdate() {
+            checked++;
+            return release;
+        }
+
+        @Override
+        public void download(
+                CoreUpdateService.ManagedRelease release,
+                Path destination) {
+            try {
+                Files.createDirectories(destination.getParent());
+                Files.writeString(destination, "release");
+            } catch (Exception exception) {
+                throw new AssertionError(exception);
+            }
+        }
+
+        int checked() {
+            return checked;
+        }
     }
 
     private static class RecordingHelper implements CoreUpdateService.HelperRunner {

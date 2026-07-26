@@ -2,7 +2,7 @@ package com.autarkos.system;
 
 import java.time.Instant;
 
-/** Public, redacted model for the bounded browser-driven core-update flow. */
+/** Public, redacted model for the managed appliance-update flow. */
 public final class CoreUpdateModels {
 
     private CoreUpdateModels() {
@@ -15,20 +15,27 @@ public final class CoreUpdateModels {
             String architecture) {
     }
 
+    public record AvailableRelease(
+            String version,
+            String channel,
+            String releaseNotesUrl) {
+    }
+
     public record Status(
             String schemaVersion,
             String status,
             boolean helperAvailable,
             boolean repairAvailable,
             String message,
+            String installedVersion,
+            String channel,
+            AvailableRelease availableRelease,
             Candidate candidate,
             String jobId,
             Instant updatedAt) {
     }
 
     public record ApplyRequest(
-            String bundleId,
-            String candidateIdentity,
-            String confirmation) {
+            String version) {
     }
 }

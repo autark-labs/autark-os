@@ -47,10 +47,37 @@ A good slice includes:
 1. Backend or state-model change, if needed.
 2. Frontend rendering of that state.
 3. Loading, empty, success, and error states.
-4. A visible way to test the feature manually.
+4. A customer-realistic way to test the feature manually.
 5. Tests or smoke coverage for the important path.
 
 Avoid landing invisible infrastructure unless it directly unlocks the current slice.
+
+### Ship product behavior, not development controls
+
+Production routes, APIs, and release artifacts must contain only behavior
+intended for appliance owners. Do not expose file importers, mock selectors,
+fixture triggers, raw protocol controls, developer confirmations, test-only
+repair buttons, or release rehearsal mechanics merely to make implementation
+easier to validate.
+
+Required behavior:
+
+- Smoke-test through the same workflow, permissions, release channel, and UI an
+  appliance owner will use.
+- Keep fixtures, fault injection, local release overrides, and test harnesses in
+  ignored local files, test source sets, or operator scripts that are not part
+  of normal navigation or shipped browser code.
+- Treat a manually supplied path, URL, archive, token, command, or protocol
+  field as an advanced recovery mechanism unless the product owner explicitly
+  approves it as customer-facing behavior.
+- Product UI should expose the decision a user actually needs to make and
+  perform discovery, verification, privilege transitions, retries, health
+  checks, and rollback behind that decision.
+- Do not publish a feature solely to validate infrastructure. Prove the
+  infrastructure beneath a complete customer workflow or keep the rehearsal
+  local until that workflow exists.
+- When replacing a development-facing prototype, remove its public route,
+  client contract, UI, copy, and browser tests in the same change.
 
 ### Diagnose before changing behavior
 

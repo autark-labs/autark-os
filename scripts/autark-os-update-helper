@@ -3,8 +3,9 @@
 
 The backend may invoke this helper through one narrow sudoers rule. It does not
 accept a command, URL, filesystem path, or release identity supplied by the
-browser. A browser upload is addressed only by a generated bundle id inside the
-configured runtime inbox. The helper safely stages the archive, verifies every
+browser. The ordinary service downloads only its configured published release
+and addresses it by a generated bundle id inside the configured runtime inbox.
+The helper safely stages the archive, verifies every
 checksum and the trusted release signature, records a short-lived one-time
 approval, and launches the fixed installed updater in a transient systemd
 service so it survives the backend service stopping itself during an update.

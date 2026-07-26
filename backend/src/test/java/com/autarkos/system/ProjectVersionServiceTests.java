@@ -23,7 +23,7 @@ class ProjectVersionServiceTests {
     Path tempDir;
 
     @Test
-    void versionStatusPointsUsersToTheUnifiedUpdaterWithoutClaimingAnUpdateExists() {
+    void versionStatusDescribesManagedUpdatesWithoutClaimingOneExists() {
         AutarkOsRuntimeProperties runtimeProperties = new AutarkOsRuntimeProperties();
         runtimeProperties.setRuntimeRoot("/tmp/autark-os-version-test");
         ProjectSettingsService settingsService = mock(ProjectSettingsService.class);
@@ -44,7 +44,7 @@ class ProjectVersionServiceTests {
 
         assertThat(version.updateStatus()).isEqualTo("check_required");
         assertThat(version.updateMessage())
-                .contains("Settings > Advanced > System updates")
+                .contains("handles verification, installation, health checks, and rollback")
                 .doesNotContain("cannot check for or install updates");
     }
 

@@ -45,9 +45,9 @@ public class ProjectVersionService {
                 identity.instanceSlug(),
                 identity.runtimeRootHash(),
                 backendJar(),
-                settings.updateChannel(),
+                updateChannel(settings.updateChannel()),
                 "check_required",
-                "Use Settings > Advanced > System updates to review and install a verified release with automatic health rollback.",
+                "Autark-OS checks its published release channel and handles verification, installation, health checks, and rollback.",
                 Instant.now());
     }
 
@@ -103,6 +103,17 @@ public class ProjectVersionService {
             }
         }
         return "";
+    }
+
+    private String updateChannel(String setting) {
+        String configured = firstPresent(
+                System.getenv("AUTARK_OS_UPDATE_CHANNEL"),
+                setting,
+                "stable");
+        return switch (configured.toLowerCase()) {
+            case "beta", "preview" -> "beta";
+            default -> "stable";
+        };
     }
 
     private record ReleaseIdentity(String version, String buildSha, String buildDate) {

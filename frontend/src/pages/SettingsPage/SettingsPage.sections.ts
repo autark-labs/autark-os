@@ -24,8 +24,8 @@ export const settingsGroups: SettingsGroup[] = [
   {
     id: 'general',
     label: 'General',
-    description: 'Identity and local time',
-    sections: ['general'],
+    description: 'Identity, local time, and software updates',
+    sections: ['general', 'updates'],
   },
   {
     id: 'apps',
@@ -49,7 +49,7 @@ export const settingsGroups: SettingsGroup[] = [
     id: 'advanced',
     label: 'Advanced',
     description: 'Host details and support checks',
-    sections: ['system', 'updates', 'advanced'],
+    sections: ['system', 'advanced'],
   },
 ];
 

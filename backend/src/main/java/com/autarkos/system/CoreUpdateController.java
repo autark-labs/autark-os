@@ -1,13 +1,10 @@
 package com.autarkos.system;
 
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.autarkos.jobs.AutarkOsJob;
 
@@ -26,10 +23,9 @@ public class CoreUpdateController {
         return service.status();
     }
 
-    @PostMapping(path = "/bundle", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public CoreUpdateModels.Status stage(
-            @RequestPart("bundle") MultipartFile bundle) {
-        return service.stage(bundle);
+    @PostMapping("/check")
+    public CoreUpdateModels.Status check() {
+        return service.check();
     }
 
     @PostMapping("/apply")

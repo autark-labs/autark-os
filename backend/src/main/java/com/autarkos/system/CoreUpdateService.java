@@ -1,16 +1,15 @@
 package com.autarkos.system;
 
 import java.io.IOException;
-import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +18,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
@@ -30,23 +28,22 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * CE-side adapter for the root-owned typed update helper. The browser can
- * upload only an opaque archive; it cannot supply a path, URL, command, or
- * approval token to the helper.
+ * CE-side adapter for managed release discovery and the root-owned typed
+ * update helper. The browser chooses when to install an already published
+ * release; it cannot supply a file, path, URL, command, or approval token.
  */
 @Service
 public class CoreUpdateService {
 
     static final String JOB_TYPE = "core_update";
     static final String JOB_SUBJECT = "autark-os";
-    static final long MAX_ARCHIVE_BYTES = 512L * 1024 * 1024;
     static final Duration HELPER_TIMEOUT = Duration.ofSeconds(45);
     static final Duration UPDATE_START_TIMEOUT = Duration.ofSeconds(30);
-    static final String CONFIRMATION_PREFIX = "INSTALL-AUTARK-OS-";
 
     private final RuntimeLayout runtimeLayout;
     private final AutarkOsJobService jobs;
     private final HelperRunner helper;
+    private final ReleaseSource releases;
     private final ObjectMapper objectMapper;
 
     @Autowired
@@ -54,9 +51,10 @@ public class CoreUpdateService {
             RuntimeLayout runtimeLayout,
             AutarkOsJobService jobs,
             SystemCommandRunner commandRunner,
+            CoreUpdateReleaseClient releases,
             @Value("${autark-os.core-update.helper:/opt/autark-os/bin/autark-os-update-helper}")
                     String helperPath) {
-        this(runtimeLayout, jobs, new ProcessHelperRunner(commandRunner, helperPath),
+        this(runtimeLayout, jobs, new ProcessHelperRunner(commandRunner, helperPath), releases,
                 new ObjectMapper());
     }
 
@@ -64,21 +62,63 @@ public class CoreUpdateService {
             RuntimeLayout runtimeLayout,
             AutarkOsJobService jobs,
             HelperRunner helper,
+            ReleaseSource releases,
             ObjectMapper objectMapper) {
         this.runtimeLayout = runtimeLayout;
         this.jobs = jobs;
         this.helper = helper;
+        this.releases = releases;
         this.objectMapper = objectMapper;
     }
 
     public CoreUpdateModels.Status status() {
+        ReleaseContext context = releases.context();
         try {
             CoreUpdateModels.Status current = invoke("status", List.of(), HELPER_TIMEOUT);
             invoke("health", List.of(), HELPER_TIMEOUT);
-            return current;
+            return contextualize(current, context, null);
         } catch (CoreUpdateException exception) {
-            return unavailableStatus(exception.code());
+            return unavailableStatus(exception.code(), context);
         }
+    }
+
+    public CoreUpdateModels.Status check() {
+        CoreUpdateModels.Status current = status();
+        if (!current.helperAvailable()
+                || !"ready".equals(current.status())
+                        && !"completed".equals(current.status())
+                        && !"failed".equals(current.status())
+                        && !"rolled_back".equals(current.status())) {
+            return current;
+        }
+        Optional<ManagedRelease> available = releases.findUpdate();
+        if (available.isEmpty()) {
+            return new CoreUpdateModels.Status(
+                    current.schemaVersion(),
+                    "current",
+                    true,
+                    false,
+                    "Autark-OS is up to date.",
+                    current.installedVersion(),
+                    current.channel(),
+                    null,
+                    current.candidate(),
+                    current.jobId(),
+                    Instant.now());
+        }
+        ManagedRelease release = available.get();
+        return new CoreUpdateModels.Status(
+                current.schemaVersion(),
+                "update_available",
+                true,
+                false,
+                "Autark-OS " + release.version() + " is ready to install.",
+                current.installedVersion(),
+                current.channel(),
+                release.summary(),
+                null,
+                current.jobId(),
+                Instant.now());
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -103,85 +143,82 @@ public class CoreUpdateService {
         }
     }
 
-    public CoreUpdateModels.Status stage(MultipartFile upload) {
-        if (upload == null || upload.isEmpty()) {
-            throw badRequest("bundle_required", "Choose a signed Autark-OS release bundle to stage.");
+    public AutarkOsJob apply(CoreUpdateModels.ApplyRequest request) {
+        if (request == null || blank(request.version())) {
+            throw badRequest("release_required", "Check for an Autark-OS update before installing.");
         }
-        if (upload.getSize() > MAX_ARCHIVE_BYTES) {
-            throw badRequest("bundle_too_large", "The release bundle exceeds the supported upload size.");
+        ManagedRelease release = releases.findUpdate()
+                .orElseThrow(() -> badRequest("no_update", "Autark-OS is already up to date."));
+        if (!release.version().equals(request.version())) {
+            throw new CoreUpdateException(
+                    "release_changed",
+                    "A newer release became available. Review the update again before installing.",
+                    HttpStatus.CONFLICT);
         }
+        return jobs.startWithJob(JOB_TYPE, JOB_SUBJECT, updateSteps(),
+                job -> runUpdate(job, release));
+    }
+
+    private AutarkOsJobOutcome runUpdate(
+            AutarkOsJob job,
+            ManagedRelease release) {
         String bundleId = UUID.randomUUID().toString().replace("-", "");
         Path inbox = runtimeLayout.runtimeRoot().resolve("core-update-inbox").normalize();
         Path archive = inbox.resolve(bundleId + ".tar.gz").normalize();
-        if (!archive.startsWith(inbox)) {
-            throw new CoreUpdateException("unsafe_upload", "The release bundle could not be staged safely.", HttpStatus.BAD_REQUEST);
-        }
+        String activeStep = "download";
         try {
-            Files.createDirectories(inbox);
-            copyBounded(upload.getInputStream(), archive);
+            if (!archive.startsWith(inbox)) {
+                throw new CoreUpdateException(
+                        "unsafe_download",
+                        "The published update could not be staged safely.",
+                        HttpStatus.SERVICE_UNAVAILABLE);
+            }
+            jobs.recordProgress(job.jobId(), progressSteps("download", "Downloading Autark-OS " + release.version() + "."));
+            releases.download(release, archive);
+            activeStep = "verify";
+            jobs.recordProgress(job.jobId(), progressSteps("verify", "Verifying the signed Autark-OS release."));
             CoreUpdateModels.Status staged = invoke(
                     "stage", List.of("--bundle-id", bundleId), HELPER_TIMEOUT);
             requireBundle(staged, bundleId);
             CoreUpdateModels.Status verified = invoke(
                     "verify", List.of("--bundle-id", bundleId), HELPER_TIMEOUT);
-            requireBundle(verified, bundleId);
-            return verified;
-        } catch (IOException exception) {
-            deleteQuietly(archive);
-            throw new CoreUpdateException("bundle_stage_failed", "The release bundle could not be staged safely.", HttpStatus.BAD_REQUEST);
-        } catch (CoreUpdateException exception) {
-            deleteQuietly(archive);
-            throw exception;
-        }
-    }
-
-    public AutarkOsJob apply(CoreUpdateModels.ApplyRequest request) {
-        if (request == null || blank(request.bundleId()) || blank(request.candidateIdentity())) {
-            throw badRequest("candidate_required", "Review a signed release bundle before installing it.");
-        }
-        CoreUpdateModels.Status current = invoke(
-                "inspect", List.of("--bundle-id", request.bundleId()), HELPER_TIMEOUT);
-        CoreUpdateModels.Candidate candidate = requireCandidate(current);
-        if (!candidate.identity().equals(request.candidateIdentity())) {
-            throw new CoreUpdateException("candidate_changed", "The release changed after review. Verify it again before installing.", HttpStatus.CONFLICT);
-        }
-        if (!expectedConfirmation(candidate.version()).equals(request.confirmation())) {
-            throw badRequest("confirmation_required", "Type the exact update confirmation shown for this release.");
-        }
-        return jobs.startWithJob(JOB_TYPE, JOB_SUBJECT, updateSteps(),
-                job -> runUpdate(job, candidate));
-    }
-
-    private AutarkOsJobOutcome runUpdate(
-            AutarkOsJob job,
-            CoreUpdateModels.Candidate candidate) {
-        try {
-            jobs.recordProgress(job.jobId(), progressSteps("approve", "Recording one-time approval for the exact signed release."));
+            CoreUpdateModels.Candidate candidate = requireCandidate(verified);
+            if (!release.version().equals(candidate.version())) {
+                throw new CoreUpdateException(
+                        "release_changed",
+                        "The downloaded release did not match the approved Autark-OS version.",
+                        HttpStatus.CONFLICT);
+            }
+            activeStep = "approve";
+            jobs.recordProgress(job.jobId(), progressSteps("approve", "Preparing the verified update."));
             String approval = approve(List.of(
-                    "--bundle-id", candidate.bundleId(),
+                    "--bundle-id", bundleId,
                     "--identity", candidate.identity(),
                     "--job-id", job.jobId()));
             if (blank(approval)) {
                 return AutarkOsJobOutcome.failed("The protected update approval could not be recorded.", failedSteps("approve", "The one-time approval could not be recorded."));
             }
+            activeStep = "apply";
             jobs.recordProgress(job.jobId(), progressSteps("apply", "Starting the protected update worker."));
             invoke("apply", List.of(
-                    "--bundle-id", candidate.bundleId(),
+                    "--bundle-id", bundleId,
                     "--approval-id", approval), UPDATE_START_TIMEOUT);
             jobs.recordProgress(job.jobId(), progressSteps("health", "The protected update worker is installing and checking the release."));
-            return waitForTerminalState(candidate, job.jobId());
+            return waitForTerminalState(release.version(), job.jobId());
         } catch (CoreUpdateException exception) {
-            return AutarkOsJobOutcome.failed(exception.getMessage(), failedSteps("apply", exception.getMessage()));
+            return AutarkOsJobOutcome.failed(exception.getMessage(), failedSteps(activeStep, exception.getMessage()));
+        } finally {
+            deleteQuietly(archive);
         }
     }
 
     private AutarkOsJobOutcome waitForTerminalState(
-            CoreUpdateModels.Candidate candidate,
+            String version,
             String jobId) {
         for (int attempt = 0; attempt < 300; attempt++) {
             CoreUpdateModels.Status current = status();
             if ("completed".equals(current.status())) {
-                return AutarkOsJobOutcome.succeeded("Autark-OS installed " + candidate.version() + " and passed its health check.", completedSteps());
+                return AutarkOsJobOutcome.succeeded("Autark-OS installed " + version + " and passed its health check.", completedSteps());
             }
             if ("failed".equals(current.status()) || "rolled_back".equals(current.status())) {
                 return AutarkOsJobOutcome.failed("The update did not complete; Autark-OS kept or restored the recoverable release.", failedSteps("health", current.message()));
@@ -223,6 +260,9 @@ public class CoreUpdateService {
                 true,
                 false,
                 safeMessage(status),
+                "",
+                "",
+                null,
                 candidate,
                 nullableText(payload, "jobId"),
                 instant(payload.path("updatedAt").asText(null)));
@@ -249,21 +289,44 @@ public class CoreUpdateService {
         return approval;
     }
 
-    private CoreUpdateModels.Status unavailableStatus(String code) {
+    private CoreUpdateModels.Status unavailableStatus(
+            String code,
+            ReleaseContext context) {
         return new CoreUpdateModels.Status(
                 "1",
                 "repair_required",
                 false,
                 !"signing_key_missing".equals(code),
                 helperMessage(code),
+                context.installedVersion(),
+                context.channel(),
+                null,
                 null,
                 null,
                 Instant.now());
     }
 
+    private CoreUpdateModels.Status contextualize(
+            CoreUpdateModels.Status status,
+            ReleaseContext context,
+            CoreUpdateModels.AvailableRelease availableRelease) {
+        return new CoreUpdateModels.Status(
+                status.schemaVersion(),
+                status.status(),
+                status.helperAvailable(),
+                status.repairAvailable(),
+                status.message(),
+                context.installedVersion(),
+                context.channel(),
+                availableRelease,
+                status.candidate(),
+                status.jobId(),
+                status.updatedAt());
+    }
+
     private CoreUpdateModels.Candidate requireCandidate(CoreUpdateModels.Status status) {
         if (status.candidate() == null) {
-            throw badRequest("candidate_required", "Review and verify a signed release bundle before installing it.");
+            throw badRequest("candidate_required", "The verified Autark-OS update is no longer available. Check again.");
         }
         return status.candidate();
     }
@@ -315,9 +378,9 @@ public class CoreUpdateService {
     private static String safeMessage(String status) {
         return switch (safeStatus(status)) {
             case "ready" -> "No core update is in progress.";
-            case "staged" -> "Release bundle staged. Its trusted signature must be verified before installation.";
-            case "verified" -> "Release checksums and trusted signature verified. Review and confirm installation.";
-            case "approved" -> "One-time approval recorded for the exact signed release.";
+            case "staged" -> "Autark-OS downloaded the update and is verifying it.";
+            case "verified" -> "The Autark-OS update passed verification.";
+            case "approved" -> "The verified Autark-OS update is ready to install.";
             case "applying" -> "Autark-OS is installing the signed release and will reconnect after health verification.";
             case "rolling_back" -> "Autark-OS is restoring the protected update snapshot and checking health.";
             case "completed" -> "The signed core update completed and passed its health check.";
@@ -328,11 +391,11 @@ public class CoreUpdateService {
 
     private static String helperMessage(String code) {
         return switch (code) {
-            case "helper_missing", "policy_missing", "root_required", "verifier_missing" -> "Autark-OS needs its protected update helper repaired before browser updates can run.";
-            case "signing_key_missing" -> "Autark-OS release signing is not configured on this appliance, so browser core updates remain unavailable.";
+            case "helper_missing", "policy_missing", "root_required", "verifier_missing" -> "Autark-OS needs to repair its update service before continuing.";
+            case "signing_key_missing" -> "Updates are unavailable because this installation cannot verify published Autark-OS releases.";
             case "unsigned_bundle", "signature_missing", "signature_invalid" -> "This release cannot be installed because its trusted signature could not be verified.";
             case "architecture_mismatch" -> "This release was built for a different processor architecture.";
-            default -> "The protected core-update helper is unavailable. Repair the supported service installation and try again.";
+            default -> "Autark-OS could not prepare its update service. Repair the installation and try again.";
         };
     }
 
@@ -354,27 +417,8 @@ public class CoreUpdateService {
         return new CoreUpdateException(code, message, HttpStatus.BAD_REQUEST);
     }
 
-    private static String expectedConfirmation(String version) {
-        return CONFIRMATION_PREFIX + version;
-    }
-
     private static boolean blank(String value) {
         return value == null || value.isBlank();
-    }
-
-    private void copyBounded(InputStream input, Path destination) throws IOException {
-        long written = 0;
-        try (input; var output = Files.newOutputStream(destination,
-                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
-            byte[] buffer = new byte[8192];
-            for (int count; (count = input.read(buffer)) != -1;) {
-                written += count;
-                if (written > MAX_ARCHIVE_BYTES) {
-                    throw new IOException("bundle_too_large");
-                }
-                output.write(buffer, 0, count);
-            }
-        }
     }
 
     private static void deleteQuietly(Path path) {
@@ -387,9 +431,11 @@ public class CoreUpdateService {
 
     private static List<AutarkOsJobStep> updateSteps() {
         return List.of(
-                AutarkOsJobStep.pending("approve", "Record exact release approval"),
-                AutarkOsJobStep.pending("apply", "Install signed release"),
-                AutarkOsJobStep.pending("health", "Verify health or roll back"));
+                AutarkOsJobStep.pending("download", "Download update"),
+                AutarkOsJobStep.pending("verify", "Verify update"),
+                AutarkOsJobStep.pending("approve", "Prepare update"),
+                AutarkOsJobStep.pending("apply", "Install update"),
+                AutarkOsJobStep.pending("health", "Confirm successful start"));
     }
 
     private static List<AutarkOsJobStep> progressSteps(String active, String message) {
@@ -421,6 +467,37 @@ public class CoreUpdateService {
 
     interface HelperRunner {
         HelperResult run(String operation, List<String> arguments, Duration timeout);
+    }
+
+    interface ReleaseSource {
+        ReleaseContext context();
+
+        Optional<ManagedRelease> findUpdate();
+
+        void download(ManagedRelease release, Path destination);
+    }
+
+    record ReleaseContext(
+            String installedVersion,
+            String channel,
+            String architecture) {
+    }
+
+    record ManagedRelease(
+            String version,
+            String channel,
+            String releaseNotesUrl,
+            String architecture,
+            URI artifactUri,
+            String sha256,
+            long sizeBytes) {
+
+        CoreUpdateModels.AvailableRelease summary() {
+            return new CoreUpdateModels.AvailableRelease(
+                    version,
+                    channel,
+                    releaseNotesUrl);
+        }
     }
 
     record HelperResult(boolean successful, boolean missing, String output) {

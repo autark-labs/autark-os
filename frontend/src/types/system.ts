@@ -235,12 +235,21 @@ export type CoreUpdateCandidate = {
   architecture: string;
 };
 
+export type CoreUpdateAvailableRelease = {
+  version: string;
+  channel: string;
+  releaseNotesUrl: string;
+};
+
 export type CoreUpdateStatus = {
   schemaVersion: '1';
-  status: 'ready' | 'staged' | 'verified' | 'approved' | 'applying' | 'rolling_back' | 'completed' | 'rolled_back' | 'failed' | 'repair_required' | string;
+  status: 'ready' | 'current' | 'update_available' | 'approved' | 'applying' | 'rolling_back' | 'completed' | 'rolled_back' | 'failed' | 'repair_required' | string;
   helperAvailable: boolean;
   repairAvailable: boolean;
   message: string;
+  installedVersion: string;
+  channel: string;
+  availableRelease: CoreUpdateAvailableRelease | null;
   candidate: CoreUpdateCandidate | null;
   jobId: string | null;
   updatedAt: string;

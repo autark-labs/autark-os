@@ -93,16 +93,12 @@ export const SystemAPIClient = {
     return response.data;
   },
 
-  async stageCoreUpdateBundle(bundle: File) {
-    const form = new FormData();
-    form.append('bundle', bundle);
-    const response = await httpClient.post<CoreUpdateStatus>('/api/system/core-update/bundle', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  async checkForCoreUpdate() {
+    const response = await httpClient.post<CoreUpdateStatus>('/api/system/core-update/check');
     return response.data;
   },
 
-  async applyCoreUpdate(request: { bundleId: string; candidateIdentity: string; confirmation: string }) {
+  async applyCoreUpdate(request: { version: string }) {
     const response = await httpClient.post<AutarkOsJob>('/api/system/core-update/apply', request);
     return response.data;
   },
