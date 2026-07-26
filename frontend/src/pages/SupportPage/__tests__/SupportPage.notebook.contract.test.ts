@@ -29,5 +29,4 @@ test('Diagnostics notebook preserves report, recovery, logs, and advanced detail
   assert.match(page, /title="Tailscale details"/);
   assert.match(page, /label="Profiles"/);
   assert.match(page, /label="Build"/);
-  assert.match(page, /label="Updates"/);
 });

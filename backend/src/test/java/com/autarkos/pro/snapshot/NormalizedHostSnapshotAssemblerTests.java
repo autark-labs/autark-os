@@ -47,9 +47,6 @@ class NormalizedHostSnapshotAssemblerTests {
                 "secret-slug",
                 "secret-runtime-root",
                 "secret-backend-jar",
-                "stable",
-                "current",
-                "secret-message",
                 NOW));
         when(source.agentVersion()).thenReturn("2.3.4");
         when(source.settings()).thenReturn(ProjectSettings.defaults(

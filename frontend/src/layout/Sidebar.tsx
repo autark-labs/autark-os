@@ -52,16 +52,6 @@ type SidebarProps = {
   onToggleCollapse: () => void;
 };
 
-export function sidebarUpdateIndicator(updateStatus?: string) {
-  if (updateStatus === 'current') {
-    return { label: 'Up to date', tone: 'current' as const };
-  }
-  if (updateStatus === 'available') {
-    return { label: 'Update available', tone: 'available' as const };
-  }
-  return null;
-}
-
 function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const { setViewMode, settings, viewMode } = useProjectSettings();
@@ -95,7 +85,6 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const setupReady = setup?.status === 'ready' || setup?.status === 'ready_with_notes';
   const deviceName = settings?.deviceName || setup?.runAsUser || 'Autark-OS';
   const versionLabel = version?.version ? `v${version.version}` : 'Version unknown';
-  const updateIndicator = sidebarUpdateIndicator(version?.updateStatus);
   const navGroups = navigationGroups(viewMode) as NavGroup[];
 
   return (
@@ -217,14 +206,6 @@ function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             <span className={cn('size-2 rounded-full', setupReady ? 'bg-cyan-300 shadow-lg shadow-cyan-400/30' : 'bg-orange-500 shadow-lg shadow-orange-500/30')} />
             <span>{setupReady ? 'Ready for your apps' : 'Setup needs attention'}</span>
           </div>
-          {updateIndicator && <div className="flex items-center gap-2">
-            <span className={cn(
-              'size-2 rounded-full',
-              updateIndicator.tone === 'current' && 'bg-cyan-300 shadow-lg shadow-cyan-400/30',
-              updateIndicator.tone === 'available' && 'bg-orange-500 shadow-lg shadow-orange-500/30',
-            )} />
-            <span>{updateIndicator.label}</span>
-          </div>}
         </div>
         <div className="mt-3 grid gap-2">
           <div className="flex items-center justify-between gap-2 text-xs text-slate-400">

@@ -23,7 +23,6 @@ public class ProjectSettingsService {
     private static final Set<String> BACKUP_FREQUENCIES = Set.of("hourly", "daily", "weekly");
     private static final Set<String> TIME_FORMATS = Set.of("12-hour", "24-hour");
     private static final Set<String> TEMPERATURE_UNITS = Set.of("fahrenheit", "celsius");
-    private static final Set<String> UPDATE_CHANNELS = Set.of("stable", "preview");
 
     private final ProjectSettingsRepository repository;
     private final ActivityLogService activityLogService;
@@ -125,7 +124,6 @@ public class ProjectSettingsService {
                 oneOf(settings.backupFrequency(), BACKUP_FREQUENCIES, fallback.backupFrequency()),
                 clamp(settings.backupRetentionDays(), 1, 90, fallback.backupRetentionDays()),
                 clean(settings.backupTime(), fallback.backupTime(), 8),
-                oneOf(settings.updateChannel(), UPDATE_CHANNELS, fallback.updateChannel()),
                 settings.showAdvancedMetrics(),
                 Instant.now());
     }
@@ -146,7 +144,6 @@ public class ProjectSettingsService {
                 oneOf(string(values, "backupFrequency", fallback.backupFrequency()), BACKUP_FREQUENCIES, fallback.backupFrequency()),
                 clamp(intValue(values, "backupRetentionDays", fallback.backupRetentionDays()), 1, 90, fallback.backupRetentionDays()),
                 string(values, "backupTime", fallback.backupTime()),
-                oneOf(string(values, "updateChannel", fallback.updateChannel()), UPDATE_CHANNELS, fallback.updateChannel()),
                 bool(values, "showAdvancedMetrics", fallback.showAdvancedMetrics()),
                 instant(values, "updatedAt", fallback.updatedAt()));
     }

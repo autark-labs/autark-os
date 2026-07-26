@@ -65,7 +65,6 @@ class BackupReportServiceTests {
                 "daily",
                 7,
                 "02:00",
-                "stable",
                 false,
                 Instant.parse("2026-01-15T00:00:00Z"));
     }

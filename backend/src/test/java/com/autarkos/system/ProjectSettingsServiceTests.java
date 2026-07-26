@@ -67,7 +67,6 @@ class ProjectSettingsServiceTests {
                 "monthly",
                 120,
                 "02:00",
-                "stable",
                 false,
                 Instant.parse("2026-06-21T13:00:00Z")));
         ProjectSettingsAppDefaultsResult result = saveResult.appDefaults();
@@ -117,7 +116,6 @@ class ProjectSettingsServiceTests {
                 defaults.backupFrequency(),
                 defaults.backupRetentionDays(),
                 defaults.backupTime(),
-                defaults.updateChannel(),
                 defaults.showAdvancedMetrics(),
                 Instant.now()));
 

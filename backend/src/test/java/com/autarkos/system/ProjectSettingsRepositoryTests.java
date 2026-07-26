@@ -37,7 +37,6 @@ class ProjectSettingsRepositoryTests {
                 "daily",
                 14,
                 "03:00",
-                "stable",
                 true,
                 Instant.parse("2026-06-19T12:00:00Z")));
         repository.saveValues(Map.of("backupDestination", runtimeRoot.resolve("external-backups").toString()));

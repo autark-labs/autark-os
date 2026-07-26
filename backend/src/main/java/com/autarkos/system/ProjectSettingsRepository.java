@@ -42,7 +42,6 @@ public interface ProjectSettingsRepository extends JpaRepository<ProjectSettingE
                 Map.entry("backupFrequency", settings.backupFrequency()),
                 Map.entry("backupRetentionDays", Integer.toString(settings.backupRetentionDays())),
                 Map.entry("backupTime", settings.backupTime()),
-                Map.entry("updateChannel", settings.updateChannel()),
                 Map.entry("showAdvancedMetrics", Boolean.toString(settings.showAdvancedMetrics())),
                 Map.entry("updatedAt", settings.updatedAt().toString())),
                 settings.updatedAt());

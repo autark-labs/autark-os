@@ -17,7 +17,6 @@ public record ProjectSettings(
         String backupFrequency,
         int backupRetentionDays,
         String backupTime,
-        String updateChannel,
         boolean showAdvancedMetrics,
         Instant updatedAt) {
 
@@ -37,7 +36,6 @@ public record ProjectSettings(
                 "daily",
                 7,
                 "02:00",
-                "stable",
                 false,
                 Instant.now());
     }

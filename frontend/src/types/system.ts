@@ -222,9 +222,6 @@ export type ProjectVersionInfo = {
   installPath: string;
   runtimePath: string;
   backendJar: string;
-  updateChannel: string;
-  updateStatus: 'unavailable' | 'available' | 'current' | string;
-  updateMessage: string;
   checkedAt: string;
 };
 
@@ -243,7 +240,6 @@ export type ProjectSettings = {
   backupFrequency: 'hourly' | 'daily' | 'weekly' | string;
   backupRetentionDays: number;
   backupTime: string;
-  updateChannel: 'stable' | 'preview' | string;
   showAdvancedMetrics: boolean;
   updatedAt: string;
 };

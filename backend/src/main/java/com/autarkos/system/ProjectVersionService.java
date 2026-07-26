@@ -16,24 +16,21 @@ import com.autarkos.marketplace.runtime.RuntimeLayout;
 public class ProjectVersionService {
 
     private final RuntimeLayout runtimeLayout;
-    private final ProjectSettingsService settingsService;
     private final InstanceIdentityService identityService;
     private final ReleaseIdentity packagedIdentity;
 
     @Autowired
-    public ProjectVersionService(RuntimeLayout runtimeLayout, ProjectSettingsService settingsService, InstanceIdentityService identityService) {
-        this(runtimeLayout, settingsService, identityService, packagedArtifact());
+    public ProjectVersionService(RuntimeLayout runtimeLayout, InstanceIdentityService identityService) {
+        this(runtimeLayout, identityService, packagedArtifact());
     }
 
-    ProjectVersionService(RuntimeLayout runtimeLayout, ProjectSettingsService settingsService, InstanceIdentityService identityService, Path packagedArtifact) {
+    ProjectVersionService(RuntimeLayout runtimeLayout, InstanceIdentityService identityService, Path packagedArtifact) {
         this.runtimeLayout = runtimeLayout;
-        this.settingsService = settingsService;
         this.identityService = identityService;
         this.packagedIdentity = readPackagedIdentity(packagedArtifact);
     }
 
     public ProjectVersionInfo info() {
-        ProjectSettings settings = settingsService.current();
         AutarkOsIdentity identity = identityService.current();
         return new ProjectVersionInfo(
                 firstPresent(packagedIdentity.version(), System.getenv("AUTARK_OS_VERSION"), "0.0.1-SNAPSHOT"),
@@ -45,9 +42,6 @@ public class ProjectVersionService {
                 identity.instanceSlug(),
                 identity.runtimeRootHash(),
                 backendJar(),
-                updateChannel(settings.updateChannel()),
-                "check_required",
-                "Autark-OS checks its published release channel and handles verification, installation, health checks, and rollback.",
                 Instant.now());
     }
 
@@ -103,17 +97,6 @@ public class ProjectVersionService {
             }
         }
         return "";
-    }
-
-    private String updateChannel(String setting) {
-        String configured = firstPresent(
-                System.getenv("AUTARK_OS_UPDATE_CHANNEL"),
-                setting,
-                "stable");
-        return switch (configured.toLowerCase()) {
-            case "beta", "preview" -> "beta";
-            default -> "stable";
-        };
     }
 
     private record ReleaseIdentity(String version, String buildSha, String buildDate) {

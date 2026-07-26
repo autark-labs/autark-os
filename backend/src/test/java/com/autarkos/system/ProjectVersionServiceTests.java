@@ -23,11 +23,9 @@ class ProjectVersionServiceTests {
     Path tempDir;
 
     @Test
-    void versionStatusDescribesManagedUpdatesWithoutClaimingOneExists() {
+    void reportsOnlyInstalledReleaseIdentity() {
         AutarkOsRuntimeProperties runtimeProperties = new AutarkOsRuntimeProperties();
         runtimeProperties.setRuntimeRoot("/tmp/autark-os-version-test");
-        ProjectSettingsService settingsService = mock(ProjectSettingsService.class);
-        when(settingsService.current()).thenReturn(ProjectSettings.defaults("autark-os"));
         InstanceIdentityService identityService = mock(InstanceIdentityService.class);
         when(identityService.current()).thenReturn(new AutarkOsIdentity(
                 "instance-1",
@@ -39,13 +37,10 @@ class ProjectVersionServiceTests {
 
         ProjectVersionInfo version = new ProjectVersionService(
                 new RuntimeLayout(runtimeProperties),
-                settingsService,
                 identityService).info();
 
-        assertThat(version.updateStatus()).isEqualTo("check_required");
-        assertThat(version.updateMessage())
-                .contains("handles verification, installation, health checks, and rollback")
-                .doesNotContain("cannot check for or install updates");
+        assertThat(version.version()).isNotBlank();
+        assertThat(version.instanceId()).isEqualTo("instance-1");
     }
 
     @Test
@@ -63,8 +58,6 @@ class ProjectVersionServiceTests {
 
         AutarkOsRuntimeProperties runtimeProperties = new AutarkOsRuntimeProperties();
         runtimeProperties.setRuntimeRoot(tempDir.resolve("runtime").toString());
-        ProjectSettingsService settingsService = mock(ProjectSettingsService.class);
-        when(settingsService.current()).thenReturn(ProjectSettings.defaults("autark-os"));
         InstanceIdentityService identityService = mock(InstanceIdentityService.class);
         when(identityService.current()).thenReturn(new AutarkOsIdentity(
                 "instance-1",
@@ -76,7 +69,6 @@ class ProjectVersionServiceTests {
 
         ProjectVersionInfo version = new ProjectVersionService(
                 new RuntimeLayout(runtimeProperties),
-                settingsService,
                 identityService,
                 packagedJar).info();
 

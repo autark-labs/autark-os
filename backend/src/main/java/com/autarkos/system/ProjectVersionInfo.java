@@ -12,8 +12,5 @@ public record ProjectVersionInfo(
         String instanceSlug,
         String runtimeRootHash,
         String backendJar,
-        String updateChannel,
-        String updateStatus,
-        String updateMessage,
         Instant checkedAt) {
 }

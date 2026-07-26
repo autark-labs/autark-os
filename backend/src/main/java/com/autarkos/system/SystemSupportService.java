@@ -453,7 +453,17 @@ public class SystemSupportService {
         if (versionService != null) {
             return versionService.info();
         }
-        return new ProjectVersionInfo("unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unknown", "unavailable", "Version service is unavailable in this context.", Instant.now());
+        return new ProjectVersionInfo(
+                "unknown",
+                "unknown",
+                "unknown",
+                "unknown",
+                "unknown",
+                "unknown",
+                "unknown",
+                "unknown",
+                "unknown",
+                Instant.now());
     }
 
     private String bundleText(SupportContext context, String headline, String summary, SystemMetrics metrics, List<ActivityLog> recentActivity, List<ActivityLog> recentFailures, List<SupportModels.SupportLogLine> logs) {
@@ -474,8 +484,6 @@ public class SystemSupportService {
                 - Version: %s
                 - Build SHA: %s
                 - Build date: %s
-                - Update channel: %s
-                - Update status: %s
                 - Install path: %s
                 - Runtime path: %s
                 - Backend jar: %s
@@ -516,8 +524,6 @@ public class SystemSupportService {
                 context.version().version(),
                 context.version().buildSha(),
                 context.version().buildDate(),
-                context.version().updateChannel(),
-                context.version().updateStatus(),
                 context.version().installPath(),
                 context.version().runtimePath(),
                 context.version().backendJar(),

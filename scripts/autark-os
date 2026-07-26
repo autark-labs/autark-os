@@ -908,14 +908,6 @@ installed_channel() {
   local value=""
   value="$(configured_value AUTARK_OS_UPDATE_CHANNEL)"
   [[ -n "${value}" ]] || value="$(awk -F= '$1 == "AUTARK_OS_UPDATE_CHANNEL" {print $2; exit}' "${PUBLIC_INSTALL_METADATA}" 2>/dev/null || true)"
-  if [[ -z "${value}" ]]; then
-    local response
-    response="$(mktemp)"
-    if api_get /api/system/version >"${response}" 2>/dev/null; then
-      value="$(json_value updateChannel "${response}")"
-    fi
-    rm -f "${response}"
-  fi
   [[ -n "${value}" ]] || value="${AUTARK_OS_UPDATE_CHANNEL:-beta}"
   case "${value}" in
     stable|beta) printf '%s\n' "${value}" ;;
@@ -2602,8 +2594,6 @@ version() {
     print_version_line "Install path" "$(json_value installPath "${tmp_file}")"
     print_version_line "Runtime path" "$(json_value runtimePath "${tmp_file}")"
     print_version_line "Backend jar" "$(json_value backendJar "${tmp_file}")"
-    print_version_line "Update channel" "$(json_value updateChannel "${tmp_file}")"
-    print_version_line "Update status" "$(json_value updateStatus "${tmp_file}")"
     print_version_line "Previous version" "$(configured_value AUTARK_OS_PREVIOUS_VERSION)"
     print_version_line "Previous jar" "$(configured_value AUTARK_OS_PREVIOUS_BACKEND_JAR)"
     rm -f "${tmp_file}"
