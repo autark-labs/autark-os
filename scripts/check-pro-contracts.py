@@ -19,6 +19,7 @@ EXAMPLE_NAMES = (
     "online-service-lease-v1",
     "pro-entitlement-status-v1",
     "pro-release-manifest-v1",
+    "pro-product-state-v1",
     "agent-status-v1",
     "normalized-host-snapshot-v1",
     "extension-ui-manifest-v1",

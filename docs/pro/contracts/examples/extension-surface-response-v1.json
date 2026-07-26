@@ -1,6 +1,8 @@
 {
   "schemaVersion": "1",
   "surface": "storage.insights",
+  "stateSchemaVersion": 1,
+  "stateCompatibility": "new",
   "continuationToken": null,
   "payload": {}
 }

@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/product-state.schema.json",
+  "title": "Generic paid product presentation state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "overallStatus",
+    "softwareEntitlement",
+    "hostedServices",
+    "agent",
+    "guardian",
+    "localMobile",
+    "hostedMobile",
+    "localCapabilities",
+    "hostedCapabilities",
+    "recommendedAction",
+    "checkedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "overallStatus": {
+      "enum": ["available", "partial", "stale", "unavailable", "retained_use", "incompatible", "error"]
+    },
+    "softwareEntitlement": { "$ref": "#/$defs/entitlement" },
+    "hostedServices": { "$ref": "#/$defs/hostedServices" },
+    "agent": { "$ref": "#/$defs/agent" },
+    "guardian": { "$ref": "#/$defs/guardian" },
+    "localMobile": { "$ref": "#/$defs/mobile" },
+    "hostedMobile": { "$ref": "#/$defs/hostedMobile" },
+    "localCapabilities": { "$ref": "#/$defs/capabilities" },
+    "hostedCapabilities": { "$ref": "#/$defs/capabilities" },
+    "recommendedAction": { "$ref": "#/$defs/recommendedAction" },
+    "checkedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "reasonCode": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$"
+    },
+    "nullableTimestamp": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "capabilities": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9.-]{1,127}$"
+      }
+    },
+    "entitlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "localUseAllowed", "updatesAllowed", "updatesThrough", "reasonCode"],
+      "properties": {
+        "state": {
+          "enum": ["absent", "activating", "active", "grace", "retained_use", "suspended", "revoked", "invalid", "error"]
+        },
+        "localUseAllowed": { "type": "boolean" },
+        "updatesAllowed": { "type": "boolean" },
+        "updatesThrough": { "$ref": "#/$defs/nullableTimestamp" },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" }
+      }
+    },
+    "hostedServices": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "allowed", "servicesThrough", "lastVerifiedAt", "reasonCode"],
+      "properties": {
+        "state": {
+          "enum": ["unavailable", "active", "grace", "expired", "suspended", "revoked", "error"]
+        },
+        "allowed": { "type": "boolean" },
+        "servicesThrough": { "$ref": "#/$defs/nullableTimestamp" },
+        "lastVerifiedAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "health", "compatibility", "componentVersion", "digestPrefix", "lastTransitionAt", "reasonCode"],
+      "properties": {
+        "state": {
+          "enum": ["not_installed", "release_available", "installing", "active", "degraded", "retained_use", "update_ineligible", "removing", "error"]
+        },
+        "health": { "enum": ["not_checked", "healthy", "degraded", "failed", "stale"] },
+        "compatibility": { "enum": ["compatible", "incompatible", "unknown"] },
+        "componentVersion": { "type": ["string", "null"], "maxLength": 64 },
+        "digestPrefix": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[a-f0-9]{12}$"
+        },
+        "lastTransitionAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" }
+      }
+    },
+    "guardian": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "schedulerState", "latestAnalysisHealth", "latestAnalysisAt", "nextAnalysisAt", "reasonCode"],
+      "properties": {
+        "state": { "enum": ["unavailable", "idle", "scheduled", "running", "healthy", "stale", "error"] },
+        "schedulerState": { "enum": ["unavailable", "idle", "scheduled", "running", "error"] },
+        "latestAnalysisHealth": { "enum": ["unavailable", "healthy", "stale", "error"] },
+        "latestAnalysisAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "nextAnalysisAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" }
+      }
+    },
+    "mobile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "pairedDeviceCount", "reasonCode"],
+      "properties": {
+        "state": { "enum": ["unavailable", "unpaired", "paired", "stale", "error"] },
+        "pairedDeviceCount": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" }
+      }
+    },
+    "hostedMobile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "linkedDeviceCount", "relayState", "lastRelayAt", "reasonCode"],
+      "properties": {
+        "state": { "enum": ["unavailable", "unlinked", "linked", "expired", "error"] },
+        "linkedDeviceCount": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "relayState": { "enum": ["unavailable", "online", "stale", "offline", "error"] },
+        "lastRelayAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" }
+      }
+    },
+    "recommendedAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "reasonCode"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$"
+        },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" }
+      }
+    }
+  }
+}

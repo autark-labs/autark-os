@@ -4,6 +4,7 @@ import {
   type ProDeactivationResult,
   type ProStatusResponse,
 } from '@/api/pro';
+import { ProProductStateAPIClient } from '@/api/proProductState';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { ProModuleState } from '@/types/pro';
 import {
@@ -13,6 +14,7 @@ import {
 
 export const proQueryKeys = {
   all: ['pro'] as const,
+  productState: ['pro', 'product-state'] as const,
   status: ['pro', 'status'] as const,
 };
 
@@ -38,6 +40,15 @@ export function useProStatusRepository() {
         ? 2_000
         : 30_000;
     },
+    staleTime: 5_000,
+  });
+}
+
+export function useProProductStateRepository() {
+  return useQuery({
+    queryKey: proQueryKeys.productState,
+    queryFn: () => ProProductStateAPIClient.current(),
+    refetchInterval: 30_000,
     staleTime: 5_000,
   });
 }
@@ -105,7 +116,7 @@ export function useDeactivateProMutation() {
   }>({
     mutationFn: (request) => ProAPIClient.deactivate(request),
     onSettled: () => {
-      void invalidateProStatus(queryClient);
+      void invalidateProLifecycle(queryClient);
       void invalidateAutarkOsJobs(queryClient);
     },
   });
@@ -124,10 +135,16 @@ async function acceptAuthoritativeProStatus(
   // immediately refetch the pre-transition state and incorrectly undo the UI.
   await queryClient.cancelQueries({ queryKey: proQueryKeys.status });
   setProStatusCache(queryClient, status);
+  await queryClient.invalidateQueries({ queryKey: proQueryKeys.productState });
 }
 
 export function invalidateProStatus(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: proQueryKeys.status });
+}
+
+export function invalidateProLifecycle(queryClient: QueryClient) {
+  void queryClient.invalidateQueries({ queryKey: proQueryKeys.productState });
+  return invalidateProStatus(queryClient);
 }
 
 function cacheProModuleJob(queryClient: QueryClient, job: AutarkOsJob) {
@@ -148,5 +165,5 @@ function cacheProModuleJob(queryClient: QueryClient, job: AutarkOsJob) {
 
 function invalidateProModuleLifecycle(queryClient: QueryClient) {
   void invalidateAutarkOsJobs(queryClient);
-  return invalidateProStatus(queryClient);
+  return invalidateProLifecycle(queryClient);
 }

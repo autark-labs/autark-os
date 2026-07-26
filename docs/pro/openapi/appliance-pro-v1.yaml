@@ -6,6 +6,16 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/pro/product-state:
+    get:
+      operationId: getCanonicalProProductState
+      responses:
+        "200":
+          description: Redacted, derived presentation state for browser, extension, and mobile consumers.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/pro-product-state-v1.schema.json
   /api/v1/pro/status:
     get:
       operationId: getPrivateExtensionLifecycleStatus

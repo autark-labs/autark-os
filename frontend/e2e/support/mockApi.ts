@@ -524,6 +524,20 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
       lastFailureCategory: null, consecutiveFailures: 0,
     },
   };
+  if (pathname === '/api/v1/pro/product-state') return {
+    schemaVersion: '1',
+    overallStatus: 'unavailable',
+    softwareEntitlement: { state: 'absent', localUseAllowed: false, updatesAllowed: false, updatesThrough: null, reasonCode: 'not_activated' },
+    hostedServices: { state: 'unavailable', allowed: false, servicesThrough: null, lastVerifiedAt: null, reasonCode: 'not_activated' },
+    agent: { state: 'not_installed', health: 'not_checked', compatibility: 'unknown', componentVersion: null, digestPrefix: null, lastTransitionAt: null, reasonCode: 'not_installed' },
+    guardian: { state: 'unavailable', schedulerState: 'unavailable', latestAnalysisHealth: 'unavailable', latestAnalysisAt: null, nextAnalysisAt: null, reasonCode: 'not_implemented' },
+    localMobile: { state: 'unavailable', pairedDeviceCount: 0, reasonCode: 'not_implemented' },
+    hostedMobile: { state: 'unavailable', linkedDeviceCount: 0, relayState: 'unavailable', lastRelayAt: null, reasonCode: 'not_implemented' },
+    localCapabilities: [],
+    hostedCapabilities: [],
+    recommendedAction: { id: 'activate', reasonCode: 'not_activated' },
+    checkedAt: fixedAt,
+  };
   if (pathname === '/api/system/onboarding') return onboarding;
   if (pathname === '/api/application-state' || pathname === '/api/application-state/refresh') return currentAppState;
   if (pathname === '/api/system-summary') return systemSummary;

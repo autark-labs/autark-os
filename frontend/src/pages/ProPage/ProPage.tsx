@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowRight, Copy, Download, LoaderCircle, RefreshCw, ShieldCheck, Trash2, Unplug } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import type { ProStatusResponse } from '@/api/pro';
+import type { ProProductState } from '@/api/proProductState';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
@@ -26,6 +27,7 @@ import {
   useContinueProActivationMutation,
   useDeactivateProMutation,
   useInstallOrUpdateProModuleMutation,
+  useProProductStateRepository,
   useProStatusRepository,
   useRefreshProEntitlementMutation,
   useRemoveProModuleMutation,
@@ -37,6 +39,7 @@ const deactivationConfirmation = 'DEACTIVATE-AUTARK-PRO';
 
 function ProPage() {
   const statusQuery = useProStatusRepository();
+  const productQuery = useProProductStateRepository();
   const activate = useActivateProMutation();
   const continueActivation = useContinueProActivationMutation();
   const refresh = useRefreshProEntitlementMutation();
@@ -68,8 +71,11 @@ function ProPage() {
   }, []);
 
   useEffect(() => {
-    if (moduleJob.data && terminalJob(moduleJob.data)) void statusQuery.refetch();
-  }, [moduleJob.data, statusQuery]);
+    if (moduleJob.data && terminalJob(moduleJob.data)) {
+      void statusQuery.refetch();
+      void productQuery.refetch();
+    }
+  }, [moduleJob.data, productQuery, statusQuery]);
 
   function submitActivation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -166,14 +172,16 @@ function ProPage() {
     showActionErrorNotification(error, title);
   }
 
-  if (statusQuery.isLoading && !status) return <LoadingState />;
+  if ((statusQuery.isLoading && !status) || (productQuery.isLoading && !productQuery.data)) return <LoadingState />;
   if (!status) return <UnavailableState message={apiErrorMessage(statusQuery.error, 'The local extension service did not return a status.')} onRetry={() => void statusQuery.refetch()} />;
+  if (!productQuery.data) return <UnavailableState message={apiErrorMessage(productQuery.error, 'The canonical Pro state could not be loaded.')} onRetry={() => void productQuery.refetch()} />;
 
-  const lifecycle = proLifecycleModel(status);
+  const product = productQuery.data;
+  const lifecycle = proLifecycleModel(status, product);
   const extensionActive = Boolean(
-    status.entitlement.localUseAllowed
-    && status.module.activeDigest
-    && status.module.health === 'healthy',
+    product.softwareEntitlement.localUseAllowed
+    && product.agent.digestPrefix
+    && product.agent.health === 'healthy',
   );
   const canConfirmRemoval = removalConfirmation === moduleRemovalConfirmation && !busy;
   const canConfirmDeactivation = deactivationPhrase === deactivationConfirmation
@@ -192,10 +200,10 @@ function ProPage() {
                 <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">{lifecycle.title}</h1>
                 <p className="mt-4 max-w-2xl text-sm leading-6 text-sky-100/75 sm:text-base">{lifecycle.description}</p>
                 <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4" aria-label="Autark Pro lifecycle status">
-                  <LifecycleValue label="License" value={formatLifecycleToken(status.entitlement.state)} />
-                  <LifecycleValue label="Software updates" value={updateStatus(status)} />
-                  <LifecycleValue label="Hosted services" value={hostedStatus(status)} />
-                  <LifecycleValue label="Private extension" value={moduleStatus(status, extensionActive)} />
+                  <LifecycleValue label="License" value={formatLifecycleToken(product.softwareEntitlement.state)} />
+                  <LifecycleValue label="Software updates" value={updateStatus(product)} />
+                  <LifecycleValue label="Hosted services" value={hostedStatus(product)} />
+                  <LifecycleValue label="Private extension" value={moduleStatus(product, extensionActive)} />
                 </dl>
                 <div className="mt-6 flex flex-wrap gap-3">
                   {lifecycle.primaryAction === 'continue-activation' && <ProjectPrimaryButton disabled={busy} onClick={resumeActivation} type="button"><ArrowRight className="size-4" />Continue activation</ProjectPrimaryButton>}
@@ -227,7 +235,7 @@ function ProPage() {
       {actionError && <ProjectPanel className="border-red-400/35 bg-red-500/10 text-sm text-red-100" role="alert">{actionError}</ProjectPanel>}
       {moduleJob.data && <JobProgress job={moduleJob.data} subjectLabel="Private extension" />}
 
-      <LifecycleDetails onCopy={(value, label) => void copyLifecycleValue(value, label)} status={status} />
+      <LifecycleDetails onCopy={(value, label) => void copyLifecycleValue(value, label)} product={product} status={status} />
 
       {extensionActive && <ExtensionSlot extensionId="autark-pro" showErrors surface="pro.dashboard" />}
 
@@ -237,18 +245,18 @@ function ProPage() {
   );
 }
 
-function LifecycleDetails({ onCopy, status }: { onCopy: (value: string, label: string) => void; status: ProStatusResponse }) {
+function LifecycleDetails({ onCopy, product, status }: { onCopy: (value: string, label: string) => void; product: ProProductState; status: ProStatusResponse }) {
   return (
     <ProjectPanel>
-      <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-white">Lifecycle details</h2><p className="mt-1 text-sm text-slate-400">These values come from the local entitlement and signed private-extension lifecycle.</p></div><span className="rounded-full border border-sky-300/20 px-2.5 py-1 text-xs font-semibold text-sky-100">{formatLifecycleToken(status.module.health)}</span></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold text-white">Lifecycle details</h2><p className="mt-1 text-sm text-slate-400">These values come from the canonical local Pro state and independently enforced lifecycle.</p></div><span className="rounded-full border border-sky-300/20 px-2.5 py-1 text-xs font-semibold text-sky-100">{formatLifecycleToken(product.agent.health)}</span></div>
       <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
         <LifecycleValue label="Plan" value={formatPlan(status.entitlement.plan)} />
         <CopyableLifecycleValue label="Installation identity" onCopy={onCopy} value={status.device.publicKeyFingerprint} />
         <LifecycleValue label="Last license verification" value={formatLifecycleDate(status.refresh.lastSuccessAt ?? status.entitlement.lastVerifiedServerTime)} />
         <LifecycleValue label="Last release check or change" value={formatLifecycleDate(status.module.lastTransitionAt)} />
         <LifecycleValue label="Last successful transition" value={formatLifecycleDate(status.module.lastSuccessfulTransitionAt)} />
-        <LifecycleValue label="Update eligibility" value={updateStatus(status)} />
-        <CopyableLifecycleValue label="Active extension" onCopy={onCopy} value={extensionValue(status.module.componentVersion, status.module.activeDigest)} />
+        <LifecycleValue label="Update eligibility" value={updateStatus(product)} />
+        <CopyableLifecycleValue label="Active extension" onCopy={onCopy} value={extensionValue(product.agent.componentVersion, product.agent.digestPrefix)} />
         <CopyableLifecycleValue label="Previous extension" onCopy={onCopy} value={extensionValue(status.module.previousComponentVersion, status.module.previousDigest)} />
         <LifecycleValue label="Available signed release" value={status.module.candidateVersion ?? 'None checked'} />
       </dl>
@@ -273,20 +281,19 @@ function DeactivationDialog({ accountAcknowledged, busy, moduleAcknowledged, onA
   return <AlertDialog onOpenChange={onOpenChange} open={open}><AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100"><AlertDialogHeader><AlertDialogTitle>Deactivate Autark Pro on this appliance?</AlertDialogTitle><AlertDialogDescription className="text-slate-400">Deactivation safely returns this appliance to Community Edition. The local module data, device identity, and remote account association are retained so recovery can be audited; hosted access is disabled.</AlertDialogDescription></AlertDialogHeader><div className="grid gap-3 text-sm text-slate-200"><label className="flex items-start gap-2"><input checked={moduleAcknowledged} className="mt-1" onChange={(event) => onModuleAcknowledged(event.target.checked)} type="checkbox" /><span>I understand that local private-extension data is retained, not deleted.</span></label><label className="flex items-start gap-2"><input checked={accountAcknowledged} className="mt-1" onChange={(event) => onAccountAcknowledged(event.target.checked)} type="checkbox" /><span>I understand that the device identity and account association are retained for recovery and audit.</span></label><label className="grid gap-2 font-medium text-slate-100" htmlFor="pro-deactivate-confirmation">Type {deactivationConfirmation} to confirm<Input autoComplete="off" id="pro-deactivate-confirmation" onChange={(event) => onPhraseChange(event.target.value)} value={phrase} /></label></div><AlertDialogFooter><ProjectDarkControlButton disabled={busy} onClick={() => onOpenChange(false)} type="button">Keep Pro active</ProjectDarkControlButton><ProjectWarningButton disabled={!ready} onClick={onConfirm} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <Unplug className="size-4" />}Deactivate Pro</ProjectWarningButton></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 }
 
-function updateStatus(status: ProStatusResponse) {
-  if (status.entitlement.updatesAllowed) return `Eligible through ${formatLifecycleDate(status.entitlement.updatesThrough)}`;
-  return status.entitlement.localUseAllowed ? 'No new private-extension releases' : 'Not available';
+function updateStatus(product: ProProductState) {
+  if (product.softwareEntitlement.updatesAllowed) return `Eligible through ${formatLifecycleDate(product.softwareEntitlement.updatesThrough)}`;
+  return product.softwareEntitlement.localUseAllowed ? 'No new private-extension releases' : 'Not available';
 }
 
-function hostedStatus(status: ProStatusResponse) {
-  if (status.entitlement.hostedServicesAllowed) return `Available through ${formatLifecycleDate(status.entitlement.serviceLeaseExpiresAt)}`;
-  return status.entitlement.localUseAllowed ? 'Not included or expired' : 'Not available';
+function hostedStatus(product: ProProductState) {
+  if (product.hostedServices.allowed) return `Available through ${formatLifecycleDate(product.hostedServices.servicesThrough)}`;
+  return product.softwareEntitlement.localUseAllowed ? formatLifecycleToken(product.hostedServices.state) : 'Not available';
 }
 
-function moduleStatus(status: ProStatusResponse, extensionActive: boolean) {
-  if (extensionActive) return status.module.componentVersion ?? 'Healthy';
-  if (status.module.state === 'RELEASE_AVAILABLE') return `${status.module.candidateVersion ?? 'Signed release'} available`;
-  return formatLifecycleToken(status.module.state);
+function moduleStatus(product: ProProductState, extensionActive: boolean) {
+  if (extensionActive) return product.agent.componentVersion ?? 'Healthy';
+  return formatLifecycleToken(product.agent.state);
 }
 
 function extensionValue(version: string | null, digest: string | null) {

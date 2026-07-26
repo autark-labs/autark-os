@@ -15,6 +15,12 @@ repository scope, digest, architecture, and image signature independently.
 Capability identifiers in signed documents are opaque strings. CE checks
 membership and equality but has no compiled product catalog.
 
+`pro-product-state-v1` is the generic, redacted presentation truth shared by
+the browser, official private extension, and mobile clients. It reports
+availability and one recommended action without granting authority or naming
+private feature policy. Signed documents and runtime health remain the
+independent enforcement inputs.
+
 ## Local extension boundary
 
 `normalized-host-snapshot-v1` is the versioned, bounded and redacted input that

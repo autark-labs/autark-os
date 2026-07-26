@@ -64,6 +64,53 @@ function proStatus(installed = true) {
   };
 }
 
+function productState(status: ReturnType<typeof proStatus>) {
+  const softwareState = {
+    NOT_ACTIVATED: 'absent', ACTIVATING: 'activating', ACTIVE: 'active', ONLINE_GRACE: 'grace',
+    RETAINED_USE: 'retained_use', SUSPENDED_ONLINE: 'suspended', REVOKED: 'revoked', INVALID: 'invalid', ERROR: 'error',
+  }[status.entitlement.state] ?? 'error';
+  const agentState = {
+    NOT_INSTALLED: 'not_installed', RELEASE_AVAILABLE: 'release_available', DOWNLOADING: 'installing',
+    VERIFYING: 'installing', STARTING_CANDIDATE: 'installing', HEALTH_CHECKING: 'installing',
+    ACTIVE: 'active', DEGRADED: 'degraded', ROLLING_BACK: 'installing', RETAINED_USE: 'retained_use',
+    UPDATE_INELIGIBLE: 'update_ineligible', REMOVING: 'removing', ERROR: 'error',
+  }[status.module.state] ?? 'error';
+  let action = 'none';
+  if (softwareState === 'absent') action = 'activate';
+  else if (!status.entitlement.localUseAllowed) action = 'review_entitlement';
+  else if (agentState === 'release_available') action = 'install_release';
+  else if (['not_installed', 'degraded', 'error'].includes(agentState)
+    || (agentState === 'active' && status.entitlement.updatesAllowed)) action = 'check_release';
+  return {
+    schemaVersion: '1',
+    overallStatus: softwareState === 'retained_use' ? 'retained_use' : status.entitlement.localUseAllowed ? 'partial' : 'unavailable',
+    softwareEntitlement: {
+      state: softwareState, localUseAllowed: status.entitlement.localUseAllowed,
+      updatesAllowed: status.entitlement.updatesAllowed, updatesThrough: status.entitlement.updatesThrough,
+      reasonCode: status.entitlement.reasonCode,
+    },
+    hostedServices: {
+      state: status.entitlement.hostedServicesAllowed ? 'active' : softwareState === 'retained_use' ? 'expired' : 'unavailable',
+      allowed: status.entitlement.hostedServicesAllowed, servicesThrough: status.entitlement.serviceLeaseExpiresAt,
+      lastVerifiedAt: status.entitlement.lastVerifiedServerTime, reasonCode: status.entitlement.reasonCode,
+    },
+    agent: {
+      state: agentState, health: status.module.health === 'not-checked' ? 'not_checked' : status.module.health,
+      compatibility: status.module.state === 'UPDATE_INELIGIBLE' ? 'incompatible' : status.module.activeDigest ? 'compatible' : 'unknown',
+      componentVersion: status.module.componentVersion,
+      digestPrefix: status.module.activeDigest ? status.module.activeDigest.slice(0, 19) : null,
+      lastTransitionAt: status.module.lastTransitionAt, reasonCode: status.module.state.toLowerCase(),
+    },
+    guardian: { state: 'unavailable', schedulerState: 'unavailable', latestAnalysisHealth: 'unavailable', latestAnalysisAt: null, nextAnalysisAt: null, reasonCode: 'not_implemented' },
+    localMobile: { state: 'unavailable', pairedDeviceCount: 0, reasonCode: 'not_implemented' },
+    hostedMobile: { state: 'unavailable', linkedDeviceCount: 0, relayState: 'unavailable', lastRelayAt: null, reasonCode: 'not_implemented' },
+    localCapabilities: status.entitlement.localUseAllowed ? status.entitlement.features : [],
+    hostedCapabilities: status.entitlement.hostedServicesAllowed ? status.entitlement.features : [],
+    recommendedAction: { id: action, reasonCode: action === 'none' ? 'no_action_required' : 'fixture_action' },
+    checkedAt: fixedAt,
+  };
+}
+
 test('installed Pro loads its browser module from the generic host', async ({ page }) => {
   const requests = await openPro(page, true);
 
@@ -216,7 +263,7 @@ test('removal and deactivation require their explicit browser confirmations', as
 
 async function openPro(page: Page, installed: boolean, options: OpenProOptions = {}) {
   const requests: string[] = [];
-  const status = options.status ?? proStatus(installed);
+  let status = options.status ?? proStatus(installed);
   await installMockApi(page, 'ready');
   await page.route(
     (url) => new URL(url).pathname.startsWith('/api/v1/pro'),
@@ -225,6 +272,10 @@ async function openPro(page: Page, installed: boolean, options: OpenProOptions =
       const body = route.request().postDataJSON() ?? null;
       if (path === '/api/v1/pro/status') {
         await fulfillJson(route, status);
+        return;
+      }
+      if (path === '/api/v1/pro/product-state') {
+        await fulfillJson(route, productState(status));
         return;
       }
       options.onAction?.({ body, path });
@@ -239,7 +290,8 @@ async function openPro(page: Page, installed: boolean, options: OpenProOptions =
         return;
       }
       if (path === '/api/v1/pro/activation/complete') {
-        await fulfillJson(route, options.activationCompletionStatus ?? status);
+        status = options.activationCompletionStatus ?? status;
+        await fulfillJson(route, status);
         return;
       }
       if (path === '/api/v1/pro/deactivate') {

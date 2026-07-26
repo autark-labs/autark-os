@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1",
+  "overallStatus": "partial",
+  "softwareEntitlement": {
+    "state": "active",
+    "localUseAllowed": true,
+    "updatesAllowed": true,
+    "updatesThrough": "2031-07-26T18:00:00Z",
+    "reasonCode": "active"
+  },
+  "hostedServices": {
+    "state": "active",
+    "allowed": true,
+    "servicesThrough": "2028-07-26T18:00:00Z",
+    "lastVerifiedAt": "2026-07-26T18:00:00Z",
+    "reasonCode": "active"
+  },
+  "agent": {
+    "state": "active",
+    "health": "healthy",
+    "compatibility": "compatible",
+    "componentVersion": "0.2.0-staging.9",
+    "digestPrefix": "sha256:eeab682e83d5",
+    "lastTransitionAt": "2026-07-26T17:55:00Z",
+    "reasonCode": "healthy"
+  },
+  "guardian": {
+    "state": "unavailable",
+    "schedulerState": "unavailable",
+    "latestAnalysisHealth": "unavailable",
+    "latestAnalysisAt": null,
+    "nextAnalysisAt": null,
+    "reasonCode": "not_implemented"
+  },
+  "localMobile": {
+    "state": "unavailable",
+    "pairedDeviceCount": 0,
+    "reasonCode": "not_implemented"
+  },
+  "hostedMobile": {
+    "state": "unavailable",
+    "linkedDeviceCount": 0,
+    "relayState": "unavailable",
+    "lastRelayAt": null,
+    "reasonCode": "not_implemented"
+  },
+  "localCapabilities": [
+    "pro.example"
+  ],
+  "hostedCapabilities": [
+    "pro.example"
+  ],
+  "recommendedAction": {
+    "id": "check_release",
+    "reasonCode": "release_check_available"
+  },
+  "checkedAt": "2026-07-26T18:00:00Z"
+}
