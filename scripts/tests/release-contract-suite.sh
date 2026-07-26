@@ -22,6 +22,7 @@ contracts=(
   scripts/tests/autark-os-pro-identity-recovery-test.sh
   scripts/tests/autark-os-installer-support-bundle-test.sh
   scripts/tests/service-hardening-contract-test.sh
+  scripts/tests/service-helper-elevation-contract-test.sh
   scripts/tests/service-hardening-drift-test.sh
 )
 

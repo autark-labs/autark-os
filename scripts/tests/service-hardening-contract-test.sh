@@ -28,7 +28,7 @@ for directive in \
   'RestrictRealtime=true' \
   'SystemCallArchitectures=native' \
   'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' \
-  'CapabilityBoundingSet=CAP_SETGID CAP_SETUID' \
+  'CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_DAC_OVERRIDE CAP_SETGID CAP_SETUID' \
   'AmbientCapabilities=' \
   'UMask=0077'; do
   if ! grep -Fxq "${directive}" "${installer}"; then
@@ -38,8 +38,8 @@ for directive in \
 done
 
 assert_installer_contains 'NoNewPrivileges=false'
-assert_installer_contains 'sudo needs its setuid/setgid'
-assert_installer_contains 'retain only those two capabilities'
+assert_installer_contains 'sudo needs its setuid/setgid and audit'
+assert_installer_contains 'Retain only those four capabilities'
 assert_installer_contains 'ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}'
 assert_installer_contains 'Installed service permissions or hardening directives have drifted'
 assert_installer_contains 'AUTARK_OS_FILEOPS_HELPER_SHA256'

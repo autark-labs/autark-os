@@ -491,7 +491,7 @@ check_state() {
         'RestrictRealtime=true'
         'SystemCallArchitectures=native'
         'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6'
-        'CapabilityBoundingSet=CAP_SETGID CAP_SETUID'
+        'CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_DAC_OVERRIDE CAP_SETGID CAP_SETUID'
         'AmbientCapabilities='
       )
       local directive
@@ -1016,9 +1016,11 @@ SuccessExitStatus=143
 Restart=on-failure
 RestartSec=5
 # The bounded root helper is invoked through sudo for restore, cleanup, core
-# updates, and Tailscale operator repair. sudo needs its setuid/setgid
-# transition, so retain only those two capabilities in the bounding set and do
-# not enable NoNewPrivileges until the helper becomes a dedicated root service.
+# updates, and Tailscale operator repair. sudo needs its setuid/setgid and audit
+# transition, while the resulting root helper needs DAC override to cross the
+# service-owned runtime directory. Retain only those four capabilities in the
+# bounding set and do not enable NoNewPrivileges until the helper becomes a
+# dedicated root service.
 # All other compatible sandboxing remains enabled below.
 NoNewPrivileges=false
 PrivateTmp=true
@@ -1034,7 +1036,7 @@ LockPersonality=true
 RestrictRealtime=true
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-CapabilityBoundingSet=CAP_SETGID CAP_SETUID
+CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_DAC_OVERRIDE CAP_SETGID CAP_SETUID
 AmbientCapabilities=
 UMask=0077
 # The root helper also writes the root-owned approved-backup destination file.

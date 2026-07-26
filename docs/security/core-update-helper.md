@@ -6,10 +6,13 @@ authenticated local Autark-OS API. That API may invoke the root-owned
 user. The helper is not a shell and has no command, URL, path, environment, or
 private-agent control channel.
 
-The service retains only `CAP_SETUID` and `CAP_SETGID` in its systemd capability
-bounding set so the operating system's `sudo` executable can perform that
-single policy-checked transition. It has no ambient capabilities; the sudoers
-allow-list and the helper's typed protocol remain the privilege boundary.
+The service retains only `CAP_SETUID`, `CAP_SETGID`, `CAP_AUDIT_WRITE`, and
+`CAP_DAC_OVERRIDE` in its systemd capability bounding set. The first three let
+the operating system's `sudo` executable perform and audit the single
+policy-checked transition; DAC override lets the resulting root helper cross
+the service-owned runtime directory to reach its root-owned update state. The
+service has no ambient capabilities; the sudoers allow-list and the helper's
+typed protocol remain the privilege boundary.
 
 ## Allowed protocol
 

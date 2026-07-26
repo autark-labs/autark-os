@@ -60,7 +60,7 @@ LockPersonality=true
 RestrictRealtime=true
 SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-CapabilityBoundingSet=CAP_SETGID CAP_SETUID
+CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_DAC_OVERRIDE CAP_SETGID CAP_SETUID
 AmbientCapabilities=
 ReadWritePaths=${runtime_dir} ${log_dir} ${config_dir}
 ENV
