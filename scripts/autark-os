@@ -974,8 +974,8 @@ github_prerelease_tag() {
   awk '
     index($0, "    \"tag_name\":") == 1 {
       value = $0
-      sub(/^[^:]*:[[:space:]]*\"/, "", value)
-      sub(/\"[,]?[[:space:]]*$/, "", value)
+      sub(/^[^:]*:[[:space:]]*"/, "", value)
+      sub(/"[,]?[[:space:]]*$/, "", value)
       tag = value
     }
     index($0, "    \"draft\": false") == 1 { draft = 0 }
