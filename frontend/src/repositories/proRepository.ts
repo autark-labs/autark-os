@@ -49,8 +49,7 @@ export function useActivateProMutation() {
       const attempt = await ProAPIClient.startActivation(activationCode);
       return ProAPIClient.completeActivation(attempt.activationId);
     },
-    onSuccess: (status) => setProStatusCache(queryClient, status),
-    onSettled: () => void invalidateProStatus(queryClient),
+    onSuccess: (status) => acceptAuthoritativeProStatus(queryClient, status),
   });
 }
 
@@ -58,8 +57,7 @@ export function useContinueProActivationMutation() {
   const queryClient = useQueryClient();
   return useMutation<ProStatusResponse, unknown, string>({
     mutationFn: (activationId) => ProAPIClient.completeActivation(activationId),
-    onSuccess: (status) => setProStatusCache(queryClient, status),
-    onSettled: () => void invalidateProStatus(queryClient),
+    onSuccess: (status) => acceptAuthoritativeProStatus(queryClient, status),
   });
 }
 
@@ -67,8 +65,7 @@ export function useRefreshProEntitlementMutation() {
   const queryClient = useQueryClient();
   return useMutation<ProStatusResponse>({
     mutationFn: () => ProAPIClient.refreshEntitlement(),
-    onSuccess: (status) => setProStatusCache(queryClient, status),
-    onSettled: () => void invalidateProStatus(queryClient),
+    onSuccess: (status) => acceptAuthoritativeProStatus(queryClient, status),
   });
 }
 
@@ -116,6 +113,17 @@ export function useDeactivateProMutation() {
 
 export function setProStatusCache(queryClient: QueryClient, status: ProStatusResponse) {
   queryClient.setQueryData(proQueryKeys.status, status);
+}
+
+async function acceptAuthoritativeProStatus(
+  queryClient: QueryClient,
+  status: ProStatusResponse,
+) {
+  // Activation and entitlement endpoints return the server's canonical state.
+  // Cancel an older status request before caching it: invalidating here could
+  // immediately refetch the pre-transition state and incorrectly undo the UI.
+  await queryClient.cancelQueries({ queryKey: proQueryKeys.status });
+  setProStatusCache(queryClient, status);
 }
 
 export function invalidateProStatus(queryClient: QueryClient) {
