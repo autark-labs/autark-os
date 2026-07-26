@@ -4,6 +4,14 @@ set -Eeuo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 installer="${repo_root}/scripts/install-autark-os-service.sh"
 
+assert_installer_contains() {
+  local expected="$1"
+  if ! grep -Fq "${expected}" "${installer}"; then
+    printf 'Service hardening contract is missing: %s\n' "${expected}" >&2
+    exit 1
+  fi
+}
+
 # These settings preserve Java, Docker socket, and the bounded sudo helper
 # while materially reducing access to the rest of the host.
 for directive in \
@@ -23,17 +31,21 @@ for directive in \
   'CapabilityBoundingSet=CAP_SETGID CAP_SETUID' \
   'AmbientCapabilities=' \
   'UMask=0077'; do
-  grep -Fxq "${directive}" "${installer}"
+  if ! grep -Fxq "${directive}" "${installer}"; then
+    printf 'Service hardening directive is missing: %s\n' "${directive}" >&2
+    exit 1
+  fi
 done
 
-grep -Fq 'NoNewPrivileges=false' "${installer}"
-grep -Fq 'sudo needs to retain its setuid transition' "${installer}"
-grep -Fq 'ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}' "${installer}"
-grep -Fq 'Installed service permissions or hardening directives have drifted' "${installer}"
-grep -Fq 'AUTARK_OS_FILEOPS_HELPER_SHA256' "${installer}"
-grep -Fq 'AUTARK_OS_CORE_UPDATE_HELPER_SHA256' "${installer}"
-grep -Fq 'autark-os-update-helper' "${installer}"
-grep -Fq 'install_core_update_signing_key' "${installer}"
-grep -Fq 'core-update-release.pub' "${installer}"
-grep -Fq 'checksum differs' "${installer}"
-grep -Fq 'systemd 247 or newer' "${installer}"
+assert_installer_contains 'NoNewPrivileges=false'
+assert_installer_contains 'sudo needs its setuid/setgid'
+assert_installer_contains 'retain only those two capabilities'
+assert_installer_contains 'ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}'
+assert_installer_contains 'Installed service permissions or hardening directives have drifted'
+assert_installer_contains 'AUTARK_OS_FILEOPS_HELPER_SHA256'
+assert_installer_contains 'AUTARK_OS_CORE_UPDATE_HELPER_SHA256'
+assert_installer_contains 'autark-os-update-helper'
+assert_installer_contains 'install_core_update_signing_key'
+assert_installer_contains 'core-update-release.pub'
+assert_installer_contains 'checksum differs'
+assert_installer_contains 'systemd 247 or newer'

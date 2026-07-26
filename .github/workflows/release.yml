@@ -224,26 +224,7 @@ jobs:
           retention-days: 14
 
       - name: Run installer and release contracts
-        run: |
-          set -euo pipefail
-          bash scripts/tests/release-runner-portability-test.sh
-          bash scripts/tests/release-workflow-contract-test.sh
-          bash scripts/tests/release-source-map-contract-test.sh
-          bash scripts/tests/release-architecture-integrity-test.sh
-          bash scripts/tests/release-bundle-contract-test.sh
-          bash scripts/tests/release-runtime-smoke-test.sh
-          bash scripts/tests/release-artifacts-dry-run-test.sh
-          bash scripts/tests/supported-host-matrix-contract-test.sh
-          bash scripts/tests/autark-os-update-delivery-test.sh
-          bash scripts/tests/autark-os-unified-update-flow-test.sh
-          bash scripts/tests/autark-os-update-helper-test.sh
-          bash scripts/tests/autark-os-safe-uninstall-flow-test.sh
-          bash scripts/tests/autark-os-cli-admin-session-test.sh
-          bash scripts/tests/autark-os-admin-recovery-test.sh
-          bash scripts/tests/autark-os-pro-identity-recovery-test.sh
-          bash scripts/tests/autark-os-installer-support-bundle-test.sh
-          bash scripts/tests/service-hardening-contract-test.sh
-          bash scripts/tests/service-hardening-drift-test.sh
+        run: bash scripts/tests/release-contract-suite.sh
 
       - name: Build architecture-specific artifacts
         env:
