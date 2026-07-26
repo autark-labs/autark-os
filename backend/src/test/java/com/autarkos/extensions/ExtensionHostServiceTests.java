@@ -156,6 +156,33 @@ class ExtensionHostServiceTests {
     }
 
     @Test
+    void retiresTheContinuationAfterPrivateDurableImport() {
+        Fixture fixture = fixture();
+        var payload = JsonNodeFactory.instance.objectNode()
+                .put("private", true);
+        when(fixture.state().loadCanonical("autark-pro", DIGEST))
+                .thenReturn(Optional.of(
+                        new ExtensionStateStore.ExtensionState(
+                                "final_encrypted_continuation",
+                                1)));
+        when(fixture.agent().renderSurface(
+                        eq("storage.insights"),
+                        any(NormalizedHostSnapshot.class),
+                        eq("final_encrypted_continuation")))
+                .thenReturn(new ExtensionSurfaceEnvelope(
+                        "1",
+                        "storage.insights",
+                        1,
+                        "compatible",
+                        null,
+                        payload));
+
+        fixture.service().render("autark-pro", "storage.insights");
+
+        verify(fixture.state()).clearCanonical("autark-pro", DIGEST);
+    }
+
+    @Test
     void rejectsAbsentUnknownStaleAndDigestMismatchedExtensions() {
         Fixture fixture = fixture();
         assertNotFound(() -> fixture.service().manifest("unknown"));

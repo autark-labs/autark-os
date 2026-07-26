@@ -95,7 +95,15 @@ public class ProAgentRuntime implements ProModuleRuntime {
                     "Autark Pro candidate health authority is missing.");
         }
         docker.activateCandidate(candidate);
-        router.activate(verified.endpoint());
+        HealthResult promoted = healthVerifier.verifyActiveReady(
+                candidate.manifest().digest());
+        if (promoted == null || !promoted.healthy()) {
+            throw new com.autarkos.pro.module.ProModuleException(
+                    "promoted_agent_health_failed",
+                    "Autark Pro promoted agent did not become healthy.");
+        }
+        router.activate(docker.activeEndpoint(
+                candidate.manifest().digest()));
         verifiedCandidate.set(null);
     }
 
@@ -146,7 +154,10 @@ public class ProAgentRuntime implements ProModuleRuntime {
         docker.remove(activeDigest, previousDigest);
         router.clear();
         verifiedCandidate.set(null);
-        apiCredentialStore.delete();
+        // Preserve the installation-local secret with the separately retained
+        // private state volume. Explicit privacy deletion removes both in a
+        // later user-confirmed workflow; ordinary module removal must remain
+        // recoverable.
     }
 
     private static ReleaseManifestVerifier.VerifiedRelease verified(

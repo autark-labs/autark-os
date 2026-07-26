@@ -125,9 +125,12 @@ class ProAgentLiveCutoverTests {
                     .get()
                     .extracting(endpoint -> endpoint.digest())
                     .isEqualTo(healthyDigest);
-            assertThat(runtime.activeHealth(
-                            healthyDigest)
-                    .healthy()).isTrue();
+            var restoredHealth = runtime.activeHealth(
+                    healthyDigest);
+            assertThat(restoredHealth.healthy())
+                    .as("restored active health: %s",
+                            restoredHealth.reasonCode())
+                    .isTrue();
         } finally {
             runtime.remove(healthyDigest, null);
         }

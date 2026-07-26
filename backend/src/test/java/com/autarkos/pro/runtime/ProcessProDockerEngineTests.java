@@ -205,12 +205,19 @@ class ProcessProDockerEngineTests {
     void startCreatesAndVerifiesAnInternalNetworkThenUsesPolicy()
             throws Exception {
         AtomicInteger networkInspections = new AtomicInteger();
+        AtomicInteger volumeInspections = new AtomicInteger();
         RecordingRunner runner = new RecordingRunner(command -> {
             if (command.contains("network")
                     && command.contains("inspect")) {
                 return networkInspections.getAndIncrement() == 0
                         ? failure()
                         : success("true|bridge|true");
+            }
+            if (command.contains("volume")
+                    && command.contains("inspect")) {
+                return volumeInspections.getAndIncrement() == 0
+                        ? failure()
+                        : success("local|true|autark-pro-agent");
             }
             if (command.contains("container")
                     && command.contains("inspect")) {
@@ -254,12 +261,45 @@ class ProcessProDockerEngineTests {
                     && command.contains("inspect")) {
                 return success("true|bridge|true");
             }
+            if (command.contains("volume")
+                    && command.contains("inspect")) {
+                return success("local|true|autark-pro-agent");
+            }
             if (command.contains("container")
                     && command.contains("inspect")) {
                 return success(
                         "false|autark-pro-agent|"
                                 + ProRuntimeTestFixtures.DIGEST
                                 + "|image|true");
+            }
+            return success();
+        });
+        ProcessProDockerEngine engine = engine(runner);
+        Path secret = new ProAgentApiCredentialStore(
+                layout().proAgentApiCredentialPath(),
+                new java.security.SecureRandom())
+                .prepareMount();
+
+        assertThatThrownBy(() -> engine.activateCandidate(
+                        ProRuntimeTestFixtures.candidate()))
+                .isInstanceOf(ProModuleException.class)
+                .extracting(exception ->
+                        ((ProModuleException) exception).code())
+                .isEqualTo("module_runtime_resource_conflict");
+        assertThat(runner.commands)
+                .noneMatch(command -> command.contains("rm"));
+    }
+
+    @Test
+    void foreignSameNamedStateVolumeIsNeverMounted() throws Exception {
+        RecordingRunner runner = new RecordingRunner(command -> {
+            if (command.contains("network")
+                    && command.contains("inspect")) {
+                return success("true|bridge|true");
+            }
+            if (command.contains("volume")
+                    && command.contains("inspect")) {
+                return success("local|false|foreign-component");
             }
             return success();
         });
@@ -277,7 +317,8 @@ class ProcessProDockerEngineTests {
                         ((ProModuleException) exception).code())
                 .isEqualTo("module_runtime_resource_conflict");
         assertThat(runner.commands)
-                .noneMatch(command -> command.contains("rm"));
+                .noneMatch(command -> command.contains("run")
+                        && command.contains("--detach"));
     }
 
     @Test
@@ -382,6 +423,10 @@ class ProcessProDockerEngineTests {
                 new ProContainerPolicy().candidateContainer(
                         ProRuntimeTestFixtures.DIGEST);
         RecordingRunner runner = new RecordingRunner(command -> {
+            if (command.contains("volume")
+                    && command.contains("inspect")) {
+                return success("local|true|autark-pro-agent");
+            }
             if (command.contains("container")
                     && command.contains("inspect")) {
                 String name = command.getLast();
@@ -401,6 +446,10 @@ class ProcessProDockerEngineTests {
             return success();
         });
 
+        new ProAgentApiCredentialStore(
+                layout().proAgentApiCredentialPath(),
+                new java.security.SecureRandom())
+                .prepareMount();
         engine(runner).activateCandidate(
                 ProRuntimeTestFixtures.candidate());
 
@@ -424,10 +473,23 @@ class ProcessProDockerEngineTests {
                 .anySatisfy(command -> assertThat(command)
                         .containsExactly(
                                 "docker",
-                                "rename",
-                                candidateName,
+                                "rm",
+                                "--force",
+                                candidateName))
+                .anySatisfy(command -> assertThat(command)
+                        .startsWith(
+                                "docker",
+                                "run",
+                                "--detach",
+                                "--name",
                                 ProContainerPolicy
-                                        .ACTIVE_CONTAINER))
+                                        .ACTIVE_CONTAINER)
+                        .contains(
+                                "AUTARK_PRO_RUNTIME_MODE=active",
+                                "type=volume,src="
+                                        + ProContainerPolicy.STATE_VOLUME
+                                        + ",dst="
+                                        + ProContainerPolicy.STATE_TARGET))
                 .anySatisfy(command -> assertThat(command)
                         .containsExactly(
                                 "docker",
@@ -617,7 +679,10 @@ class ProcessProDockerEngineTests {
                                 "rm",
                                 ProContainerPolicy.INTERNAL_NETWORK));
         assertThat(runner.commands.toString())
-                .doesNotContain("vaultwarden", "compose");
+                .doesNotContain(
+                        "vaultwarden",
+                        "compose",
+                        "volume");
     }
 
     private ProcessProDockerEngine engine(

@@ -135,6 +135,10 @@ public final class ExtensionHostService {
                     active.digest(),
                     response.stateSchemaVersion(),
                     response.continuationToken());
+        } else if (previous != null) {
+            state.clearCanonical(
+                    active.extensionId(),
+                    active.digest());
         }
         String compatibility = resetState
                 ? "reset"

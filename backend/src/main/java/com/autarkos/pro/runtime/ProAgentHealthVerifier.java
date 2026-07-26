@@ -206,6 +206,43 @@ public final class ProAgentHealthVerifier {
         }
     }
 
+    public ProModuleRuntime.HealthResult verifyActiveReady(
+            String activeDigest) {
+        int attempts = Math.max(
+                1,
+                (int) Math.ceil(
+                        (double) startupTimeout.toMillis()
+                                / pollInterval.toMillis()));
+        ProModuleRuntime.HealthResult result = null;
+        for (int attempt = 0; attempt < attempts; attempt++) {
+            result = verifyActive(activeDigest);
+            if (result != null && result.healthy()) {
+                return result;
+            }
+            String reason = result == null
+                    ? "healthcheck_unavailable"
+                    : result.reasonCode();
+            if (!"healthcheck_starting".equals(reason)) {
+                return result == null
+                        ? new ProModuleRuntime.HealthResult(
+                                false,
+                                "healthcheck_unavailable")
+                        : result;
+            }
+            if (attempt + 1 < attempts
+                    && !sleep(pollInterval)) {
+                return new ProModuleRuntime.HealthResult(
+                        false,
+                        "healthcheck_interrupted");
+            }
+        }
+        return result == null
+                ? new ProModuleRuntime.HealthResult(
+                        false,
+                        "healthcheck_unavailable")
+                : result;
+    }
+
     private boolean sleep(Duration duration) {
         try {
             sleeper.sleep(duration.toMillis());

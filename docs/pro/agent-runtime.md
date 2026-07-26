@@ -46,19 +46,32 @@ The candidate runs with:
 - a dedicated Docker `--internal` bridge, so default external egress is absent;
 - one 64 MiB `noexec,nosuid,nodev` tmpfs at `/tmp`;
 - one exact read-only bind of the agent API token file;
+- one Docker-managed writable volume at `/var/lib/autark-pro-agent` for
+  encrypted private history;
 - one CPU, 512 MiB memory/swap, 128 pids, bounded local logs, and a 15-second
   stop timeout.
 
 The host token file lives below an owner-only directory. Its exact bind-mounted
-file is read-only and readable by the fixed container UID; no broader directory
-is mounted. The token is generated once per local module installation and
-removed with the module.
+file is read-only and readable by the fixed container UID; no broader host
+directory is mounted. The token is generated once per installation and is
+preserved with the encrypted private state during ordinary module removal so a
+reinstall can recover compatible history. Explicit future privacy deletion
+removes both.
 
-Candidate, active, rollback, and network resources use fixed names and
+Candidate, active, rollback, network, and state-volume resources use fixed names and
 `com.autarkos.pro.*` ownership labels. A same-named resource without the exact
 ownership label and digest fails closed and is never changed. Pro containers
 are excluded from Found Apps so this internal module cannot be mistaken for a
 CE-managed or adoptable application.
+
+The candidate runs in an explicit ephemeral mode without the private volume.
+Its smoke surface therefore cannot open or migrate active history. After
+verification, CE stops and retains the previous active container, removes the
+ephemeral candidate, starts a fresh active container from the same immutable
+digest with the durable volume, waits for that container's own healthcheck,
+and only then changes routing. Durable state opens lazily on the first routed
+analysis. Agent schema changes are transactional; the previous container and
+encrypted database remain recoverable after a failed migration.
 
 ## Verification
 

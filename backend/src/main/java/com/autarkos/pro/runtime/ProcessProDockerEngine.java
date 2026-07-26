@@ -42,6 +42,10 @@ public class ProcessProDockerEngine implements ProDockerEngine {
     private static final String NETWORK_FORMAT =
             "{{.Internal}}|{{.Driver}}|"
                     + "{{index .Labels \"com.autarkos.pro.managed\"}}";
+    private static final String VOLUME_FORMAT =
+            "{{.Driver}}|"
+                    + "{{index .Labels \"com.autarkos.pro.managed\"}}|"
+                    + "{{index .Labels \"com.autarkos.pro.component\"}}";
     private static final String CONTAINER_FORMAT =
             "{{index .Config.Labels \"com.autarkos.pro.managed\"}}|"
                     + "{{index .Config.Labels \"com.autarkos.pro.component\"}}|"
@@ -327,6 +331,11 @@ public class ProcessProDockerEngine implements ProDockerEngine {
     public synchronized void activateCandidate(
             ProModuleCandidate candidate) {
         policy.image(candidate);
+        Path credentialPath = runtimeLayout.proAgentApiCredentialPath()
+                .toAbsolutePath()
+                .normalize();
+        requireCredentialPath(credentialPath);
+        ensureStateVolume();
         String digest = candidate.manifest().digest();
         String candidateName = policy.candidateContainer(digest);
         ContainerInfo active = inspectOwned(
@@ -362,12 +371,9 @@ public class ProcessProDockerEngine implements ProDockerEngine {
                     "module_cutover_failed",
                     "Autark Pro could not retain the previous runtime.");
         }
+        removeOwned(candidateName, digest, true);
         runRequired(
-                List.of(
-                        "docker",
-                        "rename",
-                        candidateName,
-                        ProContainerPolicy.ACTIVE_CONTAINER),
+                policy.activeCommand(candidate, credentialPath),
                 "module_cutover_failed",
                 "Autark Pro could not activate the verified candidate.");
         ensureRestartPolicy();
@@ -597,6 +603,48 @@ public class ProcessProDockerEngine implements ProDockerEngine {
                         ProContainerPolicy.INTERNAL_NETWORK),
                 "module_network_cleanup_failed",
                 "Autark Pro internal network could not be removed.");
+    }
+
+    private void ensureStateVolume() {
+        SystemCommandRunner.CommandExecutionResult inspect =
+                run(List.of(
+                        "docker",
+                        "volume",
+                        "inspect",
+                        "--format",
+                        VOLUME_FORMAT,
+                        ProContainerPolicy.STATE_VOLUME));
+        if (!inspect.successful()) {
+            runRequired(
+                    List.of(
+                            "docker",
+                            "volume",
+                            "create",
+                            "--driver",
+                            "local",
+                            "--label",
+                            ProContainerPolicy.MANAGED_LABEL + "=true",
+                            "--label",
+                            ProContainerPolicy.COMPONENT_LABEL + "="
+                                    + ProContainerPolicy.COMPONENT,
+                            ProContainerPolicy.STATE_VOLUME),
+                    "module_state_volume_failed",
+                    "Autark Pro private state storage could not be created.");
+            inspect = runRequired(
+                    List.of(
+                            "docker",
+                            "volume",
+                            "inspect",
+                            "--format",
+                            VOLUME_FORMAT,
+                            ProContainerPolicy.STATE_VOLUME),
+                    "module_state_volume_failed",
+                    "Autark Pro private state storage could not be verified.");
+        }
+        if (!("local|true|" + ProContainerPolicy.COMPONENT)
+                .equals(oneLine(inspect))) {
+            throw resourceConflict();
+        }
     }
 
     private List<ContainerInfo> managedContainers() {

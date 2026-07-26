@@ -71,6 +71,9 @@ class ProAgentLiveContractTests {
         assertThat(status.apiVersion()).isEqualTo("1");
         assertThat(entrypoint).isNotEmpty();
         assertThat(surface.payload()).isNotNull();
+        assertThat(surface.continuationToken()).isNull();
+        assertThat(surface.stateCompatibility()).isEqualTo(
+                required("AUTARK_PRO_LIVE_EXPECT_STATE"));
     }
 
     private static String required(String name) {

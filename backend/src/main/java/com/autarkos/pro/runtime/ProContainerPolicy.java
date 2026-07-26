@@ -29,6 +29,10 @@ public final class ProContainerPolicy {
     public static final String COMPONENT = "autark-pro-agent";
     public static final String API_TOKEN_TARGET =
             "/run/secrets/autark-pro-agent-api-token";
+    public static final String STATE_VOLUME =
+            "autark-pro-agent-state";
+    public static final String STATE_TARGET =
+            "/var/lib/autark-pro-agent";
 
     private static final Pattern DIGEST =
             Pattern.compile("^sha256:[0-9a-f]{64}$");
@@ -38,6 +42,31 @@ public final class ProContainerPolicy {
     public List<String> runCommand(
             ProModuleCandidate candidate,
             Path apiCredentialPath) {
+        return containerCommand(
+                candidate,
+                apiCredentialPath,
+                candidateContainer(candidate.manifest().digest()),
+                "autark-pro-agent-candidate",
+                false);
+    }
+
+    public List<String> activeCommand(
+            ProModuleCandidate candidate,
+            Path apiCredentialPath) {
+        return containerCommand(
+                candidate,
+                apiCredentialPath,
+                ACTIVE_CONTAINER,
+                ACTIVE_CONTAINER,
+                true);
+    }
+
+    private List<String> containerCommand(
+            ProModuleCandidate candidate,
+            Path apiCredentialPath,
+            String containerName,
+            String networkAlias,
+            boolean durable) {
         requireCandidate(candidate);
         String secretPath = apiCredentialPath == null
                 ? ""
@@ -55,7 +84,7 @@ public final class ProContainerPolicy {
                 "run",
                 "--detach",
                 "--name",
-                candidateContainer(digest),
+                containerName,
                 "--hostname",
                 COMPONENT,
                 "--label",
@@ -69,7 +98,7 @@ public final class ProContainerPolicy {
                 "--network",
                 INTERNAL_NETWORK,
                 "--network-alias",
-                "autark-pro-agent-candidate",
+                networkAlias,
                 "--read-only",
                 "--user",
                 "65532:65532",
@@ -104,8 +133,23 @@ public final class ProContainerPolicy {
                 "--env",
                 "AUTARK_PRO_API_TOKEN_FILE=" + API_TOKEN_TARGET,
                 "--env",
+                "AUTARK_PRO_RUNTIME_MODE="
+                        + (durable ? "active" : "candidate"),
+                "--env",
                 "AUTARK_PRO_LISTEN=:8080",
                 image));
+        if (durable) {
+            int imageIndex = command.size() - 1;
+            command.addAll(
+                    imageIndex,
+                    List.of(
+                            "--mount",
+                            "type=volume,src=" + STATE_VOLUME
+                                    + ",dst=" + STATE_TARGET,
+                            "--env",
+                            "AUTARK_PRO_STATE_PATH=" + STATE_TARGET
+                                    + "/guardian.db"));
+        }
         return List.copyOf(command);
     }
 

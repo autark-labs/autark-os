@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="${1:-}"
 NAME="autark-pro-agent-client-check"
 NETWORK="autark-pro-agent-client-check"
+STATE_VOLUME="autark-pro-agent-client-state-check"
 DIGEST="sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 RUNTIME_ROOT="$(mktemp -d)"
 AGENT_ROOT="${RUNTIME_ROOT}/pro-agent"
@@ -27,6 +28,7 @@ esac
 cleanup() {
     docker rm --force "${NAME}" >/dev/null 2>&1 || true
     docker network rm "${NETWORK}" >/dev/null 2>&1 || true
+    docker volume rm "${STATE_VOLUME}" >/dev/null 2>&1 || true
     rm -rf "${RUNTIME_ROOT}"
 }
 trap cleanup EXIT INT TERM
@@ -40,6 +42,7 @@ docker network create \
     --internal \
     --driver bridge \
     "${NETWORK}" >/dev/null
+docker volume create "${STATE_VOLUME}" >/dev/null
 docker run \
     --detach \
     --name "${NAME}" \
@@ -59,8 +62,11 @@ docker run \
     --restart no \
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
     --mount "type=bind,src=${TOKEN_FILE},dst=/run/secrets/autark-pro-agent-api-token,readonly" \
+    --mount "type=volume,src=${STATE_VOLUME},dst=/var/lib/autark-pro-agent" \
     --env AUTARK_PRO_API_TOKEN_FILE=/run/secrets/autark-pro-agent-api-token \
     --env AUTARK_PRO_LISTEN=:8080 \
+    --env AUTARK_PRO_RUNTIME_MODE=active \
+    --env AUTARK_PRO_STATE_PATH=/var/lib/autark-pro-agent/guardian.db \
     "${IMAGE}" >/dev/null
 
 attempt=0
@@ -84,6 +90,29 @@ ENDPOINT="$(docker inspect --format "{{with index .NetworkSettings.Networks \"${
 AUTARK_PRO_LIVE_ENDPOINT="${ENDPOINT}" \
 AUTARK_PRO_LIVE_DIGEST="${DIGEST}" \
 AUTARK_PRO_LIVE_RUNTIME_ROOT="${RUNTIME_ROOT}" \
+AUTARK_PRO_LIVE_EXPECT_STATE="new" \
+    "${ROOT}/backend/gradlew" \
+        -p "${ROOT}/backend" \
+        test \
+        --rerun-tasks \
+        --tests com.autarkos.pro.agent.ProAgentLiveContractTests
+
+docker restart --time 15 "${NAME}" >/dev/null
+attempt=0
+while [[ "${attempt}" -lt 30 ]]; do
+    health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "${NAME}")"
+    if [[ "${health}" == "healthy" ]]; then
+        break
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+done
+[[ "$(docker inspect --format '{{.State.Health.Status}}' "${NAME}")" == "healthy" ]]
+ENDPOINT="$(docker inspect --format "{{with index .NetworkSettings.Networks \"${NETWORK}\"}}{{.IPAddress}}{{end}}" "${NAME}")"
+AUTARK_PRO_LIVE_ENDPOINT="${ENDPOINT}" \
+AUTARK_PRO_LIVE_DIGEST="${DIGEST}" \
+AUTARK_PRO_LIVE_RUNTIME_ROOT="${RUNTIME_ROOT}" \
+AUTARK_PRO_LIVE_EXPECT_STATE="compatible" \
     "${ROOT}/backend/gradlew" \
         -p "${ROOT}/backend" \
         test \

@@ -62,6 +62,10 @@ class ProAgentRuntimeTests {
                         true,
                         "healthy",
                         candidateEndpoint));
+        when(verifier.verifyActiveReady(any())).thenReturn(
+                new ProModuleRuntime.HealthResult(
+                        true,
+                        "healthy"));
         ProAgentClientRouter router =
                 new ProAgentClientRouter(
                         mock(ProAgentClient.class));
@@ -100,13 +104,14 @@ class ProAgentRuntimeTests {
                 "verify",
                 "start",
                 "activate",
+                "active-endpoint",
                 "rollback",
                 "active-endpoint",
                 "discard",
                 "discard-previous",
                 "remove");
         assertThat(docker.secretPath).isEqualTo(secret);
-        assertThat(secret).doesNotExist();
+        assertThat(secret).exists();
         assertThat(router.activeEndpoint()).isEmpty();
         credential.close();
     }
@@ -137,6 +142,10 @@ class ProAgentRuntimeTests {
                         true,
                         "healthy",
                         candidateEndpoint));
+        when(verifier.verifyActiveReady(any())).thenReturn(
+                new ProModuleRuntime.HealthResult(
+                        true,
+                        "healthy"));
         ProAgentClientRouter router =
                 new ProAgentClientRouter(
                         mock(ProAgentClient.class));

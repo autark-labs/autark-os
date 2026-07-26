@@ -125,6 +125,26 @@ class ProAgentHealthVerifierTests {
                 .isEqualTo("container_crash_loop");
     }
 
+    @Test
+    void promotedActiveWaitsForItsOwnFreshHealthcheck() {
+        ProDockerEngine docker = mock(ProDockerEngine.class);
+        when(docker.activeHealth(ProRuntimeTestFixtures.DIGEST))
+                .thenReturn(health(false, "healthcheck_starting"))
+                .thenReturn(health(true, "healthy"));
+        when(docker.activeEndpoint(ProRuntimeTestFixtures.DIGEST))
+                .thenReturn(ENDPOINT);
+        int[] sleeps = {0};
+
+        var result = verifier(
+                docker,
+                healthyClient(),
+                ignored -> sleeps[0]++)
+                .verifyActiveReady(ProRuntimeTestFixtures.DIGEST);
+
+        assertThat(result.healthy()).isTrue();
+        assertThat(sleeps[0]).isEqualTo(1);
+    }
+
     private static void assertFailure(
             ProAgentClient client,
             String reason) {

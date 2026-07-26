@@ -39,6 +39,8 @@ cleanup() {
         --format '{{.Names}}')
     docker network rm \
         autark-pro-agent-internal >/dev/null 2>&1 || true
+    docker volume rm \
+        autark-pro-agent-state >/dev/null 2>&1 || true
     [[ -n "${HEALTHY_REFERENCE}" ]] &&
         docker image rm "${HEALTHY_REFERENCE}" >/dev/null 2>&1 || true
     [[ -n "${BROKEN_REFERENCE}" ]] &&

@@ -47,7 +47,8 @@ class ProContainerPolicyTests {
                         "type=bind,src=" + secret
                                 + ",dst="
                                 + ProContainerPolicy.API_TOKEN_TARGET
-                                + ",readonly")
+                                + ",readonly",
+                        "AUTARK_PRO_RUNTIME_MODE=candidate")
                 .endsWith(
                         ProRuntimeTestFixtures.REPOSITORY
                                 + "@"
@@ -70,6 +71,34 @@ class ProContainerPolicyTests {
                         "/var/run/docker.sock",
                         "/:/",
                         "AUTARK_PRO_API_TOKEN=");
+        assertThat(command).noneMatch(value ->
+                value.contains(ProContainerPolicy.STATE_VOLUME));
+    }
+
+    @Test
+    void activeCommandAddsOnlyThePrivateDurableVolume() {
+        Path secret =
+                Path.of("/var/lib/autark-os/pro-agent/secrets/api-token");
+
+        List<String> command = new ProContainerPolicy().activeCommand(
+                ProRuntimeTestFixtures.candidate(),
+                secret);
+
+        assertThat(command)
+                .contains(
+                        "type=bind,src=" + secret
+                                + ",dst="
+                                + ProContainerPolicy.API_TOKEN_TARGET
+                                + ",readonly",
+                        "type=volume,src="
+                                + ProContainerPolicy.STATE_VOLUME
+                                + ",dst="
+                                + ProContainerPolicy.STATE_TARGET,
+                        "AUTARK_PRO_RUNTIME_MODE=active",
+                        "AUTARK_PRO_STATE_PATH="
+                                + ProContainerPolicy.STATE_TARGET
+                                + "/guardian.db")
+                .doesNotContain("AUTARK_PRO_RUNTIME_MODE=candidate");
     }
 
     @Test
