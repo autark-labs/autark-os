@@ -66,6 +66,10 @@ public class ProProductRecommendedActionContributor
                     60, "warning", "Hosted Pro services expired",
                     "Local purchased features remain available. Review hosted service renewal.",
                     "Review hosted services");
+            case "review_guardian" -> new ActionCopy(
+                    35, "warning", "Autark Guardian found something to review",
+                    "Guardian found a condition worth reviewing. No operation will run without your approval.",
+                    "Review Guardian");
             default -> new ActionCopy(
                     30, "warning", "Autark Pro needs attention",
                     "Review the canonical Pro status for the safest available next step.",

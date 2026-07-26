@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import java.lang.reflect.Constructor;
 import java.nio.file.Path;
@@ -17,7 +18,9 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.context.ApplicationEventPublisher;
 
+import com.autarkos.extensions.ExtensionRefreshRequested;
 import com.autarkos.pro.agent.ProAgentClient;
 import com.autarkos.pro.agent.ProAgentClientRouter;
 import com.autarkos.pro.agent.ProAgentEndpoint;
@@ -69,12 +72,15 @@ class ProAgentRuntimeTests {
         ProAgentClientRouter router =
                 new ProAgentClientRouter(
                         mock(ProAgentClient.class));
+        ApplicationEventPublisher events =
+                mock(ApplicationEventPublisher.class);
         ProAgentRuntime runtime = new ProAgentRuntime(
                 registry,
                 store,
                 docker,
                 verifier,
-                router);
+                router,
+                events);
         ProModuleCandidate candidate =
                 ProRuntimeTestFixtures.candidate();
 
@@ -113,6 +119,8 @@ class ProAgentRuntimeTests {
         assertThat(docker.secretPath).isEqualTo(secret);
         assertThat(secret).exists();
         assertThat(router.activeEndpoint()).isEmpty();
+        verify(events).publishEvent(
+                any(ExtensionRefreshRequested.class));
         credential.close();
     }
 

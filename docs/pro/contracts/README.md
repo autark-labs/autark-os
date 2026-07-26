@@ -36,6 +36,13 @@ optional opaque continuation state. `extension-surface-response-v1` returns a
 replacement opaque state and a JSON payload whose schema and interpretation
 belong exclusively to the private browser module.
 
+`extension-refresh-request-v1` lets a generic CE scheduler submit the same
+bounded snapshot without selecting private behavior. The corresponding
+response exposes only completion time, state compatibility, a bounded finding
+count/severity, and either no recommendation or the fixed read-only
+`pro`/`review-guardian` navigation pair. It contains no rule identity,
+threshold, evidence pointer, private note, or executable operation.
+
 CE authenticates all agent requests, bounds request and response sizes, binds
 opaque state to the active image digest, and verifies the browser entrypoint
 hash. The browser never receives the agent credential.

@@ -46,6 +46,7 @@ class HttpProAgentClientTests {
         NormalizedHostSnapshot snapshot = snapshot();
         AtomicReference<String> authorization = new AtomicReference<>();
         AtomicReference<JsonNode> request = new AtomicReference<>();
+        AtomicReference<JsonNode> refreshRequest = new AtomicReference<>();
         start(exchange -> {
             authorization.set(exchange.getRequestHeaders()
                     .getFirst("Authorization"));
@@ -60,6 +61,11 @@ class HttpProAgentClientTests {
                     request.set(new ObjectMapper().readTree(
                             exchange.getRequestBody()));
                     respond(exchange, 200, surfaceJson());
+                }
+                case "/v1/extensions/refresh" -> {
+                    refreshRequest.set(new ObjectMapper().readTree(
+                            exchange.getRequestBody()));
+                    respond(exchange, 200, refreshJson());
                 }
                 default -> respond(exchange, 404, "{}");
             }
@@ -85,6 +91,16 @@ class HttpProAgentClientTests {
                 .isEqualTo(snapshot.snapshotId());
         assertThat(request.get().path("continuationToken").asText())
                 .isEqualTo("opaque_previous_state");
+        assertThat(client.refresh(
+                        endpoint(),
+                        snapshot,
+                        null)
+                .recommendation().actionId())
+                .isEqualTo("review-guardian");
+        assertThat(refreshRequest.get().has("surface")).isFalse();
+        assertThat(refreshRequest.get().path("snapshot")
+                .path("snapshotId").asText())
+                .isEqualTo(snapshot.snapshotId());
         assertThat(authorization.get()).startsWith("Bearer ")
                 .doesNotContain("\n", "\r");
     }
@@ -220,6 +236,23 @@ class HttpProAgentClientTests {
                   "stateCompatibility":"compatible",
                   "continuationToken":"opaque_next_state",
                   "payload":{"sections":[],"findings":[]}
+                }
+                """;
+    }
+
+    private static String refreshJson() {
+        return """
+                {
+                  "schemaVersion":"1",
+                  "completedAt":"2026-07-26T20:00:00Z",
+                  "stateCompatibility":"compatible",
+                  "activeFindingCount":2,
+                  "highestSeverity":"high",
+                  "recommendation":{
+                    "routeId":"pro",
+                    "actionId":"review-guardian",
+                    "label":"Review Guardian"
+                  }
                 }
                 """;
     }

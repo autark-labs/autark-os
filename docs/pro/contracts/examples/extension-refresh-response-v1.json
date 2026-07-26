@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1",
+  "completedAt": "2026-07-26T20:00:00Z",
+  "stateCompatibility": "compatible",
+  "activeFindingCount": 2,
+  "highestSeverity": "high",
+  "recommendation": {
+    "routeId": "pro",
+    "actionId": "review-guardian",
+    "label": "Review Guardian"
+  }
+}

@@ -61,6 +61,22 @@ paths:
             application/json:
               schema:
                 $ref: ../contracts/extension-surface-response-v1.schema.json
+  /v1/extensions/refresh:
+    post:
+      operationId: refreshExtension
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/extension-refresh-request-v1.schema.json
+      responses:
+        "200":
+          description: Generic redacted refresh status and recommendation.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/extension-refresh-response-v1.schema.json
 components:
   securitySchemes:
     agentToken:

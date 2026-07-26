@@ -24,6 +24,8 @@ import com.autarkos.pro.model.AgentStatus;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
 import com.autarkos.pro.runtime.ProAgentApiCredentialStore;
 import com.autarkos.extensions.ExtensionSurfaceEnvelope;
+import com.autarkos.extensions.ExtensionRefreshRequest;
+import com.autarkos.extensions.ExtensionRefreshResult;
 import com.autarkos.extensions.ExtensionSurfaceRequest;
 import com.autarkos.extensions.ExtensionUiManifest;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -181,6 +183,43 @@ public final class HttpProAgentClient implements ProAgentClient {
                     ExtensionSurfaceEnvelope.class);
             requireSurface(response, surface);
             return response;
+        } finally {
+            Arrays.fill(body, (byte) 0);
+        }
+    }
+
+    @Override
+    public ExtensionRefreshResult refresh(
+            ProAgentEndpoint endpoint,
+            NormalizedHostSnapshot snapshot,
+            String continuationToken) {
+        if (snapshot == null) {
+            throw new ProAgentClientException(
+                    "agent_request_invalid",
+                    "Extension refresh request is invalid.");
+        }
+        byte[] body;
+        try {
+            body = objectMapper.writeValueAsBytes(
+                    new ExtensionRefreshRequest(
+                            "1",
+                            snapshot,
+                            continuationToken));
+        } catch (IOException exception) {
+            throw failure("agent_request_invalid", exception);
+        }
+        try {
+            if (body.length > SURFACE_LIMIT) {
+                throw new ProAgentClientException(
+                        "agent_request_too_large",
+                        "Extension refresh request is too large.");
+            }
+            return exchange(
+                    endpoint,
+                    "v1/extensions/refresh",
+                    body,
+                    SURFACE_LIMIT,
+                    ExtensionRefreshResult.class);
         } finally {
             Arrays.fill(body, (byte) 0);
         }

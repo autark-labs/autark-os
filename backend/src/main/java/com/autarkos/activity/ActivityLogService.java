@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 
 @Service
 public class ActivityLogService {
@@ -16,9 +18,19 @@ public class ActivityLogService {
     private static final Logger LOGGER = LoggerFactory.getLogger(ActivityLogService.class);
 
     private final ActivityLogRepository repository;
+    private final ApplicationEventPublisher events;
 
     public ActivityLogService(ActivityLogRepository repository) {
+        this(repository, event -> {
+        });
+    }
+
+    @Autowired
+    public ActivityLogService(
+            ActivityLogRepository repository,
+            ApplicationEventPublisher events) {
         this.repository = repository;
+        this.events = events;
     }
 
     public void info(String category, String action, String title, String message) {
@@ -107,9 +119,39 @@ public class ActivityLogService {
                     clean(details, ""),
                     Instant.now().toString()));
             logToConsole(level, category, action, title, message, appId, outcome);
+            if (meaningfulMutation(level, category, action, outcome)) {
+                try {
+                    events.publishEvent(new SuccessfulMutationEvent(
+                            clean(category, "system"),
+                            clean(action, "activity")));
+                } catch (RuntimeException exception) {
+                    LOGGER.debug(
+                            "Unable to enqueue extension refresh.",
+                            exception);
+                }
+            }
         } catch (RuntimeException exception) {
             LOGGER.warn("Unable to write Autark-OS activity log: {}", exception.getMessage());
         }
+    }
+
+    private boolean meaningfulMutation(
+            String level,
+            String category,
+            String action,
+            String outcome) {
+        if (!"completed".equals(outcome)
+                || List.of("api", "pro", "extension")
+                        .contains(clean(category, "system"))) {
+            return false;
+        }
+        if ("success".equals(level)) {
+            return true;
+        }
+        String candidate = clean(action, "activity");
+        return "settings".equals(category)
+                && (candidate.endsWith("_updated")
+                        || candidate.endsWith("_applied"));
     }
 
     private ActivityLog activityLog(ActivityLogEntity entity) {

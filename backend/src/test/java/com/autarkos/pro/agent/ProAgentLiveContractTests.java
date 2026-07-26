@@ -65,6 +65,10 @@ class ProAgentLiveContractTests {
                 manifest.surfaces().getFirst(),
                 snapshot,
                 null);
+        var refresh = client.refresh(
+                endpoint,
+                snapshot,
+                null);
 
         assertThat(status.state()).isEqualTo("ready");
         assertThat(status.ready()).isTrue();
@@ -74,6 +78,9 @@ class ProAgentLiveContractTests {
         assertThat(surface.continuationToken()).isNull();
         assertThat(surface.stateCompatibility()).isEqualTo(
                 required("AUTARK_PRO_LIVE_EXPECT_STATE"));
+        assertThat(refresh.schemaVersion()).isEqualTo("1");
+        assertThat(refresh.stateCompatibility()).isEqualTo("compatible");
+        assertThat(refresh.activeFindingCount()).isBetween(0, 100);
     }
 
     private static String required(String name) {

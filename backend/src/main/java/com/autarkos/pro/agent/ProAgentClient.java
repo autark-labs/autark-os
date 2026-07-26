@@ -1,6 +1,7 @@
 package com.autarkos.pro.agent;
 
 import com.autarkos.extensions.ExtensionSurfaceEnvelope;
+import com.autarkos.extensions.ExtensionRefreshResult;
 import com.autarkos.extensions.ExtensionUiManifest;
 import com.autarkos.pro.model.AgentStatus;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
@@ -16,6 +17,11 @@ public interface ProAgentClient {
     ExtensionSurfaceEnvelope renderSurface(
             ProAgentEndpoint endpoint,
             String surface,
+            NormalizedHostSnapshot snapshot,
+            String continuationToken);
+
+    ExtensionRefreshResult refresh(
+            ProAgentEndpoint endpoint,
             NormalizedHostSnapshot snapshot,
             String continuationToken);
 }

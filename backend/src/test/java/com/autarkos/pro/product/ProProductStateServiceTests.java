@@ -2,6 +2,7 @@ package com.autarkos.pro.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -15,6 +16,7 @@ import com.autarkos.pro.entitlement.ProStatusResponse;
 import com.autarkos.pro.model.ProEntitlementState;
 import com.autarkos.pro.model.ProEntitlementStatus;
 import com.autarkos.pro.model.ProModuleState;
+import com.autarkos.extensions.ExtensionRefreshStatusSource;
 
 class ProProductStateServiceTests {
 
@@ -51,6 +53,42 @@ class ProProductStateServiceTests {
         assertThat(state.recommendedAction())
                 .isEqualTo(new ProProductState.RecommendedAction(
                         "check_release", "release_check_available"));
+    }
+
+    @Test
+    void scheduledGuardianHealthComesFromGenericRefreshStatus() {
+        ProEntitlementService entitlements =
+                mock(ProEntitlementService.class);
+        when(entitlements.status()).thenReturn(status(
+                ProEntitlementState.ACTIVE,
+                true,
+                true,
+                true,
+                ProModuleState.ACTIVE,
+                "healthy",
+                DIGEST));
+        Instant latest = NOW.minusSeconds(60);
+        ProProductState state = new ProProductStateService(
+                entitlements,
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                () -> new ExtensionRefreshStatusSource.Status(
+                        "scheduled",
+                        latest,
+                        NOW.plusSeconds(600),
+                        1,
+                        "high",
+                        "findings_available"))
+                .current();
+
+        assertThat(state.guardian().state()).isEqualTo("healthy");
+        assertThat(state.guardian().schedulerState())
+                .isEqualTo("scheduled");
+        assertThat(state.guardian().latestAnalysisHealth())
+                .isEqualTo("healthy");
+        assertThat(state.guardian().latestAnalysisAt())
+                .isEqualTo(latest);
+        assertThat(state.recommendedAction().id())
+                .isEqualTo("review_guardian");
     }
 
     @Test

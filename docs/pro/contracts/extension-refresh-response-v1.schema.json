@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/extensions/v1/refresh-response.schema.json",
+  "title": "Generic extension refresh response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "completedAt",
+    "stateCompatibility",
+    "activeFindingCount",
+    "highestSeverity",
+    "recommendation"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "completedAt": {
+      "$ref": "https://contracts.autark-os.org/pro/v1/common-v1.schema.json#/$defs/dateTime"
+    },
+    "stateCompatibility": {
+      "enum": ["new", "compatible", "reset"]
+    },
+    "activeFindingCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "highestSeverity": {
+      "enum": ["none", "info", "low", "medium", "high", "critical"]
+    },
+    "recommendation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["routeId", "actionId", "label"],
+          "properties": {
+            "routeId": { "const": "pro" },
+            "actionId": { "const": "review-guardian" },
+            "label": { "const": "Review Guardian" }
+          }
+        },
+        { "type": "null" }
+      ]
+    }
+  }
+}

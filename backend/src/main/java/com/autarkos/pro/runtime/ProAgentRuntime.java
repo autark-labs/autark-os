@@ -5,7 +5,10 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 
+import com.autarkos.extensions.ExtensionRefreshRequested;
 import com.autarkos.pro.agent.ProAgentClientRouter;
 import com.autarkos.pro.agent.ProAgentEndpoint;
 import com.autarkos.pro.module.ProModuleCandidate;
@@ -22,6 +25,7 @@ public class ProAgentRuntime implements ProModuleRuntime {
     private final ProDockerEngine docker;
     private final ProAgentHealthVerifier healthVerifier;
     private final ProAgentClientRouter router;
+    private final ApplicationEventPublisher events;
     private final AtomicReference<VerifiedCandidate>
             verifiedCandidate = new AtomicReference<>();
 
@@ -31,6 +35,24 @@ public class ProAgentRuntime implements ProModuleRuntime {
             ProDockerEngine docker,
             ProAgentHealthVerifier healthVerifier,
             ProAgentClientRouter router) {
+        this(
+                registryCredentials,
+                apiCredentialStore,
+                docker,
+                healthVerifier,
+                router,
+                event -> {
+                });
+    }
+
+    @Autowired
+    public ProAgentRuntime(
+            RegistryCredentialClient registryCredentials,
+            ProAgentApiCredentialStore apiCredentialStore,
+            ProDockerEngine docker,
+            ProAgentHealthVerifier healthVerifier,
+            ProAgentClientRouter router,
+            ApplicationEventPublisher events) {
         this.registryCredentials = Objects.requireNonNull(
                 registryCredentials);
         this.apiCredentialStore = Objects.requireNonNull(
@@ -39,6 +61,7 @@ public class ProAgentRuntime implements ProModuleRuntime {
         this.healthVerifier = Objects.requireNonNull(
                 healthVerifier);
         this.router = Objects.requireNonNull(router);
+        this.events = Objects.requireNonNull(events);
     }
 
     @Override
@@ -104,6 +127,13 @@ public class ProAgentRuntime implements ProModuleRuntime {
         }
         router.activate(docker.activeEndpoint(
                 candidate.manifest().digest()));
+        try {
+            events.publishEvent(new ExtensionRefreshRequested(
+                    "extension_activated"));
+        } catch (RuntimeException ignored) {
+            // Cadence scheduling remains the safe fallback. Event delivery
+            // must never invalidate an already healthy atomic cutover.
+        }
         verifiedCandidate.set(null);
     }
 

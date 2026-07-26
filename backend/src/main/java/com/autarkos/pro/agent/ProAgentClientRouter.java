@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.stereotype.Component;
 
 import com.autarkos.extensions.ExtensionSurfaceEnvelope;
+import com.autarkos.extensions.ExtensionRefreshResult;
 import com.autarkos.extensions.ExtensionUiManifest;
 import com.autarkos.pro.model.AgentStatus;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
@@ -53,6 +54,15 @@ public final class ProAgentClientRouter {
         return client.renderSurface(
                 requireActive(),
                 surface,
+                snapshot,
+                continuationToken);
+    }
+
+    public ExtensionRefreshResult refresh(
+            NormalizedHostSnapshot snapshot,
+            String continuationToken) {
+        return client.refresh(
+                requireActive(),
                 snapshot,
                 continuationToken);
     }

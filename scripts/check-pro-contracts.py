@@ -24,6 +24,7 @@ EXAMPLE_NAMES = (
     "normalized-host-snapshot-v1",
     "extension-ui-manifest-v1",
     "extension-surface-response-v1",
+    "extension-refresh-response-v1",
 )
 
 
@@ -90,6 +91,37 @@ def main():
         ),
         "continuationToken": None,
     })
+
+    refresh_path, refresh_schema = schemas[
+        "extension-refresh-request-v1"
+    ]
+    Draft202012Validator(
+        refresh_schema,
+        resolver=RefResolver(
+            base_uri=refresh_path.as_uri(),
+            referrer=refresh_schema,
+            store=store,
+        ),
+    ).validate({
+        "schemaVersion": "1",
+        "snapshot": load_json(
+            CONTRACTS / "examples" / "normalized-host-snapshot-v1.json"
+        ),
+        "continuationToken": None,
+    })
+
+    unsafe_refresh = load_json(
+        CONTRACTS
+        / "examples"
+        / "extension-refresh-response-v1.json"
+    )
+    unsafe_refresh["recommendation"]["actionId"] = "execute-command"
+    if validators["extension-refresh-response-v1"].is_valid(
+        unsafe_refresh
+    ):
+        raise SystemExit(
+            "executable extension recommendation unexpectedly passed"
+        )
 
     for path in sorted(OPENAPI.glob("*.yaml")):
         document = yaml.safe_load(path.read_text(encoding="utf-8"))

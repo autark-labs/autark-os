@@ -113,6 +113,16 @@ paths:
       responses:
         "200":
           description: Opaque JSON for the installed extension browser module.
+  /api/v1/extensions/{extensionId}/refresh:
+    post:
+      operationId: requestHostedExtensionRefresh
+      parameters:
+        - $ref: "#/components/parameters/ExtensionId"
+      responses:
+        "202":
+          description: Read-only refresh was queued and will respect active operation lanes.
+        "404":
+          description: Extension is absent or unhealthy.
 components:
   parameters:
     ExtensionId:

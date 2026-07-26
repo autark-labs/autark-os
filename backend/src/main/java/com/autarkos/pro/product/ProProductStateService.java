@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.pro.entitlement.ProEntitlementService;
@@ -14,6 +15,7 @@ import com.autarkos.pro.entitlement.ProStatusResponse;
 import com.autarkos.pro.model.ProEntitlementState;
 import com.autarkos.pro.model.ProEntitlementStatus;
 import com.autarkos.pro.model.ProModuleState;
+import com.autarkos.extensions.ExtensionRefreshStatusSource;
 
 @Service
 public class ProProductStateService {
@@ -22,15 +24,40 @@ public class ProProductStateService {
 
     private final ProEntitlementService entitlements;
     private final Clock clock;
+    private final ExtensionRefreshStatusSource guardianRefresh;
 
     @Autowired
-    public ProProductStateService(ProEntitlementService entitlements) {
-        this(entitlements, Clock.systemUTC());
+    public ProProductStateService(
+            ProEntitlementService entitlements,
+            ObjectProvider<ExtensionRefreshStatusSource>
+                    guardianRefresh) {
+        this(
+                entitlements,
+                Clock.systemUTC(),
+                () -> {
+                    ExtensionRefreshStatusSource source =
+                            guardianRefresh.getIfAvailable();
+                    return source == null
+                            ? ExtensionRefreshStatusSource.Status
+                                    .unavailable()
+                            : source.status();
+                });
     }
 
     ProProductStateService(ProEntitlementService entitlements, Clock clock) {
+        this(
+                entitlements,
+                clock,
+                ExtensionRefreshStatusSource.Status::unavailable);
+    }
+
+    ProProductStateService(
+            ProEntitlementService entitlements,
+            Clock clock,
+            ExtensionRefreshStatusSource guardianRefresh) {
         this.entitlements = entitlements;
         this.clock = clock;
+        this.guardianRefresh = guardianRefresh;
     }
 
     public ProProductState current() {
@@ -43,6 +70,10 @@ public class ProProductStateService {
         ProProductState.SoftwareEntitlement software = software(entitlement);
         ProProductState.HostedServices hosted = hosted(entitlement, checkedAt);
         ProProductState.Agent agent = agent(module);
+        ExtensionRefreshStatusSource.Status refreshStatus =
+                guardianRefresh.status();
+        ProProductState.Guardian guardian =
+                guardian(agent, refreshStatus);
         List<String> features = entitlement.features() == null
                 ? List.of()
                 : entitlement.features().stream()
@@ -60,7 +91,12 @@ public class ProProductStateService {
                 ? features
                 : List.of();
         ProProductState.RecommendedAction action =
-                recommendedAction(source, software, hosted, agent);
+                recommendedAction(
+                        source,
+                        software,
+                        hosted,
+                        agent,
+                        refreshStatus);
 
         return new ProProductState(
                 "1",
@@ -68,13 +104,7 @@ public class ProProductStateService {
                 software,
                 hosted,
                 agent,
-                new ProProductState.Guardian(
-                        "unavailable",
-                        "unavailable",
-                        "unavailable",
-                        null,
-                        null,
-                        NOT_IMPLEMENTED),
+                guardian,
                 new ProProductState.Mobile(
                         "unavailable", 0, NOT_IMPLEMENTED),
                 new ProProductState.HostedMobile(
@@ -87,6 +117,47 @@ public class ProProductStateService {
                 hostedCapabilities,
                 action,
                 checkedAt);
+    }
+
+    private ProProductState.Guardian guardian(
+            ProProductState.Agent agent,
+            ExtensionRefreshStatusSource.Status source) {
+        if (!"active".equals(agent.state())
+                || !"healthy".equals(agent.health())) {
+            return new ProProductState.Guardian(
+                    "unavailable",
+                    "unavailable",
+                    "unavailable",
+                    null,
+                    null,
+                    "agent_unavailable");
+        }
+        String scheduler = switch (source.state()) {
+            case "scheduled" -> "scheduled";
+            case "running" -> "running";
+            case "error" -> "error";
+            case "idle" -> "idle";
+            default -> "unavailable";
+        };
+        String state = switch (scheduler) {
+            case "running" -> "running";
+            case "error" -> "error";
+            case "scheduled" -> source.latestAnalysisAt() == null
+                    ? "scheduled"
+                    : "healthy";
+            case "idle" -> "idle";
+            default -> "unavailable";
+        };
+        String analysisHealth = source.latestAnalysisAt() == null
+                ? "unavailable"
+                : "error".equals(scheduler) ? "error" : "healthy";
+        return new ProProductState.Guardian(
+                state,
+                scheduler,
+                analysisHealth,
+                source.latestAnalysisAt(),
+                source.nextAnalysisAt(),
+                safeReason(source.reasonCode(), "unknown"));
     }
 
     private static ProProductState.SoftwareEntitlement software(
@@ -204,7 +275,8 @@ public class ProProductStateService {
             ProStatusResponse source,
             ProProductState.SoftwareEntitlement software,
             ProProductState.HostedServices hosted,
-            ProProductState.Agent agent) {
+            ProProductState.Agent agent,
+            ExtensionRefreshStatusSource.Status guardian) {
         if (source.activation() != null
                 && source.activation().activationId() != null) {
             return action("continue_activation", "activation_pending");
@@ -231,6 +303,11 @@ public class ProProductStateService {
         }
         if ("incompatible".equals(agent.compatibility())) {
             return action("review_compatibility", "agent_incompatible");
+        }
+        if (guardian.activeFindingCount() > 0
+                && "active".equals(agent.state())
+                && "healthy".equals(agent.health())) {
+            return action("review_guardian", "findings_available");
         }
         if ("expired".equals(hosted.state())) {
             return action("renew_hosted_services", "hosted_services_expired");

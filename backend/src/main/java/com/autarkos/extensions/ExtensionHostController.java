@@ -11,15 +11,22 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.ObjectProvider;
 
 @RestController
 @RequestMapping("/api/v1/extensions/{extensionId}")
 public final class ExtensionHostController {
 
     private final ExtensionHostService service;
+    private final ObjectProvider<ExtensionRefreshScheduler>
+            refreshScheduler;
 
-    public ExtensionHostController(ExtensionHostService service) {
+    public ExtensionHostController(
+            ExtensionHostService service,
+            ObjectProvider<ExtensionRefreshScheduler>
+                    refreshScheduler) {
         this.service = service;
+        this.refreshScheduler = refreshScheduler;
     }
 
     @GetMapping("/ui-manifest")
@@ -55,6 +62,24 @@ public final class ExtensionHostController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(service.render(extensionId, surface));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Void> refresh(
+            @PathVariable String extensionId) {
+        service.requireRefreshAvailable(extensionId);
+        ExtensionRefreshScheduler scheduler =
+                refreshScheduler.getIfAvailable();
+        if (scheduler == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus
+                            .SERVICE_UNAVAILABLE,
+                    "Private extension refresh is unavailable.");
+        }
+        scheduler.requestRefresh("explicit_refresh");
+        return ResponseEntity.accepted()
+                .cacheControl(CacheControl.noStore())
+                .build();
     }
 
     @PostMapping("/navigation-rejections")

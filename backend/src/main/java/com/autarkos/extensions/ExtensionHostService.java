@@ -154,6 +154,40 @@ public final class ExtensionHostService {
                         compatibility));
     }
 
+    public synchronized ExtensionRefreshResult refresh(
+            String extensionId) {
+        ActiveExtension active = requireActive(extensionId);
+        cleanupState(active);
+        ExtensionStateStore.ExtensionState previous =
+                state.loadCanonical(
+                        active.extensionId(),
+                        active.digest())
+                        .orElse(null);
+        if (previous != null
+                && previous.schemaVersion() != STATE_SCHEMA_VERSION) {
+            auditStateReset(active, "incompatible_state_schema");
+            state.clearCanonical(active.extensionId(), active.digest());
+            previous = null;
+        }
+        String continuation = previous == null
+                ? null
+                : previous.opaqueState();
+        var snapshot = snapshots.assemble();
+        ExtensionRefreshResult result = call(() ->
+                agent.refresh(snapshot, continuation));
+        requireRefreshResult(result, snapshot.generatedAt());
+        if (previous != null) {
+            state.clearCanonical(
+                    active.extensionId(),
+                    active.digest());
+        }
+        return result;
+    }
+
+    public void requireRefreshAvailable(String extensionId) {
+        requireActive(extensionId);
+    }
+
     /**
      * Private browser modules can request only fixed CE-owned navigation pairs.
      * The rejected values are intentionally not recorded so a compromised
@@ -238,6 +272,50 @@ public final class ExtensionHostService {
                 || !Objects.equals(
                         active.componentVersion(),
                         manifest.componentVersion())) {
+            throw incompatible();
+        }
+    }
+
+    private static void requireRefreshResult(
+            ExtensionRefreshResult result,
+            Instant snapshotGeneratedAt) {
+        if (result == null
+                || !"1".equals(result.schemaVersion())
+                || result.completedAt() == null
+                || snapshotGeneratedAt == null
+                || result.completedAt().isBefore(
+                        snapshotGeneratedAt.minus(Duration.ofMinutes(5)))
+                || result.completedAt().isAfter(
+                        Instant.now().plus(Duration.ofMinutes(5)))
+                || !Set.of("new", "compatible", "reset")
+                        .contains(result.stateCompatibility())
+                || result.activeFindingCount() < 0
+                || result.activeFindingCount() > 100
+                || !Set.of(
+                        "none",
+                        "info",
+                        "low",
+                        "medium",
+                        "high",
+                        "critical")
+                        .contains(result.highestSeverity())) {
+            throw incompatible();
+        }
+        ExtensionRefreshResult.Recommendation recommendation =
+                result.recommendation();
+        if (recommendation == null) {
+            if (result.activeFindingCount() != 0
+                    || !"none".equals(result.highestSeverity())) {
+                throw incompatible();
+            }
+            return;
+        }
+        if (result.activeFindingCount() == 0
+                || !"pro".equals(recommendation.routeId())
+                || !"review-guardian".equals(
+                        recommendation.actionId())
+                || !"Review Guardian".equals(
+                        recommendation.label())) {
             throw incompatible();
         }
     }

@@ -183,6 +183,60 @@ class ExtensionHostServiceTests {
     }
 
     @Test
+    void refreshReturnsOnlyValidatedGenericPresentationAndRetiresState() {
+        Fixture fixture = fixture();
+        when(fixture.state().loadCanonical("autark-pro", DIGEST))
+                .thenReturn(Optional.of(
+                        new ExtensionStateStore.ExtensionState(
+                                "final_encrypted_continuation",
+                                1)));
+        when(fixture.agent().refresh(
+                        any(NormalizedHostSnapshot.class),
+                        eq("final_encrypted_continuation")))
+                .thenReturn(new ExtensionRefreshResult(
+                        "1",
+                        Instant.now(),
+                        "compatible",
+                        2,
+                        "high",
+                        new ExtensionRefreshResult.Recommendation(
+                                "pro",
+                                "review-guardian",
+                                "Review Guardian")));
+
+        ExtensionRefreshResult result =
+                fixture.service().refresh("autark-pro");
+
+        assertThat(result.activeFindingCount()).isEqualTo(2);
+        verify(fixture.state()).clearCanonical("autark-pro", DIGEST);
+    }
+
+    @Test
+    void refreshRejectsUncontractedNavigation() {
+        Fixture fixture = fixture();
+        when(fixture.state().loadCanonical("autark-pro", DIGEST))
+                .thenReturn(Optional.empty());
+        when(fixture.agent().refresh(
+                        any(NormalizedHostSnapshot.class),
+                        isNull()))
+                .thenReturn(new ExtensionRefreshResult(
+                        "1",
+                        Instant.now(),
+                        "compatible",
+                        1,
+                        "high",
+                        new ExtensionRefreshResult.Recommendation(
+                                "system",
+                                "execute-command",
+                                "Run command")));
+
+        assertThatThrownBy(() ->
+                fixture.service().refresh("autark-pro"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+    }
+
+    @Test
     void rejectsAbsentUnknownStaleAndDigestMismatchedExtensions() {
         Fixture fixture = fixture();
         assertNotFound(() -> fixture.service().manifest("unknown"));
@@ -236,8 +290,10 @@ class ExtensionHostServiceTests {
         when(agent.uiManifest()).thenReturn(
                 manifest("1.2.3", sha256(ENTRYPOINT)));
         when(agent.uiAsset("entry.js")).thenReturn(ENTRYPOINT);
-        when(snapshots.assemble()).thenReturn(
-                mock(NormalizedHostSnapshot.class));
+        NormalizedHostSnapshot snapshot =
+                mock(NormalizedHostSnapshot.class);
+        when(snapshot.generatedAt()).thenReturn(Instant.now());
+        when(snapshots.assemble()).thenReturn(snapshot);
         return new Fixture(
                 new ExtensionHostService(
                         agent, entitlements, snapshots, state, audit),
