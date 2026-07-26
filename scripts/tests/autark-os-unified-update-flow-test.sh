@@ -214,7 +214,13 @@ cat >"${manifest}" <<JSON
 }
 JSON
 
-check_json="$(AUTARK_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/autark-os" update check --channel stable --metadata-url "file://${manifest}" --json)"
+check_stderr="${tmp_dir}/stable-update-check.stderr"
+check_json="$(AUTARK_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/autark-os" update check --channel stable --metadata-url "file://${manifest}" --json 2>"${check_stderr}")"
+if [[ -s "${check_stderr}" ]]; then
+  cat "${check_stderr}" >&2
+  printf 'Stable update manifest parsing emitted unexpected diagnostics.\n' >&2
+  exit 1
+fi
 UPDATE_CHECK_JSON="${check_json}" python3 - <<'PY'
 import json
 import os
@@ -280,7 +286,13 @@ fi
 SH
 chmod +x "${github_bin}/curl"
 
-beta_check="$(PATH="${github_bin}:/usr/bin:/bin" TEST_BETA_MANIFEST="${beta_manifest}" AUTARK_OS_CONFIG_FILE="${config_file}" AUTARK_OS_UPDATE_REPOSITORY=example/autark-os "${repo_root}/scripts/autark-os" update check --channel beta --json)"
+beta_check_stderr="${tmp_dir}/beta-update-check.stderr"
+beta_check="$(PATH="${github_bin}:/usr/bin:/bin" TEST_BETA_MANIFEST="${beta_manifest}" AUTARK_OS_CONFIG_FILE="${config_file}" AUTARK_OS_UPDATE_REPOSITORY=example/autark-os "${repo_root}/scripts/autark-os" update check --channel beta --json 2>"${beta_check_stderr}")"
+if [[ -s "${beta_check_stderr}" ]]; then
+  cat "${beta_check_stderr}" >&2
+  printf 'Beta update manifest parsing emitted unexpected diagnostics.\n' >&2
+  exit 1
+fi
 BETA_CHECK_JSON="${beta_check}" python3 - <<'PY'
 import json
 import os

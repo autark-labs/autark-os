@@ -156,7 +156,7 @@ grep -q '\[redacted-email\]' "${bundle_root}/installer-stage.log"
 grep -q '\[redacted-home-path\]' "${bundle_root}/installer-stage.log"
 grep -q 'deviceName=\[redacted-host\]' "${bundle_root}/installer-stage.log"
 
-if rg -n 'plain-secret-token|secret-couchdb-password|tskey-secret-value|state-secret-token|log-secret-token|bearer-secret-token|AAAA-BBBB|browser-session-secret|192\.168\.1\.20|person@example\.com|/home/jackson|raspberrypi' "${bundle_root}" >/tmp/autark-os-support-bundle-secrets.txt; then
+if grep -R -n -E -- 'plain-secret-token|secret-couchdb-password|tskey-secret-value|state-secret-token|log-secret-token|bearer-secret-token|AAAA-BBBB|browser-session-secret|192\.168\.1\.20|person@example\.com|/home/jackson|raspberrypi' "${bundle_root}" >/tmp/autark-os-support-bundle-secrets.txt; then
   cat /tmp/autark-os-support-bundle-secrets.txt
   exit 1
 fi

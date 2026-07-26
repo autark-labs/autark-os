@@ -38,8 +38,7 @@ for path in "${forbidden_paths[@]}"; do
   fi
 done
 
-if rg -n \
-  --glob '!**/__tests__/**' \
+if grep -R -n -E --exclude-dir='__tests__' -- \
   'pro\.(guardian|change-intelligence|capacity-forecast|backup-confidence|safe-operations|update-safety|connect|managed-support)|ProGuardian|GuardianAnalysis|ProInsight|ProPresentation|CapacityForecast|BackupConfidence' \
   backend/src/main/java \
   frontend/src \
@@ -49,8 +48,7 @@ if rg -n \
   fail "feature-specific Pro contracts or implementation remain in CE"
 fi
 
-if rg -n \
-  --glob '!**/__tests__/**' \
+if grep -R -n -E --exclude-dir='__tests__' -- \
   'function (assess|score|forecast|correlate)|sevenDayGrowthBytes|relatedChanges|recentChanges' \
   backend/src/main/java/com/autarkos/pro \
   frontend/src/pages/ProPage \
@@ -87,20 +85,19 @@ grep -Fq 'surface="discover.insights"' \
   frontend/src/pages/MarketplacePage/MarketplacePage.tsx ||
   fail "Discover extension slot is missing"
 
-if rg -n \
-  --glob '!**/__tests__/**' \
+if grep -R -n -E --exclude-dir='__tests__' -- \
   'AUTARK_PRO_API_TOKEN|agent-api-token|Authorization.*Bearer|http://autark-pro-agent' \
   frontend/src; then
   fail "browser code can reach or authenticate to the private service directly"
 fi
 
-if rg -ni \
+if grep -R -n -i -E -- \
   'MiB per day|percent pressure threshold|stale after [0-9]+|requires at least [0-9]+ (observations|retained)' \
   docs/adr docs/pro docs/security; then
   fail "public documentation contains private policy or threshold detail"
 fi
 
-if rg -n \
+if grep -R -n -E -- \
   'https?://[^ )]*(github|gitlab|bitbucket)[^ )]*(pro-client|pro-agent)' \
   docs/adr docs/pro docs/security; then
   fail "public documentation contains a private repository URL"

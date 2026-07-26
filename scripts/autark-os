@@ -1010,8 +1010,11 @@ artifact_manifest_value() {
     index($0, "\"fileName\": \"" filename "\"") > 0 { found = 1 }
     found && index($0, "\"" key "\":") > 0 {
       value = $0
-      sub("^[^:]*:[[:space:]]*\\\"", "", value)
-      sub("\\\"[,]?[[:space:]]*$", "", value)
+      # Use literal regular expressions here. Dynamic expressions with an
+      # escaped double quote are accepted by some awk variants but emit a
+      # warning (and are non-portable) on the ARM release runner.
+      sub(/^[^:]*:[[:space:]]*"/, "", value)
+      sub(/"[,]?[[:space:]]*$/, "", value)
       print value
       exit
     }

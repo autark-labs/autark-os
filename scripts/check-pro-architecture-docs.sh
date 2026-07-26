@@ -27,7 +27,7 @@ grep -Fq "The private image also carries the Pro browser module" "$module_adr"
 grep -Fq "no Docker socket" "$privilege_adr"
 grep -Fq "cannot prevent CE process startup" "$invariants"
 
-if rg -n 'https?://[^ )]*(github|gitlab|bitbucket)[^ )]*(pro-client|pro-agent)' \
+if grep -R -n -E -- 'https?://[^ )]*(github|gitlab|bitbucket)[^ )]*(pro-client|pro-agent)' \
   "$ROOT_DIR/docs/adr" "$ROOT_DIR/docs/pro"; then
   echo "private Pro repository URL found in public architecture docs" >&2
   exit 1
