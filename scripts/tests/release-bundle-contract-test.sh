@@ -33,7 +33,7 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -x "${bundle_dir}/scripts/install-autark-os.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-fileops" ]]
-[[ -x "${bundle_dir}/scripts/autark-os-update-helper" ]]
+[[ ! -e "${bundle_dir}/scripts/autark-os-update-helper" ]]
 [[ -x "${bundle_dir}/runtime/bin/java" ]]
 [[ -x "${bundle_dir}/tools/cosign" ]]
 [[ -f "${bundle_dir}/tools/cosign-LICENSE" ]]
@@ -86,7 +86,7 @@ grep -q 'autark-os-provenance.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/install-autark-os.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-gui-installer.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-fileops' "${bundle_dir}/SHA256SUMS"
-grep -q 'scripts/autark-os-update-helper' "${bundle_dir}/SHA256SUMS"
+! grep -q 'scripts/autark-os-update-helper' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/GETTING_STARTED.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/RELEASE_NOTES.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/LICENSE.md' "${bundle_dir}/SHA256SUMS"
@@ -122,7 +122,7 @@ assert "tools/cosign" in release["artifacts"]
 assert "tools/cosign-LICENSE" in release["artifacts"]
 assert "scripts/autark-os-gui-installer.sh" in release["artifacts"]
 assert "scripts/autark-os-fileops" in release["artifacts"]
-assert "scripts/autark-os-update-helper" in release["artifacts"]
+assert "scripts/autark-os-update-helper" not in release["artifacts"]
 assert "docs/GETTING_STARTED.md" in release["artifacts"]
 assert "docs/RELEASE_NOTES.md" in release["artifacts"]
 assert "docs/LICENSE.md" in release["artifacts"]
@@ -190,9 +190,9 @@ assert listed == actual, (sorted(listed - actual), sorted(actual - listed))
 PY
 (cd "${bundle_dir}" && sha256sum -c SHA256SUMS >/dev/null)
 
-# A release intended for browser installation includes only a public trust root,
-# signs the exact checksum manifest after it is complete, and remains verifiable
-# with the pinned bundled verifier.
+# Release CI signs the completed checksum manifest for independent artifact
+# verification. The signing key and trust root are never shipped as appliance
+# update machinery.
 signing_prefix="${tmp_dir}/core-update-contract"
 COSIGN_PASSWORD=contract-release-password "${bundle_dir}/tools/cosign" generate-key-pair --output-key-prefix "${signing_prefix}" >/dev/null
 signed_bundle_dir="${tmp_dir}/autark-os-1.2.3-signed"
@@ -215,11 +215,10 @@ COSIGN_PASSWORD=contract-release-password \
     --release-notes-url https://example.invalid/autark-os/1.2.3 \
     --output-dir "${signed_bundle_dir}" >/dev/null
 
-[[ -f "${signed_bundle_dir}/keys/core-update-release.pub" ]]
+[[ ! -e "${signed_bundle_dir}/keys/core-update-release.pub" ]]
 [[ -s "${signed_bundle_dir}/SHA256SUMS.sigstore.json" ]]
-cmp -s "${signing_prefix}.pub" "${signed_bundle_dir}/keys/core-update-release.pub"
 "${signed_bundle_dir}/tools/cosign" verify-blob \
-  --key "${signed_bundle_dir}/keys/core-update-release.pub" \
+  --key "${signing_prefix}.pub" \
   --bundle "${signed_bundle_dir}/SHA256SUMS.sigstore.json" \
   "${signed_bundle_dir}/SHA256SUMS" >/dev/null
 python3 - "${signed_bundle_dir}/autark-os-release.json" "${signed_bundle_dir}/autark-os-provenance.json" <<'PY'
@@ -231,7 +230,7 @@ provenance = json.load(open(sys.argv[2], encoding="utf-8"))
 assert release["signatureStatus"] == "signed"
 assert release["signatureKeyId"] == "staging-core-update-2026-01"
 assert release["trustEnvironment"] == "staging"
-assert "keys/core-update-release.pub" in release["artifacts"]
+assert "keys/core-update-release.pub" not in release["artifacts"]
 assert provenance["signatureStatus"] == "signed"
 assert provenance["signatureKeyId"] == release["signatureKeyId"]
 PY
@@ -245,7 +244,7 @@ assert str(private_key) not in (bundle / "SHA256SUMS").read_text(encoding="utf-8
 assert not any(path.name.endswith(".key") for path in bundle.rglob("*"))
 PY
 (cd "${signed_bundle_dir}" && sha256sum -c SHA256SUMS >/dev/null)
-grep -q 'keys/core-update-release.pub' "${signed_bundle_dir}/SHA256SUMS"
+! grep -q 'keys/core-update-release.pub' "${signed_bundle_dir}/SHA256SUMS"
 
 production_policy_output="${tmp_dir}/production-policy.out"
 if AUTARK_OS_RELEASE_SIGNATURE_MODE=signed \

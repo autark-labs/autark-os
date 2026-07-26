@@ -471,7 +471,7 @@ package_deb() {
   # /usr hierarchy must remain traversable by the service account.
   chmod 0755 "${deb_root}" "${deb_root}/DEBIAN"
   find "${deb_root}/usr" -type d -exec chmod 0755 {} +
-  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os" "${payload_dir}/scripts/autark-os-fileops" "${payload_dir}/scripts/autark-os-update-helper"
+  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os" "${payload_dir}/scripts/autark-os-fileops"
   size_kb="$(installed_size_kb "${deb_root}/usr")"
   write_deb_control "${deb_root}" "${size_kb}"
   write_deb_scripts "${deb_root}"

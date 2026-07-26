@@ -1,10 +1,11 @@
-# Signed Core Release Operations
+# Signed Release Artifacts
 
-Browser-delivered core updates accept only a signed Autark-OS release bundle.
-The bundle includes a root-owned public trust key at
-`keys/core-update-release.pub` and a Sigstore bundle at
-`SHA256SUMS.sigstore.json`. The private signing key is never placed in a source
-repository, release bundle, or customer appliance.
+Autark-OS release CI signs the completed release checksum manifest and publishes
+the Sigstore bundle at `SHA256SUMS.sigstore.json`. This signature provides
+independent supply-chain verification of published artifacts. It is not an
+appliance update mechanism. Neither the private signing key nor a privileged
+core-update helper is placed in a source repository, release bundle, or
+customer appliance.
 
 ## GitHub environments
 
@@ -60,15 +61,12 @@ a distinct staging key.
 The release builder fails closed if a signing key is absent, a public-key hash
 does not match its protected environment variable, a beta/stable channel is
 wrong for the environment, or a production release carries a staging key id or
-origin. A locally built unsigned bundle remains suitable only for the terminal
-installer path; browser installation deliberately rejects it.
+origin. A locally built unsigned bundle is suitable only for development.
 
 ## Rotation and withdrawal
 
 Before rotating a key, make a signed rehearsal with the replacement trust root
-and validate browser verification on a disposable supported host. Keep the
-previous public key only for the period needed to service already published
-releases; never overwrite a release asset. If a key is compromised, stop draft
-publication, disable the affected GitHub environment, remove the key secret,
-and issue a new signed release with a new key id and release notes directing
-operators to use the normal recovery/update flow.
+and verify every published artifact independently. Never overwrite a release
+asset. If a key is compromised, stop draft publication, disable the affected
+GitHub environment, remove the key secret, and issue new signed artifacts with
+a new key id.

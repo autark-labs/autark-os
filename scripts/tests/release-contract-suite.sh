@@ -15,7 +15,6 @@ contracts=(
   scripts/tests/supported-host-matrix-contract-test.sh
   scripts/tests/autark-os-update-delivery-test.sh
   scripts/tests/autark-os-unified-update-flow-test.sh
-  scripts/tests/autark-os-update-helper-test.sh
   scripts/tests/autark-os-safe-uninstall-flow-test.sh
   scripts/tests/autark-os-cli-admin-session-test.sh
   scripts/tests/autark-os-admin-recovery-test.sh

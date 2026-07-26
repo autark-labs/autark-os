@@ -228,33 +228,6 @@ export type ProjectVersionInfo = {
   checkedAt: string;
 };
 
-export type CoreUpdateCandidate = {
-  bundleId: string;
-  identity: string;
-  version: string;
-  architecture: string;
-};
-
-export type CoreUpdateAvailableRelease = {
-  version: string;
-  channel: string;
-  releaseNotesUrl: string;
-};
-
-export type CoreUpdateStatus = {
-  schemaVersion: '1';
-  status: 'ready' | 'current' | 'update_available' | 'approved' | 'applying' | 'rolling_back' | 'completed' | 'rolled_back' | 'failed' | 'repair_required' | string;
-  helperAvailable: boolean;
-  repairAvailable: boolean;
-  message: string;
-  installedVersion: string;
-  channel: string;
-  availableRelease: CoreUpdateAvailableRelease | null;
-  candidate: CoreUpdateCandidate | null;
-  jobId: string | null;
-  updatedAt: string;
-};
-
 export type ProjectSettings = {
   deviceName: string;
   timeZone: string;

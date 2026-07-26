@@ -7,7 +7,6 @@ export const settingsSectionIds = [
   'applications',
   'security',
   'remote-access',
-  'updates',
   'advanced',
 ] as const;
 
@@ -24,8 +23,8 @@ export const settingsGroups: SettingsGroup[] = [
   {
     id: 'general',
     label: 'General',
-    description: 'Identity, local time, and software updates',
-    sections: ['general', 'updates'],
+    description: 'Identity and local time',
+    sections: ['general'],
   },
   {
     id: 'apps',

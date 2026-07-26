@@ -41,7 +41,6 @@ INSTALLED_CLI="${INSTALL_DIR}/bin/autark-os"
 INSTALLED_BOOTSTRAP="${INSTALL_DIR}/bin/bootstrap-autark-os.sh"
 INSTALLED_HOST_MATRIX="${INSTALL_DIR}/bin/supported-host-matrix.env"
 INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
-INSTALLED_CORE_UPDATE_HELPER="${AUTARK_OS_CORE_UPDATE_HELPER:-${INSTALL_DIR}/bin/autark-os-update-helper}"
 INSTALLED_RELEASE_METADATA_DIR="${INSTALL_DIR}/release-metadata"
 COSIGN_SOURCE="${REPO_ROOT}/tools/cosign"
 
@@ -68,7 +67,7 @@ Environment overrides:
   AUTARK_OS_CONFIG_DIR, AUTARK_OS_LOG_DIR, AUTARK_OS_INSTALL_DIR,
   AUTARK_OS_BACKEND_JAR, AUTARK_OS_JAVA_BIN, AUTARK_OS_SERVER_PORT,
   AUTARK_OS_SERVICE_NAME, AUTARK_OS_SERVICE_FILE, AUTARK_OS_CLI_LINK,
-  AUTARK_OS_FILEOPS_HELPER, AUTARK_OS_CORE_UPDATE_HELPER, AUTARK_OS_SUDOERS_FILE, AUTARK_OS_VERSION,
+  AUTARK_OS_FILEOPS_HELPER, AUTARK_OS_SUDOERS_FILE, AUTARK_OS_VERSION,
   AUTARK_OS_BUILD_SHA, AUTARK_OS_BUILD_DATE, AUTARK_OS_UPDATE_CHANNEL,
   AUTARK_OS_INSTALL_METHOD, AUTARK_OS_UPDATE_REPOSITORY,
   AUTARK_OS_DOCUMENTATION_DIR, AUTARK_OS_COSIGN_EXECUTABLE
@@ -123,7 +122,6 @@ refresh_derived_paths() {
   INSTALLED_BOOTSTRAP="${INSTALL_DIR}/bin/bootstrap-autark-os.sh"
   INSTALLED_HOST_MATRIX="${INSTALL_DIR}/bin/supported-host-matrix.env"
   INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
-  INSTALLED_CORE_UPDATE_HELPER="${AUTARK_OS_CORE_UPDATE_HELPER:-${INSTALL_DIR}/bin/autark-os-update-helper}"
   INSTALLED_RELEASE_METADATA_DIR="${INSTALL_DIR}/release-metadata"
   COSIGN_EXECUTABLE="${AUTARK_OS_COSIGN_EXECUTABLE:-${INSTALL_DIR}/bin/cosign}"
   COSIGN_SOURCE="${REPO_ROOT}/tools/cosign"
@@ -260,7 +258,7 @@ require_root_or_reexec() {
   fi
   command_exists sudo || die "This installer needs root privileges. Install sudo or rerun as root."
   log "Requesting administrator privileges."
-  exec sudo --preserve-env=AUTARK_OS_USER,AUTARK_OS_GROUP,AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_FILEOPS_HELPER,AUTARK_OS_CORE_UPDATE_HELPER,AUTARK_OS_SUDOERS_FILE,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_DOCUMENTATION_DIR,AUTARK_OS_COSIGN_EXECUTABLE,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
+  exec sudo --preserve-env=AUTARK_OS_USER,AUTARK_OS_GROUP,AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_FILEOPS_HELPER,AUTARK_OS_SUDOERS_FILE,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_DOCUMENTATION_DIR,AUTARK_OS_COSIGN_EXECUTABLE,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
 }
 
 status_line() {
@@ -286,13 +284,11 @@ check_state() {
   log "Checking Autark-OS service-user setup."
   local installed_env="${CONFIG_DIR}/autark-os.env"
   local installed_version installed_sha installed_date installed_helper_sha actual_helper_sha
-  local installed_update_helper_sha actual_update_helper_sha
   local jar_version="" jar_sha="" jar_date="" identity_ok=0 security_ok=0
   installed_version="$(env_file_value "${installed_env}" AUTARK_OS_VERSION)"
   installed_sha="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_SHA)"
   installed_date="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_DATE)"
   installed_helper_sha="$(env_file_value "${installed_env}" AUTARK_OS_FILEOPS_HELPER_SHA256)"
-  installed_update_helper_sha="$(env_file_value "${installed_env}" AUTARK_OS_CORE_UPDATE_HELPER_SHA256)"
   [[ -n "${installed_version}" ]] || installed_version="${AUTARK_OS_VERSION}"
   [[ -n "${installed_sha}" ]] || installed_sha="$(build_sha)"
   [[ -n "${installed_date}" ]] || installed_date="$(build_date)"
@@ -436,7 +432,6 @@ check_state() {
       status_line "${label}" "protected (${owner}:${mode})"
     }
     check_root_owned_path "Installed helper" "${INSTALLED_FILEOPS_HELPER}" "required"
-    check_root_owned_path "Core update helper" "${INSTALLED_CORE_UPDATE_HELPER}" "required"
     check_root_owned_path "Autark-OS command" "${INSTALLED_CLI}" "required"
     check_root_owned_path "Bootstrap helper" "${INSTALLED_BOOTSTRAP}" "required"
     check_root_owned_path "Host support matrix" "${INSTALLED_HOST_MATRIX}" "required"
@@ -461,18 +456,6 @@ check_state() {
       fi
     elif [[ -x "${INSTALLED_FILEOPS_HELPER}" ]]; then
       status_line "Installed helper identity" "needs repair (checksum is missing)"
-      security_paths_ok=0
-    fi
-    if [[ -x "${INSTALLED_CORE_UPDATE_HELPER}" && -n "${installed_update_helper_sha}" ]] && command_exists sha256sum; then
-      actual_update_helper_sha="$(sha256sum "${INSTALLED_CORE_UPDATE_HELPER}" | awk '{print $1}')"
-      if [[ "${actual_update_helper_sha}" != "${installed_update_helper_sha}" ]]; then
-        status_line "Core update helper identity" "needs repair (checksum differs)"
-        security_paths_ok=0
-      else
-        status_line "Core update helper identity" "verified"
-      fi
-    elif [[ -x "${INSTALLED_CORE_UPDATE_HELPER}" ]]; then
-      status_line "Core update helper identity" "needs repair (checksum is missing)"
       security_paths_ok=0
     fi
     if [[ -f "${SERVICE_FILE}" ]]; then
@@ -507,7 +490,7 @@ check_state() {
         security_paths_ok=0
       fi
     fi
-    if [[ -f "${SUDOERS_FILE}" ]] && { ! grep -Fqx "${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_FILEOPS_HELPER} *" "${SUDOERS_FILE}" || ! grep -Fqx "${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_CORE_UPDATE_HELPER} *" "${SUDOERS_FILE}"; }; then
+    if [[ -f "${SUDOERS_FILE}" ]] && ! grep -Fqx "${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_FILEOPS_HELPER} *" "${SUDOERS_FILE}"; then
       status_line "Sudoers rule" "needs repair (helper allow-list differs)"
       security_paths_ok=0
     fi
@@ -718,31 +701,6 @@ install_fileops_helper() {
   log "Installed Autark-OS file operations helper to ${INSTALLED_FILEOPS_HELPER}."
 }
 
-install_core_update_helper() {
-  local helper_source="${REPO_ROOT}/scripts/autark-os-update-helper"
-  if [[ ! -f "${helper_source}" ]]; then
-    warn "Autark-OS core update helper is missing from ${helper_source}."
-    return 0
-  fi
-  run install -o root -g root -m 0755 "${helper_source}" "${INSTALLED_CORE_UPDATE_HELPER}"
-  log "Installed Autark-OS core update helper to ${INSTALLED_CORE_UPDATE_HELPER}."
-}
-
-install_core_update_signing_key() {
-  local key_source="${REPO_ROOT}/keys/core-update-release.pub"
-  local installed_key="${CONFIG_DIR}/core-update-release.pub"
-  if [[ ! -f "${key_source}" ]]; then
-    if [[ -f "${installed_key}" ]]; then
-      log "The release does not carry a core-update trust key; preserving the existing root-owned key."
-    else
-      warn "The release does not carry a core-update trust key. Browser-delivered core updates remain unavailable until a signed release is installed."
-    fi
-    return 0
-  fi
-  run install -o root -g root -m 0644 "${key_source}" "${installed_key}"
-  log "Installed the root-owned core-update trust key to ${installed_key}."
-}
-
 install_cosign() {
   if [[ ! -f "${COSIGN_SOURCE}" ]]; then
     warn "Pinned Cosign verifier is missing from ${COSIGN_SOURCE}. Community Edition remains available, but Autark Pro image activation will fail closed."
@@ -758,10 +716,9 @@ configure_fileops_privilege() {
   local sudoers_dir
   sudoers_dir="$(dirname "${SUDOERS_FILE}")"
   local rule="${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_FILEOPS_HELPER} *"
-  local update_rule="${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_CORE_UPDATE_HELPER} *"
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     run install -d -o root -g root -m 0755 "${sudoers_dir}"
-    log "Would allow ${AUTARK_OS_USER} to run bounded file and core-update helpers through sudo without a password."
+    log "Would allow ${AUTARK_OS_USER} to run bounded file operations through sudo without a password."
     return 0
   fi
 
@@ -771,15 +728,13 @@ configure_fileops_privilege() {
   {
     printf '# Autark-OS bounded app-data file operations.\n'
     printf '%s\n' "${rule}"
-    printf '# Autark-OS bounded signed core-update operations.\n'
-    printf '%s\n' "${update_rule}"
   } >"${tmp_file}"
   if command_exists visudo; then
     visudo -cf "${tmp_file}" >/dev/null
   fi
   install -o root -g root -m 0440 "${tmp_file}" "${SUDOERS_FILE}"
   rm -f "${tmp_file}"
-  log "Configured bounded sudo access for Autark-OS file and core-update operations at ${SUDOERS_FILE}."
+  log "Configured bounded sudo access for Autark-OS file operations at ${SUDOERS_FILE}."
 }
 
 configure_docker_access() {
@@ -939,7 +894,7 @@ install_runtime_image() {
 write_env_file() {
   local env_file="${CONFIG_DIR}/autark-os.env"
   local setup_command="sudo ${INSTALLED_SETUP_SCRIPT}"
-  local fileops_helper_sha="" core_update_helper_sha=""
+  local fileops_helper_sha=""
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     log "Would write ${env_file} with runtime root ${RUNTIME_DIR} and port ${SERVER_PORT}."
     return 0
@@ -948,11 +903,10 @@ write_env_file() {
   local tmp_file
   tmp_file="$(mktemp)"
   if [[ -f "${env_file}" ]]; then
-    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_FILEOPS_HELPER|AUTARK_OS_FILEOPS_HELPER_SHA256|AUTARK_OS_CORE_UPDATE_HELPER|AUTARK_OS_CORE_UPDATE_HELPER_SHA256|AUTARK_OS_CORE_UPDATE_SIGNING_KEY|AUTARK_OS_CORE_UPDATE_VERIFIER|AUTARK_OS_COSIGN_EXECUTABLE|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
+    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_FILEOPS_HELPER|AUTARK_OS_FILEOPS_HELPER_SHA256|AUTARK_OS_COSIGN_EXECUTABLE|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
   fi
   if command_exists sha256sum; then
     fileops_helper_sha="$(sha256sum "${INSTALLED_FILEOPS_HELPER}" | awk '{print $1}')"
-    core_update_helper_sha="$(sha256sum "${INSTALLED_CORE_UPDATE_HELPER}" | awk '{print $1}')"
   else
     die "sha256sum is required to record the installed privileged helper identity."
   fi
@@ -964,10 +918,6 @@ AUTARK_OS_LOG_DIR=${LOG_DIR}
 AUTARK_OS_BACKEND_JAR=${TARGET_BACKEND_JAR}
 AUTARK_OS_FILEOPS_HELPER=${INSTALLED_FILEOPS_HELPER}
 AUTARK_OS_FILEOPS_HELPER_SHA256=${fileops_helper_sha}
-AUTARK_OS_CORE_UPDATE_HELPER=${INSTALLED_CORE_UPDATE_HELPER}
-AUTARK_OS_CORE_UPDATE_HELPER_SHA256=${core_update_helper_sha}
-AUTARK_OS_CORE_UPDATE_SIGNING_KEY=${CONFIG_DIR}/core-update-release.pub
-AUTARK_OS_CORE_UPDATE_VERIFIER=${COSIGN_EXECUTABLE}
 AUTARK_OS_COSIGN_EXECUTABLE=${COSIGN_EXECUTABLE}
 AUTARK_OS_VERSION=${AUTARK_OS_VERSION}
 AUTARK_OS_BUILD_SHA=$(build_sha)
@@ -1090,8 +1040,6 @@ main() {
   install_setup_script
   install_cli
   install_fileops_helper
-  install_core_update_helper
-  install_core_update_signing_key
   install_cosign
   configure_fileops_privilege
   configure_docker_access

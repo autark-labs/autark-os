@@ -71,16 +71,13 @@ test('Settings workbench uses the same guarded close flow for backdrop and close
   await expect(cleanDialog).toHaveCount(0);
 });
 
-test('Settings updates Autark-OS through the managed appliance workflow', async ({ page }) => {
+test('Settings does not expose appliance update controls', async ({ page }) => {
   await openSettings(page);
 
   const dialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
-  await expect(dialog.getByRole('heading', { name: 'Autark-OS 0.9.1 is available' })).toBeVisible();
-  await expect(dialog.getByText('Installed version: 0.9.0-fixture · Beta channel')).toBeVisible();
-  await expect(dialog.getByText(/downloads, verifies, installs, health-checks, and rolls back/i)).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'General', exact: true }).last()).toBeVisible();
+  await expect(dialog.getByText(/software updates/i)).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Update now', exact: true })).toHaveCount(0);
   await expect(dialog.locator('input[type="file"]')).toHaveCount(0);
   await expect(dialog.getByText(/INSTALL-AUTARK-OS/)).toHaveCount(0);
-
-  await dialog.getByRole('button', { name: 'Update now', exact: true }).click();
-  await expect(dialog.getByText('Autark-OS is updating.')).toBeVisible();
 });

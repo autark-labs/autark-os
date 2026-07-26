@@ -1,6 +1,5 @@
 import { httpClient } from './httpClient';
-import type { CoreUpdateStatus, OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectSettingsSaveResult, ProjectVersionInfo, RecommendedAction, SetupProgress, SetupStatus, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
-import type { AutarkOsJob } from '@/types/jobs';
+import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectSettingsSaveResult, ProjectVersionInfo, RecommendedAction, SetupProgress, SetupStatus, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
 
 export const SystemAPIClient = {
   async summary() {
@@ -85,21 +84,6 @@ export const SystemAPIClient = {
 
   async version() {
     const response = await httpClient.get<ProjectVersionInfo>('/api/system/version');
-    return response.data;
-  },
-
-  async coreUpdateStatus() {
-    const response = await httpClient.get<CoreUpdateStatus>('/api/system/core-update');
-    return response.data;
-  },
-
-  async checkForCoreUpdate() {
-    const response = await httpClient.post<CoreUpdateStatus>('/api/system/core-update/check');
-    return response.data;
-  },
-
-  async applyCoreUpdate(request: { version: string }) {
-    const response = await httpClient.post<AutarkOsJob>('/api/system/core-update/apply', request);
     return response.data;
   },
 

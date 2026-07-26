@@ -1,8 +1,5 @@
-import { AlertTriangle, CheckCircle2, Copy, HelpCircle, LoaderCircle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, HelpCircle } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import { apiErrorMessage } from '@/api/httpClient';
-import { SystemAPIClient } from '@/api/SystemAPIClient';
-import { JobProgress } from '@/components/autark-os/JobProgress';
 import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,14 +19,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
+import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
 import type { BackupDestination, BackupSettingsSummary } from '@/types/backup';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
-import type { CoreUpdateStatus } from '@/types/system';
-import { terminalJob, useAutarkOsJobQuery } from '@/repositories/jobRepository';
 import type { SettingsSection } from './SettingsPage.sections';
 
 type SettingHelp = {
@@ -115,8 +110,6 @@ export function SettingsPanelBySection({ advancedChecks, apps, backupDestination
       return <NetworkPanel setup={setup} />;
     case 'remote-access':
       return <RemoteAccessPanel apps={apps} setup={setup} />;
-    case 'updates':
-      return <CoreUpdatePanel />;
     case 'security':
       return <SecurityPanel setup={setup} />;
     case 'advanced':
@@ -124,102 +117,6 @@ export function SettingsPanelBySection({ advancedChecks, apps, backupDestination
     default:
       return null;
   }
-}
-
-function CoreUpdatePanel() {
-  const [status, setStatus] = useState<CoreUpdateStatus | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const job = useAutarkOsJobQuery(status?.jobId ?? null);
-  const applying = status?.status === 'applying' || Boolean(job.data && !terminalJob(job.data));
-  const available = status?.availableRelease ?? null;
-
-  async function refresh(checkForUpdate = false) {
-    setBusy(true);
-    try {
-      setStatus(checkForUpdate
-        ? await SystemAPIClient.checkForCoreUpdate()
-        : await SystemAPIClient.coreUpdateStatus());
-      setError(null);
-    } catch (refreshError) {
-      setError(apiErrorMessage(refreshError, 'Autark-OS could not check for updates.'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    void refresh(true);
-  }, []);
-
-  useEffect(() => {
-    if (!applying) return undefined;
-    const timer = window.setInterval(() => void refresh(false), 2_000);
-    return () => window.clearInterval(timer);
-  }, [applying]);
-
-  async function update() {
-    if (!available) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const updateJob = await SystemAPIClient.applyCoreUpdate({
-        version: available.version,
-      });
-      setStatus((current) => current ? {
-        ...current,
-        status: 'applying',
-        jobId: updateJob.jobId,
-        message: `Autark-OS is installing ${available.version}.`,
-      } : current);
-    } catch (updateError) {
-      setError(apiErrorMessage(updateError, 'Autark-OS could not start the update.'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function repair() {
-    setBusy(true);
-    setError(null);
-    try {
-      await SystemAPIClient.repairSupported();
-      await refresh(true);
-    } catch (repairError) {
-      setError(apiErrorMessage(repairError, 'The supported service repair could not be started.'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <SettingsGroup description="Autark-OS downloads, verifies, installs, health-checks, and rolls back software updates for you." title="Software updates">
-      <div className="grid gap-4">
-        <div className="rounded-xl border border-cyan-300/20 bg-slate-950/30 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-white">
-                {available ? `Autark-OS ${available.version} is available` : 'Autark-OS updates'}
-              </h3>
-              <p className="mt-1 text-sm leading-6 text-slate-400">
-                {busy && !applying ? 'Checking the published release channel.' : status?.message || 'Checking for updates.'}
-              </p>
-              {status?.installedVersion && <p className="mt-2 text-xs text-slate-500">Installed version: {status.installedVersion} · {status.channel === 'beta' ? 'Beta' : 'Stable'} channel</p>}
-            </div>
-            {available
-              ? <ProjectPrimaryButton disabled={busy || applying} onClick={() => void update()} type="button">{busy || applying ? <LoaderCircle className="size-4 animate-spin" /> : null}Update now</ProjectPrimaryButton>
-              : <ProjectDarkControlButton disabled={busy || applying} onClick={() => void refresh(true)} size="sm" type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}Check again</ProjectDarkControlButton>}
-          </div>
-          {available && <div className="mt-4 grid gap-2 text-sm leading-6 text-slate-300"><p>Your apps, settings, backups, and private-network identity will be preserved. If the new version does not start correctly, Autark-OS restores the previous version automatically.</p><a className="w-fit font-medium text-cyan-300 hover:text-cyan-200" href={available.releaseNotesUrl} rel="noreferrer" target="_blank">Read release notes</a></div>}
-          {status?.repairAvailable && <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300/30 bg-amber-400/10 p-3 text-sm text-amber-100"><span>Autark-OS needs to repair its update service before continuing.</span><ProjectWarningButton disabled={busy} onClick={() => void repair()} size="sm" type="button">Repair updates</ProjectWarningButton></div>}
-        </div>
-
-        {applying && <div className="rounded-xl border border-cyan-300/25 bg-cyan-400/10 p-4 text-sm leading-6 text-cyan-50" role="status">Autark-OS is updating. This page may reconnect while the new version starts and passes its health check.</div>}
-        {job.data && <JobProgress job={job.data} subjectLabel="Autark-OS core update" />}
-        {error && <p className="rounded-lg border border-red-400/35 bg-red-500/10 p-3 text-sm text-red-100" role="alert">{error}</p>}
-      </div>
-    </SettingsGroup>
-  );
 }
 
 function GeneralPanel({ draft, onUpdate }: PanelProps) {

@@ -43,9 +43,10 @@ assert_installer_contains 'Retain only those four capabilities'
 assert_installer_contains 'ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}'
 assert_installer_contains 'Installed service permissions or hardening directives have drifted'
 assert_installer_contains 'AUTARK_OS_FILEOPS_HELPER_SHA256'
-assert_installer_contains 'AUTARK_OS_CORE_UPDATE_HELPER_SHA256'
-assert_installer_contains 'autark-os-update-helper'
-assert_installer_contains 'install_core_update_signing_key'
-assert_installer_contains 'core-update-release.pub'
 assert_installer_contains 'checksum differs'
 assert_installer_contains 'systemd 247 or newer'
+
+if grep -Eq 'AUTARK_OS_CORE_UPDATE|autark-os-update-helper|core-update-release.pub|install_core_update_signing_key' "${installer}"; then
+  printf 'Removed appliance core-updater machinery is still present in the service installer.\n' >&2
+  exit 1
+fi

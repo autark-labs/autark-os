@@ -61,7 +61,6 @@ The bundle layout is:
   autark-os-release.env
   SHA256SUMS
   SHA256SUMS.sigstore.json (signed release bundles only)
-  keys/core-update-release.pub (signed release bundles only)
   backend/autark-os-backend.jar
   tools/cosign
   tools/cosign-LICENSE
@@ -72,7 +71,6 @@ The bundle layout is:
   scripts/autark-os-gui-installer.sh
   scripts/autark-os
   scripts/autark-os-fileops
-  scripts/autark-os-update-helper
   docs/GETTING_STARTED.md
   docs/RELEASE_NOTES.md
   docs/LICENSE.md
@@ -536,7 +534,6 @@ write_release_json() {
     "scripts/autark-os-gui-installer.sh",
     "scripts/autark-os",
     "scripts/autark-os-fileops",
-    "scripts/autark-os-update-helper",
     "docs/GETTING_STARTED.md",
     "docs/RELEASE_NOTES.md",
     "docs/LICENSE.md",
@@ -583,11 +580,7 @@ json_string_or_null() {
   fi
 }
 
-signature_artifact_json() {
-  if [[ "${RELEASE_SIGNATURE_MODE}" == "signed" ]]; then
-    printf ',\n    "keys/core-update-release.pub"'
-  fi
-}
+signature_artifact_json() { :; }
 
 release_commit_summaries() {
   local summaries
@@ -704,8 +697,7 @@ copy_release_docs() {
 
 prepare_release_signing_key() {
   [[ "${RELEASE_SIGNATURE_MODE}" == "signed" ]] || return 0
-  run_cmd mkdir -p "${OUTPUT_DIR}/keys"
-  run_cmd install -m 0644 "${RELEASE_SIGNING_PUBLIC_KEY}" "${OUTPUT_DIR}/keys/core-update-release.pub"
+  :
 }
 
 sign_checksum_manifest() {
@@ -742,8 +734,7 @@ normalize_release_permissions() {
     "${OUTPUT_DIR}/scripts/install-autark-os.sh" \
     "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh" \
     "${OUTPUT_DIR}/scripts/autark-os" \
-    "${OUTPUT_DIR}/scripts/autark-os-fileops" \
-    "${OUTPUT_DIR}/scripts/autark-os-update-helper"
+    "${OUTPUT_DIR}/scripts/autark-os-fileops"
 }
 
 create_bundle() {
@@ -768,14 +759,12 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/autark-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os" "${OUTPUT_DIR}/scripts/autark-os"
   run_cmd cp "${SCRIPT_DIR}/autark-os-fileops" "${OUTPUT_DIR}/scripts/autark-os-fileops"
-  run_cmd cp "${SCRIPT_DIR}/autark-os-update-helper" "${OUTPUT_DIR}/scripts/autark-os-update-helper"
   copy_release_docs "${jar}"
   prepare_release_signing_key
   write_metadata
   normalize_release_permissions
 
   local checksum_roots=(backend runtime tools scripts docs)
-  [[ ! -d "${OUTPUT_DIR}/keys" ]] || checksum_roots+=(keys)
 
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     printf '+ cd %q && find' "${OUTPUT_DIR}"

@@ -45,7 +45,7 @@ grep -q '^AUTARK_OS_BUILD_DATE=2026-01-01T00:00:00Z$' "${bundle_dir}/autark-os-r
 tar -tzf "${tarball}" >/tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/scripts/autark-os$' /tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/scripts/autark-os-fileops$' /tmp/autark-os-tarball-contents.txt
-grep -q '^autark-os-3.4.5-amd64/scripts/autark-os-update-helper$' /tmp/autark-os-tarball-contents.txt
+! grep -q '^autark-os-3.4.5-amd64/scripts/autark-os-update-helper$' /tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/backend/autark-os-backend.jar$' /tmp/autark-os-tarball-contents.txt
 grep -q '^autark-os-3.4.5-amd64/tools/cosign$' /tmp/autark-os-tarball-contents.txt
 
@@ -60,7 +60,7 @@ dpkg-deb -c "${deb}" >/tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/backend/autark-os-backend.jar' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/scripts/autark-os' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/scripts/autark-os-fileops' /tmp/autark-os-deb-contents.txt
-grep -q './usr/lib/autark-os/release/scripts/autark-os-update-helper' /tmp/autark-os-deb-contents.txt
+! grep -q './usr/lib/autark-os/release/scripts/autark-os-update-helper' /tmp/autark-os-deb-contents.txt
 grep -q './usr/lib/autark-os/release/tools/cosign' /tmp/autark-os-deb-contents.txt
 grep -q './usr/share/doc/autark-os/GETTING_STARTED.md' /tmp/autark-os-deb-contents.txt
 grep -q './usr/share/doc/autark-os/RELEASE_NOTES.md' /tmp/autark-os-deb-contents.txt

@@ -537,14 +537,6 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
   if (pathname === '/api/system/setup-status') return setupStatus;
   if (pathname === '/api/system/metrics') return metrics;
   if (pathname === '/api/system/storage') return storageReport;
-  if (pathname.startsWith('/api/system/core-update')) {
-    if (method === 'POST') {
-      return pathname.endsWith('/apply')
-        ? { jobId: 'core-update-fixture', type: 'core_update', subjectId: 'autark-os', status: 'running', currentStep: 'download', steps: [], createdAt: fixedAt, updatedAt: fixedAt, completedAt: null, message: 'Fixture update started.' }
-        : { schemaVersion: '1', status: 'update_available', helperAvailable: true, repairAvailable: false, message: 'Autark-OS 0.9.1 is ready to install.', installedVersion: '0.9.0-fixture', channel: 'beta', availableRelease: { version: '0.9.1', channel: 'beta', releaseNotesUrl: 'https://github.com/autark-labs/autark-os/releases/tag/v0.9.1' }, candidate: null, jobId: null, updatedAt: fixedAt };
-    }
-    return { schemaVersion: '1', status: 'ready', helperAvailable: true, repairAvailable: false, message: 'No core update is in progress.', installedVersion: '0.9.0-fixture', channel: 'beta', availableRelease: null, candidate: null, jobId: null, updatedAt: fixedAt };
-  }
   if (pathname === '/api/system/settings') return method === 'PUT' ? { settings, appDefaults: { ok: true, severity: 'success', title: 'Settings saved', message: 'Fixture settings saved.', updatedApps: 1, completedAt: fixedAt } } : settings;
   if (pathname === '/api/system/version') return version;
   if (pathname === '/api/system/support/summary') return supportSummary;
