@@ -140,3 +140,6 @@ runtime:
   backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false
+  provisionedFiles:
+    - source: prometheus.yml
+      target: config/prometheus.yml

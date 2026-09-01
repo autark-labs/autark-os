@@ -160,6 +160,8 @@ public class MarketplaceInstallService {
             recordStep(steps, sink, InstallModels.InstallStep.completed("Creating safe storage", appRoot.toString()));
 
             packageCopier.copyManifest(manifest, appRoot);
+            packageCopier.copyProvisionedFiles(manifest, appRoot);
+            recordStep(steps, sink, InstallModels.InstallStep.completed("Preparing app configuration", "Prepared the catalog configuration required to start " + manifest.name() + "."));
             Path composeFile = composeRenderer.render(manifest, appRoot, runtimeConfiguration, appInstanceId, composeProject);
             RuntimeModels.AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
             recordStep(steps, sink, InstallModels.InstallStep.completed("Configuring private access", "Rendered Compose file with Autark-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));

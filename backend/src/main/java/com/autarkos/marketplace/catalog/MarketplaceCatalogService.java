@@ -66,6 +66,12 @@ public class MarketplaceCatalogService {
             if (!new ClassPathResource("catalog/apps/" + manifest.id() + "/compose.yaml").exists()) {
                 errors.add(manifest.id() + " is missing catalog compose.yaml");
             }
+            manifest.runtime().provisionedFiles().forEach(file -> {
+                ClassPathResource resource = new ClassPathResource("catalog/apps/" + manifest.id() + "/" + file.source());
+                if (!resource.exists()) {
+                    errors.add(manifest.id() + " is missing provisioned catalog file " + file.source());
+                }
+            });
         }
         if (!errors.isEmpty()) {
             throw new ManifestValidationException("catalog", errors);

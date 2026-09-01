@@ -15,6 +15,7 @@ import com.autarkos.marketplace.model.ConfigurationItem;
 import com.autarkos.marketplace.model.CatalogSmokeTest;
 import com.autarkos.marketplace.model.HealthManifest;
 import com.autarkos.marketplace.model.RuntimeManifest;
+import com.autarkos.marketplace.model.RuntimeProvisionedFile;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
 import com.autarkos.marketplace.model.SetupField;
 import com.autarkos.marketplace.model.SetupGeneratedValue;
@@ -98,7 +99,14 @@ public class ManifestYamlReader {
                 text(runtime, "backupStrategy"),
                 integer(runtime, "backupContractVersion", 0),
                 bool(runtime, "privileged"),
+                runtimeProvisionedFiles(runtime),
                 runtimeServices(runtime, access, usage));
+    }
+
+    private List<RuntimeProvisionedFile> runtimeProvisionedFiles(Map<String, Object> runtime) {
+        return listOfMaps(runtime, "provisionedFiles").stream()
+                .map(file -> new RuntimeProvisionedFile(text(file, "source"), text(file, "target")))
+                .toList();
     }
 
     private int integer(Map<String, Object> values, String key, int fallback) {

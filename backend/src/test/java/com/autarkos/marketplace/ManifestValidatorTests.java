@@ -13,6 +13,7 @@ import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.CatalogSmokeTest;
 import com.autarkos.marketplace.model.HealthManifest;
 import com.autarkos.marketplace.model.RuntimeManifest;
+import com.autarkos.marketplace.model.RuntimeProvisionedFile;
 import com.autarkos.marketplace.model.SetupManifest;
 import com.autarkos.marketplace.model.UsageManifest;
 
@@ -95,6 +96,31 @@ class ManifestValidatorTests {
         assertThatThrownBy(() -> validator.validate(manifest))
                 .isInstanceOf(ManifestValidationException.class)
                 .hasMessageContaining("currently available behavior");
+    }
+
+    @Test
+    void rejectsUnsafeOrDuplicateProvisionedConfigurationTargets() {
+        ApplicationManifest baseManifest = manifest("unsafe-files", "8090:80");
+        RuntimeManifest runtime = baseManifest.runtime();
+        ApplicationManifest invalidManifest = new ApplicationManifest(
+                baseManifest.id(), baseManifest.name(), baseManifest.category(), baseManifest.description(), baseManifest.shortValue(), baseManifest.badge(),
+                baseManifest.downloads(), baseManifest.rating(), baseManifest.image(), baseManifest.version(), baseManifest.lastUpdated(), baseManifest.size(),
+                baseManifest.maintainer(), baseManifest.source(), baseManifest.sourceUrl(), baseManifest.documentationUrl(), baseManifest.installTime(), baseManifest.difficulty(),
+                baseManifest.supportLevel(), baseManifest.supportSummary(), baseManifest.accessUrl(), baseManifest.tags(), baseManifest.bestFor(), baseManifest.highlights(),
+                baseManifest.plainLanguage(), baseManifest.technicalSummary(), baseManifest.requirements(), baseManifest.includes(), baseManifest.configuration(), baseManifest.access(),
+                baseManifest.usage(), baseManifest.setup(), baseManifest.health(), baseManifest.smokeTests(), new RuntimeManifest(
+                        runtime.containerName(), runtime.composeProject(), runtime.image(), runtime.network(), runtime.runtimeRoot(), runtime.ports(),
+                        runtime.volumes(), runtime.environment(), runtime.labels(), runtime.backupPaths(), runtime.backupStrategy(), runtime.backupContractVersion(),
+                        runtime.privileged(), List.of(
+                                new RuntimeProvisionedFile("defaults.yml", "config/prometheus.yml"),
+                                new RuntimeProvisionedFile("other.yml", "config/prometheus.yml"),
+                                new RuntimeProvisionedFile("../../secret", "data/secret")), runtime.services()));
+
+        assertThatThrownBy(() -> validator.validate(invalidManifest))
+                .isInstanceOf(ManifestValidationException.class)
+                .hasMessageContaining("duplicate target")
+                .hasMessageContaining("safe relative catalog path")
+                .hasMessageContaining("safe path under config/");
     }
 
     private ApplicationManifest manifest(String id, String port) {

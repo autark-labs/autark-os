@@ -42,6 +42,30 @@ class CatalogSourceLayoutValidatorTests {
     }
 
     @Test
+    void rejectsManifestThatReferencesAMissingProvisionedCatalogFile() throws Exception {
+        Path app = Files.createDirectories(temporaryDirectory.resolve("configured-app"));
+        Files.writeString(app.resolve("manifest.yaml"), """
+                id: configured-app
+                metadata: {}
+                testing: {}
+                user: {}
+                technical: {}
+                access: {}
+                usage: {}
+                health: {}
+                runtime:
+                  provisionedFiles:
+                    - source: defaults/app.yml
+                      target: config/app.yml
+                """);
+        Files.writeString(app.resolve("compose.yaml"), "services: {}\n");
+
+        assertThatThrownBy(() -> validator.validate(temporaryDirectory))
+                .isInstanceOf(ManifestValidationException.class)
+                .hasMessageContaining("configured-app is missing provisioned catalog file defaults/app.yml");
+    }
+
+    @Test
     void validatesEveryIncludedSourceCatalogDirectory() {
         assertThatCode(() -> validator.validate(Path.of("src/main/resources/catalog/apps")))
                 .doesNotThrowAnyException();

@@ -89,6 +89,39 @@ class MarketplaceInstallServiceTests {
     }
 
     @Test
+    void provisionsRequiredCatalogConfigurationBeforeStartingPrometheus() throws Exception {
+        AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
+        properties.setRuntimeRoot(runtimeRoot.toString());
+        RuntimeLayout runtimeLayout = new RuntimeLayout(properties);
+        ApplicationManifest manifest = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator())
+                .findById("prometheus")
+                .orElseThrow();
+        InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
+        MarketplaceInstallService installService = new MarketplaceInstallService(
+                new InstallPlanService(runtimeLayout, customizationResolver),
+                new RuntimeDirectoryManager(runtimeLayout),
+                new CatalogPackageCopier(),
+                new ComposeRenderer(runtimeLayout),
+                new FakeDockerComposeExecutor(),
+                repository,
+                customizationResolver,
+                new FakePostInstallProvisioner(),
+                new PostInstallGuideBuilder(),
+                new FakeTailscaleService());
+
+        InstallModels.InstallResult result = installService.install(manifest);
+
+        assertThat(result.status()).isEqualTo("installed");
+        assertThat(Files.readString(runtimeRoot.resolve("apps/prometheus/config/prometheus.yml")))
+                .contains("scrape_interval: 15s")
+                .contains("localhost:9090");
+        assertThat(result.steps())
+                .extracting(InstallModels.InstallStep::label)
+                .contains("Preparing app configuration");
+    }
+
+    @Test
     void installWritesScopedDockerMetadataForOwnedApps() throws Exception {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

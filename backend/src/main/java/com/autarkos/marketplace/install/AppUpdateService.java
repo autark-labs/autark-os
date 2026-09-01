@@ -231,6 +231,7 @@ public class AppUpdateService {
             progress.accept("apply_release");
             writeCompose(context.app(), immutableTargetCompose);
             catalogPackageCopier.copyManifest(context.targetManifest(), Path.of(context.app().runtimePath()));
+            catalogPackageCopier.copyProvisionedFiles(context.targetManifest(), Path.of(context.app().runtimePath()));
             metadataWriter.write(context.targetManifest(), Path.of(context.app().runtimePath()), context.metadata().appInstanceId(), context.app().composeProject());
             RuntimeModels.DockerComposeResult up = composeExecutor.up(composeFile(context.app()), context.app().composeProject());
             if (!up.successful()) {

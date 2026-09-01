@@ -140,6 +140,7 @@ class AppUpdateServiceTests {
         verify(snapshots).create(eq(app), eq("update"), eq("1.0.0"), eq("1.1.0"), eq(42L), snapshotCompose.capture());
         assertThat(snapshotCompose.getValue()).contains("example/app@sha256:old");
         verify(catalogPackageCopier).copyManifest(target, Path.of(app.runtimePath()));
+        verify(catalogPackageCopier).copyProvisionedFiles(target, Path.of(app.runtimePath()));
         verify(metadataWriter).write(target, Path.of(app.runtimePath()), "instance-example", "autark-os-example");
         verify(snapshots).updateStatus(snapshot, "rollback_available", "Release 1.0.0 is ready for rollback.");
     }

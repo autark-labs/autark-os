@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 import com.autarkos.marketplace.model.ApplicationManifest;
+import com.autarkos.marketplace.model.RuntimeProvisionedFile;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
 
 @Component
@@ -22,6 +23,8 @@ public class ManifestValidator {
     private static final Pattern ENVIRONMENT_KEY = Pattern.compile("[A-Z_][A-Z0-9_]*");
     private static final Pattern SAFE_RUNTIME_PATH = Pattern.compile("/var/lib/autark-os/apps/[a-z0-9][a-z0-9-]*(/[A-Za-z0-9._-]+)*");
     private static final Pattern CONTAINER_PATH = Pattern.compile("/[A-Za-z0-9._/-]+");
+    private static final Pattern CATALOG_FILE_PATH = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._/-]*");
+    private static final Pattern PROVISIONED_CONFIG_PATH = Pattern.compile("config/[A-Za-z0-9][A-Za-z0-9._/-]*");
     private static final Pattern UNIMPLEMENTED_CATALOG_COPY = Pattern.compile("(?i)\\b(future|coming\\s+soon|eventually|planned)\\b");
     private static final Set<String> ACCESS_KINDS = Set.of("web", "api", "background", "multi-port");
     private static final Set<String> ACCESS_MODES = Set.of("local", "private", "local-and-private", "none");
@@ -119,6 +122,8 @@ public class ManifestValidator {
         for (String environment : declaredEnvironment(manifest)) {
             validateEnvironment(errors, environment);
         }
+
+        validateProvisionedFiles(errors, manifest.runtime().provisionedFiles());
 
         validateServices(errors, manifest);
 
@@ -435,6 +440,24 @@ public class ManifestValidator {
         }
         if (parts[1].contains("\n") || parts[1].contains("\r")) {
             errors.add("runtime.environment values must be single-line values: " + parts[0]);
+        }
+    }
+
+    private void validateProvisionedFiles(List<String> errors, List<RuntimeProvisionedFile> provisionedFiles) {
+        Set<String> targets = new HashSet<>();
+        for (RuntimeProvisionedFile file : provisionedFiles) {
+            if (file.source() == null || file.source().isBlank()) {
+                errors.add("runtime.provisionedFiles.source is required");
+            } else if (!CATALOG_FILE_PATH.matcher(file.source()).matches() || file.source().contains("..") || file.source().endsWith("/")) {
+                errors.add("runtime.provisionedFiles.source must be a safe relative catalog path: " + file.source());
+            }
+            if (file.target() == null || file.target().isBlank()) {
+                errors.add("runtime.provisionedFiles.target is required");
+            } else if (!PROVISIONED_CONFIG_PATH.matcher(file.target()).matches() || file.target().contains("..") || file.target().endsWith("/")) {
+                errors.add("runtime.provisionedFiles.target must be a safe path under config/: " + file.target());
+            } else if (!targets.add(file.target())) {
+                errors.add("runtime.provisionedFiles declares duplicate target: " + file.target());
+            }
         }
     }
 
