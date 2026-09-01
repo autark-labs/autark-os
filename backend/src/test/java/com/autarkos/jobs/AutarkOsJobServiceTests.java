@@ -42,6 +42,58 @@ class AutarkOsJobServiceTests {
     }
 
     @Test
+    void coalescesConflictingAppMutationsIntoTheActiveJob() {
+        AutarkOsJobService service = service();
+        AutarkOsJob backup = service.start(
+                AutarkOsStates.JobType.BACKUP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
+                () -> AutarkOsJobOutcome.succeeded("Backup complete."));
+
+        AutarkOsJob uninstall = service.start(
+                AutarkOsStates.JobType.UNINSTALL_APP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("stop", "Stopping Vaultwarden")),
+                () -> AutarkOsJobOutcome.succeeded("Uninstalled."));
+
+        assertThat(uninstall.jobId()).isEqualTo(backup.jobId());
+        assertThat(service.list()).hasSize(1);
+    }
+
+    @Test
+    void allowsIndependentAppMutationsButFullRestoreLocksTheAppLane() {
+        AutarkOsJobService service = service();
+        AutarkOsJob firstBackup = service.start(
+                AutarkOsStates.JobType.BACKUP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
+                () -> AutarkOsJobOutcome.succeeded("Backup complete."));
+        AutarkOsJob secondBackup = service.start(
+                AutarkOsStates.JobType.BACKUP,
+                "jellyfin",
+                List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
+                () -> AutarkOsJobOutcome.succeeded("Backup complete."));
+
+        assertThat(secondBackup.jobId()).isNotEqualTo(firstBackup.jobId());
+
+        service.runQueuedJobsNow();
+
+        AutarkOsJobService fullRestoreService = service();
+        AutarkOsJob restore = fullRestoreService.start(
+                AutarkOsStates.JobType.BACKUP_RESTORE,
+                "42:all",
+                List.of(AutarkOsJobStep.pending("restore", "Restoring app data")),
+                () -> AutarkOsJobOutcome.succeeded("Restored."));
+        AutarkOsJob install = fullRestoreService.start(
+                AutarkOsStates.JobType.INSTALL_APP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("install", "Installing Vaultwarden")),
+                () -> AutarkOsJobOutcome.succeeded("Installed."));
+
+        assertThat(install.jobId()).isEqualTo(restore.jobId());
+    }
+
+    @Test
     void concurrentDuplicateProChangesCollapseIntoOneDurableJob()
             throws Exception {
         AutarkOsJobService service = service();
@@ -295,6 +347,32 @@ class AutarkOsJobServiceTests {
         assertThat(running.status()).isEqualTo("running");
         assertThat(running.currentStep()).isEqualTo("prepare");
         assertThat(running.steps()).extracting(AutarkOsJobStep::label).containsExactly("Preparing app");
+    }
+
+    @Test
+    void terminalJobIgnoresLateProgressAndExternalReconciliation() {
+        AutarkOsJobService service = service();
+        AutarkOsJob job = service.start(
+                AutarkOsStates.JobType.BACKUP,
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
+                () -> AutarkOsJobOutcome.succeeded("Backup complete."));
+
+        service.runQueuedJobsNow();
+        AutarkOsJob completed = service.findById(job.jobId()).orElseThrow();
+
+        AutarkOsJob afterLateProgress = service.recordProgress(
+                job.jobId(),
+                List.of(AutarkOsJobStep.running("backup", "Creating restore point", "Late callback.")));
+        AutarkOsJob afterExternalResult = service.reconcileExternalOutcome(
+                job.jobId(),
+                AutarkOsStates.JobType.BACKUP,
+                AutarkOsJobOutcome.failed("Late worker failure.", List.of()))
+                .orElseThrow();
+
+        assertThat(afterLateProgress).isEqualTo(completed);
+        assertThat(afterExternalResult).isEqualTo(completed);
+        assertThat(service.findById(job.jobId()).orElseThrow()).isEqualTo(completed);
     }
 
     @Test

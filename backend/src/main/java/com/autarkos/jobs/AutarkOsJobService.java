@@ -65,7 +65,8 @@ public class AutarkOsJobService {
     public AutarkOsJob startWithJob(String type, String subjectId, List<AutarkOsJobStep> steps, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
         AutarkOsJob job;
         synchronized (jobStartTransition) {
-            Optional<AutarkOsJob> active = activeFor(type, subjectId);
+            Optional<AutarkOsJob> active = activeFor(type, subjectId)
+                    .or(() -> activeForResource(type, subjectId));
             if (active.isPresent()) {
                 return active.get();
             }
@@ -90,6 +91,10 @@ public class AutarkOsJobService {
     }
 
     public AutarkOsJob recordProgress(String jobId, List<AutarkOsJobStep> steps) {
+        AutarkOsJob existing = findById(jobId).orElseThrow();
+        if (terminalStatus(existing.status())) {
+            return existing;
+        }
         List<AutarkOsJobStep> safeSteps =
                 steps == null ? List.of() : steps;
         return update(
@@ -135,6 +140,9 @@ public class AutarkOsJobService {
         Optional<AutarkOsJob> existing = findById(jobId);
         if (existing.isEmpty() || !expectedType.equals(existing.get().type())) {
             return Optional.empty();
+        }
+        if (terminalStatus(existing.get().status())) {
+            return existing;
         }
         AutarkOsJobOutcome safe = outcome == null
                 ? AutarkOsJobOutcome.failed("The external worker did not report an outcome.", List.of())
@@ -217,6 +225,65 @@ public class AutarkOsJobService {
                 .map(this::toDomain);
     }
 
+    /**
+     * CE has one source of truth for host mutations. Different actions against the same app
+     * (for example backup and uninstall) must therefore join the active job instead of queuing
+     * a second, contradictory mutation. A full backup or restore holds the shared app lane.
+     */
+    private Optional<AutarkOsJob> activeForResource(String type, String subjectId) {
+        String requestedResource = resourceKey(type, subjectId);
+        if (requestedResource.isBlank()) {
+            return Optional.empty();
+        }
+        return repository.activeJobs().stream()
+                .map(this::toDomain)
+                .filter(job -> resourcesConflict(requestedResource, resourceKey(job.type(), job.subjectId())))
+                .findFirst();
+    }
+
+    private String resourceKey(String type, String subjectId) {
+        String subject = AutarkOsJobs.blankToNull(subjectId);
+        if (subject == null) {
+            return "";
+        }
+        if (AutarkOsStates.JobType.BACKUP_RESTORE.equals(type)) {
+            int separator = subject.indexOf(':');
+            String target = separator < 0 ? subject : subject.substring(separator + 1);
+            return "all".equals(target) ? "app:*" : "app:" + target;
+        }
+        if (AutarkOsStates.JobType.BACKUP.equals(type)
+                && ("__full__".equals(subject) || "__routine__".equals(subject))) {
+            return "app:*";
+        }
+        if (List.of(
+                AutarkOsStates.JobType.INSTALL_APP,
+                AutarkOsStates.JobType.START_APP,
+                AutarkOsStates.JobType.STOP_APP,
+                AutarkOsStates.JobType.RESTART_APP,
+                AutarkOsStates.JobType.REPAIR_APP,
+                AutarkOsStates.JobType.BACKUP,
+                AutarkOsStates.JobType.UNINSTALL_APP,
+                AutarkOsStates.JobType.UPDATE_APP,
+                AutarkOsStates.JobType.ROLLBACK_APP).contains(type)) {
+            return "app:" + subject;
+        }
+        if ("pro_module_change".equals(type)) {
+            return "pro:" + subject;
+        }
+        return "";
+    }
+
+    private boolean resourcesConflict(String requested, String active) {
+        if (requested.isBlank() || active.isBlank()) {
+            return false;
+        }
+        if (requested.equals(active)) {
+            return true;
+        }
+        return ("app:*".equals(requested) && active.startsWith("app:"))
+                || ("app:*".equals(active) && requested.startsWith("app:"));
+    }
+
     private String progressStep(
             String jobId,
             List<AutarkOsJobStep> steps) {
@@ -285,6 +352,9 @@ public class AutarkOsJobService {
 
     private AutarkOsJob update(String jobId, String status, String currentStep, List<AutarkOsJobStep> steps, String errorCode, String errorMessage, Map<String, String> errorDetails) {
         AutarkOsJobEntity entity = repository.findById(jobId).orElseThrow();
+        if (terminalStatus(entity.status())) {
+            return toDomain(entity);
+        }
         entity.update(
                 status,
                 currentStep,
