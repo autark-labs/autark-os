@@ -347,6 +347,49 @@ class ObservedServiceServiceTests {
         });
     }
 
+    @Test
+    void refusesToAdoptForeignServiceOverAnExistingManagedApp() {
+        ObservedServiceRepository observedRepository = repository();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout());
+        installedRepository.save(new com.autarkos.marketplace.install.InstalledApp(
+                "vaultwarden",
+                "Current Vaultwarden",
+                "Ready",
+                runtimeRoot.resolve("apps/current-vaultwarden").toString(),
+                "autark-os-vaultwarden",
+                "http://localhost:8090",
+                Instant.parse("2026-06-21T12:00:00Z")));
+        observedRepository.upsert(observed(
+                "docker:foreign-vaultwarden",
+                "docker",
+                "foreign-vaultwarden",
+                "Vaultwarden",
+                "vaultwarden",
+                "foreign_autark_os",
+                "observed"));
+        ObservedServiceService service = new ObservedServiceService(
+                observedRepository,
+                new ObservedServiceScanner(List::of, currentIdentity()),
+                installedRepository,
+                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                currentIdentity(),
+                null);
+
+        HostModels.ObservedServiceAdoptionPlan plan = service.adoptionPlan("docker:foreign-vaultwarden");
+        HostModels.ActionResult result = service.adopt(
+                "docker:foreign-vaultwarden",
+                new HostModels.ObservedServiceAdoptionRequest(true, true, plan.confirmationText()));
+
+        assertThat(plan.available()).isFalse();
+        assertThat(plan.summary()).contains("already manages Vaultwarden");
+        assertThat(result.ok()).isFalse();
+        assertThat(result.message()).contains("already has a managed record");
+        assertThat(installedRepository.findAppById("vaultwarden")).hasValueSatisfying(app ->
+                assertThat(app.runtimePath()).endsWith("current-vaultwarden"));
+        assertThat(observedRepository.findServiceById("docker:foreign-vaultwarden")).hasValueSatisfying(serviceView ->
+                assertThat(serviceView.ownershipState()).isEqualTo("foreign_autark_os"));
+    }
+
     private ObservedServiceService service(ObservedServiceRepository repository, List<HostModels.HostDockerContainer> containers) {
         ObservedServiceScanner scanner = new ObservedServiceScanner(() -> containers, currentIdentity());
         return new ObservedServiceService(repository, scanner);

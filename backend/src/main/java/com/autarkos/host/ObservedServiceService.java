@@ -218,6 +218,14 @@ public class ObservedServiceService {
         if (service.catalogAppId() == null || service.catalogAppId().isBlank()) {
             return unavailablePlan(id, displayName, null, "Autark-OS cannot adopt this service until it is matched to a catalog app.", "Choose the matching app first.");
         }
+        if (installedAppRepository != null && installedAppRepository.findAppById(service.catalogAppId()).isPresent()) {
+            return unavailablePlan(
+                    id,
+                    displayName,
+                    service.catalogAppId(),
+                    "Autark-OS already manages " + displayName + ".",
+                    "This installation already has a managed record for this app. Review the existing app and this found service separately instead of adopting one over the other.");
+        }
         String runtimePath = resolvedRuntimePath(service);
         boolean composeAvailable = AppRuntimeFiles.hasComposeFile(runtimePath);
         return new HostModels.ObservedServiceAdoptionPlan(
