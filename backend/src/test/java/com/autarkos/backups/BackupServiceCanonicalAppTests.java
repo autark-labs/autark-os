@@ -222,6 +222,28 @@ class BackupServiceCanonicalAppTests {
     }
 
     @Test
+    void archiveChangedAfterRestorePreflightIsBlockedBeforeLiveDataChanges() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        TamperingFileOpsService fileOpsService = new TamperingFileOpsService(runtimeLayout);
+        BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService);
+        RestorePoint point = service.run("homepage").restorePoint();
+        fileOpsService.tamperWhenSafetyCheckpointIsCreated(point.path());
+
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+                .hasMessageContaining("integrity changed")
+                .hasMessageContaining("checksum")
+                .hasMessageContaining("immutable");
+        assertThat(fileOpsService.restoreCalls).isEmpty();
+    }
+
+    @Test
     void modifiedBackupManifestFailsVerificationAndBlocksRestore() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
@@ -426,7 +448,7 @@ class BackupServiceCanonicalAppTests {
     }
 
     private static class RecordingFileOpsService extends AutarkOsFileOpsService {
-        private final List<String> restoreCalls = new java.util.ArrayList<>();
+        protected final List<String> restoreCalls = new java.util.ArrayList<>();
 
         RecordingFileOpsService(RuntimeLayout runtimeLayout) {
             super(runtimeLayout, new LocalAutarkOsFileOperations());
@@ -440,6 +462,28 @@ class BackupServiceCanonicalAppTests {
         @Override
         public void restoreAppData(Path archive, String scope, String appId, Path approvedBackupRoot) {
             restoreAppData(archive, scope, appId);
+        }
+    }
+
+    private static class TamperingFileOpsService extends RecordingFileOpsService {
+        private Path archiveToTamper;
+
+        TamperingFileOpsService(RuntimeLayout runtimeLayout) {
+            super(runtimeLayout);
+        }
+
+        void tamperWhenSafetyCheckpointIsCreated(String archive) {
+            archiveToTamper = Path.of(archive);
+        }
+
+        @Override
+        public long createSafetyArchive(String appId, Path destination, Path approvedBackupRoot) throws java.io.IOException {
+            long size = super.createSafetyArchive(appId, destination, approvedBackupRoot);
+            if (archiveToTamper != null) {
+                Files.writeString(archiveToTamper, "tampered", java.nio.file.StandardOpenOption.APPEND);
+                archiveToTamper = null;
+            }
+            return size;
         }
     }
 }

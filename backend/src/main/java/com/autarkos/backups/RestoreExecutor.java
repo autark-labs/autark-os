@@ -118,6 +118,10 @@ class RestoreExecutor {
                 }
                 logs.add("Created safety backup for " + app.appName() + ".");
             }
+            BackupVerificationService.IntegrityCheck integrity = backupVerificationService.restoreIntegrity(point);
+            if (!integrity.restorable()) {
+                throw new InstallationException("Restore point integrity changed before Autark-OS could apply it: " + integrity.message());
+            }
             backupArchiveService.restoreAppData(Path.of(point.path()), point.scope(), app.appId());
             installedAppRepository.recordEvent(app.appId(), "restore_completed", "Restored data from restore point #" + point.id() + ".");
             activityLogService.success("backup", "restore_app", "Restored " + app.appName(), "Restored data from restore point #" + point.id() + ".", app.appId());
