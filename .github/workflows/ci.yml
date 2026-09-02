@@ -1,0 +1,62 @@
+name: CE validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Backend, frontend, and release contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install Yarn 1
+        run: npm install --global yarn@1.22.22
+
+      - name: Validate backend
+        working-directory: backend
+        run: ./gradlew test --console=plain
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Validate frontend
+        working-directory: frontend
+        run: yarn typecheck && yarn lint && yarn test && yarn build
+
+      - name: Install browser test runtime
+        working-directory: frontend
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run critical browser flows
+        working-directory: frontend
+        run: yarn test:e2e
+
+      - name: Run release contracts
+        run: bash scripts/tests/release-contract-suite.sh
+
+      - name: Enforce public/private Pro boundary
+        run: bash scripts/check-pro-public-boundary.sh
