@@ -65,7 +65,7 @@ class ProAgentRuntimeTests {
                         true,
                         "healthy",
                         candidateEndpoint));
-        when(verifier.verifyActiveReady(any())).thenReturn(
+        when(verifier.verifyActiveReady(any(ProModuleCandidate.class))).thenReturn(
                 new ProModuleRuntime.HealthResult(
                         true,
                         "healthy"));
@@ -150,7 +150,7 @@ class ProAgentRuntimeTests {
                         true,
                         "healthy",
                         candidateEndpoint));
-        when(verifier.verifyActiveReady(any())).thenReturn(
+        when(verifier.verifyActiveReady(any(ProModuleCandidate.class))).thenReturn(
                 new ProModuleRuntime.HealthResult(
                         true,
                         "healthy"));

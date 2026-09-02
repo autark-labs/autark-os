@@ -208,6 +208,25 @@ public final class ProAgentHealthVerifier {
 
     public ProModuleRuntime.HealthResult verifyActiveReady(
             String activeDigest) {
+        return waitForActive(
+                () -> verifyActive(activeDigest));
+    }
+
+    /**
+     * Rechecks the complete candidate contract after routing has switched.
+     * Container health alone cannot prove that the promoted endpoint is still
+     * the reviewed API and UI surface.
+     */
+    public ProModuleRuntime.HealthResult verifyActiveReady(
+            ProModuleCandidate candidate) {
+        Objects.requireNonNull(candidate);
+        return waitForActive(
+                () -> verifyPromotedCandidate(candidate));
+    }
+
+    private ProModuleRuntime.HealthResult waitForActive(
+            java.util.function.Supplier<ProModuleRuntime.HealthResult>
+                    healthCheck) {
         int attempts = Math.max(
                 1,
                 (int) Math.ceil(
@@ -215,7 +234,7 @@ public final class ProAgentHealthVerifier {
                                 / pollInterval.toMillis()));
         ProModuleRuntime.HealthResult result = null;
         for (int attempt = 0; attempt < attempts; attempt++) {
-            result = verifyActive(activeDigest);
+            result = healthCheck.get();
             if (result != null && result.healthy()) {
                 return result;
             }
@@ -241,6 +260,70 @@ public final class ProAgentHealthVerifier {
                         false,
                         "healthcheck_unavailable")
                 : result;
+    }
+
+    private ProModuleRuntime.HealthResult verifyPromotedCandidate(
+            ProModuleCandidate candidate) {
+        String activeDigest = candidate.manifest().digest();
+        ProModuleRuntime.HealthResult container = docker.activeHealth(
+                activeDigest);
+        if (container == null || !container.healthy()) {
+            return container == null
+                    ? new ProModuleRuntime.HealthResult(
+                            false,
+                            "healthcheck_unavailable")
+                    : container;
+        }
+        try {
+            ProAgentEndpoint endpoint = docker.activeEndpoint(activeDigest);
+            AgentStatus status = client.status(endpoint);
+            if (!status.ready()
+                    || !"ready".equals(status.state())
+                    || !candidate.manifest().version().equals(
+                            status.componentVersion())
+                    || !"1".equals(status.apiVersion())
+                    || !status.supportedSnapshotSchemaVersions()
+                            .contains("1")
+                    || !status.supportedSurfaceSchemaVersions()
+                            .contains("1")) {
+                return new ProModuleRuntime.HealthResult(
+                        false,
+                        "agent_api_incompatible");
+            }
+            var manifest = client.uiManifest(endpoint);
+            if (!candidate.manifest().version().equals(
+                            manifest.componentVersion())
+                    || manifest.surfaces().isEmpty()) {
+                return new ProModuleRuntime.HealthResult(
+                        false,
+                        "agent_ui_incompatible");
+            }
+            byte[] entrypoint = client.uiAsset(
+                    endpoint, manifest.entrypoint());
+            if (!manifest.entrypointSha256().equals(
+                    sha256(entrypoint))) {
+                return new ProModuleRuntime.HealthResult(
+                        false,
+                        "agent_ui_digest_mismatch");
+            }
+            client.renderSurface(
+                    endpoint,
+                    manifest.surfaces().getFirst(),
+                    smokeSnapshots.create(
+                            coreVersion,
+                            architecture,
+                            clock.instant()),
+                    null);
+            return new ProModuleRuntime.HealthResult(true, "healthy");
+        } catch (ProAgentClientException exception) {
+            return new ProModuleRuntime.HealthResult(
+                    false,
+                    safeReason(exception.code()));
+        } catch (RuntimeException exception) {
+            return new ProModuleRuntime.HealthResult(
+                    false,
+                    "agent_health_check_failed");
+        }
     }
 
     private boolean sleep(Duration duration) {

@@ -145,6 +145,25 @@ class ProAgentHealthVerifierTests {
         assertThat(sleeps[0]).isEqualTo(1);
     }
 
+    @Test
+    void promotedCandidateMustStillMatchTheReviewedContract() {
+        ProDockerEngine docker = mock(ProDockerEngine.class);
+        when(docker.activeHealth(ProRuntimeTestFixtures.DIGEST))
+                .thenReturn(health(true, "healthy"));
+        when(docker.activeEndpoint(ProRuntimeTestFixtures.DIGEST))
+                .thenReturn(ENDPOINT);
+        ProAgentClient wrongVersion = healthyClient();
+        when(wrongVersion.status(any())).thenReturn(new AgentStatus(
+                "1", "9.9.9", "1", List.of("1"), List.of("1"),
+                "ready", true, "none", NOW));
+
+        var result = verifier(docker, wrongVersion, ignored -> { })
+                .verifyActiveReady(CANDIDATE);
+
+        assertThat(result.healthy()).isFalse();
+        assertThat(result.reasonCode()).isEqualTo("agent_api_incompatible");
+    }
+
     private static void assertFailure(
             ProAgentClient client,
             String reason) {

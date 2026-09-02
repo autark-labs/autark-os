@@ -118,8 +118,7 @@ public class ProAgentRuntime implements ProModuleRuntime {
                     "Autark Pro candidate health authority is missing.");
         }
         docker.activateCandidate(candidate);
-        HealthResult promoted = healthVerifier.verifyActiveReady(
-                candidate.manifest().digest());
+        HealthResult promoted = healthVerifier.verifyActiveReady(candidate);
         if (promoted == null || !promoted.healthy()) {
             throw new com.autarkos.pro.module.ProModuleException(
                     "promoted_agent_health_failed",
