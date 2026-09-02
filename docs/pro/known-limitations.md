@@ -15,9 +15,11 @@ release boundaries, not production guarantees.
   multi-architecture index, SBOMs, provenance, signatures, scans, and
   control-plane manifest. New releases still require the same protected proof;
   local keyed-signature harnesses are not remote release evidence.
-- The prototype has exact per-device assignments, but no percentage rollout,
-  cohort engine, pause/resume dashboard, signed withdrawal document, or fleet
-  observability. Those controls belong to PRO-502.
+- The prototype has exact per-device assignments and a protected, audited
+  operator tool for atomic pause, resume, and permanent withdrawal. It has no
+  percentage rollout, cohort engine, release dashboard, signed withdrawal
+  document, or fleet observability. Those broader controls remain outside the
+  controlled-beta MVP.
 - Release-document, entitlement, and registry-token keys do not yet have the
   signed rotation/recovery/revocation protocol planned for PRO-501.
 - Online signing material is held in Supabase managed secrets for the

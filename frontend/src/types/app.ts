@@ -290,7 +290,8 @@ export type AppUpdatePlan = {
   appId: string;
   appName: string;
   operation: 'update' | 'rollback' | string;
-  status: 'available' | 'current' | 'blocked' | 'recovery_required' | string;
+  planId: string;
+  status: 'available' | 'current' | 'blocked' | 'recovery_required' | 'review_required' | string;
   headline: string;
   summary: string;
   currentVersion: string;
@@ -301,6 +302,15 @@ export type AppUpdatePlan = {
   rollbackSnapshotId: string;
   changes: string[];
   blockedReasons: string[];
+  guardianAdvice: {
+    state: 'ready' | 'unavailable' | string;
+    outcome: 'proceed' | 'protect_first' | 'defer' | 'blocked' | 'unavailable' | string;
+    headline: string;
+    summary: string;
+    reasons: string[];
+    analyzedAt: string | null;
+    expiresAt: string | null;
+  };
   checkedAt: string;
 };
 

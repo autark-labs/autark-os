@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.autark-os.org/pro/v1/change-safety-response.schema.json",
+  "title": "Guardian change-safety response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "planId",
+    "analyzedSnapshotId",
+    "targetResourceRef",
+    "outcome",
+    "headline",
+    "summary",
+    "reasons",
+    "analyzedAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common-v1.schema.json#/$defs/schemaVersion" },
+    "planId": { "$ref": "common-v1.schema.json#/$defs/digest" },
+    "analyzedSnapshotId": { "$ref": "common-v1.schema.json#/$defs/uuid" },
+    "targetResourceRef": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}:[A-Za-z0-9._-]{1,128}$"
+    },
+    "outcome": { "enum": ["proceed", "protect_first", "defer", "blocked"] },
+    "headline": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "reasons": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    },
+    "analyzedAt": { "$ref": "common-v1.schema.json#/$defs/dateTime" },
+    "expiresAt": { "$ref": "common-v1.schema.json#/$defs/dateTime" }
+  }
+}

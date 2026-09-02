@@ -2,15 +2,20 @@ package com.autarkos.marketplace.install;
 
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,6 +36,7 @@ import com.autarkos.marketplace.install.models.UpdateModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.RuntimeManifest;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
+import com.autarkos.pro.change.ProChangeSafetyService;
 
 /**
  * Applies the deliberately narrow, reversible first generation of managed
@@ -55,6 +61,7 @@ public class AppUpdateService {
     private final AppLifecycleService lifecycleService;
     private final AppUpdateSnapshotStore snapshots;
     private final ActivityLogService activityLog;
+    private final ProChangeSafetyService changeSafety;
 
     /** Keeps old direct callers explicitly unsupported outside Spring. */
     public AppUpdateService() {
@@ -69,6 +76,7 @@ public class AppUpdateService {
         this.lifecycleService = null;
         this.snapshots = null;
         this.activityLog = null;
+        this.changeSafety = null;
     }
 
     @Autowired
@@ -83,7 +91,8 @@ public class AppUpdateService {
             BackupService backupService,
             AppLifecycleService lifecycleService,
             AppUpdateSnapshotStore snapshots,
-            ActivityLogService activityLog) {
+            ActivityLogService activityLog,
+            ProChangeSafetyService changeSafety) {
         this.installedApps = installedApps;
         this.catalog = catalog;
         this.manifestReader = manifestReader;
@@ -95,6 +104,7 @@ public class AppUpdateService {
         this.lifecycleService = lifecycleService;
         this.snapshots = snapshots;
         this.activityLog = activityLog;
+        this.changeSafety = changeSafety;
     }
 
     public UpdateModels.AppUpdateCapability capability() {
@@ -106,51 +116,58 @@ public class AppUpdateService {
             return unavailablePlan(appId, "update");
         }
         try {
-            UpdateContext context = updateContext(appId);
-            Optional<AppUpdateSnapshot> activeSnapshot = snapshots.activeFor(appId);
-            if (activeSnapshot.isPresent()) {
-                AppUpdateSnapshot snapshot = activeSnapshot.get();
-                return blocked(context.app(), "update", "Update needs recovery", "Autark-OS found an interrupted release change.",
-                        List.of("Restore the saved " + snapshot.fromVersion() + " release before starting another update."));
-            }
-            if (context.versionComparison() == 0) {
-                return new UpdateModels.AppUpdatePlan(
-                        context.app().appId(), context.app().appName(), "update", "current", "App is up to date",
-                        context.app().appName() + " is already on catalog release " + context.currentVersion() + ".",
-                        context.currentVersion(), context.targetVersion(), false, true,
-                        snapshots.latestRollbackFor(appId).isPresent(), snapshots.latestRollbackFor(appId).map(AppUpdateSnapshot::snapshotId).orElse(""),
-                        List.of(), List.of(), Instant.now());
-            }
-            if (context.versionComparison() < 0) {
-                return blocked(context.app(), "update", "Catalog release is older", "Autark-OS will not turn an update into a downgrade.",
-                        List.of("The installed release is newer than the current catalog release."));
-            }
-            if (!healthyForUpdate(context.app())) {
-                return blocked(context.app(), "update", "App needs attention first", "Autark-OS will not change a release while the current app is unhealthy.",
-                        List.of("Repair or start the app and confirm it is healthy before updating."));
-            }
-            List<String> compatibilityReasons = compatibilityReasons(context);
-            if (!immutableImagesAvailable(context.currentImages())) {
-                compatibilityReasons.add("Autark-OS could not resolve immutable image digests for the currently running release.");
-            }
-            if (!compatibilityReasons.isEmpty()) {
-                return blocked(context.app(), "update", "Update needs review", "This release changes more than container images.", compatibilityReasons);
-            }
-            if (!backupReady(context.app())) {
-                return blocked(context.app(), "update", "Backup required", "Autark-OS needs a verified safety checkpoint before changing this app.",
-                        List.of("Turn on backups and configure a ready backup destination before updating."));
-            }
-            Optional<AppUpdateSnapshot> rollback = snapshots.latestRollbackFor(appId);
-            return new UpdateModels.AppUpdatePlan(
-                    context.app().appId(), context.app().appName(), "update", "available", "Update ready to review",
-                    "Autark-OS will create a verified backup, pin the target images by digest, and retain " + context.currentVersion() + " for rollback.",
-                    context.currentVersion(), context.targetVersion(), true, true,
-                    rollback.isPresent(), rollback.map(AppUpdateSnapshot::snapshotId).orElse(""),
-                    List.of("Create verified safety checkpoint", "Pull release " + context.targetVersion() + " by immutable image digest", "Verify app health before completing"),
-                    List.of(), Instant.now());
+            return updatePlan(updateContext(appId));
         } catch (InstallationException exception) {
             return UpdateModels.AppUpdatePlan.blocked(appId, "App", "update", "Update unavailable", exception.getMessage(), List.of(exception.getMessage()));
         }
+    }
+
+    private UpdateModels.AppUpdatePlan updatePlan(UpdateContext context) {
+        Optional<AppUpdateSnapshot> activeSnapshot = snapshots.activeFor(context.app().appId());
+        if (activeSnapshot.isPresent()) {
+            AppUpdateSnapshot snapshot = activeSnapshot.get();
+            return blocked(context.app(), "update", "Update needs recovery", "Autark-OS found an interrupted release change.",
+                    List.of("Restore the saved " + snapshot.fromVersion() + " release before starting another update."));
+        }
+        Optional<AppUpdateSnapshot> rollback = snapshots.latestRollbackFor(context.app().appId());
+        if (context.versionComparison() == 0) {
+            return new UpdateModels.AppUpdatePlan(
+                    context.app().appId(), context.app().appName(), "update", "", "current", "App is up to date",
+                    context.app().appName() + " is already on catalog release " + context.currentVersion() + ".",
+                    context.currentVersion(), context.targetVersion(), false, true,
+                    rollback.isPresent(), rollback.map(AppUpdateSnapshot::snapshotId).orElse(""),
+                    List.of(), List.of(), UpdateModels.ChangeSafetyAdvice.unavailable(), Instant.now());
+        }
+        if (context.versionComparison() < 0) {
+            return blocked(context.app(), "update", "Catalog release is older", "Autark-OS will not turn an update into a downgrade.",
+                    List.of("The installed release is newer than the current catalog release."));
+        }
+        if (!healthyForUpdate(context.app())) {
+            return blocked(context.app(), "update", "App needs attention first", "Autark-OS will not change a release while the current app is unhealthy.",
+                    List.of("Repair or start the app and confirm it is healthy before updating."));
+        }
+        List<String> compatibilityReasons = compatibilityReasons(context);
+        Map<String, String> currentImageDigests = composeExecutor.imageDigests(context.currentImages());
+        if (!immutableImagesAvailable(context.currentImages(), currentImageDigests)) {
+            compatibilityReasons.add("Autark-OS could not resolve immutable image digests for the currently running release.");
+        }
+        if (!compatibilityReasons.isEmpty()) {
+            return blocked(context.app(), "update", "Update needs review", "This release changes more than container images.", compatibilityReasons);
+        }
+        if (!backupReady(context.app())) {
+            return blocked(context.app(), "update", "Backup required", "Autark-OS needs a verified safety checkpoint before changing this app.",
+                    List.of("Turn on backups and configure a ready backup destination before updating."));
+        }
+        UpdateModels.AppUpdatePlan corePlan = identified(new UpdateModels.AppUpdatePlan(
+                context.app().appId(), context.app().appName(), "update", "", "available", "Update ready to review",
+                "Autark-OS will create a verified backup, pin the target images by digest, and retain " + context.currentVersion() + " for rollback.",
+                context.currentVersion(), context.targetVersion(), true, true,
+                rollback.isPresent(), rollback.map(AppUpdateSnapshot::snapshotId).orElse(""),
+                List.of("Create verified safety checkpoint", "Pull release " + context.targetVersion() + " by immutable image digest", "Verify app health before completing"),
+                List.of(), UpdateModels.ChangeSafetyAdvice.unavailable(), Instant.now()), updateIdentity(context, currentImageDigests));
+        return corePlan.withGuardianAdvice(changeSafety == null
+                ? UpdateModels.ChangeSafetyAdvice.unavailable()
+                : changeSafety.assess(corePlan));
     }
 
     public UpdateModels.AppUpdatePlan rollbackPlan(String appId) {
@@ -163,9 +180,10 @@ public class AppUpdateService {
             Optional<AppUpdateSnapshot> interrupted = snapshots.activeFor(appId);
             if (interrupted.isPresent()) {
                 AppUpdateSnapshot snapshot = interrupted.get();
-                return new UpdateModels.AppUpdatePlan(app.appId(), app.appName(), "rollback", "recovery_required", "Release recovery is ready",
+                return identified(new UpdateModels.AppUpdatePlan(app.appId(), app.appName(), "rollback", "", "recovery_required", "Release recovery is ready",
                         "Autark-OS saved the previous release before an interrupted update.", "", snapshot.fromVersion(), true, true, true,
-                        snapshot.snapshotId(), List.of("Create a fresh safety checkpoint", "Restore " + snapshot.fromVersion() + ""), List.of(), Instant.now());
+                        snapshot.snapshotId(), List.of("Create a fresh safety checkpoint", "Restore " + snapshot.fromVersion() + ""), List.of(), UpdateModels.ChangeSafetyAdvice.unavailable(), Instant.now()),
+                        rollbackIdentity(app, snapshot));
             }
             return blocked(app, "rollback", "No rollback point", "Autark-OS has no verified previous release for this app.",
                     List.of("Complete one managed update before rolling back."));
@@ -175,18 +193,20 @@ public class AppUpdateService {
             return blocked(app, "rollback", "Backup required", "Autark-OS needs a fresh safety checkpoint before restoring a previous release.",
                     List.of("Turn on backups and configure a ready backup destination before rolling back."));
         }
-        return new UpdateModels.AppUpdatePlan(app.appId(), app.appName(), "rollback", "available", "Rollback ready to review",
+        return identified(new UpdateModels.AppUpdatePlan(app.appId(), app.appName(), "rollback", "", "available", "Rollback ready to review",
                 "Autark-OS will create a fresh safety checkpoint, then restore " + snapshot.fromVersion() + " from its retained release snapshot.",
                 snapshot.toVersion(), snapshot.fromVersion(), true, true, true, snapshot.snapshotId(),
-                List.of("Create verified safety checkpoint", "Restore prior Compose, manifest, and metadata", "Verify app health"), List.of(), Instant.now());
+                List.of("Create verified safety checkpoint", "Restore prior Compose, manifest, and metadata", "Verify app health"), List.of(), UpdateModels.ChangeSafetyAdvice.unavailable(), Instant.now()),
+                rollbackIdentity(app, snapshot));
     }
 
-    public void update(String appId, Consumer<String> progress) {
-        UpdateModels.AppUpdatePlan plan = updatePlan(appId);
+    public void update(String appId, String reviewedPlanId, Consumer<String> progress) {
+        UpdateContext context = updateContext(appId);
+        UpdateModels.AppUpdatePlan plan = updatePlan(context);
         if (!plan.canApply()) {
             throw new InstallationException(firstReason(plan, "Autark-OS cannot safely update this app."));
         }
-        UpdateContext context = updateContext(appId);
+        assertReviewedPlan(plan, reviewedPlanId);
         backupService.runWithUpdateSafetyCheckpoint(appId, RecoveryOperationCoordinator.Operation.APP_UPDATE, backup -> {
             assertVerifiedSafetyCheckpoint(backup, context.app());
             applyUpdate(context, backup.restorePoint().id(), progress == null ? ignored -> { } : progress);
@@ -194,14 +214,18 @@ public class AppUpdateService {
         });
     }
 
-    public void rollback(String appId, Consumer<String> progress) {
+    public void rollback(String appId, String reviewedPlanId, Consumer<String> progress) {
         UpdateModels.AppUpdatePlan plan = rollbackPlan(appId);
         if (!plan.canApply()) {
             throw new InstallationException(firstReason(plan, "Autark-OS cannot safely roll this app back."));
         }
+        assertReviewedPlan(plan, reviewedPlanId);
         AppUpdateSnapshot previous = snapshots.activeFor(appId)
                 .or(() -> snapshots.latestRollbackFor(appId))
                 .orElseThrow(() -> new InstallationException("No saved release is available for rollback."));
+        if (!Objects.equals(plan.rollbackSnapshotId(), previous.snapshotId())) {
+            throw changedPlan();
+        }
         InstalledApp app = installedApp(appId);
         backupService.runWithUpdateSafetyCheckpoint(appId, RecoveryOperationCoordinator.Operation.APP_ROLLBACK, backup -> {
             assertVerifiedSafetyCheckpoint(backup, app);
@@ -367,6 +391,7 @@ public class AppUpdateService {
                 && Objects.equals(current.backupStrategy(), target.backupStrategy())
                 && current.backupContractVersion() == target.backupContractVersion()
                 && current.privileged() == target.privileged()
+                && Objects.equals(current.provisionedFiles(), target.provisionedFiles())
                 && sameServices(current.services(), target.services());
     }
 
@@ -386,6 +411,7 @@ public class AppUpdateService {
                     || !Objects.equals(before.environment(), after.environment())
                     || !Objects.equals(before.dependsOn(), after.dependsOn())
                     || !labelsWithoutVersion(before.labels()).equals(labelsWithoutVersion(after.labels()))
+                    || !Objects.equals(before.health(), after.health())
                     || before.privileged() != after.privileged()) {
                 return false;
             }
@@ -426,8 +452,7 @@ public class AppUpdateService {
         return replaceImages(compose, immutableImages);
     }
 
-    private boolean immutableImagesAvailable(List<String> images) {
-        Map<String, String> digests = composeExecutor.imageDigests(images);
+    private boolean immutableImagesAvailable(List<String> images, Map<String, String> digests) {
         return images.stream().allMatch(image -> {
             String digest = digests.get(image);
             return digest != null && digest.contains("@sha256:");
@@ -579,9 +604,93 @@ public class AppUpdateService {
 
     private UpdateModels.AppUpdatePlan blocked(InstalledApp app, String operation, String headline, String summary, List<String> reasons) {
         return new UpdateModels.AppUpdatePlan(
-                app.appId(), app.appName(), operation, "blocked", headline, summary, "", "", false, true,
+                app.appId(), app.appName(), operation, "", "blocked", headline, summary, "", "", false, true,
                 snapshots.latestRollbackFor(app.appId()).isPresent(), snapshots.latestRollbackFor(app.appId()).map(AppUpdateSnapshot::snapshotId).orElse(""),
-                List.of(), List.copyOf(reasons), Instant.now());
+                List.of(), List.copyOf(reasons), UpdateModels.ChangeSafetyAdvice.unavailable(), Instant.now());
+    }
+
+    public boolean reviewedPlanMatches(UpdateModels.AppUpdatePlan currentPlan, String reviewedPlanId) {
+        return currentPlan != null
+                && currentPlan.canApply()
+                && reviewedPlanId != null
+                && reviewedPlanId.matches("^sha256:[0-9a-f]{64}$")
+                && MessageDigest.isEqual(
+                        currentPlan.planId().getBytes(StandardCharsets.US_ASCII),
+                        reviewedPlanId.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    private void assertReviewedPlan(UpdateModels.AppUpdatePlan currentPlan, String reviewedPlanId) {
+        if (!reviewedPlanMatches(currentPlan, reviewedPlanId)) {
+            throw changedPlan();
+        }
+    }
+
+    private InstallationException changedPlan() {
+        return new InstallationException("The app release plan changed after it was reviewed. Review the current plan before starting this change.");
+    }
+
+    private UpdateModels.AppUpdatePlan identified(UpdateModels.AppUpdatePlan plan, List<String> identityParts) {
+        return new UpdateModels.AppUpdatePlan(
+                plan.appId(),
+                plan.appName(),
+                plan.operation(),
+                planIdentity(identityParts),
+                plan.status(),
+                plan.headline(),
+                plan.summary(),
+                plan.currentVersion(),
+                plan.targetVersion(),
+                plan.canApply(),
+                plan.safetyBackupRequired(),
+                plan.rollbackAvailable(),
+                plan.rollbackSnapshotId(),
+                plan.changes(),
+                plan.blockedReasons(),
+                plan.guardianAdvice(),
+                plan.checkedAt());
+    }
+
+    private List<String> updateIdentity(UpdateContext context, Map<String, String> currentImageDigests) {
+        return List.of(
+                "update-plan-v1",
+                context.app().appId(),
+                context.app().composeProject(),
+                context.currentVersion(),
+                context.targetVersion(),
+                readCompose(context.app()),
+                context.currentManifest().toString(),
+                context.targetManifest().toString(),
+                new TreeMap<>(currentImageDigests).toString());
+    }
+
+    private List<String> rollbackIdentity(InstalledApp app, AppUpdateSnapshot snapshot) {
+        return List.of(
+                "rollback-plan-v1",
+                app.appId(),
+                app.composeProject(),
+                currentVersion(app),
+                readCompose(app),
+                readRuntimeManifest(app).toString(),
+                snapshot.snapshotId(),
+                snapshot.fromVersion(),
+                snapshot.toVersion(),
+                snapshot.status());
+    }
+
+    private String planIdentity(List<String> identityParts) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (String part : identityParts) {
+                byte[] value = (part == null ? "" : part).getBytes(StandardCharsets.UTF_8);
+                digest.update(Integer.toString(value.length).getBytes(StandardCharsets.US_ASCII));
+                digest.update((byte) ':');
+                digest.update(value);
+                digest.update((byte) '\n');
+            }
+            return "sha256:" + HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable.", exception);
+        }
     }
 
     private String firstReason(UpdateModels.AppUpdatePlan plan, String fallback) {

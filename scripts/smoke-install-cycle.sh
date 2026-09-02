@@ -8,6 +8,8 @@ WORK_DIR=""
 RUN_INSTALL=0
 KEEP_INSTALL=0
 INSTALL_DEPS=0
+INSTALL_ACTIVE=0
+ACTIVE_CONFIG_FILE=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -159,6 +161,17 @@ cleanup_smoke_install() {
   fi
 }
 
+cleanup_on_exit() {
+  local status=$?
+  if [[ "${RUN_INSTALL}" -eq 1 && "${INSTALL_ACTIVE}" -eq 1 && "${KEEP_INSTALL}" -eq 0 ]]; then
+    cleanup_smoke_install "${ACTIVE_CONFIG_FILE}"
+    INSTALL_ACTIVE=0
+  fi
+  if [[ "${status}" -ne 0 ]]; then
+    log "Smoke cycle failed. Review the output and support material in ${WORK_DIR}."
+  fi
+}
+
 main() {
   parse_args "$@"
   [[ "${SMOKE_NAME}" =~ ^[a-zA-Z0-9._-]+$ ]] || die "--smoke-name contains unsupported characters."
@@ -176,6 +189,8 @@ main() {
   local support_file="${WORK_DIR}/${SMOKE_NAME}-support.tar.gz"
   local user_name
   user_name="$(smoke_user)"
+  ACTIVE_CONFIG_FILE="${config_file}"
+  trap cleanup_on_exit EXIT
 
   log "Smoke mode: $([[ "${RUN_INSTALL}" -eq 1 ]] && printf run || printf dry-run)"
   log "Smoke service: ${SMOKE_NAME}.service"
@@ -198,6 +213,9 @@ main() {
   [[ "${INSTALL_DEPS}" -eq 1 ]] && install_args+=(--auto-install-deps)
   [[ "${RUN_INSTALL}" -eq 0 ]] && install_args+=(--dry-run)
 
+  if [[ "${RUN_INSTALL}" -eq 1 ]]; then
+    INSTALL_ACTIVE=1
+  fi
   AUTARK_OS_SERVICE_NAME="${SMOKE_NAME}" \
   AUTARK_OS_USER="${user_name}" \
   AUTARK_OS_GROUP="${user_name}" \
@@ -216,7 +234,7 @@ main() {
   AUTARK_OS_CONFIG_FILE="${config_file}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
   AUTARK_OS_CLI_LINK="${cli_link}" \
-    "${REPO_ROOT}/scripts/autark-os" doctor || true
+    "${REPO_ROOT}/scripts/autark-os" doctor
 
   AUTARK_OS_SERVICE_NAME="${SMOKE_NAME}" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
@@ -225,7 +243,7 @@ main() {
     "${REPO_ROOT}/scripts/autark-os" support-bundle \
       --release-bundle "${BUNDLE_DIR}" \
       --state-dir "${state_dir}" \
-      --output "${support_file}" || true
+      --output "${support_file}"
 
   log "Support bundle: ${support_file}"
   if [[ "${KEEP_INSTALL}" -eq 1 ]]; then
@@ -234,6 +252,8 @@ main() {
     return 0
   fi
   cleanup_smoke_install "${config_file}"
+  INSTALL_ACTIVE=0
+  log "Smoke cycle passed. Installation, API readiness, catalog access, Activity Log, support bundle, and cleanup completed."
 }
 
 main "$@"

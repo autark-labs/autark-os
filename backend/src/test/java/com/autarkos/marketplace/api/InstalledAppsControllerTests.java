@@ -1,6 +1,8 @@
 package com.autarkos.marketplace.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -80,8 +82,8 @@ class InstalledAppsControllerTests {
 
         UpdateModels.AppUpdateCapability listed = controller.updates();
         var plan = controller.updatePlan("vaultwarden");
-        var update = controller.update("vaultwarden");
-        var rollback = controller.rollback("vaultwarden");
+        var update = controller.update("vaultwarden", null);
+        var rollback = controller.rollback("vaultwarden", null);
 
         assertThat(listed.available()).isFalse();
         assertThat(listed.status()).isEqualTo("unavailable");
@@ -92,6 +94,83 @@ class InstalledAppsControllerTests {
         assertThat(update.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         assertThat(rollback.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         verifyNoUpdateWork(lifecycleService, applicationStateService);
+    }
+
+    @Test
+    void updateMutationRejectsAPlanThatIsNoLongerCurrent() {
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        AutarkOsJobService jobService = jobService();
+        InstalledAppsController controller = new InstalledAppsController(
+                mock(AppLifecycleService.class),
+                mock(MonitoringMetricsService.class),
+                updateService,
+                applicationStateService,
+                jobService);
+        UpdateModels.AppUpdatePlan plan = applicableUpdatePlan();
+        when(updateService.updatePlan("vaultwarden")).thenReturn(plan);
+        when(updateService.reviewedPlanMatches(plan, "sha256:" + "b".repeat(64))).thenReturn(false);
+
+        var response = controller.update(
+                "vaultwarden",
+                new UpdateModels.AppUpdateApplyRequest("sha256:" + "b".repeat(64)));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
+        assertThat(((UpdateModels.AppUpdatePlan) response.getBody()).status()).isEqualTo("review_required");
+        assertThat(jobService.list()).isEmpty();
+        verify(updateService, never()).update(eq("vaultwarden"), any(), any());
+    }
+
+    @Test
+    void updateMutationQueuesTheExactReviewedPlan() {
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        AutarkOsJobService jobService = jobService();
+        InstalledAppsController controller = new InstalledAppsController(
+                mock(AppLifecycleService.class),
+                mock(MonitoringMetricsService.class),
+                updateService,
+                applicationStateService,
+                jobService);
+        UpdateModels.AppUpdatePlan plan = applicableUpdatePlan();
+        when(updateService.updatePlan("vaultwarden")).thenReturn(plan);
+        when(updateService.reviewedPlanMatches(plan, plan.planId())).thenReturn(true);
+
+        var response = controller.update(
+                "vaultwarden",
+                new UpdateModels.AppUpdateApplyRequest(plan.planId()));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(202);
+        AutarkOsJob job = (AutarkOsJob) response.getBody();
+        assertThat(job).isNotNull();
+        assertThat(job.status()).isEqualTo("queued");
+        jobService.runQueuedJobsNow();
+        verify(updateService).update(eq("vaultwarden"), eq(plan.planId()), any());
+    }
+
+    @Test
+    void duplicateUpdateRequestReturnsTheExistingActiveJob() {
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        AutarkOsJobService jobService = jobService();
+        AutarkOsJob existing = jobService.start(
+                "update_app",
+                "vaultwarden",
+                List.of(AutarkOsJobStep.pending("create_safety_checkpoint", "Create safety checkpoint")),
+                () -> AutarkOsJobOutcome.succeeded("Updated."));
+        InstalledAppsController controller = new InstalledAppsController(
+                mock(AppLifecycleService.class),
+                mock(MonitoringMetricsService.class),
+                updateService,
+                applicationStateService,
+                jobService);
+
+        var response = controller.update("vaultwarden", null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(((AutarkOsJob) response.getBody()).jobId()).isEqualTo(existing.jobId());
+        verify(updateService, never()).updatePlan("vaultwarden");
     }
 
     @Test
@@ -364,6 +443,27 @@ class InstalledAppsControllerTests {
                 List.of(),
                 List.of(),
                 List.of(),
+                Instant.parse("2026-06-21T12:00:00Z"));
+    }
+
+    private UpdateModels.AppUpdatePlan applicableUpdatePlan() {
+        return new UpdateModels.AppUpdatePlan(
+                "vaultwarden",
+                "Vaultwarden",
+                "update",
+                "sha256:" + "a".repeat(64),
+                "available",
+                "Update ready to review",
+                "A verified checkpoint will be created.",
+                "1.0.0",
+                "1.1.0",
+                true,
+                true,
+                false,
+                "",
+                List.of("Create verified safety checkpoint"),
+                List.of(),
+                UpdateModels.ChangeSafetyAdvice.unavailable(),
                 Instant.parse("2026-06-21T12:00:00Z"));
     }
 

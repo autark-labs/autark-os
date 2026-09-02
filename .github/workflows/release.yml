@@ -111,14 +111,14 @@ jobs:
         working-directory: frontend
     steps:
       - name: Check out release source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Check Pro public/private repository boundary
         working-directory: .
         run: bash scripts/check-pro-public-boundary.sh
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: yarn
@@ -143,7 +143,7 @@ jobs:
 
       - name: Upload the Playwright report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-playwright-report
           path: frontend/playwright-report
@@ -167,17 +167,17 @@ jobs:
     environment: ${{ needs.prepare.outputs.channel == 'stable' && 'core-release-production' || 'core-release-staging' }}
     steps:
       - name: Check out release source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: yarn
@@ -216,7 +216,7 @@ jobs:
 
       - name: Retain private frontend source maps
         if: success()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: autark-os-private-source-maps-${{ matrix.architecture }}
           path: frontend/dist/**/*.map
@@ -299,7 +299,7 @@ jobs:
           grep -Fq './usr/share/doc/autark-os/GETTING_STARTED.md' "${deb_contents}"
 
       - name: Retain architecture build output
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: autark-os-release-${{ matrix.architecture }}
           path: release/ci-${{ needs.prepare.outputs.version }}-${{ matrix.architecture }}/
@@ -314,16 +314,16 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out release source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Download amd64 build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: autark-os-release-amd64
           path: release-input/amd64
 
       - name: Download arm64 build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: autark-os-release-arm64
           path: release-input/arm64
@@ -357,7 +357,7 @@ jobs:
           find release-ready -maxdepth 1 -type f -printf '%f\n' | sort
 
       - name: Retain complete release rehearsal
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: autark-os-release-${{ needs.prepare.outputs.version }}
           path: release-ready/
@@ -376,10 +376,10 @@ jobs:
       contents: write
     steps:
       - name: Check out release source
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Download validated release set
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: autark-os-release-${{ needs.prepare.outputs.version }}
           path: release-ready

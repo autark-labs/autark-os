@@ -5,6 +5,8 @@ import com.autarkos.extensions.ExtensionRefreshResult;
 import com.autarkos.extensions.ExtensionUiManifest;
 import com.autarkos.pro.model.AgentStatus;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
+import com.autarkos.pro.change.ProChangeSafetyRequest;
+import com.autarkos.pro.change.ProChangeSafetyResponse;
 
 public interface ProAgentClient {
 
@@ -24,4 +26,8 @@ public interface ProAgentClient {
             ProAgentEndpoint endpoint,
             NormalizedHostSnapshot snapshot,
             String continuationToken);
+
+    ProChangeSafetyResponse changeSafety(
+            ProAgentEndpoint endpoint,
+            ProChangeSafetyRequest request);
 }

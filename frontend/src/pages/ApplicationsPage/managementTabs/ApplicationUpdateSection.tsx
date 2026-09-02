@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { History, Loader2, RefreshCw, ShieldCheck, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AppUpdatePlanChangedError } from '@/api/InstalledAppsAPIClient';
 import { cn } from '@/lib/utils';
 import { operationBlocksManagement } from '../extensions/ApplicationsPage.operations';
 import type { ApplicationActionHandlers, ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
@@ -21,6 +22,11 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
   }
 
   const blockedByOperation = operationBlocksManagement(item.operationState);
+  const planLines = plan?.canApply
+    ? plan.changes
+    : plan?.blockedReasons.length
+      ? plan.blockedReasons
+      : plan?.guardianAdvice.reasons ?? [];
 
   async function review(operation: 'update' | 'rollback') {
     setLoading(operation);
@@ -28,8 +34,11 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
       setPlan(operation === 'update'
         ? await actions.onLoadUpdatePlan(item.id)
         : await actions.onLoadRollbackPlan(item.id));
-    } catch {
-      // The page-level action handler has already shown the actionable error notification.
+    } catch (error) {
+      if (error instanceof AppUpdatePlanChangedError) {
+        setPlan(error.plan);
+      }
+      // The page-level action handler has already shown the actionable notification.
     } finally {
       setLoading(null);
     }
@@ -42,9 +51,9 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
     setSubmitting(true);
     try {
       if (plan.operation === 'rollback') {
-        await actions.onRunRollback(item.id);
+        await actions.onRunRollback(item.id, plan.planId);
       } else {
-        await actions.onRunUpdate(item.id);
+        await actions.onRunUpdate(item.id, plan.planId);
       }
       setPlan(null);
     } catch {
@@ -108,10 +117,22 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
             </p>
           )}
 
-          {(plan.changes.length > 0 || plan.blockedReasons.length > 0) && (
+          {planLines.length > 0 && (
             <ul className="mt-2 grid gap-1 text-xs leading-5 text-sky-100/70">
-              {(plan.canApply ? plan.changes : plan.blockedReasons).map((line) => <li key={line}>• {line}</li>)}
+              {planLines.map((line) => <li key={line}>• {line}</li>)}
             </ul>
+          )}
+
+          {plan.canApply && plan.guardianAdvice.state === 'ready' && (
+            <div className={cn(
+              'mt-3 rounded-lg border px-3 py-2 text-xs leading-5',
+              plan.guardianAdvice.outcome === 'proceed'
+                ? 'border-emerald-300/20 bg-emerald-400/5 text-emerald-100'
+                : 'border-amber-300/20 bg-amber-400/5 text-amber-100',
+            )}>
+              <p className="font-semibold">{plan.guardianAdvice.headline}</p>
+              <p className="mt-0.5 opacity-80">{plan.guardianAdvice.summary}</p>
+            </div>
           )}
 
           <div className="mt-3 flex justify-end gap-2">
@@ -119,7 +140,11 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
             {plan.canApply && (
               <Button className="bg-cyan-300 text-slate-950 hover:bg-cyan-200" disabled={submitting} onClick={() => void apply()} size="sm" type="button">
                 {submitting ? <Loader2 className="size-3.5 animate-spin" /> : plan.operation === 'rollback' ? <Undo2 className="size-3.5" /> : <RefreshCw className="size-3.5" />}
-                {plan.operation === 'rollback' ? 'Restore release' : 'Start update'}
+                {plan.operation === 'rollback'
+                  ? 'Restore release'
+                  : plan.guardianAdvice.outcome === 'protect_first'
+                    ? 'Start protected update'
+                    : 'Start update'}
               </Button>
             )}
           </div>

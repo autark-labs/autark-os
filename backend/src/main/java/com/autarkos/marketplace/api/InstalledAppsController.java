@@ -211,19 +211,26 @@ public class InstalledAppsController {
     }
 
     @PostMapping("/{id}/update")
-    public ResponseEntity<?> update(@PathVariable String id) {
+    public ResponseEntity<?> update(
+            @PathVariable String id,
+            @RequestBody(required = false) UpdateModels.AppUpdateApplyRequest request) {
+        AutarkOsJob active = activeLifecycleJob(id);
+        if (active != null) {
+            applicationStateService.invalidate();
+            return ResponseEntity.ok(active);
+        }
         UpdateModels.AppUpdatePlan plan = appUpdateService.updatePlan(id);
         if (!plan.canApply()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(plan);
         }
-        AutarkOsJob active = activeLifecycleJob(id);
-        if (active != null) {
-            return ResponseEntity.ok(active);
+        String reviewedPlanId = request == null ? null : request.planId();
+        if (!appUpdateService.reviewedPlanMatches(plan, reviewedPlanId)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(plan.reviewRequired());
         }
         AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.UPDATE_APP, id, updateJobSteps(false), activeJob -> {
             markUpdateProgress(activeJob.jobId(), updateJobSteps(false), "create_safety_checkpoint");
             try {
-                appUpdateService.update(id, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(false), phase));
+                appUpdateService.update(id, reviewedPlanId, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(false), phase));
                 List<AutarkOsJobStep> completed = updateJobSteps(false).stream()
                         .map(step -> AutarkOsJobStep.succeeded(step.id(), step.label(), step.label() + " completed."))
                         .toList();
@@ -242,19 +249,26 @@ public class InstalledAppsController {
     }
 
     @PostMapping("/{id}/rollback")
-    public ResponseEntity<?> rollback(@PathVariable String id) {
+    public ResponseEntity<?> rollback(
+            @PathVariable String id,
+            @RequestBody(required = false) UpdateModels.AppUpdateApplyRequest request) {
+        AutarkOsJob active = activeLifecycleJob(id);
+        if (active != null) {
+            applicationStateService.invalidate();
+            return ResponseEntity.ok(active);
+        }
         UpdateModels.AppUpdatePlan plan = appUpdateService.rollbackPlan(id);
         if (!plan.canApply()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(plan);
         }
-        AutarkOsJob active = activeLifecycleJob(id);
-        if (active != null) {
-            return ResponseEntity.ok(active);
+        String reviewedPlanId = request == null ? null : request.planId();
+        if (!appUpdateService.reviewedPlanMatches(plan, reviewedPlanId)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(plan.reviewRequired());
         }
         AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.ROLLBACK_APP, id, updateJobSteps(true), activeJob -> {
             markUpdateProgress(activeJob.jobId(), updateJobSteps(true), "create_safety_checkpoint");
             try {
-                appUpdateService.rollback(id, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(true), phase));
+                appUpdateService.rollback(id, reviewedPlanId, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(true), phase));
                 List<AutarkOsJobStep> completed = updateJobSteps(true).stream()
                         .map(step -> AutarkOsJobStep.succeeded(step.id(), step.label(), step.label() + " completed."))
                         .toList();

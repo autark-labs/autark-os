@@ -91,6 +91,19 @@ public final class NormalizedHostSnapshotAssembler {
 
     public NormalizedHostSnapshot assemble(
             List<ProSnapshotMutation> origins) {
+        return assembleTargeted(origins, null).snapshot();
+    }
+
+    public TargetedSnapshot assembleForApp(String appId) {
+        if (appId == null || appId.isBlank()) {
+            throw new IllegalArgumentException("Choose a managed app before requesting private guidance.");
+        }
+        return assembleTargeted(List.of(), appId.trim());
+    }
+
+    private TargetedSnapshot assembleTargeted(
+            List<ProSnapshotMutation> origins,
+            String targetAppId) {
         Instant generatedAt = clock.get();
         PartialTracker partial = new PartialTracker();
         ProjectVersionInfo version =
@@ -173,7 +186,14 @@ public final class NormalizedHostSnapshotAssembler {
                 draft,
                 deterministicId(draft));
         requireBounded(snapshot);
-        return snapshot;
+        return new TargetedSnapshot(
+                snapshot,
+                targetAppId == null ? null : resources.resolve(targetAppId));
+    }
+
+    public record TargetedSnapshot(
+            NormalizedHostSnapshot snapshot,
+            String resourceRef) {
     }
 
     private NormalizedHostSnapshot.SystemSnapshot system(

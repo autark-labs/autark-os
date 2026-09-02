@@ -18,7 +18,12 @@ test('the production frontend exposes planned managed app update and rollback ac
   assert.match(client, /\/api\/apps\/\$\{appId\}\/rollback-plan/);
   assert.match(client, /\/api\/apps\/\$\{appId\}\/update/);
   assert.match(client, /\/api\/apps\/\$\{appId\}\/rollback/);
+  assert.match(client, /class AppUpdatePlanChangedError/);
+  assert.match(client, /error\.response\?\.status === 409/);
   assert.doesNotMatch(repository, /useAppUpdatesQuery|appUpdatesQueryKey|invalidateAppUpdates/);
   assert.match(appTypes, /AppUpdatePlan/);
+  const section = source('src/pages/ApplicationsPage/managementTabs/ApplicationUpdateSection.tsx');
+  assert.match(section, /plan\.canApply && plan\.guardianAdvice\.state === 'ready'/);
+  assert.match(section, /error instanceof AppUpdatePlanChangedError/);
   assert.equal(existsSync(resolve(root, 'src/pages/UpdatesPage')), false);
 });

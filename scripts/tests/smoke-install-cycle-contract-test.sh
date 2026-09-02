@@ -51,3 +51,12 @@ grep -q 'autark-os-smoke-test.service' <<<"${cycle_output}"
 grep -q 'autark-os-smoke-test' <<<"${cycle_output}"
 grep -q 'autark-os-smoke-test support-bundle' <<<"${cycle_output}"
 grep -q 'Cleanup command' <<<"${cycle_output}"
+grep -q 'scripts/autark-os" doctor$' "${repo_root}/scripts/smoke-install-cycle.sh"
+if grep -q 'scripts/autark-os" doctor || true' "${repo_root}/scripts/smoke-install-cycle.sh"; then
+  echo 'Smoke cycle must fail when post-install doctor fails.' >&2
+  exit 1
+fi
+if grep -q -- '--output "${support_file}" || true' "${repo_root}/scripts/smoke-install-cycle.sh"; then
+  echo 'Smoke cycle must fail when support-bundle generation fails.' >&2
+  exit 1
+fi

@@ -40,6 +40,7 @@ public final class UpdateModels {
             String appId,
             String appName,
             String operation,
+            String planId,
             String status,
             String headline,
             String summary,
@@ -51,6 +52,7 @@ public final class UpdateModels {
             String rollbackSnapshotId,
             List<String> changes,
             List<String> blockedReasons,
+            ChangeSafetyAdvice guardianAdvice,
             Instant checkedAt) {
 
         public static AppUpdatePlan blocked(String appId, String appName, String operation, String headline, String summary, List<String> reasons) {
@@ -58,6 +60,7 @@ public final class UpdateModels {
                     appId,
                     appName,
                     operation,
+                    "",
                     "blocked",
                     headline,
                     summary,
@@ -69,7 +72,77 @@ public final class UpdateModels {
                     "",
                     List.of(),
                     reasons == null ? List.of() : List.copyOf(reasons),
+                    ChangeSafetyAdvice.unavailable(),
                     Instant.now());
+        }
+
+        public AppUpdatePlan reviewRequired() {
+            return new AppUpdatePlan(
+                    appId,
+                    appName,
+                    operation,
+                    planId,
+                    "review_required",
+                    "Review the release plan again",
+                    "The app or release plan changed after it was reviewed. Review the current plan before Autark-OS starts this change.",
+                    currentVersion,
+                    targetVersion,
+                    false,
+                    safetyBackupRequired,
+                    rollbackAvailable,
+                    rollbackSnapshotId,
+                    changes,
+                    List.of("Review the current release plan and confirm it again."),
+                    guardianAdvice,
+                    Instant.now());
+        }
+
+        public AppUpdatePlan withGuardianAdvice(ChangeSafetyAdvice advice) {
+            ChangeSafetyAdvice safeAdvice = advice == null ? ChangeSafetyAdvice.unavailable() : advice;
+            boolean guardianBlocksApply = "ready".equals(safeAdvice.state())
+                    && List.of("defer", "blocked").contains(safeAdvice.outcome());
+            return new AppUpdatePlan(
+                    appId,
+                    appName,
+                    operation,
+                    planId,
+                    guardianBlocksApply ? safeAdvice.outcome() : status,
+                    guardianBlocksApply ? safeAdvice.headline() : headline,
+                    guardianBlocksApply ? safeAdvice.summary() : summary,
+                    currentVersion,
+                    targetVersion,
+                    canApply && !guardianBlocksApply,
+                    safetyBackupRequired,
+                    rollbackAvailable,
+                    rollbackSnapshotId,
+                    changes,
+                    guardianBlocksApply ? safeAdvice.reasons() : blockedReasons,
+                    safeAdvice,
+                    checkedAt);
+        }
+    }
+
+    public record AppUpdateApplyRequest(String planId) {
+    }
+
+    public record ChangeSafetyAdvice(
+            String state,
+            String outcome,
+            String headline,
+            String summary,
+            List<String> reasons,
+            Instant analyzedAt,
+            Instant expiresAt) {
+
+        public static ChangeSafetyAdvice unavailable() {
+            return new ChangeSafetyAdvice(
+                    "unavailable",
+                    "unavailable",
+                    "Guardian guidance is unavailable",
+                    "Autark-OS will continue with its standard verified backup, health check, and rollback protections.",
+                    List.of(),
+                    null,
+                    null);
         }
     }
 }

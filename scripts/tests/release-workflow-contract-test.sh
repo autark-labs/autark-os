@@ -12,8 +12,8 @@ grep -q '^  push:' "${workflow}"
 grep -q 'ubuntu-24.04-arm' "${workflow}"
 grep -q 'architecture: amd64' "${workflow}"
 grep -q 'architecture: arm64' "${workflow}"
-grep -q 'actions/upload-artifact@v6' "${workflow}"
-grep -q 'actions/download-artifact@v8' "${workflow}"
+grep -q 'actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6' "${workflow}"
+grep -q 'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8' "${workflow}"
 grep -q 'compose-release-manifest.py compose' "${workflow}"
 grep -q 'compose-release-manifest.py validate' "${workflow}"
 grep -q 'release-contract-suite.sh' "${workflow}"
@@ -55,6 +55,11 @@ grep -Fq "grep -Fq './usr/share/doc/autark-os/GETTING_STARTED.md' \"\${deb_conte
 
 if grep -q -- '--clobber' "${workflow}"; then
   printf 'Release workflow must never overwrite existing release assets.\n' >&2
+  exit 1
+fi
+
+if grep -REq 'uses: [^ ]+@(main|master|v[0-9]+)([[:space:]#]|$)' "${repo_root}/.github/workflows"; then
+  printf 'GitHub Actions must use immutable commit SHAs.\n' >&2
   exit 1
 fi
 

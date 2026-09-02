@@ -22,6 +22,8 @@ import org.springframework.stereotype.Component;
 
 import com.autarkos.pro.model.AgentStatus;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
+import com.autarkos.pro.change.ProChangeSafetyRequest;
+import com.autarkos.pro.change.ProChangeSafetyResponse;
 import com.autarkos.pro.runtime.ProAgentApiCredentialStore;
 import com.autarkos.extensions.ExtensionSurfaceEnvelope;
 import com.autarkos.extensions.ExtensionRefreshRequest;
@@ -40,6 +42,7 @@ public final class HttpProAgentClient implements ProAgentClient {
 
     private static final int STATUS_LIMIT = 16 * 1024;
     private static final int SURFACE_LIMIT = 1024 * 1024;
+    private static final int CHANGE_SAFETY_LIMIT = 768 * 1024;
     private static final int UI_MANIFEST_LIMIT = 16 * 1024;
     private static final int UI_ASSET_LIMIT = 2 * 1024 * 1024;
     private static final Pattern UI_ASSET_NAME =
@@ -220,6 +223,38 @@ public final class HttpProAgentClient implements ProAgentClient {
                     body,
                     SURFACE_LIMIT,
                     ExtensionRefreshResult.class);
+        } finally {
+            Arrays.fill(body, (byte) 0);
+        }
+    }
+
+    @Override
+    public ProChangeSafetyResponse changeSafety(
+            ProAgentEndpoint endpoint,
+            ProChangeSafetyRequest request) {
+        if (request == null) {
+            throw new ProAgentClientException(
+                    "agent_request_invalid",
+                    "Change-safety request is invalid.");
+        }
+        byte[] body;
+        try {
+            body = objectMapper.writeValueAsBytes(request);
+        } catch (IOException exception) {
+            throw failure("agent_request_invalid", exception);
+        }
+        try {
+            if (body.length > CHANGE_SAFETY_LIMIT) {
+                throw new ProAgentClientException(
+                        "agent_request_too_large",
+                        "Change-safety request is too large.");
+            }
+            return exchange(
+                    endpoint,
+                    "v1/change-safety/evaluate",
+                    body,
+                    64 * 1024,
+                    ProChangeSafetyResponse.class);
         } finally {
             Arrays.fill(body, (byte) 0);
         }

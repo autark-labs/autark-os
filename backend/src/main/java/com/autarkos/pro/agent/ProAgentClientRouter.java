@@ -11,6 +11,8 @@ import com.autarkos.extensions.ExtensionRefreshResult;
 import com.autarkos.extensions.ExtensionUiManifest;
 import com.autarkos.pro.model.AgentStatus;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
+import com.autarkos.pro.change.ProChangeSafetyRequest;
+import com.autarkos.pro.change.ProChangeSafetyResponse;
 
 @Component
 public final class ProAgentClientRouter {
@@ -65,6 +67,11 @@ public final class ProAgentClientRouter {
                 requireActive(),
                 snapshot,
                 continuationToken);
+    }
+
+    public ProChangeSafetyResponse changeSafety(
+            ProChangeSafetyRequest request) {
+        return client.changeSafety(requireActive(), request);
     }
 
     private ProAgentEndpoint requireActive() {

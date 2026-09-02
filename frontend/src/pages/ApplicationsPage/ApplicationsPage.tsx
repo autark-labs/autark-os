@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
-import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
+import { AppUpdatePlanChangedError, InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
 import { PageShell } from '@/components/layout/PageShell';
@@ -483,10 +483,10 @@ export const ApplicationsPage = () => {
     }
   }
 
-  async function runUpdate(appId: string) {
+  async function runUpdate(appId: string, planId: string) {
     setAppActionLoading(appId, 'update');
     try {
-      const job = await InstalledAppsAPIClient.update(appId);
+      const job = await InstalledAppsAPIClient.update(appId, planId);
       syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
@@ -496,17 +496,21 @@ export const ApplicationsPage = () => {
         message: 'Autark-OS saved a verified safety checkpoint and will keep showing release progress here.',
       });
     } catch (err) {
-      showActionErrorNotification(err, 'Update could not start');
+      if (err instanceof AppUpdatePlanChangedError) {
+        showActionNotification({ ok: false, severity: 'warning', title: err.plan.headline, message: err.plan.summary });
+      } else {
+        showActionErrorNotification(err, 'Update could not start');
+      }
       throw err;
     } finally {
       setAppActionLoading(appId, null);
     }
   }
 
-  async function runRollback(appId: string) {
+  async function runRollback(appId: string, planId: string) {
     setAppActionLoading(appId, 'rollback');
     try {
-      const job = await InstalledAppsAPIClient.rollback(appId);
+      const job = await InstalledAppsAPIClient.rollback(appId, planId);
       syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
       showActionNotification({
@@ -516,7 +520,11 @@ export const ApplicationsPage = () => {
         message: 'Autark-OS created a fresh safety checkpoint and is restoring the saved release.',
       });
     } catch (err) {
-      showActionErrorNotification(err, 'Rollback could not start');
+      if (err instanceof AppUpdatePlanChangedError) {
+        showActionNotification({ ok: false, severity: 'warning', title: err.plan.headline, message: err.plan.summary });
+      } else {
+        showActionErrorNotification(err, 'Rollback could not start');
+      }
       throw err;
     } finally {
       setAppActionLoading(appId, null);

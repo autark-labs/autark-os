@@ -20,6 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
+import com.autarkos.pro.change.ProChangeSafetyRequest;
 import com.autarkos.pro.runtime.ProAgentApiCredentialStore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,9 +45,11 @@ class HttpProAgentClientTests {
     void exercisesAuthenticatedUiAndSurfaceEndpoints()
             throws Exception {
         NormalizedHostSnapshot snapshot = snapshot();
+        String targetResourceRef = "app:target";
         AtomicReference<String> authorization = new AtomicReference<>();
         AtomicReference<JsonNode> request = new AtomicReference<>();
         AtomicReference<JsonNode> refreshRequest = new AtomicReference<>();
+        AtomicReference<JsonNode> changeSafetyRequest = new AtomicReference<>();
         start(exchange -> {
             authorization.set(exchange.getRequestHeaders()
                     .getFirst("Authorization"));
@@ -66,6 +69,13 @@ class HttpProAgentClientTests {
                     refreshRequest.set(new ObjectMapper().readTree(
                             exchange.getRequestBody()));
                     respond(exchange, 200, refreshJson());
+                }
+                case "/v1/change-safety/evaluate" -> {
+                    changeSafetyRequest.set(new ObjectMapper().readTree(
+                            exchange.getRequestBody()));
+                    respond(exchange, 200, changeSafetyJson(
+                            snapshot.snapshotId(),
+                            targetResourceRef));
                 }
                 default -> respond(exchange, 404, "{}");
             }
@@ -101,6 +111,22 @@ class HttpProAgentClientTests {
         assertThat(refreshRequest.get().path("snapshot")
                 .path("snapshotId").asText())
                 .isEqualTo(snapshot.snapshotId());
+        String planId = "sha256:" + "a".repeat(64);
+        assertThat(client.changeSafety(
+                        endpoint(),
+                        new ProChangeSafetyRequest(
+                                "1",
+                                planId,
+                                "update",
+                                targetResourceRef,
+                                "1.0.0",
+                                "1.1.0",
+                                List.of("Create verified safety checkpoint"),
+                                true,
+                                snapshot))
+                .outcome()).isEqualTo("protect_first");
+        assertThat(changeSafetyRequest.get().path("planId").asText())
+                .isEqualTo(planId);
         assertThat(authorization.get()).startsWith("Bearer ")
                 .doesNotContain("\n", "\r");
     }
@@ -255,6 +281,25 @@ class HttpProAgentClientTests {
                   }
                 }
                 """;
+    }
+
+    private static String changeSafetyJson(
+            String snapshotId,
+            String resourceRef) {
+        return """
+                {
+                  "schemaVersion":"1",
+                  "planId":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "analyzedSnapshotId":"%s",
+                  "targetResourceRef":"%s",
+                  "outcome":"protect_first",
+                  "headline":"Create protection first",
+                  "summary":"Guardian recommends creating a verified safety checkpoint.",
+                  "reasons":["The update job will create the checkpoint."],
+                  "analyzedAt":"2026-07-19T12:00:01Z",
+                  "expiresAt":"2026-07-19T12:05:01Z"
+                }
+                """.formatted(snapshotId, resourceRef);
     }
 
     private static void respond(

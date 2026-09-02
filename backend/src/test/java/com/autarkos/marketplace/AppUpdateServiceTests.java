@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
@@ -47,6 +48,7 @@ import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.install.models.UpdateModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
+import com.autarkos.pro.change.ProChangeSafetyService;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -73,6 +75,8 @@ class AppUpdateServiceTests {
     AppUpdateSnapshotStore snapshots;
     @Mock
     ActivityLogService activityLog;
+    @Mock
+    ProChangeSafetyService changeSafety;
 
     private AppUpdateService service;
     private InstalledApp app;
@@ -101,7 +105,8 @@ class AppUpdateServiceTests {
                 backupService,
                 lifecycleService,
                 snapshots,
-                activityLog);
+                activityLog,
+                changeSafety);
 
         when(installedApps.findAppById("example")).thenReturn(Optional.of(app));
         when(installedApps.ownershipFor("example")).thenReturn(Optional.of(new RuntimeModels.InstalledAppOwnershipMetadata(
@@ -119,6 +124,7 @@ class AppUpdateServiceTests {
         when(composeExecutor.up(any(), eq("autark-os-example"))).thenReturn(new RuntimeModels.DockerComposeResult(0, List.of("started")));
         when(lifecycleService.healthSnapshot("example")).thenReturn(new AppHealthSnapshot(
                 "example", AutarkOsStates.AppStatus.READY, "Ready", "", "running", "reachable", "not_enabled", false, Instant.now()));
+        when(changeSafety.assess(any())).thenReturn(UpdateModels.ChangeSafetyAdvice.unavailable());
     }
 
     @Test
@@ -133,7 +139,7 @@ class AppUpdateServiceTests {
         when(snapshots.create(eq(app), eq("update"), eq("1.0.0"), eq("1.1.0"), eq(42L), any())).thenReturn(snapshot);
         runWithSafetyCheckpoint();
 
-        service.update("example", ignored -> { });
+        service.update("example", plan.planId(), ignored -> { });
 
         assertThat(readCompose()).contains("example/app@sha256:new");
         ArgumentCaptor<String> snapshotCompose = ArgumentCaptor.forClass(String.class);
@@ -147,6 +153,7 @@ class AppUpdateServiceTests {
 
     @Test
     void restoresTheSavedReleaseWhenTheTargetCannotStart() {
+        UpdateModels.AppUpdatePlan plan = service.updatePlan("example");
         AppUpdateSnapshot snapshot = snapshot("update_1", "1.0.0", "1.1.0");
         when(snapshots.create(eq(app), eq("update"), eq("1.0.0"), eq("1.1.0"), eq(42L), any())).thenReturn(snapshot);
         runWithSafetyCheckpoint();
@@ -154,7 +161,7 @@ class AppUpdateServiceTests {
                 .thenReturn(new RuntimeModels.DockerComposeResult(1, List.of("target failed")))
                 .thenReturn(new RuntimeModels.DockerComposeResult(0, List.of("restored")));
 
-        assertThatThrownBy(() -> service.update("example", ignored -> { }))
+        assertThatThrownBy(() -> service.update("example", plan.planId(), ignored -> { }))
                 .hasMessageContaining("restored the previous release");
 
         verify(snapshots).restore(snapshot, app);
@@ -171,6 +178,53 @@ class AppUpdateServiceTests {
 
         assertThat(plan.canApply()).isFalse();
         assertThat(plan.blockedReasons()).anyMatch(reason -> reason.contains("runtime layout"));
+    }
+
+    @Test
+    void rejectsAReviewedPlanWhenTheCatalogReleaseChangesBeforeApply() {
+        UpdateModels.AppUpdatePlan reviewed = service.updatePlan("example");
+        ApplicationManifest changedTarget = new ManifestYamlReader().read(new org.springframework.core.io.ByteArrayResource(
+                manifest("1.2.0", "example/app:1.2.0", "8080:80").getBytes()));
+        when(catalog.findById("example")).thenReturn(Optional.of(changedTarget));
+
+        assertThatThrownBy(() -> service.update("example", reviewed.planId(), ignored -> { }))
+                .hasMessageContaining("changed after it was reviewed");
+
+        verify(backupService, never()).runWithUpdateSafetyCheckpoint(eq("example"), eq(RecoveryOperationCoordinator.Operation.APP_UPDATE), any());
+    }
+
+    @Test
+    void blocksAReleaseThatChangesProvisionedConfiguration() throws Exception {
+        String withProvisionedFile = manifest("1.1.0", "example/app:1.1.0", "8080:80")
+                .replace("  backupPaths:\n", "  provisionedFiles:\n    - source: config/default.yml\n      target: config/default.yml\n  backupPaths:\n");
+        ApplicationManifest changedTarget = new ManifestYamlReader().read(new org.springframework.core.io.ByteArrayResource(withProvisionedFile.getBytes()));
+        when(catalog.findById("example")).thenReturn(Optional.of(changedTarget));
+
+        UpdateModels.AppUpdatePlan plan = service.updatePlan("example");
+
+        assertThat(plan.canApply()).isFalse();
+        assertThat(plan.blockedReasons()).anyMatch(reason -> reason.contains("runtime layout"));
+    }
+
+    @Test
+    void freshGuardianDeferralCannotStartTheUpdate() {
+        when(changeSafety.assess(any())).thenReturn(new UpdateModels.ChangeSafetyAdvice(
+                "ready",
+                "defer",
+                "Wait for current server state",
+                "Guardian needs a complete server check before this update.",
+                List.of("Review the update again after server state refreshes."),
+                Instant.now(),
+                Instant.now().plusSeconds(300)));
+
+        UpdateModels.AppUpdatePlan plan = service.updatePlan("example");
+
+        assertThat(plan.canApply()).isFalse();
+        assertThat(plan.status()).isEqualTo("defer");
+        assertThat(plan.headline()).isEqualTo("Wait for current server state");
+        assertThat(plan.blockedReasons()).containsExactly("Review the update again after server state refreshes.");
+        assertThat(plan.guardianAdvice().outcome()).isEqualTo("defer");
+        verify(backupService, never()).runWithUpdateSafetyCheckpoint(eq("example"), eq(RecoveryOperationCoordinator.Operation.APP_UPDATE), any());
     }
 
     @SuppressWarnings("unchecked")
