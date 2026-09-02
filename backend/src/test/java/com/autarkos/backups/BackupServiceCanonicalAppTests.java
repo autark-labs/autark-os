@@ -125,6 +125,30 @@ class BackupServiceCanonicalAppTests {
     }
 
     @Test
+    void backupPreflightUsesTheCanonicalRuntimePathInsteadOfStoredMetadata() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp canonical = installed("homepage", "Homepage", runtimeLayout);
+        InstalledApp staleMetadata = new InstalledApp(
+                canonical.appId(),
+                canonical.appName(),
+                canonical.status(),
+                runtimeRoot.resolve("outside-autark-os-runtime").toString(),
+                canonical.composeProject(),
+                canonical.accessUrl(),
+                canonical.installedAt());
+        installedRepository.save(staleMetadata);
+        saveOwned(installedRepository, canonical);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(canonical.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+
+        BackupModels.BackupRunResult result = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).run("homepage");
+
+        assertThat(result.status()).isEqualTo("completed");
+    }
+
+    @Test
     void legacyRestorePointIsNotPresentedAsProtected() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);

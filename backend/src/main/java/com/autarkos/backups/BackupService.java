@@ -293,8 +293,10 @@ public class BackupService {
     private BackupModels.BackupRunResult runAppBackup(String appId, String backupSource) {
         InstalledApp app = installedAppRepository.findAppById(appId)
                 .orElseThrow(() -> new InstallationException("App is not installed: " + appId));
-        Path source = Path.of(app.runtimePath()).toAbsolutePath().normalize();
-        if (!AppRuntimeFiles.hasComposeFile(app.runtimePath())) {
+        Path source = runtimeLayout.appRoot(app.appId())
+                .toAbsolutePath()
+                .normalize();
+        if (!AppRuntimeFiles.hasComposeFile(source.toString())) {
             String message = app.appName() + " cannot use normal backups because its original Compose file is missing. Review it in My Apps and use archive-first cleanup if you no longer need the container.";
             RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, message);
             return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
