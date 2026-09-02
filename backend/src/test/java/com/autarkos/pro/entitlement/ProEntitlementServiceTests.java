@@ -277,6 +277,20 @@ class ProEntitlementServiceTests {
     }
 
     @Test
+    void activationStartIsIdempotentForARepeatedOneTimeCode() {
+        ProEntitlementService service = service();
+
+        var first = service.startActivation("AUTARK-PRO-ONE-TIME-CODE");
+        var repeated = service.startActivation("AUTARK-PRO-ONE-TIME-CODE");
+
+        assertThat(repeated.activationId()).isEqualTo(first.activationId());
+        assertThat(repeated.expiresAt()).isEqualTo(first.expiresAt());
+        assertThat(controlPlane.activationCalls).hasValue(1);
+        assertThat(repeated.toString())
+                .doesNotContain("AUTARK-PRO-ONE-TIME-CODE");
+    }
+
+    @Test
     void activationAndEntitlementLifecycleUseStructuredSafeAuditEvents() {
         ProAuditService audit = mock(ProAuditService.class);
         List<ProAuditEvent> events = new ArrayList<>();

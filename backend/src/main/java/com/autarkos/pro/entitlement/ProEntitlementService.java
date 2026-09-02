@@ -3,6 +3,10 @@ package com.autarkos.pro.entitlement;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -82,6 +86,9 @@ public class ProEntitlementService {
             new AtomicReference<>();
     private final ConcurrentMap<UUID, ActivationAttempt> activationAttempts =
             new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, UUID> activationAttemptIdsByCode =
+            new ConcurrentHashMap<>();
+    private final Object activationStartLock = new Object();
     private final Object cacheMutationLock = new Object();
     private long cacheGeneration;
 
@@ -201,52 +208,57 @@ public class ProEntitlementService {
     }
 
     public ActivationStartResult startActivation(String activationCode) {
-        cleanupActivationAttempts();
-        if (activationAttempts.size() >= MAX_ACTIVATION_ATTEMPTS) {
-            throw new ProEntitlementApiException(
-                    "too_many_activation_attempts",
-                    "Too many activation attempts are already pending.",
-                    HttpStatus.TOO_MANY_REQUESTS);
+        String codeFingerprint = activationCodeFingerprint(activationCode);
+        synchronized (activationStartLock) {
+            cleanupActivationAttempts();
+            DeviceIdentity identity = identityService.current();
+            ActivationAttempt existing = existingActivationAttempt(
+                    codeFingerprint);
+            if (existing != null) {
+                return activationStartResult(existing, identity);
+            }
+            if (activationAttempts.size() >= MAX_ACTIVATION_ATTEMPTS) {
+                throw new ProEntitlementApiException(
+                        "too_many_activation_attempts",
+                        "Too many activation attempts are already pending.",
+                        HttpStatus.TOO_MANY_REQUESTS);
+            }
+            UUID requestId = UUID.randomUUID();
+            audit(
+                    "activation-" + requestId,
+                    ProAuditEventType.ACTIVATION_STARTED,
+                    requestId.toString(),
+                    "device",
+                    null,
+                    null,
+                    null,
+                    null,
+                    "started",
+                    null,
+                    identity.keyId(),
+                    identity.publicKeyFingerprint());
+            ProControlPlaneClient.ActivationTicket ticket =
+                    controlPlaneClient.startActivation(activationCode, requestId);
+            Instant now = clock.instant();
+            if (ticket.expiresAt() == null || !ticket.expiresAt().isAfter(now)) {
+                throw new ProEntitlementApiException(
+                        "invalid_activation_ticket",
+                        "The control plane returned an expired activation ticket.",
+                        HttpStatus.BAD_GATEWAY);
+            }
+            UUID activationId = UUID.randomUUID();
+            ActivationAttempt attempt = new ActivationAttempt(
+                    activationId,
+                    codeFingerprint,
+                    ticket.activationTicket(),
+                    now,
+                    ticket.expiresAt(),
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID());
+            activationAttempts.put(activationId, attempt);
+            activationAttemptIdsByCode.put(codeFingerprint, activationId);
+            return activationStartResult(attempt, identity);
         }
-        DeviceIdentity identity = identityService.current();
-        UUID requestId = UUID.randomUUID();
-        audit(
-                "activation-" + requestId,
-                ProAuditEventType.ACTIVATION_STARTED,
-                requestId.toString(),
-                "device",
-                null,
-                null,
-                null,
-                null,
-                "started",
-                null,
-                identity.keyId(),
-                identity.publicKeyFingerprint());
-        ProControlPlaneClient.ActivationTicket ticket =
-                controlPlaneClient.startActivation(activationCode, requestId);
-        Instant now = clock.instant();
-        if (ticket.expiresAt() == null || !ticket.expiresAt().isAfter(now)) {
-            throw new ProEntitlementApiException(
-                    "invalid_activation_ticket",
-                    "The control plane returned an expired activation ticket.",
-                    HttpStatus.BAD_GATEWAY);
-        }
-        UUID activationId = UUID.randomUUID();
-        ActivationAttempt attempt = new ActivationAttempt(
-                activationId,
-                ticket.activationTicket(),
-                now,
-                ticket.expiresAt(),
-                UUID.randomUUID().toString(),
-                UUID.randomUUID());
-        activationAttempts.put(activationId, attempt);
-        return new ActivationStartResult(
-                "1",
-                activationId,
-                ticket.expiresAt(),
-                identity.publicKeyFingerprint(),
-                "Activation code accepted. Complete device proof before the attempt expires.");
     }
 
     public ProStatusResponse completeActivation(UUID activationId) {
@@ -280,7 +292,7 @@ public class ProEntitlementService {
             ProStatusResponse result = completeActivationAttempt(attempt);
             synchronized (attempt) {
                 if (result.entitlement().localUseAllowed()) {
-                    activationAttempts.remove(attempt.activationId, attempt);
+                    removeActivationAttempt(attempt);
                     result = status(refreshInFlight.get() != null);
                 } else {
                     attempt.inFlight = null;
@@ -380,6 +392,7 @@ public class ProEntitlementService {
             repository.save(current.locallyDeactivated(now));
         }
         activationAttempts.clear();
+        activationAttemptIdsByCode.clear();
         return new DeactivationResult(
                 "1",
                 true,
@@ -400,7 +413,7 @@ public class ProEntitlementService {
         }
         if (registration == null) {
             if (!attempt.expiresAt.isAfter(clock.instant())) {
-                activationAttempts.remove(attempt.activationId, attempt);
+                removeActivationAttempt(attempt);
                 throw badRequest(
                         "activation_attempt_expired",
                         "Activation attempt expired. Start activation again.");
@@ -1013,11 +1026,67 @@ public class ProEntitlementService {
         activationAttempts.entrySet().removeIf(entry -> {
             ActivationAttempt attempt = entry.getValue();
             synchronized (attempt) {
-                return !attempt.expiresAt.isAfter(now)
+                boolean expired = !attempt.expiresAt.isAfter(now)
                         && (attempt.inFlight == null
                                 || attempt.inFlight.isDone());
+                if (expired) {
+                    activationAttemptIdsByCode.remove(
+                            attempt.codeFingerprint,
+                            attempt.activationId);
+                }
+                return expired;
             }
         });
+    }
+
+    private ActivationAttempt existingActivationAttempt(
+            String codeFingerprint) {
+        UUID activationId = activationAttemptIdsByCode.get(codeFingerprint);
+        if (activationId == null) {
+            return null;
+        }
+        ActivationAttempt attempt = activationAttempts.get(activationId);
+        if (attempt == null || !attempt.expiresAt.isAfter(clock.instant())) {
+            activationAttemptIdsByCode.remove(codeFingerprint, activationId);
+            return null;
+        }
+        return attempt;
+    }
+
+    private ActivationStartResult activationStartResult(
+            ActivationAttempt attempt,
+            DeviceIdentity identity) {
+        return new ActivationStartResult(
+                "1",
+                attempt.activationId,
+                attempt.expiresAt,
+                identity.publicKeyFingerprint(),
+                "Activation code accepted. Complete device proof before the attempt expires.");
+    }
+
+    private void removeActivationAttempt(ActivationAttempt attempt) {
+        activationAttempts.remove(attempt.activationId, attempt);
+        activationAttemptIdsByCode.remove(
+                attempt.codeFingerprint,
+                attempt.activationId);
+    }
+
+    private static String activationCodeFingerprint(String activationCode) {
+        if (activationCode == null || activationCode.isBlank()
+                || activationCode.length() > 512) {
+            throw badRequest(
+                    "activation_code_required",
+                    "Activation code is required.");
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(
+                    activationCode.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(
+                    "SHA-256 is unavailable for activation handling.",
+                    exception);
+        }
     }
 
     private static ProStatusResponse.DeviceStatus deviceStatus(
@@ -1253,6 +1322,7 @@ public class ProEntitlementService {
     private static final class ActivationAttempt {
 
         private final UUID activationId;
+        private final String codeFingerprint;
         private String activationTicket;
         private final Instant startedAt;
         private final Instant expiresAt;
@@ -1264,12 +1334,14 @@ public class ProEntitlementService {
 
         private ActivationAttempt(
                 UUID activationId,
+                String codeFingerprint,
                 String activationTicket,
                 Instant startedAt,
                 Instant expiresAt,
                 String idempotencyKey,
                 UUID registrationRequestId) {
             this.activationId = activationId;
+            this.codeFingerprint = codeFingerprint;
             this.activationTicket = activationTicket;
             this.startedAt = startedAt;
             this.expiresAt = expiresAt;
