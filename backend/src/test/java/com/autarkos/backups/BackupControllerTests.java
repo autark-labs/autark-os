@@ -62,6 +62,35 @@ class BackupControllerTests {
     }
 
     @Test
+    void appBackupKeepsItsVerifiedRestorePointButFailsTheJobWhenTheAppCannotRestart() {
+        BackupService backupService = mock(BackupService.class);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        AutarkOsJobService jobService = jobService();
+        BackupController controller = new BackupController(backupService, jobService, applicationStateService);
+        BackupModels.BackupRunResult result = new BackupModels.BackupRunResult(
+                "vaultwarden",
+                "Vaultwarden",
+                "warning",
+                "Backup completed. Vaultwarden could not restart. Open My Apps to retry starting it.",
+                new RestorePoint(
+                        42L, "vaultwarden", "Vaultwarden", "app", "manual", "vaultwarden", "completed", "/backups/vaultwarden.zip", 1024L,
+                        "Backup completed.", "verified", "Archive checksum matched.", "checksum", "baseline", "archive", 1, "high",
+                        Instant.parse("2026-06-21T12:00:00Z"), Instant.parse("2026-06-21T12:00:00Z")),
+                Instant.parse("2026-06-21T12:00:00Z"));
+        when(backupService.run("vaultwarden")).thenReturn(result);
+
+        AutarkOsJob job = controller.run("vaultwarden");
+        jobService.runQueuedJobsNow();
+
+        AutarkOsJob completed = jobService.findById(job.jobId()).orElseThrow();
+        assertThat(completed.status()).isEqualTo("failed");
+        assertThat(completed.error().message()).contains("Vaultwarden could not restart");
+        assertThat(completed.steps()).extracting(AutarkOsJobStep::status)
+                .containsExactly("succeeded", "succeeded", "succeeded", "failed");
+        assertThat(completed.steps().get(2).message()).isEqualTo("Archive checksum matched.");
+    }
+
+    @Test
     void configuresBackupDestinationAndRefreshesCanonicalApplicationState() {
         BackupService backupService = mock(BackupService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);

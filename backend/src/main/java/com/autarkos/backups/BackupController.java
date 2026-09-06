@@ -112,6 +112,14 @@ public class BackupController {
                     AutarkOsJobStep.pending("finish", "Finishing backup"));
             return AutarkOsJobOutcome.failed(result.message(), steps);
         }
+        if (AutarkOsStates.Tone.WARNING.equals(result.status())) {
+            java.util.List<AutarkOsJobStep> steps = java.util.List.of(
+                    AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
+                    AutarkOsJobStep.succeeded("copy_data", "Copying app data", "Restore point created."),
+                    AutarkOsJobStep.succeeded("verify_backup", "Verifying restore point", result.restorePoint() == null ? "" : result.restorePoint().verificationMessage()),
+                    AutarkOsJobStep.failed("finish", "Finishing backup", result.message()));
+            return AutarkOsJobOutcome.failed(result.message(), steps);
+        }
         java.util.List<AutarkOsJobStep> steps = java.util.List.of(
                 AutarkOsJobStep.succeeded("prepare_backup", "Preparing restore point", "Backup destination checked."),
                 AutarkOsJobStep.succeeded("copy_data", "Copying app data", result.message()),

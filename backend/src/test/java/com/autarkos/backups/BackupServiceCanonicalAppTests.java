@@ -145,7 +145,8 @@ class BackupServiceCanonicalAppTests {
 
         BackupModels.BackupRunResult result = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).run("homepage");
 
-        assertThat(result.status()).isEqualTo("completed");
+        assertThat(result.status()).isEqualTo("warning");
+        assertThat(result.message()).contains("Homepage could not restart");
     }
 
     @Test
@@ -364,6 +365,53 @@ class BackupServiceCanonicalAppTests {
         assertThat(Files.exists(runtimeLayout.runtimeRoot().resolve("backups/homepage"))).isFalse();
     }
 
+    @Test
+    void pausedAppStaysPausedWithoutStopOrStartDuringBackup() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp ready = installed("homepage", "Homepage", runtimeLayout);
+        InstalledApp paused = new InstalledApp(
+                ready.appId(), ready.appName(), "Paused", ready.runtimePath(), ready.composeProject(), ready.accessUrl(), ready.installedAt());
+        installedRepository.save(paused);
+        saveOwned(installedRepository, paused);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(paused.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        NoopDockerComposeExecutor composeExecutor = new NoopDockerComposeExecutor();
+
+        BackupModels.BackupRunResult result = backupService(
+                runtimeLayout, installedRepository, backupRepository, catalogService,
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()), composeExecutor).run("homepage");
+
+        assertThat(result.status()).isEqualTo("completed");
+        assertThat(composeExecutor.stopCalls).isZero();
+        assertThat(composeExecutor.startCalls).isZero();
+    }
+
+    @Test
+    void pausedAppStaysPausedWhenBackupPreflightFails() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp ready = installed("homepage", "Homepage", runtimeLayout);
+        InstalledApp paused = new InstalledApp(
+                ready.appId(), ready.appName(), "Paused", ready.runtimePath(), ready.composeProject(), ready.accessUrl(), ready.installedAt());
+        installedRepository.save(paused);
+        saveOwned(installedRepository, paused);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(paused.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        Files.delete(runtimeLayout.appRoot("homepage").resolve("compose.yaml"));
+        NoopDockerComposeExecutor composeExecutor = new NoopDockerComposeExecutor();
+
+        BackupModels.BackupRunResult result = backupService(
+                runtimeLayout, installedRepository, backupRepository, catalogService,
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()), composeExecutor).run("homepage");
+
+        assertThat(result.status()).isEqualTo("failed");
+        assertThat(composeExecutor.stopCalls).isZero();
+        assertThat(composeExecutor.startCalls).isZero();
+    }
+
     private AppLifecycleService appLifecycleService(RuntimeLayout runtimeLayout, InstalledAppRepository repository, MarketplaceCatalogService catalogService, BackupRepository backupRepository) {
         return new AppLifecycleService(
                 repository,
@@ -471,8 +519,10 @@ class BackupServiceCanonicalAppTests {
 
     private static class NoopDockerComposeExecutor implements DockerComposeExecutor {
         int stopCalls;
+        int startCalls;
         @Override
         public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
+            startCalls++;
             return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 

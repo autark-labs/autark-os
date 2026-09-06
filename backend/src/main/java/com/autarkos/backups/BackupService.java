@@ -224,11 +224,12 @@ public class BackupService {
         if (protectedApps.isEmpty()) {
             return new BackupModels.BackupRunResult("__full__", "All apps", "not_applicable", "No apps currently have a backup contract that Autark-OS can protect automatically.", null, Instant.now());
         }
-        List<InstalledApp> stoppedApps = new java.util.ArrayList<>();
+        List<InstalledApp> runningApps = new java.util.ArrayList<>();
+        BackupModels.BackupRunResult result;
         try {
             // Validate every source and the destination before pausing the first app.
             backupArchiveService.validateFullBackup(protectedApps);
-            stopAppsForBackup(protectedApps, stoppedApps);
+            stopRunningAppsForBackup(protectedApps, runningApps);
             Files.createDirectories(backupRoot().resolve("full"));
             Path destination = backupRoot().resolve("full").resolve("autark-os-full-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
             long size = backupArchiveService.createFullArchive(protectedApps, destination);
@@ -237,19 +238,19 @@ public class BackupService {
             RestorePoint point = recordVerifiedArchive("__full__", "All apps", "full", cleanSource(source), included, destination, size, "Full backup completed for " + protectedApps.size() + " app(s).", contract);
             point = backupVerificationService.verifyRestorePoint(point).restorePoint();
             if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
-                return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.verificationMessage(), point, Instant.now());
+                result = new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.verificationMessage(), point, Instant.now());
+            } else {
+                enforceFullRetentionDays(projectSettingsService.current().backupRetentionDays());
+                activityLogService.success("backup", cleanSource(source) + "_full_backup", "Full backup completed", point.message(), null);
+                protectedApps.forEach(app -> installedAppRepository.recordEvent(app.appId(), "backup_completed", "Included in full " + cleanSource(source) + " backup."));
+                result = new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.COMPLETED, point.message(), point, Instant.now());
             }
-            enforceFullRetentionDays(projectSettingsService.current().backupRetentionDays());
-            activityLogService.success("backup", cleanSource(source) + "_full_backup", "Full backup completed", point.message(), null);
-            protectedApps.forEach(app -> installedAppRepository.recordEvent(app.appId(), "backup_completed", "Included in full " + cleanSource(source) + " backup."));
-            return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.COMPLETED, point.message(), point, Instant.now());
         } catch (RuntimeException | IOException exception) {
             RestorePoint point = recordRestorePoint("__full__", "All apps", "full", cleanSource(source), protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(",")), "", AutarkOsStates.RestorePointStatus.FAILED, 0, userMessage(exception));
             activityLogService.error("backup", cleanSource(source) + "_full_backup", "Full backup failed", userMessage(exception), null, exception);
-            return new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
-        } finally {
-            restartAppsAfterBackup(stoppedApps);
+            result = new BackupModels.BackupRunResult("__full__", "All apps", AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
+        return withRestartOutcome(result, restartAppsAfterBackup(runningApps));
     }
 
     public RestoreModels.RestorePlan restorePlan(long restorePointId, String targetAppId) {
@@ -319,10 +320,10 @@ public class BackupService {
             RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, destinationState.message());
             return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
         }
-        boolean stopped = false;
+        boolean wasRunning = false;
+        BackupModels.BackupRunResult result;
         try {
-            stopAppForBackup(app);
-            stopped = true;
+            wasRunning = stopAppForBackupIfRunning(app);
             backupArchiveService.validateAppBackup(source);
             Files.createDirectories(backupRoot().resolve(app.appId()));
             Path destination = backupRoot().resolve(app.appId()).resolve(app.appId() + "-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
@@ -330,22 +331,20 @@ public class BackupService {
             RestorePoint point = recordVerifiedArchive(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), destination, size, "Backup completed.", contract);
             point = backupVerificationService.verifyRestorePoint(point).restorePoint();
             if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
-                return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.verificationMessage(), point, Instant.now());
+                result = new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.verificationMessage(), point, Instant.now());
+            } else {
+                enforceRetention(app.appId(), policy.retention());
+                activityLogService.success("backup", cleanSource(backupSource) + "_app_backup", "Backup completed", app.appName() + " backup is ready.", app.appId());
+                installedAppRepository.recordEvent(app.appId(), "backup_completed", "Backup completed.");
+                result = new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.COMPLETED, "Backup completed.", point, Instant.now());
             }
-            enforceRetention(app.appId(), policy.retention());
-            activityLogService.success("backup", cleanSource(backupSource) + "_app_backup", "Backup completed", app.appName() + " backup is ready.", app.appId());
-            installedAppRepository.recordEvent(app.appId(), "backup_completed", "Backup completed.");
-            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.COMPLETED, "Backup completed.", point, Instant.now());
         } catch (RuntimeException | IOException exception) {
             RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, userMessage(exception));
             activityLogService.error("backup", cleanSource(backupSource) + "_app_backup", "Backup failed", userMessage(exception), app.appId(), exception);
             installedAppRepository.recordEvent(app.appId(), "backup_failed", userMessage(exception));
-            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), point, Instant.now());
-        } finally {
-            if (stopped) {
-                restartAppAfterBackup(app);
-            }
+            result = new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, userMessage(exception), point, Instant.now());
         }
+        return wasRunning ? withRestartOutcome(result, restartAppsAfterBackup(List.of(app))) : result;
     }
 
     private RestorePoint recordRestorePoint(String appId, String appName, String path, String status, long sizeBytes, String message) {
@@ -382,29 +381,50 @@ public class BackupService {
                 .collect(java.util.stream.Collectors.joining("; "));
     }
 
-    private void stopAppsForBackup(List<InstalledApp> apps, List<InstalledApp> stoppedApps) {
+    private void stopRunningAppsForBackup(List<InstalledApp> apps, List<InstalledApp> runningApps) {
         for (InstalledApp app : apps) {
-            stopAppForBackup(app);
-            stoppedApps.add(app);
+            if (stopAppForBackupIfRunning(app)) {
+                runningApps.add(app);
+            }
         }
     }
 
-    private void stopAppForBackup(InstalledApp app) {
+    private boolean stopAppForBackupIfRunning(InstalledApp app) {
+        if (AutarkOsStates.AppStatus.PAUSED.equals(app.status()) || AutarkOsStates.AppStatus.STOPPED.equals(app.status())) {
+            return false;
+        }
         appLifecycleService.stopAndConfirm(app.appId());
+        return true;
     }
 
-    private void restartAppsAfterBackup(List<InstalledApp> apps) {
+    private List<String> restartAppsAfterBackup(List<InstalledApp> apps) {
+        List<String> failures = new java.util.ArrayList<>();
         for (InstalledApp app : apps.reversed()) {
-            restartAppAfterBackup(app);
+            restartAppAfterBackup(app).ifPresent(failures::add);
         }
+        return failures;
     }
 
-    private void restartAppAfterBackup(InstalledApp app) {
+    private java.util.Optional<String> restartAppAfterBackup(InstalledApp app) {
         try {
             appLifecycleService.start(app.appId());
+            return java.util.Optional.empty();
         } catch (RuntimeException exception) {
+            String failure = app.appName() + " could not restart.";
             activityLogService.warning("backup", "backup_restart_failed", "App needs attention after backup", "Autark-OS created the backup but could not restart " + app.appName() + ".", app.appId());
+            return java.util.Optional.of(failure);
         }
+    }
+
+    private BackupModels.BackupRunResult withRestartOutcome(BackupModels.BackupRunResult result, List<String> restartFailures) {
+        if (restartFailures.isEmpty()) {
+            return result;
+        }
+        String message = result.message() + " " + String.join(" ", restartFailures) + " Open My Apps to retry starting it.";
+        String status = AutarkOsStates.RestorePointStatus.FAILED.equals(result.status())
+                ? AutarkOsStates.RestorePointStatus.FAILED
+                : "warning";
+        return new BackupModels.BackupRunResult(result.appId(), result.appName(), status, message, result.restorePoint(), Instant.now());
     }
 
     private int enforceRetention(String appId, int retention) {
