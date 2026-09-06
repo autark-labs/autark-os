@@ -8,7 +8,7 @@ The repository README is the public overview. These guides focus on installing, 
 
 - [Install Autark-OS](./non-technical-install-guide.md): plain-language install guide for first-time users and support-assisted installs.
 - [First run](./first-run.md): finish setup, install a first app, and understand app ownership labels.
-- [Getting started and recovery](./getting-started.md): keep the essential appliance and managed-app update, recovery, and support actions close at hand.
+- [Getting started and recovery](./getting-started.md): keep the essential appliance, Core update, recovery, and support actions close at hand.
 - [Administrator access and recovery](./security-and-admin-access.md): claim the appliance, understand sessions, reset a lost password, and use safe remote access.
 
 ## Use And Recover
@@ -19,6 +19,10 @@ The repository README is the public overview. These guides focus on installing, 
 
 ## Technical Administration
 
+- [Architecture](./architecture.md): the local runtime, state ownership, and
+  service boundaries.
+- [Development](./development.md): source checkout prerequisites, run commands,
+  and targeted validation.
 - [Technical installation](./technical-installation.md): release artifacts, supported hosts, preflight checks, runtime storage, and installed paths.
 - [Portable and offline installation](./offline-install.md): verify and install copied release artifacts without downloading during setup.
 - [Service and storage reference](./service-user-installation.md): the installed service, durable data paths, systemd, Docker access, and Tailscale operator setup.

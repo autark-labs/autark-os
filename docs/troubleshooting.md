@@ -56,18 +56,16 @@ The reset revokes existing sessions but preserves apps, settings, backups, Docke
 
 Open **My Apps**, select the app, and read the recommended action. Use **Repair** only after reviewing the message. If the app is protected, create or confirm a restore point before making a risky change.
 
-## A managed app update is blocked or rolled back
+## A managed app update is unavailable or a recovery record needs review
 
-Open **My Apps**, select the app, open **Manage app**, and review the **App
-release** message in the **Overview** tab. An update is intentionally blocked
-when backups are not ready, the app is unhealthy, immutable image identities
-cannot be resolved, or the new catalog release changes more than container
-images.
+New managed-app updates are intentionally unavailable during the controlled
+beta. This is a release boundary, not an app failure. Continue using the
+current app release and use its recommended backup, repair, or recovery action.
 
-If Autark-OS reports that it rolled the release back, the target release did
-not pass verification and the saved previous release was restored. Do not
-repeatedly retry it. Confirm that the app is healthy, keep the retained release
-snapshot, and generate a support report from **Diagnostics**.
+If Autark-OS shows a retained rollback or release record from an earlier
+installation, do not repeatedly retry it as a new update. Confirm that the app
+is healthy, keep the record, and generate a support report from **Diagnostics**
+before using a recovery action.
 
 ## Private links do not work
 

@@ -99,11 +99,9 @@ Open **Discover** and choose a simple first app. The app card shows what the app
 
 Choose **Install**, review the plan, and continue. After the app is ready, open **My Apps** to see its status, access link, storage use, and next steps.
 
-When the bundled catalog later contains an eligible image-only release, select
-the managed app in **My Apps**, open **Manage app**, and choose **Review
-update**. Autark-OS requires a verified safety checkpoint and keeps the
-previous release available for rollback. It blocks updates that require
-unreviewed settings or data migrations.
+New managed-app updates are deferred during this controlled beta. Use **My
+Apps** to open, operate, back up, recover, or uninstall supported apps. Core
+updates use `autark-os update`; they do not silently update installed apps.
 
 If the app needs attention, Autark-OS should show a plain-language message and a safe next action. Advanced details remain available for support.
 

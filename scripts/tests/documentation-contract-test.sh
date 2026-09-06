@@ -23,15 +23,14 @@ grep -E -q -- 'autark-os support-bundle' SUPPORT.md
 grep -E -q -- 'private vulnerability reporting' SECURITY.md
 grep -E -q -- 'autark-os update' docs/getting-started.md
 grep -E -q -- 'autark-os uninstall --plan' docs/getting-started.md
-grep -E -q -- 'currently applies image-only catalog releases' docs/getting-started.md
-grep -E -q -- 'Update or roll back a managed app' docs/maintenance.md
-grep -E -q -- 'creates and verifies a safety checkpoint' docs/maintenance.md
-grep -E -q -- 'Managed app updates currently support image-only catalog releases' README.md
-grep -E -q -- 'Managed app health verification is conservative during beta' README.md
-grep -E -q -- 'Managed-app updates currently support image-only catalog releases' scripts/build-release-bundle.sh
+grep -E -q -- 'New managed-app updates are deferred for the controlled beta' docs/getting-started.md
+grep -E -q -- 'Managed app changes during beta' docs/maintenance.md
+grep -E -q -- 'Existing release snapshots and rollback records remain available as recovery evidence' docs/maintenance.md
+grep -E -q -- 'New managed-app updates are deferred during beta' README.md
+grep -E -q -- 'New managed-app updates are deferred during the controlled beta' scripts/build-release-bundle.sh
 grep -E -q -- 'Autark-OS does not claim that backups are encrypted' docs/getting-started.md
 grep -E -q -- 'personal and non-commercial use' docs/getting-started.md
 grep -E -q -- 'THIRD_PARTY_COMPONENTS.txt' docs/third-party-notices.md
-! grep -R -n -E -- 'Managed application updates are currently unavailable|keeps managed app updates disabled until' README.md docs SUPPORT.md scripts/build-release-bundle.sh backend/src/main/java
+! grep -R -n -E -- 'image-only catalog releases|eligible managed-app image updates|Review update' README.md docs SUPPORT.md scripts/build-release-bundle.sh backend/src/main/java
 ! grep -R -n -E -- 'autarklabs\.local' README.md docs SUPPORT.md SECURITY.md scripts/build-release-artifacts.sh
 ! grep -R -n -E -- 'Marketplace|\*\*Applications\*\*|Generate support bundle|GUI and one-command installer flow' README.md docs/non-technical-install-guide.md docs/first-run.md docs/offline-install.md docs/backups-and-recovery.md docs/maintenance.md docs/technical-installation.md docs/troubleshooting.md

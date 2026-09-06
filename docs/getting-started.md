@@ -37,13 +37,11 @@ previous program files and local database if the new release is unhealthy.
 Use `autark-os update check`, `plan`, `status`, or `rollback` for a scoped
 Autark-OS update action.
 
-Managed application updates are reviewed separately in **My Apps**. Select a
-managed app, open **Manage app**, and use **Review update** in the **Overview**
-tab. Autark-OS currently applies image-only catalog releases: it requires a
-ready backup destination and verified safety checkpoint, pins container images
-by digest, and keeps the previous release for rollback. A release that changes
-ports, storage, environment, service topology, or backup contracts is blocked
-for review rather than migrated automatically.
+New managed-app updates are deferred for the controlled beta. Autark-OS keeps
+existing recovery and rollback records, but does not offer a new update action
+or create an update job. Use **My Apps** to operate, back up, recover, or
+uninstall a supported managed app. Use `autark-os update` only to update
+Autark-OS itself.
 
 The normal uninstall preserves managed app data, backups, and the local
 database; permanent data deletion needs the explicit command shown by the

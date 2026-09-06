@@ -100,7 +100,7 @@ Tested beta target:
 - Linux host with `systemd`
 - `sudo`
 - Docker Engine and Docker Compose v2
-- Tailscale for private links and remote access workflows
+- Tailscale for private links and remote access workflows (optional for local-only use)
 
 Docker is required for Discover app installs. Tailscale is optional for local-only usage, but strongly recommended because private access is a core Autark-OS workflow.
 
@@ -150,6 +150,8 @@ docs/          Installation, operation, recovery, and technical-admin guides
 - [Maintenance](docs/maintenance.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Technical installation](docs/technical-installation.md)
+- [Architecture](docs/architecture.md)
+- [Development](docs/development.md)
 - [Service and storage reference](docs/service-user-installation.md)
 - [Support policy](SUPPORT.md)
 - [Security reporting](SECURITY.md)
@@ -159,10 +161,10 @@ docs/          Installation, operation, recovery, and technical-admin guides
 
 - Public download hosting is through GitHub Releases for beta builds.
 - The Linux `.run` installer is guided and executable, but it is not a polished native desktop wizard yet.
-- Artifact signing is reserved but not finished.
+- Checksum verification is available; authenticated release-signature verification awaits a distributed, pinned trust root.
 - Dependency automation is focused on Debian, Ubuntu, and Raspberry Pi OS.
 - App catalog coverage is still early and should be tested app by app.
-- Managed app updates currently support image-only catalog releases. Changes to ports, storage, environment, service topology, or backup contracts are blocked instead of migrated automatically.
+- New managed-app updates are deferred during beta. Existing rollback records remain available for recovery; Core updates use `autark-os update`.
 - Managed app health verification is conservative during beta. A target release that is not ready when checked is rolled back; do not repeatedly retry it without reviewing Activity or Diagnostics.
 - Public network exposure should remain an intentional advanced workflow.
 
