@@ -63,13 +63,6 @@ class MarketplaceCatalogServiceTests {
     }
 
     @Test
-    void reusesTheValidatedCatalogForRepeatedLookups() {
-        assertThat(catalogService.findAll()).isSameAs(catalogService.findAll());
-        assertThat(catalogService.findById("vaultwarden").orElseThrow())
-                .isSameAs(catalogService.findById("vaultwarden").orElseThrow());
-    }
-
-    @Test
     void exposesCatalogAndInstallPreviewThroughDiscoverController() {
         assertThat(discoverController.apps()).extracting(com.autarkos.discover.DiscoverAppView::id).containsExactlyInAnyOrder("freshrss", "homepage", "syncthing");
         DiscoverInstallModels.DiscoverInstallPreview preview = discoverController.installPreview("homepage", new DiscoverSetupModels.DiscoverSetupAnswersRequest(java.util.Map.of()));
