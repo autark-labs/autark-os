@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -21,13 +24,26 @@ public class MarketplaceCatalogService {
 
     private final ManifestYamlReader manifestYamlReader;
     private final ManifestValidator validator;
+    private final List<ApplicationManifest> catalog;
+    private final Map<String, ApplicationManifest> catalogById;
 
     public MarketplaceCatalogService(ManifestYamlReader manifestYamlReader, ManifestValidator validator) {
         this.manifestYamlReader = manifestYamlReader;
         this.validator = validator;
+        this.catalog = loadCatalog();
+        this.catalogById = catalog.stream()
+                .collect(Collectors.toUnmodifiableMap(ApplicationManifest::id, Function.identity()));
     }
 
     public List<ApplicationManifest> findAll() {
+        return catalog;
+    }
+
+    public Optional<ApplicationManifest> findById(String id) {
+        return Optional.ofNullable(catalogById.get(id));
+    }
+
+    private List<ApplicationManifest> loadCatalog() {
         try {
             Resource[] resources = new PathMatchingResourcePatternResolver().getResources(MANIFEST_PATTERN);
             List<ApplicationManifest> manifests = Arrays.stream(resources)
@@ -40,12 +56,6 @@ public class MarketplaceCatalogService {
         } catch (IOException exception) {
             throw new IllegalStateException("Unable to load marketplace catalog.", exception);
         }
-    }
-
-    public Optional<ApplicationManifest> findById(String id) {
-        return findAll().stream()
-                .filter(manifest -> manifest.id().equals(id))
-                .findFirst();
     }
 
     private ApplicationManifest readAndValidate(Resource resource) {
