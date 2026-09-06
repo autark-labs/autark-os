@@ -40,6 +40,8 @@ cat >"${sudoers_file}" <<ENV
 ${service_user} ALL=(root) NOPASSWD: ${helper} *
 ENV
 cat >"${service_file}" <<ENV
+[Unit]
+RequiresMountsFor=${runtime_dir}
 [Service]
 NoNewPrivileges=false
 PrivateTmp=true
@@ -118,6 +120,14 @@ if check_service >"${tmp_dir}/unit-drift.out" 2>&1; then
 fi
 grep -q 'missing PrivateTmp=true' "${tmp_dir}/unit-drift.out"
 sed -i '/\[Service\]/a PrivateTmp=true' "${service_file}"
+
+sed -i '/RequiresMountsFor=/d' "${service_file}"
+if check_service >"${tmp_dir}/mount-dependency-drift.out" 2>&1; then
+  echo "expected a missing runtime mount dependency to fail the service check" >&2
+  exit 1
+fi
+grep -q 'missing RequiresMountsFor=' "${tmp_dir}/mount-dependency-drift.out"
+sed -i '/\[Unit\]/a RequiresMountsFor='"${runtime_dir}" "${service_file}"
 
 printf '%s\n' "${service_user} ALL=(root) NOPASSWD: /usr/bin/false" >"${sudoers_file}"
 if check_service >"${tmp_dir}/sudoers-drift.out" 2>&1; then

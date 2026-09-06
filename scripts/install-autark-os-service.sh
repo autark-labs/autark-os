@@ -460,6 +460,7 @@ check_state() {
     fi
     if [[ -f "${SERVICE_FILE}" ]]; then
       local required_directives=(
+        "RequiresMountsFor=${RUNTIME_DIR}"
         'NoNewPrivileges=false'
         'PrivateTmp=true'
         'ProtectSystem=strict'
@@ -952,6 +953,7 @@ write_systemd_unit() {
 Description=Autark-OS backend
 Wants=network-online.target
 After=network-online.target docker.service tailscaled.service
+RequiresMountsFor=${RUNTIME_DIR}
 
 [Service]
 Type=simple

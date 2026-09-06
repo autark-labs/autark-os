@@ -38,6 +38,7 @@ for directive in \
 done
 
 assert_installer_contains 'NoNewPrivileges=false'
+assert_installer_contains 'RequiresMountsFor=${RUNTIME_DIR}'
 assert_installer_contains 'sudo needs its setuid/setgid and audit'
 assert_installer_contains 'Retain only those four capabilities'
 assert_installer_contains 'ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}'
