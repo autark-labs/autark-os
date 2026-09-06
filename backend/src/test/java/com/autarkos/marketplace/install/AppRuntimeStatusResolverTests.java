@@ -41,4 +41,38 @@ class AppRuntimeStatusResolverTests {
 
         assertThat(accessUrl).isEqualTo("http://localhost:18090");
     }
+
+    @Test
+    void neverMarksAnAppReadyWhenARunningServiceHasAnExitedRequiredDependency() {
+        AppRuntimeStatus status = resolver.normalize(List.of(
+                new RuntimeModels.DockerContainerStatus("app", "app", "running", "", "Up", ""),
+                new RuntimeModels.DockerContainerStatus("database", "database", "exited", "", "Exited (1)", "")),
+                List.of("app", "database"));
+
+        assertThat(status.friendlyStatus()).isEqualTo("Needs attention");
+        assertThat(status.healthCheck()).isEqualTo("incomplete");
+        assertThat(status.technicalStatus()).contains("required service is stopped");
+    }
+
+    @Test
+    void neverMarksAnAppReadyWhenARequiredServiceIsMissingFromDockerObservation() {
+        AppRuntimeStatus status = resolver.normalize(List.of(
+                new RuntimeModels.DockerContainerStatus("app", "app", "running", "", "Up", "")),
+                List.of("app", "database"));
+
+        assertThat(status.friendlyStatus()).isEqualTo("Needs attention");
+        assertThat(status.healthCheck()).isEqualTo("incomplete");
+        assertThat(status.technicalStatus()).contains("missing required service(s): database");
+    }
+
+    @Test
+    void reportsCreatedContainersAsStartingRatherThanReady() {
+        AppRuntimeStatus status = resolver.normalize(List.of(
+                new RuntimeModels.DockerContainerStatus("app", "app", "running", "", "Up", ""),
+                new RuntimeModels.DockerContainerStatus("database", "database", "created", "", "Created", "")),
+                List.of("app", "database"));
+
+        assertThat(status.friendlyStatus()).isEqualTo("Starting");
+        assertThat(status.healthCheck()).isEqualTo("starting");
+    }
 }

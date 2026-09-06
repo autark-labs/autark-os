@@ -196,8 +196,9 @@ public class ApplicationStateService {
     }
 
     private ApplicationState buildSnapshot(Instant startedAt) {
-        List<AppInstanceView> managed = managedApps.get();
         List<AppRuntimeView> runtime = runtimeApps(runtimeApps.get());
+        // Runtime observation writes the freshly derived status; build management views only afterwards.
+        List<AppInstanceView> managed = managedApps.get();
         List<ObservedService> observed = cachedObservedServices();
         List<ObservedServiceView> observedViews = observed.stream()
                 .map(ObservedServiceService::toView)

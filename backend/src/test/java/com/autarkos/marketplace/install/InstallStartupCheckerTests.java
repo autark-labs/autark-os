@@ -38,6 +38,17 @@ class InstallStartupCheckerTests {
         assertThat(check.detail()).contains("stopped or reported unhealthy").contains("state=exited");
     }
 
+    @Test
+    void doesNotDeclareStartupReadyWhenARequiredServiceIsMissing() {
+        InstallStartupChecker.StartupCheck check = new InstallStartupChecker(new FixedContainerExecutor(List.of(
+                container("running", "healthy", "Up 2 minutes (healthy)"))))
+                .waitForStartup(Path.of("compose.yaml"), "autarkos-vaultwarden", HEALTH, List.of("vaultwarden", "database"));
+
+        assertThat(check.ready()).isFalse();
+        assertThat(check.failed()).isTrue();
+        assertThat(check.detail()).contains("required service(s): database");
+    }
+
     private static RuntimeModels.DockerContainerStatus container(String state, String health, String status) {
         return new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", state, health, status, "0.0.0.0:8090->80/tcp");
     }

@@ -16,12 +16,16 @@ final class InstallStartupChecker {
     }
 
     StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health) {
+        return waitForStartup(composeFile, composeProject, health, List.of());
+    }
+
+    StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health, List<String> requiredServices) {
         List<String> lastStatus = List.of();
         List<RuntimeModels.DockerContainerStatus> lastContainers = List.of();
         for (int attempt = 1; attempt <= 20; attempt++) {
             List<RuntimeModels.DockerContainerStatus> containers = dockerComposeExecutor.containers(composeFile, composeProject);
             lastContainers = containers;
-            StartupCheck check = evaluateStartup(containers, health);
+            StartupCheck check = evaluateStartup(containers, health, requiredServices);
             lastStatus = check.logs();
             if (check.ready() || check.failed()) return check;
             sleep();
@@ -36,7 +40,7 @@ final class InstallStartupChecker {
                 lastStatus);
     }
 
-    private StartupCheck evaluateStartup(List<RuntimeModels.DockerContainerStatus> containers, HealthManifest health) {
+    private StartupCheck evaluateStartup(List<RuntimeModels.DockerContainerStatus> containers, HealthManifest health, List<String> requiredServices) {
         if (containers.isEmpty()) {
             return StartupCheck.pending("Waiting for Docker to report the app container.", List.of("No containers reported yet."));
         }
@@ -44,6 +48,13 @@ final class InstallStartupChecker {
         List<String> failedContainers = containers.stream().filter(this::failed).map(this::statusLine).toList();
         if (!failedContainers.isEmpty()) {
             return StartupCheck.failed("The app container stopped or reported unhealthy: " + String.join("; ", failedContainers), statusLines);
+        }
+        List<String> missingServices = (requiredServices == null ? List.<String>of() : requiredServices).stream()
+                .filter(required -> required != null && !required.isBlank())
+                .filter(required -> containers.stream().noneMatch(container -> required.equals(container.service())))
+                .toList();
+        if (!missingServices.isEmpty()) {
+            return StartupCheck.failed("Docker did not report required service(s): " + String.join(", ", missingServices), statusLines);
         }
         boolean starting = containers.stream().anyMatch(this::starting);
         boolean running = containers.stream().anyMatch(this::running);

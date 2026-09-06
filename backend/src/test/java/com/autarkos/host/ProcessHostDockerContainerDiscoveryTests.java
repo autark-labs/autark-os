@@ -36,4 +36,20 @@ class ProcessHostDockerContainerDiscoveryTests {
                 .extracting(HostModels.HostDockerContainer::name)
                 .containsExactly("vaultwarden");
     }
+
+    @Test
+    void failedDockerCommandIsNotReportedAsASuccessfulEmptyInventory() {
+        SystemCommandRunner runner = new SystemCommandRunner() {
+            @Override
+            public CommandExecutionResult run(String... command) {
+                return new CommandExecutionResult(124, List.of("Docker status check timed out."), false, true);
+            }
+        };
+
+        HostDockerContainerDiscovery.DockerInventory inventory = new ProcessHostDockerContainerDiscovery(runner).observeContainers();
+
+        assertThat(inventory.successful()).isFalse();
+        assertThat(inventory.containers()).isEmpty();
+        assertThat(inventory.diagnostic()).contains("timed out");
+    }
 }

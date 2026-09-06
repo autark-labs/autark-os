@@ -22,6 +22,11 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
 
     @Override
     public List<HostModels.HostDockerContainer> findContainers() {
+        return observeContainers().containers();
+    }
+
+    @Override
+    public DockerInventory observeContainers() {
         SystemCommandRunner.CommandExecutionResult result = commandRunner.run(
                 "docker",
                 "ps",
@@ -29,15 +34,15 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
                 "--format",
                 "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Labels}}\t{{.Ports}}");
         if (!result.successful()) {
-            return List.of();
+            return DockerInventory.failed(result.output());
         }
-        return result.outputLines().stream()
+        return DockerInventory.successful(result.outputLines().stream()
                 .map(this::container)
                 .filter(container -> !container.name().isBlank())
                 .filter(container -> !"true".equals(
                         container.labels().get(
                                 PRO_MANAGED_LABEL)))
-                .toList();
+                .toList());
     }
 
     private HostModels.HostDockerContainer container(String line) {

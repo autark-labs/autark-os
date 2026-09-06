@@ -225,6 +225,18 @@ test('only explicit unhealthy or unreachable states need attention', () => {
   assert.equal(appNeedsAttentionFromCanonicalState(unreachableApp, unreachableApp.healthSnapshot, accessByAppId({ runtimeApps: [unreachableApp] }).homepage, unreachableApp.telemetry), true);
 });
 
+test('a running app with an unresponsive local link is unavailable in the normal application state', () => {
+  const app = runtimeApp('vaultwarden', 'Ready', {
+    ...health('Unavailable', 'unreachable'),
+    dockerStatus: 'Ready',
+    detail: 'Docker reports the app is running, but the local app link did not answer.',
+  });
+  const access = accessByAppId({ runtimeApps: [app] }).vaultwarden;
+
+  assert.equal(displayStatusFromCanonicalState(app, app.healthSnapshot), 'Unavailable');
+  assert.equal(appNeedsAttentionFromCanonicalState(app, app.healthSnapshot, access, app.telemetry), true);
+});
+
 test('observed service pinned-state helper preserves recoverable state', () => {
   const state = {
     observedServices: [

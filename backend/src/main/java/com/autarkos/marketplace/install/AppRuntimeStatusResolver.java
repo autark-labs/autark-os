@@ -97,6 +97,20 @@ class AppRuntimeStatusResolver {
     }
 
     AppRuntimeStatus normalize(List<RuntimeModels.DockerContainerStatus> containers) {
+        return normalize(containers, List.of());
+    }
+
+    AppRuntimeStatus normalize(List<RuntimeModels.DockerContainerStatus> containers, ApplicationManifest manifest) {
+        List<String> requiredServices = manifest == null || manifest.runtime() == null || manifest.runtime().services() == null
+                ? List.of()
+                : manifest.runtime().services().stream()
+                        .map(com.autarkos.marketplace.model.RuntimeServiceManifest::name)
+                        .filter(name -> name != null && !name.isBlank())
+                        .toList();
+        return normalize(containers, requiredServices);
+    }
+
+    AppRuntimeStatus normalize(List<RuntimeModels.DockerContainerStatus> containers, List<String> requiredServices) {
         if (containers.isEmpty()) {
             return new AppRuntimeStatus(AutarkOsStates.AppStatus.STOPPED, "No managed containers found", "not running");
         }
@@ -112,6 +126,20 @@ class AppRuntimeStatusResolver {
         }
         if (containers.stream().allMatch(this::stopped)) {
             return new AppRuntimeStatus(AutarkOsStates.AppStatus.STOPPED, technicalStatus, "not running");
+        }
+        List<String> missingServices = requiredServices.stream()
+                .filter(required -> containers.stream().noneMatch(container -> required.equals(container.service())))
+                .toList();
+        if (!missingServices.isEmpty()) {
+            return new AppRuntimeStatus(AutarkOsStates.AppStatus.NEEDS_ATTENTION,
+                    technicalStatus + "; missing required service(s): " + String.join(", ", missingServices), "incomplete");
+        }
+        List<RuntimeModels.DockerContainerStatus> requiredContainers = requiredServices.isEmpty()
+                ? containers
+                : containers.stream().filter(container -> requiredServices.contains(container.service())).toList();
+        if (requiredContainers.stream().anyMatch(this::stopped)) {
+            return new AppRuntimeStatus(AutarkOsStates.AppStatus.NEEDS_ATTENTION,
+                    technicalStatus + "; a required service is stopped", "incomplete");
         }
         if (containers.stream().anyMatch(this::running)) {
             String health = containers.stream().anyMatch(this::healthy) ? "passing" : "running";
@@ -135,7 +163,7 @@ class AppRuntimeStatusResolver {
     private boolean starting(RuntimeModels.DockerContainerStatus container) {
         String health = normalized(container.health());
         String state = normalized(container.state());
-        return health.equals("starting") || state.equals("restarting");
+        return health.equals("starting") || state.equals("created") || state.equals("restarting");
     }
 
     private boolean stopped(RuntimeModels.DockerContainerStatus container) {

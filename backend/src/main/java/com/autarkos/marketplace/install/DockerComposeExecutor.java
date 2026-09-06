@@ -39,8 +39,16 @@ public interface DockerComposeExecutor {
 
     List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName);
 
+    default RuntimeModels.DockerContainerObservation observeContainers(Path composeFile, String projectName) {
+        return RuntimeModels.DockerContainerObservation.successful(containers(composeFile, projectName));
+    }
+
     default List<RuntimeModels.DockerContainerStatus> containersForApp(Path composeFile, String projectName, String appId) {
         return containers(composeFile, projectName);
+    }
+
+    default RuntimeModels.DockerContainerObservation observeContainersForApp(Path composeFile, String projectName, String appId) {
+        return RuntimeModels.DockerContainerObservation.successful(containersForApp(composeFile, projectName, appId));
     }
 
     default RuntimeModels.DockerComposeResult archiveAndRemoveManagedProject(String projectName, String appId, Path archiveDirectory) {

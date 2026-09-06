@@ -46,9 +46,15 @@ class AppHealthService {
     }
 
     AppHealthSnapshot healthSnapshot(InstalledApp app) {
-        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId());
-        AppRuntimeStatus runtime = runtimeStatusResolver.normalize(containers);
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
+        RuntimeModels.DockerContainerObservation observation = composeExecutor.observeContainersForApp(composeFile(app), app.composeProject(), app.appId());
+        if (!observation.successful()) {
+            throw new RuntimeObservationException("Docker observation failed. Previous application state is retained until Docker responds again.");
+        }
+        return healthSnapshot(app, manifest, observation.containers(), runtimeStatusResolver.normalize(observation.containers(), manifest));
+    }
+
+    AppHealthSnapshot healthSnapshot(InstalledApp app, ApplicationManifest manifest, List<RuntimeModels.DockerContainerStatus> containers, AppRuntimeStatus runtime) {
         String accessUrl = runtimeStatusResolver.accessUrl(app, manifest, containers);
         InstallModels.InstallSettings settings = settingsPolicy.normalizeSettings(repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(accessUrl)), app, manifest, accessUrl);
         AccessModels.AppAccessCheck localCheck = accessChecker.shouldCheckLocalAccess(manifest, accessUrl)
@@ -128,8 +134,8 @@ class AppHealthService {
             message = "Unavailable";
             detail = "Autark-OS could not find running managed containers for this app.";
         } else if (localBroken) {
-            status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
-            message = health.failureLabel();
+            status = AutarkOsStates.AppStatus.UNAVAILABLE;
+            message = "Unavailable";
             detail = "Docker reports the app is running, but the local app link did not answer.";
         } else if (privateBroken) {
             status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;

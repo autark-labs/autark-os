@@ -1,6 +1,7 @@
 package com.autarkos.host;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -22,6 +23,28 @@ class ObservedServiceServiceTests {
 
     @TempDir
     Path runtimeRoot;
+
+    @Test
+    void failedDockerInventoryRetainsPreviouslyFoundServicesInsteadOfDeletingThem() {
+        ObservedServiceRepository repository = repository();
+        repository.upsert(observed("docker:existing", "docker", "existing", "Existing app", "homepage", "external_docker", "observed"));
+        HostDockerContainerDiscovery unavailableDocker = new HostDockerContainerDiscovery() {
+            @Override
+            public List<HostModels.HostDockerContainer> findContainers() {
+                return List.of();
+            }
+
+            @Override
+            public DockerInventory observeContainers() {
+                return DockerInventory.failed("Docker status check timed out.");
+            }
+        };
+        ObservedServiceService service = new ObservedServiceService(
+                repository, new ObservedServiceScanner(unavailableDocker, currentIdentity()));
+
+        assertThatThrownBy(service::refresh).isInstanceOf(HostInventoryException.class);
+        assertThat(repository.findServiceById("docker:existing")).isPresent();
+    }
 
     @Test
     void excludedFoundAppsKeepReviewAndVisibilityActionsButCannotOfferNewInstalls() {

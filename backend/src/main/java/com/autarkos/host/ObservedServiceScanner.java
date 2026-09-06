@@ -43,7 +43,11 @@ public class ObservedServiceScanner {
 
     public List<ObservedService> scan(Instant now) {
         AutarkOsIdentity identity = currentIdentity.get();
-        return containerDiscovery.findContainers().stream()
+        HostDockerContainerDiscovery.DockerInventory inventory = containerDiscovery.observeContainers();
+        if (!inventory.successful()) {
+            throw new HostInventoryException("Docker inventory failed. Existing found services are retained until Docker responds again.");
+        }
+        return inventory.containers().stream()
                 .map(container -> observed(container, identity, now))
                 .toList();
     }

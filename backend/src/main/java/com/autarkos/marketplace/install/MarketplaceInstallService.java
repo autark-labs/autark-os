@@ -176,7 +176,13 @@ public class MarketplaceInstallService {
                 return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, "Docker Compose failed to start the app.", runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
             }
             recordStep(steps, sink, InstallModels.InstallStep.completed("Starting services", "Docker Compose started the managed services."));
-            InstallStartupChecker.StartupCheck startupCheck = startupChecker.waitForStartup(composeFile, composeProject, manifest.health());
+            InstallStartupChecker.StartupCheck startupCheck = startupChecker.waitForStartup(
+                    composeFile,
+                    composeProject,
+                    manifest.health(),
+                    manifest.runtime() == null || manifest.runtime().services() == null
+                            ? List.of()
+                            : manifest.runtime().services().stream().map(com.autarkos.marketplace.model.RuntimeServiceManifest::name).toList());
             logs.addAll(startupCheck.logs());
             if (!startupCheck.ready()) {
                 recordStep(steps, sink, InstallModels.InstallStep.failed("Checking app health", startupCheck.detail()));

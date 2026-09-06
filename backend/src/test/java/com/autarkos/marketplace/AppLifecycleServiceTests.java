@@ -100,10 +100,23 @@ class AppLifecycleServiceTests {
         assertThat(app.readinessState()).isEqualTo("ready");
         assertThat(app.attentionState()).isEqualTo("none");
         assertThat(app.healthCheck()).isEqualTo("passing");
+        assertThat(app.healthSnapshot()).isNotNull();
+        assertThat(repository.healthFor("vaultwarden")).isPresent();
         assertThat(app.category()).isEqualTo("Security");
         assertThat(app.telemetry().cpuPercent()).isEqualTo("Unavailable");
         assertThat(app.appConfiguration()).isNotEmpty();
         assertThat(app.recentEvents()).hasSize(1);
+    }
+
+    @Test
+    void runtimeObservationFailureDoesNotTurnAnAppIntoAStoppedOrMissingApp() {
+        composeExecutor.observationFails = true;
+
+        assertThatThrownBy(() -> service.getApp("vaultwarden"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("Previous application state is retained");
+        assertThat(repository.findAppById("vaultwarden")).hasValueSatisfying(app ->
+                assertThat(app.status()).isEqualTo("Installed"));
     }
 
     @Test
@@ -229,6 +242,23 @@ class AppLifecycleServiceTests {
 
         assertThat(unreachable.readinessState()).isEqualTo("unreachable");
         assertThat(unreachable.attentionState()).isEqualTo("needs_review");
+    }
+
+    @Test
+    void runningContainerWithAnUnresponsiveLocalAppLinkIsUnavailable() {
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
+                "autark-os-vaultwarden",
+                "vaultwarden",
+                "running",
+                "healthy",
+                "Up 1 minute (healthy)",
+                "0.0.0.0:1->80/tcp"));
+
+        AppRuntimeView app = service.getApp("vaultwarden");
+
+        assertThat(app.friendlyStatus()).isEqualTo("Unavailable");
+        assertThat(app.healthSnapshot().detail()).contains("local app link did not answer");
+        assertThat(app.readinessState()).isEqualTo("unreachable");
     }
 
     @Test
@@ -1059,6 +1089,7 @@ class AppLifecycleServiceTests {
         boolean failArchive;
         boolean stopManagedCalled;
         boolean transitionToStarting;
+        boolean observationFails;
         String requiredProjectName;
 
         @Override
@@ -1120,6 +1151,13 @@ class AppLifecycleServiceTests {
                 return List.of();
             }
             return containers;
+        }
+
+        @Override
+        public RuntimeModels.DockerContainerObservation observeContainersForApp(Path composeFile, String projectName, String appId) {
+            return observationFails
+                    ? RuntimeModels.DockerContainerObservation.failed(List.of("Docker status check timed out."))
+                    : RuntimeModels.DockerContainerObservation.successful(containers(composeFile, projectName));
         }
 
         @Override

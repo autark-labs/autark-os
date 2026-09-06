@@ -98,28 +98,40 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
 
     @Override
     public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
+        return observeContainers(composeFile, projectName).containers();
+    }
+
+    @Override
+    public RuntimeModels.DockerContainerObservation observeContainers(Path composeFile, String projectName) {
         RuntimeModels.DockerComposeResult result = run(composeFile, projectName, "ps", "--all", "--format", "json");
         if (!result.successful() || result.output().isEmpty()) {
-            return List.of();
+            return result.successful()
+                    ? RuntimeModels.DockerContainerObservation.successful(List.of())
+                    : RuntimeModels.DockerContainerObservation.failed(result.output());
         }
-        return parseContainers(result.output());
+        return RuntimeModels.DockerContainerObservation.successful(parseContainers(result.output()));
     }
 
     @Override
     public List<RuntimeModels.DockerContainerStatus> containersForApp(Path composeFile, String projectName, String appId) {
+        return observeContainersForApp(composeFile, projectName, appId).containers();
+    }
+
+    @Override
+    public RuntimeModels.DockerContainerObservation observeContainersForApp(Path composeFile, String projectName, String appId) {
         if (Files.isRegularFile(composeFile)) {
-            return containers(composeFile, projectName);
+            return observeContainers(composeFile, projectName);
         }
         List<String> command = managedDockerCommand("ps", "-a", projectName, appId);
         command.addAll(List.of("--format", "{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Ports}}\t{{.Label \"com.docker.compose.service\"}}"));
         RuntimeModels.DockerComposeResult result = runCommand(command);
         if (!result.successful()) {
-            return List.of();
+            return RuntimeModels.DockerContainerObservation.failed(result.output());
         }
-        return result.output().stream()
+        return RuntimeModels.DockerContainerObservation.successful(result.output().stream()
                 .map(this::containerFromColumns)
                 .filter(container -> !container.name().isBlank())
-                .toList();
+                .toList());
     }
 
     @Override

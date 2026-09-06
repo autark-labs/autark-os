@@ -540,10 +540,13 @@ public class AppLifecycleService {
 
     private AppRuntimeView refresh(InstalledApp app, boolean includeTelemetry) {
         app = reconcileRuntimeMetadata(app);
-        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId());
-        AppRuntimeStatus status = runtimeStatusResolver.normalize(containers);
-        repository.updateStatus(app.appId(), status.friendlyStatus());
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
+        RuntimeModels.DockerContainerObservation observation = composeExecutor.observeContainersForApp(composeFile(app), app.composeProject(), app.appId());
+        if (!observation.successful()) {
+            throw new RuntimeObservationException("Docker observation failed. Previous application state is retained until Docker responds again.");
+        }
+        List<RuntimeModels.DockerContainerStatus> containers = observation.containers();
+        AppRuntimeStatus status = runtimeStatusResolver.normalize(containers, manifest);
         String category = manifest == null ? "Installed" : manifest.category();
         String description = manifest == null ? "Managed by Autark-OS." : manifest.description();
         String version = manifest == null ? "Unknown" : manifest.version();
@@ -587,8 +590,9 @@ public class AppLifecycleService {
         AccessModels.AccessDesiredState desiredAccess = settingsPolicy.desiredAccessState(settings, manifest, accessUrl, privateAccess);
         AccessModels.AccessObservedState observedAccess = settingsPolicy.observedAccessState(settings, accessUrl, privateAccess);
         AccessModels.AppAccessRoute accessRoute = settingsPolicy.accessRoute(settings, accessUrl, observedAccess, privateAccess);
-        AppHealthSnapshot healthSnapshot = repository.healthFor(app.appId()).orElse(null);
-        String remediationStatus = healthSnapshot == null ? status.friendlyStatus() : healthSnapshot.status();
+        AppHealthSnapshot healthSnapshot = healthService.healthSnapshot(app, manifest, containers, status);
+        repository.updateStatus(app.appId(), healthSnapshot.status());
+        String remediationStatus = healthSnapshot.status();
         String backupState = backupState(app.appId(), settings);
         ReliabilityModels.AppRemediationView remediation = AppRemediationPolicy.remediation(
                 app.appName(),
@@ -604,7 +608,7 @@ public class AppLifecycleService {
                 description,
                 version,
                 image,
-                status.friendlyStatus(),
+                healthSnapshot.status(),
                 status.technicalStatus(),
                 status.healthCheck(),
                 app.runtimePath(),

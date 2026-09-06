@@ -75,6 +75,25 @@ public final class RuntimeModels {
             String ports) {
     }
 
+    /** A Docker inventory result; an empty successful inventory is distinct from an unavailable Docker runtime. */
+    public record DockerContainerObservation(
+            boolean successful,
+            List<DockerContainerStatus> containers,
+            List<String> diagnostics) {
+        public DockerContainerObservation {
+            containers = List.copyOf(containers == null ? List.of() : containers);
+            diagnostics = List.copyOf(diagnostics == null ? List.of() : diagnostics);
+        }
+
+        public static DockerContainerObservation successful(List<DockerContainerStatus> containers) {
+            return new DockerContainerObservation(true, containers, List.of());
+        }
+
+        public static DockerContainerObservation failed(List<String> diagnostics) {
+            return new DockerContainerObservation(false, List.of(), diagnostics);
+        }
+    }
+
     public record DockerResourceClassification(
             DockerResourceOwnership ownership,
             String appId,
