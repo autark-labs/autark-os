@@ -97,6 +97,7 @@ class RestoreExecutor {
         }
         Path safetyArchive = null;
         InstallationException restoreFailure = null;
+        boolean requestedRestoreApplied = false;
         try {
             if (Files.exists(destination) && fileOperations.directorySize(destination) > 0) {
                 Files.createDirectories(backupRoot.get().resolve("pre-restore"));
@@ -123,6 +124,7 @@ class RestoreExecutor {
                 throw new InstallationException("Restore point integrity changed before Autark-OS could apply it: " + integrity.message());
             }
             backupArchiveService.restoreAppData(Path.of(point.path()), point.scope(), app.appId());
+            requestedRestoreApplied = true;
             installedAppRepository.recordEvent(app.appId(), "restore_completed", "Restored data from restore point #" + point.id() + ".");
             activityLogService.success("backup", "restore_app", "Restored " + app.appName(), "Restored data from restore point #" + point.id() + ".", app.appId());
             logs.add("Restored " + app.appName() + ".");
@@ -140,8 +142,11 @@ class RestoreExecutor {
             restartFailure = "Autark-OS could not start " + app.appName() + ": " + userMessage(exception);
             logs.add(restartFailure);
         }
-        if (restartFailure != null && safetyArchive != null) {
+        if (restartFailure != null && safetyArchive != null && requestedRestoreApplied) {
             try {
+                logs.add("Stopping " + app.appName() + " before restoring its safety checkpoint.");
+                AppActionResult stop = appLifecycleService.stopAndConfirm(app.appId());
+                logs.add(stop.message());
                 logs.add("Restoring the verified safety checkpoint for " + app.appName() + ".");
                 backupArchiveService.restoreAppData(safetyArchive, "app", app.appId());
                 AppActionResult recovered = startAndCheck(app, logs);

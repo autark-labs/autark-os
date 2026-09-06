@@ -203,6 +203,56 @@ class BackupServiceCanonicalAppTests {
         installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
         RestorePoint point = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService).run("homepage").restorePoint();
+        FailingStartDockerComposeExecutor composeExecutor = new FailingStartDockerComposeExecutor();
+        BackupService service = backupService(
+                runtimeLayout,
+                installedRepository,
+                backupRepository,
+                catalogService,
+                fileOpsService,
+                composeExecutor);
+
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+                .hasMessageContaining("could not restore the safety checkpoint");
+        assertThat(fileOpsService.restoreCalls).hasSize(2);
+        assertThat(fileOpsService.restoreCalls.getFirst()).isEqualTo("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
+        assertThat(fileOpsService.restoreCalls.get(1)).contains("homepage|app|").contains("pre-restore");
+        assertThat(composeExecutor.stopCalls).isEqualTo(2);
+    }
+
+    @Test
+    void restoreDoesNotApplySafetyCheckpointWhenRollbackStopCannotBeConfirmed() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        RecordingFileOpsService fileOpsService = new RecordingFileOpsService(runtimeLayout);
+        RestorePoint point = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService).run("homepage").restorePoint();
+        FailingRollbackStopDockerComposeExecutor composeExecutor = new FailingRollbackStopDockerComposeExecutor();
+        BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService, composeExecutor);
+
+        assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
+                .hasMessageContaining("could not restore the safety checkpoint");
+        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
+        assertThat(composeExecutor.stopCalls).isEqualTo(2);
+    }
+
+    @Test
+    void restoreDoesNotApplySafetyCheckpointWhenRequestedDataWasNeverSwapped() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedRepository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
+        installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
+        installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        FailingRequestedRestoreFileOpsService fileOpsService = new FailingRequestedRestoreFileOpsService(runtimeLayout);
+        RestorePoint point = backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService).run("homepage").restorePoint();
         BackupService service = backupService(
                 runtimeLayout,
                 installedRepository,
@@ -212,10 +262,9 @@ class BackupServiceCanonicalAppTests {
                 new FailingStartDockerComposeExecutor());
 
         assertThatThrownBy(() -> service.restore(point.id(), "homepage"))
-                .hasMessageContaining("could not restore the safety checkpoint");
-        assertThat(fileOpsService.restoreCalls).hasSize(2);
-        assertThat(fileOpsService.restoreCalls.getFirst()).isEqualTo("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
-        assertThat(fileOpsService.restoreCalls.get(1)).contains("homepage|app|").contains("pre-restore");
+                .hasMessageContaining("Restore failed for Homepage")
+                .hasMessageContaining("requested archive could not be applied");
+        assertThat(fileOpsService.restoreCalls).containsExactly("homepage|app|" + Path.of(point.path()).toAbsolutePath().normalize());
     }
 
     @Test
@@ -421,6 +470,7 @@ class BackupServiceCanonicalAppTests {
     }
 
     private static class NoopDockerComposeExecutor implements DockerComposeExecutor {
+        int stopCalls;
         @Override
         public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
             return new RuntimeModels.DockerComposeResult(0, List.of());
@@ -428,6 +478,7 @@ class BackupServiceCanonicalAppTests {
 
         @Override
         public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            stopCalls++;
             return new RuntimeModels.DockerComposeResult(0, List.of());
         }
 
@@ -471,6 +522,16 @@ class BackupServiceCanonicalAppTests {
         }
     }
 
+    private static class FailingRollbackStopDockerComposeExecutor extends FailingStartDockerComposeExecutor {
+        @Override
+        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
+            stopCalls++;
+            return stopCalls == 1
+                    ? new RuntimeModels.DockerComposeResult(0, List.of())
+                    : new RuntimeModels.DockerComposeResult(1, List.of("container could not be stopped before rollback"));
+        }
+    }
+
     private static class RecordingFileOpsService extends AutarkOsFileOpsService {
         protected final List<String> restoreCalls = new java.util.ArrayList<>();
 
@@ -479,12 +540,12 @@ class BackupServiceCanonicalAppTests {
         }
 
         @Override
-        public void restoreAppData(Path archive, String scope, String appId) {
+        public void restoreAppData(Path archive, String scope, String appId) throws java.io.IOException {
             restoreCalls.add(appId + "|" + scope + "|" + archive.toAbsolutePath().normalize());
         }
 
         @Override
-        public void restoreAppData(Path archive, String scope, String appId, Path approvedBackupRoot) {
+        public void restoreAppData(Path archive, String scope, String appId, Path approvedBackupRoot) throws java.io.IOException {
             restoreAppData(archive, scope, appId);
         }
     }
@@ -508,6 +569,18 @@ class BackupServiceCanonicalAppTests {
                 archiveToTamper = null;
             }
             return size;
+        }
+    }
+
+    private static class FailingRequestedRestoreFileOpsService extends RecordingFileOpsService {
+        FailingRequestedRestoreFileOpsService(RuntimeLayout runtimeLayout) {
+            super(runtimeLayout);
+        }
+
+        @Override
+        public void restoreAppData(Path archive, String scope, String appId) throws java.io.IOException {
+            super.restoreAppData(archive, scope, appId);
+            throw new java.io.IOException("requested archive could not be applied");
         }
     }
 }
