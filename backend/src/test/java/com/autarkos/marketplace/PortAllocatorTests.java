@@ -3,6 +3,7 @@ package com.autarkos.marketplace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.ServerSocket;
+import java.net.DatagramSocket;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -64,6 +65,30 @@ class PortAllocatorTests {
         assertThat(configuration.accessUrl()).isEqualTo("http://localhost:" + webPort);
     }
 
+    @Test
+    void tcpCollisionDoesNotMoveAnAvailableUdpPort() throws Exception {
+        int port = availableUdpPortWithFreeNeighbor();
+        try (ServerSocket ignored = new ServerSocket(port)) {
+            ApplicationManifest manifest = manifest(port + ":5353/udp");
+
+            RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
+
+            assertThat(configuration.ports()).containsExactly(port + ":5353/udp");
+        }
+    }
+
+    @Test
+    void movesUdpPortWhenTheUdpPortIsBusy() throws Exception {
+        int port = availableUdpPortWithFreeNeighbor();
+        try (DatagramSocket ignored = new DatagramSocket(port)) {
+            ApplicationManifest manifest = manifest(port + ":5353/udp");
+
+            RuntimeModels.ResolvedRuntimeConfiguration configuration = new PortAllocator().resolve(manifest);
+
+            assertThat(configuration.ports()).containsExactly((port + 1) + ":5353/udp");
+        }
+    }
+
     private int availablePort() {
         try (ServerSocket socket = new ServerSocket(0)) {
             return socket.getLocalPort();
@@ -83,6 +108,23 @@ class PortAllocatorTests {
 
     private boolean canBind(int port) {
         try (ServerSocket ignored = new ServerSocket(port)) {
+            return true;
+        } catch (java.io.IOException exception) {
+            return false;
+        }
+    }
+
+    private int availableUdpPortWithFreeNeighbor() {
+        for (int port = 20000; port < 65000; port++) {
+            if (canBindUdp(port) && canBindUdp(port + 1)) {
+                return port;
+            }
+        }
+        throw new IllegalStateException("Unable to find adjacent available UDP ports.");
+    }
+
+    private boolean canBindUdp(int port) {
+        try (DatagramSocket ignored = new DatagramSocket(port)) {
             return true;
         } catch (java.io.IOException exception) {
             return false;

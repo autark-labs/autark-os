@@ -1,6 +1,7 @@
 package com.autarkos.marketplace.install;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.util.ArrayList;
@@ -69,10 +70,11 @@ public class PortAllocator {
         if (hostPort < 1 || hostPort > MAX_PORT) {
             throw new InstallationException("Host port must be between 1 and 65535.");
         }
-        if (!isAvailable(hostPort)) {
+        PortMapping mapping = parse(defaultPortMapping);
+        if (!isAvailable(hostPort, mapping.protocol())) {
             throw new InstallationException("Port " + hostPort + " is already in use. Choose another port or use automatic port selection.");
         }
-        return hostPort + ":" + parse(defaultPortMapping).containerPort();
+        return hostPort + ":" + mapping.containerPort();
     }
 
     public String accessUrl(ApplicationManifest manifest, List<String> ports) {
@@ -120,24 +122,41 @@ public class PortAllocator {
             return portMapping;
         }
         int hostPort = Integer.parseInt(mapping.hostPort());
-        int availablePort = availablePort(hostPort);
+        int availablePort = availablePort(hostPort, mapping.protocol());
         if (availablePort == hostPort) {
             return portMapping;
         }
         return availablePort + ":" + mapping.containerPort();
     }
 
-    private int availablePort(int preferredPort) {
+    private int availablePort(int preferredPort, String protocol) {
         for (int port = preferredPort; port <= MAX_PORT; port++) {
-            if (isAvailable(port)) {
+            if (isAvailable(port, protocol)) {
                 return port;
             }
         }
         throw new InstallationException("No available port found starting at " + preferredPort + ".");
     }
 
-    private boolean isAvailable(int port) {
+    private boolean isAvailable(int port, String protocol) {
+        if ("udp".equals(protocol)) {
+            return udpAvailable(port);
+        }
+        return tcpAvailable(port);
+    }
+
+    private boolean tcpAvailable(int port) {
         try (ServerSocket socket = new ServerSocket()) {
+            socket.setReuseAddress(false);
+            socket.bind(new InetSocketAddress("0.0.0.0", port));
+            return true;
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    private boolean udpAvailable(int port) {
+        try (DatagramSocket socket = new DatagramSocket(null)) {
             socket.setReuseAddress(false);
             socket.bind(new InetSocketAddress("0.0.0.0", port));
             return true;
@@ -157,6 +176,11 @@ public class PortAllocator {
     private record PortMapping(String hostPort, String containerPort) {
         private String containerPortNumber() {
             return containerPort.split("/", 2)[0];
+        }
+
+        private String protocol() {
+            String[] parts = containerPort.split("/", 2);
+            return parts.length == 2 ? parts[1].trim().toLowerCase() : "tcp";
         }
     }
 }
