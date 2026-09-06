@@ -16,12 +16,24 @@ mkdir -p "${app_root}/old" "${backup_root}/full" "${backup_root}/pre-restore"
 printf 'old\n' >"${app_root}/old/file.txt"
 
 python3 - "${archive}" <<'PY'
+import json
+import os
 import sys
 import zipfile
 
 with zipfile.ZipFile(sys.argv[1], "w") as archive:
     archive.writestr("home-assistant/config/configuration.yaml", "default_config:\n")
     archive.writestr("grafana/config.ini", "ignored=true\n")
+    archive.writestr(".autark-os-filesystem.json", json.dumps({
+        "schemaVersion": 1,
+        "entries": [{
+            "path": "home-assistant/config/configuration.yaml",
+            "type": "file",
+            "mode": 0o640,
+            "uid": os.getuid(),
+            "gid": os.getgid(),
+        }],
+    }))
 PY
 
 "${repo_root}/scripts/autark-os-fileops" restore-app-data \
@@ -34,6 +46,10 @@ PY
 [[ ! -e "${app_root}/old/file.txt" ]]
 grep -q 'default_config' "${app_root}/config/configuration.yaml"
 [[ ! -e "${app_root}/grafana/config.ini" ]]
+[[ "$(stat -c '%a' "${app_root}/config/configuration.yaml")" == "640" ]]
+
+mkdir -p "${app_root}/empty-state"
+chmod 700 "${app_root}/empty-state"
 
 "${repo_root}/scripts/autark-os-fileops" create-safety-archive \
   --runtime-root "${runtime_root}" \
@@ -42,6 +58,8 @@ grep -q 'default_config' "${app_root}/config/configuration.yaml"
   --destination "${safety}" >/dev/null
 
 unzip -l "${safety}" | grep -q 'config/configuration.yaml'
+unzip -l "${safety}" | grep -q 'empty-state/'
+unzip -l "${safety}" | grep -q '.autark-os-filesystem.json'
 
 mkdir -p "${runtime_root}/apps/grafana"
 printf 'grafana\n' >"${runtime_root}/apps/grafana/config.ini"

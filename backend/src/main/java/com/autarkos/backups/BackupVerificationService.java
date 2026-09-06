@@ -14,6 +14,7 @@ import java.util.zip.ZipInputStream;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.fileops.ArchiveFilesystemMetadata;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
@@ -56,7 +57,7 @@ class BackupVerificationService {
                 return new VerificationUpdate(updated, result(updated));
             }
             ZipSummary summary = inspectZip(path);
-            if (summary.entries() == 0 || summary.bytes() <= 0) {
+            if (summary.entries() == 0) {
                 RestorePoint updated = updateVerification(point.id(), AutarkOsStates.RestorePointStatus.FAILED, "Backup archive is empty.", "low");
                 return new VerificationUpdate(updated, result(updated));
             }
@@ -109,7 +110,7 @@ class BackupVerificationService {
                 return IntegrityCheck.blocked("Backup file is missing.");
             }
             ZipSummary summary = inspectZip(archive);
-            if (summary.entries() == 0 || summary.bytes() <= 0) {
+            if (summary.entries() == 0) {
                 return IntegrityCheck.blocked("Backup archive is empty.");
             }
             if (!point.integrityBaselineSha256().equals(checksum(archive))) {
@@ -169,6 +170,10 @@ class BackupVerificationService {
         try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(path))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
+                if (ArchiveFilesystemMetadata.ENTRY_NAME.equals(entry.getName())) {
+                    zip.closeEntry();
+                    continue;
+                }
                 if (!entry.isDirectory()) {
                     if (entry.getName().startsWith("/") || entry.getName().contains("..\\") || entry.getName().contains("../")) {
                         throw new InstallationException("Backup archive contains an unsafe file path.");
@@ -188,7 +193,8 @@ class BackupVerificationService {
                 zip.closeEntry();
             }
         }
-        return new ZipSummary(entries, bytes);
+        List<ArchiveFilesystemMetadata.Entry> metadata = ArchiveFilesystemMetadata.read(path);
+        return new ZipSummary(metadata.size(), bytes);
     }
 
     private String checksum(Path path) throws IOException {

@@ -14,6 +14,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.fileops.ArchiveFilesystemMetadata;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 
@@ -55,11 +56,11 @@ class RestoreSimulationService {
                     continue;
                 }
                 SimulationStats stats = extractAppForSimulation(point, app, simulationRoot.resolve(app.appId()).normalize());
-                if (stats.files() == 0 || stats.bytes() == 0) {
+                if (stats.entries() == 0) {
                     failed = true;
                     details.add(app.appName() + ": no restorable files were found in the archive.");
                 } else {
-                    details.add(app.appName() + ": simulated " + stats.files() + " file(s), " + stats.bytes() + " byte(s), without touching live data.");
+                    details.add(app.appName() + ": simulated " + stats.entries() + " filesystem entr" + (stats.entries() == 1 ? "y" : "ies") + ", " + stats.bytes() + " byte(s), without touching live data.");
                 }
             }
         } catch (RuntimeException | IOException exception) {
@@ -85,14 +86,18 @@ class RestoreSimulationService {
 
     private SimulationStats extractAppForSimulation(RestorePoint point, InstalledApp app, Path destination) throws IOException {
         Path zipPath = Path.of(point.path()).toAbsolutePath().normalize();
+        List<ArchiveFilesystemMetadata.Entry> metadata = ArchiveFilesystemMetadata.forRestore(
+                ArchiveFilesystemMetadata.read(zipPath), point.scope(), app.appId());
+        java.util.Set<String> expected = metadata.stream().map(ArchiveFilesystemMetadata.Entry::path).collect(java.util.stream.Collectors.toSet());
+        java.util.Set<String> extracted = new java.util.HashSet<>();
         Files.createDirectories(destination);
-        long files = 0;
+        long entries = 0;
         long bytes = 0;
         byte[] buffer = new byte[8192];
         try (ZipInputStream zip = new ZipInputStream(Files.newInputStream(zipPath))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
-                if (entry.isDirectory()) {
+                if (ArchiveFilesystemMetadata.ENTRY_NAME.equals(entry.getName())) {
                     zip.closeEntry();
                     continue;
                 }
@@ -113,19 +118,31 @@ class RestoreSimulationService {
                 if (!target.startsWith(destination)) {
                     throw new InstallationException("Restore point contains an unsafe file path.");
                 }
-                Files.createDirectories(target.getParent());
-                try (var output = Files.newOutputStream(target)) {
-                    int read;
-                    while ((read = zip.read(buffer)) >= 0) {
-                        output.write(buffer, 0, read);
-                        bytes += read;
+                String metadataName = name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
+                if (!expected.contains(metadataName)) {
+                    throw new InstallationException("Restore point contents do not match filesystem metadata.");
+                }
+                if (entry.isDirectory()) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.createDirectories(target.getParent());
+                    try (var output = Files.newOutputStream(target)) {
+                        int read;
+                        while ((read = zip.read(buffer)) >= 0) {
+                            output.write(buffer, 0, read);
+                            bytes += read;
+                        }
                     }
                 }
-                files++;
+                entries++;
+                extracted.add(metadataName);
                 zip.closeEntry();
             }
         }
-        return new SimulationStats(files, bytes);
+        if (!extracted.equals(expected)) {
+            throw new InstallationException("Restore point contents do not match filesystem metadata.");
+        }
+        return new SimulationStats(entries, bytes);
     }
 
     private void deleteContents(Path directory) throws IOException {
@@ -148,6 +165,6 @@ class RestoreSimulationService {
                 : exception.getMessage();
     }
 
-    private record SimulationStats(long files, long bytes) {
+    private record SimulationStats(long entries, long bytes) {
     }
 }
