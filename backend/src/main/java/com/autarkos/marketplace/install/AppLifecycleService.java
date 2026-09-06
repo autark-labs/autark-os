@@ -20,6 +20,8 @@ import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
+import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.AccessModels;
@@ -59,8 +61,12 @@ public class AppLifecycleService {
         this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, new RecoveryOperationCoordinator());
     }
 
-    @Autowired
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
+        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, recoveryOperations, new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
+    }
+
+    @Autowired
+    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, AutarkOsFileOpsService fileOpsService) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -71,7 +77,7 @@ public class AppLifecycleService {
         this.settingsPolicy = new AppSettingsPolicy(repository, runtimeStatusResolver);
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.recoveryOperations = recoveryOperations;
-        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations);
+        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations, fileOpsService);
         this.healthService = new AppHealthService(repository, composeExecutor, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
         this.containerLifecycleService = new AppContainerLifecycleService(repository, composeExecutor, activityLogService, this::refresh);
         this.reliabilityService = new AppReliabilityService(repository, tailscaleService);

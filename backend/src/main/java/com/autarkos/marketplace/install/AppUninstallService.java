@@ -1,18 +1,12 @@
 package com.autarkos.marketplace.install;
 
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
@@ -20,6 +14,8 @@ import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
+import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -39,6 +35,7 @@ class AppUninstallService {
     private final ActivityLogService activityLogService;
     private final BackupDestinationService backupDestinationService;
     private final RecoveryOperationCoordinator recoveryOperations;
+    private final AutarkOsFileOpsService fileOpsService;
 
     AppUninstallService(
             InstalledAppRepository repository,
@@ -70,6 +67,28 @@ class AppUninstallService {
             ActivityLogService activityLogService,
             BackupDestinationService backupDestinationService,
             RecoveryOperationCoordinator recoveryOperations) {
+        this(
+                repository,
+                composeExecutor,
+                runtimeLayout,
+                backupRepository,
+                tailscaleService,
+                activityLogService,
+                backupDestinationService,
+                recoveryOperations,
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
+    }
+
+    AppUninstallService(
+            InstalledAppRepository repository,
+            DockerComposeExecutor composeExecutor,
+            RuntimeLayout runtimeLayout,
+            BackupRepository backupRepository,
+            TailscaleService tailscaleService,
+            ActivityLogService activityLogService,
+            BackupDestinationService backupDestinationService,
+            RecoveryOperationCoordinator recoveryOperations,
+            AutarkOsFileOpsService fileOpsService) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.runtimeLayout = runtimeLayout;
@@ -79,6 +98,7 @@ class AppUninstallService {
         this.activityLogService = activityLogService;
         this.backupDestinationService = backupDestinationService;
         this.recoveryOperations = recoveryOperations;
+        this.fileOpsService = fileOpsService;
     }
 
     InstallModels.UninstallPlan uninstallPlan(InstalledApp app) {
@@ -88,11 +108,11 @@ class AppUninstallService {
         String checkpointMessage = !composeAvailable
                 ? "The old Compose file is missing. Before removing any matching container, Autark-OS will export its writable filesystem to a recovery archive. Removal is cancelled if that archive cannot be verified. Mounted files are not part of a Docker export, so Autark-OS leaves those storage resources untouched."
                 : runtimeCheckpointPlanned
-                    ? "Autark-OS will save a safety checkpoint before removing containers. Your app data is still kept on disk."
+                    ? "Autark-OS will create a complete safety checkpoint before removing containers. If it cannot read every file, the app will stay installed. Your app data is still kept on disk."
                     : "Autark-OS did not find app data to checkpoint. The remove step will still keep the app folder if it exists.";
         List<String> willStop = !composeAvailable
                 ? List.of("Export each matching container filesystem to a recovery archive", "Verify every recovery archive", "Remove only the matching adopted containers", "Hide the app from the managed Applications list")
-                : List.of("Create a safety checkpoint when app data is present", "Stop the app containers", "Remove the Compose project", "Hide the app from the managed Applications list");
+                : List.of("Create a complete safety checkpoint when app data is present", "Stop the app containers", "Remove the Compose project", "Hide the app from the managed Applications list");
         List<String> willKeep = !composeAvailable
                 ? List.of("Verified container writable-filesystem recovery archives", "Named volumes and bind-mounted app files", "Backups and historical activity events")
                 : List.of("Application data in " + app.runtimePath(), "Backups and files created outside Docker", "Historical activity events");
@@ -161,15 +181,15 @@ class AppUninstallService {
     }
 
     private SafetyCheckpointResult createPreUninstallCheckpoint(InstalledApp app) {
-        Path source = Path.of(app.runtimePath()).toAbsolutePath().normalize();
-        if (!Files.isDirectory(source) || directorySize(source) == 0) {
+        Path source = runtimeLayout.appRoot(app.appId()).toAbsolutePath().normalize();
+        if (!Files.isDirectory(source)) {
             return new SafetyCheckpointResult(false, List.of("No app data found to checkpoint before uninstall."));
         }
         try {
             Path directory = backupRoot().resolve("pre-uninstall");
             Files.createDirectories(directory);
             Path destination = directory.resolve(app.appId() + "-pre-uninstall-" + SAFETY_CHECKPOINT_NAME_FORMAT.format(Instant.now()) + ".zip");
-            long size = zipDirectory(source, destination);
+            long size = fileOpsService.createSafetyArchive(app.appId(), destination, backupRoot());
             backupRepository.save(RestorePoints.create(app.appId(), app.appName(), "app", "pre_uninstall", app.appId(), destination.toString(), AutarkOsStates.RestorePointStatus.COMPLETED, size, "Safety checkpoint created before uninstall."));
             repository.recordEvent(app.appId(), "safety_checkpoint_created", "Saved a safety checkpoint before removing " + app.appName() + ".");
             activitySuccess("safety_checkpoint_created", "Saved safety checkpoint", "Autark-OS saved a checkpoint before removing " + app.appName() + ".", app.appId());
@@ -181,7 +201,7 @@ class AppUninstallService {
             String message = "Autark-OS could not create a safety checkpoint before uninstall: " + reason;
             repository.recordEvent(app.appId(), "safety_checkpoint_failed", message);
             activityWarning("safety_checkpoint_failed", "Safety checkpoint failed", message, app.appId());
-            return new SafetyCheckpointResult(false, List.of(message));
+            throw new InstallationException(message, exception);
         }
     }
 
@@ -198,71 +218,8 @@ class AppUninstallService {
     }
 
     private boolean hasCheckpointableData(InstalledApp app) {
-        Path source = Path.of(app.runtimePath()).toAbsolutePath().normalize();
-        return Files.isDirectory(source) && directorySize(source) > 0;
-    }
-
-    private long zipDirectory(Path source, Path destination) throws IOException {
-        AtomicLong writtenBytes = new AtomicLong();
-        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destination))) {
-            Files.walkFileTree(source, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                    if (!attrs.isRegularFile() || !Files.isReadable(file)) {
-                        return FileVisitResult.CONTINUE;
-                    }
-                    Path relative = source.relativize(file);
-                    ZipEntry entry = new ZipEntry(relative.toString());
-                    zip.putNextEntry(entry);
-                    long copied = Files.copy(file, zip);
-                    writtenBytes.addAndGet(copied);
-                    zip.closeEntry();
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFileFailed(Path file, IOException exception) {
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
-                    return Files.isReadable(directory) ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
-                }
-            });
-        }
-        return Files.size(destination) > 0 ? Files.size(destination) : writtenBytes.get();
-    }
-
-    private long directorySize(Path path) {
-        if (!Files.exists(path)) {
-            return 0;
-        }
-        AtomicLong total = new AtomicLong();
-        try {
-            Files.walkFileTree(path, new SimpleFileVisitor<>() {
-                @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                    if (attrs.isRegularFile()) {
-                        total.addAndGet(attrs.size());
-                    }
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult visitFileFailed(Path file, IOException exception) {
-                    return FileVisitResult.CONTINUE;
-                }
-
-                @Override
-                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
-                    return Files.isReadable(directory) ? FileVisitResult.CONTINUE : FileVisitResult.SKIP_SUBTREE;
-                }
-            });
-        } catch (IOException | SecurityException ignored) {
-            return total.get();
-        }
-        return total.get();
+        Path source = runtimeLayout.appRoot(app.appId()).toAbsolutePath().normalize();
+        return Files.isDirectory(source);
     }
 
     private String failureReason(List<String> output) {

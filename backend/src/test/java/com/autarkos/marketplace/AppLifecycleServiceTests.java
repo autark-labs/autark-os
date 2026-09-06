@@ -2,6 +2,10 @@ package com.autarkos.marketplace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,6 +25,7 @@ import com.autarkos.backups.RecoveryOperationConflictException;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
+import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -838,6 +843,38 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void uninstallDoesNotRemoveContainersWhenItsPlannedSafetyCheckpointCannotBeCreated() throws Exception {
+        AutarkOsFileOpsService fileOpsService = mock(AutarkOsFileOpsService.class);
+        when(fileOpsService.createSafetyArchive(eq("vaultwarden"), any(Path.class), any(Path.class)))
+                .thenThrow(new java.io.IOException("Autark-OS cannot read app-data.sqlite"));
+        AppLifecycleService checkpointFailureService = new AppLifecycleService(
+                repository,
+                composeExecutor,
+                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
+                () -> List.of(),
+                runtimeLayout,
+                new PostInstallGuideBuilder(),
+                tailscaleService,
+                false,
+                null,
+                backupRepository,
+                new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
+                null,
+                recoveryOperations,
+                fileOpsService);
+
+        assertThatThrownBy(() -> checkpointFailureService.uninstall("vaultwarden"))
+                .hasMessageContaining("could not create a safety checkpoint")
+                .hasMessageContaining("cannot read app-data.sqlite");
+
+        assertThat(composeExecutor.downCalled).isFalse();
+        assertThat(repository.findAppById("vaultwarden")).isPresent();
+        assertThat(repository.eventsFor("vaultwarden", 10))
+                .extracting(event -> event.type())
+                .contains("safety_checkpoint_failed");
+    }
+
+    @Test
     void failedUninstallLeavesAppRecordVisible() {
         composeExecutor.failDown = true;
 
@@ -1128,6 +1165,7 @@ class AppLifecycleServiceTests {
         boolean upCalled;
         List<String> failUpOutput = List.of();
         boolean failDown;
+        boolean downCalled;
         boolean archiveCalled;
         boolean failArchive;
         boolean stopManagedCalled;
@@ -1169,6 +1207,7 @@ class AppLifecycleServiceTests {
 
         @Override
         public RuntimeModels.DockerComposeResult down(Path composeFile, String projectName) {
+            downCalled = true;
             if (failDown) {
                 return new RuntimeModels.DockerComposeResult(1, List.of("failed to remove " + projectName));
             }
