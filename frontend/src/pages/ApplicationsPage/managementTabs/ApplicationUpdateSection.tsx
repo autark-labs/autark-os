@@ -75,18 +75,20 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
           <p className="mt-1 text-xs leading-5 text-sky-100/65">{betaScope.managedAppUpdatesAvailable ? 'Review an image-only update before Autark-OS changes this app.' : 'New app updates are deferred during beta. Existing rollback plans remain available for recovery.'}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          <Button
-            className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-700"
-            disabled={blockedByOperation || loading !== null || submitting}
-            onClick={() => void review('update')}
-            size="sm"
-            title={blockedByOperation ? 'Wait for the current app operation to finish.' : undefined}
-            type="button"
-            variant="outline"
-          >
-            {loading === 'update' ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-            Review update
-          </Button>
+          {betaScope.managedAppUpdatesAvailable && (
+            <Button
+              className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-700"
+              disabled={blockedByOperation || loading !== null || submitting}
+              onClick={() => void review('update')}
+              size="sm"
+              title={blockedByOperation ? 'Wait for the current app operation to finish.' : undefined}
+              type="button"
+              variant="outline"
+            >
+              {loading === 'update' ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              Review update
+            </Button>
+          )}
           <Button
             className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-700"
             disabled={blockedByOperation || loading !== null || submitting}
