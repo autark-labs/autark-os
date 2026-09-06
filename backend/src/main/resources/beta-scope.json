@@ -1,0 +1,14 @@
+{
+  "qualificationStatus": "pending",
+  "primaryEnvironment": "Debian 12 amd64, systemd, Docker Engine with Compose v2, local Linux filesystem storage",
+  "installationRoute": "portable .run installer",
+  "coreUpdateRoute": "autark-os update",
+  "apps": [
+    { "id": "freshrss", "label": "FreshRSS", "detail": "Read your news feeds" },
+    { "id": "homepage", "label": "Homepage", "detail": "Friendly app dashboard" },
+    { "id": "syncthing", "label": "Syncthing", "detail": "Sync files between your devices" }
+  ],
+  "proInstallationAvailable": false,
+  "managedAppUpdatesAvailable": false,
+  "automaticRepairDefault": false
+}

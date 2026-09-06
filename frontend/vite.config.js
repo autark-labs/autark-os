@@ -57,6 +57,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(dirname, './src'),
       '@spa-route-manifest': path.resolve(dirname, '../backend/src/main/resources/spa-route-manifest.json'),
+      '@beta-scope': path.resolve(dirname, '../backend/src/main/resources/beta-scope.json'),
     },
   },
   server: {

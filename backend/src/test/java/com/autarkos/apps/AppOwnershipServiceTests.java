@@ -108,7 +108,7 @@ class AppOwnershipServiceTests {
                     assertThat(view.installCopyWarningRequired()).isTrue();
                     assertThat(view.reviewExistingHref()).isEqualTo("/apps?focus=service%3Adocker%3Afound_jellyfin&panel=manage");
                     assertThat(view.primaryAction().id()).isEqualTo("review_existing");
-                    assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("review_existing", "install_copy");
+                    assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("review_existing", "unavailable");
                     assertThat(view.installedApp()).isNull();
                     assertThat(view.observedService()).isNotNull();
                 });
@@ -146,7 +146,7 @@ class AppOwnershipServiceTests {
         assertThat(view.ownedByCurrentInstance()).isFalse();
         assertThat(view.installCopyWarningRequired()).isTrue();
         assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("review_existing", "Review existing service", "route", "/apps?focus=service%3Amanual%3Ajellyfin&panel=manage", null, false, ""));
-        assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("open", "review_existing", "install_copy");
+        assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("open", "review_existing", "unavailable");
         assertThat(view.observedService()).isNotNull();
         assertThat(view.observedService().id()).isEqualTo(pinned.id());
     }
@@ -208,8 +208,9 @@ class AppOwnershipServiceTests {
         assertThat(view.stateLabel()).isEqualTo("Install failed");
         assertThat(view.statusTone()).isEqualTo("warning");
         assertThat(view.installCopyWarningRequired()).isFalse();
-        assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("review_setup", "Review setup", "route", "/discover?app=vaultwarden", null, false, ""));
-        assertThat(view.availableActions()).extracting(AppOwnershipAction::id).containsExactly("review_setup");
+        assertThat(view.primaryAction().disabled()).isTrue();
+        assertThat(view.primaryAction().reason()).isEqualTo(com.autarkos.system.BetaScope.INSTALL_UNAVAILABLE);
+        assertThat(view.availableActions()).extracting(AppOwnershipAction::id).containsExactly("unavailable");
         assertThat(view.observedService()).isNotNull();
         assertThat(view.observedService().userStatus()).isEqualTo("failed_install");
         assertThat(view.observedService().userStatusLabel()).isEqualTo("Install failed");

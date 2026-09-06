@@ -33,6 +33,7 @@ import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.install.models.UpdateModels;
 import com.autarkos.monitoring.MonitoringMetricsService;
+import com.autarkos.system.BetaScope;
 
 @RestController
 @RequestMapping("/api/apps")
@@ -94,6 +95,10 @@ public class InstalledAppsController {
 
     @GetMapping("/updates")
     public UpdateModels.AppUpdateCapability updates() {
+        if (!BetaScope.CURRENT.managedAppUpdatesAvailable()) {
+            return new UpdateModels.AppUpdateCapability(false, "unavailable", "Managed app updates are deferred",
+                    BetaScope.UPDATES_UNAVAILABLE, "beta_scope_deferred", java.time.Instant.now());
+        }
         return appUpdateService.capability();
     }
 
@@ -121,6 +126,9 @@ public class InstalledAppsController {
 
     @GetMapping("/{id}/update-plan")
     public UpdateModels.AppUpdatePlan updatePlan(@PathVariable String id) {
+        if (!BetaScope.CURRENT.managedAppUpdatesAvailable()) {
+            return deferredUpdatePlan(id);
+        }
         return appUpdateService.updatePlan(id);
     }
 
@@ -214,6 +222,9 @@ public class InstalledAppsController {
     public ResponseEntity<?> update(
             @PathVariable String id,
             @RequestBody(required = false) UpdateModels.AppUpdateApplyRequest request) {
+        if (!BetaScope.CURRENT.managedAppUpdatesAvailable()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(deferredUpdatePlan(id));
+        }
         AutarkOsJob active = activeLifecycleJob(id);
         if (active != null) {
             applicationStateService.invalidate();
@@ -241,6 +252,11 @@ public class InstalledAppsController {
         });
         applicationStateService.invalidate();
         return ResponseEntity.accepted().body(job);
+    }
+
+    private UpdateModels.AppUpdatePlan deferredUpdatePlan(String id) {
+        return UpdateModels.AppUpdatePlan.blocked(id, "App", "update", "Managed app updates are deferred",
+                BetaScope.UPDATES_UNAVAILABLE, List.of(BetaScope.UPDATES_UNAVAILABLE));
     }
 
     @GetMapping("/{id}/rollback-plan")

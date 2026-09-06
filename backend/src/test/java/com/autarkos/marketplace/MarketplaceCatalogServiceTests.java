@@ -64,12 +64,12 @@ class MarketplaceCatalogServiceTests {
 
     @Test
     void exposesCatalogAndInstallPreviewThroughDiscoverController() {
-        assertThat(discoverController.apps()).hasSize(27);
-        DiscoverInstallModels.DiscoverInstallPreview preview = discoverController.installPreview("vaultwarden", new DiscoverSetupModels.DiscoverSetupAnswersRequest(java.util.Map.of()));
+        assertThat(discoverController.apps()).extracting(com.autarkos.discover.DiscoverAppView::id).containsExactlyInAnyOrder("freshrss", "homepage", "syncthing");
+        DiscoverInstallModels.DiscoverInstallPreview preview = discoverController.installPreview("homepage", new DiscoverSetupModels.DiscoverSetupAnswersRequest(java.util.Map.of()));
 
         assertThat(preview.technicalDetails())
                 .extracting(InstallPlan::appId)
-                .isEqualTo("vaultwarden");
+                .isEqualTo("homepage");
     }
 
     @Test

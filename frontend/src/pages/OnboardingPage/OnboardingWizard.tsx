@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import betaScope from '@beta-scope';
 import type { ReactNode } from 'react';
 import { CheckCircle2, ChevronLeft, ChevronRight, HardDrive, Loader2, Network, ServerCog, ShieldCheck, Sparkles } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -30,11 +31,7 @@ type OnboardingWizardProps = {
   onComplete: () => void;
 };
 
-const starterApps = [
-  { id: 'vaultwarden', label: 'Vaultwarden', detail: 'Private password vault' },
-  { id: 'jellyfin', label: 'Jellyfin', detail: 'Personal media streaming' },
-  { id: 'homepage', label: 'Homepage', detail: 'Friendly app dashboard' },
-];
+const starterApps = betaScope.apps;
 
 function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const [state, setState] = useState<OnboardingState | null>(null);
@@ -368,7 +365,7 @@ function draftFromState(state: OnboardingState): OnboardingDraft {
   const defaultDestination = `${state.runtimePath}/backups`;
   const backupDestination = state.backupDestination || defaultDestination;
   const backupPosture: BackupPosture = !state.automaticBackupsEnabled ? 'later' : backupDestination === defaultDestination ? 'routine' : 'external';
-  return { automaticBackups: state.automaticBackupsEnabled, backupDestination, backupPosture, deviceName: state.deviceName || 'Autark-OS', privateAccessChoice: cleanPrivateAccessChoice(state.privateAccessChoice, state.tailscaleConnected), selectedApps: state.recommendedApps.length ? state.recommendedApps : starterApps.map((app) => app.id) };
+  return { automaticBackups: state.automaticBackupsEnabled, backupDestination, backupPosture, deviceName: state.deviceName || 'Autark-OS', privateAccessChoice: cleanPrivateAccessChoice(state.privateAccessChoice, state.tailscaleConnected), selectedApps: state.recommendedApps.filter((id) => starterApps.some((app) => app.id === id)) };
 }
 
 async function persistSetupProgress(privateAccessChoice: PrivateAccessChoice) {

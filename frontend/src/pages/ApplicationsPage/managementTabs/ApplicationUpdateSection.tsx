@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import betaScope from '@beta-scope';
 import { History, Loader2, RefreshCw, ShieldCheck, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AppUpdatePlanChangedError } from '@/api/InstalledAppsAPIClient';
@@ -71,7 +72,7 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
             <History className="size-4 text-cyan-200" />
             App release
           </div>
-          <p className="mt-1 text-xs leading-5 text-sky-100/65">Review a safe, image-only update before Autark-OS changes this app.</p>
+          <p className="mt-1 text-xs leading-5 text-sky-100/65">{betaScope.managedAppUpdatesAvailable ? 'Review an image-only update before Autark-OS changes this app.' : 'New app updates are deferred during beta. Existing rollback plans remain available for recovery.'}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <Button

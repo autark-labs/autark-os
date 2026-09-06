@@ -22,6 +22,7 @@ import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
+import com.autarkos.system.BetaScope;
 
 @Service
 public class AppOwnershipService {
@@ -255,6 +256,10 @@ public class AppOwnershipService {
     }
 
     private AppOwnershipAction reviewSetup(String appId) {
+        if (!BetaScope.allowsInstall(appId)) {
+            return new AppOwnershipAction("unavailable", "Not available in beta", "disabled", null, null, true,
+                    BetaScope.INSTALL_UNAVAILABLE);
+        }
         return new AppOwnershipAction("review_setup", "Review setup", "route", "/discover?app=" + encode(appId), null, false, "");
     }
 
@@ -271,6 +276,9 @@ public class AppOwnershipService {
     }
 
     private AppOwnershipAction installCopy(String appId) {
+        if (!BetaScope.allowsInstall(appId)) {
+            return reviewSetup(appId);
+        }
         return new AppOwnershipAction("install_copy", "Install second copy anyway", "install", "/api/discover/apps/" + appId + "/install", "POST", false, "");
     }
 

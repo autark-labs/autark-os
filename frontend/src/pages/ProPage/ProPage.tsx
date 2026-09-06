@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import betaScope from '@beta-scope';
 import { ArrowRight, Copy, Download, LoaderCircle, RefreshCw, ShieldCheck, Trash2, Unplug } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import type { ProStatusResponse } from '@/api/pro';
@@ -178,6 +179,7 @@ function ProPage() {
 
   const product = productQuery.data;
   const lifecycle = proLifecycleModel(status, product);
+  const primaryAction = betaScope.proInstallationAvailable ? lifecycle.primaryAction : null;
   const extensionActive = Boolean(
     product.softwareEntitlement.localUseAllowed
     && product.agent.digestPrefix
@@ -191,14 +193,15 @@ function ProPage() {
 
   return (
     <PageShell>
+      {!betaScope.proInstallationAvailable && <p className="text-sm text-muted-foreground">New Pro activation and extension installation are deferred during the Core beta. Existing status, license checks and removal remain available.</p>}
       <ExtensionActionTarget actionId="review-pro" routeId="pro">
         <ProjectPanel className="overflow-hidden p-0">
           <div className="bg-app-hero-default p-6 md:p-8">
             <div className="flex flex-wrap items-start justify-between gap-5">
               <div className="max-w-3xl">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-200/80">Signed private extension</p>
-                <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">{lifecycle.title}</h1>
-                <p className="mt-4 max-w-2xl text-sm leading-6 text-sky-100/75 sm:text-base">{lifecycle.description}</p>
+                <h1 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">{!betaScope.proInstallationAvailable && lifecycle.primaryAction === 'activate' ? 'Autark Pro is deferred' : lifecycle.title}</h1>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-sky-100/75 sm:text-base">{!betaScope.proInstallationAvailable && (lifecycle.primaryAction === 'activate' || lifecycle.primaryAction === 'continue-activation') ? 'Core remains available independently of Pro. Existing license details are retained; new activation and installation are outside this beta.' : lifecycle.description}</p>
                 <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4" aria-label="Autark Pro lifecycle status">
                   <LifecycleValue label="License" value={formatLifecycleToken(product.softwareEntitlement.state)} />
                   <LifecycleValue label="Software updates" value={updateStatus(product)} />
@@ -206,9 +209,9 @@ function ProPage() {
                   <LifecycleValue label="Private extension" value={moduleStatus(product, extensionActive)} />
                 </dl>
                 <div className="mt-6 flex flex-wrap gap-3">
-                  {lifecycle.primaryAction === 'continue-activation' && <ProjectPrimaryButton disabled={busy} onClick={resumeActivation} type="button"><ArrowRight className="size-4" />Continue activation</ProjectPrimaryButton>}
-                  {lifecycle.primaryAction === 'check-release' && <ProjectPrimaryButton disabled={busy} onClick={checkForExtensionRelease} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}Check for update</ProjectPrimaryButton>}
-                  {lifecycle.primaryAction === 'install-release' && <ProjectPrimaryButton disabled={busy} onClick={installExtension} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}{status.module.activeDigest ? 'Update private extension' : 'Install private extension'}</ProjectPrimaryButton>}
+                  {primaryAction === 'continue-activation' && <ProjectPrimaryButton disabled={busy} onClick={resumeActivation} type="button"><ArrowRight className="size-4" />Continue activation</ProjectPrimaryButton>}
+                  {primaryAction === 'check-release' && <ProjectPrimaryButton disabled={busy} onClick={checkForExtensionRelease} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}Check for update</ProjectPrimaryButton>}
+                  {primaryAction === 'install-release' && <ProjectPrimaryButton disabled={busy} onClick={installExtension} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}{status.module.activeDigest ? 'Update private extension' : 'Install private extension'}</ProjectPrimaryButton>}
                   {lifecycle.canRefreshEntitlement && <ProjectDarkControlButton disabled={busy} onClick={refreshLicense} type="button"><RefreshCw className={`size-4 ${refresh.isPending ? 'animate-spin' : ''}`} />Check license</ProjectDarkControlButton>}
                   {lifecycle.canRemoveModule && <ProjectWarningButton disabled={busy} onClick={() => setRemovalOpen(true)} type="button"><Trash2 className="size-4" />Remove private extension</ProjectWarningButton>}
                   {lifecycle.canDeactivate && <ProjectDarkControlButton disabled={busy} onClick={() => setDeactivationOpen(true)} type="button"><Unplug className="size-4" />Deactivate Pro</ProjectDarkControlButton>}
@@ -220,7 +223,7 @@ function ProPage() {
         </ProjectPanel>
       </ExtensionActionTarget>
 
-      {lifecycle.primaryAction === 'activate' && (
+      {primaryAction === 'activate' && (
         <ProjectPanel>
           <h2 className="text-lg font-semibold text-white">Activate this server</h2>
           <p className="mt-1 text-sm leading-6 text-slate-400">The one-time code is sent directly to the control plane and is not stored in the browser.</p>

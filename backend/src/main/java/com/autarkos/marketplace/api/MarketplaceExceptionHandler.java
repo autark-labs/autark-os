@@ -14,9 +14,16 @@ import com.autarkos.jobs.JobCancellationConflictException;
 import com.autarkos.marketplace.catalog.ManifestValidationException;
 import com.autarkos.marketplace.install.DuplicateInstallAcknowledgementRequiredException;
 import com.autarkos.marketplace.install.InstallationException;
+import com.autarkos.system.BetaScope;
 
 @RestControllerAdvice
 public class MarketplaceExceptionHandler {
+
+    @ExceptionHandler(BetaScope.UnavailableException.class)
+    public ResponseEntity<ApiError> betaScope(BetaScope.UnavailableException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(
+                "beta_scope_deferred", exception.getReason(), List.of(), Instant.now()));
+    }
 
     private final ActivityLogService activityLogService;
 

@@ -1,5 +1,7 @@
 package com.autarkos.host;
 
+import com.autarkos.system.BetaScope;
+
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -513,7 +515,9 @@ public class ObservedServiceService {
             case HostModels.ObservedServiceStatus.RECOVERABLE -> "Autark-OS found recoverable app metadata for this service.";
             case HostModels.ObservedServiceStatus.OWNED_ELSEWHERE -> "Owned by another Autark-OS installation.";
             case HostModels.ObservedServiceStatus.CONFLICT -> "This service may block installing a managed copy.";
-            case HostModels.ObservedServiceStatus.FAILED_INSTALL -> "Autark-OS started creating this app but did not finish. Review setup or click install again when ready.";
+            case HostModels.ObservedServiceStatus.FAILED_INSTALL -> BetaScope.allowsInstall(service.catalogAppId())
+                    ? "Autark-OS started creating this app but did not finish. Review setup or click install again when ready."
+                    : "A previous installation did not finish. New installs of this app are deferred in beta; existing resources have not been deleted.";
             default -> "Found on this server.";
         };
     }
@@ -525,7 +529,7 @@ public class ObservedServiceService {
         }
         if ("failed_install".equals(service.ownershipState())) {
             if (service.catalogAppId() != null && !service.catalogAppId().isBlank()) {
-                actions.add(new HostModels.ObservedServiceAction("review_setup", "Review setup", "route", "/discover?app=" + encode(service.catalogAppId()), null, false, ""));
+                actions.add(installAction(service.catalogAppId(), "review_setup", "Review setup"));
             }
             return List.copyOf(actions);
         }
@@ -538,12 +542,19 @@ public class ObservedServiceService {
             actions.add(new HostModels.ObservedServiceAction("adoption_plan", "Review adoption plan", "api", "/api/observed-services/" + encode(service.id()) + "/adoption-plan", "POST", false, ""));
         }
         if (service.catalogAppId() != null && !"owned_managed".equals(service.ownershipState())) {
-            actions.add(new HostModels.ObservedServiceAction("install_copy", "Install separate copy", "route", "/discover?app=" + encode(service.catalogAppId()), null, false, ""));
+            actions.add(installAction(service.catalogAppId(), "install_copy", "Install separate copy"));
         }
         if (!"owned_managed".equals(service.ownershipState())) {
             actions.add(new HostModels.ObservedServiceAction("change_match", "Change app match", "api", "/api/observed-services/" + encode(service.id()) + "/match", "POST", false, ""));
         }
         return List.copyOf(actions);
+    }
+
+    private static HostModels.ObservedServiceAction installAction(String appId, String id, String label) {
+        if (!BetaScope.allowsInstall(appId)) {
+            return new HostModels.ObservedServiceAction("unavailable", "Not available in beta", "disabled", null, null, true, BetaScope.INSTALL_UNAVAILABLE);
+        }
+        return new HostModels.ObservedServiceAction(id, label, "route", "/discover?app=" + encode(appId), null, false, "");
     }
 
     private static boolean adoptable(ObservedService service) {

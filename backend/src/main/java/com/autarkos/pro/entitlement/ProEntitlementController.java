@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.pro.module.ProModuleManager;
+import com.autarkos.system.BetaScope;
 
 @RestController
 @RequestMapping("/api/v1/pro")
@@ -37,6 +38,7 @@ public class ProEntitlementController {
     @PostMapping("/activation/start")
     public ProEntitlementService.ActivationStartResult startActivation(
             @RequestBody ActivationStartRequest request) {
+        BetaScope.requireProInstallation();
         return service.startActivation(
                 request == null ? null : request.activationCode());
     }
@@ -44,6 +46,7 @@ public class ProEntitlementController {
     @PostMapping("/activation/complete")
     public ProStatusResponse completeActivation(
             @RequestBody ActivationCompleteRequest request) {
+        BetaScope.requireProInstallation();
         return service.completeActivation(
                 request == null ? null : request.activationId());
     }
@@ -55,12 +58,14 @@ public class ProEntitlementController {
 
     @PostMapping("/module/check")
     public AutarkOsJob checkModuleRelease() {
+        BetaScope.requireProInstallation();
         return moduleManager.checkForRelease(
                 service.moduleAuthorization());
     }
 
     @PostMapping("/module/install")
     public AutarkOsJob installOrUpdateModule() {
+        BetaScope.requireProInstallation();
         return moduleManager.installOrUpdate(
                 service.moduleAuthorization());
     }

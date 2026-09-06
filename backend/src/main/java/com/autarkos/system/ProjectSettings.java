@@ -31,7 +31,7 @@ public record ProjectSettings(
                 true,
                 false,
                 "manifest-default",
-                true,
+                BetaScope.CURRENT.automaticRepairDefault(),
                 true,
                 "daily",
                 7,

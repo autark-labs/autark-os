@@ -91,7 +91,7 @@ class DiscoverServiceTests {
                     assertThat(app.cardTone()).isEqualTo("danger");
                     assertThat(app.ownedByCurrentInstance()).isFalse();
                     assertThat(app.installCopyWarningRequired()).isTrue();
-                    assertThat(app.availableActions()).extracting(com.autarkos.apps.AppOwnershipAction::id).contains("review_existing", "install_copy");
+                    assertThat(app.availableActions()).extracting(com.autarkos.apps.AppOwnershipAction::id).contains("review_existing", "unavailable");
                     assertThat(app.installedApp()).isNull();
                     assertThat(app.observedService()).isNotNull();
                 });

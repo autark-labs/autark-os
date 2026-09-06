@@ -32,6 +32,25 @@ class OnboardingServiceTests {
     Path externalRoot;
 
     @Test
+    void recommendationsUseBetaRosterAndFilterPreviouslySavedExcludedApps() {
+        RuntimeLayout layout = runtimeLayout();
+        ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(layout);
+        OnboardingService onboarding = service(repository, layout);
+        assertThat(onboarding.state().recommendedApps()).containsExactly("freshrss", "homepage", "syncthing");
+        assertThat(ProjectSettings.defaults("Autark-OS").automaticRepairEnabled()).isFalse();
+
+        repository.saveValues(java.util.Map.of("onboardingRecommendedApps", "vaultwarden,homepage"));
+        assertThat(onboarding.state().recommendedApps()).containsExactly("homepage");
+
+        onboarding.update(new OnboardingModels.OnboardingUpdateRequest(null, null, null, null, null, null,
+                List.of("immich", "freshrss"), null));
+        assertThat(onboarding.state().recommendedApps()).containsExactly("freshrss");
+        onboarding.update(new OnboardingModels.OnboardingUpdateRequest(null, null, null, null, null, null,
+                List.of("immich"), null));
+        assertThat(onboarding.state().recommendedApps()).isEmpty();
+    }
+
+    @Test
     void adminClaimSettingsDoNotSilentlyCompleteFirstBootSetup() {
         RuntimeLayout runtimeLayout = runtimeLayout();
         ProjectSettingsRepository repository = JpaTestRepositories.projectSettingsRepository(runtimeLayout);

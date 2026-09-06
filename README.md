@@ -21,19 +21,19 @@ Autark-OS should help users answer four questions quickly:
 
 ## Current Status
 
-Autark-OS is ready for controlled beta testing on Linux homelab hosts. It is not yet a polished public installer.
+Autark-OS is preparing for a narrow controlled beta; release qualification is still pending. See the [beta scope and release boundary](docs/beta-scope.md) before choosing a test environment or application.
 
-Supported initial hosts are Debian 12/13 and Ubuntu 24.04/26.04 LTS on amd64 or ARM64, plus 64-bit Raspberry Pi OS 11/12/13 on ARM64. Raspberry Pi OS 13 is the primary Pi 5 target; Pi OS 12 is also supported on Pi 5, while Pi OS 11 is retained for compatible older Pi hardware. All hosts require systemd, 2 GB memory, and 10 GB free disk. Run `./scripts/autark-os install --doctor --json` before installing.
+The primary beta qualification target is Debian 12 amd64 with systemd, Docker Engine, Compose v2 and local Linux filesystem storage. The installer accepts additional Linux/ARM64 combinations, but acceptance is not beta certification. The current prerequisite floor is 2 GB memory and 10 GB free disk, before application-specific needs. Run `./scripts/autark-os install --doctor --json` before installing.
 
-The current beta path supports Debian packages, portable installers, and local release bundles. After installation, open the printed local address to complete setup in your browser.
+The primary beta path is the portable `.run` installer. Other packaging paths remain available for development and advanced recovery. After installation, open the printed local address to complete setup in your browser.
 
 ## What Autark-OS Does
 
 - Discovers apps and services already running on the host.
 - Installs supported catalog apps with guided install plans.
 - Shows app readiness, access links, backup status, and recovery actions.
-- Starts, pauses, restarts, repairs, backs up, restores, updates, rolls back, and uninstalls managed apps.
-- Applies eligible app updates as reviewed, backup-gated image changes while keeping the previous release available for rollback.
+- Starts, pauses, restarts, repairs, backs up, restores, and uninstalls managed apps.
+- Defers new managed-app updates during beta; existing recovery records and rollback paths are retained. Core updates use `autark-os update`.
 - Keeps local app data under an Autark-OS runtime directory.
 - Uses Tailscale for private links when the host is signed in and configured.
 - Preserves data by default around risky actions.

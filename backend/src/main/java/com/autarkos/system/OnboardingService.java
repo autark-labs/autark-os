@@ -19,7 +19,7 @@ import com.autarkos.backups.BackupDestinationService;
 @Service
 public class OnboardingService {
 
-    private static final List<String> DEFAULT_RECOMMENDED_APPS = List.of("vaultwarden", "jellyfin", "homepage");
+    private static final List<String> DEFAULT_RECOMMENDED_APPS = BetaScope.CURRENT.apps().stream().map(BetaScope.App::id).toList();
 
     private final ProjectSettingsRepository settingsRepository;
     private final ProjectSettingsService settingsService;
@@ -54,7 +54,7 @@ public class OnboardingService {
                 tailscaleService.status().connected(),
                 value(values, "privateAccessChoice", tailscaleService.status().connected() ? "already-connected" : "local-only"),
                 settings.automaticBackupsEnabled(),
-                listValue(values, "onboardingRecommendedApps", DEFAULT_RECOMMENDED_APPS),
+                listValue(values, "onboardingRecommendedApps", DEFAULT_RECOMMENDED_APPS).stream().filter(BetaScope::allowsInstall).toList(),
                 listValue(values, "onboardingCompletedSteps", List.of()),
                 doctorService.status(),
                 instantValue(values, "onboardingUpdatedAt"));
@@ -88,7 +88,7 @@ public class OnboardingService {
             updates.put("privateAccessChoice", cleanPrivateAccessChoice(request.privateAccessChoice()));
         }
         if (request.recommendedApps() != null) {
-            updates.put("onboardingRecommendedApps", encodeList(request.recommendedApps()));
+            updates.put("onboardingRecommendedApps", encodeList(request.recommendedApps().stream().filter(BetaScope::allowsInstall).toList()));
         }
         if (request.completedSteps() != null) {
             updates.put("onboardingCompletedSteps", encodeList(request.completedSteps()));
@@ -154,7 +154,7 @@ public class OnboardingService {
 
     private List<String> listValue(Map<String, String> values, String key, List<String> fallback) {
         String value = values.get(key);
-        if (value == null || value.isBlank()) {
+        if (value == null) {
             return fallback;
         }
         return Arrays.stream(value.split(",")).map(String::trim).filter(item -> !item.isBlank()).toList();

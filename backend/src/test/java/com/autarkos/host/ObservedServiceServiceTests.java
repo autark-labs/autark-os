@@ -24,6 +24,15 @@ class ObservedServiceServiceTests {
     Path runtimeRoot;
 
     @Test
+    void excludedFoundAppsKeepReviewAndVisibilityActionsButCannotOfferNewInstalls() {
+        var found = ObservedServiceService.toView(observed("obs_vaultwarden", "manual_url", "http://vault.local", "Vaultwarden", "vaultwarden", "external", "pinned"));
+        assertThat(found.availableActions()).extracting(HostModels.ObservedServiceAction::id)
+                .contains("open", "unpin", "unavailable").doesNotContain("install_copy");
+        var eligible = ObservedServiceService.toView(observed("obs_homepage", "manual_url", "http://homepage.local", "Homepage", "homepage", "external", "pinned"));
+        assertThat(eligible.availableActions()).extracting(HostModels.ObservedServiceAction::id).contains("install_copy");
+    }
+
+    @Test
     void unpinRemovesServiceFromMyAppsButDoesNotDeleteObservedTruth() {
         ObservedServiceRepository repository = repository();
         ObservedServiceService service = service(repository, List.of());

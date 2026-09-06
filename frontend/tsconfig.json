@@ -19,7 +19,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@spa-route-manifest": ["../backend/src/main/resources/spa-route-manifest.json"]
+      "@spa-route-manifest": ["../backend/src/main/resources/spa-route-manifest.json"],
+      "@beta-scope": ["../backend/src/main/resources/beta-scope.json"]
     }
   },
   "include": ["src/main.tsx", "src/**/*.d.ts"],

@@ -21,7 +21,7 @@ import com.autarkos.pro.module.ProModuleManager.ProModuleAuthorization;
 class ProEntitlementControllerTests {
 
     @Test
-    void moduleActionsUseVerifiedBackendAuthorityAndReturnSharedJobs() {
+    void betaBlocksNewModuleWorkButRetainsRemovalJobs() {
         ProEntitlementService service =
                 mock(ProEntitlementService.class);
         ProModuleManager manager = mock(ProModuleManager.class);
@@ -37,16 +37,18 @@ class ProEntitlementControllerTests {
         ProEntitlementController controller =
                 new ProEntitlementController(service, manager);
 
-        assertThat(controller.checkModuleRelease()).isSameAs(job);
-        assertThat(controller.installOrUpdateModule()).isSameAs(job);
+        org.assertj.core.api.Assertions.assertThatThrownBy(controller::checkModuleRelease)
+                .isInstanceOf(com.autarkos.system.BetaScope.UnavailableException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(controller::installOrUpdateModule)
+                .isInstanceOf(com.autarkos.system.BetaScope.UnavailableException.class);
         assertThat(controller.removeModule(
                 new ProEntitlementController.ModuleRemovalRequest(
                         ProEntitlementController.MODULE_REMOVAL_CONFIRMATION)))
                 .isSameAs(job);
 
-        verify(service, times(2)).moduleAuthorization();
-        verify(manager).checkForRelease(authorization);
-        verify(manager).installOrUpdate(authorization);
+        verify(service, times(0)).moduleAuthorization();
+        verify(manager, times(0)).checkForRelease(authorization);
+        verify(manager, times(0)).installOrUpdate(authorization);
         verify(manager).remove();
     }
 

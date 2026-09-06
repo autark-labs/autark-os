@@ -128,7 +128,8 @@ test('absent extension does not download browser code', async ({ page }) => {
   const requests = await openPro(page, false);
 
   await expect(page.getByRole('button', { name: 'Check for update' }))
-    .toBeVisible();
+    .toHaveCount(0);
+  await expect(page.getByText(/New Pro activation and extension installation are deferred/)).toBeVisible();
   expect(requests.some((path) => path.includes('/assets/'))).toBe(false);
 });
 
@@ -148,7 +149,7 @@ test('extension host shell is responsive and accessible', async ({ page }) => {
     .toEqual([]);
 });
 
-test('activation remains in the authenticated console and never puts the code in the URL', async ({ page }) => {
+test('Core beta offers no new activation and sends no activation requests', async ({ page }) => {
   const actions: ProAction[] = [];
   const initial = proStatus(false);
   initial.entitlement.state = 'NOT_ACTIVATED';
@@ -171,15 +172,12 @@ test('activation remains in the authenticated console and never puts the code in
     status: initial,
   });
 
-  await page.getByLabel('Device activation code').fill('AUTARK-PRO-1234-5678');
-  await page.getByRole('button', { name: 'Verify this server' }).click();
-
-  await expect(page.getByRole('heading', { name: 'Autark Pro is available' })).toBeVisible();
-  expect(actions).toEqual([
-    { body: { activationCode: 'AUTARK-PRO-1234-5678' }, path: '/api/v1/pro/activation/start' },
-    { body: { activationId: '33333333-3333-4333-8333-333333333333' }, path: '/api/v1/pro/activation/complete' },
-  ]);
-  expect(page.url()).not.toContain('AUTARK-PRO-1234-5678');
+  await expect(page.getByLabel('Device activation code')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Verify this server' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Autark Pro', exact: true })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('link', { name: 'Autark Pro', exact: true })).toHaveCount(0);
+  expect(actions).toEqual([]);
 });
 
 test('release, rollback, retained-use, offline, and revoked lifecycle states give honest actions', async ({ page }) => {
@@ -188,11 +186,8 @@ test('release, rollback, retained-use, offline, and revoked lifecycle states giv
   release.module.candidateVersion = '0.2.1';
   const releaseActions: ProAction[] = [];
   await openPro(page, true, { onAction: (action) => releaseActions.push(action), status: release });
-  await expect(page.getByRole('button', { name: 'Update private extension' })).toBeVisible();
-  await page.getByRole('button', { name: 'Update private extension' }).click();
-  await expect.poll(() => releaseActions).toEqual([
-    { body: null, path: '/api/v1/pro/module/install' },
-  ]);
+  await expect(page.getByRole('button', { name: 'Update private extension' })).toHaveCount(0);
+  expect(releaseActions).toEqual([]);
 
   const rollback = proStatus(true);
   rollback.module.state = 'ROLLING_BACK';
@@ -218,7 +213,7 @@ test('release, rollback, retained-use, offline, and revoked lifecycle states giv
   offline.entitlement.reasonCode = 'offline_grace';
   await openPro(page, true, { status: offline });
   await expect(page.getByRole('heading', { name: 'Autark Pro is available locally' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Check for update/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Check for update/i })).toHaveCount(0);
 
   const revoked = proStatus(true);
   revoked.entitlement.state = 'REVOKED';

@@ -54,7 +54,7 @@ class InstalledAppsControllerTests {
 
         mvc.perform(MockMvcRequestBuilders.get("/api/apps/updates"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
-                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unavailable\"", "\"reasonCode\":\"managed_updates_not_configured\""));
+                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unavailable\"", "\"reasonCode\":\"beta_scope_deferred\""));
         mvc.perform(MockMvcRequestBuilders.get("/api/apps/vaultwarden/update-plan"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
                 .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"status\":\"blocked\""));
@@ -90,14 +90,14 @@ class InstalledAppsControllerTests {
         assertThat(plan.status()).isEqualTo("blocked");
         assertThat(update.getStatusCode().value()).isEqualTo(409);
         assertThat(rollback.getStatusCode().value()).isEqualTo(409);
-        assertThat(plan.summary()).contains("not configured");
+        assertThat(plan.summary()).contains("deferred");
         assertThat(update.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         assertThat(rollback.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         verifyNoUpdateWork(lifecycleService, applicationStateService);
     }
 
     @Test
-    void updateMutationRejectsAPlanThatIsNoLongerCurrent() {
+    void betaScopeRejectsEvenAStaleUpdatePlanWithoutStartingWork() {
         AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
@@ -117,13 +117,13 @@ class InstalledAppsControllerTests {
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
-        assertThat(((UpdateModels.AppUpdatePlan) response.getBody()).status()).isEqualTo("review_required");
+        assertThat(((UpdateModels.AppUpdatePlan) response.getBody()).status()).isEqualTo("blocked");
         assertThat(jobService.list()).isEmpty();
         verify(updateService, never()).update(eq("vaultwarden"), any(), any());
     }
 
     @Test
-    void updateMutationQueuesTheExactReviewedPlan() {
+    void betaScopeRejectsEvenAnApplicableReviewedPlanWithoutStartingWork() {
         AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
@@ -141,16 +141,14 @@ class InstalledAppsControllerTests {
                 "vaultwarden",
                 new UpdateModels.AppUpdateApplyRequest(plan.planId()));
 
-        assertThat(response.getStatusCode().value()).isEqualTo(202);
-        AutarkOsJob job = (AutarkOsJob) response.getBody();
-        assertThat(job).isNotNull();
-        assertThat(job.status()).isEqualTo("queued");
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(jobService.list()).isEmpty();
         jobService.runQueuedJobsNow();
-        verify(updateService).update(eq("vaultwarden"), eq(plan.planId()), any());
+        verify(updateService, never()).update(eq("vaultwarden"), any(), any());
     }
 
     @Test
-    void duplicateUpdateRequestReturnsTheExistingActiveJob() {
+    void betaScopeDoesNotDeleteExistingUpdateJobs() {
         AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
@@ -168,8 +166,8 @@ class InstalledAppsControllerTests {
 
         var response = controller.update("vaultwarden", null);
 
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(((AutarkOsJob) response.getBody()).jobId()).isEqualTo(existing.jobId());
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(jobService.list()).extracting(AutarkOsJob::jobId).contains(existing.jobId());
         verify(updateService, never()).updatePlan("vaultwarden");
     }
 

@@ -1,4 +1,5 @@
 import { appRoutes } from '@/appRouteManifest';
+import betaScope from '@beta-scope';
 
 export { routeAliases } from '@/appRouteManifest';
 
@@ -9,7 +10,7 @@ export const primaryNavigation = [
   { id: 'access', label: 'Access', to: appRoutes.access, icon: 'access', activePaths: [appRoutes.access, '/network'] },
   { id: 'backups', label: 'Backups', to: appRoutes.backups, icon: 'backups', activePaths: [appRoutes.backups] },
   { id: 'pro', label: 'Autark Pro', to: appRoutes.pro, icon: 'pro', activePaths: [appRoutes.pro] },
-];
+].filter((item) => item.id !== 'pro' || betaScope.proInstallationAvailable);
 
 export const advancedNavigation = [
   { id: 'storage', label: 'Storage', to: appRoutes.storage, icon: 'storage', activePaths: [appRoutes.storage, '/files-storage'] },
