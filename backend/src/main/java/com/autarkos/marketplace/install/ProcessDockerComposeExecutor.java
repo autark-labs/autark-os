@@ -269,11 +269,33 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
     }
 
     private RuntimeModels.DockerComposeResult runCommand(List<String> command) {
-        SystemCommandRunner.CommandExecutionResult result = commandRunner.run(command);
+        CommandDeadline deadline = deadlineFor(command);
+        SystemCommandRunner.CommandExecutionResult result = commandRunner.run(
+                command,
+                deadline.timeout(),
+                deadline.timeoutMessage(),
+                "Docker command was interrupted before it completed.");
         if (result.missingCommand()) {
             throw new InstallationException("Unable to run Docker Compose. " + result.output());
         }
         return new RuntimeModels.DockerComposeResult(result.exitCode(), result.outputLines());
+    }
+
+    private CommandDeadline deadlineFor(List<String> command) {
+        if (command.contains("pull")) {
+            return new CommandDeadline(SystemCommandRunner.IMAGE_PULL_TIMEOUT,
+                    "Docker image pull timed out. Check network access and Docker, then refresh the app state before retrying.");
+        }
+        if (command.contains("export")) {
+            return new CommandDeadline(SystemCommandRunner.ARCHIVE_TIMEOUT,
+                    "Docker container archive timed out. No container removal was attempted after the timeout.");
+        }
+        if (command.contains("up") || command.contains("down") || command.contains("stop") || command.contains("restart") || command.contains("rm")) {
+            return new CommandDeadline(SystemCommandRunner.COMPOSE_TIMEOUT,
+                    "Docker lifecycle command timed out. Refresh the app state before trying another action.");
+        }
+        return new CommandDeadline(SystemCommandRunner.PROBE_TIMEOUT,
+                "Docker status check timed out. The displayed runtime state may be stale.");
     }
 
     private ContainerSelection managedContainerIds(String projectName, String appId) {
@@ -328,6 +350,9 @@ public class ProcessDockerComposeExecutor implements DockerComposeExecutor {
         boolean successful() {
             return exitCode == 0;
         }
+    }
+
+    private record CommandDeadline(java.time.Duration timeout, String timeoutMessage) {
     }
 
     private RuntimeModels.ContainerTelemetry telemetry(String line) {

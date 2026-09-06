@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -84,9 +85,24 @@ class ProcessDockerComposeExecutorTests {
         });
     }
 
+    @Test
+    void dockerCommandsUseExplicitDeadlinesInsteadOfAnUnboundedRunner() {
+        RecordingCommandRunner runner = new RecordingCommandRunner(false);
+        ProcessDockerComposeExecutor executor = new ProcessDockerComposeExecutor(runner);
+        Path compose = runtimeRoot.resolve("compose.yaml");
+
+        executor.pull(compose, "autarkos_homepage");
+        executor.up(compose, "autarkos_homepage");
+        executor.archiveAndRemoveManagedProject("autarkos_homepage", "homepage", runtimeRoot.resolve("recovery"));
+
+        assertThat(runner.timeouts).contains(SystemCommandRunner.IMAGE_PULL_TIMEOUT, SystemCommandRunner.COMPOSE_TIMEOUT, SystemCommandRunner.ARCHIVE_TIMEOUT);
+        assertThat(runner.timeouts).doesNotContain(Duration.ZERO);
+    }
+
     private static final class RecordingCommandRunner extends SystemCommandRunner {
         private final boolean failExport;
         private final List<List<String>> commands = new ArrayList<>();
+        private final List<Duration> timeouts = new ArrayList<>();
 
         private RecordingCommandRunner(boolean failExport) {
             this.failExport = failExport;
@@ -94,7 +110,13 @@ class ProcessDockerComposeExecutorTests {
 
         @Override
         public CommandExecutionResult run(List<String> command) {
+            return run(command, SystemCommandRunner.PROBE_TIMEOUT, "", "");
+        }
+
+        @Override
+        public CommandExecutionResult run(List<String> command, java.time.Duration timeout, String timeoutMessage, String interruptedMessage) {
             commands.add(List.copyOf(command));
+            timeouts.add(timeout);
             if (command.contains("ps") && command.contains("{{.ID}}")) {
                 return new CommandExecutionResult(0, List.of(CONTAINER_ID), false);
             }
