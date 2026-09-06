@@ -67,13 +67,17 @@ public class AppLifecycleService {
 
     @Autowired
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, AutarkOsFileOpsService fileOpsService) {
+        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, recoveryOperations, fileOpsService, new AppAccessChecker());
+    }
+
+    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, AutarkOsFileOpsService fileOpsService, AppAccessChecker accessChecker) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
         this.runtimeLayout = runtimeLayout;
         this.postInstallGuideBuilder = postInstallGuideBuilder;
         this.tailscaleService = tailscaleService;
-        this.accessChecker = new AppAccessChecker();
+        this.accessChecker = Objects.requireNonNull(accessChecker, "accessChecker");
         this.settingsPolicy = new AppSettingsPolicy(repository, runtimeStatusResolver);
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.recoveryOperations = recoveryOperations;

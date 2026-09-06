@@ -26,10 +26,12 @@ import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppActionResult;
+import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.AppGuardianService;
 import com.autarkos.marketplace.install.AppHealthSnapshot;
 import com.autarkos.marketplace.install.AppLifecycleService;
@@ -42,6 +44,8 @@ import com.autarkos.marketplace.install.PostInstallGuideBuilder;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.marketplace.install.models.AccessModels;
+import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.network.tailscale.TailscaleServeResult;
@@ -89,7 +93,9 @@ class AppLifecycleServiceTests {
                 backupRepository,
                 new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
                 null,
-                recoveryOperations);
+                recoveryOperations,
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                new FakeAppAccessChecker());
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
@@ -1120,6 +1126,23 @@ class AppLifecycleServiceTests {
                     assertThat(value.label()).isEqualTo("Database");
                     assertThat(value.value()).isEqualTo("obsidian");
                 });
+    }
+
+    private static class FakeAppAccessChecker extends AppAccessChecker {
+        @Override
+        public AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
+            return accessCheck(appId, accessUrl);
+        }
+
+        @Override
+        public AccessModels.AppAccessCheck accessCheck(String appId, String accessUrl) {
+            if (accessUrl == null || accessUrl.isBlank()) {
+                return AccessModels.AppAccessCheck.notConfigured(appId);
+            }
+            return accessUrl.endsWith(":1")
+                    ? AccessModels.AppAccessCheck.unreachable(appId, accessUrl)
+                    : AccessModels.AppAccessCheck.reachable(appId, accessUrl);
+        }
     }
 
     private static class FakeTailscaleService extends TailscaleService {

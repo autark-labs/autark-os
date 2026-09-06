@@ -15,7 +15,7 @@ import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.HealthManifest;
 
-class AppAccessChecker {
+public class AppAccessChecker {
 
     static final Duration ACCESS_CHECK_TIMEOUT = Duration.ofMillis(850);
 
@@ -43,7 +43,7 @@ class AppAccessChecker {
         return manifest.health();
     }
 
-    AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
+    protected AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
         HealthManifest health = healthContract(manifest);
         if ("tcp".equals(health.type())) {
             return tcpAccessCheck(appId, accessUrl);
@@ -51,7 +51,7 @@ class AppAccessChecker {
         return accessCheck(appId, accessUrl);
     }
 
-    AccessModels.AppAccessCheck accessCheck(String appId, String accessUrl) {
+    protected AccessModels.AppAccessCheck accessCheck(String appId, String accessUrl) {
         if (accessUrl == null || accessUrl.isBlank()) {
             return AccessModels.AppAccessCheck.notConfigured(appId);
         }
