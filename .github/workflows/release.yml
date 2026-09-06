@@ -214,6 +214,17 @@ jobs:
           AUTARK_OS_PRIVATE_SOURCEMAPS: "1"
         run: ./gradlew test bootJar --console=plain
 
+      - name: Retain backend test failures
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: autark-os-backend-test-failures-${{ matrix.architecture }}
+          path: |
+            backend/build/test-results/test/
+            backend/build/reports/tests/test/
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Retain private frontend source maps
         if: success()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
