@@ -1,6 +1,7 @@
 package com.autarkos.marketplace.install;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.backups.RecoveryOperationConflictException;
+import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 
@@ -55,6 +58,31 @@ class AppGuardianServiceTests {
 
         verify(lifecycleService, never()).healthSnapshot("vaultwarden");
         verify(lifecycleService, never()).repair("vaultwarden", true);
+    }
+
+    @Test
+    void guardianDefersRepairWhenRecoveryWorkOwnsTheMutationSlot() {
+        InstalledAppRepository repository = mock(InstalledAppRepository.class);
+        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
+        InstalledApp app = new InstalledApp(
+                "vaultwarden", "Vaultwarden", "Ready", "/runtime/apps/vaultwarden", "autark-os-vaultwarden", "http://localhost:8090", Instant.now());
+        when(repository.settingsFor("vaultwarden")).thenReturn(Optional.of(settings()));
+        when(lifecycleService.healthSnapshot("vaultwarden")).thenReturn(health("Needs attention"));
+        doThrow(new RecoveryOperationConflictException(
+                RecoveryOperationCoordinator.Operation.APP_BACKUP,
+                RecoveryOperationCoordinator.Operation.APP_LIFECYCLE))
+                .when(lifecycleService).repair("vaultwarden", true);
+        AppGuardianService guardian = new AppGuardianService(repository, lifecycleService, true);
+
+        guardian.inspectApp(app);
+
+        verify(repository).recordEvent("vaultwarden", "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
+    }
+
+    private InstallModels.InstallSettings settings() {
+        return new InstallModels.InstallSettings(
+                "http://localhost:8090", null, false, Map.of(), InstallModels.BackupPolicy.defaults(),
+                "local", "optional", 8090, "http", null, null, null, null, true);
     }
 
     private ApplicationState applicationStateWith(AppRuntimeView app) {

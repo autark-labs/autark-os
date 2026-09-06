@@ -54,6 +54,7 @@ public class AppLifecycleService {
     private final AppContainerLifecycleService containerLifecycleService;
     private final AppReliabilityService reliabilityService;
     private final PrivateAccessStateResolver privateAccessStateResolver;
+    private final RecoveryOperationCoordinator recoveryOperations;
     public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService) {
         this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, new RecoveryOperationCoordinator());
     }
@@ -69,6 +70,7 @@ public class AppLifecycleService {
         this.accessChecker = new AppAccessChecker();
         this.settingsPolicy = new AppSettingsPolicy(repository, runtimeStatusResolver);
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
+        this.recoveryOperations = recoveryOperations;
         this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations);
         this.healthService = new AppHealthService(repository, composeExecutor, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
         this.containerLifecycleService = new AppContainerLifecycleService(repository, composeExecutor, activityLogService, this::refresh);
@@ -134,6 +136,10 @@ public class AppLifecycleService {
     }
 
     public AppActionResult start(String appId) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> startUnlocked(appId));
+    }
+
+    private AppActionResult startUnlocked(String appId) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "start");
         assertComposeAvailable(app, "start");
@@ -141,6 +147,10 @@ public class AppLifecycleService {
     }
 
     public AppActionResult stop(String appId) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> stopUnlocked(appId));
+    }
+
+    private AppActionResult stopUnlocked(String appId) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "stop");
         return containerLifecycleService.stop(app, composeFile(app));
@@ -152,8 +162,12 @@ public class AppLifecycleService {
      * a successful command alone is never treated as a safe quiescent state.
      */
     public AppActionResult stopAndConfirm(String appId) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> stopAndConfirmUnlocked(appId));
+    }
+
+    private AppActionResult stopAndConfirmUnlocked(String appId) {
         InstalledApp app = installedApp(appId);
-        AppActionResult result = stop(appId);
+        AppActionResult result = stopUnlocked(appId);
         RuntimeModels.DockerComposeResult status = composeExecutor.ps(composeFile(app), app.composeProject());
         if (!status.successful()) {
             throw new InstallationException("Autark-OS stopped " + app.appName() + " but could not confirm its container state.");
@@ -170,6 +184,10 @@ public class AppLifecycleService {
     }
 
     public AppActionResult restart(String appId) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> restartUnlocked(appId));
+    }
+
+    private AppActionResult restartUnlocked(String appId) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "restart");
         assertComposeAvailable(app, "restart");
@@ -181,6 +199,10 @@ public class AppLifecycleService {
     }
 
     AppActionResult repair(String appId, boolean automatic) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> repairUnlocked(appId, automatic));
+    }
+
+    private AppActionResult repairUnlocked(String appId, boolean automatic) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "repair");
         assertComposeAvailable(app, "repair");

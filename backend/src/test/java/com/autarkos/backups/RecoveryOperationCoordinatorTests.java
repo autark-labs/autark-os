@@ -88,6 +88,20 @@ class RecoveryOperationCoordinatorTests {
     }
 
     @Test
+    void allowsLifecycleWorkNestedInsideTheSameRecoveryOperation() {
+        RecoveryOperationCoordinator coordinator = new RecoveryOperationCoordinator();
+
+        String result = coordinator.runExclusive(RecoveryOperationCoordinator.Operation.APP_BACKUP, () ->
+                coordinator.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> {
+                    assertThat(coordinator.activeOperation()).contains(RecoveryOperationCoordinator.Operation.APP_BACKUP);
+                    return "stopped for backup";
+                }));
+
+        assertThat(result).isEqualTo("stopped for backup");
+        assertThat(coordinator.activeOperation()).isEmpty();
+    }
+
+    @Test
     void releasesTheGuardWhenAnOperationFails() {
         RecoveryOperationCoordinator coordinator = new RecoveryOperationCoordinator();
 

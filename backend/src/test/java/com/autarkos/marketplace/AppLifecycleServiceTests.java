@@ -7,12 +7,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.backups.RecoveryOperationConflictException;
+import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.marketplace.catalog.ManifestValidator;
@@ -53,6 +59,7 @@ class AppLifecycleServiceTests {
     FakeTailscaleService tailscaleService;
     RuntimeLayout runtimeLayout;
     BackupRepository backupRepository;
+    RecoveryOperationCoordinator recoveryOperations;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -61,6 +68,7 @@ class AppLifecycleServiceTests {
         runtimeLayout = new RuntimeLayout(properties);
         repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
+        recoveryOperations = new RecoveryOperationCoordinator();
         composeExecutor = new FakeLifecycleDockerComposeExecutor();
         tailscaleService = new FakeTailscaleService();
         service = new AppLifecycleService(
@@ -73,7 +81,10 @@ class AppLifecycleServiceTests {
                 tailscaleService,
                 false,
                 null,
-                backupRepository);
+                backupRepository,
+                new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
+                null,
+                recoveryOperations);
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
@@ -117,6 +128,38 @@ class AppLifecycleServiceTests {
                 .hasMessageContaining("Previous application state is retained");
         assertThat(repository.findAppById("vaultwarden")).hasValueSatisfying(app ->
                 assertThat(app.status()).isEqualTo("Installed"));
+    }
+
+    @Test
+    void lifecycleActionConflictsWithAnActiveBackupOnAnotherThread() throws Exception {
+        CountDownLatch backupStarted = new CountDownLatch(1);
+        CountDownLatch releaseBackup = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var activeBackup = executor.submit(() -> recoveryOperations.runExclusive(
+                    RecoveryOperationCoordinator.Operation.APP_BACKUP,
+                    () -> {
+                        backupStarted.countDown();
+                        try {
+                            releaseBackup.await(2, TimeUnit.SECONDS);
+                        } catch (InterruptedException exception) {
+                            Thread.currentThread().interrupt();
+                            throw new AssertionError(exception);
+                        }
+                        return null;
+                    }));
+            assertThat(backupStarted.await(2, TimeUnit.SECONDS)).isTrue();
+
+            assertThatThrownBy(() -> service.start("vaultwarden"))
+                    .isInstanceOf(RecoveryOperationConflictException.class)
+                    .hasMessageContaining("already creating an app backup");
+
+            releaseBackup.countDown();
+            activeBackup.get(2, TimeUnit.SECONDS);
+        } finally {
+            releaseBackup.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test

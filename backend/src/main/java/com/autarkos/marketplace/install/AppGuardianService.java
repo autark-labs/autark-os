@@ -17,6 +17,7 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.automation.AutomationService;
+import com.autarkos.backups.RecoveryOperationConflictException;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.ReliabilityModels;
 
@@ -121,6 +122,12 @@ public class AppGuardianService {
         saveGuardianState(app, settings, "guardian_repair_queued", attemptAt);
         try {
             appLifecycleService.repair(app.appId(), true);
+        } catch (RecoveryOperationConflictException exception) {
+            saveGuardianState(app, settings, "guardian_repair_deferred", attemptAt);
+            repository.recordEvent(app.appId(), "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
+            if (activityLogService != null) {
+                activityLogService.info("stability", "guardian_repair_deferred", "Automatic repair deferred for " + app.appName(), exception.getMessage(), app.appId());
+            }
         } catch (RuntimeException exception) {
             saveGuardianState(app, settings, blockedByOwnership(exception) ? "guardian_repair_blocked" : "guardian_repair_failed", attemptAt);
             if (!hasRecentGuardianFailure(app.appId())) {
@@ -155,6 +162,12 @@ public class AppGuardianService {
         saveGuardianState(app, settings, "guardian_repair_queued", attemptAt);
         try {
             appLifecycleService.repair(app.appId(), true);
+        } catch (RecoveryOperationConflictException exception) {
+            saveGuardianState(app, settings, "guardian_repair_deferred", attemptAt);
+            repository.recordEvent(app.appId(), "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
+            if (activityLogService != null) {
+                activityLogService.info("stability", "guardian_repair_deferred", "Automatic repair deferred for " + app.appName(), exception.getMessage(), app.appId());
+            }
         } catch (RuntimeException exception) {
             saveGuardianState(app, settings, blockedByOwnership(exception) ? "guardian_repair_blocked" : "guardian_repair_failed", attemptAt);
             if (!hasRecentGuardianFailure(app.appId())) {

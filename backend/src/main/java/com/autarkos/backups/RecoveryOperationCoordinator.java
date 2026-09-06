@@ -41,6 +41,9 @@ public class RecoveryOperationCoordinator {
 
     private synchronized Lease acquire(Operation operation) {
         if (activeOperation != null) {
+            if (activeOperation.ownerThread() == Thread.currentThread()) {
+                return Lease.nested();
+            }
             throw new RecoveryOperationConflictException(activeOperation.operation(), operation);
         }
         return reserve(operation);
@@ -55,7 +58,7 @@ public class RecoveryOperationCoordinator {
 
     private Lease reserve(Operation operation) {
         long leaseId = ++nextLeaseId;
-        activeOperation = new ActiveOperation(leaseId, operation);
+        activeOperation = new ActiveOperation(leaseId, operation, Thread.currentThread());
         return new Lease(this, leaseId);
     }
 
@@ -75,6 +78,7 @@ public class RecoveryOperationCoordinator {
         BACKUP_RETENTION("backup cleanup", "cleaning up older restore points"),
         STORAGE_CLEANUP("storage cleanup", "cleaning up unused app data"),
         BACKUP_DESTINATION_CHANGE("a backup destination change", "changing the backup destination"),
+        APP_LIFECYCLE("an app lifecycle action", "changing an app's running state"),
         UNINSTALL_CHECKPOINT("an app uninstall", "creating an uninstall safety checkpoint"),
         APP_UPDATE("an app update", "updating an app safely"),
         APP_ROLLBACK("an app rollback", "rolling an app back safely");
@@ -96,7 +100,7 @@ public class RecoveryOperationCoordinator {
         }
     }
 
-    private record ActiveOperation(long leaseId, Operation operation) {
+    private record ActiveOperation(long leaseId, Operation operation, Thread ownerThread) {
     }
 
     private static final class Lease implements AutoCloseable {
@@ -110,11 +114,17 @@ public class RecoveryOperationCoordinator {
             this.leaseId = leaseId;
         }
 
+        private static Lease nested() {
+            return new Lease(null, 0);
+        }
+
         @Override
         public void close() {
             if (!closed) {
                 closed = true;
-                coordinator.release(leaseId);
+                if (coordinator != null) {
+                    coordinator.release(leaseId);
+                }
             }
         }
     }

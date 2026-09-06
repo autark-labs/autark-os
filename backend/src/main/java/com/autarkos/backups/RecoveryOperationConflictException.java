@@ -5,7 +5,7 @@ public class RecoveryOperationConflictException extends RuntimeException {
     private final RecoveryOperationCoordinator.Operation activeOperation;
     private final RecoveryOperationCoordinator.Operation requestedOperation;
 
-    RecoveryOperationConflictException(
+    public RecoveryOperationConflictException(
             RecoveryOperationCoordinator.Operation activeOperation,
             RecoveryOperationCoordinator.Operation requestedOperation) {
         super("Autark-OS is already " + activeOperation.inProgressLabel()
