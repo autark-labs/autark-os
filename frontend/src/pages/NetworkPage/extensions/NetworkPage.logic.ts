@@ -360,9 +360,11 @@ function classifyAppExposure(app: AppRuntimeView, tailscale: TailscaleStatus | n
     }
   }
   if (desiredMode === 'network') {
+    if (app.accessRoute?.dashboardScope) return app.accessRoute.dashboardScope === 'network' ? 'lan' : 'local';
     return 'lan';
   }
   if (desiredMode === 'local' || desiredMode === 'none') {
+    if (app.accessRoute?.dashboardScope) return app.accessRoute.dashboardScope === 'network' ? 'lan' : 'local';
     return 'local';
   }
 

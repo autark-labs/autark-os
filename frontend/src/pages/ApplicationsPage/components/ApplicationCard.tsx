@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { ExternalLink, MoreVertical } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
@@ -84,7 +85,7 @@ export function ApplicationCard({
               <DropdownMenu>
                 <div className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center gap-0.5">
                   {item.href ? (
-                    <a
+                    <AppBrowserLink
                       aria-label={`Open ${item.name}`}
                       className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
                       href={item.href}
@@ -93,7 +94,7 @@ export function ApplicationCard({
                       target="_blank"
                     >
                       <ExternalLink className="size-3.5" />
-                    </a>
+                    </AppBrowserLink>
                   ) : null}
                   <DropdownMenuTrigger asChild>
                     <button
@@ -112,7 +113,7 @@ export function ApplicationCard({
                   <DropdownMenuSeparator className="bg-sky-300/10" />
                   {actions.map((action) => action.href ? (
                     <DropdownMenuItem asChild key={action.id}>
-                      <a href={action.href} rel="noreferrer" target={action.href.startsWith('/') ? undefined : '_blank'}>{action.label}</a>
+                      <AppBrowserLink href={action.href} rel="noreferrer" target={action.href.startsWith('/') ? undefined : '_blank'}>{action.label}</AppBrowserLink>
                     </DropdownMenuItem>
                   ) : (
                     <DropdownMenuItem

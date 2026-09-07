@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Archive, CheckCircle2, Clock3, Loader2, Settings2, TriangleAlert } from 'lucide-react';
@@ -340,7 +341,7 @@ function InstalledAppNotice({ app, manageHref }: { app: DiscoverInstalledAppSumm
           <div className="mt-3 flex flex-wrap gap-2">
             {app.accessUrl && (
               <ProjectPrimaryButton asChild size="sm">
-                <a href={app.accessUrl} rel="noreferrer" target="_blank">Open app</a>
+                <AppBrowserLink href={app.accessUrl} rel="noreferrer" target="_blank">Open app</AppBrowserLink>
               </ProjectPrimaryButton>
             )}
             <ProjectDarkControlButton asChild size="sm">
@@ -387,9 +388,9 @@ function InlineInstallStatus({
             <JobStepList job={job} />
             {succeeded && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {(installedApp?.accessUrl || app.accessUrl) && (
+                {installedApp?.accessUrl && (
                   <ProjectPrimaryButton asChild size="sm">
-                    <a href={installedApp?.accessUrl || app.accessUrl} rel="noreferrer" target="_blank">Open {app.name}</a>
+                    <AppBrowserLink href={installedApp.accessUrl} rel="noreferrer" target="_blank">Open {app.name}</AppBrowserLink>
                   </ProjectPrimaryButton>
                 )}
                 {installedApp && shouldOfferFirstBackup(installedApp) && (

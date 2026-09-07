@@ -286,6 +286,8 @@ public class AppLifecycleService {
         String defaultAccessUrl = app.accessUrl();
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(defaultAccessUrl));
         InstallModels.InstallSettings sanitized = settingsPolicy.sanitize(settings, app);
+        catalogService.findById(appId).ifPresent(manifest -> InstallCustomizationResolver.accessMode(manifest,
+                new InstallOptionsRequest.AccessOptions(settings.tailscaleEnabled(), settings.desiredAccessMode())));
         InstallModels.AppSettingsChangePlan plan = settingsPolicy.settingsChangePlan(app, current, sanitized);
         repository.recordEvent(app.appId(), "settings_change_planned", plan.summary());
         activityInfo("settings_change_planned", "Settings change planned for " + app.appName(), plan.summary(), app.appId());
@@ -304,7 +306,7 @@ public class AppLifecycleService {
                     false,
                     sanitized.storageSubfolders(),
                     sanitized.backup(),
-                    "local",
+                    sanitized.desiredAccessMode(),
                     "disabled",
                     sanitized.expectedLocalPort(),
                     sanitized.expectedProtocol(),
@@ -322,7 +324,7 @@ public class AppLifecycleService {
                     false,
                     sanitized.storageSubfolders(),
                     sanitized.backup(),
-                    "local",
+                    sanitized.desiredAccessMode(),
                     "disabled",
                     sanitized.expectedLocalPort(),
                     sanitized.expectedProtocol(),
@@ -360,7 +362,15 @@ public class AppLifecycleService {
                     false, false, false, false, List.of(), List.of(), List.of(reason));
         }
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-        return settingsPolicy.settingsChangePlan(app, current, settingsPolicy.sanitize(settings, app));
+        InstallModels.InstallSettings sanitized = settingsPolicy.sanitize(settings, app);
+        try {
+            catalogService.findById(appId).ifPresent(manifest -> InstallCustomizationResolver.accessMode(manifest,
+                    new InstallOptionsRequest.AccessOptions(sanitized.tailscaleEnabled(), sanitized.desiredAccessMode())));
+        } catch (InstallationException exception) {
+            return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Access change unavailable",
+                    exception.getMessage(), false, false, false, false, List.of(), List.of(), List.of(exception.getMessage()));
+        }
+        return settingsPolicy.settingsChangePlan(app, current, sanitized);
     }
 
     private void safeRedeployForSettings(InstalledApp app, InstallModels.InstallSettings settings) {
@@ -373,11 +383,11 @@ public class AppLifecycleService {
         try {
             InstallOptionsRequest options = new InstallOptionsRequest(
                     new InstallOptionsRequest.PortOptions(settings.expectedLocalPort()),
-                    new InstallOptionsRequest.AccessOptions(settings.tailscaleEnabled()),
+                    new InstallOptionsRequest.AccessOptions(settings.tailscaleEnabled(), settings.desiredAccessMode()),
                     new InstallOptionsRequest.StorageOptions(settings.storageSubfolders()),
                     new InstallOptionsRequest.BackupOptions(settings.backup().enabled(), settings.backup().frequency(), settings.backup().retention()));
-            RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = new InstallCustomizationResolver(new PortAllocator()).resolve(manifest, options);
-            new ComposeRenderer(runtimeLayout).render(manifest, appRoot, runtimeConfiguration);
+            RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = new InstallCustomizationResolver(new PortAllocator()).resolveSettings(manifest, options, previousCompose);
+            new ComposeRenderer(runtimeLayout).updatePorts(composePath, manifest, runtimeConfiguration);
             RuntimeModels.DockerComposeResult result = composeExecutor.up(composePath, app.composeProject());
             if (!result.successful()) {
                 restoreCompose(composePath, previousCompose);
@@ -440,7 +450,7 @@ public class AppLifecycleService {
                 true,
                 current.storageSubfolders(),
                 current.backup(),
-                "private",
+                com.autarkos.network.HostAddress.isLoopbackUrl(accessUrl) ? "private" : "local-and-private",
                 firstPresent(current.privateAccessRequirement(), "optional"),
                 localPort,
                 "http",
@@ -466,7 +476,7 @@ public class AppLifecycleService {
                 false,
                 current.storageSubfolders(),
                 current.backup(),
-                "local",
+                com.autarkos.network.HostAddress.isLoopbackUrl(current.accessUrl()) ? "local" : "network",
                 "disabled",
                 current.expectedLocalPort(),
                 current.expectedProtocol(),

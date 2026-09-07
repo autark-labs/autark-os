@@ -396,7 +396,7 @@ public class MarketplaceInstallService {
                 privateAccessDesired,
                 runtimeConfiguration.storageSubfolders(),
                 runtimeConfiguration.backup(),
-                privateAccessDesired ? "private" : "local",
+                runtimeConfiguration.accessMode(),
                 manifest.usage().privateHttpsRequired() ? "recommended" : "optional",
                 portFromAccessUrl(accessUrl),
                 protocolFromAccessUrl(accessUrl),

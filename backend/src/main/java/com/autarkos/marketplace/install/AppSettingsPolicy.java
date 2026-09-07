@@ -35,6 +35,13 @@ class AppSettingsPolicy {
 
         Integer currentPort = current.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(firstPresent(current.accessUrl(), app.accessUrl())) : current.expectedLocalPort();
         Integer requestedPort = requested.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(requested.accessUrl()) : requested.expectedLocalPort();
+        boolean wantsLan = "network".equals(requested.desiredAccessMode()) || "local-and-private".equals(requested.desiredAccessMode());
+        boolean hasLan = !com.autarkos.network.HostAddress.isLoopbackUrl(current.accessUrl());
+        if (wantsLan != hasLan) {
+            changes.add(wantsLan ? "The dashboard will become available on your home network." : "The dashboard will be limited to this server and any enabled private link.");
+            redeployRequired = true;
+            warnings.add("Changing dashboard access restarts the app containers.");
+        }
         if (!same(current.accessUrl(), requested.accessUrl()) || !same(currentPort, requestedPort)) {
             changes.add("Local app address will change to " + requested.accessUrl() + ".");
             if (!same(currentPort, requestedPort)) {

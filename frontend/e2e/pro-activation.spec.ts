@@ -115,6 +115,8 @@ test('installed Pro loads its browser module from the generic host', async ({ pa
   const requests = await openPro(page, true);
 
   await expect(page.getByRole('heading', { name: 'Autark Pro is available' })).toBeVisible();
+  await expect(page.getByText('Online access check', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Verified until /)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Private extension surface' }))
     .toBeVisible();
   await expect(page.getByText('pro.dashboard')).toBeVisible();
@@ -130,6 +132,9 @@ test('absent extension does not download browser code', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Check for update' }))
     .toHaveCount(0);
   await expect(page.getByText(/New Pro activation and extension installation are deferred/)).toBeVisible();
+  await expect(page.getByText(/Phone pairing, hosted monitoring and push alerts are not available in this beta/)).toBeVisible();
+  await expect(page.getByRole('link', { name: 'licensing@autarklabs.com' }))
+    .toHaveAttribute('href', 'mailto:licensing@autarklabs.com');
   expect(requests.some((path) => path.includes('/assets/'))).toBe(false);
 });
 

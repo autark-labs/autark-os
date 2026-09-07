@@ -33,7 +33,10 @@ public record InstallOptionsRequest(
     public record PortOptions(Integer hostPort) {
     }
 
-    public record AccessOptions(Boolean tailscaleEnabled) {
+    public record AccessOptions(Boolean tailscaleEnabled, String mode) {
+        public AccessOptions(Boolean tailscaleEnabled) {
+            this(tailscaleEnabled, null);
+        }
     }
 
     public record StorageOptions(Map<String, String> subfolders, Map<String, String> hostPaths) {

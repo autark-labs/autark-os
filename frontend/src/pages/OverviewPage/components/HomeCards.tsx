@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import type { ComponentType, ReactNode } from 'react';
 import { AlertTriangle, CheckCircle2, Info, MoreVertical, Sparkles, XCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -210,7 +211,7 @@ export function HomeQuickAccessTile({
 }) {
   const action = href ? (
     <ProjectOpenButton asChild className="h-9 rounded-lg px-4 text-sm font-semibold" size="sm">
-      <a href={href} rel="noreferrer" target="_blank">{actionLabel}</a>
+      <AppBrowserLink href={href} rel="noreferrer" target="_blank">{actionLabel}</AppBrowserLink>
     </ProjectOpenButton>
   ) : to ? (
     <ProjectOpenButton asChild className="h-9 rounded-lg px-4 text-sm font-semibold" size="sm">
@@ -336,7 +337,7 @@ export function HomeActionButton({
     const ButtonComponent = variant === 'dark' ? ProjectDarkControlButton : ProjectPrimaryButton;
     return (
       <ButtonComponent asChild className={className} size="sm">
-        <a href={href} rel="noreferrer" target={href.startsWith('http') ? '_blank' : undefined}>{label}</a>
+        <AppBrowserLink href={href} rel="noreferrer" target={href.startsWith('http') ? '_blank' : undefined}>{label}</AppBrowserLink>
       </ButtonComponent>
     );
   }

@@ -98,7 +98,7 @@ class AppLifecycleServiceTests {
                 new FakeAppAccessChecker());
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
-        Files.writeString(appRoot.resolve("compose.yaml"), "services: {}\n");
+        Files.writeString(appRoot.resolve("compose.yaml"), "services:\n  vaultwarden:\n    image: vaultwarden/server:1.36.0\n    ports:\n      - '8090:80'\n    labels:\n      - autark-os.instance-id=test-owner\n");
         repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Installed", appRoot.toString(), "autark-os-vaultwarden", "http://localhost:8090", Instant.parse("2026-06-11T00:00:00Z")));
         repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "vaultwarden",
@@ -625,8 +625,8 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView app = service.getApp("vaultwarden");
 
-        assertThat(app.accessUrl()).isEqualTo("http://localhost:8090");
-        assertThat(repository.findAppById("vaultwarden").orElseThrow().accessUrl()).isEqualTo("http://localhost:8090");
+        assertThat(app.accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":8090");
+        assertThat(repository.findAppById("vaultwarden").orElseThrow().accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":8090");
     }
 
     @Test
@@ -642,7 +642,7 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView app = service.getApp("vaultwarden");
 
-        assertThat(app.accessUrl()).isEqualTo("http://localhost:8090");
+        assertThat(app.accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":8090");
     }
 
     @Test
@@ -668,8 +668,8 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView app = service.getApp("gitea");
 
-        assertThat(app.accessUrl()).isEqualTo("http://localhost:3002");
-        assertThat(repository.findAppById("gitea").orElseThrow().accessUrl()).isEqualTo("http://localhost:3002");
+        assertThat(app.accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":3002");
+        assertThat(repository.findAppById("gitea").orElseThrow().accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":3002");
     }
 
     @Test
@@ -733,7 +733,7 @@ class AppLifecycleServiceTests {
         assertThat(app.desiredAccess().label()).isEqualTo("Only this device");
         assertThat(app.desiredAccess().expectedLocalPort()).isEqualTo(8090);
         assertThat(app.desiredAccess().expectedProtocol()).isEqualTo("http");
-        assertThat(app.observedAccess().localUrl()).isEqualTo("http://localhost:8090");
+        assertThat(app.observedAccess().localUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":8090");
         assertThat(app.observedAccess().localPort()).isEqualTo(8090);
         assertThat(app.observedAccess().privateLinkStatus()).isEqualTo("not_enabled");
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().expectedLocalPort()).isEqualTo(8090);
@@ -751,7 +751,7 @@ class AppLifecycleServiceTests {
         AppRuntimeView app = service.getApp("vaultwarden");
 
         assertThat(app.accessRoute().privateLinkStatus()).isEqualTo("port_conflict");
-        assertThat(app.accessRoute().primaryOpenUrl()).isEqualTo("http://localhost:8090");
+        assertThat(app.accessRoute().primaryOpenUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":8090");
         assertThat(app.accessRoute().privateUrl()).isNull();
     }
 
@@ -1046,7 +1046,7 @@ class AppLifecycleServiceTests {
                 InstallModels.BackupPolicy.defaults()));
 
         assertThat(plan.redeployRequired()).isTrue();
-        assertThat(app.accessUrl()).isEqualTo("http://localhost:19090");
+        assertThat(app.accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":19090");
         assertThat(composeExecutor.upCalled).isTrue();
         assertThat(Files.readString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"))).contains("19090:80");
         assertThat(repository.eventsFor("vaultwarden", 10))
@@ -1086,7 +1086,7 @@ class AppLifecycleServiceTests {
         assertThat(tailscaleService.lastHttpsPort).isNotEqualTo(8090);
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().privateAccessUrl()).isEqualTo("https://autark-os.example.ts.net:" + tailscaleService.lastHttpsPort);
-        assertThat(result.app().desiredAccess().mode()).isEqualTo("private");
+        assertThat(result.app().desiredAccess().mode()).isEqualTo("local-and-private");
         assertThat(result.app().observedAccess().privateLinkStatus()).isEqualTo("verified");
         assertThat(result.app().accessRoute().primaryOpenUrl()).isEqualTo("https://autark-os.example.ts.net:" + tailscaleService.lastHttpsPort);
         assertThat(result.app().accessRoute().backendTargetUrl()).isEqualTo("http://127.0.0.1:8090");

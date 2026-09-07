@@ -10,6 +10,7 @@ import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { Surface } from '@/components/primitives/Surface';
+import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +31,6 @@ import { copyText } from '@/lib/copyText';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import {
-  setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
@@ -62,7 +62,6 @@ import type { ReachabilityService, ReachabilityTypeFilter, ReachabilityZoneId } 
 import {
   acknowledgePendingReachability,
   applyPendingReachability,
-  appWithReachabilityZone,
   filterReachabilityServices,
   isPrivateAccessApp,
   removePendingReachabilityForToken,
@@ -135,6 +134,11 @@ function NetworkPage() {
 
   const copyAccessLink = useCallback(async (appId: string, linkKind: string, url: string | null) => {
     if (!url) return;
+    const reason = appBrowserAccessReason(url);
+    if (reason) {
+      showActionNotification({ ok: false, severity: 'info', title: 'Server-only link', message: reason }, 'Server-only link');
+      return;
+    }
     const result = await copyText(url);
     if (!result.ok) {
       showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
@@ -175,18 +179,9 @@ function NetworkPage() {
           const disabled = await InstalledAppsAPIClient.disablePrivateAccess(app.appId);
           syncCanonicalAppMutationResult(queryClient, disabled);
           appForSettings = disabled.app ?? appForSettings;
-          if (targetZone === 'local') {
-            setRuntimeAppInApplicationStateCache(queryClient, appWithReachabilityZone(appForSettings, targetZone));
-            showActionNotification(disabled, 'Private access turned off');
-            setPendingReachabilityByServiceId((current) => acknowledgePendingReachability(current, service.id, pendingToken));
-            void invalidateNetworkQueries(queryClient);
-            succeeded = true;
-            return;
-          }
         }
-        setRuntimeAppInApplicationStateCache(queryClient, appWithReachabilityZone(appForSettings, targetZone));
         const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(appForSettings, targetZone));
-        syncCanonicalAppMutationResult(queryClient, { app: appWithReachabilityZone(updated, targetZone) });
+        syncCanonicalAppMutationResult(queryClient, { app: updated });
         showActionNotification({
           ok: true,
           severity: 'success',

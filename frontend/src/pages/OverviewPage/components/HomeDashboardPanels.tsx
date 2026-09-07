@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import type { LucideIcon } from 'lucide-react';
 import {
   Activity,
@@ -52,7 +53,7 @@ function InstalledAppCard({ app, index }: { app: AppInstanceView; index: number 
   const status = appStatus(app.userStatus);
   return (
     <article className="group/app-card relative h-56 min-w-0 overflow-hidden rounded-xl border border-sky-200/20 bg-app-card-harbor text-slate-50 shadow-lg shadow-slate-950/20 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-app-card-harbor-hover hover:shadow-xl hover:shadow-cyan-950/30" role="listitem">
-      <a
+      <AppBrowserLink
         aria-label={`Open ${app.name}`}
         className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/80"
         href={openUrl || detailRoute}
@@ -69,7 +70,7 @@ function InstalledAppCard({ app, index }: { app: AppInstanceView; index: number 
             <>
               <span className="absolute left-2 top-2 z-20 rounded-full border border-slate-950/35 bg-slate-950/55 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">Managed app</span>
               <div className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center gap-0.5">
-                <a
+                <AppBrowserLink
                   aria-label={`Open ${app.name}`}
                   className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
                   href={openUrl || detailRoute}
@@ -77,7 +78,7 @@ function InstalledAppCard({ app, index }: { app: AppInstanceView; index: number 
                   target={openUrl ? '_blank' : undefined}
                 >
                   <ExternalLink aria-hidden="true" className="size-3.5" />
-                </a>
+                </AppBrowserLink>
                 <Link aria-label={`${app.name} management actions`} className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80" to={detailRoute}>
                   <MoreVertical className="size-3.5" />
                 </Link>

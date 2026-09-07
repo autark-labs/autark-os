@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Loader2, Pin, PinOff, RotateCcw, Search, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -137,10 +138,10 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
             <div className="flex flex-wrap gap-2">
               {service.url && (
                 <Button asChild className="bg-sky-500 text-slate-950 hover:bg-sky-400" size="sm">
-                  <a href={service.url} rel="noreferrer" target="_blank">
+                  <AppBrowserLink href={service.url} rel="noreferrer" target="_blank">
                     <ExternalLink className="size-4" />
                     Open
-                  </a>
+                  </AppBrowserLink>
                 </Button>
               )}
               {canPin && (

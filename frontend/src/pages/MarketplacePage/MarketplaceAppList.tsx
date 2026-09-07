@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { ChevronDown, ExternalLink, Filter, Loader2, MoreVertical, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { AppCardName } from '@/components/autark-os/AppCardName';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
@@ -186,7 +187,7 @@ function DenseLauncherCard({ app, installing, onSelect, selected }: { app: Disco
               <span className="absolute left-2 top-2 z-20 max-w-28 truncate rounded-full border border-slate-950/35 bg-slate-950/55 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">{app.serviceKindLabel}</span>
               <div className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center gap-0.5">
                 {canOpen && (
-                  <a
+                  <AppBrowserLink
                     aria-label={`Open ${app.name}`}
                     className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
                     href={app.installedApp?.accessUrl}
@@ -194,7 +195,7 @@ function DenseLauncherCard({ app, installing, onSelect, selected }: { app: Disco
                     target="_blank"
                   >
                     <ExternalLink className="size-3.5" />
-                  </a>
+                  </AppBrowserLink>
                 )}
                 <button aria-label={`Review ${app.name}`} className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80" onClick={onSelect} type="button">
                   <MoreVertical className="size-3.5" />

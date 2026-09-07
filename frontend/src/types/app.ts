@@ -114,6 +114,7 @@ export type AccessObservedState = {
 };
 
 export type AppAccessRoute = {
+  dashboardScope?: 'local' | 'network';
   primaryOpenUrl: string | null;
   localUrl: string | null;
   privateUrl: string | null;

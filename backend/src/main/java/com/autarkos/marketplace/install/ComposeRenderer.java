@@ -37,6 +37,31 @@ public class ComposeRenderer {
         return render(manifest, appRoot, new RuntimeModels.ResolvedRuntimeConfiguration(manifest.runtime().ports(), manifest.accessUrl()));
     }
 
+    /** A port edit must not regenerate ownership, storage or other app settings. */
+    public void updatePorts(Path composePath, ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration configuration) {
+        var yaml = new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()));
+        try {
+            Object document = yaml.load(Files.readString(composePath));
+            if (!(document instanceof Map<?, ?> root) || !(root.get("services") instanceof Map<?, ?> services)) {
+                throw new InstallationException("The existing app configuration cannot be read safely.");
+            }
+            Map<Object, Object> updatedServices = new LinkedHashMap<>(services);
+            for (var entry : configuration.servicePorts().entrySet()) {
+                if (!(services.get(entry.getKey()) instanceof Map<?, ?> service)) {
+                    throw new InstallationException("The app service is missing from its existing Compose configuration.");
+                }
+                Map<Object, Object> updatedService = new LinkedHashMap<>(service);
+                updatedService.put("ports", scopedPorts(manifest, entry.getValue(), configuration.accessMode()));
+                updatedServices.put(entry.getKey(), updatedService);
+            }
+            Map<Object, Object> updated = new LinkedHashMap<>(root);
+            updated.put("services", updatedServices);
+            Files.writeString(composePath, yaml.dump(updated));
+        } catch (IOException exception) {
+            throw new InstallationException("Unable to update the app's port configuration.", exception);
+        }
+    }
+
     public Path render(ApplicationManifest manifest, Path appRoot, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         return render(manifest, appRoot, runtimeConfiguration, "", "");
     }
@@ -80,7 +105,7 @@ public class ComposeRenderer {
         yaml.append("    container_name: ").append(containerName(manifest, composeProject)).append("\n");
         yaml.append("    restart: unless-stopped\n");
         appendNetwork(yaml, manifest);
-        appendPorts(yaml, manifest, runtimeConfiguration.ports());
+        appendPorts(yaml, manifest, runtimeConfiguration.ports(), runtimeConfiguration.accessMode());
         appendVolumes(yaml, manifest, manifest.runtime().volumes(), runtimeConfiguration);
         appendEnvironment(yaml, manifest.runtime().environment());
         appendLabels(yaml, labels(manifest, manifest.runtime().labels(), appInstanceId, composeProject));
@@ -98,7 +123,7 @@ public class ComposeRenderer {
                 yaml.append("      - ").append(dependency).append("\n");
             }
         }
-        appendPorts(yaml, manifest, servicePorts);
+        appendPorts(yaml, manifest, servicePorts, runtimeConfiguration.accessMode());
         appendVolumes(yaml, manifest, service.volumes(), runtimeConfiguration);
         appendEnvironment(yaml, service.environment());
         appendLabels(yaml, labels(manifest, serviceLabels(manifest, service), appInstanceId, composeProject));
@@ -121,11 +146,11 @@ public class ComposeRenderer {
         }
     }
 
-    private void appendPorts(StringBuilder yaml, ApplicationManifest manifest, List<String> ports) {
+    private void appendPorts(StringBuilder yaml, ApplicationManifest manifest, List<String> ports, String accessMode) {
         if (!ports.isEmpty() && !manifest.runtime().network().equalsIgnoreCase("host")) {
             yaml.append("    ports:\n");
-            for (String port : ports) {
-                yaml.append("      - \"").append(rewritePort(manifest, port)).append("\"\n");
+            for (String port : scopedPorts(manifest, ports, accessMode)) {
+                yaml.append("      - \"").append(port).append("\"\n");
             }
         }
     }
@@ -222,11 +247,19 @@ public class ComposeRenderer {
         return runtimeLayout.appPath(manifest.id(), relative) + ":" + containerPath;
     }
 
-    private String rewritePort(ApplicationManifest manifest, String port) {
-        if (!manifest.usage().privateHttpsRequired() || port == null || port.isBlank() || port.startsWith("127.0.0.1:")) {
+    public static List<String> scopedPorts(ApplicationManifest manifest, List<String> ports, String mode) {
+        return ports.stream().map(port -> rewritePort(manifest, port, mode)).toList();
+    }
+
+    private static String rewritePort(ApplicationManifest manifest, String port, String mode) {
+        boolean restricted = manifest.access().privateDashboard() || manifest.usage().privateHttpsRequired()
+                || "local".equals(mode) || "private".equals(mode);
+        if (!restricted || port == null || port.isBlank() || port.startsWith("127.0.0.1:")) {
             return port;
         }
-        return "127.0.0.1:" + port;
+        String containerPort = port.substring(port.lastIndexOf(':') + 1);
+        String dashboard = PortAllocator.dashboardTarget(manifest);
+        return containerPort.equals(dashboard) ? "127.0.0.1:" + port : port;
     }
 
     private String escape(String value) {

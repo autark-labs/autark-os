@@ -134,7 +134,15 @@ public final class RuntimeModels {
             Map<String, String> storageSubfolders,
             Map<String, String> storageHostPaths,
             boolean tailscaleEnabled,
-            InstallModels.BackupPolicy backup) {
+            InstallModels.BackupPolicy backup,
+            String accessMode) {
+
+        public ResolvedRuntimeConfiguration(List<String> ports, Map<String, List<String>> servicePorts,
+                String accessUrl, String privateAccessUrl, Map<String, String> storageSubfolders,
+                Map<String, String> storageHostPaths, boolean tailscaleEnabled, InstallModels.BackupPolicy backup) {
+            this(ports, servicePorts, accessUrl, privateAccessUrl, storageSubfolders, storageHostPaths,
+                    tailscaleEnabled, backup, tailscaleEnabled ? "local-and-private" : "network");
+        }
 
         public ResolvedRuntimeConfiguration(List<String> ports, String accessUrl) {
             this(ports, Map.of(), accessUrl, null, Map.of(), Map.of(), false, InstallModels.BackupPolicy.defaults());

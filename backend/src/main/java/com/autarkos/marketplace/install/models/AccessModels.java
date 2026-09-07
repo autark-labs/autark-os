@@ -60,7 +60,13 @@ public final class AccessModels {
             String backendProtocol,
             Integer localPort,
             Integer privatePort,
-            String privateLinkStatus) {
+            String privateLinkStatus,
+            String dashboardScope) {
+        public AppAccessRoute(String primaryOpenUrl, String localUrl, String privateUrl, String backendTargetUrl,
+                String backendProtocol, Integer localPort, Integer privatePort, String privateLinkStatus) {
+            this(primaryOpenUrl, localUrl, privateUrl, backendTargetUrl, backendProtocol, localPort, privatePort,
+                    privateLinkStatus, com.autarkos.network.HostAddress.isLoopbackUrl(localUrl) ? "local" : "network");
+        }
     }
 
     public record PrivateAccessReconciliationItem(

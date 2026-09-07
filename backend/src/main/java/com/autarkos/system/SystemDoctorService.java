@@ -1,8 +1,6 @@
 package com.autarkos.system;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
 import java.net.Socket;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -200,22 +198,6 @@ public class SystemDoctorService {
     }
 
     private String lanAddress() {
-        try {
-            var interfaces = NetworkInterface.networkInterfaces().toList();
-            for (NetworkInterface networkInterface : interfaces) {
-                if (!networkInterface.isUp() || networkInterface.isLoopback()) {
-                    continue;
-                }
-                var addresses = networkInterface.inetAddresses().toList();
-                for (InetAddress address : addresses) {
-                    if (address instanceof java.net.Inet4Address && !address.isLoopbackAddress()) {
-                        return address.getHostAddress();
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            return "localhost";
-        }
-        return "localhost";
+        return com.autarkos.network.HostAddress.lanAddress();
     }
 }

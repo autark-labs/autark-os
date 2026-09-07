@@ -46,11 +46,18 @@ public class DiscoverInstallPreviewService {
 
     public InstallOptionsRequest installOptions(ApplicationManifest manifest, DiscoverSetupModels.DiscoverSetupAnswers answers) {
         Integer hostPort = hostPort(answers.value("localBrowserPort"));
-        boolean tailscale = "private_lan".equals(answers.stringValue("accessMode"));
+        String mode = switch (answers.stringValue("accessMode")) {
+            case "local_only" -> "local";
+            case "private_only" -> "private";
+            case "private_lan" -> "local-and-private";
+            case "lan_only" -> "network";
+            default -> throw new com.autarkos.marketplace.install.InstallationException("Choose a supported app access mode.");
+        };
+        boolean tailscale = mode.equals("private") || mode.equals("local-and-private");
         boolean backupEnabled = !"disabled".equals(answers.stringValue("backupPolicy"));
         return new InstallOptionsRequest(
                 new InstallOptionsRequest.PortOptions(hostPort),
-                new InstallOptionsRequest.AccessOptions(tailscale),
+                new InstallOptionsRequest.AccessOptions(tailscale, mode),
                 new InstallOptionsRequest.StorageOptions(storageSubfolders(manifest, answers), storageHostPaths(manifest, answers)),
                 new InstallOptionsRequest.BackupOptions(backupEnabled, "daily", 7));
     }
@@ -112,8 +119,9 @@ public class DiscoverInstallPreviewService {
 
     private List<DiscoverInstallModels.DiscoverInstallPreviewItem> connectItems(DiscoverSetupModels.DiscoverSetupAnswers answers) {
         return switch (answers.stringValue("accessMode")) {
+            case "private_only" -> List.of(item("Keep the dashboard on this server and request a private Tailscale link.", "Peer sync and discovery ports remain available on the home network.", "default"));
             case "private_lan" -> List.of(item("Create a home network link and request private Tailscale access.", null, "default"));
-            case "local_only" -> List.of(item("Keep access limited to this server until you change it later.", null, "warning"));
+            case "local_only" -> List.of(item("Keep the dashboard limited to this server.", "Other devices cannot open this dashboard without private access. App peer ports, where declared, remain on the home network.", "warning"));
             default -> List.of(item("Create a home network link for devices on your LAN.", null, "default"));
         };
     }

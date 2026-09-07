@@ -28,19 +28,88 @@ public class InstallCustomizationResolver {
         InstallOptionsRequest options = request == null ? InstallOptionsRequest.defaults() : request;
         Map<String, List<String>> servicePorts = portAllocator.resolveServicePorts(manifest, options.ports());
         List<String> ports = servicePorts.values().stream().flatMap(List::stream).toList();
+        String mode = accessMode(manifest, options.access());
+        String accessUrl = portAllocator.accessUrl(manifest, ports);
+        if (mode.equals("network") || mode.equals("local-and-private")) {
+            accessUrl = com.autarkos.network.HostAddress.withHost(accessUrl, com.autarkos.network.HostAddress.lanAddress());
+        }
         return new RuntimeModels.ResolvedRuntimeConfiguration(
                 ports,
                 servicePorts,
-                portAllocator.accessUrl(manifest, ports),
+                accessUrl,
                 null,
                 storageSubfolders(options.storage()),
                 storageHostPaths(options.storage()),
-                tailscaleEnabled(options.access()),
-                backupPolicy(options.backup()));
+                mode.equals("private") || mode.equals("local-and-private"),
+                backupPolicy(options.backup()),
+                mode);
     }
 
-    private boolean tailscaleEnabled(InstallOptionsRequest.AccessOptions access) {
-        return access != null && Boolean.TRUE.equals(access.tailscaleEnabled());
+    /** Keep the running app's peer bindings when changing its dashboard port. */
+    public RuntimeModels.ResolvedRuntimeConfiguration resolveSettings(ApplicationManifest manifest, InstallOptionsRequest options, String compose) {
+        var yaml = new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()));
+        Object document = yaml.load(compose);
+        if (!(document instanceof Map<?, ?> root) || !(root.get("services") instanceof Map<?, ?> services)) {
+            throw new InstallationException("The existing app configuration cannot be read safely.");
+        }
+        Map<String, List<String>> existing = new LinkedHashMap<>();
+        services.forEach((name, value) -> {
+            if (!(value instanceof Map<?, ?> service)) throw new InstallationException("Invalid app service configuration.");
+            Object mappings = service.get("ports");
+            if (mappings == null) existing.put(name.toString(), List.of());
+            else if (mappings instanceof List<?> list && list.stream().allMatch(String.class::isInstance)) {
+                existing.put(name.toString(), list.stream().map(Object::toString).toList());
+            } else throw new InstallationException("This app's port configuration needs a supported Compose template before editing.");
+        });
+        Map<String, List<String>> updated = new LinkedHashMap<>();
+        Map<String, List<String>> declared = new LinkedHashMap<>();
+        if (manifest.runtime().multiService()) manifest.runtime().services().forEach(service -> declared.put(service.name(), service.ports()));
+        else declared.put(manifest.runtime().containerName(), manifest.runtime().ports());
+        declared.forEach((service, mappings) -> {
+            List<String> values = new java.util.ArrayList<>();
+            for (String mapping : mappings) {
+                String target = mapping.substring(mapping.lastIndexOf(':') + 1);
+                String current = existing.getOrDefault(service, List.of()).stream()
+                        .filter(port -> port.substring(port.lastIndexOf(':') + 1).equals(target)).findFirst().orElse(null);
+                if (target.equals(PortAllocator.dashboardTarget(manifest)) && options.ports() != null && options.ports().hostPort() != null) {
+                    int requested = options.ports().hostPort();
+                    String[] parts = current == null ? new String[0] : current.split(":");
+                    boolean samePort = parts.length >= 2 && parts[parts.length - 2].equals(Integer.toString(requested));
+                    String selected = samePort ? requested + ":" + target
+                            : portAllocator.resolveExplicitPort(mapping, requested);
+                    values.add(selected);
+                } else {
+                    values.add(current == null ? portAllocator.resolveMapping(mapping) : current);
+                }
+            }
+            updated.put(service, values);
+        });
+        String mode = accessMode(manifest, options.access());
+        List<String> ports = updated.values().stream().flatMap(List::stream).toList();
+        String url = portAllocator.accessUrl(manifest, ports);
+        if (mode.equals("network") || mode.equals("local-and-private")) url = com.autarkos.network.HostAddress.withHost(url, com.autarkos.network.HostAddress.lanAddress());
+        return new RuntimeModels.ResolvedRuntimeConfiguration(ports, updated, url, null,
+                storageSubfolders(options.storage()), storageHostPaths(options.storage()),
+                mode.equals("private") || mode.equals("local-and-private"), backupPolicy(options.backup()), mode);
+    }
+
+    public static String accessMode(ApplicationManifest manifest, InstallOptionsRequest.AccessOptions access) {
+        String mode = access == null ? null : access.mode();
+        if (mode == null || mode.isBlank()) {
+            mode = manifest.access().privateDashboard() ? "private"
+                    : access != null && Boolean.TRUE.equals(access.tailscaleEnabled()) ? "local-and-private" : "network";
+        }
+        if (!List.of("local", "network", "private", "local-and-private").contains(mode)) {
+            throw new InstallationException("Choose this server, home network, or private access.");
+        }
+        if (manifest.access().privateDashboard() && (mode.equals("network") || mode.equals("local-and-private"))) {
+            throw new InstallationException(manifest.name() + " dashboard must stay on this server or private Tailscale devices. Peer synchronization remains available on the home network.");
+        }
+        if (manifest.usage().privateHttpsRequired()) return "private";
+        if (manifest.runtime().network().equalsIgnoreCase("host") && (mode.equals("local") || mode.equals("private"))) {
+            throw new InstallationException("This app uses host networking and cannot enforce server-only dashboard access.");
+        }
+        return mode;
     }
 
     private Map<String, String> storageSubfolders(InstallOptionsRequest.StorageOptions storage) {

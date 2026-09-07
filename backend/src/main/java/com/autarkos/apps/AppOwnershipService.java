@@ -32,18 +32,27 @@ public class AppOwnershipService {
     private final ObservedServiceService observedServiceService;
     private final DockerOwnershipService dockerOwnershipService;
     private final BackupRepository backupRepository;
+    private final com.autarkos.marketplace.install.AppInstanceViewProvider appViews;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public AppOwnershipService(
             MarketplaceCatalogService catalogService,
             InstalledAppRepository installedAppRepository,
             ObservedServiceService observedServiceService,
             DockerOwnershipService dockerOwnershipService,
-            BackupRepository backupRepository) {
+            BackupRepository backupRepository,
+            com.autarkos.marketplace.install.AppInstanceViewProvider appViews) {
         this.catalogService = catalogService;
         this.installedAppRepository = installedAppRepository;
         this.observedServiceService = observedServiceService;
         this.dockerOwnershipService = dockerOwnershipService;
         this.backupRepository = backupRepository;
+        this.appViews = appViews;
+    }
+
+    public AppOwnershipService(MarketplaceCatalogService catalogService, InstalledAppRepository installedAppRepository,
+            ObservedServiceService observedServiceService, DockerOwnershipService dockerOwnershipService, BackupRepository backupRepository) {
+        this(catalogService, installedAppRepository, observedServiceService, dockerOwnershipService, backupRepository, List::of);
     }
 
     public List<AppOwnershipView> apps() {
@@ -51,16 +60,29 @@ public class AppOwnershipService {
     }
 
     public List<AppOwnershipView> apps(List<ObservedService> observedServices) {
+        return apps(observedServices, appViews.list());
+    }
+
+    public List<AppOwnershipView> apps(List<ObservedService> observedServices, List<com.autarkos.marketplace.install.AppInstanceView> managedApps) {
+        var links = browserLinks(managedApps);
         return catalogService.findAll().stream()
-                .map(manifest -> appView(manifest, observedServices))
+                .map(manifest -> appView(manifest, observedServices, links))
                 .sorted(Comparator.comparing(AppOwnershipView::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
     public Optional<AppOwnershipView> app(String appId) {
         List<ObservedService> observedServices = cachedObservedServices();
+        var links = browserLinks(appViews.list());
         return catalogService.findById(appId)
-                .map(manifest -> appView(manifest, observedServices));
+                .map(manifest -> appView(manifest, observedServices, links));
+    }
+
+    private java.util.Map<String, String> browserLinks(List<com.autarkos.marketplace.install.AppInstanceView> apps) {
+        return apps.stream().collect(java.util.stream.Collectors.toMap(
+                com.autarkos.marketplace.install.AppInstanceView::catalogAppId,
+                app -> app.privateUrl() != null && !app.privateUrl().isBlank() ? app.privateUrl() : app.localUrl() == null ? "" : app.localUrl(),
+                (first, second) -> first));
     }
 
     private List<ObservedService> cachedObservedServices() {
@@ -70,9 +92,11 @@ public class AppOwnershipService {
         return observedServiceService.observedServices();
     }
 
-    private AppOwnershipView appView(ApplicationManifest manifest, List<ObservedService> observedServices) {
+    private AppOwnershipView appView(ApplicationManifest manifest, List<ObservedService> observedServices, java.util.Map<String, String> links) {
         InstalledApp installed = installedAppRepository.findAppById(manifest.id())
                 .filter(app -> ownershipCompatible(manifest.id()))
+                .map(app -> new InstalledApp(app.appId(), app.appName(), app.status(), app.runtimePath(), app.composeProject(),
+                        links.getOrDefault(app.appId(), app.accessUrl()), app.installedAt()))
                 .orElse(null);
         ObservedService recoverable = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);
         ObservedService managedElsewhere = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS.equals(service.ownershipState())).orElse(null);

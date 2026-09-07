@@ -1,6 +1,11 @@
 # Autark Pro Extension Threat Model
 
-This review covers the PRO-208 prototype boundary.
+This review records the historical PRO-208 prototype boundary. It is not a
+current release acceptance or independent security assessment. Current agents
+also use an isolated encrypted state volume and scheduled refresh; see
+[runtime boundaries](../pro/agent-runtime.md) and
+[current limitations](../pro/known-limitations.md). New customer activation
+remains deferred by [beta scope](../beta-scope.md).
 
 ## Security objectives
 

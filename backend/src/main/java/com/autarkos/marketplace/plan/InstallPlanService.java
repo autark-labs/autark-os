@@ -29,6 +29,7 @@ public class InstallPlanService {
 
     public InstallPlan generatePlan(ApplicationManifest manifest, InstallOptionsRequest options) {
         RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
+        List<String> publishedPorts = com.autarkos.marketplace.install.ComposeRenderer.scopedPorts(manifest, runtimeConfiguration.ports(), runtimeConfiguration.accessMode());
         FriendlyInstallPlan friendly = new FriendlyInstallPlan(
                 manifest.name() + " will be prepared with Autark-OS managed storage, networking, access, and backups.",
                 manifest.installTime(),
@@ -44,7 +45,7 @@ public class InstallPlanService {
                 manifest.runtime().composeProject(),
                 plannedContainers(manifest),
                 manifest.runtime().network(),
-                runtimeConfiguration.ports(),
+                publishedPorts,
                 effectiveVolumes(manifest, runtimeConfiguration),
                 effectiveLabels(manifest),
                 manifest.runtime().backupPaths());

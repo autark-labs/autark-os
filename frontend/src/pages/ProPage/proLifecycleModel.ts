@@ -29,7 +29,7 @@ const entitlementCopy: Record<ProProductState['softwareEntitlement']['state'], {
   },
   active: {
     title: 'Autark Pro is available',
-    description: 'Local Pro features and the currently eligible update channel are available.',
+    description: 'This appliance has verified its local Pro entitlement. Available guidance depends on its installed private extension and current release scope.',
   },
   grace: {
     title: 'Autark Pro is available locally',
@@ -59,7 +59,7 @@ const entitlementCopy: Record<ProProductState['softwareEntitlement']['state'], {
 
 const moduleCopy: Record<ProProductState['agent']['state'], string> = {
   not_installed: 'No private extension is installed yet.',
-  release_available: 'A signed private extension release is ready to install.',
+  release_available: 'A signed private extension release was found. Installation depends on the current release scope.',
   installing: 'Autark-OS is safely preparing the signed private extension.',
   active: 'The signed private extension is healthy on this appliance.',
   degraded: 'The private extension needs attention. Community Edition remains available.',
@@ -102,7 +102,7 @@ function primaryActionFor(product: ProProductState): ProLifecyclePrimaryAction {
 
 function redactedLifecycleReason(product: ProProductState) {
   if (product.agent.state === 'error' || product.agent.state === 'degraded') {
-    return 'The private extension reported a recoverable lifecycle problem. Check for a signed release or remove the extension if recovery does not succeed.';
+    return 'The private extension reported a recoverable lifecycle problem. Review its Activity Log or remove the extension if recovery does not succeed. New installation and updates depend on the current release scope.';
   }
   return product.recommendedAction.id === 'none'
     ? null

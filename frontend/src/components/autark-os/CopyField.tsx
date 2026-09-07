@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { CopyTextButton } from '@/components/autark-os/CopyTextButton';
 import { cn } from '@/lib/utils';
+import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
 
 export type CopyFieldModel = {
   emptyLabel?: string;
@@ -20,6 +21,7 @@ type CopyFieldProps = {
 /** A readable, selectable value with a consistent accessible copy control. */
 export function CopyField({ action, className, icon: Icon, model }: CopyFieldProps) {
   const value = model.value || '';
+  const accessReason = appBrowserAccessReason(value);
   const displayValue = model.sensitive ? '••••••••••••' : value || model.emptyLabel || 'Not available';
 
   return (
@@ -35,6 +37,7 @@ export function CopyField({ action, className, icon: Icon, model }: CopyFieldPro
         </div>
       </div>
       <p className="select-text break-all font-mono text-xs text-white">{displayValue}</p>
+      {accessReason && <p className="text-xs text-muted-foreground">{accessReason}</p>}
     </div>
   );
 }

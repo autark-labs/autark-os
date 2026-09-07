@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { ExternalLink, KeyRound, Link2, Server } from 'lucide-react';
 import { CopyField } from '@/components/autark-os/CopyField';
 import { Link } from 'react-router-dom';
@@ -53,10 +54,10 @@ function LiveLinkRow({ icon: Icon, label, value }: { icon: typeof ExternalLink; 
     <CopyField
       action={canOpen && value ? (
         <Button asChild className="border-sky-400/30 bg-slate-800 text-sky-50 hover:bg-slate-700" size="sm" variant="outline">
-          <a href={value} rel="noreferrer" target="_blank">
+          <AppBrowserLink href={value} rel="noreferrer" target="_blank">
             <ExternalLink data-icon="inline-start" />
             Open
-          </a>
+          </AppBrowserLink>
         </Button>
       ) : undefined}
       icon={Icon}

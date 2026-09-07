@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { ExternalLink, Loader2, Network, Pause, Play, RotateCw, Search, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { AppCardName } from '@/components/autark-os/AppCardName';
@@ -147,9 +148,9 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
         <div className="flex h-16 justify-end gap-1 whitespace-nowrap">
           {item.href && (
             <ApplicationOpenButton asChild className="my-auto size-8 px-0" size="icon-sm">
-              <a aria-label={`Open ${item.name}`} href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank" title={`Open ${item.name}`}>
+              <AppBrowserLink aria-label={`Open ${item.name}`} href={item.href} onClick={(event) => event.stopPropagation()} rel="noreferrer" target="_blank" title={`Open ${item.name}`}>
                 <ExternalLink />
-              </a>
+              </AppBrowserLink>
             </ApplicationOpenButton>
           )}
           {item.managementState === 'managed' && (

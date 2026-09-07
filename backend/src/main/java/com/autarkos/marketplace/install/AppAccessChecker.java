@@ -45,10 +45,11 @@ public class AppAccessChecker {
 
     protected AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
         HealthManifest health = healthContract(manifest);
+        String probeUrl = com.autarkos.network.HostAddress.probeUrl(accessUrl);
         if ("tcp".equals(health.type())) {
-            return tcpAccessCheck(appId, accessUrl);
+            return tcpAccessCheck(appId, probeUrl);
         }
-        return accessCheck(appId, accessUrl);
+        return accessCheck(appId, probeUrl);
     }
 
     protected AccessModels.AppAccessCheck accessCheck(String appId, String accessUrl) {

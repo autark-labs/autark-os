@@ -149,7 +149,8 @@ public class ManifestYamlReader {
                 text(access, "defaultMode"),
                 bool(access, "privateAccessRecommended"),
                 bool(access, "requiresFirstRunSetup"),
-                strings(access, "notes"));
+                strings(access, "notes"),
+                bool(access, "privateDashboard"));
     }
 
     private UsageManifest usageManifest(Map<String, Object> usage) {

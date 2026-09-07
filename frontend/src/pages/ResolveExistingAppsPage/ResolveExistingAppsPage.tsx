@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -194,10 +195,10 @@ function ServiceSummaryCard({
       <div className="mt-4 flex flex-wrap gap-2">
         {service.url && (
           <ProjectDarkControlButton asChild size="sm">
-            <a href={service.url} rel="noreferrer" target="_blank">
+            <AppBrowserLink href={service.url} rel="noreferrer" target="_blank">
               <ExternalLink className="size-4" />
               Open
-            </a>
+            </AppBrowserLink>
           </ProjectDarkControlButton>
         )}
         <ProjectPrimaryButton onClick={onReview} size="sm" type="button">
@@ -254,10 +255,10 @@ function ServiceDetailsPreview({
           </div>
           {service.url && (
             <ProjectDarkControlButton asChild>
-              <a href={service.url} rel="noreferrer" target="_blank">
+              <AppBrowserLink href={service.url} rel="noreferrer" target="_blank">
                 <ExternalLink className="size-4" />
                 Open
-              </a>
+              </AppBrowserLink>
             </ProjectDarkControlButton>
           )}
         </div>

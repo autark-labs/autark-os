@@ -89,6 +89,7 @@ technical:
       value: LAN and Tailscale dashboard
 access:
   kind: multi-port
+  privateDashboard: true
   defaultMode: local-and-private
   privateAccessRecommended: true
   requiresFirstRunSetup: true
@@ -103,6 +104,7 @@ usage:
   summary: Autark-OS starts the sync service. You choose which devices and folders are allowed to sync from the Syncthing dashboard.
   setupSteps:
     - Open the Syncthing dashboard.
+    - Set a dashboard username and password in Syncthing Settings before pairing devices.
     - Add each trusted phone, laptop, or desktop by scanning or copying its device ID.
     - Choose the folders you want to sync and confirm the share on the other device.
     - Keep the dashboard private because it controls synced folders.

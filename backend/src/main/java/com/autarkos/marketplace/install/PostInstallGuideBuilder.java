@@ -73,7 +73,7 @@ public class PostInstallGuideBuilder {
 
     private Map<String, String> values(ApplicationManifest manifest, String accessUrl, String privateAccessUrl, GuideModels.PostInstallProvisioningResult provisioningResult) {
         Map<String, String> values = new HashMap<>(provisioningResult.values());
-        values.put("accessUrl", accessUrl == null ? "" : accessUrl);
+        values.put("accessUrl", privateAccessUrl != null && !privateAccessUrl.isBlank() ? privateAccessUrl : accessUrl == null ? "" : accessUrl);
         values.put("privateAccessUrl", privateAccessUrl == null ? "" : privateAccessUrl);
         values.put("localAccessUrl", accessUrl == null ? "" : accessUrl);
         values.put("appName", manifest.name());

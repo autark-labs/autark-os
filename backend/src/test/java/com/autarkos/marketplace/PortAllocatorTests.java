@@ -22,6 +22,16 @@ import com.autarkos.marketplace.model.UsageManifest;
 class PortAllocatorTests {
 
     @Test
+    void customDashboardPortPreservesPeerMappings() {
+        int webPort = availablePort();
+        int peerPort = availableUdpPortWithFreeNeighbor();
+        ApplicationManifest manifest = manifest("http://localhost:8384",
+                List.of("8384:8384", peerPort + ":22000/tcp", peerPort + ":22000/udp", (peerPort + 1) + ":21027/udp"));
+        assertThat(new PortAllocator().resolvePorts(manifest, new InstallOptionsRequest.PortOptions(webPort)))
+                .containsExactly(webPort + ":8384", peerPort + ":22000/tcp", peerPort + ":22000/udp", (peerPort + 1) + ":21027/udp");
+    }
+
+    @Test
     void keepsPreferredPortWhenAvailable() {
         int port = availablePort();
         ApplicationManifest manifest = manifest(port + ":80");

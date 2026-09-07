@@ -32,14 +32,14 @@ public class PortAllocator {
 
     public Map<String, List<String>> resolveServicePorts(ApplicationManifest manifest, InstallOptionsRequest.PortOptions options) {
         if (!manifest.runtime().multiService()) {
-            return Map.of(manifest.runtime().containerName(), resolvePortList(manifest.runtime().ports(), options));
+            return Map.of(manifest.runtime().containerName(), resolvePortList(manifest.runtime().ports(), options, dashboardTarget(manifest)));
         }
         Map<String, List<String>> resolved = new LinkedHashMap<>();
         boolean explicitApplied = false;
         for (RuntimeServiceManifest service : manifest.runtime().services()) {
             List<String> servicePorts = new ArrayList<>();
             for (String port : service.ports()) {
-                if (options != null && options.hostPort() != null && !explicitApplied) {
+                if (options != null && options.hostPort() != null && !explicitApplied && parse(port).containerPort().equals(dashboardTarget(manifest))) {
                     servicePorts.add(resolveExplicitPort(port, options.hostPort()));
                     explicitApplied = true;
                 } else {
@@ -51,9 +51,14 @@ public class PortAllocator {
         return resolved;
     }
 
-    private List<String> resolvePortList(List<String> ports, InstallOptionsRequest.PortOptions options) {
+    private List<String> resolvePortList(List<String> ports, InstallOptionsRequest.PortOptions options, String dashboardTarget) {
         if (options != null && options.hostPort() != null && !ports.isEmpty()) {
-            return List.of(resolveExplicitPort(ports.get(0), options.hostPort()));
+            List<String> resolved = new ArrayList<>();
+            for (String mapping : ports) {
+                resolved.add(parse(mapping).containerPort().equals(dashboardTarget)
+                        ? resolveExplicitPort(mapping, options.hostPort()) : resolvePort(mapping));
+            }
+            return resolved;
         }
         if (ports.isEmpty()) {
             return List.of();
@@ -66,7 +71,7 @@ public class PortAllocator {
         return resolvedPorts;
     }
 
-    private String resolveExplicitPort(String defaultPortMapping, int hostPort) {
+    String resolveExplicitPort(String defaultPortMapping, int hostPort) {
         if (hostPort < 1 || hostPort > MAX_PORT) {
             throw new InstallationException("Host port must be between 1 and 65535.");
         }
@@ -81,13 +86,10 @@ public class PortAllocator {
         if (ports.isEmpty()) {
             return manifest.accessUrl();
         }
-        Integer preferredPort = portFromAccessUrl(manifest.accessUrl());
-        if (preferredPort != null) {
-            for (String port : ports) {
-                PortMapping mapping = parse(port);
-                if (preferredPort.toString().equals(mapping.hostPort())) {
-                    return "http://localhost:" + mapping.hostPort();
-                }
+        for (String port : ports) {
+            PortMapping mapping = parse(port);
+            if (mapping.containerPort().equals(dashboardTarget(manifest))) {
+                return "http://localhost:" + mapping.hostPort();
             }
         }
         PortMapping first = parse(ports.get(0));
@@ -95,25 +97,14 @@ public class PortAllocator {
         return "http://localhost:" + hostPort;
     }
 
-    private Integer portFromAccessUrl(String accessUrl) {
-        if (accessUrl == null || accessUrl.isBlank()) {
-            return null;
-        }
-        try {
-            java.net.URI uri = java.net.URI.create(accessUrl);
-            if (uri.getPort() > 0) {
-                return uri.getPort();
-            }
-            if ("http".equalsIgnoreCase(uri.getScheme())) {
-                return 80;
-            }
-            if ("https".equalsIgnoreCase(uri.getScheme())) {
-                return 443;
-            }
-            return null;
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
+    static String dashboardTarget(ApplicationManifest manifest) {
+        List<String> ports = manifest.runtime().multiService()
+                ? manifest.runtime().services().stream().flatMap(service -> service.ports().stream()).toList()
+                : manifest.runtime().ports();
+        Integer webPort = AppPrivateAccessPorts.portFromUrl(manifest.accessUrl());
+        return ports.stream().filter(port -> webPort != null && port.startsWith(webPort + ":"))
+                .findFirst().or(() -> ports.stream().findFirst())
+                .map(port -> port.substring(port.lastIndexOf(':') + 1)).orElse("");
     }
 
     private String resolvePort(String portMapping) {
@@ -127,6 +118,10 @@ public class PortAllocator {
             return portMapping;
         }
         return availablePort + ":" + mapping.containerPort();
+    }
+
+    String resolveMapping(String mapping) {
+        return resolvePort(mapping);
     }
 
     private int availablePort(int preferredPort, String protocol) {
@@ -166,11 +161,11 @@ public class PortAllocator {
     }
 
     private PortMapping parse(String portMapping) {
-        String[] parts = portMapping.split(":", 2);
+        String[] parts = portMapping.split(":");
         if (parts.length == 1) {
             return new PortMapping("", parts[0]);
         }
-        return new PortMapping(parts[0], parts[1]);
+        return new PortMapping(parts[parts.length - 2], parts[parts.length - 1]);
     }
 
     private record PortMapping(String hostPort, String containerPort) {

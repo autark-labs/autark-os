@@ -39,7 +39,15 @@ class AppRuntimeStatusResolverTests {
                 "Up 1 minute",
                 "0.0.0.0:18090->80/tcp")));
 
-        assertThat(accessUrl).isEqualTo("http://localhost:18090");
+        assertThat(accessUrl).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":18090");
+    }
+
+    @Test
+    void loopbackBindingStaysServerOnlyDespiteAnOldLanAddress() {
+        var app = new InstalledApp("syncthing", "Syncthing", "Ready", "/tmp/app", "project", "http://192.168.1.2:18384", java.time.Instant.now());
+        assertThat(resolver.accessUrl(app, null, List.of(new RuntimeModels.DockerContainerStatus(
+                "app", "app", "running", "healthy", "Up", "127.0.0.1:18384->8384/tcp, 0.0.0.0:22000->22000/tcp"))))
+                .isEqualTo("http://localhost:18384");
     }
 
     @Test

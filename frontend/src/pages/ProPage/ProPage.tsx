@@ -193,7 +193,7 @@ function ProPage() {
 
   return (
     <PageShell>
-      {!betaScope.proInstallationAvailable && <p className="text-sm text-muted-foreground">New Pro activation and extension installation are deferred during the Core beta. Existing status, license checks and removal remain available.</p>}
+      {!betaScope.proInstallationAvailable && <p className="text-sm text-muted-foreground">New Pro activation and extension installation are deferred during the Core beta. Existing status, license checks and removal remain available. Qualification is pending. Phone pairing, hosted monitoring and push alerts are not available in this beta. For availability or an existing license, contact <a className="underline underline-offset-4" href="mailto:licensing@autarklabs.com">licensing@autarklabs.com</a>.</p>}
       <ExtensionActionTarget actionId="review-pro" routeId="pro">
         <ProjectPanel className="overflow-hidden p-0">
           <div className="bg-app-hero-default p-6 md:p-8">
@@ -205,7 +205,7 @@ function ProPage() {
                 <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4" aria-label="Autark Pro lifecycle status">
                   <LifecycleValue label="License" value={formatLifecycleToken(product.softwareEntitlement.state)} />
                   <LifecycleValue label="Software updates" value={updateStatus(product)} />
-                  <LifecycleValue label="Hosted services" value={hostedStatus(product)} />
+                  <LifecycleValue label="Online access check" value={hostedStatus(product)} />
                   <LifecycleValue label="Private extension" value={moduleStatus(product, extensionActive)} />
                 </dl>
                 <div className="mt-6 flex flex-wrap gap-3">
@@ -290,7 +290,7 @@ function updateStatus(product: ProProductState) {
 }
 
 function hostedStatus(product: ProProductState) {
-  if (product.hostedServices.allowed) return `Available through ${formatLifecycleDate(product.hostedServices.servicesThrough)}`;
+  if (product.hostedServices.allowed) return `Verified until ${formatLifecycleDate(product.hostedServices.servicesThrough)}`;
   return product.softwareEntitlement.localUseAllowed ? formatLifecycleToken(product.hostedServices.state) : 'Not available';
 }
 

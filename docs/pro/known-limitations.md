@@ -1,93 +1,75 @@
-# Autark Pro Prototype Known Limitations
+# Autark Pro — Current Known Limitations
 
-These limitations apply to the staging prototype using CE `0.9.1-beta.7` at
-`5143bf3` and private agent `0.2.0-staging.6` at `5ed5a20`. They are explicit
-release boundaries, not production guarantees.
+**Scope reviewed: September 7, 2026.** These are current source and customer
+availability limits. Historical staging results apply only to their recorded
+artifacts and do not qualify the current release.
 
-## Release and operations
+## Release availability and platforms
 
-- The build is a private staging prototype, not generally available or
-  production-ready.
-- The public staging registry has real DNS, TLS, a token-authenticated
-  Distribution endpoint, and a read-only registry public JWKS. It is a single
-  disk-backed staging service, not a production highly available registry.
-- Protected GitHub OIDC tag runs published and verified the recorded staging
-  multi-architecture index, SBOMs, provenance, signatures, scans, and
-  control-plane manifest. New releases still require the same protected proof;
-  local keyed-signature harnesses are not remote release evidence.
-- The prototype has exact per-device assignments and a protected, audited
-  operator tool for atomic pause, resume, and permanent withdrawal. It has no
-  percentage rollout, cohort engine, release dashboard, signed withdrawal
-  document, or fleet observability. Those broader controls remain outside the
-  controlled-beta MVP.
-- Release-document, entitlement, and registry-token keys do not yet have the
-  signed rotation/recovery/revocation protocol planned for PRO-501.
-- Online signing material is held in Supabase managed secrets for the
-  prototype; production KMS/HSM custody is deferred.
+- Pro remains a development prototype. New activation, private-extension
+  installation/update, and managed-app updates are deferred during the Core
+  beta. Existing `/pro` status, license checks, compatible module rendering,
+  removal, and deactivation remain available for existing installations.
+- [Beta qualification](../beta-scope.md) remains pending. Debian 12 AMD64 with
+  systemd, Docker/Compose v2, and local Linux filesystem storage is the initial
+  target; FreshRSS, Homepage, and Syncthing are app candidates, not certified
+  recovery claims. ARM64/Pi and other hosts require separate qualification.
+- Existing signed release, health-check, and rollback mechanisms are not a
+  substitute for testing the current customer flow on supported hardware.
+- Operator release controls exist in source. Current deployment and release
+  acceptance must be verified separately; no customer fleet dashboard or
+  percentage rollout is provided.
 
-## Entitlement and accounts
+## Local guidance and history
 
-- Activation is by one-time code only. Account-session activation, device
-  transfer, self-service recovery, and remote unlink are not implemented.
-- Local deactivation cannot claim to delete the control-plane device
-  association.
-- The durable update term is fixed at activation. Operators must not edit a
-  signed grant to simulate retained use.
-- Retained use preserves an eligible installed local version. It does not
-  promise indefinite hosted registry, relay, push, support, download, or
-  compatibility with future clients.
-- Billing, checkout, subscription lifecycle, and customer account management
-  are intentionally absent.
+- Compatible newer agents provide scheduled analysis and encrypted durable
+  private history. Older installed prototype versions may still use earlier
+  history behavior. Losing or resetting private state must be visible.
+- The current private UI principally exposes summaries and links. Complete
+  evidence/history review, snooze, acknowledgement, dismissal, and note controls
+  are unfinished even though private lifecycle storage exists.
+- Guidance needs field calibration. Change correlation is not proof of cause;
+  capacity estimates depend on sufficient, stable observations.
+- Backup guidance evaluates available evidence. It does not perform isolated
+  restore tests, certify an unqualified app, or protect against same-disk loss.
+- Guardian cannot independently execute app, backup, restore, cleanup, or host
+  operations. Broader ChangeSafe, Move, Rebuild, and Blueprint workflows remain
+  outside the beta deliverable.
+- Private export/deletion primitives and bounded retention do not yet provide
+  complete owner-facing export, deletion, and configurable retention controls.
+  Ordinary module removal preserves recoverable private state.
 
-## Guardian and data
+## Connected services, licensing, and support
 
-- Guardian is read-only. It cannot execute repair, restart, update, backup,
-  verification, restore, cleanup, or any other operation.
-- Private feature policy is prototype quality and needs field calibration for
-  usefulness and false-positive rates. A finding remains advisory evidence,
-  not a guarantee or a causal claim.
-- Feature history and derived state live only in the private agent's encrypted
-  continuation token. Losing the per-install token or module state resets that
-  context rather than exposing it to Community Edition.
-- Private feature history is local to the extension. Production export,
-  deletion, and configurable retention are deferred to PRO-503.
+- Local and hosted phone pairing, remote health monitoring, push, and relay
+  are unavailable. Retired prototype endpoints are not a fallback. An active
+  license does not imply those services exist.
+- Signed advisory delivery, remote approvals, recovery escrow, and coordinated
+  support sessions are not complete customer features.
+- The proposed $149 early-access/$199 full-release offer and $49/year Online
+  renewal are not a currently available purchase flow. Checkout, term renewals,
+  device transfer, self-service recovery, and remote unlink are unfinished.
+- Current prototype update eligibility starts at activation. The proposed
+  full-release restart and separate purchased Online term need implementation.
+  A short access-verification expiry is not a purchased service end date.
+- Eligible installed local use survives ordinary term/online expiry. This does
+  not guarantee perpetual downloads, hosted services, or compatibility with
+  future clients. Existing signed rights and any purchase terms are unchanged.
+- Contact [licensing@autarklabs.com](mailto:licensing@autarklabs.com) about
+  availability or an existing license. Managed support is a separate proposal,
+  not a delivered beta service. See the [current guide](user-guide.md).
 
-## Runtime and platform
+## Security and acceptance boundaries
 
-- AMD64 lifecycle execution is native in the local gate. A native ARM64 Pi has
-  completed staging install, unhealthy-candidate rollback, CE restart, and a
-  later healthy cutover. Pinned QEMU user-mode remains a portable automated
-  harness; neither path establishes long-duration performance evidence.
-- The agent depends on the host Docker daemon, kernel, default seccomp, and
-  AppArmor configuration. A root or Docker-daemon compromise is outside its
+- There is no independent security-assessment or production privacy-lifecycle
+  acceptance claim. Customer export, hosted deletion, and complete retention
+  procedures still need qualification.
+- Trust-key rotation and recovery, production signing-key custody, broad
+  resource-exhaustion testing, and long-duration platform behavior remain work.
+- The private runtime relies on host Docker/kernel isolation and has no broad
+  backward-compatibility commitment. Host-root compromise is outside that
   container boundary.
-- The agent has bounded CPU/memory/pids and no default external egress, but
-  broad resource-exhaustion and kernel/container-escape chaos testing remains
-  PRO-504.
-- Only the current API/schema v1 prototype combination is supported. There is
-  no backward-compatibility commitment yet.
-- Private surface analysis currently runs on demand when a hosted surface is
-  opened or refreshed. It is not a durable scheduler or canonical finding
-  history.
-
-## Security and privacy
-
-- No independent security assessment or penetration test has been completed.
-- No formal production privacy review, data-processing inventory, customer
-  export, hosted deletion, or full retention job is implemented.
-- The current trust stores embed staging public keys. Planned overlapping
-  rotation and offline-root recovery are absent.
-- The release scan blocks known unexcepted HIGH/CRITICAL findings, but scanning
-  cannot detect unknown vulnerabilities or malicious reviewed source.
-- Local lifecycle tests use ephemeral test authorities. They do not prove
-  external DNS, TLS-provider, registry-host, GitHub Environment, or managed
-  secret configuration.
-
-## Demonstration boundary
-
-The reproducible demo fixture proves deterministic analysis against public
-contracts. It is synthetic and contains no customer data. The lifecycle harness
-proves real local boundaries with ephemeral authority. A complete staging demo
-additionally requires a real one-time activation, protected agent publication,
-control-plane manifest, registry pull, clean-appliance cutover, rollback
-exercise, retained-use evidence, removal, and CE smoke checks.
+- Component tests, generated contract parity, synthetic demonstrations, and
+  local ephemeral signing tests establish only their tested boundaries.
+  Hosted acceptance requires current signed artifacts and a customer-realistic
+  browser/mobile staging flow without manual payload construction.

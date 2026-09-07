@@ -38,6 +38,25 @@ class AppOwnershipServiceTests {
     Path runtimeRoot;
 
     @Test
+    void discoverOpenUsesTheSameVerifiedPrivateLinkAsManagedAppViews() {
+        var repository = installedRepository();
+        repository.save(new InstalledApp("syncthing", "Syncthing", "Ready", runtimeRoot.resolve("apps/syncthing").toString(),
+                "owned_syncthing", "http://localhost:18384", Instant.now()));
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
+                "syncthing", "instance", "syncthing", "current-instance", "runtime-hash",
+                "installed", "owned", Instant.now(), Instant.now()));
+        var managed = new com.autarkos.marketplace.install.AppInstanceView("instance", "syncthing", "Syncthing", "Productivity", "",
+                "Ready", "ready", "running", "owned", "private_ready", "backup_disabled", "http://localhost:18384",
+                "https://server.example.ts.net:14384", List.of(), List.of(), Instant.now());
+        var service = new AppOwnershipService(catalogService(), repository, observedService(observedRepository()), dockerOwnershipService(),
+                JpaTestRepositories.backupRepository(runtimeLayout()), () -> List.of(managed));
+        var view = service.app("syncthing").orElseThrow();
+        assertThat(view.installedApp().accessUrl()).isEqualTo(managed.privateUrl());
+        assertThat(view.availableActions()).anySatisfy(action -> assertThat(action.href()).isEqualTo(managed.privateUrl()));
+        assertThat(repository.findAppById("syncthing").orElseThrow().accessUrl()).isEqualTo("http://localhost:18384");
+    }
+
+    @Test
     void returnsCanonicalOwnershipViewsSortedByNameWithManagedAppsOnlyMarkedInstalled() {
         InstalledAppRepository installedRepository = installedRepository();
         installedRepository.save(new InstalledApp(

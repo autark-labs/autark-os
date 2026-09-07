@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { CheckCircle2, CircleAlert, Copy, ExternalLink, GripVertical, Lock, Router, Server, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { DragEvent } from 'react';
 import { useEffect, useState } from 'react';
@@ -316,10 +317,10 @@ function ReachabilityCard({
           <StatusBadge className="text-[0.68rem]" tone={loading ? 'info' : statusTone}>{loading ? 'Processing' : service.statusLabel}</StatusBadge>
           {service.openUrl ? (
             <ProjectOpenButton asChild className="ml-auto" size="icon-sm" title={`Open ${service.label}`}>
-              <a href={service.openUrl} rel="noreferrer" target="_blank">
+              <AppBrowserLink href={service.openUrl} rel="noreferrer" target="_blank">
                 <ExternalLink className="size-3.5" />
                 <span className="sr-only">Open {service.label}</span>
-              </a>
+              </AppBrowserLink>
             </ProjectOpenButton>
           ) : null}
         </div>

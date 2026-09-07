@@ -35,8 +35,9 @@ public class SystemSummaryService implements SystemSummaryProvider {
             InstanceIdentityService identityService,
             SystemSetupService setupService,
             SetupProgressService setupProgressService,
-            BackupDestinationService backupDestinationService) {
-        this(() -> applicationStateService.snapshot().managedApps(), settingsService::current, identityService::current, setupService::status, setupProgressService::status, () -> "http://localhost:8082", Instant::now, backupDestinationService::current);
+            BackupDestinationService backupDestinationService,
+            @org.springframework.beans.factory.annotation.Value("${server.port:8082}") String port) {
+        this(() -> applicationStateService.snapshot().managedApps(), settingsService::current, identityService::current, setupService::status, setupProgressService::status, () -> "http://" + com.autarkos.network.HostAddress.lanAddress() + ":" + port, Instant::now, backupDestinationService::current);
     }
 
     public SystemSummaryService(

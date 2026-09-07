@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, ExternalLink, Loader2, Pause, Play, RotateCw, ShieldCheck, Wrench, X } from 'lucide-react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
@@ -111,10 +112,10 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
               {item.href && (
                 <ApplicationPrimaryButton asChild className="w-full min-w-0 overflow-hidden" size="sm">
-                  <a href={item.href} rel="noreferrer" target="_blank">
+                  <AppBrowserLink href={item.href} rel="noreferrer" target="_blank">
                     <ExternalLink data-icon="inline-start" />
                     <span className="truncate">Open app</span>
-                  </a>
+                  </AppBrowserLink>
                 </ApplicationPrimaryButton>
               )}
               <Button

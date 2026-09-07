@@ -209,7 +209,7 @@ public class ApplicationStateService {
         List<ObservedServiceView> found = observedViews.stream()
                 .filter(service -> !service.managedByThisAutarkOs() && !HostModels.ObservedServiceStatus.PINNED.equals(service.userStatus()))
                 .toList();
-        List<AppOwnershipView> ownership = appOwnershipService == null ? List.of() : appOwnershipService.apps(observed);
+        List<AppOwnershipView> ownership = appOwnershipService == null ? List.of() : appOwnershipService.apps(observed, managed);
         Instant completedAt = clock.get();
         return new ApplicationState(
                 managed,

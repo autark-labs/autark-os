@@ -203,7 +203,7 @@ class MarketplaceInstallServiceTests {
                 new InstallOptionsRequest.StorageOptions(java.util.Map.of("data", "vault-data")),
                 new InstallOptionsRequest.BackupOptions(true, "weekly", 4)));
 
-        assertThat(result.accessUrl()).isEqualTo("http://localhost:19090");
+        assertThat(result.accessUrl()).isEqualTo("http://" + com.autarkos.network.HostAddress.lanAddress() + ":19090");
         assertThat(Files.readString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml")))
                 .contains("19090:80")
                 .contains(runtimeRoot.resolve("apps/vaultwarden/vault-data").toString());

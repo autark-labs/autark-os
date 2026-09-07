@@ -25,8 +25,9 @@ public class AccessStatusService {
     private final Supplier<Instant> clock;
 
     @Autowired
-    public AccessStatusService(AppInstanceViewProvider appInstanceViewProvider, TailscaleService tailscaleService) {
-        this(appInstanceViewProvider::list, tailscaleService::status, () -> "http://localhost:8082", Instant::now);
+    public AccessStatusService(AppInstanceViewProvider appInstanceViewProvider, TailscaleService tailscaleService,
+            @org.springframework.beans.factory.annotation.Value("${server.port:8082}") String port) {
+        this(appInstanceViewProvider::list, tailscaleService::status, () -> "http://" + com.autarkos.network.HostAddress.lanAddress() + ":" + port, Instant::now);
     }
 
     public AccessStatusService(

@@ -97,29 +97,6 @@ export function isPrivateAccessApp(app: AppRuntimeView) {
   return Boolean(app.settings?.tailscaleEnabled || desiredMode === 'private' || desiredMode === 'local-and-private');
 }
 
-export function appWithReachabilityZone(
-  app: AppRuntimeView,
-  zone: Exclude<ReachabilityZoneId, 'tailnet' | 'public'>,
-): AppRuntimeView {
-  const desiredAccessMode = reachabilityZoneAccessMode(zone);
-  return {
-    ...app,
-    desiredAccess: app.desiredAccess ? {
-      ...app.desiredAccess,
-      mode: desiredAccessMode,
-      privateAccessRequirement: 'disabled',
-      privateUrl: null,
-    } : app.desiredAccess,
-    settings: {
-      ...(app.settings ?? settingsForReachabilityZone(app, zone)),
-      desiredAccessMode,
-      privateAccessRequirement: 'disabled',
-      privateAccessUrl: null,
-      tailscaleEnabled: false,
-    },
-  };
-}
-
 export function settingsForReachabilityZone(
   app: AppRuntimeView,
   zone: Exclude<ReachabilityZoneId, 'tailnet' | 'public'>,

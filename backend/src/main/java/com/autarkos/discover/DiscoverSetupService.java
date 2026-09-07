@@ -35,9 +35,9 @@ public class DiscoverSetupService {
                 "choice",
                 "recommended",
                 true,
-                manifest.access().privateAccessRecommended() ? "private_lan" : "lan_only",
+                manifest.access().privateDashboard() ? "private_only" : manifest.access().privateAccessRecommended() ? "private_lan" : "lan_only",
                 "Choose where the app can be opened from. Private access means trusted Tailscale devices can open the app away from home.",
-                accessOptions(),
+                accessOptions(manifest),
                 Map.of()));
         inputs.add(new DiscoverSetupModels.DiscoverSetupInput(
                 "storageMode",
@@ -160,7 +160,12 @@ public class DiscoverSetupService {
         };
     }
 
-    private List<DiscoverSetupModels.DiscoverSetupOption> accessOptions() {
+    private List<DiscoverSetupModels.DiscoverSetupOption> accessOptions(ApplicationManifest manifest) {
+        if (manifest.access().privateDashboard()) {
+            return List.of(
+                    option("private_only", "Private devices", "Dashboard access through Tailscale or on this server. Peer sync stays available on your home network.", true, false),
+                    option("local_only", "This server only", "Open the dashboard on this server. Peer sync stays available on your home network.", false, false));
+        }
         return List.of(
                 option("private_lan", "Private + home network", "Available on your home network and to trusted Tailscale devices.", true, false),
                 option("lan_only", "Home network only", "Available only to devices on your home network.", false, false),

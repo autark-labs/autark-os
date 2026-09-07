@@ -11,6 +11,7 @@ import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutat
 import { recommendedActionQueryKeys, useRecommendedActionQuery } from '@/repositories/recommendedActionRepository';
 import type { AutarkOsAction } from '@/types/app';
 import type { RecommendedAction } from '@/types/system';
+import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
 
 const dismissedRecommendationsStorageKey = 'autark-os.dismissed-recommendations.v1';
 const maxHistory = 20;
@@ -79,6 +80,11 @@ export function AppNotificationsProvider({ children }: { children: ReactNode }) 
     const method = action.method?.toUpperCase();
     if (!method || method === 'GET') {
       if (action.href.startsWith('http')) {
+        const reason = appBrowserAccessReason(action.href);
+        if (reason) {
+          showActionNotification({ ok: false, severity: 'info', title: 'Open on this server', message: reason }, 'Open on this server');
+          return;
+        }
         window.open(action.href, '_blank', 'noopener,noreferrer');
       } else {
         navigate(action.href);

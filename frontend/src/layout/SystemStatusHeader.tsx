@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { useMemo } from 'react';
 import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -178,10 +179,10 @@ function StatusPopover({ loading, service }: { loading: boolean; service: Header
             <Link to="/settings">Settings</Link>
           </Button>
           <Button asChild size="sm" variant="outline">
-            <a href={service.externalHref} rel="noreferrer" target="_blank">
+            <AppBrowserLink href={service.externalHref} rel="noreferrer" target="_blank">
               {service.externalLabel}
               <ExternalLink data-icon="inline-end" />
-            </a>
+            </AppBrowserLink>
           </Button>
         </div>
       </PopoverContent>

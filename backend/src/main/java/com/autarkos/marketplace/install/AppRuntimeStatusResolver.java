@@ -33,12 +33,29 @@ class AppRuntimeStatusResolver {
             return java.util.Optional.empty();
         }
         if (manifestPort != null && ports.contains(manifestPort.toString())) {
-            return java.util.Optional.of("http://localhost:" + manifestPort);
+            return java.util.Optional.of(browserUrl(containers, manifestPort));
         }
         if (storedPort != null && ports.contains(storedPort.toString())) {
-            return java.util.Optional.of("http://localhost:" + storedPort);
+            return java.util.Optional.of(browserUrl(containers, storedPort));
         }
-        return java.util.Optional.of("http://localhost:" + ports.get(0));
+        return java.util.Optional.of(browserUrl(containers, Integer.parseInt(ports.get(0))));
+    }
+
+    private String browserUrl(List<RuntimeModels.DockerContainerStatus> containers, int port) {
+        // Derive exposure from observed bindings, including older installs whose
+        // stored preference did not actually control Compose.
+        boolean networkBound = containers.stream().map(RuntimeModels.DockerContainerStatus::ports)
+                .filter(java.util.Objects::nonNull)
+                .map(value -> value.replace("-\\u003e", "->"))
+                .anyMatch(value -> {
+                    var matches = java.util.regex.Pattern.compile("(\\[[^]]+]|[0-9.]+):" + port + "->").matcher(value);
+                    while (matches.find()) {
+                        String bind = matches.group(1);
+                        if (!bind.startsWith("127.") && !bind.equals("[::1]")) return true;
+                    }
+                    return false;
+                });
+        return "http://" + (networkBound ? com.autarkos.network.HostAddress.lanAddress() : "localhost") + ":" + port;
     }
 
     List<String> publishedPorts(String ports) {
@@ -87,6 +104,7 @@ class AppRuntimeStatusResolver {
     }
 
     String manifestAccessUrl(InstalledApp app, ApplicationManifest manifest) {
+        if (app.accessUrl() != null && !app.accessUrl().isBlank()) return app.accessUrl();
         if (manifest == null) {
             return app.accessUrl();
         }

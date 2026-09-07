@@ -45,5 +45,7 @@ values are not hashed because even a hash could leak equality.
   `partial=true`; they do not abort assembly.
 
 Historical samples, baselines, feature state, and derived analysis belong to
-the private agent. They may be carried only inside its encrypted opaque
-continuation token.
+the private agent's encrypted durable store. CE manages the isolated volume
+lifecycle without reading its records. The final encrypted opaque continuation
+token is accepted only as migration input; current history is not carried back
+through CE in that token.

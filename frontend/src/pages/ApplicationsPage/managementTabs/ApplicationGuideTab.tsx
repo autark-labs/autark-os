@@ -1,3 +1,4 @@
+import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { ExternalLink, KeyRound, ListChecks, QrCode, Sparkles } from 'lucide-react';
 import { CopyField } from '@/components/autark-os/CopyField';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
@@ -39,10 +40,10 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
 
         {item.href && (
           <Button asChild className="w-fit bg-cyan-300 text-slate-950 hover:bg-cyan-200">
-            <a href={item.href} rel="noreferrer" target="_blank">
+            <AppBrowserLink href={item.href} rel="noreferrer" target="_blank">
               <ExternalLink data-icon="inline-start" />
               {usageGuide?.openUrlLabel || usageGuide?.primaryAction || 'Open app'}
-            </a>
+            </AppBrowserLink>
           </Button>
         )}
       </section>
