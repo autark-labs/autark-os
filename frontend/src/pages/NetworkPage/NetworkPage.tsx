@@ -63,7 +63,6 @@ import {
   acknowledgePendingReachability,
   applyPendingReachability,
   filterReachabilityServices,
-  isPrivateAccessApp,
   removePendingReachabilityForToken,
   removePendingReachabilityIds,
   removeServiceProcessingForToken,
@@ -173,14 +172,7 @@ function NetworkPage() {
         showActionNotification(result, 'Private Tailnet enabled');
         succeeded = true;
       } else {
-        const currentlyPrivate = isPrivateAccessApp(app);
-        let appForSettings = app;
-        if (currentlyPrivate) {
-          const disabled = await InstalledAppsAPIClient.disablePrivateAccess(app.appId);
-          syncCanonicalAppMutationResult(queryClient, disabled);
-          appForSettings = disabled.app ?? appForSettings;
-        }
-        const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(appForSettings, targetZone));
+        const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(app, targetZone));
         syncCanonicalAppMutationResult(queryClient, { app: updated });
         showActionNotification({
           ok: true,

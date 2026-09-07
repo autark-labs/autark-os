@@ -40,13 +40,13 @@ class AppSettingsPolicy {
         if (wantsLan != hasLan) {
             changes.add(wantsLan ? "The dashboard will become available on your home network." : "The dashboard will be limited to this server and any enabled private link.");
             redeployRequired = true;
-            warnings.add("Changing dashboard access restarts the app containers.");
+            warnings.add("Running apps restart when dashboard access changes. Paused apps stay paused until you start them.");
         }
         if (!same(current.accessUrl(), requested.accessUrl()) || !same(currentPort, requestedPort)) {
             changes.add("Local app address will change to " + requested.accessUrl() + ".");
             if (!same(currentPort, requestedPort)) {
                 redeployRequired = true;
-                warnings.add("Autark-OS will update the Compose file and restart the app containers so the new port is active.");
+                warnings.add("Running apps restart to use the new port. Paused apps use the new port the next time you start them.");
             }
         }
         if (!same(current.expectedProtocol(), requested.expectedProtocol())) {
@@ -87,14 +87,14 @@ class AppSettingsPolicy {
         String headline = switch (impact) {
             case "manual" -> "Needs manual attention";
             case "data_migration_required" -> "Data migration required";
-            case "redeploy_required" -> "App restart required";
+            case "redeploy_required" -> "App configuration change";
             case "restart_required" -> "Restart recommended";
             default -> "Safe to save";
         };
         String summary = switch (impact) {
             case "manual" -> "Autark-OS cannot safely apply one or more settings yet.";
             case "data_migration_required" -> "Autark-OS needs a migration step before changing storage folders.";
-            case "redeploy_required" -> "Autark-OS will rewrite the Compose file and start the app with the new settings.";
+            case "redeploy_required" -> "Autark-OS will update the app configuration. Running apps restart; paused apps stay paused and use the settings on their next start.";
             case "restart_required" -> "Autark-OS will save the setting and may need a restart before it is reflected.";
             default -> "Autark-OS will save these settings without restarting containers.";
         };

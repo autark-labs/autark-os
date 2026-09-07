@@ -28,6 +28,8 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(page, /deepLinkTarget\.tab \?\? 'matrix'/);
   assert.match(page, /ReachabilityTypeFilter/);
   assert.match(page, /InstalledAppsAPIClient\.updateSettings/);
+  // The backend must preflight the entire edit before removing private access.
+  assert.doesNotMatch(page, /InstalledAppsAPIClient\.disablePrivateAccess/);
   assert.match(page, /pendingReachabilityByServiceId/);
   assert.match(page, /applyPendingReachability\(reachabilityServices, pendingReachabilityByServiceId\)/);
   assert.match(page, /pendingReachabilityTokenRef/);

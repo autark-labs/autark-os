@@ -17,6 +17,12 @@ class AppRuntimeStatusResolver {
     }
 
     String accessUrl(InstalledApp app, ApplicationManifest manifest, List<RuntimeModels.DockerContainerStatus> containers) {
+        // Stopped containers can still report their old port configuration.
+        // They publish no live dashboard; the saved address is for the next start.
+        if (!containers.isEmpty() && containers.stream().allMatch(container ->
+                List.of("exited", "stopped", "created").contains(java.util.Objects.toString(container.state(), "").toLowerCase(java.util.Locale.ROOT)))) {
+            return manifestAccessUrl(app, manifest);
+        }
         Integer manifestPort = manifest == null ? null : portFromUrl(manifest.accessUrl());
         Integer storedPort = portFromUrl(app.accessUrl());
         return publishedAccessUrl(containers, manifestPort, storedPort)

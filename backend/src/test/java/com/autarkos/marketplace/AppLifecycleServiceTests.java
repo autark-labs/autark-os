@@ -31,6 +31,7 @@ import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppActionResult;
+import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.AppGuardianService;
 import com.autarkos.marketplace.install.AppHealthSnapshot;
@@ -166,6 +167,9 @@ class AppLifecycleServiceTests {
             assertThatThrownBy(() -> service.start("vaultwarden"))
                     .isInstanceOf(RecoveryOperationConflictException.class)
                     .hasMessageContaining("already creating an app backup");
+            assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                    .isInstanceOf(RecoveryOperationConflictException.class);
+            assertThat(composeExecutor.upCalled).isFalse();
 
             releaseBackup.countDown();
             activeBackup.get(2, TimeUnit.SECONDS);
@@ -1025,6 +1029,60 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void occupiedPortIsRejectedBeforeRemovingPrivateAccessOrEditingCompose() throws Exception {
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
+                "http://localhost:8090", "https://autark-os.example.ts.net:12890", true,
+                java.util.Map.of(), InstallModels.BackupPolicy.defaults()));
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        String original = Files.readString(compose);
+        try (var occupied = new java.net.ServerSocket(0)) {
+            var requested = InstallModels.InstallSettings.defaults("http://localhost:" + occupied.getLocalPort());
+            assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
+            assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
+                    .isInstanceOf(InstallationException.class);
+        }
+        assertThat(tailscaleService.disableCalled).isFalse();
+        assertThat(composeExecutor.upCalled).isFalse();
+        assertThat(Files.readString(compose)).isEqualTo(original);
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
+    }
+
+    @Test
+    void uncertainRuntimeBlocksPortChangesWithoutEditingCompose() throws Exception {
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        String original = Files.readString(compose);
+        var requested = InstallModels.InstallSettings.defaults("http://localhost:19090");
+        composeExecutor.observationFails = true;
+        assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
+                .hasMessageContaining("cannot confirm");
+        composeExecutor.observationFails = false;
+        composeExecutor.containers = List.of();
+        assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
+                .hasMessageContaining("cannot confirm");
+        composeExecutor.containers = List.of(
+                new RuntimeModels.DockerContainerStatus("web", "web", "running", "", "Up", ""),
+                new RuntimeModels.DockerContainerStatus("db", "db", "exited", "", "Exited", ""));
+        assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
+                .hasMessageContaining("partly running");
+        assertThat(composeExecutor.upCalled).isFalse();
+        assertThat(Files.readString(compose)).isEqualTo(original);
+    }
+
+    @Test
+    void portChangeKeepsAPausedAppPaused() throws Exception {
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
+                "autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited", "0.0.0.0:8090->80/tcp"));
+        var updated = service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090"));
+        assertThat(composeExecutor.upCalled).isFalse();
+        assertThat(updated.friendlyStatus()).isEqualTo("Paused");
+        assertThat(updated.accessUrl()).isEqualTo("http://localhost:19090");
+        assertThat(Files.readString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"))).contains("19090:80");
+    }
+
+    @Test
     void changingLocalPortRendersComposeAndRestartsApp() throws Exception {
         InstallModels.AppSettingsChangePlan plan = service.settingsChangePlan("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:19090",
@@ -1170,6 +1228,13 @@ class AppLifecycleServiceTests {
     private static class FakeTailscaleService extends TailscaleService {
         int lastLocalPort;
         int lastHttpsPort;
+        boolean disableCalled;
+
+        @Override
+        public TailscaleServeResult disableHttps(int httpsPort) {
+            disableCalled = true;
+            return new TailscaleServeResult(true, null, "Private link removed.", List.of());
+        }
 
         @Override
         public TailscaleServeResult serveHttps(int localPort, int httpsPort) {

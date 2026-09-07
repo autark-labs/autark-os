@@ -428,7 +428,7 @@ export const ApplicationsPage = () => {
       showActionNotification({
         ok: true,
         severity: 'success',
-        title: plan.restartRequired || plan.redeployRequired ? 'Settings saved and restart requested' : 'Settings saved',
+        title: 'Settings saved',
         message: plan.summary,
       });
       setSettingsDirtyByAppId((current) => ({ ...current, [appId]: false }));

@@ -280,6 +280,11 @@ public class AppLifecycleService {
     }
 
     public AppRuntimeView updateSettings(String appId, InstallModels.InstallSettings settings) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE,
+                () -> updateSettingsUnlocked(appId, settings));
+    }
+
+    private AppRuntimeView updateSettingsUnlocked(String appId, InstallModels.InstallSettings settings) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "update settings for");
         assertComposeAvailable(app, "update settings for");
@@ -296,6 +301,8 @@ public class AppLifecycleService {
             activityWarning("settings_change_blocked", "Settings change blocked for " + app.appName(), String.join(" ", plan.blockedReasons()), app.appId());
             throw new InstallationException(String.join(" ", plan.blockedReasons()));
         }
+        // Validate ports and runtime before removing a private link or editing Compose.
+        SettingsRedeploy redeploy = plan.redeployRequired() ? prepareSettingsRedeploy(app, sanitized) : null;
         repository.recordEvent(app.appId(), "settings_apply_started", "Applying settings change for " + app.appName() + ".");
         activityInfo("settings_apply_started", "Applying settings for " + app.appName(), plan.summary(), app.appId());
         if (current.tailscaleEnabled() && !sanitized.tailscaleEnabled()) {
@@ -335,7 +342,7 @@ public class AppLifecycleService {
                     sanitized.autoRepairEnabled());
         }
         if (plan.redeployRequired()) {
-            safeRedeployForSettings(app, sanitized);
+            safeRedeployForSettings(app, redeploy);
             app = new InstalledApp(
                     app.appId(),
                     app.appName(),
@@ -370,24 +377,55 @@ public class AppLifecycleService {
             return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Access change unavailable",
                     exception.getMessage(), false, false, false, false, List.of(), List.of(), List.of(exception.getMessage()));
         }
-        return settingsPolicy.settingsChangePlan(app, current, sanitized);
+        InstallModels.AppSettingsChangePlan plan = settingsPolicy.settingsChangePlan(app, current, sanitized);
+        if (plan.saveAllowed() && plan.redeployRequired()) {
+            try {
+                prepareSettingsRedeploy(app, sanitized);
+            } catch (InstallationException exception) {
+                return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Settings change unavailable",
+                        exception.getMessage(), false, false, false, false, plan.changes(), plan.warnings(), List.of(exception.getMessage()));
+            }
+        }
+        return plan;
     }
 
-    private void safeRedeployForSettings(InstalledApp app, InstallModels.InstallSettings settings) {
+    private SettingsRedeploy prepareSettingsRedeploy(InstalledApp app, InstallModels.InstallSettings settings) {
         ApplicationManifest manifest = catalogService.findById(app.appId())
                 .orElseThrow(() -> new InstallationException("Autark-OS could not find the catalog template for " + app.appName() + "."));
-        Path appRoot = Path.of(app.runtimePath());
-        Path composePath = appRoot.resolve("compose.yaml");
+        Path composePath = composeFile(app);
         String previousCompose = readCompose(composePath);
+        InstallOptionsRequest options = new InstallOptionsRequest(
+                new InstallOptionsRequest.PortOptions(settings.expectedLocalPort()),
+                new InstallOptionsRequest.AccessOptions(settings.tailscaleEnabled(), settings.desiredAccessMode()),
+                new InstallOptionsRequest.StorageOptions(settings.storageSubfolders()),
+                new InstallOptionsRequest.BackupOptions(settings.backup().enabled(), settings.backup().frequency(), settings.backup().retention()));
+        RuntimeModels.ResolvedRuntimeConfiguration configuration = new InstallCustomizationResolver(new PortAllocator()).resolveSettings(manifest, options, previousCompose);
+        var observation = composeExecutor.observeContainersForApp(composePath, app.composeProject(), app.appId());
+        if (!observation.successful() || observation.containers().isEmpty()) {
+            throw new InstallationException("Autark-OS cannot confirm this app's running state. Check Docker and the app in My Apps before changing its settings.");
+        }
+        boolean running = observation.containers().stream().allMatch(container -> "running".equalsIgnoreCase(container.state()));
+        boolean stopped = observation.containers().stream().allMatch(container ->
+                List.of("exited", "stopped", "created").contains(Objects.toString(container.state(), "").toLowerCase(java.util.Locale.ROOT)));
+        if (!running && !stopped) {
+            throw new InstallationException("The app is changing state or is only partly running. Wait for it to settle, or pause the whole app before changing settings.");
+        }
+        return new SettingsRedeploy(manifest, composePath, previousCompose, configuration, running);
+    }
+
+    private record SettingsRedeploy(ApplicationManifest manifest, Path composePath, String previousCompose,
+            RuntimeModels.ResolvedRuntimeConfiguration configuration, boolean running) { }
+
+    private void safeRedeployForSettings(InstalledApp app, SettingsRedeploy redeploy) {
+        Path composePath = redeploy.composePath();
+        String previousCompose = redeploy.previousCompose();
         boolean restored = false;
         try {
-            InstallOptionsRequest options = new InstallOptionsRequest(
-                    new InstallOptionsRequest.PortOptions(settings.expectedLocalPort()),
-                    new InstallOptionsRequest.AccessOptions(settings.tailscaleEnabled(), settings.desiredAccessMode()),
-                    new InstallOptionsRequest.StorageOptions(settings.storageSubfolders()),
-                    new InstallOptionsRequest.BackupOptions(settings.backup().enabled(), settings.backup().frequency(), settings.backup().retention()));
-            RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = new InstallCustomizationResolver(new PortAllocator()).resolveSettings(manifest, options, previousCompose);
-            new ComposeRenderer(runtimeLayout).updatePorts(composePath, manifest, runtimeConfiguration);
+            new ComposeRenderer(runtimeLayout).updatePorts(composePath, redeploy.manifest(), redeploy.configuration());
+            if (!redeploy.running()) {
+                repository.recordEvent(app.appId(), "settings_saved_stopped", "Saved settings for " + app.appName() + ". The app remains paused; its next start will use the new configuration.");
+                return;
+            }
             RuntimeModels.DockerComposeResult result = composeExecutor.up(composePath, app.composeProject());
             if (!result.successful()) {
                 restoreCompose(composePath, previousCompose);

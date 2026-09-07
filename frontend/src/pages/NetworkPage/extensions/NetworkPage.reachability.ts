@@ -92,11 +92,6 @@ export function removeServiceProcessingIds(current: Record<string, number>, serv
   return next;
 }
 
-export function isPrivateAccessApp(app: AppRuntimeView) {
-  const desiredMode = app.settings?.desiredAccessMode || app.desiredAccess?.mode;
-  return Boolean(app.settings?.tailscaleEnabled || desiredMode === 'private' || desiredMode === 'local-and-private');
-}
-
 export function settingsForReachabilityZone(
   app: AppRuntimeView,
   zone: Exclude<ReachabilityZoneId, 'tailnet' | 'public'>,

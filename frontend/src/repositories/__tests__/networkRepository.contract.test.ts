@@ -29,7 +29,8 @@ test('Access page private access mutations consume action results without local 
   const networkPage = source('src/pages/NetworkPage/NetworkPage.tsx');
 
   assert.match(networkPage, /InstalledAppsAPIClient\.enablePrivateAccess\(app\.appId\)/);
-  assert.match(networkPage, /InstalledAppsAPIClient\.disablePrivateAccess\(app\.appId\)/);
+  assert.match(networkPage, /InstalledAppsAPIClient\.updateSettings\(app\.appId, settingsForReachabilityZone\(app, targetZone\)\)/);
+  assert.doesNotMatch(networkPage, /InstalledAppsAPIClient\.disablePrivateAccess/);
   assert.match(networkPage, /syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.match(networkPage, /invalidateNetworkQueries\(queryClient\)/);
   assert.doesNotMatch(networkPage, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);

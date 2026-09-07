@@ -104,6 +104,12 @@ test('applications page settings tab uses real controls and confirm-before-save 
   assert.doesNotMatch(settings, /onClick=\{\(\) => toggleField\(\)\}/);
 });
 
+test('settings feedback does not claim that a paused app was restarted', () => {
+  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  assert.match(page, /title: 'Settings saved'/);
+  assert.doesNotMatch(page, /Settings saved and restart requested/);
+});
+
 test('applications page management panel uses canonical runtime data instead of generated mock facts', () => {
   const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
