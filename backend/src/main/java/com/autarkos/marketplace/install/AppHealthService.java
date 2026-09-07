@@ -98,7 +98,8 @@ class AppHealthService {
                 settings.lastRepairAttemptAt(),
                 settings.lastRepairStatus(),
                 settings.autoRepairEnabled());
-        repository.saveSettings(app.appId(), updated);
+        repository.updateAccessCheckTimestamps(app.appId(), localCheck.checkedAt().toString(),
+                "reachable".equals(localCheck.status()) ? 1 : 0);
         return updated;
     }
 

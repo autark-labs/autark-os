@@ -26,13 +26,11 @@ public class AutarkOsDataSourceConfiguration {
         }
         SQLiteDataSource dataSource = new SQLiteDataSource();
         dataSource.setUrl("jdbc:sqlite:" + runtimeLayout.databasePath());
-        /*
-         * Pro lifecycle jobs intentionally interleave short JDBC state
-         * transitions with REQUIRES_NEW JPA audit writes. SQLite has one
-         * writer at a time, so give those bounded writes a chance to
-         * serialize instead of failing an otherwise safe module operation
-         * immediately with SQLITE_BUSY.
-         */
+        // Reserve the writer before a transaction reads. With DEFERRED, two
+        // JPA read-then-save transactions can deadlock when upgrading their
+        // read locks; busy_timeout cannot make that upgrade safe. Keep these
+        // transactions short and leave Docker/network work outside them.
+        dataSource.setTransactionMode("IMMEDIATE");
         dataSource.setBusyTimeout(SQLITE_BUSY_TIMEOUT_MILLIS);
         return dataSource;
     }

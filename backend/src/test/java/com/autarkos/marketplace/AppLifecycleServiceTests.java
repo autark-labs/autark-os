@@ -69,6 +69,7 @@ class AppLifecycleServiceTests {
     RuntimeLayout runtimeLayout;
     BackupRepository backupRepository;
     RecoveryOperationCoordinator recoveryOperations;
+    FakeAppAccessChecker accessChecker;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -80,6 +81,7 @@ class AppLifecycleServiceTests {
         recoveryOperations = new RecoveryOperationCoordinator();
         composeExecutor = new FakeLifecycleDockerComposeExecutor();
         tailscaleService = new FakeTailscaleService();
+        accessChecker = new FakeAppAccessChecker();
         service = new AppLifecycleService(
                 repository,
                 composeExecutor,
@@ -95,7 +97,7 @@ class AppLifecycleServiceTests {
                 null,
                 recoveryOperations,
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
-                new FakeAppAccessChecker());
+                accessChecker);
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services:\n  vaultwarden:\n    image: vaultwarden/server:1.36.0\n    ports:\n      - '8090:80'\n    labels:\n      - autark-os.instance-id=test-owner\n");
@@ -1128,9 +1130,29 @@ class AppLifecycleServiceTests {
                 });
     }
 
+    @Test
+    void healthProbeDoesNotOverwriteSettingsSavedWhileTheProbeWasRunning() {
+        var desired = new InstallModels.InstallSettings("http://localhost:18090", null, false,
+                java.util.Map.of("data", "preserved"), new InstallModels.BackupPolicy(false, "weekly", 3),
+                "local", "optional", 18090, "http", null, null, null, null, false);
+        accessChecker.duringProbe = () -> repository.saveSettings("vaultwarden", desired);
+
+        service.getApp("vaultwarden");
+
+        var saved = repository.settingsFor("vaultwarden").orElseThrow();
+        assertThat(saved.accessUrl()).isEqualTo(desired.accessUrl());
+        assertThat(saved.expectedLocalPort()).isEqualTo(18090);
+        assertThat(saved.backup()).isEqualTo(desired.backup());
+        assertThat(saved.storageSubfolders()).isEqualTo(desired.storageSubfolders());
+        assertThat(saved.autoRepairEnabled()).isFalse();
+        assertThat(saved.lastAccessCheckAt()).isNotNull();
+    }
+
     private static class FakeAppAccessChecker extends AppAccessChecker {
+        Runnable duringProbe = () -> { };
         @Override
         public AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
+            duringProbe.run();
             return accessCheck(appId, accessUrl);
         }
 

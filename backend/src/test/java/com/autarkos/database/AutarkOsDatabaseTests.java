@@ -76,6 +76,48 @@ class AutarkOsDatabaseTests {
     }
 
     @Test
+    void readThenWriteTransactionsWaitBeforeReadingInsteadOfFailingOnUpgrade() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        DataSource source = new AutarkOsDataSourceConfiguration().dataSource(layout, new AutarkOsDatabase(layout));
+        try (var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+             var first = source.getConnection()) {
+            first.setAutoCommit(false);
+            try (var statement = first.createStatement(); var rows = statement.executeQuery("select count(*) from installed_apps")) {
+                assertThat(rows.next()).isTrue();
+            }
+            var attempted = new java.util.concurrent.CountDownLatch(1);
+            var read = new java.util.concurrent.CountDownLatch(1);
+            var second = executor.submit(() -> {
+                try (var connection = source.getConnection()) {
+                    attempted.countDown();
+                    connection.setAutoCommit(false);
+                    try (var statement = connection.createStatement()) {
+                        try (var rows = statement.executeQuery("select count(*) from installed_apps")) { rows.next(); }
+                        read.countDown();
+                        statement.executeUpdate("update installed_apps set status = 'Ready'");
+                    }
+                    connection.commit();
+                }
+                return true;
+            });
+            try {
+                assertThat(attempted.await(2, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                assertThat(read.await(200, java.util.concurrent.TimeUnit.MILLISECONDS)).isFalse();
+                try (var statement = first.createStatement()) { statement.executeUpdate("update installed_apps set status = 'Paused'"); }
+                // End the unit of work. Xerial commit() alone immediately
+                // begins the next transaction while auto-commit is disabled.
+                first.setAutoCommit(true);
+                assertThat(second.get(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            } finally {
+                if (!first.getAutoCommit()) {
+                    first.rollback();
+                    first.setAutoCommit(true);
+                }
+            }
+        }
+    }
+
+    @Test
     void configuredDataSourceBoundsConcurrentWriterWaits() throws Exception {
         RuntimeLayout runtimeLayout = runtimeLayout();
         AutarkOsDatabase database = new AutarkOsDatabase(runtimeLayout);

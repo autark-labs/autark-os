@@ -56,8 +56,21 @@ public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity
 
     @Transactional
     @Modifying
-    @Query("update InstalledAppEntity app set app.status = :status where app.appId = :appId")
+    @Query("update InstalledAppEntity app set app.status = :status where app.appId = :appId and (app.status is null or app.status <> :status)")
     void updateStatus(@Param("appId") String appId, @Param("status") String status);
+
+    /** Observation owns only check timestamps, never the owner's preferences. */
+    @Transactional
+    @Modifying
+    @Query(value = """
+            update installed_app_settings
+            set last_access_check_at = :checkedAt,
+                last_successful_access_at = case when :reachable = 1 then :checkedAt else last_successful_access_at end
+            where app_id = :appId
+              and (last_access_check_at is null or julianday(last_access_check_at) <= julianday(:checkedAt))
+            """, nativeQuery = true)
+    void updateAccessCheckTimestamps(@Param("appId") String appId,
+            @Param("checkedAt") String checkedAt, @Param("reachable") int reachable);
 
     default void saveSettings(String appId, InstallModels.InstallSettings settings) {
         upsertSettings(
