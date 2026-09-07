@@ -43,6 +43,10 @@ yarn-error.log*
 *.db-shm
 *.db-wal
 
+# Local Pi development target configuration and collected evidence
+/tools/dev-pi.env
+/.autark-os-dev/
+
 # Local screenshots, planning, and assistant workspace
 screenshots/
 /docs/development/

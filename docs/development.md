@@ -85,3 +85,35 @@ git diff --check
 For catalog changes, follow the [manifest authoring checklist](./development/manifest-authoring-checklist.md).
 For SQLite changes, follow [database migration discipline](./development/database-migrations.md).
 For contribution and review expectations, see [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Test A Release On A Reachable Pi
+
+Use [`tools/dev-pi.sh`](../tools/dev-pi.sh) from this workstation to control a
+development Pi through ordinary SSH. It is a developer-only helper and is not
+included in release artifacts. It uses the Pi's installed `autark-os update`
+flow rather than copying files into `/opt` itself, so a deployment keeps normal
+checksum verification, update snapshots, health verification and rollback.
+
+Create the ignored local target configuration:
+
+```bash
+cat > tools/dev-pi.env <<'EOF'
+AUTARK_PI_HOST=your-pi-host-or-address
+AUTARK_PI_USER=your-ssh-user
+EOF
+```
+
+Then use one terminal on this workstation:
+
+```bash
+tools/dev-pi.sh status
+tools/dev-pi.sh deploy --bundle-dir /absolute/path/to/extracted-arm64-release-bundle
+tools/dev-pi.sh collect
+tools/dev-pi.sh tunnel --local-port 18082
+```
+
+`deploy`, `verify`, `collect`, and `logs` may request the Pi user's sudo
+password in the local terminal. Do not add a broad passwordless-sudo rule just
+to automate this. The helper writes its logs and downloaded redacted support
+bundles under `.autark-os-dev/pi/`, which is ignored by Git. The tunnel exposes
+the Pi UI locally at `http://localhost:18082`; stop it with `Ctrl+C`.
