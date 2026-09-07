@@ -11,6 +11,7 @@ if ! sudo -n true >/dev/null 2>&1; then
 fi
 
 contract_root="$(mktemp -d)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 helper="${contract_root}/bounded-helper"
 protected_dir="${contract_root}/protected"
 sudoers_rule="/etc/sudoers.d/autark-os-helper-elevation-contract-$$"
@@ -24,6 +25,48 @@ trap cleanup EXIT
 chmod 0755 "${contract_root}"
 sudo -n install -d -o root -g root -m 0700 "${protected_dir}"
 printf 'protected state\n' | sudo -n tee "${protected_dir}/health" >/dev/null
+sudo -n cp "${repo_root}/scripts/autark-os-fileops" "${protected_dir}/fileops.py"
+# Run the actual archive/restore implementation with a disposable configured
+# runtime under the service profile. The fixture stays outside product code.
+sudo -n tee "${protected_dir}/restore-contract.py" >/dev/null <<'PY'
+import argparse
+import importlib.util
+import os
+from pathlib import Path
+import pwd
+import shutil
+import sys
+
+sys.dont_write_bytecode = True
+root = Path(__file__).parent
+spec = importlib.util.spec_from_file_location("fileops", root / "fileops.py")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+runtime = root / "runtime"
+shutil.rmtree(runtime, ignore_errors=True)
+app = runtime / "apps" / "fixture"
+app.mkdir(parents=True)
+owner = pwd.getpwnam("nobody")
+os.chown(app.parent, owner.pw_uid, owner.pw_gid)
+os.chown(app, owner.pw_uid, owner.pw_gid)
+data = app / "article.txt"
+data.write_text("Saved feed and read state\n")
+os.chown(data, 33, 33)
+data.chmod(0o640)
+backup = runtime / "backups"
+backup.mkdir()
+archive = backup / "fixture.zip"
+module.RUNTIME_CONFIG = root / "fixture.env"
+module.RUNTIME_CONFIG.write_text(f"AUTARK_OS_RUNTIME_ROOT={runtime}\n")
+args = argparse.Namespace(runtime_root=runtime, backup_root=backup, app="fixture",
+                          destination=str(archive), archive=str(archive), scope="app")
+module.create_safety_archive(args)
+data.write_text("Changed after backup\n")
+module.restore_app_data(args)
+assert data.read_text() == "Saved feed and read state\n"
+assert (data.stat().st_uid, data.stat().st_gid, data.stat().st_mode & 0o777) == (33, 33, 0o640)
+assert (app.stat().st_uid, app.stat().st_gid, app.stat().st_mode & 0o777) == (owner.pw_uid, owner.pw_gid, 0o700)
+PY
 
 cat >"${helper}" <<SH
 #!/usr/bin/env bash
@@ -36,6 +79,7 @@ if [[ "\${1:-}" == metadata ]]; then
   chown nobody:nogroup '${protected_dir}/metadata'
   chmod 0640 '${protected_dir}/metadata'
   [[ "\$(stat -c '%u:%g:%a' '${protected_dir}/metadata')" == "\$(id -u nobody):\$(id -g nobody):640" ]]
+  python3 '${protected_dir}/restore-contract.py' >/dev/null
 fi
 printf '{"status":"ready"}\\n'
 SH
@@ -110,7 +154,6 @@ fi
 
 # Exercise the shipped sandbox directives, not just setpriv's capability mask.
 # Several systemd directives implicitly set NNP even with NoNewPrivileges=false.
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 properties=(-p User=nobody -p Group=nogroup -p "BindPaths=${contract_root}" -p "ReadWritePaths=${contract_root}")
 while IFS= read -r directive; do
   properties+=(-p "${directive}")

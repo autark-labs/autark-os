@@ -380,6 +380,12 @@ def restore_app_data(args: argparse.Namespace) -> None:
                 target = require_inside(staging / str(entry["path"]), staging, "restore target")
                 os.chown(target, int(entry["uid"]), int(entry["gid"]))
                 os.chmod(target, int(entry["mode"]))
+        # The outer app directory belongs to the runtime manager, not to the
+        # root helper that created staging. Container-owned entries retain
+        # their archived metadata. Leaving staging root:root 0700 makes the
+        # restored compose file inaccessible to the unprivileged service.
+        runtime_owner = destination.parent.stat()
+        os.chown(staging, runtime_owner.st_uid, runtime_owner.st_gid)
         if destination.exists():
             os.replace(destination, previous)
             moved_previous = True
