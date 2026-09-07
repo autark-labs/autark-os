@@ -86,6 +86,43 @@ For catalog changes, follow the [manifest authoring checklist](./development/man
 For SQLite changes, follow [database migration discipline](./development/database-migrations.md).
 For contribution and review expectations, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 
+## Build Local Release Artifacts
+
+Build the ready-to-install AMD64 and ARM64 artifacts on this workstation before
+publishing a release or smoke-testing a Raspberry Pi. The target device never
+compiles source code. This command builds the application and runs the release
+job's unit and frontend checks once on the local host, then validates and
+packages that application for both architectures. It does not start containers,
+contact a target device, or call `systemctl`.
+
+```bash
+tools/build-local-release.sh --version 0.9.1-beta.24
+```
+
+The command refuses uncommitted source by default, matching a GitHub release.
+For an intentional development smoke build, add `--allow-dirty`; the bundle
+still records the current base commit as its provenance.
+
+Artifacts are written to:
+
+```text
+build/releases/<version>/
+  amd64/
+  arm64/
+```
+
+Each architecture directory has the same artifact layout as GitHub: a Debian
+package, tarball, self-extracting installer, extracted bundle, checksum file,
+and artifact manifest. Local candidates are unsigned (`unsigned-reserved`), so
+they are for local smoke testing only; GitHub remains responsible for signed
+published releases.
+
+The AMD64 bundle uses the local Java 21 `jlink` runtime, as GitHub does. The
+ARM64 bundle uses a pinned, checksum-verified Temurin Java 21 runtime downloaded
+once into `build/cache/`; it is copied into the bundle and never executed on
+this workstation. This avoids QEMU, Docker Buildx, cross-compiling, and Pi-side
+build work while preserving the same installer and application payload.
+
 ## Test A Release On A Reachable Pi
 
 Use [`tools/dev-pi.sh`](../tools/dev-pi.sh) from this workstation to control a

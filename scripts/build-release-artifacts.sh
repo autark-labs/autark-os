@@ -93,7 +93,9 @@ validate_build_architecture() {
   local host_architecture
   ARCHITECTURE="$(normalize_architecture "${ARCHITECTURE}")" || die "--architecture must be amd64 or arm64: ${ARCHITECTURE}"
   host_architecture="$(normalize_architecture "$(default_architecture)")" || die "Unsupported build host architecture: $(default_architecture)"
-  [[ "${ARCHITECTURE}" == "${host_architecture}" ]] || die "Cannot build ${ARCHITECTURE} release artifacts on ${host_architecture}. Use a native ${ARCHITECTURE} builder."
+  [[ "${ARCHITECTURE}" == "${host_architecture}" ]] && return 0
+  [[ "${SKIP_BUILD}" -eq 1 && -d "${AUTARK_OS_RUNTIME_DIR:-}" ]] ||
+    die "Cannot build ${ARCHITECTURE} release artifacts on ${host_architecture}. Cross-architecture packaging requires --skip-build and AUTARK_OS_RUNTIME_DIR containing a verified ${ARCHITECTURE} runtime."
 }
 
 parse_args() {
