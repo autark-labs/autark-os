@@ -113,13 +113,18 @@ public class DiscoverService {
         }
         ApplicationManifest manifest = catalogService.findById(appId).orElseThrow(() -> new IllegalArgumentException("Unknown app: " + appId));
         DiscoverSetupModels.DiscoverSetupAnswersRequest answersRequest = request == null ? new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of()) : request.answersRequest();
+        DiscoverSetupModels.DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, answersRequest);
+        Map<String, Object> parameters = Map.of("answers", answers.values(),
+                "reinstall", request != null && request.reinstallRequested(),
+                "duplicateAcknowledged", request != null && request.duplicateAcknowledgedRequested());
+        var existing = jobService.existingForRequest(AutarkOsStates.JobType.INSTALL_APP, appId, installJobSteps(manifest.name()), parameters);
+        if (existing.isPresent()) return existing.get();
         DiscoverInstallModels.DiscoverInstallPreview preview = previewService.preview(manifest, answersRequest);
         if (!preview.valid()) {
             throw new IllegalArgumentException(preview.blockingIssues().getFirst().message());
         }
-        DiscoverSetupModels.DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, answersRequest);
-        setupService.persist(appId, manifest.id(), answers);
-        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.INSTALL_APP, appId, installJobSteps(manifest.name()), activeJob -> {
+        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.INSTALL_APP, appId, installJobSteps(manifest.name()), parameters, activeJob -> {
+            setupService.persist(appId, manifest.id(), answers);
             List<AutarkOsJobStep> liveSteps = new ArrayList<>();
             InstallOptionsRequest installOptions = installOptions(preview.installOptions(), request);
             InstallModels.InstallResult result = marketplaceInstallService.install(manifest, installOptions, step -> {

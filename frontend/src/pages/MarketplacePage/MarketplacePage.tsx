@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { apiErrorMessage } from '@/api/httpClient';
+import { showActionErrorNotification } from '@/lib/actionNotifications';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
@@ -267,6 +268,7 @@ function MarketplacePage() {
     } catch (error) {
       const message = apiErrorMessage(error);
       setMarketplaceError(message);
+      showActionErrorNotification(error, 'Install could not start');
     }
   }
 
@@ -276,6 +278,7 @@ function MarketplacePage() {
       setMarketplaceError('');
     } catch (error) {
       setMarketplaceError(apiErrorMessage(error, 'Backup could not be started.'));
+      showActionErrorNotification(error, 'Backup could not start');
     }
   }
 

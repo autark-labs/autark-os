@@ -117,8 +117,18 @@ and artifact manifest. Local candidates are unsigned (`unsigned-reserved`), so
 they are for local smoke testing only; GitHub remains responsible for signed
 published releases.
 
-The AMD64 bundle uses the local Java 21 `jlink` runtime, as GitHub does. The
-ARM64 bundle uses a pinned, checksum-verified Temurin Java 21 runtime downloaded
+The AMD64 bundle uses the Java 21 `jlink` selected on `PATH`. Use a compatible
+JDK distribution such as the Temurin JDK used by release CI: Ubuntu's system
+OpenJDK can require a newer glibc than Debian 12 and fail before installation.
+Select the compatible JDK's `bin` directory on `PATH` before building; merely
+setting Gradle's toolchain does not select the packaging runtime.
+
+The bundler checks every runtime ELF file's glibc requirements using `readelf`
+(from binutils), including imported runtimes. Requirements must fit the oldest
+declared host for that architecture: glibc 2.36 on AMD64 and 2.31 on ARM64.
+This check does not replace running the finished artifact on the target host.
+
+The ARM64 bundle uses a pinned, checksum-verified Temurin Java 21 runtime downloaded
 once into `build/cache/`; it is copied into the bundle and never executed on
 this workstation. This avoids QEMU, Docker Buildx, cross-compiling, and Pi-side
 build work while preserving the same installer and application payload.

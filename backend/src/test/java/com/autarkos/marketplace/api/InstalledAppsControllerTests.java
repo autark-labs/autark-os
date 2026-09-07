@@ -203,7 +203,7 @@ class InstalledAppsControllerTests {
     }
 
     @Test
-    void lifecycleMutationReturnsExistingActiveLifecycleJobForSameApp() {
+    void lifecycleMutationRejectsADifferentActiveActionWithAnActionableHttpConflict() throws Exception {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
         AppUpdateService updateService = mock(AppUpdateService.class);
@@ -221,10 +221,35 @@ class InstalledAppsControllerTests {
                 applicationStateService,
                 jobService);
 
-        AutarkOsJob returned = controller.start("vaultwarden");
-
-        assertThat(returned.jobId()).isEqualTo(existing.jobId());
+        var mvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new MarketplaceExceptionHandler(mock(com.autarkos.activity.ActivityLogService.class))).build();
+        mvc.perform(MockMvcRequestBuilders.post("/api/apps/vaultwarden/start"))
+                .andExpect(result -> {
+                    assertThat(result.getResponse().getStatus()).isEqualTo(409);
+                    assertThat(result.getResponse().getContentAsString()).contains(
+                            "\"code\":\"job_conflict\"", existing.jobId(), "Restart app", "This request was not started");
+                });
         verify(lifecycleService, never()).start("vaultwarden");
+    }
+
+    @Test
+    void sameLifecycleRetryReturnsOneJobAndBackupDuringRestartGets409() throws Exception {
+        var jobs = jobService();
+        var lifecycle = mock(AppLifecycleService.class);
+        var backups = mock(com.autarkos.backups.BackupService.class);
+        var state = mock(ApplicationStateService.class);
+        var controller = new InstalledAppsController(lifecycle, mock(MonitoringMetricsService.class), mock(AppUpdateService.class), state, jobs);
+        var first = controller.restart("vaultwarden");
+        assertThat(controller.restart("vaultwarden").jobId()).isEqualTo(first.jobId());
+        var mvc = MockMvcBuilders.standaloneSetup(controller, new com.autarkos.backups.BackupController(backups, jobs, state))
+                .setControllerAdvice(new MarketplaceExceptionHandler(mock(com.autarkos.activity.ActivityLogService.class))).build();
+        mvc.perform(MockMvcRequestBuilders.post("/api/backups/apps/vaultwarden/run"))
+                .andExpect(result -> {
+                    assertThat(result.getResponse().getStatus()).isEqualTo(409);
+                    assertThat(result.getResponse().getContentAsString()).contains("job_conflict", "restart_app", first.jobId(), "This request was not started");
+                });
+        verify(backups, never()).run("vaultwarden");
+        assertThat(jobs.list()).hasSize(1);
     }
 
     @Test

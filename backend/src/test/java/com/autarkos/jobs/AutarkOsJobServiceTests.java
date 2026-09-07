@@ -1,6 +1,7 @@
 package com.autarkos.jobs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -30,6 +31,28 @@ class AutarkOsJobServiceTests {
     Path runtimeRoot;
 
     @Test
+    void equivalentParametersJoinButDifferentParametersAndOperationsConflict() {
+        var service = service();
+        var steps = List.of(AutarkOsJobStep.pending("install", "Installing app"));
+        var parameters = new java.util.LinkedHashMap<String, Object>();
+        parameters.put("port", 8080);
+        parameters.put("mode", "local");
+        var first = service.startWithJob("install_app", "freshrss", steps, parameters, job -> AutarkOsJobOutcome.succeeded("Installed."));
+        var same = service.startWithJob("install_app", "freshrss", steps, java.util.Map.of("mode", "local", "port", 8080), job -> { throw new AssertionError("Duplicate ran"); });
+        assertThat(same.jobId()).isEqualTo(first.jobId());
+        parameters.put("port", 9090);
+        assertThatThrownBy(() -> service.startWithJob("install_app", "freshrss", steps, parameters, job -> AutarkOsJobOutcome.succeeded("Wrong install")))
+                .isInstanceOf(JobConflictException.class);
+        var pro = service.start("pro_module_change", "agent", List.of(AutarkOsJobStep.pending("check", "Check release")), () -> AutarkOsJobOutcome.succeeded("Checked"));
+        assertThatThrownBy(() -> service.start("pro_module_change", "agent", List.of(AutarkOsJobStep.pending("remove", "Remove module")), () -> AutarkOsJobOutcome.succeeded("Removed")))
+                .isInstanceOf(JobConflictException.class);
+        service.cancel(first.jobId());
+        var afterCancel = service.startWithJob("install_app", "freshrss", steps, parameters, job -> AutarkOsJobOutcome.succeeded("New install"));
+        assertThat(afterCancel.jobId()).isNotEqualTo(first.jobId());
+        assertThat(service.findById(pro.jobId()).orElseThrow().status()).isEqualTo("queued");
+    }
+
+    @Test
     void coalescesDuplicateActiveInstallJobForSameApp() {
         AutarkOsJobService service = service();
 
@@ -42,7 +65,7 @@ class AutarkOsJobServiceTests {
     }
 
     @Test
-    void coalescesConflictingAppMutationsIntoTheActiveJob() {
+    void rejectsConflictingAppMutationsInsteadOfReturningAnUnrelatedJob() {
         AutarkOsJobService service = service();
         AutarkOsJob backup = service.start(
                 AutarkOsStates.JobType.BACKUP,
@@ -50,13 +73,14 @@ class AutarkOsJobServiceTests {
                 List.of(AutarkOsJobStep.pending("backup", "Creating restore point")),
                 () -> AutarkOsJobOutcome.succeeded("Backup complete."));
 
-        AutarkOsJob uninstall = service.start(
+        assertThatThrownBy(() -> service.start(
                 AutarkOsStates.JobType.UNINSTALL_APP,
                 "vaultwarden",
                 List.of(AutarkOsJobStep.pending("stop", "Stopping Vaultwarden")),
-                () -> AutarkOsJobOutcome.succeeded("Uninstalled."));
-
-        assertThat(uninstall.jobId()).isEqualTo(backup.jobId());
+                () -> AutarkOsJobOutcome.succeeded("Uninstalled.")))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("already");
+        assertThat(service.findById(backup.jobId()).orElseThrow().type()).isEqualTo(AutarkOsStates.JobType.BACKUP);
         assertThat(service.list()).hasSize(1);
     }
 
@@ -84,13 +108,14 @@ class AutarkOsJobServiceTests {
                 "42:all",
                 List.of(AutarkOsJobStep.pending("restore", "Restoring app data")),
                 () -> AutarkOsJobOutcome.succeeded("Restored."));
-        AutarkOsJob install = fullRestoreService.start(
+        assertThatThrownBy(() -> fullRestoreService.start(
                 AutarkOsStates.JobType.INSTALL_APP,
                 "vaultwarden",
                 List.of(AutarkOsJobStep.pending("install", "Installing Vaultwarden")),
-                () -> AutarkOsJobOutcome.succeeded("Installed."));
-
-        assertThat(install.jobId()).isEqualTo(restore.jobId());
+                () -> AutarkOsJobOutcome.succeeded("Installed.")))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(fullRestoreService.list()).filteredOn(job -> "queued".equals(job.status()))
+                .extracting(AutarkOsJob::jobId).containsExactly(restore.jobId());
     }
 
     @Test
@@ -322,7 +347,7 @@ class AutarkOsJobServiceTests {
         AutarkOsJobRepository repository = JpaTestRepositories.jobRepository(new RuntimeLayout(properties));
         AutarkOsJobService previousProcess = new AutarkOsJobService(repository, Runnable::run, false);
         AutarkOsJob queued = previousProcess.start("install_app", "vaultwarden", List.of(AutarkOsJobStep.pending("download", "Downloading app")), () -> AutarkOsJobOutcome.succeeded("Installed."));
-        AutarkOsJob running = previousProcess.start("backup", "vaultwarden", List.of(AutarkOsJobStep.pending("copy", "Copying app data")), () -> AutarkOsJobOutcome.succeeded("Backed up."));
+        AutarkOsJob running = previousProcess.start("backup", "jellyfin", List.of(AutarkOsJobStep.pending("copy", "Copying app data")), () -> AutarkOsJobOutcome.succeeded("Backed up."));
         previousProcess.recordProgress(running.jobId(), List.of(AutarkOsJobStep.running("copy", "Copying app data", "Copying app data.")));
 
         AutarkOsJobService restarted = new AutarkOsJobService(repository, Runnable::run, false);

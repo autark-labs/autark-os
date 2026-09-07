@@ -139,6 +139,48 @@ verify_runtime_architecture() {
   [[ "${detected}" == "${ARTIFACT_ARCHITECTURE}" ]] || die "Bundled Java runtime is ${detected}, but this artifact is declared ${ARTIFACT_ARCHITECTURE}."
 }
 
+verify_runtime_glibc() {
+  [[ "${DRY_RUN}" -eq 0 ]] || return 0
+  has_command readelf || die "readelf (binutils) is required to check bundled runtime compatibility."
+  # Oldest libc in the declared host matrix: Debian 12 on AMD64 and
+  # Raspberry Pi OS 11 on ARM64. This checks requirements, not qualification.
+  local baseline="2.36"
+  [[ "${ARTIFACT_ARCHITECTURE}" != arm64 ]] || baseline="2.31"
+  python3 - "${OUTPUT_DIR}/runtime" "${baseline}" <<'PY'
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+root = Path(sys.argv[1])
+baseline = tuple(map(int, sys.argv[2].split('.')))
+for path in sorted(root.rglob('*')):
+    if not path.is_file():
+        continue
+    with path.open('rb') as binary:
+        if binary.read(4) != b'\x7fELF':
+            continue
+    result = subprocess.run(['readelf', '--version-info', '--wide', str(path)],
+                            capture_output=True, text=True, check=True,
+                            env={**os.environ, 'LC_ALL': 'C'})
+    # Definitions exported by a library are not requirements on the host.
+    needs = result.stdout.partition('Version needs section')[2]
+    versions = [tuple(map(int, value.split('.')))
+                for value in re.findall(r'Name: GLIBC_([0-9.]+)\b', needs)]
+    if 'Name: GLIBC_ABI_DT_RELR' in needs:
+        versions.append((2, 36))
+    required = max(versions, default=(0,))
+    if required > baseline or 'Name: GLIBC_PRIVATE' in needs:
+        requirement = '.'.join(map(str, required)) if 'Name: GLIBC_PRIVATE' not in needs else 'private symbols'
+        sys.exit(f'Bundled Java runtime {path.relative_to(root)} requires glibc {requirement}; '
+                 f'the declared host baseline is {sys.argv[2]}. '
+                 'Select a compatible Java 21 JDK on PATH (as in release CI), '
+                 'or provide a verified compatible AUTARK_OS_RUNTIME_DIR with --skip-build. '
+                 'The runtime must also pass the target-host installation rehearsal.')
+PY
+}
+
 prepare_cosign() {
   local target="${OUTPUT_DIR}/tools/cosign"
   local expected_sha source_url cache_root cached
@@ -748,6 +790,7 @@ create_bundle() {
   run_cmd mkdir -p "${OUTPUT_DIR}/backend" "${OUTPUT_DIR}/scripts"
   build_runtime
   verify_runtime_architecture
+  verify_runtime_glibc
   prepare_cosign
   run_cmd cp "${jar}" "${OUTPUT_DIR}/backend/autark-os-backend.jar"
   run_cmd cp "${SCRIPT_DIR}/bootstrap-autark-os.sh" "${OUTPUT_DIR}/scripts/bootstrap-autark-os.sh"

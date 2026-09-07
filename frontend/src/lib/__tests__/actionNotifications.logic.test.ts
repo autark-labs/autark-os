@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
+import { AxiosError, AxiosHeaders } from 'axios';
 import { test } from 'vitest';
 import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from '../actionNotifications.logic';
+
+test('job conflicts retain the actionable server message instead of a generic HTTP error', () => {
+  const message = 'Another operation is already running: Restart app. This request was not started. Wait for that operation to finish, then try again.';
+  const error = new AxiosError('Request failed with status code 409', 'ERR_BAD_REQUEST', undefined, undefined, {
+    status: 409, statusText: 'Conflict', headers: {}, config: { headers: new AxiosHeaders() },
+    data: { code: 'job_conflict', message, activeJobId: 'job_existing', activeJobType: 'restart_app' },
+  });
+  const notification = actionNotificationFromError(error, 'Backup could not start');
+  assert.equal(notification.message, message);
+  assert.equal(notification.sticky, true);
+  assert.equal(notification.severity, 'error');
+});
 
 test('maps completed app action results to concise success notifications', () => {
   const notification = actionNotificationFromResult({

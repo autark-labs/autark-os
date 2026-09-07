@@ -9,6 +9,7 @@ contracts=(
   scripts/tests/release-workflow-contract-test.sh
   scripts/tests/release-source-map-contract-test.sh
   scripts/tests/release-architecture-integrity-test.sh
+  scripts/tests/release-runtime-glibc-test.sh
   scripts/tests/release-bundle-contract-test.sh
   scripts/tests/release-runtime-smoke-test.sh
   scripts/tests/release-artifacts-dry-run-test.sh

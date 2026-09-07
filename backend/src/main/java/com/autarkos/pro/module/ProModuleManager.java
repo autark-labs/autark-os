@@ -289,6 +289,7 @@ public class ProModuleManager implements ProModuleStatusProvider {
                 JOB_TYPE,
                 JOB_SUBJECT,
                 checkSteps(),
+                java.util.Objects.toString(authorization.releaseChannel(), ""),
                 job -> runCheck(job, authorization));
     }
 
@@ -299,6 +300,7 @@ public class ProModuleManager implements ProModuleStatusProvider {
                 JOB_TYPE,
                 JOB_SUBJECT,
                 installSteps(),
+                java.util.Objects.toString(authorization.releaseChannel(), ""),
                 job -> runInstall(job, authorization));
     }
 

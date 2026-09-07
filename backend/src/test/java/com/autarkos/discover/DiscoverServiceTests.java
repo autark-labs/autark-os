@@ -192,6 +192,24 @@ class DiscoverServiceTests {
     }
 
     @Test
+    void installRetriesJoinOnlyMatchingChoicesAndNeverPersistRejectedChoices() {
+        var installService = new RecordingMarketplaceInstallService();
+        var jobs = jobService();
+        var service = discoverService(observedRepository(), installService, jobs);
+        var firstRequest = new DiscoverInstallModels.DiscoverInstallRequest(Map.of("displayName", "Original name"), false, true);
+        var first = service.install("vaultwarden", firstRequest);
+        assertThat(service.install("vaultwarden", firstRequest).jobId()).isEqualTo(first.jobId());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.install("vaultwarden",
+                new DiscoverInstallModels.DiscoverInstallRequest(Map.of("displayName", "Rejected name"), false, true)))
+                .isInstanceOf(com.autarkos.jobs.JobConflictException.class);
+        assertThat(JpaTestRepositories.discoverSetupRepository(runtimeLayout()).recordByAppId("vaultwarden")).isEmpty();
+        jobs.runQueuedJobsNow();
+        assertThat(JpaTestRepositories.discoverSetupRepository(runtimeLayout()).recordByAppId("vaultwarden"))
+                .hasValueSatisfying(record -> assertThat(record.displayName()).isEqualTo("Original name"));
+        assertThat(jobs.list()).hasSize(1);
+    }
+
+    @Test
     void installPassesDuplicateAcknowledgementToMarketplaceInstall() {
         RecordingMarketplaceInstallService installService = new RecordingMarketplaceInstallService();
         AutarkOsJobService jobService = jobService();
@@ -205,18 +223,19 @@ class DiscoverServiceTests {
     }
 
     @Test
-    void installPersistsSetupAnswersBeforeStartingInstallJob() {
+    void installPersistsSetupAnswersOnlyAfterItsJobIsAcceptedAndRuns() {
         RuntimeLayout layout = runtimeLayout();
         DiscoverSetupRepository setupRepository = JpaTestRepositories.discoverSetupRepository(layout);
         DiscoverSetupService setupService = new DiscoverSetupService(setupRepository);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
+        AutarkOsJobService jobs = jobService();
         DiscoverService service = new DiscoverService(
                 catalogService(),
                 List::of,
                 setupService,
                 new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService),
                 new RecordingMarketplaceInstallService(),
-                jobService());
+                jobs);
 
         service.install("vaultwarden", new DiscoverInstallModels.DiscoverInstallRequest(Map.of(
                 "displayName", "Family Passwords",
@@ -225,6 +244,8 @@ class DiscoverServiceTests {
                 "backupPolicy", "enabled_first_checkpoint",
                 "localBrowserPort", "auto"), false, true));
 
+        assertThat(setupRepository.recordByAppId("vaultwarden")).isEmpty();
+        jobs.runQueuedJobsNow();
         assertThat(setupRepository.recordByAppId("vaultwarden")).hasValueSatisfying(record -> {
             assertThat(record.displayName()).isEqualTo("Family Passwords");
             assertThat(record.accessMode()).isEqualTo("private_lan");

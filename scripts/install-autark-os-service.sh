@@ -102,8 +102,7 @@ command_exists() {
 }
 
 require_supported_systemd_hardening() {
-  # ProtectClock is the newest directive in the reviewed unit profile. Debian
-  # 11/Raspberry Pi OS Bullseye ships systemd 247; every supported target is
+  # Debian 11/Raspberry Pi OS Bullseye ships systemd 247; every supported target is
   # at or above that baseline. Refuse before changing files on older hosts so
   # an update leaves the previous unit available for rollback.
   command_exists systemctl || return 0
@@ -149,8 +148,23 @@ env_file_value() {
 jar_manifest_value() {
   local jar="$1"
   local key="$2"
-  command_exists unzip || return 1
-  unzip -p "${jar}" META-INF/MANIFEST.MF 2>/dev/null | tr -d '\r' | awk -F': ' -v key="${key}" '$1 == key {print $2; exit}'
+  if command_exists unzip; then
+    unzip -p "${jar}" META-INF/MANIFEST.MF 2>/dev/null | tr -d '\r' | awk -F': ' -v key="${key}" '$1 == key {print $2; exit}'
+  else
+    # Python is already used by the installed file helper. Minimal Debian
+    # hosts need not install another archive tool just to inspect JAR identity.
+    python3 - "${jar}" "${key}" <<'PY'
+import sys
+import zipfile
+with zipfile.ZipFile(sys.argv[1]) as jar:
+    manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8').replace('\r\n', '\n').replace('\n ', '')
+for line in manifest.splitlines():
+    key, separator, value = line.partition(': ')
+    if separator and key == sys.argv[2]:
+        print(value)
+        break
+PY
+  fi
 }
 
 java_major_version() {
@@ -322,7 +336,7 @@ check_state() {
 
   if [[ -f "${TARGET_BACKEND_JAR}" ]]; then
     status_line "Backend jar" "${TARGET_BACKEND_JAR}"
-    if command_exists unzip; then
+    if command_exists unzip || command_exists python3; then
       jar_version="$(jar_manifest_value "${TARGET_BACKEND_JAR}" Implementation-Version || true)"
       jar_sha="$(jar_manifest_value "${TARGET_BACKEND_JAR}" Autark-OS-Build-Sha || true)"
       jar_date="$(jar_manifest_value "${TARGET_BACKEND_JAR}" Autark-OS-Build-Date || true)"
@@ -333,7 +347,7 @@ check_state() {
         identity_ok=1
       fi
     else
-      status_line "Backend jar identity" "cannot inspect (unzip is missing)"
+      status_line "Backend jar identity" "cannot inspect (unzip or Python 3 is required)"
       identity_ok=1
     fi
   else
@@ -465,17 +479,11 @@ check_state() {
         'PrivateTmp=true'
         'ProtectSystem=strict'
         'ProtectHome=true'
-        'ProtectKernelTunables=true'
-        'ProtectKernelModules=true'
         'ProtectControlGroups=true'
-        'ProtectClock=true'
-        'ProtectKernelLogs=true'
-        'PrivateDevices=true'
-        'LockPersonality=true'
-        'RestrictRealtime=true'
-        'SystemCallArchitectures=native'
-        'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6'
-        'CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_DAC_OVERRIDE CAP_SETGID CAP_SETUID'
+        'ReadOnlyPaths=/proc/sys /proc/sysrq-trigger /proc/irq /proc/bus /sys'
+        'InaccessiblePaths=-/proc/kmsg -/dev/kmsg -/usr/lib/modules -/lib/modules'
+        'DevicePolicy=closed'
+        'CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID'
         'AmbientCapabilities='
       )
       local directive
@@ -514,6 +522,18 @@ check_state() {
     else
       status_line "Service user groups" "needs repair (service user is missing)"
       security_paths_ok=0
+    fi
+    local service_main_pid=""
+    if command_exists systemctl; then
+      service_main_pid="$(systemctl show "${SERVICE_NAME}.service" --property=MainPID --value 2>/dev/null || true)"
+    fi
+    if [[ "${service_main_pid}" =~ ^[1-9][0-9]*$ && -r "/proc/${service_main_pid}/status" ]]; then
+      if grep -Eq '^NoNewPrivs:[[:space:]]*1$' "/proc/${service_main_pid}/status"; then
+        status_line "Helper elevation" "blocked (running process has no-new-privileges set)"
+        security_paths_ok=0
+      else
+        status_line "Helper elevation" "permitted by running process profile"
+      fi
     fi
     if [[ "${security_paths_ok}" -eq 1 ]]; then
       status_line "Service hardening" "protected (privileged helper exception documented)"
@@ -970,25 +990,22 @@ RestartSec=5
 # The bounded root helper is invoked through sudo for restore, cleanup, core
 # updates, and Tailscale operator repair. sudo needs its setuid/setgid and audit
 # transition, while the resulting root helper needs DAC override to cross the
-# service-owned runtime directory. Retain only those four capabilities in the
+# service-owned runtime directory. CHOWN and FOWNER restore container-owned
+# files and modes from validated backup metadata. Retain only those six capabilities in the
 # bounding set and do not enable NoNewPrivileges until the helper becomes a
 # dedicated root service.
-# All other compatible sandboxing remains enabled below.
+# Seccomp-based systemd restrictions imply NoNewPrivileges for this non-root
+# service, even when it is explicitly false. Use mount and device restrictions
+# here; the capability bound already excludes kernel/module/clock/raw-IO powers.
 NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ProtectKernelTunables=true
-ProtectKernelModules=true
 ProtectControlGroups=true
-ProtectClock=true
-ProtectKernelLogs=true
-PrivateDevices=true
-LockPersonality=true
-RestrictRealtime=true
-SystemCallArchitectures=native
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_DAC_OVERRIDE CAP_SETGID CAP_SETUID
+ReadOnlyPaths=/proc/sys /proc/sysrq-trigger /proc/irq /proc/bus /sys
+InaccessiblePaths=-/proc/kmsg -/dev/kmsg -/usr/lib/modules -/lib/modules
+DevicePolicy=closed
+CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID
 AmbientCapabilities=
 UMask=0077
 # The root helper also writes the root-owned approved-backup destination file.

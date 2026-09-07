@@ -149,11 +149,6 @@ public class InstalledAppsController {
 
     @PostMapping("/{id}/repair")
     public AutarkOsJob repair(@PathVariable String id) {
-        AutarkOsJob active = activeLifecycleJob(id);
-        if (active != null) {
-            applicationStateService.invalidate();
-            return active;
-        }
         AutarkOsJob created = jobService.startWithJob(AutarkOsStates.JobType.REPAIR_APP, id, repairJobSteps(), job -> {
             List<AutarkOsJobStep> inspecting = repairJobSteps().stream()
                     .map(step -> "inspect_app".equals(step.id())
@@ -225,7 +220,7 @@ public class InstalledAppsController {
         if (!BetaScope.CURRENT.managedAppUpdatesAvailable()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(deferredUpdatePlan(id));
         }
-        AutarkOsJob active = activeLifecycleJob(id);
+        AutarkOsJob active = jobService.existingForRequest(AutarkOsStates.JobType.UPDATE_APP, id, updateJobSteps(false), request).orElse(null);
         if (active != null) {
             applicationStateService.invalidate();
             return ResponseEntity.ok(active);
@@ -238,7 +233,7 @@ public class InstalledAppsController {
         if (!appUpdateService.reviewedPlanMatches(plan, reviewedPlanId)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(plan.reviewRequired());
         }
-        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.UPDATE_APP, id, updateJobSteps(false), activeJob -> {
+        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.UPDATE_APP, id, updateJobSteps(false), request, activeJob -> {
             markUpdateProgress(activeJob.jobId(), updateJobSteps(false), "create_safety_checkpoint");
             try {
                 appUpdateService.update(id, reviewedPlanId, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(false), phase));
@@ -268,7 +263,7 @@ public class InstalledAppsController {
     public ResponseEntity<?> rollback(
             @PathVariable String id,
             @RequestBody(required = false) UpdateModels.AppUpdateApplyRequest request) {
-        AutarkOsJob active = activeLifecycleJob(id);
+        AutarkOsJob active = jobService.existingForRequest(AutarkOsStates.JobType.ROLLBACK_APP, id, updateJobSteps(true), request).orElse(null);
         if (active != null) {
             applicationStateService.invalidate();
             return ResponseEntity.ok(active);
@@ -281,7 +276,7 @@ public class InstalledAppsController {
         if (!appUpdateService.reviewedPlanMatches(plan, reviewedPlanId)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(plan.reviewRequired());
         }
-        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.ROLLBACK_APP, id, updateJobSteps(true), activeJob -> {
+        AutarkOsJob job = jobService.startWithJob(AutarkOsStates.JobType.ROLLBACK_APP, id, updateJobSteps(true), request, activeJob -> {
             markUpdateProgress(activeJob.jobId(), updateJobSteps(true), "create_safety_checkpoint");
             try {
                 appUpdateService.rollback(id, reviewedPlanId, phase -> markUpdateProgress(activeJob.jobId(), updateJobSteps(true), phase));
@@ -359,11 +354,6 @@ public class InstalledAppsController {
     }
 
     private AutarkOsJob startLifecycleJob(String action, String jobType, String id) {
-        AutarkOsJob active = activeLifecycleJob(id);
-        if (active != null) {
-            applicationStateService.invalidate();
-            return active;
-        }
         AutarkOsJob created = jobService.startWithJob(jobType, id, lifecycleJobSteps(action), job -> {
             List<AutarkOsJobStep> runningCommand = lifecycleJobSteps(action).stream()
                     .map(step -> "run_command".equals(step.id())
@@ -400,21 +390,6 @@ public class InstalledAppsController {
         });
         applicationStateService.invalidate();
         return created;
-    }
-
-    private AutarkOsJob activeLifecycleJob(String id) {
-        return jobService.list().stream()
-                .filter(job -> id.equals(job.subjectId()))
-                .filter(job -> List.of(
-                        AutarkOsStates.JobType.START_APP,
-                        AutarkOsStates.JobType.STOP_APP,
-                        AutarkOsStates.JobType.RESTART_APP,
-                        AutarkOsStates.JobType.REPAIR_APP,
-                        AutarkOsStates.JobType.UPDATE_APP,
-                        AutarkOsStates.JobType.ROLLBACK_APP).contains(job.type()))
-                .filter(job -> AutarkOsStates.JobStatus.QUEUED.equals(job.status()) || AutarkOsStates.JobStatus.RUNNING.equals(job.status()))
-                .findFirst()
-                .orElse(null);
     }
 
     private List<AutarkOsJobStep> updateJobSteps(boolean rollback) {

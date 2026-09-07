@@ -34,6 +34,9 @@ public class AutarkOsJobService {
     private final Supplier<Instant> clock;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ConcurrentHashMap<String, Runnable> queuedTasks = new ConcurrentHashMap<>();
+    // Only live workers can accept retries. After a restart, interrupted jobs
+    // are reconciled rather than guessed equivalent or automatically replayed.
+    private final ConcurrentHashMap<String, RequestSignature> activeRequests = new ConcurrentHashMap<>();
     private final Object jobStartTransition = new Object();
 
     @Autowired
@@ -63,14 +66,19 @@ public class AutarkOsJobService {
     }
 
     public AutarkOsJob startWithJob(String type, String subjectId, List<AutarkOsJobStep> steps, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
+        return startWithJob(type, subjectId, steps, Map.of(), operation);
+    }
+
+    public AutarkOsJob startWithJob(String type, String subjectId, List<AutarkOsJobStep> steps, Object parameters, Function<AutarkOsJob, AutarkOsJobOutcome> operation) {
+        RequestSignature request = signature(steps, parameters);
         AutarkOsJob job;
         synchronized (jobStartTransition) {
-            Optional<AutarkOsJob> active = activeFor(type, subjectId)
-                    .or(() -> activeForResource(type, subjectId));
+            Optional<AutarkOsJob> active = existingForRequest(type, subjectId, steps, parameters);
             if (active.isPresent()) {
                 return active.get();
             }
             job = create(type, subjectId, steps);
+            activeRequests.put(job.jobId(), request);
             Runnable task = () -> run(job, operation);
             queuedTasks.put(job.jobId(), task);
         }
@@ -79,6 +87,28 @@ public class AutarkOsJobService {
         }
         return job;
     }
+
+    /** Preflight before validation/persistence; startWithJob checks again atomically. */
+    public Optional<AutarkOsJob> existingForRequest(String type, String subjectId, List<AutarkOsJobStep> steps, Object parameters) {
+        synchronized (jobStartTransition) {
+            Optional<AutarkOsJob> active = activeFor(type, subjectId).or(() -> activeForResource(type, subjectId));
+            if (active.isEmpty()) return Optional.empty();
+            AutarkOsJob job = active.get();
+            if (job.type().equals(AutarkOsJobs.clean(type, "job"))
+                    && java.util.Objects.equals(job.subjectId(), AutarkOsJobs.blankToNull(subjectId))
+                    && signature(steps, parameters).equals(activeRequests.get(job.jobId()))) {
+                return active;
+            }
+            throw new JobConflictException(job);
+        }
+    }
+
+    private RequestSignature signature(List<AutarkOsJobStep> steps, Object parameters) {
+        return new RequestSignature(steps == null ? List.of() : steps.stream().map(AutarkOsJobStep::id).toList(),
+                objectMapper.valueToTree(parameters == null ? Map.of() : parameters));
+    }
+
+    private record RequestSignature(List<String> stepIds, com.fasterxml.jackson.databind.JsonNode parameters) { }
 
     public List<AutarkOsJob> list() {
         return repository.recent(100).stream()
@@ -227,8 +257,8 @@ public class AutarkOsJobService {
 
     /**
      * CE has one source of truth for host mutations. Different actions against the same app
-     * (for example backup and uninstall) must therefore join the active job instead of queuing
-     * a second, contradictory mutation. A full backup or restore holds the shared app lane.
+     * (for example backup and uninstall) must conflict, not impersonate the active job.
+     * A full backup or restore holds the shared app lane.
      */
     private Optional<AutarkOsJob> activeForResource(String type, String subjectId) {
         String requestedResource = resourceKey(type, subjectId);
@@ -363,7 +393,9 @@ public class AutarkOsJobService {
                 errorMessage,
                 AutarkOsJobs.errorDetailsJson(errorDetails, objectMapper),
                 clock.get().toString());
-        return toDomain(repository.save(entity));
+        AutarkOsJob saved = toDomain(repository.save(entity));
+        if (terminalStatus(saved.status())) activeRequests.remove(jobId);
+        return saved;
     }
 
     private List<AutarkOsJobStep> markStep(String jobId, String stepId, String status, String message, boolean started) {

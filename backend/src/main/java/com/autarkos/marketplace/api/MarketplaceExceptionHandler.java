@@ -19,6 +19,16 @@ import com.autarkos.system.BetaScope;
 @RestControllerAdvice
 public class MarketplaceExceptionHandler {
 
+    @ExceptionHandler(com.autarkos.jobs.JobConflictException.class)
+    public ResponseEntity<JobConflictError> jobConflict(com.autarkos.jobs.JobConflictException exception) {
+        var active = exception.activeJob();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new JobConflictError(
+                "job_conflict", exception.getMessage(), active.jobId(), active.type(), active.status(), Instant.now()));
+    }
+
+    public record JobConflictError(String code, String message, String activeJobId,
+            String activeJobType, String activeJobStatus, Instant timestamp) { }
+
     @ExceptionHandler(BetaScope.UnavailableException.class)
     public ResponseEntity<ApiError> betaScope(BetaScope.UnavailableException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiError(

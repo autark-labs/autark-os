@@ -1,4 +1,5 @@
 import { queuedJobText } from '../repositories/jobRepository.logic';
+import axios from 'axios';
 
 const TERMINAL_ERROR_STATUSES = new Set(['failed', 'error']);
 const INFO_STATUSES = new Set(['skipped', 'cancelled', 'canceled']);
@@ -85,6 +86,12 @@ export function actionNotificationFromJob(job: ActionNotificationJob = {}) {
 }
 
 function errorMessage(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const data: unknown = error.response?.data;
+    if (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string' && data.message.trim()) {
+      return data.message;
+    }
+  }
   if (error instanceof Error && error.message) {
     return error.message;
   }
