@@ -835,13 +835,9 @@ public class AppLifecycleService {
     }
 
     private String backupState(String appId, InstallModels.InstallSettings settings) {
-        if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
-            return AutarkOsStates.BackupState.DISABLED;
-        }
-        boolean hasVerifiedRestorePoint = backupRepository.forApp(appId, 10).stream()
-                .map(RestorePoints::toDomain)
-                .anyMatch(BackupProtectionPolicy::isProtected);
-        return hasVerifiedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
+        return BackupProtectionPolicy.state(settings != null && settings.backup() != null && settings.backup().enabled(),
+                catalogService.findById(appId).orElse(null),
+                backupRepository.containingApp(appId).stream().map(RestorePoints::toDomain).toList());
     }
 
     private boolean isRepairAvailable(String status) {

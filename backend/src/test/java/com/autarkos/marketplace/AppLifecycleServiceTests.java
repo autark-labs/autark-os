@@ -571,7 +571,7 @@ class AppLifecycleServiceTests {
     }
 
     @Test
-    void runtimeViewOnlyRecommendsRestoreWhenCompletedRestorePointExists() {
+    void runtimeViewDoesNotRecommendRestoreForUnsupportedCurrentContract() {
         repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 null,
@@ -604,8 +604,8 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView withRestorePoint = service.getApp("vaultwarden");
 
-        assertThat(withRestorePoint.remediation().state()).isEqualTo("restore_recommended");
-        assertThat(withRestorePoint.remediation().nextActionLabel()).isEqualTo("Review restore");
+        assertThat(withRestorePoint.remediation().state()).isEqualTo("repair_failed");
+        assertThat(withRestorePoint.remediation().nextActionLabel()).isEqualTo("Review repair");
     }
 
     @Test

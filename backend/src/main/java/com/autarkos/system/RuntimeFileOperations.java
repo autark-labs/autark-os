@@ -17,6 +17,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class RuntimeFileOperations {
 
+    /** Complete logical file bytes, or -1 when the directory cannot be measured. Never reports a partial sum. */
+    public long measuredDirectorySize(Path path) {
+        AtomicLong total = new AtomicLong();
+        try {
+            if (!Files.isDirectory(path) || !Files.isReadable(path)) return -1;
+            Files.walkFileTree(path, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) throws IOException {
+                    if (!Files.isReadable(directory)) throw new IOException("Directory is unreadable");
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (attrs.isRegularFile()) total.addAndGet(attrs.size());
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            return total.get();
+        } catch (IOException | SecurityException exception) {
+            return -1;
+        }
+    }
+
     public long directorySize(Path path) {
         if (!Files.exists(path)) {
             return 0;

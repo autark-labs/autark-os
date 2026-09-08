@@ -69,7 +69,7 @@ class BackupReportService {
                         || AutarkOsStates.RestorePointStatus.FAILED.equals(point.verificationStatus()))
                 .count();
         BackupModels.BackupDestination destination = destinationService.current();
-        long backupStorage = destination.ready() ? fileOperations.directorySize(Path.of(destination.configuredPath())) : 0;
+        long backupStorage = destination.ready() ? fileOperations.measuredDirectorySize(Path.of(destination.configuredPath())) : -1;
         String status = destination.ready() ? status(apps, failedBackups) : "warning";
         ProjectSettings settings = projectSettingsService.current();
         RestorePoint lastRoutine = recent.stream()
@@ -136,7 +136,7 @@ class BackupReportService {
     private BackupModels.AppBackupStatus appStatus(InstalledApp app, Map<String, ApplicationManifest> manifestsById) {
         Optional<InstallModels.InstallSettings> settings = installedAppRepository.settingsFor(app.appId());
         InstallModels.BackupPolicy policy = settings.map(InstallModels.InstallSettings::backup).orElse(InstallModels.BackupPolicy.defaults());
-        List<RestorePoint> restorePoints = backupRepository.forApp(app.appId(), 5).stream()
+        List<RestorePoint> restorePoints = backupRepository.containingApp(app.appId()).stream()
                 .map(RestorePoints::toDomain)
                 .toList();
         RestorePoint latest = restorePoints.stream().findFirst().orElse(null);
@@ -144,7 +144,9 @@ class BackupReportService {
         BackupModels.BackupContract contract = backupContractService.backupContract(app, manifestsById.get(app.appId()));
         boolean backupAvailable = AppRuntimeFiles.hasComposeFile(app.runtimePath());
         String backupUnavailableReason = backupAvailable ? "" : missingRuntimeReason(app.appName());
-        String status = appBackupStatus(policy, latest, contract, backupAvailable);
+        boolean protectedByBackups = AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(
+                BackupProtectionPolicy.state(policy.enabled(), manifestsById.get(app.appId()), restorePoints));
+        String status = protectedByBackups ? "protected" : appBackupStatus(policy, latest, contract, backupAvailable);
         return new BackupModels.AppBackupStatus(
                 app.appId(),
                 app.appName(),
@@ -154,13 +156,14 @@ class BackupReportService {
                 policy.retention(),
                 Math.toIntExact(Math.min(
                         Integer.MAX_VALUE,
-                        backupRepository.countByAppId(app.appId()))),
+                        restorePoints.size())),
                 contract,
                 app.runtimePath(),
                 dataSize,
                 latest,
                 restorePoints,
-                statusMessage(policy, latest, contract, backupAvailable, backupUnavailableReason),
+                protectedByBackups ? "Protected by a compatible verified restore point. The latest attempt is shown separately."
+                        : statusMessage(policy, latest, contract, backupAvailable, backupUnavailableReason),
                 backupAvailable,
                 backupUnavailableReason,
                 nextBackup(policy),
@@ -182,11 +185,6 @@ class BackupReportService {
         }
         if (AutarkOsStates.RestorePointStatus.FAILED.equals(latest.status())) {
             return AutarkOsStates.RestorePointStatus.FAILED;
-        }
-        if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())
-                && AutarkOsStates.RestorePointStatus.VERIFIED.equals(latest.verificationStatus())
-                && !contract.reviewRequired()) {
-            return "protected";
         }
         return "not_backed_up";
     }
@@ -210,7 +208,7 @@ class BackupReportService {
         if (AutarkOsStates.RestorePointStatus.COMPLETED.equals(latest.status())
                 && AutarkOsStates.RestorePointStatus.VERIFIED.equals(latest.verificationStatus())
                 && !contract.reviewRequired()) {
-            return "Protected by a verified restore point.";
+            return "This restore point is not compatible with the current app backup contract. Create a new backup.";
         }
         if ("legacy_unverified".equals(latest.verificationStatus())) {
             return "This is a legacy restore point without an immutable integrity baseline. Create a new backup before relying on it.";

@@ -18,6 +18,10 @@ class BackupContractService {
         return backupContract(app, catalogService.findById(app.appId()).orElse(null));
     }
 
+    boolean compatible(RestorePoint point, InstalledApp app) {
+        return BackupProtectionPolicy.isCompatible(point, catalogService.findById(app.appId()).orElse(null));
+    }
+
     BackupModels.BackupContract backupContract(InstalledApp app, ApplicationManifest appManifest) {
         if (appManifest == null) {
             return new BackupModels.BackupContract(

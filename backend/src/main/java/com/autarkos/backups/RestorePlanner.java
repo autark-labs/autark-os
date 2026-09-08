@@ -54,8 +54,12 @@ class RestorePlanner {
         for (InstalledApp app : affected) {
             BackupModels.BackupContract contract = backupContractService.backupContract(app);
             dryRunDetails.add(app.appName() + ": " + contract.label() + ". " + contract.summary());
+            dryRunDetails.addAll(contract.details());
             if (contract.reviewRequired()) {
                 warnings.add(app.appName() + " uses " + contract.label().toLowerCase() + ". Autark-OS will restore managed files, but database/application consistency should be reviewed after restore.");
+            }
+            if (!backupContractService.compatible(point, app)) {
+                warnings.add(app.appName() + " does not match this restore point's backup contract or included apps.");
             }
         }
         if (AutarkOsStates.RestorePointStatus.FAILED.equals(point.verificationStatus())) {
@@ -101,6 +105,7 @@ class RestorePlanner {
                         && !affected.isEmpty()
                         && archiveAvailable.test(Path.of(point.path()))
                         && integrity.restorable()
+                        && affected.stream().allMatch(app -> backupContractService.compatible(point, app))
                         && affected.stream().map(backupContractService::backupContract).noneMatch(BackupModels.BackupContract::reviewRequired)
                         && !AutarkOsStates.RestoreSimulationStatus.FAILED.equals(simulation.status()),
                 Instant.now());
@@ -111,7 +116,7 @@ class RestorePlanner {
                 .collect(java.util.stream.Collectors.toMap(InstalledApp::appId, app -> app));
         if (targetAppId != null && !targetAppId.isBlank()) {
             InstalledApp app = installed.get(targetAppId);
-            return app == null ? List.of() : List.of(app);
+            return app == null || !BackupProtectionPolicy.includesApp(point, targetAppId) ? List.of() : List.of(app);
         }
         if ("full".equals(point.scope())) {
             return java.util.Arrays.stream(point.includedAppIds().split(","))

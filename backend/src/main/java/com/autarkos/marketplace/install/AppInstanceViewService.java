@@ -231,25 +231,9 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
     }
 
     private String backupState(String appId, InstallModels.InstallSettings settings) {
-        if (settings == null || settings.backup() == null || !settings.backup().enabled()) {
-            return AutarkOsStates.BackupState.DISABLED;
-        }
-        List<RestorePoint> restorePoints = backupRepository.forApp(appId, 10).stream()
-                .map(RestorePoints::toDomain)
-                .toList();
-        if (restorePoints.isEmpty()) {
-            return AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
-        }
-        boolean hasVerifiedRestorePoint = restorePoints.stream()
-                .anyMatch(BackupProtectionPolicy::isProtected);
-        if (hasVerifiedRestorePoint) {
-            return AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT;
-        }
-        RestorePoint latest = restorePoints.getFirst();
-        if (AutarkOsStates.RestorePointStatus.FAILED.equalsIgnoreCase(latest.status())) {
-            return "backup_failed";
-        }
-        return AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
+        return BackupProtectionPolicy.state(settings != null && settings.backup() != null && settings.backup().enabled(),
+                catalogService.findById(appId).orElse(null),
+                backupRepository.containingApp(appId).stream().map(RestorePoints::toDomain).toList());
     }
 
     private String firstPresent(String... values) {

@@ -11,6 +11,14 @@ const apps = [{ appId: 'vaultwarden' }] as AppBackupStatus[];
 const appRestorePoint = { appId: 'vaultwarden', id: 101, scope: 'app' } as RestorePoint;
 const fullRestorePoint = { appId: '__full__', id: 202, scope: 'full' } as RestorePoint;
 
+test('an app folder can select a full backup containing that exact app', () => {
+  const point = { ...fullRestorePoint, includedAppIds: 'homepage, vaultwarden' };
+  assert.deepEqual(parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), apps, [point]),
+    { directory: 'app:vaultwarden', restorePointId: 202 });
+  const unrelated = { ...point, includedAppIds: 'vaultwarden-other' };
+  assert.equal(parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=202'), apps, [unrelated]).restorePointId, null);
+});
+
 test('backup route selects a specific app folder and restore point', () => {
   const route = parseBackupNavigatorRoute(new URLSearchParams('app=vaultwarden&backup=101'), apps, [appRestorePoint, fullRestorePoint]);
 

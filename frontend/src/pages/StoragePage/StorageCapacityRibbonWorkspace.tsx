@@ -475,7 +475,7 @@ function AppDataWorkspace({
             </div>
             <StorageTrendChart emphasizeChanges trend={selectedApp.trend} />
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <DetailFact label="Last backup" value={lastBackupLabel(selectedApp.lastBackup)} />
+              <DetailFact label="Restore protection" value={selectedApp.backupState === 'protected_by_restore_point' ? 'Verified restore point' : selectedApp.backupState === 'backup_disabled' ? 'Backups off — review retained points in Backups' : 'No compatible verified restore point'} />
               <DetailFact label="Storage status" value={selectedApp.status} />
             </div>
             {showAdvancedMetrics && <div className="mt-3 flex items-center gap-2"><p className="min-w-0 flex-1 select-text truncate font-mono text-xs text-slate-300" title={selectedApp.path}>{selectedApp.path}</p><ProjectDarkControlButton className="shrink-0" onClick={() => onCopyPath(selectedApp.path, selectedApp.appId)} size="sm" type="button">{copiedPathId === selectedApp.appId ? <CheckCircle2 aria-hidden="true" className="size-3.5" /> : <Copy aria-hidden="true" className="size-3.5" />}{copiedPathId === selectedApp.appId ? 'Copied' : 'Copy path'}</ProjectDarkControlButton></div>}
@@ -571,13 +571,6 @@ function growthSummary(appCount: number, weeklyGrowthBytes: number) {
 function signedBytes(value: number) {
   if (value === 0) return 'No change';
   return `${value > 0 ? '+' : '-'}${formatStorageBytes(Math.abs(value))}`;
-}
-
-function lastBackupLabel(value: string) {
-  if (!value) return 'No completed backup reported';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(undefined, { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short' });
 }
 
 function usageTone(value: number): SemanticStatusTone {

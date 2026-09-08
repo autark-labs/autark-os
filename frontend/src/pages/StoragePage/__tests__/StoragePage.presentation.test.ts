@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import type { StorageReport } from '@/types/system';
-import { aggregateAppStorageTrend, capacitySegments, weeklyAppGrowth } from '../StoragePage.presentation';
+import { aggregateAppStorageTrend, capacitySegments, weeklyAppGrowth, formatStorageBytes } from '../StoragePage.presentation';
+
+test('missing backup measurement is not presented as an empty backup folder', () => {
+  assert.equal(formatStorageBytes(-1), 'Unavailable');
+  assert.equal(formatStorageBytes(0), '0 B');
+  const storage = report();
+  storage.backupStorage.usedBytes = -1;
+  assert.equal(capacitySegments(storage).some(segment => segment.tone === 'backups'), false);
+});
 
 function report(overrides: Partial<StorageReport> = {}): StorageReport {
   return {
@@ -12,8 +20,8 @@ function report(overrides: Partial<StorageReport> = {}): StorageReport {
     runtimeDisk: { label: 'Runtime', path: '/var/lib/autark-os', totalBytes: 1_000, usableBytes: 400, usedBytes: 200, usedPercent: 20 },
     backupStorage: { label: 'Backups', path: '/backups', totalBytes: 1_000, usableBytes: 900, usedBytes: 100, usedPercent: 10 },
     apps: [
-      { appId: 'immich', appName: 'Immich', status: 'healthy', path: '/apps/immich', usedBytes: 300, sevenDayGrowthBytes: 40, trend: [{ sampledAt: '2026-07-01T00:00:00.000Z', usedBytes: 260 }, { sampledAt: '2026-07-02T00:00:00.000Z', usedBytes: 300 }], backupEnabled: true, backupFrequency: 'daily', lastBackup: '' },
-      { appId: 'vaultwarden', appName: 'Vaultwarden', status: 'healthy', path: '/apps/vaultwarden', usedBytes: 80, sevenDayGrowthBytes: 5, trend: [{ sampledAt: '2026-07-01T00:00:00.000Z', usedBytes: 75 }, { sampledAt: '2026-07-02T00:00:00.000Z', usedBytes: 80 }], backupEnabled: true, backupFrequency: 'daily', lastBackup: '' },
+      { appId: 'immich', appName: 'Immich', status: 'healthy', path: '/apps/immich', usedBytes: 300, sevenDayGrowthBytes: 40, trend: [{ sampledAt: '2026-07-01T00:00:00.000Z', usedBytes: 260 }, { sampledAt: '2026-07-02T00:00:00.000Z', usedBytes: 300 }], backupEnabled: true, backupFrequency: 'daily', backupState: 'backup_enabled_no_restore_point' },
+      { appId: 'vaultwarden', appName: 'Vaultwarden', status: 'healthy', path: '/apps/vaultwarden', usedBytes: 80, sevenDayGrowthBytes: 5, trend: [{ sampledAt: '2026-07-01T00:00:00.000Z', usedBytes: 75 }, { sampledAt: '2026-07-02T00:00:00.000Z', usedBytes: 80 }], backupEnabled: true, backupFrequency: 'daily', backupState: 'backup_enabled_no_restore_point' },
     ],
     orphanedData: [],
     recommendations: [],

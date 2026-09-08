@@ -4,6 +4,17 @@ import { formatLocalizedDateTime } from '@/lib/dateTime';
 import type { AppBackupStatus, BackupReport, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
 
+export function reportRestorePoints(report: BackupReport): RestorePoint[] {
+  return [...new Map([...report.recentRestorePoints, ...report.apps.flatMap(app => app.restorePoints ?? [])]
+    .map(point => [point.id, point])).values()];
+}
+
+export function restorePointIncludesApp(point: RestorePoint, appId: string): boolean {
+  return point.scope === 'full'
+    ? (point.includedAppIds ?? '').split(',').map(id => id.trim()).includes(appId)
+    : point.appId === appId;
+}
+
 /**
  * @param {string | null | undefined} value
  * @returns {string}
@@ -240,7 +251,7 @@ export function backupProtectionHero(report: BackupReport | null | undefined, la
  * @param {unknown | null} report
  */
 export function backupPageViewModel(report: BackupReport | null | undefined) {
-  const restorePoints: RestorePoint[] = report?.recentRestorePoints ?? [];
+  const restorePoints = report ? reportRestorePoints(report).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)) : [];
   const latestRestore = restorePoints.find((point) => point.status === 'completed') ?? null;
   return {
     appRestorePoints: restorePoints.filter((point) => point.scope !== 'full' && point.status === 'completed'),

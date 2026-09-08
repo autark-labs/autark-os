@@ -277,7 +277,7 @@ export type AppStorageUsage = {
   trend: StorageTrendPoint[];
   backupEnabled: boolean;
   backupFrequency: string;
-  lastBackup: string;
+  backupState: string;
 };
 
 export type StorageTrendPoint = {

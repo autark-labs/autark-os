@@ -7,7 +7,8 @@ export type CapacitySegment = {
 };
 
 export function formatStorageBytes(value: number) {
-  if (!Number.isFinite(value) || value <= 0) return '0 B';
+  if (!Number.isFinite(value) || value < 0) return 'Unavailable';
+  if (value === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let size = value;
   let unitIndex = 0;

@@ -155,13 +155,9 @@ public class AppOwnershipService {
 
     private String backupState(InstalledApp app) {
         InstallModels.InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-        if (settings.backup() == null || !settings.backup().enabled()) {
-            return AutarkOsStates.BackupState.DISABLED;
-        }
-        boolean hasVerifiedRestorePoint = backupRepository.forApp(app.appId(), 10).stream()
-                .map(RestorePoints::toDomain)
-                .anyMatch(BackupProtectionPolicy::isProtected);
-        return hasVerifiedRestorePoint ? AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT : AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT;
+        return BackupProtectionPolicy.state(settings.backup() != null && settings.backup().enabled(),
+                catalogService.findById(app.appId()).orElse(null),
+                backupRepository.containingApp(app.appId()).stream().map(RestorePoints::toDomain).toList());
     }
 
     private boolean ownershipCompatible(String appId) {

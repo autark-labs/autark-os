@@ -107,15 +107,18 @@ public class StorageService {
                 : runtimeRoot.resolve("backups").normalize();
         ensure(runtimeRoot);
 
-        List<InstalledApp> installedApps = managedInstalledApps();
+        var appViews = appInstanceViewProvider.list().stream().collect(java.util.stream.Collectors.toMap(
+                AppInstanceView::catalogAppId, java.util.function.Function.identity(), (first, second) -> first));
+        List<InstalledApp> installedApps = installedAppRepository.findAllApps().stream()
+                .filter(app -> appViews.containsKey(app.appId())).toList();
         Set<String> installedIds = installedApps.stream().map(InstalledApp::appId).collect(HashSet::new, Set::add, Set::addAll);
         StorageModels.StorageUsage hostDisk = diskUsage("Host disk", runtimeRoot);
         StorageModels.StorageUsage runtimeDisk = directoryUsage("Autark-OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
         StorageModels.StorageUsage backupStorage = backupDestination != null && !backupDestination.ready()
-                ? new StorageModels.StorageUsage("Backup destination unavailable", backupDestination.configuredPath(), 0, 0, 0, 0)
-                : diskUsage("Backups", backupsRoot);
+                ? new StorageModels.StorageUsage("Backup destination unavailable", backupDestination.configuredPath(), -1, -1, -1, -1)
+                : backupDirectoryUsage(backupsRoot);
         List<StorageModels.AppStorageUsage> apps = installedApps.stream()
-                .map(this::appStorage)
+                .map(app -> appStorage(app, appViews.get(app.appId()).backupState()))
                 .sorted(Comparator.comparingLong(StorageModels.AppStorageUsage::usedBytes).reversed())
                 .toList();
         recordStorageSamples(apps);
@@ -193,7 +196,7 @@ public class StorageService {
                 : backupDestinationService.activeRoot();
     }
 
-    private StorageModels.AppStorageUsage appStorage(InstalledApp app) {
+    private StorageModels.AppStorageUsage appStorage(InstalledApp app, String backupState) {
         Path path = Path.of(app.runtimePath()).toAbsolutePath().normalize();
         InstallModels.InstallSettings settings = installedAppRepository.settingsFor(app.appId()).orElse(null);
         long usedBytes = fileOperations.directorySize(path);
@@ -211,7 +214,7 @@ public class StorageService {
                 trend,
                 settings == null || settings.backup().enabled(),
                 settings == null ? "daily" : settings.backup().frequency(),
-                "Not recorded");
+                backupState);
     }
 
     private void recordStorageSamples(List<StorageModels.AppStorageUsage> apps) {
@@ -270,6 +273,13 @@ public class StorageService {
         return new StorageModels.StorageUsage(label, path.toAbsolutePath().normalize().toString(), totalBytes, usableBytes, used, ratioPercent(used, totalBytes));
     }
 
+    private StorageModels.StorageUsage backupDirectoryUsage(Path path) {
+        StorageModels.StorageUsage disk = diskUsage("Backup filesystem", path);
+        long bytes = fileOperations.measuredDirectorySize(path);
+        return new StorageModels.StorageUsage("Backup files", path.toAbsolutePath().normalize().toString(),
+                disk.totalBytes(), disk.usableBytes(), bytes, bytes < 0 ? -1 : ratioPercent(bytes, disk.totalBytes()));
+    }
+
     private InstallStorageSafety installSafety(long currentFreeBytes) {
         if (currentFreeBytes < MINIMUM_INSTALL_FREE_BYTES) {
             return new InstallStorageSafety(
@@ -309,9 +319,11 @@ public class StorageService {
             recommendations.add(new StorageModels.StorageRecommendation("backup-destination-unavailable", "warning", "Backup drive needs attention", backupDestination.message(), "Open backups"));
         } else if (backupStorage.usedBytes() == 0) {
             recommendations.add(new StorageModels.StorageRecommendation("backups-empty", "neutral", "No backup files found", "Backup storage is empty. Run a routine or manual backup to create the first restore point.", "Open backups"));
+        } else if (backupStorage.usedBytes() < 0) {
+            recommendations.add(new StorageModels.StorageRecommendation("backup-size-unavailable", "warning", "Backup size is unavailable", "Autark-OS could not measure all files in the backup folder. Check the destination and folder permissions.", "Open backups"));
         }
         apps.stream().filter(app -> !app.backupEnabled()).findFirst().ifPresent(app ->
-                recommendations.add(new StorageModels.StorageRecommendation("backup-disabled", "warning", "Some apps are not protected", "At least one installed app is excluded from routine backup protection.", "Open backups")));
+                recommendations.add(new StorageModels.StorageRecommendation("backup-disabled", "warning", "Some apps are excluded from scheduled backups", "Existing restore points are listed in Backups. Inclusion in a schedule does not mean a verified restore point exists.", "Open backups")));
         return recommendations;
     }
 

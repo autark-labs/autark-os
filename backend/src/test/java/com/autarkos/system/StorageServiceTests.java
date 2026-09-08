@@ -22,6 +22,22 @@ import java.util.List;
 
 class StorageServiceTests {
 
+    @Test
+    void backupUsageMeasuresOnlyBackupFilesAndReportsMissingMeasurement() throws Exception {
+        RuntimeLayout layout = runtimeLayout(tempDir.resolve("measured-runtime"));
+        Files.createDirectories(layout.runtimeRoot().resolve("backups"));
+        Files.writeString(layout.runtimeRoot().resolve("backups/point.zip"), "12345");
+        Files.writeString(layout.runtimeRoot().resolve("unrelated.data"), "x".repeat(1000));
+        StorageService service = new StorageService(layout, JpaTestRepositories.installedAppRepository(layout),
+                new ActivityLogService(mock(ActivityLogRepository.class)), mock(StorageSampleRepository.class));
+        assertThat(service.report().backupStorage().usedBytes()).isEqualTo(5);
+        assertThat(service.report().backupStorage().totalBytes()).isGreaterThan(5);
+        RuntimeFileOperations files = new RuntimeFileOperations();
+        assertThat(files.measuredDirectorySize(layout.runtimeRoot().resolve("absent"))).isEqualTo(-1);
+        Files.createDirectories(layout.runtimeRoot().resolve("empty"));
+        assertThat(files.measuredDirectorySize(layout.runtimeRoot().resolve("empty"))).isZero();
+    }
+
     @TempDir
     Path tempDir;
 

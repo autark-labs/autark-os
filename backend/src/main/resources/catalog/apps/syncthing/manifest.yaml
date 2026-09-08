@@ -22,7 +22,6 @@ metadata:
   accessUrl: http://localhost:8384
   tags:
     - File sync
-    - Backups
     - Devices
     - Peer-to-peer
 testing:
@@ -55,7 +54,7 @@ testing:
 user:
   bestFor:
     - Syncing documents between devices
-    - Keeping laptop folders backed up
+    - Keeping laptop folders synchronized
     - Sharing family files privately
   highlights:
     - No central cloud account
@@ -73,7 +72,7 @@ technical:
     - Syncthing service
     - Web management dashboard
     - Sync and discovery ports
-    - Config backup profile
+    - Managed configuration and data restore points
   configuration:
     - label: Container name
       value: syncthing
@@ -84,7 +83,7 @@ technical:
     - label: Data storage
       value: /var/lib/autark-os/apps/syncthing/config
     - label: Backup
-      value: Configuration daily
+      value: Managed config and data folders; other devices and external folders are not included
     - label: Access
       value: LAN and Tailscale dashboard
 access:
@@ -116,6 +115,8 @@ usage:
   notes:
     - Syncthing intentionally requires device approval so files are not shared by accident.
     - Autark-OS can start the service, but you still choose which devices and folders are trusted.
+    - Synchronization is not a backup; deletions can spread to other devices.
+    - Autark-OS restore points include managed config and data folders, not folders elsewhere or copies on other devices.
 health:
   type: http
   path: /
@@ -144,6 +145,7 @@ runtime:
     - autark-os.version=2.1.1
   backupPaths:
     - config
+    - data
   backupStrategy: cold_file
   backupContractVersion: 1
   privileged: false

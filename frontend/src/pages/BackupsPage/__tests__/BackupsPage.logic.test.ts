@@ -28,9 +28,9 @@ test('backupPageViewModel groups restore points and attention apps for page comp
 
   assert.deepEqual(model.needsAttention.map((app) => app.appId), ['notes']);
   assert.deepEqual(model.routineRestorePoints.map((point) => point.id), ['routine-full']);
-  assert.deepEqual(model.fullRestorePoints.map((point) => point.id), ['manual-full', 'routine-full']);
+  assert.deepEqual(model.fullRestorePoints.map((point) => point.id), ['routine-full', 'manual-full']);
   assert.deepEqual(model.appRestorePoints.map((point) => point.id), ['app-point']);
-  assert.equal(model.latestRestore.id, 'manual-full');
+  assert.equal(model.latestRestore.id, 'routine-full');
   assert.equal(model.protectionHero.title, 'Finish backup protection');
 });
 

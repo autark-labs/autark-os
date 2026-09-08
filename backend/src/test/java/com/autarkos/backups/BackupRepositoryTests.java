@@ -48,4 +48,19 @@ class BackupRepositoryTests {
         properties.setRuntimeRoot(runtimeRoot.toString());
         return JpaTestRepositories.backupRepository(new RuntimeLayout(properties));
     }
+
+    @Test
+    void includesFullPointsWithExactAppMembershipAndNoRecentHistoryCutoff() {
+        BackupRepository repository = repository();
+        var full = repository.save(RestorePoints.create("__full__", "All apps", "full", "manual", "homepage, syncthing",
+                "/backups/full.zip", "completed", 1, "Full backup", "a".repeat(64), "cold_file", 1));
+        for (int i = 0; i < 12; i++) {
+            repository.save(RestorePoints.create("homepage", "Homepage", "app", "manual", "homepage",
+                    "", "failed", 0, "Failed", "", "cold_file", 1));
+        }
+        assertThat(repository.containingApp("homepage")).hasSize(13);
+        assertThat(repository.containingApp("syncthing")).extracting(RestorePointEntity::id).containsExactly(full.id());
+        assertThat(repository.containingApp("home")).isEmpty();
+        assertThat(repository.containingApp("vaultwarden")).isEmpty();
+    }
 }

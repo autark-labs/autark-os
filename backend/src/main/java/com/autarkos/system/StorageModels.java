@@ -20,7 +20,7 @@ public final class StorageModels {
             List<StorageTrendPoint> trend,
             boolean backupEnabled,
             String backupFrequency,
-            String lastBackup) {
+            String backupState) {
     }
 
     public record OrphanedStorage(

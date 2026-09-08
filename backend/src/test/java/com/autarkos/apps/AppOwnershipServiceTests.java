@@ -238,30 +238,30 @@ class AppOwnershipServiceTests {
     @Test
     void installedSummaryReportsCanonicalBackupProtectionFromCompletedRestorePoints() {
         InstalledAppRepository repository = installedRepository();
-        InstalledApp vaultwarden = new InstalledApp(
-                "vaultwarden",
+        InstalledApp homepage = new InstalledApp(
+                "homepage",
                 "Family Passwords",
                 "Ready",
-                runtimeRoot.resolve("apps/vaultwarden").toString(),
-                "autark-os-vaultwarden",
+                runtimeRoot.resolve("apps/homepage").toString(),
+                "autark-os-homepage",
                 "http://localhost:8090",
                 Instant.parse("2026-06-21T12:00:00Z"));
-        repository.save(vaultwarden);
+        repository.save(homepage);
         repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
-                "vaultwarden",
-                "appinst_vaultwarden",
-                "vaultwarden",
+                "homepage",
+                "appinst_homepage",
+                "homepage",
                 "current-instance",
-                runtimeRoot.resolve("apps/vaultwarden").toString(),
+                runtimeRoot.resolve("apps/homepage").toString(),
                 "installed",
                 "owned",
                 Instant.parse("2026-06-21T12:00:00Z"),
                 Instant.parse("2026-06-21T12:00:00Z")));
         BackupRepository backupRepository = JpaTestRepositories.backupRepository(runtimeLayout());
-        RestorePointTestRecords.record(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden-failed.zip", "failed", 0, "Backup failed.");
+        RestorePointTestRecords.record(backupRepository, "homepage", "Family Passwords", "app", "manual", "homepage", "/backups/homepage-failed.zip", "failed", 0, "Backup failed.");
 
         DiscoverInstallModels.DiscoverInstalledAppSummary unprotected = service(repository, observedRepository(), backupRepository)
-                .app("vaultwarden")
+                .app("homepage")
                 .orElseThrow()
                 .installedApp();
 
@@ -269,10 +269,10 @@ class AppOwnershipServiceTests {
         assertThat(unprotected.protectedByBackups()).isFalse();
         assertThat(unprotected.firstBackupRecommended()).isTrue();
 
-        RestorePointTestRecords.recordVerified(backupRepository, "vaultwarden", "Family Passwords", "app", "manual", "vaultwarden", "/backups/vaultwarden.zip", 1024, "Backup completed.");
+        RestorePointTestRecords.recordVerified(backupRepository, "homepage", "Family Passwords", "app", "manual", "homepage", "/backups/homepage.zip", 1024, "Backup completed.");
 
         DiscoverInstallModels.DiscoverInstalledAppSummary protectedApp = service(repository, observedRepository(), backupRepository)
-                .app("vaultwarden")
+                .app("homepage")
                 .orElseThrow()
                 .installedApp();
 

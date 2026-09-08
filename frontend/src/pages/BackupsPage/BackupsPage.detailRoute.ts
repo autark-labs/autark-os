@@ -1,4 +1,5 @@
 import type { AppBackupStatus, RestorePoint } from '@/types/backup';
+import { restorePointIncludesApp } from './BackupsPage.logic';
 
 export type BackupDirectoryKey = 'all' | 'full' | `app:${string}`;
 
@@ -70,7 +71,7 @@ function directoryForRestorePoint(point: RestorePoint, apps: AppBackupStatus[]):
 function pointMatchesDirectory(point: RestorePoint, directory: BackupDirectoryKey) {
   if (directory === 'all') return true;
   if (directory === 'full') return point.scope === 'full';
-  return point.appId === directory.slice(4);
+  return restorePointIncludesApp(point, directory.slice(4));
 }
 
 function restorePointForId(restorePoints: RestorePoint[], rawId: string | null) {

@@ -40,6 +40,54 @@ import com.autarkos.testsupport.RestorePointTestRecords;
 
 class BackupServiceCanonicalAppTests {
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"homepage", "syncthing"})
+    void fullBackupProtectsAppAndRestoresActualFilesDespiteNewerUnverifiedAttempts(String appId) throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        InstalledAppRepository installed = JpaTestRepositories.installedAppRepository(layout);
+        BackupRepository backups = JpaTestRepositories.backupRepository(layout);
+        MarketplaceCatalogService catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        InstalledApp app = installed(appId, appId, layout);
+        installed.save(app);
+        saveOwned(installed, app);
+        installed.saveSettings(app.appId(), new InstallModels.InstallSettings(app.accessUrl(), null, false,
+                java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        Path data = layout.appRoot(appId).resolve("config/settings.yaml");
+        Files.createDirectories(data.getParent());
+        Files.writeString(data, "title: original\n");
+        Path syncedData = layout.appRoot(appId).resolve("data/document.txt");
+        Files.createDirectories(syncedData.getParent());
+        Files.writeString(syncedData, "original document");
+        BackupService service = backupService(layout, installed, backups, catalog,
+                new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations()), new NoopDockerComposeExecutor(), appId);
+        assertThat(service.report().protectedApps()).isZero();
+        RestorePoint full = service.runFullBackup("manual").restorePoint();
+        assertThat(full.verificationStatus()).isEqualTo("verified");
+        for (int i = 0; i < 12; i++) {
+            RestorePointTestRecords.record(backups, appId, appId, "app", "manual", appId, "",
+                    "completed", 0, "Unverified checkpoint");
+        }
+        BackupModels.BackupReport report = service.report();
+        assertThat(report.protectedApps()).isEqualTo(1);
+        assertThat(report.apps().getFirst().latestBackup().verificationStatus()).isNotEqualTo("verified");
+        assertThat(report.apps().getFirst().restorePoints()).extracting(RestorePoint::id).contains(full.id());
+        var views = new com.autarkos.marketplace.install.AppInstanceViewService(installed,
+                new com.autarkos.marketplace.install.AppReconciliationService(installed, List::of, catalog), catalog, backups, new TailscaleService());
+        assertThat(views.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
+        assertThat(appLifecycleService(layout, installed, catalog, backups, new NoopDockerComposeExecutor())
+                .getApp(appId).canonicalBackupState()).isEqualTo("protected_by_restore_point");
+        Files.writeString(data, "title: changed\n");
+        Files.writeString(syncedData, "changed document");
+        assertThat(service.restorePlan(full.id(), appId).executable()).isTrue();
+        if (appId.equals("syncthing")) {
+            assertThat(service.restorePlan(full.id(), appId).dryRunDetails()).contains("Declared paths: config, data");
+        }
+        assertThat(service.restore(full.id(), appId).status()).isEqualTo("completed");
+        assertThat(Files.readString(data)).isEqualTo("title: original\n");
+        assertThat(Files.readString(syncedData)).isEqualTo("original document");
+        assertThat(service.restorePlan(full.id(), "vaultwarden").executable()).isFalse();
+    }
+
     @TempDir
     Path runtimeRoot;
 
@@ -435,6 +483,10 @@ class BackupServiceCanonicalAppTests {
     }
 
     private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService, AutarkOsFileOpsService fileOpsService, DockerComposeExecutor composeExecutor) {
+        return backupService(runtimeLayout, installedRepository, backupRepository, catalogService, fileOpsService, composeExecutor, "homepage");
+    }
+
+    private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService, AutarkOsFileOpsService fileOpsService, DockerComposeExecutor composeExecutor, String managedAppId) {
         return new BackupService(
                 runtimeLayout,
                 installedRepository,
@@ -444,7 +496,7 @@ class BackupServiceCanonicalAppTests {
                 new ProjectSettingsService(JpaTestRepositories.projectSettingsRepository(runtimeLayout), new ActivityLogService(mock(ActivityLogRepository.class))),
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository, composeExecutor),
                 catalogService,
-                () -> List.of(appInstance("homepage", "Homepage")),
+                () -> List.of(appInstance(managedAppId, managedAppId.equals("homepage") ? "Homepage" : managedAppId)),
                 new RuntimeFileOperations(),
                 fileOpsService);
     }
