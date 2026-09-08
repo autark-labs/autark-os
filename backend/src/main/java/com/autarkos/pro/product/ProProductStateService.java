@@ -204,7 +204,9 @@ public class ProProductStateService {
         return new ProProductState.HostedServices(
                 state,
                 entitlement.hostedServicesAllowed(),
-                entitlement.serviceLeaseExpiresAt(),
+                // The signed lease proves temporary access, not a purchased
+                // Online term. No authoritative paid end date exists yet.
+                null,
                 entitlement.lastVerifiedServerTime(),
                 state.equals("active") ? "active"
                         : safeReason(entitlement.reasonCode(), state));

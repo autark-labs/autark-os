@@ -35,6 +35,11 @@ Open `/pro` on your appliance using its administrator session. A compatible,
 healthy private extension can display local findings and links to the relevant
 CE pages. Its available sections depend on the installed version.
 
+When the appliance recommends reviewing findings, **Review guidance** moves
+directly to the installed extension's guidance on this page. License checks,
+removal and deactivation remain available separately. If expected guidance is
+unavailable, the page offers **Try again** while the CE shell stays available.
+
 Current private builds analyze a bounded local snapshot on a schedule, after
 meaningful changes, and on explicit refresh. Their encrypted private history
 survives ordinary restarts and compatible agent changes. CE does not interpret

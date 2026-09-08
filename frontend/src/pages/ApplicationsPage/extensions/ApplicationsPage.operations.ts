@@ -178,6 +178,9 @@ function operationStateFromJob(job: AutarkOsJob): AppOperationState {
       currentStep: currentJobStepText(job),
     };
   }
+  if (job.type === 'save_app_settings') {
+    return { kind: 'saving_settings', label: 'Saving settings', jobId: job.jobId, currentStep: currentJobStepText(job) };
+  }
   if (job.type === 'uninstall_app') {
     return {
       kind: 'uninstalling',
@@ -225,7 +228,7 @@ function jobsForItem(item: Pick<ApplicationSurfaceItem, 'id' | 'sourceId'>, jobs
   const itemIds = new Set([item?.id, item?.sourceId].filter((id): id is string => Boolean(id)));
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => jobTargetsItem(job, itemIds))
-    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app', 'update_app', 'rollback_app'].includes(job.type))
+    .filter((job) => ['start_app', 'stop_app', 'restart_app', 'repair_app', 'save_app_settings', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app', 'update_app', 'rollback_app'].includes(job.type))
     .sort((left, right) => jobTime(right) - jobTime(left));
 }
 

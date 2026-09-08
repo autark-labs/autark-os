@@ -103,7 +103,6 @@ export type ApplicationSettingsFormValues = {
   backupEnabled: boolean;
   backupFrequency: 'daily' | 'weekly' | 'monthly';
   backupRetention: number;
-  expectedProtocol: 'http' | 'https';
   localPort: number | null;
 };
 

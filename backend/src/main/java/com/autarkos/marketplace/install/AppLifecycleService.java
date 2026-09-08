@@ -215,6 +215,18 @@ public class AppLifecycleService {
     private AppActionResult repairUnlocked(String appId, boolean automatic) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "repair");
+        var pendingSettings = repository.settingsRecoveryFor(appId);
+        if (pendingSettings.isPresent()) {
+            if (automatic) return new AppActionResult(appId, "repair", "skipped", "Use Repair in My Apps to retry saved settings recovery.", null, List.of(), Instant.now());
+            AppSettingsCheckpoint checkpoint = readSettingsCheckpoint(pendingSettings.get());
+            if (!Objects.equals(app.runtimePath(), checkpoint.app().runtimePath())
+                    || !Objects.equals(app.composeProject(), checkpoint.app().composeProject())) {
+                throw new InstallationException("The app location changed since settings recovery was saved. Review Diagnostics before recovery.");
+            }
+            var recovery = recoverFailedSettingsChange(checkpoint, new InstallationException("An earlier settings change was interrupted."));
+            if (repository.settingsRecoveryFor(appId).isPresent()) throw recovery;
+            return new AppActionResult(appId, "repair", "succeeded", "Previous settings restored. Check the app and its access.", refresh(installedApp(appId)), List.of(), Instant.now());
+        }
         assertComposeAvailable(app, "repair");
         AppHealthSnapshot before = healthService.healthSnapshot(app);
         List<String> logs = new java.util.ArrayList<>();
@@ -305,55 +317,74 @@ public class AppLifecycleService {
         SettingsRedeploy redeploy = plan.redeployRequired() ? prepareSettingsRedeploy(app, sanitized) : null;
         repository.recordEvent(app.appId(), "settings_apply_started", "Applying settings change for " + app.appName() + ".");
         activityInfo("settings_apply_started", "Applying settings for " + app.appName(), plan.summary(), app.appId());
-        if (current.tailscaleEnabled() && !sanitized.tailscaleEnabled()) {
-            TailscaleServeResult disableResult = disablePrivateAccessMapping(app, current);
-            sanitized = new InstallModels.InstallSettings(
-                    sanitized.accessUrl(),
-                    null,
-                    false,
-                    sanitized.storageSubfolders(),
-                    sanitized.backup(),
-                    sanitized.desiredAccessMode(),
-                    "disabled",
-                    sanitized.expectedLocalPort(),
-                    sanitized.expectedProtocol(),
-                    sanitized.lastAccessCheckAt(),
-                    sanitized.lastSuccessfulAccessAt(),
-                    Instant.now(),
-                    disableResult.configured() ? "private_access_disabled" : "private_access_disable_failed",
-                    sanitized.autoRepairEnabled());
-            repository.recordEvent(app.appId(), "private_access_disabled", "Removed private HTTPS link for " + app.appName() + ".");
-            activitySuccess("private_access_disabled", "Private link removed for " + app.appName(), "Autark-OS turned off private access for this app.", app.appId());
-        } else if (!sanitized.tailscaleEnabled() && sanitized.privateAccessUrl() != null) {
-            sanitized = new InstallModels.InstallSettings(
-                    sanitized.accessUrl(),
-                    null,
-                    false,
-                    sanitized.storageSubfolders(),
-                    sanitized.backup(),
-                    sanitized.desiredAccessMode(),
-                    "disabled",
-                    sanitized.expectedLocalPort(),
-                    sanitized.expectedProtocol(),
-                    sanitized.lastAccessCheckAt(),
-                    sanitized.lastSuccessfulAccessAt(),
-                    sanitized.lastRepairAttemptAt(),
-                    sanitized.lastRepairStatus(),
-                    sanitized.autoRepairEnabled());
+        boolean privateChange = current.tailscaleEnabled() != sanitized.tailscaleEnabled()
+                || (current.tailscaleEnabled() && !Objects.equals(current.expectedLocalPort(), sanitized.expectedLocalPort()));
+        Integer privatePort = privateChange ? (current.tailscaleEnabled()
+                ? privateAccessStateResolver.resolve(app.appId(), current, current.accessUrl()).expectedHttpsPort()
+                : AppPrivateAccessPorts.selectHttpsPort(app.appId(), sanitized.expectedLocalPort(), repository)) : null;
+        if (privateChange && privatePort == null) throw new InstallationException("Check this app's private access before changing settings.");
+        AppSettingsCheckpoint checkpoint = new AppSettingsCheckpoint(app, current,
+                redeploy == null ? null : redeploy.previousCompose(), redeploy != null && redeploy.running(),
+                redeploy == null ? List.of() : redeploy.previousContainers(), privatePort, privateChange);
+        repository.beginSettingsChange(appId, encodeSettingsCheckpoint(checkpoint));
+        try {
+            if (current.tailscaleEnabled() && !sanitized.tailscaleEnabled()) {
+                TailscaleServeResult disableResult = disablePrivateAccessMapping(app, current);
+                sanitized = new InstallModels.InstallSettings(
+                        sanitized.accessUrl(),
+                        null,
+                        false,
+                        sanitized.storageSubfolders(),
+                        sanitized.backup(),
+                        sanitized.desiredAccessMode(),
+                        "disabled",
+                        sanitized.expectedLocalPort(),
+                        sanitized.expectedProtocol(),
+                        sanitized.lastAccessCheckAt(),
+                        sanitized.lastSuccessfulAccessAt(),
+                        Instant.now(),
+                        disableResult.configured() ? "private_access_disabled" : "private_access_disable_failed",
+                        sanitized.autoRepairEnabled());
+                repository.recordEvent(app.appId(), "private_access_disabled", "Removed private HTTPS link for " + app.appName() + ".");
+                activitySuccess("private_access_disabled", "Private link removed for " + app.appName(), "Autark-OS turned off private access for this app.", app.appId());
+            } else if (!sanitized.tailscaleEnabled() && sanitized.privateAccessUrl() != null) {
+                sanitized = new InstallModels.InstallSettings(
+                        sanitized.accessUrl(),
+                        null,
+                        false,
+                        sanitized.storageSubfolders(),
+                        sanitized.backup(),
+                        sanitized.desiredAccessMode(),
+                        "disabled",
+                        sanitized.expectedLocalPort(),
+                        sanitized.expectedProtocol(),
+                        sanitized.lastAccessCheckAt(),
+                        sanitized.lastSuccessfulAccessAt(),
+                        sanitized.lastRepairAttemptAt(),
+                        sanitized.lastRepairStatus(),
+                        sanitized.autoRepairEnabled());
+            }
+            if (plan.redeployRequired()) {
+                safeRedeployForSettings(app, redeploy);
+                app = new InstalledApp(
+                        app.appId(),
+                        app.appName(),
+                        app.status(),
+                        app.runtimePath(),
+                        app.composeProject(),
+                        sanitized.accessUrl(),
+                        app.installedAt());
+            }
+            if (privateChange && sanitized.tailscaleEnabled()) {
+                var served = tailscaleService.serveHttps(sanitized.expectedLocalPort(), privatePort);
+                if (!served.configured()) throw new InstallationException("The private link could not be updated. Check Tailscale in Access.");
+                sanitized = settingsPolicy.withPrivateAccess(sanitized, served.privateUrl());
+                verifySettingsPrivateMapping(privatePort, sanitized.expectedLocalPort());
+            }
+            repository.commitSettingsChange(app, sanitized);
+        } catch (RuntimeException exception) {
+            throw recoverFailedSettingsChange(checkpoint, exception);
         }
-        if (plan.redeployRequired()) {
-            safeRedeployForSettings(app, redeploy);
-            app = new InstalledApp(
-                    app.appId(),
-                    app.appName(),
-                    app.status(),
-                    app.runtimePath(),
-                    app.composeProject(),
-                    sanitized.accessUrl(),
-                    app.installedAt());
-            repository.save(app);
-        }
-        repository.saveSettings(app.appId(), sanitized);
         repository.recordEvent(app.appId(), "settings_updated", "Updated application settings for " + app.appName() + ".");
         repository.recordEvent(app.appId(), "settings_apply_completed", "Applied settings for " + app.appName() + ".");
         activitySuccess("settings_updated", "Updated settings for " + app.appName(), "Application settings were saved.", app.appId());
@@ -362,6 +393,11 @@ public class AppLifecycleService {
 
     public InstallModels.AppSettingsChangePlan settingsChangePlan(String appId, InstallModels.InstallSettings settings) {
         InstalledApp app = installedApp(appId);
+        if (repository.settingsRecoveryFor(appId).isPresent()) {
+            String reason = "Use Repair in My Apps to finish the saved settings recovery first.";
+            return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Settings recovery required",
+                    reason, false, false, false, false, List.of(), List.of(), List.of(reason));
+        }
         if (!AppRuntimeFiles.isComposeFile(composeFile(app))) {
             String reason = "The original Compose file is missing. Settings cannot be changed until that configuration is restored.";
             return new InstallModels.AppSettingsChangePlan(
@@ -419,51 +455,61 @@ public class AppLifecycleService {
 
     private void safeRedeployForSettings(InstalledApp app, SettingsRedeploy redeploy) {
         Path composePath = redeploy.composePath();
-        try {
-            new ComposeRenderer(runtimeLayout).updatePorts(composePath, redeploy.manifest(), redeploy.configuration());
-            if (!redeploy.running()) {
-                repository.recordEvent(app.appId(), "settings_saved_stopped", "Saved settings for " + app.appName() + ". The app remains paused; its next start will use the new configuration.");
-                return;
-            }
-            RuntimeModels.DockerComposeResult result = composeExecutor.up(composePath, app.composeProject());
-            if (!result.successful()) {
-                throw new InstallationException(failureReason(result.output()));
-            }
-        } catch (RuntimeException exception) {
-            throw recoverFailedSettingsRedeploy(app, redeploy, exception);
+        new ComposeRenderer(runtimeLayout).updatePorts(composePath, redeploy.manifest(), redeploy.configuration());
+        if (!redeploy.running()) {
+            repository.recordEvent(app.appId(), "settings_saved_stopped", "Saved settings for " + app.appName() + ". The app remains paused; its next start will use the new configuration.");
+            return;
+        }
+        RuntimeModels.DockerComposeResult result = composeExecutor.up(composePath, app.composeProject());
+        if (!result.successful()) {
+            throw new InstallationException(failureReason(result.output()));
         }
         repository.recordEvent(app.appId(), "settings_redeploy_completed", "Updated Compose and restarted " + app.appName() + ".");
-        activitySuccess("settings_redeploy_completed", "Settings redeploy completed for " + app.appName(), "Autark-OS updated Compose and restarted the app.", app.appId());
     }
 
-    private InstallationException recoverFailedSettingsRedeploy(InstalledApp app, SettingsRedeploy redeploy, RuntimeException applyFailure) {
+    private InstallationException recoverFailedSettingsChange(AppSettingsCheckpoint checkpoint, RuntimeException applyFailure) {
+        InstalledApp app = checkpoint.app();
         // Recovery must not depend on successfully writing an activity event.
         RuntimeException recoveryFailure = null;
         try {
-            restoreCompose(redeploy.composePath(), redeploy.previousCompose());
-            if (redeploy.running()) {
-                var result = composeExecutor.up(redeploy.composePath(), app.composeProject());
-                if (!result.successful()) throw new InstallationException(failureReason(result.output()));
+            if (checkpoint.compose() != null) {
+                restoreCompose(composeFile(app), checkpoint.compose());
+                if (checkpoint.running()) {
+                    var result = composeExecutor.up(composeFile(app), app.composeProject());
+                    if (!result.successful()) throw new InstallationException(failureReason(result.output()));
+                }
+                var observed = composeExecutor.observeContainersForApp(composeFile(app), app.composeProject(), app.appId());
+                boolean previousRuntimeRestored = observed.successful()
+                        && observed.containers().size() == checkpoint.containers().size()
+                        && checkpoint.containers().stream().allMatch(previous ->
+                        observed.containers().stream().anyMatch(actual ->
+                                Objects.equals(previous.name(), actual.name())
+                                && Objects.equals(previous.service(), actual.service())
+                                && Objects.equals(previous.ports(), actual.ports())
+                                && (checkpoint.running() ? "running".equalsIgnoreCase(actual.state())
+                                        : Objects.equals(previous.state(), actual.state()))));
+                if (!previousRuntimeRestored) throw new InstallationException("Docker did not confirm the previous containers and port mappings.");
             }
-            var observed = composeExecutor.observeContainersForApp(redeploy.composePath(), app.composeProject(), app.appId());
-            boolean previousRuntimeRestored = observed.successful()
-                    && observed.containers().size() == redeploy.previousContainers().size()
-                    && redeploy.previousContainers().stream().allMatch(previous ->
-                    observed.containers().stream().anyMatch(actual ->
-                            Objects.equals(previous.name(), actual.name())
-                            && Objects.equals(previous.service(), actual.service())
-                            && Objects.equals(previous.ports(), actual.ports())
-                            && (redeploy.running() ? "running".equalsIgnoreCase(actual.state())
-                                    : Objects.equals(previous.state(), actual.state()))));
-            if (!previousRuntimeRestored) throw new InstallationException("Docker did not confirm the previous containers and port mappings.");
+            if (checkpoint.privateChange()) {
+                Integer previousPort = checkpoint.settings().expectedLocalPort() != null ? checkpoint.settings().expectedLocalPort()
+                        : runtimeStatusResolver.portFromUrl(firstPresent(checkpoint.settings().accessUrl(), app.accessUrl()));
+                if (checkpoint.settings().tailscaleEnabled() && previousPort == null) throw new InstallationException("The previous private link target is unknown.");
+                var result = checkpoint.settings().tailscaleEnabled()
+                        ? tailscaleService.serveHttps(previousPort, checkpoint.privatePort())
+                        : tailscaleService.disableHttps(checkpoint.privatePort());
+                if (!result.configured()) throw new InstallationException("The previous private access configuration could not be restored.");
+                verifySettingsPrivateMapping(checkpoint.privatePort(), checkpoint.settings().tailscaleEnabled()
+                        ? previousPort : null);
+            }
+            repository.commitSettingsChange(app, checkpoint.settings());
         } catch (RuntimeException exception) {
             recoveryFailure = exception;
         }
         String message = recoveryFailure == null
                 ? "The settings change failed. The previous container configuration was restored and "
-                        + (redeploy.running() ? "the previous containers are running again." : "the app remains paused.")
+                        + (checkpoint.running() ? "the previous containers are running again." : "the previous settings are saved.")
                         + " Check the app and its access in My Apps before trying again."
-                : "The settings change failed and recovery could not be confirmed. Check the app in My Apps and review Diagnostics before retrying. Do not uninstall it to resolve this error.";
+                : "The settings change failed and recovery could not be confirmed. Use Repair in My Apps to retry saved recovery and review Diagnostics. Do not uninstall it to resolve this error.";
         var failure = new InstallationException(message, applyFailure);
         if (recoveryFailure != null) failure.addSuppressed(recoveryFailure);
         String eventType = recoveryFailure == null ? "settings_rollback_completed" : "settings_rollback_failed";
@@ -475,6 +521,43 @@ public class AppLifecycleService {
             failure.addSuppressed(loggingFailure);
         }
         return failure;
+    }
+
+    private String encodeSettingsCheckpoint(AppSettingsCheckpoint checkpoint) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().writeValueAsString(checkpoint);
+        } catch (IOException exception) {
+            throw new InstallationException("Autark-OS could not save the settings recovery record. No settings were changed.", exception);
+        }
+    }
+
+    private AppSettingsCheckpoint readSettingsCheckpoint(String snapshot) {
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().readValue(snapshot, AppSettingsCheckpoint.class);
+        } catch (IOException exception) {
+            throw new InstallationException("The saved settings recovery record could not be read. Review Diagnostics.", exception);
+        }
+    }
+
+    private void verifySettingsPrivateMapping(int privatePort, Integer localPort) {
+        var config = tailscaleService.serveConfig();
+        boolean matches = config.available() && (localPort == null
+                ? config.mappings().stream().noneMatch(mapping -> Objects.equals(mapping.servePort(), privatePort))
+                : config.mappings().stream().anyMatch(mapping -> Objects.equals(mapping.servePort(), privatePort)
+                        && Objects.equals(mapping.targetPort(), localPort)));
+        if (!matches) throw new InstallationException("Tailscale did not confirm the expected private link configuration.");
+    }
+
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void recoverInterruptedSettings() {
+        for (InstalledApp app : repository.findAllApps()) {
+            if (repository.settingsRecoveryFor(app.appId()).isEmpty()) continue;
+            try {
+                repair(app.appId());
+            } catch (RuntimeException exception) {
+                activityWarning("settings_recovery_pending", "Settings recovery needs attention", "Use Repair in My Apps to retry saved settings recovery.", app.appId());
+            }
+        }
     }
 
     private String readCompose(Path composePath) {
@@ -497,6 +580,10 @@ public class AppLifecycleService {
     }
 
     public AppActionResult enablePrivateAccess(String appId) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> enablePrivateAccessUnlocked(appId));
+    }
+
+    private AppActionResult enablePrivateAccessUnlocked(String appId) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "enable private access for");
         AppRuntimeView view = refresh(app);
@@ -537,6 +624,10 @@ public class AppLifecycleService {
     }
 
     public AppActionResult disablePrivateAccess(String appId) {
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.APP_LIFECYCLE, () -> disablePrivateAccessUnlocked(appId));
+    }
+
+    private AppActionResult disablePrivateAccessUnlocked(String appId) {
         InstalledApp app = installedApp(appId);
         assertLifecycleEligible(app, "disable private access for");
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
@@ -668,7 +759,7 @@ public class AppLifecycleService {
         String accessUrl = runtimeStatusResolver.accessUrl(app, manifest, containers);
         InstallModels.InstallSettings settings = settingsPolicy.normalizeSettings(repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(accessUrl)), app, manifest, accessUrl);
         RuntimeModels.AppTelemetry telemetry = includeTelemetry ? telemetry(containers) : RuntimeModels.AppTelemetry.unavailable();
-        if (accessUrl != null && !accessUrl.equals(app.accessUrl())) {
+        if (accessUrl != null && !accessUrl.equals(app.accessUrl()) && repository.settingsRecoveryFor(app.appId()).isEmpty()) {
             repository.save(new InstalledApp(
                     app.appId(),
                     app.appName(),
@@ -874,6 +965,9 @@ public class AppLifecycleService {
     }
 
     private void assertLifecycleEligible(InstalledApp app, String action) {
+        if (!"repair".equals(action) && repository.settingsRecoveryFor(app.appId()).isPresent()) {
+            throw new InstallationException("This app has an unfinished settings change. Use Repair in My Apps before changing it again.");
+        }
         RuntimeModels.InstalledAppOwnershipMetadata metadata = repository.ownershipFor(app.appId())
                 .orElseThrow(() -> new InstallationException(app.appName() + " is not owned by this Autark-OS instance, so Autark-OS will not " + action + " it automatically."));
         if (!"owned".equalsIgnoreCase(metadata.ownershipStatus())) {

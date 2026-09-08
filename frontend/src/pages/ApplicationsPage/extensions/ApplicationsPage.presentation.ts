@@ -12,7 +12,7 @@ export type ApplicationCollectionFilter = 'managed' | 'linked' | 'attention';
 /** Maps an app's canonical settings into the form contract used by My Apps. */
 export function settingsFromFormValues(app: AppRuntimeView, values: ApplicationSettingsFormValues): InstallSettings {
   const currentSettings = settingsWithDefaults(app);
-  const protocol = values.expectedProtocol || currentSettings.expectedProtocol || 'http';
+  const protocol = currentSettings.expectedProtocol || 'http';
   const accessUrl = accessUrlWithPort(currentSettings.accessUrl ?? app.accessUrl, protocol, values.localPort ?? currentSettings.expectedLocalPort);
 
   return {

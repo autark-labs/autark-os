@@ -173,14 +173,14 @@ function NetworkPage() {
         succeeded = true;
       } else {
         const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(app, targetZone));
-        syncCanonicalAppMutationResult(queryClient, { app: updated });
+        syncCanonicalAppMutationResult(queryClient, updated);
         showActionNotification({
           ok: true,
-          severity: 'success',
-          title: `${app.appName} access updated`,
+          severity: 'info',
+          title: `${app.appName} access change started`,
           message: targetZone === 'lan'
-            ? 'Autark-OS saved this service for home-network reachability.'
-            : 'Autark-OS saved this service for server-only reachability.',
+            ? 'Autark-OS is applying home-network reachability. Follow the job for the result.'
+            : 'Autark-OS is applying server-only reachability. Follow the job for the result.',
         }, 'Access updated');
         succeeded = true;
       }

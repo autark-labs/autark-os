@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import betaScope from '@beta-scope';
 import { ArrowRight, Copy, Download, LoaderCircle, RefreshCw, ShieldCheck, Trash2, Unplug } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
@@ -50,6 +50,10 @@ function ProPage() {
   const deactivate = useDeactivateProMutation();
   const status = statusQuery.data ?? null;
   const moduleJob = useAutarkOsJobQuery(status?.module?.jobId ?? null);
+  const guidanceRef = useRef<HTMLElement>(null);
+  const completedModuleJobId = moduleJob.data && terminalJob(moduleJob.data) ? moduleJob.data.jobId : null;
+  const { refetch: refetchStatus } = statusQuery;
+  const { refetch: refetchProduct } = productQuery;
   const [activationCode, setActivationCode] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [removalOpen, setRemovalOpen] = useState(false);
@@ -72,11 +76,16 @@ function ProPage() {
   }, []);
 
   useEffect(() => {
-    if (moduleJob.data && terminalJob(moduleJob.data)) {
-      void statusQuery.refetch();
-      void productQuery.refetch();
+    if (completedModuleJobId) {
+      void refetchStatus();
+      void refetchProduct();
     }
-  }, [moduleJob.data, productQuery, statusQuery]);
+  }, [completedModuleJobId, refetchProduct, refetchStatus]);
+
+  function reviewGuidance() {
+    guidanceRef.current?.focus({ preventScroll: true });
+    guidanceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function submitActivation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -179,12 +188,9 @@ function ProPage() {
 
   const product = productQuery.data;
   const lifecycle = proLifecycleModel(status, product);
-  const primaryAction = betaScope.proInstallationAvailable ? lifecycle.primaryAction : null;
-  const extensionActive = Boolean(
-    product.softwareEntitlement.localUseAllowed
-    && product.agent.digestPrefix
-    && product.agent.health === 'healthy',
-  );
+  const primaryAction = betaScope.proInstallationAvailable || lifecycle.primaryAction === 'review-guidance'
+    ? lifecycle.primaryAction : null;
+  const extensionActive = lifecycle.guidanceAvailable;
   const canConfirmRemoval = removalConfirmation === moduleRemovalConfirmation && !busy;
   const canConfirmDeactivation = deactivationPhrase === deactivationConfirmation
     && moduleRetentionAcknowledged
@@ -209,6 +215,7 @@ function ProPage() {
                   <LifecycleValue label="Private extension" value={moduleStatus(product, extensionActive)} />
                 </dl>
                 <div className="mt-6 flex flex-wrap gap-3">
+                  {primaryAction === 'review-guidance' && <ProjectPrimaryButton onClick={reviewGuidance} type="button"><ArrowRight className="size-4" />Review guidance</ProjectPrimaryButton>}
                   {primaryAction === 'continue-activation' && <ProjectPrimaryButton disabled={busy} onClick={resumeActivation} type="button"><ArrowRight className="size-4" />Continue activation</ProjectPrimaryButton>}
                   {primaryAction === 'check-release' && <ProjectPrimaryButton disabled={busy} onClick={checkForExtensionRelease} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}Check for update</ProjectPrimaryButton>}
                   {primaryAction === 'install-release' && <ProjectPrimaryButton disabled={busy} onClick={installExtension} type="button">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}{status.module.activeDigest ? 'Update private extension' : 'Install private extension'}</ProjectPrimaryButton>}
@@ -240,7 +247,7 @@ function ProPage() {
 
       <LifecycleDetails onCopy={(value, label) => void copyLifecycleValue(value, label)} product={product} status={status} />
 
-      {extensionActive && <ExtensionSlot extensionId="autark-pro" showErrors surface="pro.dashboard" />}
+      {extensionActive && <section aria-label="Autark Pro guidance" ref={guidanceRef} tabIndex={-1}><ExtensionSlot extensionId="autark-pro" required showErrors surface="pro.dashboard" /></section>}
 
       <RemovalDialog busy={busy} confirmation={removalConfirmation} onConfirm={removeExtension} onConfirmationChange={setRemovalConfirmation} onOpenChange={(open) => open ? setRemovalOpen(true) : closeRemoval()} open={removalOpen} ready={canConfirmRemoval} />
       <DeactivationDialog accountAcknowledged={accountRetentionAcknowledged} busy={busy} moduleAcknowledged={moduleRetentionAcknowledged} onAccountAcknowledged={setAccountRetentionAcknowledged} onConfirm={deactivatePro} onModuleAcknowledged={setModuleRetentionAcknowledged} onOpenChange={(open) => open ? setDeactivationOpen(true) : closeDeactivation()} onPhraseChange={setDeactivationPhrase} open={deactivationOpen} phrase={deactivationPhrase} ready={canConfirmDeactivation} />
@@ -290,7 +297,9 @@ function updateStatus(product: ProProductState) {
 }
 
 function hostedStatus(product: ProProductState) {
-  if (product.hostedServices.allowed) return `Verified until ${formatLifecycleDate(product.hostedServices.servicesThrough)}`;
+  if (product.hostedServices.allowed) return product.hostedServices.lastVerifiedAt
+    ? `Last verified ${formatLifecycleDate(product.hostedServices.lastVerifiedAt)}`
+    : 'Verification time unavailable';
   return product.softwareEntitlement.localUseAllowed ? formatLifecycleToken(product.hostedServices.state) : 'Not available';
 }
 

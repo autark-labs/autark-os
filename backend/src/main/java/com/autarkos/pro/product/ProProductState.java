@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * Generated shape for docs/pro/contracts/pro-product-state-v1.schema.json.
  * Schema SHA-256:
- * 9333c01b96f9843eb46132cfbe2d25f0aaf5b829c2ae6d122c1bf5d0e95f3ca3.
+ * a1732a302f8c8ebd4c744dd438b1f1eba79cdd10c12aa0507a8927f8cc5d54fe.
  * Presentation state never grants authority; signed lifecycle inputs remain
  * independently enforced by their owning services.
  */

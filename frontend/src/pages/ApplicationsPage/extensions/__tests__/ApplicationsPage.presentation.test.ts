@@ -48,10 +48,9 @@ describe('My Apps presentation helpers', () => {
       backupEnabled: false,
       backupFrequency: 'weekly',
       backupRetention: 14,
-      expectedProtocol: 'https',
       localPort: 8443,
     })).toMatchObject({
-      accessUrl: 'https://vaultwarden.local:8443',
+      accessUrl: 'http://vaultwarden.local:8443',
       autoRepairEnabled: false,
       backup: { enabled: false, frequency: 'weekly', retention: 14 },
       storageSubfolders: { data: 'data' },

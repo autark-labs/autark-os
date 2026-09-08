@@ -99,6 +99,7 @@ test('applications page settings tab uses real controls and confirm-before-save 
   assert.match(settings, /prepareSave/);
   assert.match(settings, /confirmSave/);
   assert.match(settings, /Local app port/);
+  assert.doesNotMatch(settings, /name="expectedProtocol"/);
   assert.match(settings, /Backup retention/);
   assert.doesNotMatch(settings, /role="switch"/);
   assert.doesNotMatch(settings, /onClick=\{\(\) => toggleField\(\)\}/);
@@ -106,9 +107,10 @@ test('applications page settings tab uses real controls and confirm-before-save 
 
 test('settings feedback does not claim that a paused app was restarted', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  assert.match(page, /title: 'Settings saved'/);
+  assert.match(page, /title: 'Settings change started'/);
   assert.doesNotMatch(page, /Settings saved and restart requested/);
-  assert.match(page, /restoreApplicationState\(previousState\);\s*void invalidateApplicationState\(queryClient\);\s*showActionErrorNotification\(err, 'Settings update failed'\)/);
+  assert.match(page, /void invalidateApplicationState\(queryClient\);\s*showActionErrorNotification\(err, 'Settings update failed'\)/);
+  assert.doesNotMatch(page, /setRuntimeAppInApplicationStateCache/);
 });
 
 test('applications page management panel uses canonical runtime data instead of generated mock facts', () => {

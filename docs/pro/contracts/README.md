@@ -21,6 +21,13 @@ availability and one recommended action without granting authority or naming
 private feature policy. Signed documents and runtime health remain the
 independent enforcement inputs.
 
+`hostedServices.servicesThrough` is a purchased Online end date, and is null
+while no authoritative paid term is available. It must not contain the short
+authentication lease expiry. `lastVerifiedAt` records the access check time;
+the raw entitlement status separately reports `serviceLeaseExpiresAt` for
+lifecycle enforcement. These dates do not imply one another. Existing v1
+clients already accept a null purchased end date; the wire shape is unchanged.
+
 ## Local extension boundary
 
 `normalized-host-snapshot-v1` is the versioned, bounded and redacted input that

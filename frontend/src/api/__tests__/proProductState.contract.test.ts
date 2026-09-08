@@ -15,6 +15,18 @@ describe('canonical Pro product state boundary', () => {
     expect(parseProProductState(fixture()).recommendedAction.id).toBe('check_release');
   });
 
+  it('keeps an unknown purchased term separate from a verified access check', () => {
+    const state = parseProProductState(fixture());
+    expect(state.hostedServices.allowed).toBe(true);
+    expect(state.hostedServices.servicesThrough).toBeNull();
+    expect(state.hostedServices.lastVerifiedAt).toBe('2026-07-26T18:00:00Z');
+
+    const withPaidTerm = fixture();
+    withPaidTerm.hostedServices.servicesThrough = '2027-07-26T18:00:00Z';
+    expect(parseProProductState(withPaidTerm).hostedServices.servicesThrough)
+      .toBe('2027-07-26T18:00:00Z');
+  });
+
   it('accepts unknown future capabilities and recommended actions', () => {
     const future = fixture();
     future.localCapabilities.push('pro.future');

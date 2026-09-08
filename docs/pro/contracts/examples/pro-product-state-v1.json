@@ -11,7 +11,7 @@
   "hostedServices": {
     "state": "active",
     "allowed": true,
-    "servicesThrough": "2028-07-26T18:00:00Z",
+    "servicesThrough": null,
     "lastVerifiedAt": "2026-07-26T18:00:00Z",
     "reasonCode": "active"
   },

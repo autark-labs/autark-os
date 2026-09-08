@@ -35,7 +35,7 @@ test('Access page avoids duplicate Tailscale status and progressively discloses 
   assert.match(page, /pendingReachabilityTokenRef/);
   assert.match(page, /setPendingReachabilityByServiceId\(\(current\) => \(\{ \.\.\.current, \[service\.id\]: \{ acknowledged: false, token: pendingToken, zone: targetZone \} \}\)\)/);
   assert.doesNotMatch(page, /appWithReachabilityZone/);
-  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, \{ app: updated \}\)/);
+  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, updated\)/);
   assert.match(page, /removePendingReachabilityForToken\(current, service\.id, pendingToken\)/);
   assert.match(page, /pending\.acknowledged && reachabilityServices\.find\(\(service\) => service\.id === serviceId\)\?\.zone === pending\.zone/);
   assert.match(page, /removePendingReachabilityIds\(current, settledServiceIds\)/);

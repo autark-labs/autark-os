@@ -14,16 +14,13 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import {
-  applicationStateQueryKey,
   invalidateApplicationState,
-  setRuntimeAppInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import { invalidateBackupQueries } from '@/repositories/backupRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import { terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
-import type { ApplicationState } from '@/types/applicationState';
 import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan } from '@/types/observedService';
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
 import { BasicApplicationsView } from './BasicApplicationsView';
@@ -321,10 +318,6 @@ export const ApplicationsPage = () => {
     setSettingsLoadingByAppId((current) => ({ ...current, [appId]: action }));
   };
 
-  const restoreApplicationState = (previousState: ApplicationState | undefined) => {
-    queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, previousState);
-  };
-
   const runManagedAction = async (appId: string, action: ManagedLifecycleAction) => {
     setAppActionLoading(appId, action);
 
@@ -408,14 +401,9 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    const previousState = queryClient.getQueryData<ApplicationState | undefined>(applicationStateQueryKey);
     const nextSettings = settingsFromFormValues(app, values);
 
     setSettingsLoading(appId, 'saving');
-    setRuntimeAppInApplicationStateCache(queryClient, {
-      ...app,
-      settings: nextSettings,
-    });
 
     try {
       const plan = await InstalledAppsAPIClient.settingsChangePlan(appId, nextSettings);
@@ -423,18 +411,18 @@ export const ApplicationsPage = () => {
         throw new Error(plan.blockedReasons[0] || 'Autark-OS cannot safely apply these settings yet.');
       }
       const updatedApp = await InstalledAppsAPIClient.updateSettings(appId, nextSettings);
-      syncCanonicalAppMutationResult(queryClient, { app: updatedApp });
+      syncCanonicalAppMutationResult(queryClient, updatedApp);
+      setTrackedAppJobIds((current) => current.includes(updatedApp.jobId) ? current : [...current, updatedApp.jobId]);
 
       showActionNotification({
         ok: true,
-        severity: 'success',
-        title: 'Settings saved',
-        message: plan.summary,
+        severity: 'info',
+        title: 'Settings change started',
+        message: 'Autark-OS will report the result when the change or recovery finishes.',
       });
       setSettingsDirtyByAppId((current) => ({ ...current, [appId]: false }));
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
-      restoreApplicationState(previousState);
       void invalidateApplicationState(queryClient);
       showActionErrorNotification(err, 'Settings update failed');
       throw err;
@@ -604,7 +592,9 @@ export const ApplicationsPage = () => {
   const handleStop = (id: string) => void runManagedAction(id, 'stop');
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
   const handleRepair = (id: string) => void runRepair(id);
-  const handleDirtyChange = (id: string, dirty: boolean) => setSettingsDirtyByAppId((current) => ({ ...current, [id]: dirty }));
+  const handleDirtyChange = useCallback((id: string, dirty: boolean) => {
+    setSettingsDirtyByAppId((current) => current[id] === dirty ? current : { ...current, [id]: dirty });
+  }, []);
   const handleCreateBackup = (id: string) => void runBackup(id);
 
   const handleRunNextAction = (id: string) => {

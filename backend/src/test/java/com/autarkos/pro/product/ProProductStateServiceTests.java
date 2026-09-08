@@ -39,6 +39,9 @@ class ProProductStateServiceTests {
         assertThat(state.overallStatus()).isEqualTo("partial");
         assertThat(state.softwareEntitlement().state()).isEqualTo("active");
         assertThat(state.hostedServices().state()).isEqualTo("active");
+        assertThat(state.hostedServices().servicesThrough()).isNull();
+        assertThat(state.hostedServices().lastVerifiedAt())
+                .isEqualTo(NOW.minusSeconds(30));
         assertThat(state.agent().state()).isEqualTo("active");
         assertThat(state.agent().digestPrefix())
                 .isEqualTo("sha256:aaaaaaaaaaaa")
@@ -106,6 +109,7 @@ class ProProductStateServiceTests {
         assertThat(state.softwareEntitlement().localUseAllowed()).isTrue();
         assertThat(state.localCapabilities()).isNotEmpty();
         assertThat(state.hostedCapabilities()).isEmpty();
+        assertThat(state.hostedServices().servicesThrough()).isNull();
     }
 
     @Test
@@ -227,8 +231,8 @@ class ProProductStateServiceTests {
         Instant updatesThrough = updates
                 ? NOW.plusSeconds(31_536_000)
                 : null;
-        Instant servicesThrough = hosted
-                ? NOW.plusSeconds(31_536_000)
+        Instant leaseExpiresAt = hosted
+                ? NOW.plusSeconds(86_400)
                 : NOW.minusSeconds(60);
         ProEntitlementStatus entitlement = new ProEntitlementStatus(
                 "1",
@@ -236,7 +240,7 @@ class ProProductStateServiceTests {
                 "opaque-plan",
                 List.of("pro.future", "pro.example", "pro.future"),
                 updatesThrough,
-                servicesThrough,
+                leaseExpiresAt,
                 NOW.minusSeconds(30),
                 localUse,
                 updates,

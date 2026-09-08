@@ -75,8 +75,14 @@
           "enum": ["unavailable", "active", "grace", "expired", "suspended", "revoked", "error"]
         },
         "allowed": { "type": "boolean" },
-        "servicesThrough": { "$ref": "#/$defs/nullableTimestamp" },
-        "lastVerifiedAt": { "$ref": "#/$defs/nullableTimestamp" },
+        "servicesThrough": {
+          "$ref": "#/$defs/nullableTimestamp",
+          "description": "Purchased Online term end, or null when no authoritative paid term is available. Never inferred from an authentication lease expiry."
+        },
+        "lastVerifiedAt": {
+          "$ref": "#/$defs/nullableTimestamp",
+          "description": "Last trusted server verification time. This is an access check, not the start or end of a purchased term."
+        },
         "reasonCode": { "$ref": "#/$defs/reasonCode" }
       }
     },

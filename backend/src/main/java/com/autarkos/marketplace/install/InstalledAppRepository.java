@@ -23,6 +23,27 @@ import com.autarkos.marketplace.install.models.RuntimeModels;
 @Repository
 public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity, String> {
 
+    @Transactional
+    @Modifying
+    @Query(value = "insert into app_settings_recovery(app_id, snapshot) values (:appId, :snapshot)", nativeQuery = true)
+    void beginSettingsChange(@Param("appId") String appId, @Param("snapshot") String snapshot);
+
+    @Query(value = "select snapshot from app_settings_recovery where app_id = :appId", nativeQuery = true)
+    Optional<String> settingsRecoveryFor(@Param("appId") String appId);
+
+    @Transactional
+    @Modifying
+    @Query(value = "delete from app_settings_recovery where app_id = :appId", nativeQuery = true)
+    void clearSettingsRecovery(@Param("appId") String appId);
+
+    /** Commit preferences and their address together; the checkpoint survives any failed commit. */
+    @Transactional
+    default void commitSettingsChange(InstalledApp app, InstallModels.InstallSettings settings) {
+        save(app);
+        saveSettings(app.appId(), settings);
+        clearSettingsRecovery(app.appId());
+    }
+
     List<InstalledAppEntity> findAllByOrderByAppNameAsc();
 
     default void save(InstalledApp app) {

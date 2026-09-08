@@ -400,6 +400,7 @@ class InstalledAppsControllerTests {
 
     @Test
     void settingsMutationInvalidatesCanonicalAppStateImmediately() {
+        AutarkOsJobService jobs = jobService();
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
         AppUpdateService updateService = mock(AppUpdateService.class);
@@ -409,14 +410,17 @@ class InstalledAppsControllerTests {
                 metricsService,
                 updateService,
                 applicationStateService,
-                jobService());
+                jobs);
         AppRuntimeView app = appRuntimeView("gitea");
         InstallModels.InstallSettings settings = InstallModels.InstallSettings.defaults("http://localhost:3000");
         when(lifecycleService.updateSettings("gitea", settings)).thenReturn(app);
 
-        AppRuntimeView returned = controller.updateSettings("gitea", settings);
+        AutarkOsJob returned = controller.updateSettings("gitea", settings);
 
-        assertThat(returned).isEqualTo(app);
+        assertThat(returned.type()).isEqualTo("save_app_settings");
+        verify(lifecycleService, never()).updateSettings("gitea", settings);
+        jobs.runQueuedJobsNow();
+        assertThat(jobs.findById(returned.jobId()).orElseThrow().status()).isEqualTo("succeeded");
         verify(applicationStateService).invalidate();
         verify(applicationStateService, never()).refreshInBackground();
     }

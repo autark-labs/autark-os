@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from 'playwright/test';
+import type { AutarkOsJob } from '../src/types/jobs';
 import { installMockApi, stabilizePage } from './support/mockApi';
 
 const fixedAt = '2026-07-19T17:00:00Z';
@@ -12,6 +13,10 @@ type ProAction = {
 
 type OpenProOptions = {
   activationCompletionStatus?: ReturnType<typeof proStatus>;
+  servicesThrough?: string;
+  recommendedAction?: string;
+  moduleJob?: AutarkOsJob;
+  extensionAvailable?: () => boolean;
   onAction?: (action: ProAction) => void;
   status?: ReturnType<typeof proStatus>;
 };
@@ -48,7 +53,7 @@ function proStatus(installed = true) {
       previousComponentVersion: null,
       candidateVersion: null,
       health: installed ? 'healthy' : 'not-checked',
-      jobId: null,
+      jobId: null as string | null,
       errorCode: null,
       lastSuccessfulTransitionAt: installed ? fixedAt : null,
       lastTransitionAt: fixedAt,
@@ -91,7 +96,7 @@ function productState(status: ReturnType<typeof proStatus>) {
     },
     hostedServices: {
       state: status.entitlement.hostedServicesAllowed ? 'active' : softwareState === 'retained_use' ? 'expired' : 'unavailable',
-      allowed: status.entitlement.hostedServicesAllowed, servicesThrough: status.entitlement.serviceLeaseExpiresAt,
+      allowed: status.entitlement.hostedServicesAllowed, servicesThrough: null,
       lastVerifiedAt: status.entitlement.lastVerifiedServerTime, reasonCode: status.entitlement.reasonCode,
     },
     agent: {
@@ -116,7 +121,8 @@ test('installed Pro loads its browser module from the generic host', async ({ pa
 
   await expect(page.getByRole('heading', { name: 'Autark Pro is available' })).toBeVisible();
   await expect(page.getByText('Online access check', { exact: true })).toBeVisible();
-  await expect(page.getByText(/^Verified until /)).toBeVisible();
+  await expect(page.getByText('Last verified Jul 19, 2026', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Verified until /)).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Private extension surface' }))
     .toBeVisible();
   await expect(page.getByText('pro.dashboard')).toBeVisible();
@@ -124,6 +130,14 @@ test('installed Pro loads its browser module from the generic host', async ({ pa
   expect(requests.some((path) => path.startsWith('/api/v1/extensions/autark-pro/assets/entry.js')))
     .toBe(true);
   expect(requests).toContain('/api/v1/extensions/autark-pro/surfaces/pro.dashboard');
+});
+
+test('Online access check never uses the purchased term as its verification date', async ({ page }) => {
+  await openPro(page, true, { servicesThrough: '2027-08-10T17:00:00Z' });
+
+  await expect(page.getByText('Last verified Jul 19, 2026', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Last verified.*2027/)).toHaveCount(0);
+  await expect(page.getByText(/^Verified until /)).toHaveCount(0);
 });
 
 test('absent extension does not download browser code', async ({ page }) => {
@@ -138,9 +152,73 @@ test('absent extension does not download browser code', async ({ page }) => {
   expect(requests.some((path) => path.includes('/assets/'))).toBe(false);
 });
 
+test('Guardian recommendation opens the installed guidance while new activation is deferred', async ({ page }) => {
+  await openPro(page, true, { recommendedAction: 'review_guardian' });
+
+  const review = page.getByRole('button', { name: 'Review guidance', exact: true });
+  await expect(review).toBeVisible();
+  await review.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Autark Pro guidance', exact: true })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Private extension surface' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Check for update', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Device activation code')).toHaveCount(0);
+});
+
+test('missing installed guidance offers an in-page retry and preserves the CE shell', async ({ page }) => {
+  let available = false;
+  await openPro(page, true, {
+    recommendedAction: 'review_guardian',
+    extensionAvailable: () => available,
+  });
+  await page.getByRole('button', { name: 'Review guidance', exact: true }).click();
+  const guidance = page.getByRole('region', { name: 'Autark Pro guidance', exact: true });
+  await expect(guidance).toContainText('Private guidance is unavailable. Check your license and try again.');
+  await expect(page.getByRole('link', { name: /Home/i }).first()).toBeVisible();
+  available = true;
+  await guidance.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(guidance.getByRole('heading', { name: 'Private extension surface' })).toBeVisible();
+  await expect(guidance.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0);
+});
+
+test('a completed module job refreshes lifecycle state without a request loop', async ({ page }) => {
+  const status = proStatus(true);
+  status.module.jobId = 'pro-lifecycle-job';
+  const requests = await openPro(page, true, {
+    moduleJob: { ...jobFixture(), status: 'succeeded' },
+    status,
+  });
+  const statusRequests = () => requests.filter((path) => path === '/api/v1/pro/status').length;
+  await expect.poll(statusRequests).toBeGreaterThanOrEqual(2);
+  // Observe a quiet interval shorter than either normal lifecycle polling period.
+  await page.waitForTimeout(1_000);
+  expect(statusRequests()).toBeLessThanOrEqual(3);
+  expect(requests.filter((path) => path === '/api/v1/pro/product-state').length).toBeLessThanOrEqual(3);
+});
+
+test('reload resumes job observation and a failed candidate leaves existing guidance available', async ({ page }) => {
+  const status = proStatus(true);
+  status.module.state = 'VERIFYING';
+  status.module.jobId = 'pro-lifecycle-job';
+  const job: AutarkOsJob = { ...jobFixture(), status: 'running' };
+  await openPro(page, true, { moduleJob: job, status, recommendedAction: 'review_guardian' });
+  await expect(page.getByRole('region', { name: /for Private extension: running/ })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('region', { name: /for Private extension: running/ })).toBeVisible();
+
+  status.module.state = 'ACTIVE';
+  job.status = 'failed';
+  job.error = { code: 'candidate_unhealthy', message: 'The candidate failed its health check. Your previous extension is still running.', advancedDetails: {} };
+  await expect(page.getByRole('region', { name: /for Private extension: failed/ })).toContainText('Your previous extension is still running.');
+  await page.getByRole('button', { name: 'Review guidance', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Private extension surface' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Home/i }).first()).toBeVisible();
+});
+
 test('extension host shell is responsive and accessible', async ({ page }) => {
-  await openPro(page, true);
+  await openPro(page, true, { recommendedAction: 'review_guardian' });
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('button', { name: 'Review guidance', exact: true })).toBeVisible();
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth
       - document.documentElement.clientWidth);
@@ -152,6 +230,7 @@ test('extension host shell is responsive and accessible', async ({ page }) => {
   expect(results.violations.filter((violation) =>
     violation.impact === 'serious' || violation.impact === 'critical'))
     .toEqual([]);
+  await page.screenshot({ path: test.info().outputPath('pro-guidance-mobile.png'), fullPage: true });
 });
 
 test('Core beta offers no new activation and sends no activation requests', async ({ page }) => {
@@ -265,17 +344,30 @@ async function openPro(page: Page, installed: boolean, options: OpenProOptions =
   const requests: string[] = [];
   let status = options.status ?? proStatus(installed);
   await installMockApi(page, 'ready');
+  if (options.moduleJob) {
+    await page.route(`**/api/jobs/${options.moduleJob.jobId}`, (route) => fulfillJson(route, options.moduleJob));
+  }
   await page.route(
     (url) => new URL(url).pathname.startsWith('/api/v1/pro'),
     async (route) => {
       const path = new URL(route.request().url()).pathname;
+      requests.push(path);
       const body = route.request().postDataJSON() ?? null;
       if (path === '/api/v1/pro/status') {
         await fulfillJson(route, status);
         return;
       }
       if (path === '/api/v1/pro/product-state') {
-        await fulfillJson(route, productState(status));
+        const product = productState(status);
+        await fulfillJson(route, {
+          ...product,
+          // The real projection stamps each read with the current server time.
+          checkedAt: options.moduleJob ? new Date().toISOString() : product.checkedAt,
+          recommendedAction: options.recommendedAction
+            ? { id: options.recommendedAction, reasonCode: 'findings_available' }
+            : product.recommendedAction,
+          hostedServices: { ...product.hostedServices, servicesThrough: options.servicesThrough ?? null },
+        });
         return;
       }
       options.onAction?.({ body, path });
@@ -320,7 +412,7 @@ async function openPro(page: Page, installed: boolean, options: OpenProOptions =
     async (route) => {
       const path = new URL(route.request().url()).pathname;
       requests.push(path);
-      if (!installed) {
+      if (!installed || options.extensionAvailable?.() === false) {
         await fulfillJson(route, { error: { code: 'not_found' } }, 404);
       } else if (path.endsWith('/ui-manifest')) {
         await fulfillJson(route, {

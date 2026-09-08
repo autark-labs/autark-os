@@ -101,4 +101,26 @@ describe('Pro lifecycle model', () => {
     expect(proLifecycleModel(status('ACTIVE', 'ACTIVE'), product('ACTIVE', 'ACTIVE', 'check_release')).primaryAction).toBe('check-release');
     expect(proLifecycleModel(status('REVOKED', 'ACTIVE'), product('REVOKED', 'ACTIVE', 'review_entitlement')).primaryAction).toBe('none');
   });
+
+  it('preserves the canonical Guardian recommendation for available local guidance', () => {
+    const state = product('ACTIVE', 'ACTIVE', 'review_guardian');
+    const model = proLifecycleModel(status('ACTIVE', 'ACTIVE'), state);
+    expect(model.primaryAction).toBe('review-guidance');
+    expect(model.guidanceAvailable).toBe(true);
+    expect(model.reason).toBeNull();
+  });
+
+  it('does not direct owners to unavailable guidance from a stale recommendation', () => {
+    for (const change of [
+      (state: ProProductState) => { state.softwareEntitlement.localUseAllowed = false; },
+      (state: ProProductState) => { state.agent.health = 'failed'; },
+      (state: ProProductState) => { state.agent.digestPrefix = null; },
+    ]) {
+      const state = product('ACTIVE', 'ACTIVE', 'review_guardian');
+      change(state);
+      const model = proLifecycleModel(status('ACTIVE', 'ACTIVE'), state);
+      expect(model.primaryAction).toBe('none');
+      expect(model.guidanceAvailable).toBe(false);
+    }
+  });
 });

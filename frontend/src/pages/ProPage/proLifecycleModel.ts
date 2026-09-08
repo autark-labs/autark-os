@@ -6,12 +6,14 @@ export type ProLifecyclePrimaryAction =
   | 'check-release'
   | 'continue-activation'
   | 'install-release'
+  | 'review-guidance'
   | 'none';
 
 export type ProLifecycleModel = {
   canDeactivate: boolean;
   canRefreshEntitlement: boolean;
   canRemoveModule: boolean;
+  guidanceAvailable: boolean;
   description: string;
   primaryAction: ProLifecyclePrimaryAction;
   reason: string | null;
@@ -75,6 +77,9 @@ export function proLifecycleModel(status: ProStatusResponse, product: ProProduct
     ? 'Autark-OS is restoring the last known-good private extension.'
     : moduleCopy[product.agent.state];
   const primaryAction = primaryActionFor(product);
+  const guidanceAvailable = Boolean(product.softwareEntitlement.localUseAllowed
+    && product.agent.digestPrefix
+    && product.agent.health === 'healthy');
 
   return {
     canDeactivate: status.device.registered && status.activation.state === 'idle',
@@ -84,7 +89,8 @@ export function proLifecycleModel(status: ProStatusResponse, product: ProProduct
       && status.module.state !== 'REMOVING'
       && !status.module.jobId,
     description: `${entitlement.description} ${moduleDescription}`,
-    primaryAction,
+    guidanceAvailable,
+    primaryAction: primaryAction === 'review-guidance' && !guidanceAvailable ? 'none' : primaryAction,
     reason: redactedLifecycleReason(product),
     title: entitlement.title,
   };
@@ -96,6 +102,7 @@ function primaryActionFor(product: ProProductState): ProLifecyclePrimaryAction {
     check_release: 'check-release',
     continue_activation: 'continue-activation',
     install_release: 'install-release',
+    review_guardian: 'review-guidance',
   };
   return actions[product.recommendedAction.id] ?? 'none';
 }
@@ -104,6 +111,7 @@ function redactedLifecycleReason(product: ProProductState) {
   if (product.agent.state === 'error' || product.agent.state === 'degraded') {
     return 'The private extension reported a recoverable lifecycle problem. Review its Activity Log or remove the extension if recovery does not succeed. New installation and updates depend on the current release scope.';
   }
+  if (product.recommendedAction.id === 'review_guardian') return null;
   return product.recommendedAction.id === 'none'
     ? null
     : 'Autark-OS is showing the safest available local state. No appliance data was removed.';

@@ -15,6 +15,7 @@ import {
 type ExtensionSlotProps = {
   className?: string;
   extensionId: string;
+  required?: boolean;
   showErrors?: boolean;
   surface: string;
 };
@@ -26,6 +27,7 @@ const retryDelays = [300, 900, 1800];
 export function ExtensionSlot({
   className,
   extensionId,
+  required = false,
   showErrors = true,
   surface,
 }: ExtensionSlotProps) {
@@ -88,7 +90,7 @@ export function ExtensionSlot({
     };
   }, [attempt, extensionId, navigate, surface]);
 
-  if (state === 'absent') return null;
+  if (state === 'absent' && !required) return null;
   const retryAvailable = state !== 'loading' && state !== 'mounted' && state !== 'incompatible';
   const showStatus = state !== 'mounted' && state !== 'loading' && (showErrors || state === 'starting');
 
@@ -121,6 +123,7 @@ export function ExtensionSlot({
 
 function extensionStateMessage(state: ExtensionSlotState, attempt: number) {
   if (state === 'loading') return '';
+  if (state === 'absent') return 'Private guidance is unavailable. Check your license and try again.';
   if (state === 'starting') {
     return attempt < retryDelays.length
       ? 'Private guidance is starting. Autark-OS will try again shortly.'

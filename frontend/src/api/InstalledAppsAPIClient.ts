@@ -113,7 +113,7 @@ export const InstalledAppsAPIClient = {
   },
 
   async updateSettings(appId: string, settings: InstallSettings) {
-    const response = await httpClient.put<AppRuntimeView>(`/api/apps/${appId}/settings`, settings);
+    const response = await httpClient.put<AutarkOsJob>(`/api/apps/${appId}/settings`, settings);
     return response.data;
   },
 

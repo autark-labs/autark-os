@@ -1072,6 +1072,132 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "AUTARK_SETTINGS_DOCKER_REHEARSAL", matches = "1")
+    void realDockerSettingsRollbackPreservesDataAndOldAccess() throws Exception {
+        String project = "autark-val03-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        Path data = runtimeRoot.resolve("rehearsal-data");
+        Files.createDirectories(data);
+        Files.writeString(data.resolve("index.html"), "preserved-settings-data");
+        int oldPort;
+        int newPort;
+        try (var first = new java.net.ServerSocket(0); var second = new java.net.ServerSocket(0)) {
+            oldPort = first.getLocalPort();
+            newPort = second.getLocalPort();
+        }
+        String original = "services:\n  vaultwarden:\n    image: freshrss/freshrss:1.29.1\n"
+                + "    entrypoint: [php, -S, '0.0.0.0:80', -t, /data]\n"
+                + "    ports:\n      - '127.0.0.1:" + oldPort + ":80'\n"
+                + "    volumes:\n      - '" + data + ":/data:ro'\n";
+        Files.writeString(compose, original);
+        InstalledApp app = repository.findAppById("vaultwarden").orElseThrow();
+        repository.save(new InstalledApp(app.appId(), app.appName(), app.status(), app.runtimePath(), project,
+                "http://localhost:" + oldPort, app.installedAt()));
+        var real = new com.autarkos.marketplace.install.ProcessDockerComposeExecutor(new com.autarkos.system.SystemCommandRunner());
+        composeExecutor.realObservation = real;
+        try {
+            var initial = real.up(compose, project);
+            assertThat(initial.successful()).withFailMessage(String.join("\n", initial.output())).isTrue();
+            var client = java.net.http.HttpClient.newHttpClient();
+            var request = java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:" + oldPort))
+                    .timeout(java.time.Duration.ofSeconds(5)).build();
+            assertThat(client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).body()).contains("preserved-settings-data");
+            composeExecutor.upBehavior = (path, call) -> {
+                var result = real.up(path, project);
+                assertThat(result.successful()).isTrue();
+                return call == 1 ? new RuntimeModels.DockerComposeResult(1, List.of("injected failure after real Compose apply")) : result;
+            };
+            assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:" + newPort)))
+                    .hasMessageContaining("previous containers are running again");
+            assertThat(composeExecutor.upCalls).isEqualTo(2);
+            assertThat(compose).hasContent(original);
+            assertThat(client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString()).body()).contains("preserved-settings-data");
+            assertThat(data.resolve("index.html")).hasContent("preserved-settings-data");
+            assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
+        } finally {
+            assertThat(real.down(compose, project).successful()).isTrue();
+        }
+    }
+
+    @Test
+    void localProtocolChangesAreBlockedWithoutChangingRuntime() {
+        var requested = InstallModels.InstallSettings.defaults("https://localhost:8090");
+        assertThat(service.settingsChangePlan("vaultwarden", requested).blockedReasons())
+                .anyMatch(reason -> reason.contains("protocol"));
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested)).hasMessageContaining("protocol");
+        assertThat(composeExecutor.upCalled).isFalse();
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
+    }
+
+    @Test
+    void privateRollbackFailureKeepsCheckpointForNormalRepair() {
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
+                "http://localhost:8090", "https://autark-os.example.ts.net:12890", true,
+                java.util.Map.of(), InstallModels.BackupPolicy.defaults()));
+        composeExecutor.upBehavior = (path, call) -> new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("result"));
+        tailscaleService.failServe = true;
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("Use Repair");
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isPresent();
+        assertThat(service.settingsChangePlan("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")).saveAllowed()).isFalse();
+        tailscaleService.failServe = false;
+        assertThat(service.repair("vaultwarden").ok()).isTrue();
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
+        assertThat(tailscaleService.lastLocalPort).isEqualTo(8090);
+    }
+
+    @Test
+    void interruptedSettingsKeepCheckpointAndRecoverOnStartup() throws Exception {
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        String original = Files.readString(compose);
+        composeExecutor.upBehavior = (path, call) -> { throw new AssertionError("simulated process exit"); };
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .isInstanceOf(AssertionError.class);
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isPresent();
+        assertThat(service.getApp("vaultwarden").friendlyStatus()).isEqualTo("Needs attention");
+        assertThatThrownBy(() -> service.start("vaultwarden")).hasMessageContaining("Use Repair");
+        composeExecutor.upBehavior = null;
+        service.recoverInterruptedSettings();
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
+        assertThat(compose).hasContent(original);
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().expectedLocalPort()).isEqualTo(8090);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"running", "exited"})
+    void persistenceFailureRollsBackRuntimeAndAtomicallyPreservesPreviousPreferences(String state) throws Exception {
+        composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
+                "autark-os-vaultwarden", "vaultwarden", state, "", state, "0.0.0.0:8090->80/tcp"));
+        var originalSettings = InstallModels.InstallSettings.defaults("http://localhost:8090");
+        repository.saveSettings("vaultwarden", originalSettings);
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + runtimeLayout.databasePath());
+                var statement = connection.createStatement()) {
+            statement.execute("create trigger reject_test_port before update on installed_app_settings when NEW.expected_local_port = 19090 begin select raise(abort, 'injected settings failure'); end");
+        }
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("previous container configuration was restored");
+        assertThat(composeExecutor.upCalls).isEqualTo("running".equals(state) ? 2 : 0);
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
+        assertThat(repository.findAppById("vaultwarden").orElseThrow().accessUrl()).isEqualTo("http://localhost:8090");
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow()).isEqualTo(originalSettings);
+    }
+
+    @Test
+    void failedRedeployRestoresPrivateLinkRemovedBySettingsChange() {
+        repository.saveSettings("vaultwarden", new InstallModels.InstallSettings(
+                "http://localhost:8090", "https://autark-os.example.ts.net:12890", true,
+                java.util.Map.of(), InstallModels.BackupPolicy.defaults()));
+        composeExecutor.upBehavior = (path, call) -> new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("result"));
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("previous containers are running again");
+        assertThat(tailscaleService.disableCalled).isTrue();
+        assertThat(tailscaleService.lastLocalPort).isEqualTo(8090);
+        assertThat(tailscaleService.lastHttpsPort).isEqualTo(12890);
+        assertThat(repository.settingsRecoveryFor("vaultwarden")).isEmpty();
+        assertThat(repository.settingsFor("vaultwarden").orElseThrow().tailscaleEnabled()).isTrue();
+    }
+
+    @Test
     void failedSettingsApplyReappliesOriginalComposeAndVerifiesRunningContainers() throws Exception {
         Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
         String original = Files.readString(compose).replace("'8090:80'", "'8090:80'\n      - '18091:81/udp'")
@@ -1316,6 +1442,7 @@ class AppLifecycleServiceTests {
         int lastLocalPort;
         int lastHttpsPort;
         boolean disableCalled;
+        boolean failServe;
 
         @Override
         public TailscaleServeResult disableHttps(int httpsPort) {
@@ -1325,6 +1452,7 @@ class AppLifecycleServiceTests {
 
         @Override
         public TailscaleServeResult serveHttps(int localPort, int httpsPort) {
+            if (failServe) return new TailscaleServeResult(false, null, "Injected Tailscale failure", List.of());
             lastLocalPort = localPort;
             lastHttpsPort = httpsPort;
             return new TailscaleServeResult(true, "https://autark-os.example.ts.net:" + httpsPort, "Private HTTPS link is ready.", List.of("fake tailscale serve " + localPort));
@@ -1362,6 +1490,7 @@ class AppLifecycleServiceTests {
         boolean upCalled;
         int upCalls;
         java.util.function.BiFunction<Path, Integer, RuntimeModels.DockerComposeResult> upBehavior;
+        DockerComposeExecutor realObservation;
         List<String> failUpOutput = List.of();
         boolean failDown;
         boolean downCalled;
@@ -1438,6 +1567,7 @@ class AppLifecycleServiceTests {
 
         @Override
         public RuntimeModels.DockerContainerObservation observeContainersForApp(Path composeFile, String projectName, String appId) {
+            if (realObservation != null) return realObservation.observeContainersForApp(composeFile, projectName, appId);
             return observationFails
                     ? RuntimeModels.DockerContainerObservation.failed(List.of("Docker status check timed out."))
                     : RuntimeModels.DockerContainerObservation.successful(containers(composeFile, projectName));

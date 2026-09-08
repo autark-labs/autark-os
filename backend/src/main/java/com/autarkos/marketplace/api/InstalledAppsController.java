@@ -308,8 +308,16 @@ public class InstalledAppsController {
     }
 
     @PutMapping("/{id}/settings")
-    public AppRuntimeView updateSettings(@PathVariable String id, @RequestBody InstallModels.InstallSettings settings) {
-        return refreshAfter(appLifecycleService.updateSettings(id, settings));
+    public AutarkOsJob updateSettings(@PathVariable String id, @RequestBody InstallModels.InstallSettings settings) {
+        return jobService.startWithJob(AutarkOsStates.JobType.SAVE_APP_SETTINGS, id,
+                List.of(AutarkOsJobStep.pending("apply_settings", "Apply settings or recover the previous configuration")), settings, job -> {
+                    try {
+                        appLifecycleService.updateSettings(id, settings);
+                        return AutarkOsJobOutcome.succeeded("Settings saved. Paused apps use the new configuration on their next start.");
+                    } finally {
+                        applicationStateService.invalidate();
+                    }
+                });
     }
 
     @PostMapping("/{id}/settings-plan")

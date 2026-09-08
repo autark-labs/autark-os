@@ -236,7 +236,7 @@ export function setRuntimeAppInState(state: ApplicationState | undefined, app: A
 }
 
 function lifecycleJobTypes() {
-  return new Set(['install_app', 'repair_app', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app']);
+  return new Set(['install_app', 'repair_app', 'save_app_settings', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app']);
 }
 
 function jobTargetsApp(job: AutarkOsJob | null | undefined, appId?: string | null) {
@@ -323,6 +323,7 @@ function operationKind(type: string): AppOperationKind {
   if (type === 'stop_app') return 'stopping';
   if (type === 'restart_app') return 'restarting';
   if (type === 'repair_app') return 'repairing';
+  if (type === 'save_app_settings') return 'saving_settings';
   if (type === 'install_app') return 'installing';
   if (type === 'backup' || type === 'backup_verify') return 'backing_up';
   if (type === 'backup_restore') return 'restoring';
@@ -337,6 +338,7 @@ function operationLabel(type: string) {
   if (type === 'stop_app') return 'Pausing';
   if (type === 'restart_app') return 'Restarting';
   if (type === 'repair_app') return 'Repairing';
+  if (type === 'save_app_settings') return 'Saving settings';
   if (type === 'install_app') return 'Installing';
   if (type === 'backup' || type === 'backup_verify') return 'Creating backup';
   if (type === 'backup_restore') return 'Restoring';

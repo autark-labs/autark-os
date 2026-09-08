@@ -49,15 +49,20 @@ type ApplicationSettingsTabProps = {
 };
 
 const backupFrequencies = ['daily', 'weekly', 'monthly'] as const;
-const protocols = ['http', 'https'] as const;
 
 export function ApplicationSettingsTab({ actions, item, loadingAction }: ApplicationSettingsTabProps) {
   const settingsRestriction = applicationActionRestriction(item, 'settings');
   const editable = item.managementState === 'managed' && item.settings.canEdit && !settingsRestriction.disabled;
-  const initialValues = useMemo(
-    () => settingsFormValues(item),
-    [item],
-  );
+  const { autoRepairEnabled, backupEnabled, backupFrequency, backupRetention, expectedLocalPort } = item.settings;
+  // Parent dirty-state updates and runtime polling replace the item object.
+  // Only changed persisted form values should reset a draft, not object identity.
+  const initialValues = useMemo(() => ({
+    autoRepairEnabled,
+    backupEnabled,
+    backupFrequency: normalizeBackupFrequency(backupFrequency),
+    backupRetention,
+    localPort: expectedLocalPort,
+  }), [autoRepairEnabled, backupEnabled, backupFrequency, backupRetention, expectedLocalPort]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingImpact, setPendingImpact] = useState<ApplicationSettingsImpact | null>(null);
   const [pendingValues, setPendingValues] = useState<ApplicationSettingsFormValues | null>(null);
@@ -83,12 +88,13 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
     setPendingImpact(null);
     setPendingValues(null);
     setPlanError(null);
-  }, [initialValues, reset]);
+  }, [item.id, initialValues, reset]);
 
+  const onDirtyChange = actions.onDirtyChange;
   useEffect(() => {
-    actions.onDirtyChange(item.id, isDirty);
-    return () => actions.onDirtyChange(item.id, false);
-  }, [actions, isDirty, item.id]);
+    onDirtyChange(item.id, isDirty);
+    return () => onDirtyChange(item.id, false);
+  }, [onDirtyChange, isDirty, item.id]);
 
   useEffect(() => {
     if (!isDirty) {
@@ -193,14 +199,6 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
               label="Local app port"
               min={1}
               name="localPort"
-            />
-            <SelectField
-              control={control}
-              disabled={!editable || busy}
-              explanation="This tells Autark-OS whether the local app endpoint should be checked as HTTP or HTTPS."
-              label="Local protocol"
-              name="expectedProtocol"
-              options={protocols}
             />
           </div>
         </FieldSet>
@@ -451,7 +449,7 @@ function SelectField({
   disabled: boolean;
   explanation: string;
   label: string;
-  name: 'backupFrequency' | 'expectedProtocol';
+  name: 'backupFrequency';
   options: readonly string[];
 }) {
   const inputId = useId();
@@ -512,17 +510,6 @@ function SettingsImpactAlert({ impact }: { impact: ApplicationSettingsImpact }) 
       </AlertDescription>
     </Alert>
   );
-}
-
-function settingsFormValues(item: ApplicationSurfaceItem): ApplicationSettingsFormValues {
-  return {
-    autoRepairEnabled: item.settings.autoRepairEnabled,
-    backupEnabled: item.settings.backupEnabled,
-    backupFrequency: normalizeBackupFrequency(item.settings.backupFrequency),
-    backupRetention: item.settings.backupRetention,
-    expectedProtocol: item.settings.expectedProtocol === 'https' ? 'https' : 'http',
-    localPort: item.settings.expectedLocalPort,
-  };
 }
 
 function privateNetworkStatus(item: ApplicationSurfaceItem, accessChanging: boolean) {

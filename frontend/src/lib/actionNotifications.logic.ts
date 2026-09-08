@@ -128,6 +128,8 @@ function jobOperationLabel(type: string | null | undefined) {
       return 'Install';
     case 'repair_app':
       return 'Repair';
+    case 'save_app_settings':
+      return 'Settings change';
     case 'update_app':
       return 'Update';
     case 'rollback_app':

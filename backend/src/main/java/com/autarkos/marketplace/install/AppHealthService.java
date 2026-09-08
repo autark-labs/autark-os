@@ -118,7 +118,11 @@ class AppHealthService {
         String status;
         String message;
         String detail;
-        if (AutarkOsStates.AppStatus.READY.equals(runtime.friendlyStatus()) && !localBroken && !privateBroken) {
+        if (repository.settingsRecoveryFor(app.appId()).isPresent()) {
+            status = AutarkOsStates.AppStatus.NEEDS_ATTENTION;
+            message = "Settings recovery needs attention";
+            detail = "Use Repair in My Apps to restore the saved settings before making another change.";
+        } else if (AutarkOsStates.AppStatus.READY.equals(runtime.friendlyStatus()) && !localBroken && !privateBroken) {
             status = AutarkOsStates.AppStatus.READY;
             message = health.successLabel();
             detail = containerOnly ? health.description() : "Docker is running and expected links are responding.";

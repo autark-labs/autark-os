@@ -99,6 +99,7 @@ public final class AutarkOsStates {
         public static final String BACKUP_RESTORE = "backup_restore";
         public static final String UNINSTALL_APP = "uninstall_app";
         public static final String UPDATE_APP = "update_app";
+        public static final String SAVE_APP_SETTINGS = "save_app_settings";
         public static final String ROLLBACK_APP = "rollback_app";
 
         private JobType() {

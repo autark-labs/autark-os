@@ -272,6 +272,7 @@ public class ApplicationStateService {
                 AutarkOsStates.JobType.STOP_APP,
                 AutarkOsStates.JobType.RESTART_APP,
                 AutarkOsStates.JobType.REPAIR_APP,
+                AutarkOsStates.JobType.SAVE_APP_SETTINGS,
                 AutarkOsStates.JobType.BACKUP,
                 AutarkOsStates.JobType.BACKUP_VERIFY,
                 AutarkOsStates.JobType.BACKUP_RESTORE,
@@ -346,6 +347,7 @@ public class ApplicationStateService {
             case AutarkOsStates.JobType.STOP_APP -> AutarkOsStates.OperationKind.STOPPING;
             case AutarkOsStates.JobType.RESTART_APP -> AutarkOsStates.OperationKind.RESTARTING;
             case AutarkOsStates.JobType.REPAIR_APP -> AutarkOsStates.OperationKind.REPAIRING;
+            case AutarkOsStates.JobType.SAVE_APP_SETTINGS -> "saving_settings";
             case AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY -> AutarkOsStates.OperationKind.BACKING_UP;
             case AutarkOsStates.JobType.BACKUP_RESTORE -> AutarkOsStates.OperationKind.RESTORING;
             case AutarkOsStates.JobType.UNINSTALL_APP -> AutarkOsStates.OperationKind.UNINSTALLING;
@@ -361,6 +363,7 @@ public class ApplicationStateService {
             case AutarkOsStates.JobType.STOP_APP -> "Pausing";
             case AutarkOsStates.JobType.RESTART_APP -> "Restarting";
             case AutarkOsStates.JobType.REPAIR_APP -> "Repairing";
+            case AutarkOsStates.JobType.SAVE_APP_SETTINGS -> "Saving settings";
             case AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY -> "Creating backup";
             case AutarkOsStates.JobType.BACKUP_RESTORE -> "Restoring";
             case AutarkOsStates.JobType.UNINSTALL_APP -> "Uninstalling safely";

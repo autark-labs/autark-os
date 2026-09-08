@@ -14,6 +14,13 @@ import com.autarkos.marketplace.model.ApplicationManifest;
 
 class AppSettingsPolicy {
 
+    InstallModels.InstallSettings withPrivateAccess(InstallModels.InstallSettings settings, String url) {
+        return new InstallModels.InstallSettings(settings.accessUrl(), url, true, settings.storageSubfolders(),
+                settings.backup(), settings.desiredAccessMode(), settings.privateAccessRequirement(),
+                settings.expectedLocalPort(), settings.expectedProtocol(), settings.lastAccessCheckAt(),
+                settings.lastSuccessfulAccessAt(), settings.lastRepairAttemptAt(), settings.lastRepairStatus(), settings.autoRepairEnabled());
+    }
+
     private static final Pattern SAFE_STORAGE_NAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
     private static final Set<String> BACKUP_FREQUENCIES = Set.of("hourly", "daily", "weekly");
 
@@ -49,9 +56,11 @@ class AppSettingsPolicy {
                 warnings.add("Running apps restart to use the new port. Paused apps use the new port the next time you start them.");
             }
         }
-        if (!same(current.expectedProtocol(), requested.expectedProtocol())) {
-            changes.add("Expected protocol will change to " + requested.expectedProtocol() + ".");
-            restartRequired = true;
+        String currentProtocol = current.expectedProtocol() != null ? current.expectedProtocol()
+                : java.net.URI.create(app.accessUrl() == null ? "http://localhost" : app.accessUrl()).getScheme();
+        if (!same(currentProtocol, requested.expectedProtocol())
+                || (requested.accessUrl() != null && !same(currentProtocol, java.net.URI.create(requested.accessUrl()).getScheme()))) {
+            blocked.add("The local protocol is configured by the app and cannot be changed here. Use Tailscale private access for an HTTPS link.");
         }
         if (current.tailscaleEnabled() != requested.tailscaleEnabled()) {
             changes.add(requested.tailscaleEnabled() ? "Private access preference will be enabled." : "Private access preference will be disabled.");
@@ -143,6 +152,8 @@ class AppSettingsPolicy {
     }
 
     InstallModels.InstallSettings normalizeSettings(InstallModels.InstallSettings settings, InstalledApp app, ApplicationManifest manifest, String accessUrl) {
+        // Runtime probes must not overwrite preferences while an edit can still roll back.
+        if (repository.settingsRecoveryFor(app.appId()).isPresent()) return settings;
         AccessManifest accessManifest = manifest == null ? AccessManifest.defaults() : manifest.access();
         String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : accessManifest.defaultMode());
         String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
