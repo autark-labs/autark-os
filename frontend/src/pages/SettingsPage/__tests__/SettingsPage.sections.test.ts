@@ -48,3 +48,11 @@ test('keeps storage-only preferences out of the free settings surface', () => {
   assert.doesNotMatch(page, /label="Language"|label="Temperature unit"|label="Date format"|label="Time format"/);
   assert.doesNotMatch(page, /Start Autark-OS on boot|Default install access|Prefer private installs/);
 });
+
+test('keeps the external backup path out of the routine settings flow', () => {
+  const panels = readFileSync(resolve(here, '../SettingsPage.panels.tsx'), 'utf8');
+
+  assert.match(panels, /Store restore points on this device by default/);
+  assert.match(panels, /Use an external drive/);
+  assert.match(panels, /externalDestinationOpen/);
+});

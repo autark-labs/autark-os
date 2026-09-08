@@ -277,6 +277,24 @@ class ExtensionHostServiceTests {
         verify(fixture.audit()).recordRequired(any(ProAuditEvent.class));
     }
 
+    @Test
+    void privateActionsRequireEntitlementAndAnInstalledSurface() {
+        Fixture fixture = fixture();
+        var payload = JsonNodeFactory.instance.objectNode().put("opaque", "owner-intent");
+        var request = new ExtensionActionRequest("1", "pro.dashboard", "private.intent", payload);
+        var result = new ExtensionActionResult("1", "completed", payload,
+                new ExtensionActionResult.Summary(Instant.now(), 0, "none"));
+        when(fixture.agent().action(request)).thenReturn(result);
+        assertThat(fixture.service().action("autark-pro", request)).isEqualTo(result);
+        assertThatThrownBy(() -> fixture.service().action("autark-pro",
+                new ExtensionActionRequest("1", "home.unregistered", "private.intent", payload)))
+                .isInstanceOf(ResponseStatusException.class);
+        when(fixture.entitlements().status()).thenReturn(status(false, DIGEST, "healthy"));
+        assertThatThrownBy(() -> fixture.service().action("autark-pro", request))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(fixture.agent(), times(1)).action(any());
+    }
+
     private static Fixture fixture() {
         ProAgentClientRouter agent = mock(ProAgentClientRouter.class);
         ProEntitlementService entitlements =

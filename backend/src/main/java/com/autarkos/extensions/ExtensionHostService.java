@@ -301,7 +301,7 @@ public final class ExtensionHostService {
                 || !Set.of("new", "compatible", "reset")
                         .contains(result.stateCompatibility())
                 || result.activeFindingCount() < 0
-                || result.activeFindingCount() > 100
+                || result.activeFindingCount() > 500
                 || !Set.of(
                         "none",
                         "info",

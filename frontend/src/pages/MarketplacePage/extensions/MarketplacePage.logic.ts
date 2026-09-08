@@ -1,5 +1,6 @@
 export const START_HERE_DISMISSAL_KEY = 'autark-os:discover:start-here-dismissed:v1';
 
+import betaScope from '@beta-scope';
 import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import type { DiscoverAppView, DiscoverInstalledAppSummary } from '@/types/discover';
 import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
@@ -32,6 +33,15 @@ type StarterAppContext = {
   limitedStorage: boolean;
   privateAccessBlocked: boolean;
 };
+
+/**
+ * Discover's quiet first-run guidance must describe the same apps that the
+ * backend permits a beta owner to install. The release-owned scope file is
+ * deliberately shared with the browser instead of maintaining another list
+ * in this page.
+ */
+export const betaStarterAppIds = betaScope.apps.map((app) => app.id);
+export const defaultDiscoverAppId = betaStarterAppIds[0] ?? null;
 
 export function marketplaceVisibleApps({
   apps = [],
@@ -111,7 +121,8 @@ export function starterAppsForMarketplace(
   doctor: SystemDoctorStatus | null | undefined,
   storage: StorageReport | null | undefined,
 ) {
-  const selectedIds = (recommendedApps.length ? recommendedApps : ['vaultwarden', 'jellyfin', 'homepage', 'freshrss', 'syncthing']).slice(0, 5);
+  const eligibleRecommendations = recommendedApps.filter((appId) => betaStarterAppIds.includes(appId));
+  const selectedIds = (eligibleRecommendations.length ? eligibleRecommendations : betaStarterAppIds).slice(0, 5);
   const appInstallsBlocked = doctor?.readiness.groups.find((group) => group.id === 'app-installs')?.status === 'warning';
   const privateAccessBlocked = doctor?.readiness.groups.find((group) => group.id === 'private-access')?.status === 'warning';
   const limitedStorage = storage?.status === 'warning' || storage?.status === 'critical' || (storage?.runtimeDisk.usedPercent ?? 0) >= 75;
@@ -149,20 +160,8 @@ export function shouldShowStartHereSection(
 }
 
 export function starterCatalogForDiscover(apps: MarketplaceApp[]) {
-  const starterIds = ['vaultwarden', 'jellyfin', 'homepage', 'immich', 'adguard-home', 'home-assistant', 'nextcloud'];
   const byId = new Map(apps.map((app) => [app.id, app]));
-  const starterApps = starterIds.map((appId) => byId.get(appId)).filter((app): app is MarketplaceApp => Boolean(app));
-  const readyApps = apps.filter((app) => app.supportLevel === 'Ready' || app.badge === 'Official' || marketplaceDifficultyRank(app.difficulty) === 0);
-  const catalog: MarketplaceApp[] = [];
-  for (const app of [...starterApps, ...readyApps]) {
-    if (!catalog.some((candidate) => candidate.id === app.id) && app.supportLevel !== 'Advanced' && app.supportLevel !== 'Experimental') {
-      catalog.push(app);
-    }
-    if (catalog.length >= 6) {
-      break;
-    }
-  }
-  return catalog;
+  return betaStarterAppIds.map((appId) => byId.get(appId)).filter((app): app is MarketplaceApp => Boolean(app));
 }
 
 export function safeBasicCatalogForDiscover(apps: MarketplaceApp[]) {

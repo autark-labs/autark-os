@@ -34,6 +34,21 @@ class ExtensionRefreshSchedulerTests {
             Instant.parse("2026-07-26T20:00:00Z");
 
     @Test
+    void newerDecisionSummaryWinsOverAnOlderAnalysisCompletion() {
+        Fixture fixture = fixture();
+        fixture.scheduler.acceptSummary(new ExtensionActionResult.Summary(START.plusSeconds(20), 0, "none"));
+        fixture.scheduler.acceptSummary(new ExtensionActionResult.Summary(START.plusSeconds(10), 3, "high"));
+        assertThat(fixture.scheduler.status().activeFindingCount()).isZero();
+        assertThat(fixture.scheduler.status().latestAnalysisAt()).isNull();
+        fixture.scheduler.requestRefresh("explicit_refresh");
+        fixture.clock.advance(Duration.ofSeconds(10));
+        fixture.scheduler.tick();
+        assertThat(fixture.scheduler.status().activeFindingCount()).isZero();
+        assertThat(fixture.scheduler.status().highestSeverity()).isEqualTo("none");
+        assertThat(fixture.scheduler.status().reasonCode()).isEqualTo("analysis_healthy");
+    }
+
+    @Test
     void rapidMutationBurstProducesOneTrailingDebouncedRun() {
         Fixture fixture = fixture();
 

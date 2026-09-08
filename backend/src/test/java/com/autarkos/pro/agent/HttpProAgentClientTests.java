@@ -42,6 +42,30 @@ class HttpProAgentClientTests {
     }
 
     @Test
+    void forwardsBoundedOpaqueActionsWithTheInstalledCredential() throws Exception {
+        AtomicReference<JsonNode> received = new AtomicReference<>();
+        AtomicReference<String> authorization = new AtomicReference<>();
+        start(exchange -> {
+            assertThat(exchange.getRequestURI().getPath()).isEqualTo("/v1/extensions/actions");
+            authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            received.set(new ObjectMapper().readTree(exchange.getRequestBody()));
+            respond(exchange, 200, """
+                    {"schemaVersion":"1","outcome":"conflict","payload":{},"summary":null}
+                    """);
+        });
+        var payload = new ObjectMapper().createObjectNode().put("opaque", "owner-intent");
+        var request = new com.autarkos.extensions.ExtensionActionRequest("1", "pro.dashboard", "private.intent", payload);
+        var result = fixture(Duration.ofSeconds(1)).client().action(endpoint(), request);
+        assertThat(result.outcome()).isEqualTo("conflict");
+        assertThat(received.get().get("payload")).isEqualTo(payload);
+        assertThat(authorization.get()).startsWith("Bearer ").hasSize(50);
+        assertThatThrownBy(() -> fixture(Duration.ofSeconds(1)).client().action(endpoint(),
+                new com.autarkos.extensions.ExtensionActionRequest("1", "pro.dashboard", "private.intent",
+                        new ObjectMapper().createObjectNode().put("large", "x".repeat(16384)))))
+                .isInstanceOf(ProAgentClientException.class);
+    }
+
+    @Test
     void exercisesAuthenticatedUiAndSurfaceEndpoints()
             throws Exception {
         NormalizedHostSnapshot snapshot = snapshot();

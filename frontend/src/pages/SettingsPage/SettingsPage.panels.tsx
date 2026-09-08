@@ -169,10 +169,17 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
 function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfigureBackupDestination, onUpdate }: PanelProps & { apps: AppRuntimeView[]; backupDestination: BackupDestination | null; backupSchedule: BackupSettingsSummary | null; onConfigureBackupDestination: (path: string) => Promise<void> }) {
   const protectedApps = apps.filter((app) => app.canonicalBackupState === 'protected_by_restore_point').length;
   const [destinationPath, setDestinationPath] = useState(backupDestination?.configuredPath || '');
+  const [externalDestinationOpen, setExternalDestinationOpen] = useState(backupDestination?.kind === 'external');
   const [updatingDestination, setUpdatingDestination] = useState(false);
   useEffect(() => setDestinationPath(backupDestination?.configuredPath || ''), [backupDestination?.configuredPath]);
   const external = backupDestination?.kind === 'external';
   const destinationReady = backupDestination?.status === 'ready';
+
+  useEffect(() => {
+    if (external) {
+      setExternalDestinationOpen(true);
+    }
+  }, [external]);
 
   async function updateDestination() {
     setUpdatingDestination(true);
@@ -197,18 +204,28 @@ function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfig
       <SettingRow controlId="settings-backup-retention" helpId="automaticBackupsEnabled" label="Retention" note="How many days automatic backups should be kept.">
         <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-retention" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
-      <SettingRow controlId="settings-backup-destination" helpId="automaticBackupsEnabled" label="Backup destination" note="Use an external mounted drive for protection against failure of this device's runtime drive.">
+      <SettingRow controlId="settings-backup-destination" helpId="automaticBackupsEnabled" label="Backup location" note="Store restore points on this device by default. An external drive adds protection if this device's runtime drive fails.">
         <div className="grid w-full max-w-xl gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Input className="min-w-0 flex-1 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-destination" onChange={(event) => setDestinationPath(event.target.value)} placeholder="/mnt/backup-drive/autark-os-backups" value={destinationPath} />
-            <ProjectDarkControlButton disabled={!destinationPath.trim() || updatingDestination} onClick={() => void updateDestination()} size="sm" type="button">
-              {updatingDestination ? 'Checking…' : 'Use destination'}
-            </ProjectDarkControlButton>
-          </div>
           <p className={cn('text-xs leading-5', destinationReady ? 'text-slate-400' : 'text-amber-200')}>
             {backupDestination?.message || 'Autark-OS has not checked a backup destination yet.'}
           </p>
           {backupDestination && <p className="text-xs text-slate-500">{external ? `External drive${backupDestination.mountPoint ? ` mounted at ${backupDestination.mountPoint}` : ''}.` : 'Stored on this device. It protects against app mistakes, not runtime-drive failure.'}</p>}
+          {!externalDestinationOpen && <ProjectDarkControlButton className="w-fit" onClick={() => setExternalDestinationOpen(true)} size="sm" type="button">
+            Use an external drive
+          </ProjectDarkControlButton>}
+          {externalDestinationOpen && <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-3">
+            <p className="text-sm font-medium text-foreground">External backup drive</p>
+            <p className="text-xs leading-5 text-muted-foreground">Choose a folder on a mounted drive. Autark-OS verifies that it is safe and writable before using it.</p>
+            <div className="flex flex-wrap gap-2">
+              <Input className="min-w-0 flex-1" id="settings-backup-destination" onChange={(event) => setDestinationPath(event.target.value)} placeholder="/mnt/backup-drive/autark-os-backups" value={destinationPath} />
+              <ProjectDarkControlButton disabled={!destinationPath.trim() || updatingDestination} onClick={() => void updateDestination()} size="sm" type="button">
+                {updatingDestination ? 'Checking…' : 'Use external drive'}
+              </ProjectDarkControlButton>
+            </div>
+            {!external && <ProjectDarkControlButton className="w-fit" onClick={() => setExternalDestinationOpen(false)} size="sm" type="button">
+              Keep backups on this device
+            </ProjectDarkControlButton>}
+          </div>}
         </div>
       </SettingRow>
       <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={<LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule?.nextRoutineRun }} />} />

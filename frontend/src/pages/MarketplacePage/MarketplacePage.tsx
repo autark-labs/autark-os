@@ -44,6 +44,7 @@ import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
 import { categories, type MarketplaceStatusFilter } from './extensions/MarketplacePage.constants';
 import {
   START_HERE_DISMISSAL_KEY,
+  defaultDiscoverAppId,
   formatMarketplaceActivityTime,
   marketplaceActivityTone,
   marketplaceVisibleAppViews,
@@ -90,7 +91,7 @@ function MarketplacePage() {
   const wideRailLayout = useDiscoverRailLayout();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedAppId, setSelectedAppId] = useState('vaultwarden');
+  const [selectedAppId, setSelectedAppId] = useState(defaultDiscoverAppId);
   const [sortBy, setSortBy] = useState('Recommended');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<MarketplaceStatusFilter>('all');
@@ -310,8 +311,8 @@ function MarketplacePage() {
     [apps, doctor, installedById, onboarding?.recommendedApps, storage],
   );
   const showStartHere = shouldShowStartHereSection(starterRecommendations, startHereDismissed);
-  const vaultwardenRecommendation = useMemo(
-    () => starterRecommendations.find((recommendation) => recommendation.app.id === 'vaultwarden' && !recommendation.installed) ?? null,
+  const starterRecommendation = useMemo(
+    () => starterRecommendations.find((recommendation) => !recommendation.installed) ?? null,
     [starterRecommendations],
   );
   const starterGuidanceVisible = Boolean(
@@ -320,7 +321,7 @@ function MarketplacePage() {
     && !searchQuery.trim()
     && statusFilter === 'all'
     && showStartHere
-    && vaultwardenRecommendation,
+    && starterRecommendation,
   );
   const canRestoreStarterGuidance = Boolean(
     !showAdvancedMetrics
@@ -328,7 +329,7 @@ function MarketplacePage() {
     && !searchQuery.trim()
     && statusFilter === 'all'
     && startHereDismissed
-    && vaultwardenRecommendation,
+    && starterRecommendation,
   );
   const discoverFilters = useMemo(
     () => showAdvancedMetrics
@@ -469,10 +470,10 @@ function MarketplacePage() {
             onRestoreStarterGuidance={canRestoreStarterGuidance ? restoreStartHere : undefined}
             onSelect={selectApp}
             selectedAppId={selectedView?.id ?? ''}
-            starterGuidance={starterGuidanceVisible && vaultwardenRecommendation ? {
-              appName: vaultwardenRecommendation.app.name,
+            starterGuidance={starterGuidanceVisible && starterRecommendation ? {
+              appName: starterRecommendation.app.name,
               onDismiss: dismissStartHere,
-              onReview: () => openAppDetails(vaultwardenRecommendation.app.id),
+              onReview: () => openAppDetails(starterRecommendation.app.id),
             } : null}
           />
         </section>

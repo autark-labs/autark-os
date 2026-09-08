@@ -82,9 +82,41 @@ git diff --check
 - Add a regression test when a state can disagree across surfaces or after a
   failed operation.
 
-For catalog changes, follow the [manifest authoring checklist](./development/manifest-authoring-checklist.md).
-For SQLite changes, follow [database migration discipline](./development/database-migrations.md).
 For contribution and review expectations, see [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+### Catalog changes
+
+A catalog manifest is the contract for a supported app, not a generic Compose
+file. Before changing one, verify that its friendly identity and first-run copy
+are understandable, its image and Compose project are unique, its runtime and
+backup paths stay under `/var/lib/autark-os/apps/<app-id>`, its port mappings
+do not collide, and its required services, durable data, health check, access
+mode, and initial setup are represented. Do not introduce privileged containers
+or arbitrary host mounts for a catalog change.
+
+Run the catalog-plan and manifest-validation tests that cover the changed
+contract, then run `cd backend && ./gradlew test`. A catalog entry is not
+beta-ready until its real image has passed the roster's install, first-use,
+restart, backup/restore, reboot, and uninstall qualification.
+
+### SQLite and Flyway changes
+
+Flyway owns schema creation and evolution. Add each schema change as a small,
+versioned `V#__description.sql` file under
+`backend/src/main/resources/db/migration/`; never create or repair tables from
+runtime code. Applied migrations are immutable: correct a shipped migration
+with a later forward-only migration. New non-null fields need explicit
+defaults, and data-risky changes need a backup/recovery note and a test against
+both clean and previously migrated databases.
+
+### Product language
+
+Use **Discover** for the catalog; call an app **installed** only when the
+current instance manages it. Host-detected resources are **Found on this
+server** and user-added shortcuts are **Linked services**. Use **Pause** and
+**Resume** for routine lifecycle controls. Say **Protected by a restore point**
+only after a successful restore point exists. User-facing support output is a
+**Support report**; technical names belong in Diagnostics or advanced detail.
 
 ## Build Local Release Artifacts
 

@@ -6,6 +6,41 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/extensions/{extensionId}/actions:
+    post:
+      operationId: performInstalledExtensionAction
+      summary: Submit an owner intent to an active installed extension.
+      description: Requires the administrator session, JSON content type and X-Autark-Extension-Action header. CE verifies entitlement and the installed manifest surface, bounds transport and forwards the private payload without interpretation.
+      parameters:
+        - name: extensionId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: X-Autark-Extension-Action
+          in: header
+          required: true
+          schema: { type: string, const: '1' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/extension-action-request-v1.schema.json
+      responses:
+        '200':
+          description: Private action outcome and opaque payload.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/extension-action-response-v1.schema.json
+        '401':
+          description: Administrator login required.
+        '403':
+          description: Use the installed same-origin browser surface.
+        '404':
+          description: Extension or surface is not available.
+        '413':
+          description: Action exceeds the 16 KiB request limit.
   /api/v1/pro/product-state:
     get:
       operationId: getCanonicalProProductState

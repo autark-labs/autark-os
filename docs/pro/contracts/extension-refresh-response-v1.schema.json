@@ -23,7 +23,7 @@
     "activeFindingCount": {
       "type": "integer",
       "minimum": 0,
-      "maximum": 100
+      "maximum": 500
     },
     "highestSeverity": {
       "enum": ["none", "info", "low", "medium", "high", "critical"]

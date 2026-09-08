@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import {
   START_HERE_DISMISSAL_KEY,
+  betaStarterAppIds,
   marketplacePrimaryRoute,
   marketplaceVisibleAppViews,
   marketplaceVisibleApps,
@@ -110,8 +111,8 @@ test('marketplaceVisibleApps applies supported sort modes', () => {
 
 test('starterAppsForMarketplace marks blocked and storage-review recommendations', () => {
   const apps = [
-    app({ id: 'vaultwarden', name: 'Vaultwarden', category: 'Security', difficulty: 'Easy' }),
-    app({ id: 'jellyfin', name: 'Jellyfin', difficulty: 'Advanced', installTime: '10 minutes' }),
+    app({ id: 'freshrss', name: 'FreshRSS', category: 'Productivity', difficulty: 'Easy' }),
+    app({ id: 'syncthing', name: 'Syncthing', difficulty: 'Advanced', installTime: '10 minutes' }),
   ];
   const doctor = {
     readiness: {
@@ -122,28 +123,40 @@ test('starterAppsForMarketplace marks blocked and storage-review recommendations
     },
   };
   const storage = { runtimeDisk: { usedPercent: 82 }, status: 'warning' };
-  const recommendations = starterAppsForMarketplace(apps, ['jellyfin', 'vaultwarden'], new Map(), doctor, storage);
+  const recommendations = starterAppsForMarketplace(apps, ['syncthing', 'freshrss'], new Map(), doctor, storage);
 
-  assert.equal(recommendations[0].app.id, 'vaultwarden');
+  assert.equal(recommendations[0].app.id, 'freshrss');
   assert.equal(recommendations[0].readiness, 'ready');
-  assert.equal(recommendations[1].app.id, 'jellyfin');
+  assert.equal(recommendations[1].app.id, 'syncthing');
   assert.equal(recommendations[1].readiness, 'review');
   assert.match(recommendations[1].notes.join(' '), /Storage is tight/);
 });
 
 test('starterAppsForMarketplace falls back to curated starter apps when onboarding did not pick apps', () => {
   const apps = [
-    app({ id: 'vaultwarden', name: 'Vaultwarden', category: 'Security' }),
-    app({ id: 'jellyfin', name: 'Jellyfin' }),
     app({ id: 'homepage', name: 'Homepage', category: 'Utilities' }),
     app({ id: 'freshrss', name: 'FreshRSS', category: 'Productivity' }),
     app({ id: 'syncthing', name: 'Syncthing', category: 'Productivity' }),
+    app({ id: 'vaultwarden', name: 'Vaultwarden', category: 'Security' }),
     app({ id: 'grafana', name: 'Grafana', category: 'Monitoring' }),
   ];
 
   const recommendations = starterAppsForMarketplace(apps, [], new Map(), null, null);
 
-  assert.deepEqual(recommendations.map((recommendation) => recommendation.app.id), ['vaultwarden', 'jellyfin', 'homepage', 'freshrss', 'syncthing']);
+  assert.deepEqual(recommendations.map((recommendation) => recommendation.app.id), betaStarterAppIds);
+});
+
+test('starterAppsForMarketplace does not revive an excluded onboarding recommendation', () => {
+  const apps = [
+    app({ id: 'homepage', name: 'Homepage', category: 'Utilities' }),
+    app({ id: 'freshrss', name: 'FreshRSS', category: 'Productivity' }),
+    app({ id: 'syncthing', name: 'Syncthing', category: 'Productivity' }),
+    app({ id: 'vaultwarden', name: 'Vaultwarden', category: 'Security' }),
+  ];
+
+  const recommendations = starterAppsForMarketplace(apps, ['vaultwarden'], new Map(), null, null);
+
+  assert.deepEqual(recommendations.map((recommendation) => recommendation.app.id), betaStarterAppIds);
 });
 
 test('shouldShowStartHereSection hides dismissed or fully installed starter recommendations', () => {
@@ -161,14 +174,14 @@ test('shouldShowStartHereSection hides dismissed or fully installed starter reco
 test('starterCatalogForDiscover keeps the basic catalog focused on ready starter apps', () => {
   const apps = [
     app({ id: 'advanced', name: 'Advanced App', difficulty: 'Advanced', supportLevel: 'Advanced' }),
-    app({ id: 'vaultwarden', name: 'Vaultwarden', category: 'Security', supportLevel: 'Ready' }),
-    app({ id: 'jellyfin', name: 'Jellyfin', supportLevel: 'Ready' }),
     app({ id: 'homepage', name: 'Homepage', category: 'Utilities', supportLevel: 'Ready' }),
-    app({ id: 'immich', name: 'Immich', supportLevel: 'Needs testing' }),
+    app({ id: 'freshrss', name: 'FreshRSS', category: 'Productivity', supportLevel: 'Ready' }),
+    app({ id: 'syncthing', name: 'Syncthing', category: 'Productivity', supportLevel: 'Ready' }),
+    app({ id: 'vaultwarden', name: 'Vaultwarden', category: 'Security', supportLevel: 'Ready' }),
     app({ id: 'easy-ready', name: 'Easy Ready', supportLevel: 'Ready' }),
   ];
 
-  assert.deepEqual(starterCatalogForDiscover(apps).map((item) => item.id), ['vaultwarden', 'jellyfin', 'homepage', 'immich', 'easy-ready']);
+  assert.deepEqual(starterCatalogForDiscover(apps).map((item) => item.id), betaStarterAppIds);
 });
 
 test('safeBasicCatalogForDiscover shows only ready apps for basic view all', () => {

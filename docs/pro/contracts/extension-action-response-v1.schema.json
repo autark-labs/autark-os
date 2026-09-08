@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "$id": "https://contracts.autark-os.org/extensions/v1/action-response.schema.json",
+  "description": "Limit: 131072 encoded bytes. A conflict never applies a stale write. Summary comes from the same private lifecycle used by review surfaces.",
+  "required": [
+    "schemaVersion",
+    "outcome",
+    "payload",
+    "summary"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1"
+    },
+    "outcome": {
+      "enum": [
+        "completed",
+        "conflict",
+        "not_found",
+        "invalid"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "asOf",
+            "activeFindingCount",
+            "highestSeverity"
+          ],
+          "properties": {
+            "asOf": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "activeFindingCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 500
+            },
+            "highestSeverity": {
+              "enum": [
+                "none",
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

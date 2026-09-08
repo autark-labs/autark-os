@@ -9,7 +9,7 @@ const appList = readFileSync(resolve(process.cwd(), 'src/pages/MarketplacePage/M
 test('Discover keeps its first-run guidance without duplicating global recommendations', () => {
   assert.doesNotMatch(page, /CanonicalRecommendedAction/);
   assert.match(page, /starterGuidanceVisible/);
-  assert.match(page, /vaultwardenRecommendation/);
+  assert.match(page, /starterRecommendation/);
   assert.match(page, /!showAdvancedMetrics/);
   assert.match(page, /basicCatalogMode === 'starter'/);
   assert.match(appList, /aria-label="Starter app recommendation"/);

@@ -8,6 +8,24 @@ servers:
 security:
   - agentToken: []
 paths:
+  /v1/extensions/actions:
+    post:
+      operationId: performExtensionAction
+      summary: Perform an intent from an installed private surface.
+      description: Request is limited to 16 KiB; response to 128 KiB. Agent owns payload semantics, stale-write checks and idempotency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../contracts/extension-action-request-v1.schema.json
+      responses:
+        '200':
+          description: Completed action or a safe rejected decision with current private summary.
+          content:
+            application/json:
+              schema:
+                $ref: ../contracts/extension-action-response-v1.schema.json
   /v1/status:
     get:
       operationId: getExtensionStatus

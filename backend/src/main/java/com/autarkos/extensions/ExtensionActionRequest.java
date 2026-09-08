@@ -23,6 +23,7 @@ public record ExtensionActionRequest(String schemaVersion, String surface, Strin
         }
         try {
             var request = MAPPER.readValue(body, ExtensionActionRequest.class);
+            if (request == null) { throw new IllegalArgumentException(); }
             request.validate();
             return request;
         } catch (java.io.IOException | IllegalArgumentException exception) {
