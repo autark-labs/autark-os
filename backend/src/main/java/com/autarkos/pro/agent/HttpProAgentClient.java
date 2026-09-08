@@ -260,6 +260,25 @@ public final class HttpProAgentClient implements ProAgentClient {
         }
     }
 
+    @Override
+    public com.autarkos.extensions.ExtensionActionResult action(
+            ProAgentEndpoint endpoint,
+            com.autarkos.extensions.ExtensionActionRequest request) {
+        request.validate();
+        byte[] body;
+        try { body = objectMapper.writeValueAsBytes(request); }
+        catch (java.io.IOException exception) { throw failure("agent_request_invalid", exception); }
+        try {
+            if (body.length > com.autarkos.extensions.ExtensionActionRequest.MAX_BYTES) {
+                throw new ProAgentClientException("agent_request_invalid", "Extension action is too large.");
+            }
+            var result = exchange(endpoint, "v1/extensions/actions", body,
+                    128 * 1024, com.autarkos.extensions.ExtensionActionResult.class);
+            result.validate();
+            return result;
+        } finally { Arrays.fill(body, (byte) 0); }
+    }
+
     private <T> T exchange(
             ProAgentEndpoint endpoint,
             String path,

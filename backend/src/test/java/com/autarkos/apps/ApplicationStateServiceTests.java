@@ -29,6 +29,24 @@ import java.nio.file.Path;
 
 class ApplicationStateServiceTests {
 
+    @Test
+    void failedUninstallRemainsVisibleUntilSuccessfulUninstallWithoutRewritingRuntimeReadiness() {
+        var failure = lifecycleJob("uninstall-failed", "uninstall_app", "homepage", "failed", "checkpoint", "2026-06-21T12:00:00Z");
+        var jobs = new AtomicReference<>(List.of(failure));
+        var service = new ApplicationStateService(List::of, () -> List.of(runtimeApp("homepage", "Homepage")),
+                new ObservedServiceService(repository(), noScan()), null,
+                () -> Instant.parse("2026-06-21T12:05:00Z"), jobs::get);
+        var app = service.refreshNow().runtimeApps().getFirst();
+        assertThat(app.readinessState()).isEqualTo("ready");
+        assertThat(app.operationState().label()).isEqualTo("Uninstall failed");
+        assertThat(app.operationState().jobType()).isEqualTo("uninstall_app");
+        jobs.set(List.of(lifecycleJob("backup-ok", "backup", "homepage", "succeeded", "archive", "2026-06-21T12:01:00Z"), failure));
+        assertThat(service.refreshNow().runtimeApps().getFirst().operationState().kind()).isEqualTo("failed");
+        jobs.set(List.of(lifecycleJob("uninstall-ok", "uninstall_app", "homepage", "succeeded", "remove", "2026-06-21T12:02:00Z"), failure));
+        assertThat(service.refreshNow().runtimeApps().getFirst().operationState().kind()).isEqualTo("idle");
+        assertThat(jobs.get()).contains(failure);
+    }
+
     @TempDir
     Path runtimeRoot;
 
@@ -406,7 +424,7 @@ class ApplicationStateServiceTests {
 
         assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("idle");
         assertThat(state.runtimeApps().get(1).operationState().kind()).isEqualTo("failed");
-        assertThat(state.runtimeApps().get(1).operationState().label()).isEqualTo("Restoring");
+        assertThat(state.runtimeApps().get(1).operationState().label()).isEqualTo("Restore failed");
     }
 
     @Test
@@ -422,7 +440,7 @@ class ApplicationStateServiceTests {
         ApplicationState state = service.refreshNow();
 
         assertThat(state.runtimeApps().getFirst().operationState().kind()).isEqualTo("failed");
-        assertThat(state.runtimeApps().getFirst().operationState().label()).isEqualTo("Creating backup");
+        assertThat(state.runtimeApps().getFirst().operationState().label()).isEqualTo("Backup failed");
     }
 
     @Test

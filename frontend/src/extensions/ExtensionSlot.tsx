@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { showActionNotification } from '@/lib/actionNotifications';
+import { extensionAction } from './extensionActions';
 import { cn } from '@/lib/utils';
 import {
   extensionLoadFailureKind,
@@ -32,6 +35,7 @@ export function ExtensionSlot({
   surface,
 }: ExtensionSlotProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const hostRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<ExtensionSlotState>('loading');
   const [attempt, setAttempt] = useState(0);
@@ -52,6 +56,12 @@ export function ExtensionSlot({
         }
         unmount = await extension.module.mount({
           apiBase: extension.apiBase,
+          act: async (actionId, payload) => {
+            const result = await extensionAction(extension.apiBase, surface, actionId, payload);
+            void queryClient.invalidateQueries({ queryKey: ['pro'] });
+            return result;
+          },
+          notify: (result) => { showActionNotification(result); },
           element: hostRef.current,
           navigate: (routeId, actionId) => {
             const target = resolveExtensionNavigation(routeId, actionId);
@@ -88,7 +98,7 @@ export function ExtensionSlot({
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
       unmount?.();
     };
-  }, [attempt, extensionId, navigate, surface]);
+  }, [attempt, extensionId, navigate, queryClient, surface]);
 
   if (state === 'absent' && !required) return null;
   const retryAvailable = state !== 'loading' && state !== 'mounted' && state !== 'incompatible';

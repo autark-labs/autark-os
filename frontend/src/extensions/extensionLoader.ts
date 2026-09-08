@@ -12,6 +12,8 @@ export type ExtensionHostContext = {
   element: HTMLElement;
   navigate: (routeId: string, actionId?: string) => void;
   surface: string;
+  act?: (actionId: string, payload: Record<string, unknown>) => Promise<{ outcome: string; payload: Record<string, unknown> }>;
+  notify?: (result: { ok: boolean; title: string; message?: string; severity: string }) => void;
 };
 
 export type ExtensionModule = {

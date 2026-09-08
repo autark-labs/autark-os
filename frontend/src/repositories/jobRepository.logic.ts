@@ -2,6 +2,10 @@ import type { AutarkOsJob, AutarkOsJobStep } from '@/types/jobs';
 
 const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
 
+export function failureSuperseded(job: AutarkOsJob, matchingJobs: AutarkOsJob[]) {
+  return matchingJobs.some(later => later.type === job.type && later.status === 'succeeded' && jobTime(later) > jobTime(job));
+}
+
 export const ACTIVE_JOB_LIST_REFETCH_INTERVAL_MS = 1_200;
 export const IDLE_JOB_LIST_REFETCH_INTERVAL_MS = 15_000;
 

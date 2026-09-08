@@ -37,6 +37,11 @@ public final class ProAgentClientRouter {
         return Optional.ofNullable(active.get());
     }
 
+    public com.autarkos.extensions.ExtensionActionResult action(
+            com.autarkos.extensions.ExtensionActionRequest request) {
+        return client.action(requireActive(), request);
+    }
+
     public AgentStatus status() {
         return client.status(requireActive());
     }

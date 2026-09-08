@@ -10,6 +10,9 @@ import com.autarkos.pro.change.ProChangeSafetyResponse;
 
 public interface ProAgentClient {
 
+    com.autarkos.extensions.ExtensionActionResult action(ProAgentEndpoint endpoint,
+            com.autarkos.extensions.ExtensionActionRequest request);
+
     AgentStatus status(ProAgentEndpoint endpoint);
 
     ExtensionUiManifest uiManifest(ProAgentEndpoint endpoint);

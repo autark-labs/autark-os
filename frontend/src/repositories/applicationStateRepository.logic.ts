@@ -9,6 +9,7 @@ import type {
 import type { ApplicationState, ApplicationStateFreshness } from '@/types/applicationState';
 import type { AppOwnershipView } from '@/types/appOwnership';
 import type { AutarkOsJob } from '@/types/jobs';
+import { jobTypeLabel } from './jobRepository.logic';
 import type { ObservedServiceAction, ObservedServiceView } from '@/types/observedService';
 
 export const applicationStateQueryKey = ['application-state'];
@@ -20,6 +21,7 @@ type ExtendedApplicationState = ApplicationState & {
 type AppOperationKind = BackendAppOperationState['kind'] | 'installing' | 'repairing' | 'restoring';
 
 type AppOperation = {
+  jobType?: string;
   currentStep?: string;
   jobId?: string;
   kind: AppOperationKind;
@@ -203,7 +205,7 @@ export function setAutarkOsJobInState(state: ApplicationState | undefined, job?:
   }
 
   const operation = operationStateFromAutarkOsJob(job);
-  const runtimeApps = (state.runtimeApps ?? []).map((app) => jobTargetsApp(job, app.appId)
+  const runtimeApps = (state.runtimeApps ?? []).map((app) => jobTargetsApp(job, app.appId) && !preservesUnrelatedFailure(app.operationState, job)
     ? runtimeAppWithOperation(app, operation)
     : app);
   const managedApps = (state.managedApps ?? []).map((app) => jobTargetsApp(job, app.catalogAppId)
@@ -215,6 +217,10 @@ export function setAutarkOsJobInState(state: ApplicationState | undefined, job?:
     runtimeApps,
     managedApps,
   };
+}
+
+function preservesUnrelatedFailure(operation: BackendAppOperationState | null | undefined, job: AutarkOsJob) {
+  return operation?.kind === 'failed' && operation.jobType && operation.jobType !== job.type && job.status === 'succeeded';
 }
 
 export function setRuntimeAppInState(state: ApplicationState | undefined, app: AppRuntimeView) {
@@ -274,7 +280,8 @@ function operationStateFromAutarkOsJob(job: AutarkOsJob): AppOperation {
     }
     return {
       kind: 'failed',
-      label: operationLabel(job.type),
+      label: `${jobTypeLabel(job.type)} failed`,
+      jobType: job.type,
       jobId: job.jobId,
       currentStep: '',
       message: job.error?.message || 'Autark-OS could not finish this action.',

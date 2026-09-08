@@ -1,4 +1,5 @@
 import { AlertTriangle, ListChecks, Play, Settings, Square, Wrench } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -9,9 +10,10 @@ type ApplicationRecoveryTabProps = {
   actions: Pick<ApplicationActionHandlers, 'onRepair' | 'onStart' | 'onStop' | 'onRestart'>;
   item: ApplicationSurfaceItem;
   onEditSettings: () => void;
+  onReviewManagement: () => void;
 };
 
-export function ApplicationRecoveryTab({ actions, item, onEditSettings }: ApplicationRecoveryTabProps) {
+export function ApplicationRecoveryTab({ actions, item, onEditSettings, onReviewManagement }: ApplicationRecoveryTabProps) {
   if (item.operationState.kind !== 'failed') {
     return null;
   }
@@ -20,7 +22,8 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
   const start = applicationActionRestriction(item, 'start');
   const stop = applicationActionRestriction(item, 'stop');
   const settings = applicationActionRestriction(item, 'settings');
-  const recovery = explainFailure(item.operationState.message);
+  const operationRecovery = recoveryForOperation(item.operationState.jobType);
+  const recovery = operationRecovery ?? explainFailure(item.operationState.message);
   const recentEvents = item.runtime.recentEvents.slice(0, 4);
   const backupWarning = backupSafetyMessage(item);
 
@@ -28,9 +31,9 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
     <section className="grid gap-4 rounded-xl border border-red-300/40 bg-red-950 p-4 text-red-50 shadow-inner shadow-red-950/40">
       <Alert className="border-red-300/40 bg-red-900 text-red-50">
         <AlertTriangle />
-        <AlertTitle>Recovery needed</AlertTitle>
+        <AlertTitle>{item.operationState.label}</AlertTitle>
         <AlertDescription className="text-red-50/80">
-          Autark-OS could not finish the last app action. Review the likely cause, then adjust settings or stop the app before trying again.
+          {operationRecovery?.description ?? 'Autark-OS could not finish the last app action. Review the cause and current app state before trying again.'}
         </AlertDescription>
       </Alert>
 
@@ -44,7 +47,7 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
         <p className="text-sm leading-6 text-red-50/80">{recovery.description}</p>
       </div>
 
-      {backupWarning && (
+      {backupWarning && !operationRecovery && (
         <Alert className="border-red-300/40 bg-red-900 text-red-50">
           <AlertTriangle />
           <AlertTitle>Backup status</AlertTitle>
@@ -52,7 +55,15 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
         </Alert>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      {operationRecovery ? (
+        operationRecovery.destination === 'backups' ? (
+          <Button asChild variant="outline"><Link to={`/backups?app=${encodeURIComponent(item.sourceId || item.id)}`}>Review backups and restore plan</Link></Button>
+        ) : (
+          <Button onClick={operationRecovery.destination === 'settings' ? onEditSettings : onReviewManagement} variant="outline">
+            {operationRecovery.destination === 'settings' ? 'Review settings' : 'Review app management'}
+          </Button>
+        )
+      ) : <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {repairAction && (
           <DisabledAction disabled={Boolean(repairAction.disabled)} reason={repairAction.reason || 'Repair is not available for this app right now.'}>
             <Button className="bg-red-100 text-red-950 hover:bg-white" disabled={repairAction.disabled} onClick={() => actions.onRepair(item.id)} title={repairAction.reason || undefined} type="button">
@@ -79,7 +90,7 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
             Edit settings
           </Button>
         </DisabledAction>
-      </div>
+      </div>}
 
       <div className="grid gap-2 rounded-lg border border-red-300/30 bg-red-900/70 p-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -101,6 +112,30 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings }: Applic
       </div>
     </section>
   );
+}
+
+function recoveryForOperation(jobType?: string) {
+  if (jobType === 'uninstall_app') return {
+    title: 'Uninstall did not finish', destination: 'overview',
+    description: 'Review the error for a checkpoint, permission or removal problem. Resolve that problem, then review a fresh uninstall plan in app management. Data may still be present; do not delete it manually.',
+  };
+  if (jobType === 'backup_restore') return {
+    title: 'Review the restore result', destination: 'backups',
+    description: 'The restore failed. A running app does not prove that the requested data was restored. Review the error and any safety checkpoint before reviewing a new restore plan.',
+  };
+  if (jobType === 'backup' || jobType === 'backup_verify') return {
+    title: 'Review backup access and verification', destination: 'backups',
+    description: 'Check the backup destination and the reported error, then retry the backup or verification in Backups. Starting or stopping the app does not resolve a failed backup.',
+  };
+  if (jobType === 'save_app_settings') return {
+    title: 'Review the settings result', destination: 'settings',
+    description: 'Review the error before retrying. If Autark-OS could not confirm recovery of the previous settings, use Repair in My Apps; do not uninstall the app.',
+  };
+  if (jobType === 'update_app' || jobType === 'rollback_app') return {
+    title: 'Review the installed release', destination: 'overview',
+    description: 'Review the release error and the current app state in app management before requesting another update or rollback.',
+  };
+  return null;
 }
 
 function backupSafetyMessage(item: ApplicationSurfaceItem) {

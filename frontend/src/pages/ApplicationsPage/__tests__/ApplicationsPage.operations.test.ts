@@ -111,7 +111,8 @@ test('operationStateForItem maps relevant failed durable jobs and ignores jobs f
     },
   ]), {
     kind: 'failed',
-    label: 'Action failed',
+    label: 'Uninstall failed',
+    jobType: 'uninstall_app',
     message: 'Docker could not remove the app safely.',
     jobId: 'failed-1',
   });
@@ -138,7 +139,8 @@ test('operationStateForItem maps relevant failed durable jobs and ignores jobs f
     },
   ]), {
     kind: 'failed',
-    label: 'Action failed',
+    label: 'Restore failed',
+    jobType: 'backup_restore',
     message: 'Restore failed for Vaultwarden.',
     jobId: 'restore-failed',
   });
@@ -221,6 +223,17 @@ function item(id, overrides = {}) {
     ...overrides,
   };
 }
+
+test('successful retry clears a cached failure but unrelated success does not', () => {
+  const failed = job('restore-failed', 'backup_restore', '42:homepage', 'failed', 'restore_data');
+  const cached = item('homepage', { readinessState: 'ready', attentionState: 'none', operationState: {
+    kind: 'failed', label: 'Restore failed', jobId: failed.jobId, jobType: failed.type, message: 'Restore failed',
+  } });
+  const unrelated = job('backup-ok', 'backup', 'homepage', 'succeeded', 'archive', '2026-06-29T12:01:00Z');
+  assert.equal(operationStateForItem(cached, null, null, [unrelated, failed]).kind, 'failed');
+  const retry = job('restore-ok', 'backup_restore', '42:homepage', 'succeeded', 'restore_data', '2026-06-29T12:02:00Z');
+  assert.deepEqual(operationStateForItem(cached, null, null, [retry, unrelated, failed]), { kind: 'idle' });
+});
 
 function job(jobId, type, subjectId, status, currentStep, updatedAt = '2026-06-29T12:00:00Z') {
   return {

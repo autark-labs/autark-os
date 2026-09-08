@@ -18,6 +18,7 @@ export type AppOperationState =
   }
   | {
     kind: 'failed';
+    jobType?: string;
     label: string;
     message: string;
     jobId?: string;

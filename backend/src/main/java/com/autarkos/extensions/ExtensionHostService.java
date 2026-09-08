@@ -184,6 +184,17 @@ public final class ExtensionHostService {
         return result;
     }
 
+    public synchronized ExtensionActionResult action(String extensionId, ExtensionActionRequest request) {
+        request.validate();
+        ActiveExtension active = requireActive(extensionId);
+        ExtensionUiManifest manifest = call(agent::uiManifest);
+        requireBoundManifest(manifest, active);
+        if (!manifest.surfaces().contains(request.surface())) { throw notFound(); }
+        ExtensionActionResult result = call(() -> agent.action(request));
+        result.validate();
+        return result;
+    }
+
     public void requireRefreshAvailable(String extensionId) {
         requireActive(extensionId);
     }

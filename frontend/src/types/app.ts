@@ -34,6 +34,7 @@ export type BackendAppReadinessState = 'ready' | 'starting' | 'paused' | 'stoppe
 export type BackendAppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked' | string;
 
 export type BackendAppOperationState = {
+  jobType?: string | null;
   kind: 'idle' | 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling' | 'updating' | 'rolling_back' | 'failed' | string;
   label?: string | null;
   jobId?: string | null;

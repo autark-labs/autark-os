@@ -38,6 +38,7 @@ public final class ExtensionRefreshScheduler
     private Instant pendingAt;
     private Instant nextAnalysisAt;
     private Instant latestAnalysisAt;
+    private Instant latestSummaryAt;
     private Instant lastFailureNoticeAt;
     private String state;
     private String reasonCode;
@@ -165,6 +166,14 @@ public final class ExtensionRefreshScheduler
                 reasonCode);
     }
 
+    public synchronized void acceptSummary(ExtensionActionResult.Summary summary) {
+        if (latestSummaryAt != null && summary.asOf().isBefore(latestSummaryAt)) { return; }
+        latestSummaryAt = summary.asOf();
+        activeFindingCount = summary.activeFindingCount();
+        highestSeverity = summary.highestSeverity();
+        reasonCode = activeFindingCount > 0 ? "findings_available" : "analysis_healthy";
+    }
+
     private synchronized boolean claimDue(Instant now) {
         if (!enabled || running.get()) {
             return false;
@@ -196,10 +205,10 @@ public final class ExtensionRefreshScheduler
             Instant now) {
         latestAnalysisAt = result.completedAt();
         nextAnalysisAt = now.plus(interval);
-        activeFindingCount = result.activeFindingCount();
-        highestSeverity = result.highestSeverity();
+        acceptSummary(new ExtensionActionResult.Summary(result.completedAt(),
+                result.activeFindingCount(), result.highestSeverity()));
         state = "scheduled";
-        reasonCode = result.activeFindingCount() > 0
+        reasonCode = activeFindingCount > 0
                 ? "findings_available"
                 : "analysis_healthy";
     }

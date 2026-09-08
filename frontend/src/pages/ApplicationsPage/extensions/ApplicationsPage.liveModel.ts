@@ -261,6 +261,7 @@ function backendOperationState(value: AppRuntimeView['operationState']): AppOper
   if (value.kind === 'failed') {
     return {
       kind: 'failed',
+      jobType: value.jobType || undefined,
       label: value.label || 'Action failed',
       message: value.message || 'Autark-OS could not finish this action.',
       jobId: value.jobId || undefined,

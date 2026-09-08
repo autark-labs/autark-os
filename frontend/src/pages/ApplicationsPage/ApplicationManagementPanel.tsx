@@ -98,6 +98,7 @@ export function ApplicationManagementPanel({
                 actions={actions}
                 item={item}
                 onEditSettings={() => onTabValueChange?.('settings')}
+                onReviewManagement={() => onTabValueChange?.('overview')}
               />
             </TabsContent>
           )}

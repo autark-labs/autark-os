@@ -468,6 +468,18 @@ function restoreJob(subjectId, status) {
   };
 }
 
+test('immediate failure overlays remain terminal and an unrelated success does not clear them', () => {
+  const state = { runtimeApps: [runtimeApp('vaultwarden', 'Ready')], managedApps: [] };
+  const failed = setAutarkOsJobInState(state, restoreJob('42:vaultwarden', 'failed'));
+  assert.equal(failed.runtimeApps[0].friendlyStatus, 'Ready');
+  assert.equal(failed.runtimeApps[0].operationState.label, 'Restore failed');
+  assert.equal(failed.runtimeApps[0].operationState.jobType, 'backup_restore');
+  const unrelated = setAutarkOsJobInState(failed, { ...restoreJob('vaultwarden', 'succeeded'), type: 'backup' });
+  assert.equal(unrelated.runtimeApps[0].operationState.kind, 'failed');
+  const restored = setAutarkOsJobInState(unrelated, restoreJob('42:vaultwarden', 'succeeded'));
+  assert.equal(restored.runtimeApps[0].operationState.kind, 'idle');
+});
+
 function runtimeApp(appId, friendlyStatus, healthSnapshot = null) {
   return {
     appId,

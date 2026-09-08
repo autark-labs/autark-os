@@ -64,6 +64,29 @@ public final class ExtensionHostController {
                 .body(service.render(extensionId, surface));
     }
 
+    @PostMapping(value = "/actions", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ExtensionActionResult> action(
+            @PathVariable String extensionId,
+            jakarta.servlet.http.HttpServletRequest httpRequest) throws java.io.IOException {
+        // This fixed header requires a same-origin browser request (cross-origin
+        // requests need a CORS preflight, which this host does not grant).
+        if (!"1".equals(httpRequest.getHeader("X-Autark-Extension-Action"))
+                || "cross-site".equals(httpRequest.getHeader("Sec-Fetch-Site"))) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Open this action from Autark-OS.");
+        }
+        byte[] body = httpRequest.getInputStream().readNBytes(ExtensionActionRequest.MAX_BYTES + 1);
+        ExtensionActionRequest request;
+        try { request = ExtensionActionRequest.decode(body); }
+        finally { java.util.Arrays.fill(body, (byte) 0); }
+        ExtensionActionResult result = service.action(extensionId, request);
+        ExtensionRefreshScheduler scheduler = refreshScheduler.getIfAvailable();
+        if (scheduler != null && result.summary() != null) {
+            scheduler.acceptSummary(result.summary());
+        }
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(result);
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<Void> refresh(
             @PathVariable String extensionId) {

@@ -1,4 +1,5 @@
 import type { AutarkOsJob } from '@/types/jobs';
+import { failureSuperseded, jobTypeLabel } from '@/repositories/jobRepository.logic';
 import type {
   ApplicationRuntimeAction,
   ApplicationSettingsAction,
@@ -20,7 +21,12 @@ export function operationStateForItem(
     return operationStateFromJob(activeJob);
   }
 
-  if (item?.operationState && item.operationState.kind && item.operationState.kind !== 'idle') {
+  const priorJobId = item.operationState?.kind !== 'idle' ? item.operationState?.jobId : undefined;
+  const priorJob = matchingJobs.find(job => job.jobId === priorJobId);
+  const priorFailureResolved = priorJob && (priorJob.status === 'succeeded' || failureSuperseded(priorJob, matchingJobs));
+  const terminalJob = matchingJobs.find(job => job.status === 'failed' && !failureSuperseded(job, matchingJobs) && failedJobStillRelevant(item, job));
+  const newerFailure = priorJob && terminalJob && jobTime(terminalJob) > jobTime(priorJob);
+  if (item?.operationState && item.operationState.kind && item.operationState.kind !== 'idle' && !priorFailureResolved && !newerFailure) {
     return item.operationState;
   }
 
@@ -35,11 +41,11 @@ export function operationStateForItem(
     };
   }
 
-  const terminalJob = matchingJobs.find((job) => TERMINAL_JOB_STATUSES.has(job.status));
   if (terminalJob?.status === 'failed' && failedJobStillRelevant(item, terminalJob)) {
     return {
       kind: 'failed',
-      label: 'Action failed',
+      label: `${jobTypeLabel(terminalJob.type)} failed`,
+      jobType: terminalJob.type,
       message: terminalJob.error?.message || 'Autark-OS could not finish this action.',
       jobId: terminalJob.jobId,
     };

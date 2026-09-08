@@ -238,10 +238,19 @@ public class ApplicationStateService {
     }
 
     private AppRuntimeView runtimeApp(AppRuntimeView app, int displayOrder, List<AutarkOsJob> operationJobs) {
-        AutarkOsJob job = operationJobs.stream()
+        List<AutarkOsJob> matchingJobs = operationJobs.stream()
                 .filter(candidate -> jobTargetsApp(candidate, app.appId()))
-                .findFirst()
-                .orElse(null);
+                .toList();
+        AutarkOsJob job = matchingJobs.stream().filter(candidate ->
+                AutarkOsStates.JobStatus.QUEUED.equals(candidate.status()) || AutarkOsStates.JobStatus.RUNNING.equals(candidate.status()))
+                .findFirst().orElseGet(() -> matchingJobs.stream()
+                        .filter(candidate -> AutarkOsStates.JobStatus.FAILED.equals(candidate.status()))
+                        .filter(candidate -> failedLifecycleJobStillRelevant(candidate, app))
+                        .filter(candidate -> matchingJobs.stream().noneMatch(later ->
+                                AutarkOsStates.JobStatus.SUCCEEDED.equals(later.status())
+                                        && later.type().equals(candidate.type())
+                                        && later.updatedAt().isAfter(candidate.updatedAt())))
+                        .findFirst().orElse(null));
         AppOperationView operation = operationState(job, app);
         return app.withSurfaceState(
                 operation,
@@ -311,7 +320,7 @@ public class ApplicationStateService {
             if (!failedLifecycleJobStillRelevant(job, app)) {
                 return AppOperationView.idle();
             }
-            return AppOperationView.failed(operationLabel(job.type()), job.jobId(), job.error() == null ? "" : job.error().message());
+            return AppOperationView.failed(failedOperationLabel(job.type()), job.jobId(), job.error() == null ? "" : job.error().message(), job.type());
         }
         if (!AutarkOsStates.JobStatus.QUEUED.equals(job.status()) && !AutarkOsStates.JobStatus.RUNNING.equals(job.status())) {
             return AppOperationView.idle();
@@ -323,7 +332,8 @@ public class ApplicationStateService {
         if (isFailedFullRestore(job)) {
             return false;
         }
-        if (job != null && List.of(AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY, AutarkOsStates.JobType.BACKUP_RESTORE).contains(job.type())) {
+        if (job != null && !List.of(AutarkOsStates.JobType.START_APP, AutarkOsStates.JobType.STOP_APP,
+                AutarkOsStates.JobType.RESTART_APP, AutarkOsStates.JobType.REPAIR_APP).contains(job.type())) {
             return true;
         }
         String readinessState = app.readinessState() == null ? "" : app.readinessState();
@@ -370,6 +380,23 @@ public class ApplicationStateService {
             case AutarkOsStates.JobType.UPDATE_APP -> "Updating safely";
             case AutarkOsStates.JobType.ROLLBACK_APP -> "Restoring previous release";
             default -> "Working";
+        };
+    }
+
+    private String failedOperationLabel(String type) {
+        return switch (type) {
+            case AutarkOsStates.JobType.START_APP -> "Start failed";
+            case AutarkOsStates.JobType.STOP_APP -> "Pause failed";
+            case AutarkOsStates.JobType.RESTART_APP -> "Restart failed";
+            case AutarkOsStates.JobType.REPAIR_APP -> "Repair failed";
+            case AutarkOsStates.JobType.SAVE_APP_SETTINGS -> "Settings change failed";
+            case AutarkOsStates.JobType.BACKUP -> "Backup failed";
+            case AutarkOsStates.JobType.BACKUP_VERIFY -> "Backup verification failed";
+            case AutarkOsStates.JobType.BACKUP_RESTORE -> "Restore failed";
+            case AutarkOsStates.JobType.UNINSTALL_APP -> "Uninstall failed";
+            case AutarkOsStates.JobType.UPDATE_APP -> "Update failed";
+            case AutarkOsStates.JobType.ROLLBACK_APP -> "Rollback failed";
+            default -> "Action failed";
         };
     }
 
