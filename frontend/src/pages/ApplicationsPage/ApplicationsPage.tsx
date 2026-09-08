@@ -435,6 +435,7 @@ export const ApplicationsPage = () => {
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       restoreApplicationState(previousState);
+      void invalidateApplicationState(queryClient);
       showActionErrorNotification(err, 'Settings update failed');
       throw err;
     } finally {

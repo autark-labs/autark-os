@@ -410,16 +410,15 @@ public class AppLifecycleService {
         if (!running && !stopped) {
             throw new InstallationException("The app is changing state or is only partly running. Wait for it to settle, or pause the whole app before changing settings.");
         }
-        return new SettingsRedeploy(manifest, composePath, previousCompose, configuration, running);
+        return new SettingsRedeploy(manifest, composePath, previousCompose, configuration, running, List.copyOf(observation.containers()));
     }
 
     private record SettingsRedeploy(ApplicationManifest manifest, Path composePath, String previousCompose,
-            RuntimeModels.ResolvedRuntimeConfiguration configuration, boolean running) { }
+            RuntimeModels.ResolvedRuntimeConfiguration configuration, boolean running,
+            List<RuntimeModels.DockerContainerStatus> previousContainers) { }
 
     private void safeRedeployForSettings(InstalledApp app, SettingsRedeploy redeploy) {
         Path composePath = redeploy.composePath();
-        String previousCompose = redeploy.previousCompose();
-        boolean restored = false;
         try {
             new ComposeRenderer(runtimeLayout).updatePorts(composePath, redeploy.manifest(), redeploy.configuration());
             if (!redeploy.running()) {
@@ -428,20 +427,54 @@ public class AppLifecycleService {
             }
             RuntimeModels.DockerComposeResult result = composeExecutor.up(composePath, app.composeProject());
             if (!result.successful()) {
-                restoreCompose(composePath, previousCompose);
-                restored = true;
-                repository.recordEvent(app.appId(), "settings_redeploy_failed", failureReason(result.output()));
-                activityWarning("settings_redeploy_failed", "Settings redeploy failed for " + app.appName(), failureReason(result.output()), app.appId());
-                throw new InstallationException("Autark-OS could not restart " + app.appName() + " with the new settings. The previous Compose file was restored.");
+                throw new InstallationException(failureReason(result.output()));
             }
-            repository.recordEvent(app.appId(), "settings_redeploy_completed", "Updated Compose and restarted " + app.appName() + ".");
-            activitySuccess("settings_redeploy_completed", "Settings redeploy completed for " + app.appName(), "Autark-OS updated Compose and restarted the app.", app.appId());
         } catch (RuntimeException exception) {
-            if (!restored) {
-                restoreCompose(composePath, previousCompose);
-            }
-            throw exception;
+            throw recoverFailedSettingsRedeploy(app, redeploy, exception);
         }
+        repository.recordEvent(app.appId(), "settings_redeploy_completed", "Updated Compose and restarted " + app.appName() + ".");
+        activitySuccess("settings_redeploy_completed", "Settings redeploy completed for " + app.appName(), "Autark-OS updated Compose and restarted the app.", app.appId());
+    }
+
+    private InstallationException recoverFailedSettingsRedeploy(InstalledApp app, SettingsRedeploy redeploy, RuntimeException applyFailure) {
+        // Recovery must not depend on successfully writing an activity event.
+        RuntimeException recoveryFailure = null;
+        try {
+            restoreCompose(redeploy.composePath(), redeploy.previousCompose());
+            if (redeploy.running()) {
+                var result = composeExecutor.up(redeploy.composePath(), app.composeProject());
+                if (!result.successful()) throw new InstallationException(failureReason(result.output()));
+            }
+            var observed = composeExecutor.observeContainersForApp(redeploy.composePath(), app.composeProject(), app.appId());
+            boolean previousRuntimeRestored = observed.successful()
+                    && observed.containers().size() == redeploy.previousContainers().size()
+                    && redeploy.previousContainers().stream().allMatch(previous ->
+                    observed.containers().stream().anyMatch(actual ->
+                            Objects.equals(previous.name(), actual.name())
+                            && Objects.equals(previous.service(), actual.service())
+                            && Objects.equals(previous.ports(), actual.ports())
+                            && (redeploy.running() ? "running".equalsIgnoreCase(actual.state())
+                                    : Objects.equals(previous.state(), actual.state()))));
+            if (!previousRuntimeRestored) throw new InstallationException("Docker did not confirm the previous containers and port mappings.");
+        } catch (RuntimeException exception) {
+            recoveryFailure = exception;
+        }
+        String message = recoveryFailure == null
+                ? "The settings change failed. The previous container configuration was restored and "
+                        + (redeploy.running() ? "the previous containers are running again." : "the app remains paused.")
+                        + " Check the app and its access in My Apps before trying again."
+                : "The settings change failed and recovery could not be confirmed. Check the app in My Apps and review Diagnostics before retrying. Do not uninstall it to resolve this error.";
+        var failure = new InstallationException(message, applyFailure);
+        if (recoveryFailure != null) failure.addSuppressed(recoveryFailure);
+        String eventType = recoveryFailure == null ? "settings_rollback_completed" : "settings_rollback_failed";
+        try {
+            repository.recordEvent(app.appId(), "settings_redeploy_failed", "The new application settings could not be applied.");
+            repository.recordEvent(app.appId(), eventType, message);
+            activityWarning(eventType, "Settings change failed for " + app.appName(), message, app.appId());
+        } catch (RuntimeException loggingFailure) {
+            failure.addSuppressed(loggingFailure);
+        }
+        return failure;
     }
 
     private String readCompose(Path composePath) {

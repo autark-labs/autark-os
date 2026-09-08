@@ -108,6 +108,7 @@ test('settings feedback does not claim that a paused app was restarted', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
   assert.match(page, /title: 'Settings saved'/);
   assert.doesNotMatch(page, /Settings saved and restart requested/);
+  assert.match(page, /restoreApplicationState\(previousState\);\s*void invalidateApplicationState\(queryClient\);\s*showActionErrorNotification\(err, 'Settings update failed'\)/);
 });
 
 test('applications page management panel uses canonical runtime data instead of generated mock facts', () => {

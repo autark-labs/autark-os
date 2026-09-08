@@ -1072,6 +1072,93 @@ class AppLifecycleServiceTests {
     }
 
     @Test
+    void failedSettingsApplyReappliesOriginalComposeAndVerifiesRunningContainers() throws Exception {
+        Path compose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
+        String original = Files.readString(compose).replace("'8090:80'", "'8090:80'\n      - '18091:81/udp'")
+                + "    environment:\n      KEEP_ME: unchanged\n    volumes:\n      - ./data:/data\n";
+        Files.writeString(compose, original);
+        var previousContainers = composeExecutor.containers;
+        composeExecutor.upBehavior = (path, call) -> {
+            if (call == 1) {
+                composeExecutor.containers = List.of();
+                return new RuntimeModels.DockerComposeResult(1, List.of("partial apply failed"));
+            }
+            assertThat(path).hasContent(original);
+            composeExecutor.containers = previousContainers;
+            return new RuntimeModels.DockerComposeResult(0, List.of("restored"));
+        };
+
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("previous containers are running again");
+        assertThat(composeExecutor.upCalls).isEqualTo(2);
+        assertThat(compose).hasContent(original);
+        assertThat(repository.findAppById("vaultwarden").orElseThrow().accessUrl()).isEqualTo("http://localhost:8090");
+        assertThat(repository.eventsFor("vaultwarden", 20)).extracting(event -> event.type())
+                .contains("settings_rollback_completed").doesNotContain("settings_apply_completed");
+    }
+
+    @Test
+    void failedSettingsRollbackReportsRecoveryFailureInsteadOfFileRestorationSuccess() {
+        composeExecutor.failUpOutput = List.of("Docker unavailable");
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("recovery could not be confirmed").hasMessageContaining("My Apps");
+        assertThat(composeExecutor.upCalls).isEqualTo(2);
+        assertThat(repository.eventsFor("vaultwarden", 20)).extracting(event -> event.type())
+                .contains("settings_rollback_failed").doesNotContain("settings_rollback_completed");
+    }
+
+    @Test
+    void thrownApplyFailureAlsoRunsRollbackExactlyOnce() {
+        composeExecutor.upBehavior = (path, call) -> {
+            if (call == 1) throw new IllegalStateException("Docker command interrupted");
+            return new RuntimeModels.DockerComposeResult(0, List.of("restored"));
+        };
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("previous containers are running again")
+                .hasCauseInstanceOf(IllegalStateException.class);
+        assertThat(composeExecutor.upCalls).isEqualTo(2);
+    }
+
+    @Test
+    void wrongPortsAfterRollbackAreNotConfirmedAsRecovery() {
+        composeExecutor.upBehavior = (path, call) -> {
+            composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
+                    "autark-os-vaultwarden", "vaultwarden", "running", "healthy", "Up", "0.0.0.0:19090->80/tcp"));
+            return new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("command result"));
+        };
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("recovery could not be confirmed");
+        assertThat(composeExecutor.upCalls).isEqualTo(2);
+    }
+
+    @Test
+    void failedComposeRestoreDoesNotStartTheNewDefinitionAgain() {
+        composeExecutor.upBehavior = (path, call) -> {
+            try {
+                Files.delete(path);
+                Files.createDirectory(path);
+            } catch (java.io.IOException exception) {
+                throw new java.io.UncheckedIOException(exception);
+            }
+            return new RuntimeModels.DockerComposeResult(1, List.of("partial apply failed"));
+        };
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("recovery could not be confirmed");
+        assertThat(composeExecutor.upCalls).isEqualTo(1);
+    }
+
+    @Test
+    void rollbackCommandSuccessWithoutRuntimeEvidenceIsNotRecovery() {
+        composeExecutor.upBehavior = (path, call) -> {
+            if (call == 2) composeExecutor.observationFails = true;
+            return new RuntimeModels.DockerComposeResult(call == 1 ? 1 : 0, List.of("command result"));
+        };
+        assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
+                .hasMessageContaining("recovery could not be confirmed");
+        assertThat(composeExecutor.upCalls).isEqualTo(2);
+    }
+
+    @Test
     void portChangeKeepsAPausedAppPaused() throws Exception {
         composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited", "0.0.0.0:8090->80/tcp"));
@@ -1273,6 +1360,8 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         boolean restartCalled;
         boolean upCalled;
+        int upCalls;
+        java.util.function.BiFunction<Path, Integer, RuntimeModels.DockerComposeResult> upBehavior;
         List<String> failUpOutput = List.of();
         boolean failDown;
         boolean downCalled;
@@ -1286,6 +1375,8 @@ class AppLifecycleServiceTests {
         @Override
         public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
             upCalled = true;
+            upCalls++;
+            if (upBehavior != null) return upBehavior.apply(composeFile, upCalls);
             if (!failUpOutput.isEmpty()) {
                 return new RuntimeModels.DockerComposeResult(1, failUpOutput);
             }
