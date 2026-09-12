@@ -4,7 +4,9 @@ set -Eeuo pipefail
 # Produces the same installable artifact types as the GitHub release job without
 # emulation or target-device build work. The application is built once on this
 # host; architecture-specific packaging differs only in its bundled runtime and
-# Cosign binary.
+# Cosign binary. Release runtimes are pinned rather than derived from the host
+# JDK, so an Ubuntu workstation cannot accidentally package a runtime that is
+# too new for the declared Debian baseline.
 
 readonly REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly TEMURIN_VERSION="21.0.9_10"
@@ -85,13 +87,13 @@ done
 [[ "${CHANNEL}" != "beta" || "${VERSION}" == *-* ]] ||
   die "Beta releases require a prerelease version such as 0.9.1-beta.24."
 
-for tool in curl dpkg-deb file java jlink python3 sha256sum tar unzip yarn; do
+for tool in curl dpkg-deb file java python3 sha256sum tar unzip yarn; do
   require_tool "${tool}"
 done
 [[ "$(dpkg --print-architecture)" == "amd64" ]] ||
   die "This local dual-architecture builder runs on an AMD64 workstation."
-[[ "$(jlink --version)" == 21.* ]] ||
-  die "Java 21 (including jlink) is required."
+[[ "$(java -version 2>&1 | head -1)" == *"21."* ]] ||
+  die "Java 21 is required to build the application."
 
 if [[ "${ALLOW_DIRTY}" -eq 0 ]] && [[ -n "$(git -C "${REPO_ROOT}" status --porcelain)" ]]; then
   die "The worktree has uncommitted changes. Commit them for a GitHub-like candidate or pass --allow-dirty intentionally."
@@ -106,24 +108,43 @@ CACHE_ROOT="${AUTARK_OS_RELEASE_CACHE_DIR:-${REPO_ROOT}/build/cache}"
   die "Output already exists: ${OUTPUT_ROOT}. Choose a new version or remove that version directory deliberately."
 
 runtime_url() {
-  printf 'https://github.com/adoptium/temurin21-binaries/releases/download/%s/OpenJDK21U-jre_aarch64_linux_hotspot_%s.tar.gz\n' \
-    "${TEMURIN_TAG}" "${TEMURIN_VERSION}"
+  local architecture="$1"
+  local temurin_architecture
+  case "${architecture}" in
+    amd64) temurin_architecture="x64" ;;
+    arm64) temurin_architecture="aarch64" ;;
+    *) die "Unsupported release runtime architecture: ${architecture}" ;;
+  esac
+  printf 'https://github.com/adoptium/temurin21-binaries/releases/download/%s/OpenJDK21U-jre_%s_linux_hotspot_%s.tar.gz\n' \
+    "${TEMURIN_TAG}" "${temurin_architecture}" "${TEMURIN_VERSION}"
 }
 
-prepare_arm64_runtime() {
-  local archive_name="OpenJDK21U-jre_aarch64_linux_hotspot_${TEMURIN_VERSION}.tar.gz"
+prepare_runtime() {
+  local architecture="$1"
+  local temurin_architecture expected_sha
+  case "${architecture}" in
+    amd64)
+      temurin_architecture="x64"
+      expected_sha="aeab55d064a1a27a3744b0880b9b414077b4ed2b1790817eea3df60aec946431"
+      ;;
+    arm64)
+      temurin_architecture="aarch64"
+      expected_sha="1d041073c65e834bdb4da732485a54ff829859dcd1549e7992f15bd73341be29"
+      ;;
+    *) die "Unsupported release runtime architecture: ${architecture}" ;;
+  esac
+  local archive_name="OpenJDK21U-jre_${temurin_architecture}_linux_hotspot_${TEMURIN_VERSION}.tar.gz"
   local archive="${CACHE_ROOT}/${archive_name}"
-  local runtime="${CACHE_ROOT}/temurin-jre-${TEMURIN_VERSION}-arm64"
-  local expected_sha="1d041073c65e834bdb4da732485a54ff829859dcd1549e7992f15bd73341be29"
+  local runtime="${CACHE_ROOT}/temurin-jre-${TEMURIN_VERSION}-${architecture}"
 
   mkdir -p "${CACHE_ROOT}"
   if [[ ! -r "${archive}" ]] || ! verify_checksum "${expected_sha}" "${archive}"; then
-    log "Downloading the pinned Temurin ARM64 runtime." >&2
+    log "Downloading the pinned Temurin ${architecture} runtime." >&2
     local download
     download="$(mktemp "${CACHE_ROOT}/.runtime-download.XXXXXX")"
-    if ! curl --fail --location --silent --show-error "$(runtime_url)" --output "${download}"; then
+    if ! curl --fail --location --silent --show-error "$(runtime_url "${architecture}")" --output "${download}"; then
       rm -f "${download}"
-      die "Could not download the pinned Temurin ARM64 runtime."
+      die "Could not download the pinned Temurin ${architecture} runtime."
     fi
     if ! verify_checksum "${expected_sha}" "${download}"; then
       rm -f "${download}"
@@ -133,12 +154,12 @@ prepare_arm64_runtime() {
   fi
 
   if [[ ! -x "${runtime}/bin/java" ]]; then
-    log "Preparing the cached Temurin ARM64 runtime." >&2
+    log "Preparing the cached Temurin ${architecture} runtime." >&2
     local extraction
     extraction="$(mktemp -d "${CACHE_ROOT}/.runtime-extract.XXXXXX")"
     trap 'rm -rf "${extraction}"' RETURN
     tar -xzf "${archive}" --strip-components=1 -C "${extraction}"
-    test -x "${extraction}/bin/java" || die "Temurin ARM64 archive did not contain bin/java."
+    test -x "${extraction}/bin/java" || die "Temurin ${architecture} archive did not contain bin/java."
     mv "${extraction}" "${runtime}"
     trap - RETURN
   fi
@@ -234,9 +255,12 @@ PY
 }
 
 main() {
+  local amd64_runtime arm64_runtime
+  amd64_runtime="$(prepare_runtime amd64)"
+  arm64_runtime="$(prepare_runtime arm64)"
   run_validation
-  build_artifacts amd64
-  build_artifacts arm64 "$(prepare_arm64_runtime)"
+  build_artifacts amd64 "${amd64_runtime}"
+  build_artifacts arm64 "${arm64_runtime}"
   log "Local release artifacts are ready: ${OUTPUT_ROOT}"
 }
 

@@ -112,7 +112,14 @@ run_logged() {
 }
 
 remote_stage() {
-  printf '%s\n' ".cache/autark-os-dev/$(date -u +%Y%m%dT%H%M%SZ)"
+  # sudo starts the appliance CLI with root's working context. A relative
+  # release-bundle path would therefore resolve below /root instead of the SSH
+  # user's home directory where we uploaded it.
+  local remote_home
+  remote_home="$(ssh_base 'printf "%s" "$HOME"')"
+  [[ "${remote_home}" == /* && "${remote_home}" != *"'"* && "${remote_home}" != *$'\n'* ]] ||
+    die "The Pi reported an unsafe remote home directory."
+  printf '%s/.cache/autark-os-dev/%s\n' "${remote_home}" "$(date -u +%Y%m%dT%H%M%SZ)"
 }
 
 status() {
