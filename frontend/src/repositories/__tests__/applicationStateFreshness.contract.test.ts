@@ -24,10 +24,11 @@ test('Discover waits for a successful canonical snapshot and locks installs whil
   const page = source('pages/MarketplacePage/MarketplacePage.tsx');
   const repository = source('repositories/discoverRepository.ts');
 
-  assert.match(page, /useDiscoverAppsQuery\([\s\S]*applicationState\.freshness\.hasUsableData/);
+  assert.match(page, /useDiscoverAppsQuery\(applicationState\.freshness\.hasUsableData\)/);
   assert.match(page, /selectedAppInstallLocked = !applicationState\.freshness\.isCurrent/);
   assert.match(page, /Refresh app information before reviewing or starting an install/);
-  assert.match(repository, /queryKey: \[\.\.\.discoverQueryKeys\.apps, applicationStateUpdatedAt \?\? 'unavailable'\]/);
+  assert.match(repository, /queryKey: discoverQueryKeys\.apps/);
+  assert.doesNotMatch(repository, /applicationStateUpdatedAt/);
   assert.match(repository, /enabled,/);
 });
 

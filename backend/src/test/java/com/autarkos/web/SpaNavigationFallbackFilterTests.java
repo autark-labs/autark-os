@@ -12,13 +12,19 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 class SpaNavigationFallbackFilterTests {
 
-    private final SpaNavigationFallbackFilter filter = new SpaNavigationFallbackFilter();
+    private final SpaNavigationFallbackFilter filter = new SpaNavigationFallbackFilter(new SpaRouteManifest());
 
     @Test
-    void forwardsHtmlNavigationForActiveAndUnknownClientRoutes() throws Exception {
+    void forwardsHtmlNavigationForDeclaredClientRoutes() throws Exception {
         assertForwarded("/pro");
         assertForwarded("/apps/found");
-        assertForwarded("/a-stale-bookmark");
+        assertForwarded("/overview");
+    }
+
+    @Test
+    void leavesUnknownBrowserPathsToTheirNormalHandlers() throws Exception {
+        assertPassedThrough("/a-stale-bookmark");
+        assertPassedThrough("/apps/unknown");
     }
 
     @Test

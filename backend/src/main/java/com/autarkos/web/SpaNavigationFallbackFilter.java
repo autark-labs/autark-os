@@ -1,8 +1,6 @@
 package com.autarkos.web;
 
 import java.io.IOException;
-import java.util.List;
-
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -14,15 +12,17 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * Sends browser document navigations to the React application so React Router can
- * render a route or its intentional not-found screen. API and static-resource
- * requests always keep their normal server-side behavior.
+ * Sends browser document requests for declared React routes to the application
+ * shell. Unknown paths keep their normal server-side 404 behavior.
  */
 @Component
 public class SpaNavigationFallbackFilter extends OncePerRequestFilter {
 
-    private static final List<String> NON_SPA_PREFIXES = List.of(
-            "/api", "/actuator", "/error", "/assets", "/downloads", "/app-images");
+    private final SpaRouteManifest routeManifest;
+
+    public SpaNavigationFallbackFilter(SpaRouteManifest routeManifest) {
+        this.routeManifest = routeManifest;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -37,25 +37,16 @@ public class SpaNavigationFallbackFilter extends OncePerRequestFilter {
         request.getRequestDispatcher("/index.html").forward(request, response);
     }
 
-    static boolean isSpaNavigation(HttpServletRequest request) {
+    boolean isSpaNavigation(HttpServletRequest request) {
         if (!"GET".equalsIgnoreCase(request.getMethod()) || !acceptsHtml(request)) {
             return false;
         }
 
-        return isSpaNavigationPath(pathWithinApplication(request));
+        return routeManifest.contains(pathWithinApplication(request));
     }
 
-    static boolean isSpaNavigationPath(String path) {
-        if (path == null || path.isBlank()) {
-            return false;
-        }
-
-        if (NON_SPA_PREFIXES.stream().anyMatch(prefix -> path.equals(prefix) || path.startsWith(prefix + "/"))) {
-            return false;
-        }
-
-        String lastSegment = path.substring(path.lastIndexOf('/') + 1);
-        return !lastSegment.contains(".");
+    boolean isSpaNavigationPath(String path) {
+        return routeManifest.contains(path);
     }
 
     private static boolean acceptsHtml(HttpServletRequest request) {

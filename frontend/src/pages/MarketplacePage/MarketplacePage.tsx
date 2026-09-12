@@ -112,10 +112,7 @@ function MarketplacePage() {
   const recoveryMode = searchParams.get('mode');
   const explicitDetailAppId = marketplaceDetailId(searchParams);
   const detailAppId = explicitDetailAppId ?? recoveryAppId;
-  const appsQuery = useDiscoverAppsQuery(
-    applicationState.applicationState?.updatedAt ?? null,
-    applicationState.freshness.hasUsableData,
-  );
+  const appsQuery = useDiscoverAppsQuery(applicationState.freshness.hasUsableData);
   const activityQuery = useMarketplaceActivityQuery();
   const readinessQuery = useDiscoverReadinessQuery();
   const installMutation = useDiscoverInstallMutation();
@@ -232,12 +229,16 @@ function MarketplacePage() {
   useEffect(() => {
     setDuplicateAcknowledgedAppId(null);
     setInstallReviewOpen(false);
+  }, [selectedAppId]);
+
+  useEffect(() => {
     const view = apps.find((nextApp) => nextApp.id === selectedAppId);
-    if (view) {
-      setSetupAnswers(defaultAnswersFromSchema(view.setupSchema));
-      setSetupAnswersAppId(selectedAppId);
+    if (!view || setupAnswersAppId === selectedAppId) {
+      return;
     }
-  }, [apps, selectedAppId]);
+    setSetupAnswers(defaultAnswersFromSchema(view.setupSchema));
+    setSetupAnswersAppId(selectedAppId);
+  }, [apps, selectedAppId, setupAnswersAppId]);
 
   async function installApp(appId = selectedApp?.id, _options = installOptions, mode: 'install' | 'reinstall' = 'install') {
     if (!appId) {
