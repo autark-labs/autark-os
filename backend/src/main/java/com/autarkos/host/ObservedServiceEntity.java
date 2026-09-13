@@ -25,9 +25,6 @@ class ObservedServiceEntity {
     @Column(name = "url")
     private String url;
 
-    @Column(name = "category", nullable = false)
-    private String category;
-
     @Column(name = "access_scope", nullable = false)
     private String accessScope;
 
@@ -40,14 +37,8 @@ class ObservedServiceEntity {
     @Column(name = "ownership_state", nullable = false)
     private String ownershipState;
 
-    @Column(name = "user_visibility", nullable = false)
-    private String userVisibility;
-
     @Column(name = "runtime_state", nullable = false)
     private String runtimeState;
-
-    @Column(name = "health_check_enabled", nullable = false)
-    private boolean healthCheckEnabled;
 
     @Column(name = "autark_os_instance_id")
     private String autarkOsInstanceId;
@@ -57,12 +48,6 @@ class ObservedServiceEntity {
 
     @Column(name = "last_seen_at", nullable = false)
     private String lastSeenAt;
-
-    @Column(name = "pinned_at")
-    private String pinnedAt;
-
-    @Column(name = "ignored_at")
-    private String ignoredAt;
 
     @Column(name = "metadata_json", nullable = false)
     private String metadataJson;
@@ -81,18 +66,13 @@ class ObservedServiceEntity {
     void updateFrom(ObservedService service) {
         this.displayName = service.displayName();
         this.url = cleanToNull(service.url());
-        this.category = blankDefault(service.category(), "External");
         this.accessScope = blankDefault(service.accessScope(), "LAN");
         this.catalogAppId = cleanToNull(service.catalogAppId());
         this.catalogMatchConfidence = blankDefault(service.catalogMatchConfidence(), "unknown");
         this.ownershipState = blankDefault(service.ownershipState(), "external");
-        this.userVisibility = blankDefault(service.userVisibility(), "observed");
         this.runtimeState = blankDefault(service.runtimeState(), "unknown");
-        this.healthCheckEnabled = service.healthCheckEnabled();
         this.autarkOsInstanceId = cleanToNull(service.autarkOsInstanceId());
         this.lastSeenAt = service.lastSeenAt().toString();
-        this.pinnedAt = service.pinnedAt() == null ? null : service.pinnedAt().toString();
-        this.ignoredAt = service.ignoredAt() == null ? null : service.ignoredAt().toString();
         this.metadataJson = blankDefault(service.metadataJson(), "{}");
     }
 
@@ -116,10 +96,6 @@ class ObservedServiceEntity {
         return url;
     }
 
-    String category() {
-        return category;
-    }
-
     String accessScope() {
         return accessScope;
     }
@@ -136,16 +112,8 @@ class ObservedServiceEntity {
         return ownershipState;
     }
 
-    String userVisibility() {
-        return userVisibility;
-    }
-
     String runtimeState() {
         return runtimeState;
-    }
-
-    boolean healthCheckEnabled() {
-        return healthCheckEnabled;
     }
 
     String autarkOsInstanceId() {
@@ -158,14 +126,6 @@ class ObservedServiceEntity {
 
     String lastSeenAt() {
         return lastSeenAt;
-    }
-
-    String pinnedAt() {
-        return pinnedAt;
-    }
-
-    String ignoredAt() {
-        return ignoredAt;
     }
 
     String metadataJson() {

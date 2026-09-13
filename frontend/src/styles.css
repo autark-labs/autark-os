@@ -62,7 +62,7 @@
   --app-shadow-md: 0 18px 54px rgb(2 6 23 / 0.2);
   --app-shadow-lg: 0 28px 90px rgb(2 6 23 / 0.28);
   --app-shadow-sidebar: 10px 0 42px rgb(2 6 23 / 0.28);
-  --app-shadow-pinned-column: 12px 0 20px rgb(2 6 23 / 0.3);
+  --app-shadow-sticky-column: 12px 0 20px rgb(2 6 23 / 0.3);
   --app-brand-gradient: linear-gradient(135deg, var(--color-cyan-300) 0%, var(--color-sky-500) 58%, var(--color-cyan-200) 100%);
   --app-hero-default:
     radial-gradient(circle at top left, rgb(34 211 238 / 0.16), transparent 30%),
@@ -362,7 +362,7 @@
   --color-app-disabled-surface: var(--app-disabled-surface);
   --color-app-disabled-border: var(--app-disabled-border);
   --color-app-disabled-text: var(--app-disabled-text);
-  --shadow-app-pinned-column: var(--app-shadow-pinned-column);
+  --shadow-app-sticky-column: var(--app-shadow-sticky-column);
   --background-image-app-hero-default: var(--app-hero-default);
 }
 

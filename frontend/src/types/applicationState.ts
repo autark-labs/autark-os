@@ -1,9 +1,23 @@
 import type { AppRuntimeView, AutarkOsIssue } from './app';
-import type { ObservedServiceView } from './observedService';
 
 export type ApplicationRelationship = 'managed' | 'recovery_required' | 'blocked' | 'available';
 export type CatalogAvailability = 'installable' | 'unavailable_in_beta' | string;
 export type ApplicationTone = 'neutral' | 'success' | 'warning' | 'danger' | 'muted' | string;
+
+export type ApplicationEvidence = {
+  resourceId: string;
+  source: string;
+  url: string | null;
+  accessScope: string;
+  ownershipState: string;
+  runtimeState: string;
+  statusLabel: string;
+  summary: string;
+  appInstanceId: string;
+  ownerInstanceId: string;
+  runtimePath: string;
+  composeProject: string;
+};
 
 export type ApplicationAction = {
   id: string;
@@ -34,12 +48,10 @@ export type ApplicationView = {
   relationshipDescription: string;
   statusTone: ApplicationTone;
   cardTone: ApplicationTone;
-  installCopyWarningRequired: boolean;
-  reviewExistingHref: string | null;
   primaryAction: ApplicationAction;
   availableActions: ApplicationAction[];
   runtime: AppRuntimeView | null;
-  evidence: ObservedServiceView | null;
+  evidence: ApplicationEvidence | null;
 };
 
 export type ApplicationState = {

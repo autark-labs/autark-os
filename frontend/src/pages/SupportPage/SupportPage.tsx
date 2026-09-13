@@ -22,7 +22,7 @@ import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
-import type { ObservedServiceView } from '@/types/observedService';
+import type { ApplicationView } from '@/types/applicationState';
 import type { AppRuntimeView } from '@/types/app';
 import type { SupportBundle, SupportFinding, SupportLogLine, SupportRedactionRule, SupportSummary, SystemDoctorStatus, SystemSetupStatus } from '@/types/system';
 import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from './SupportPage.diagnosticsModel';
@@ -154,7 +154,7 @@ function SupportPage() {
   }
 
   const summary = state.summary;
-  const observedServices = useMemo(() => appState.applications.flatMap((application) => application.evidence ? [application.evidence] : []), [appState.applications]);
+  const evidencedApplications = useMemo(() => appState.applications.filter((application) => Boolean(application.evidence)), [appState.applications]);
   const managedApps = useMemo(() => appState.applications.flatMap((application) => (
     application.relationship === 'managed' && application.runtime ? [application.runtime] : []
   )), [appState.applications]);
@@ -164,10 +164,10 @@ function SupportPage() {
   const healthChecks = notebookHealthChecks(state.doctor, state.setup, summaryRows);
   const headline = diagnosticsHeadline(summary, state.doctor);
   const conflict = productionConflictSummary(state.setup);
-  const ownershipResources = useMemo(() => appState.applications
-    .filter((application) => application.relationship !== 'managed' && application.relationship !== 'available')
-    .flatMap((application) => application.evidence ? [application.evidence] : []), [appState.applications]);
-  const dockerResources = useMemo(() => observedServices.filter((service) => service.source === 'docker'), [observedServices]);
+  const ownershipResources = useMemo(() => evidencedApplications
+    .filter((application) => application.relationship !== 'managed' && application.relationship !== 'available'), [evidencedApplications]);
+  const dockerResources = useMemo(() => evidencedApplications
+    .filter((application) => application.evidence?.source === 'docker'), [evidencedApplications]);
   const repairResources = useMemo(() => managedApps.filter((app) => hasRepairDetail(app)), [managedApps]);
   const tailscaleCheck = state.setup?.checks?.find((check) => check.id === 'tailscale');
   const operatorCheck = state.setup?.checks?.find((check) => check.id === 'tailscale-operator');
@@ -238,7 +238,7 @@ type DiagnosticsNotebookProps = {
   bundle: SupportBundle | null;
   bundleBusy: boolean;
   conflict: ReturnType<typeof productionConflictSummary>;
-  dockerResources: ObservedServiceView[];
+  dockerResources: ApplicationView[];
   error: string | null;
   findings: SupportFinding[];
   healthChecks: NotebookHealthCheck[];
@@ -256,7 +256,7 @@ type DiagnosticsNotebookProps = {
   onSectionChange: (section: DiagnosticsNotebookSection) => void;
   onViewLogs: () => void;
   operatorCheck: string;
-  ownershipResources: ObservedServiceView[];
+  ownershipResources: ApplicationView[];
   redactionRules: SupportRedactionRule[];
   refreshing: boolean;
   repairResources: AppRuntimeView[];
@@ -439,7 +439,7 @@ function HealthChecksWorkspace({ conflict, findings, healthChecks }: { conflict:
         <div className={cn('rounded-xl border p-3', conflict.tone === 'warning' ? 'border-amber-300/30 bg-amber-400/10' : 'border-cyan-300/25 bg-cyan-400/10')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><p className="text-sm font-semibold text-white">{conflict.title}</p><p className="mt-1 text-xs leading-5 text-sky-100/70">{conflict.message}</p></div>
-            <ProjectPrimaryButton asChild className="h-8 shrink-0 px-2.5 text-xs"><Link to="/resolve-existing-apps">Recover existing apps</Link></ProjectPrimaryButton>
+            <ProjectPrimaryButton asChild className="h-8 shrink-0 px-2.5 text-xs"><Link to="/apps">Recover existing apps</Link></ProjectPrimaryButton>
           </div>
         </div>
       )}
@@ -511,7 +511,7 @@ function RedactionRulesWorkspace({ rules }: { rules: SupportRedactionRule[] }) {
   );
 }
 
-function SystemDetailsWorkspace({ dockerResources, onOpenSettings, operatorCheck, ownershipResources, repairResources, setup, showAdvancedMetrics, summary, tailscaleCheck }: { dockerResources: ObservedServiceView[]; onOpenSettings: () => void; operatorCheck: string; ownershipResources: ObservedServiceView[]; repairResources: AppRuntimeView[]; setup: SystemSetupStatus | null; showAdvancedMetrics: boolean; summary: SupportSummary | null; tailscaleCheck: string }) {
+function SystemDetailsWorkspace({ dockerResources, onOpenSettings, operatorCheck, ownershipResources, repairResources, setup, showAdvancedMetrics, summary, tailscaleCheck }: { dockerResources: ApplicationView[]; onOpenSettings: () => void; operatorCheck: string; ownershipResources: ApplicationView[]; repairResources: AppRuntimeView[]; setup: SystemSetupStatus | null; showAdvancedMetrics: boolean; summary: SupportSummary | null; tailscaleCheck: string }) {
   return (
     <div className="grid min-h-full content-start gap-3">
       <WorkspaceHeading description="Technical context stays available without competing with everyday health checks." title="System details" />
@@ -519,11 +519,11 @@ function SystemDetailsWorkspace({ dockerResources, onOpenSettings, operatorCheck
         <div><p className="text-xs font-semibold uppercase tracking-wide text-sky-100/55">Instance</p><div className="mt-2 grid gap-2 text-sm"><InfoLine label="Name" value={setup?.instanceSlug || 'Unknown'} /><InfoLine label="ID" value={setup?.instanceId || 'Unknown'} /><InfoLine label="Mode" value={setup?.devMode ? 'Development' : 'Production'} /><InfoLine label="Profiles" value={setup?.activeProfiles || 'default'} /></div></div>
         <div><p className="text-xs font-semibold uppercase tracking-wide text-sky-100/55">Version</p><div className="mt-2 grid gap-2 text-sm"><InfoLine label="Version" value={summary?.version?.version || 'Unknown'} /><InfoLine label="Build" value={summary?.version?.buildSha ? shortSha(summary.version.buildSha) : 'Unknown'} /><InfoLine label="Generated" value={formatDate(summary?.checkedAt)} /></div></div>
       </section>
-      <AdvancedSection defaultOpen={false} icon={Server} title="App ownership details">{ownershipResources.length ? ownershipResources.map((resource) => <ResourceLine key={resource.id} resource={resource} />) : <p className="text-sm text-slate-400">No found apps or ignored resources are currently visible.</p>}</AdvancedSection>
+      <AdvancedSection defaultOpen={false} icon={Server} title="App ownership details">{ownershipResources.length ? ownershipResources.map((application) => <ResourceLine application={application} key={application.id} />) : <p className="text-sm text-slate-400">No apps require ownership review.</p>}</AdvancedSection>
       <AdvancedSection defaultOpen={repairResources.length > 0} icon={ShieldCheck} title="App repair details">{repairResources.length ? repairResources.map((app) => <RepairLine app={app} key={app.appId} />) : <p className="text-sm text-slate-400">No app repair attempts or remediation states are currently visible.</p>}</AdvancedSection>
-      <AdvancedSection defaultOpen={false} icon={FileText} title="Docker resources">{dockerResources.length ? dockerResources.map((resource) => <ResourceLine key={resource.id} resource={resource} technical />) : <p className="text-sm text-slate-400">No Docker resources were returned by the host inventory scan.</p>}</AdvancedSection>
+      <AdvancedSection defaultOpen={false} icon={FileText} title="Docker resources">{dockerResources.length ? dockerResources.map((application) => <ResourceLine application={application} key={application.id} technical />) : <p className="text-sm text-slate-400">No matching Docker evidence is present in the app inventory.</p>}</AdvancedSection>
       <AdvancedSection defaultOpen={false} icon={LockKeyhole} title="Tailscale details"><div className="grid gap-3 md:grid-cols-2"><InfoLine label="Tailscale" value={tailscaleCheck} /><InfoLine label="Private access permission" value={operatorCheck} /><InfoLine label="Version" value={setup?.tailscaleVersion || 'Unknown'} /><InfoLine label="Instance" value={setup?.instanceSlug || 'Unknown'} /></div></AdvancedSection>
-      <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3"><SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." /><div className="mt-3 grid gap-2 sm:grid-cols-2"><RelatedLink onClick={onOpenSettings} title="Settings" detail="Host setup checks and service-user guidance." /><RelatedLink to="/resolve-existing-apps" title="Resolve Existing Apps" detail="Review apps found on this server." /><RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />{showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}</div></section>
+      <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3"><SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." /><div className="mt-3 grid gap-2 sm:grid-cols-2"><RelatedLink onClick={onOpenSettings} title="Settings" detail="Host setup checks and service-user guidance." /><RelatedLink to="/apps" title="My Apps" detail="Review apps that need recovery or conflict resolution." /><RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />{showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}</div></section>
     </div>
   );
 }
@@ -619,22 +619,23 @@ function AdvancedSection({ children, defaultOpen, icon: Icon, onOpenChange, open
   );
 }
 
-function ResourceLine({ resource, technical = false }: { resource: ObservedServiceView; technical?: boolean }) {
+function ResourceLine({ application, technical = false }: { application: ApplicationView; technical?: boolean }) {
+  const evidence = application.evidence;
   return (
     <SupportInset>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-bold text-white">{resource.displayName}</p>
-          <p className="mt-1 text-sm text-slate-400">{resource.userStatusDescription}</p>
+          <p className="font-bold text-white">{application.name}</p>
+          <p className="mt-1 text-sm text-slate-400">{application.relationshipDescription}</p>
         </div>
-        <MetadataBadge>{resource.userStatusLabel || labelForOwnership(resource.ownershipState)}</MetadataBadge>
+        <MetadataBadge>{evidence?.statusLabel || labelForOwnership(application.ownershipState)}</MetadataBadge>
       </div>
       {technical && (
         <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
-          <span>State: {resource.runtimeState || 'unknown'}</span>
-          <span>Catalog: {resource.catalogAppId || 'Unknown'}</span>
-          <span>Source: {resource.source}</span>
-          <span>Actions: {resource.availableActions.map((action) => action.label || humanize(action.id)).join(', ') || 'None'}</span>
+          <span>State: {application.runtimeState || 'unknown'}</span>
+          <span>Catalog: {application.id}</span>
+          <span>Source: {evidence?.source || 'Unknown'}</span>
+          <span>Relationship: {application.relationshipLabel}</span>
         </div>
       )}
     </SupportInset>

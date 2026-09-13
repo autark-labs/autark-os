@@ -21,10 +21,6 @@ public interface ObservedServiceRepository extends JpaRepository<ObservedService
                 .toList();
     }
 
-    default Optional<ObservedService> findServiceById(String id) {
-        return findById(id).map(ObservedServices::service);
-    }
-
     default Optional<ObservedService> findServiceBySourceAndFingerprint(String source, String fingerprint) {
         return findBySourceAndFingerprint(source, fingerprint).map(ObservedServices::service);
     }
@@ -41,9 +37,6 @@ public interface ObservedServiceRepository extends JpaRepository<ObservedService
     }
 
     default void deleteDockerServicesNotIn(Collection<String> fingerprints) {
-        if (fingerprints == null || fingerprints.isEmpty()) {
-            return;
-        }
         Collection<String> currentFingerprints = fingerprints == null ? List.of() : fingerprints;
         List<ObservedServiceEntity> stale = findBySource(HostModels.ObservedServiceSource.DOCKER).stream()
                 .filter(entity -> !currentFingerprints.contains(entity.fingerprint()))

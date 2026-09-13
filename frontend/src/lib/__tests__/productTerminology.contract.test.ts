@@ -12,7 +12,7 @@ function source(relativePath: string) {
 test('active product copy distinguishes managed apps, recovery, and conflicts', () => {
   const firstRunGuide = source('../docs/first-run.md');
   const applicationsHeader = source('src/pages/ApplicationsPage/components/AppsPageHeader.tsx');
-  const foundServiceDetails = source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx');
+  const recoveryDialog = source('src/pages/ApplicationsPage/ApplicationReviewDialog.tsx');
   const installer = source('../scripts/autark-os-gui-installer.sh');
 
   assert.match(firstRunGuide, /\*\*Managed app\*\*/);
@@ -20,7 +20,7 @@ test('active product copy distinguishes managed apps, recovery, and conflicts', 
   assert.match(firstRunGuide, /\*\*Blocked\*\*/);
   assert.doesNotMatch(firstRunGuide, /Linked service/);
   assert.match(applicationsHeader, /Open, manage, and monitor apps installed by Autark-OS\./);
-  assert.match(foundServiceDetails, /Catalog match/);
+  assert.match(recoveryDialog, /Bring this app under your current Autark-OS installation/);
   assert.match(installer, /Discover app installs/);
   assert.doesNotMatch(installer, /Marketplace app installs/);
 });

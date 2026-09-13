@@ -6,7 +6,6 @@ type ProFailureMode = 'disabled' | 'unavailable' | 'malformed' | 'unhealthy';
 const ceRoutes = [
   { path: '/home', heading: /Your Apps/i },
   { path: '/apps', heading: /My Apps/i },
-  { path: '/apps/found', heading: /Resolve Existing Apps/i },
   { path: '/discover', heading: /^Discover$/i },
   { path: '/access', heading: /^Access$/i },
   { path: '/backups', heading: /^Backups$/i },

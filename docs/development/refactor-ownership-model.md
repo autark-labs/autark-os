@@ -1,6 +1,6 @@
 # Ownership Model Refactor
 
-Status: Proposed
+Status: Completed locally; Raspberry Pi validation deferred
 
 ## Context
 
@@ -588,6 +588,51 @@ Acceptance criteria:
 - fresh installation and database upgrade paths both work
 - production lines of code and file count are measurably lower
 - complete frontend, backend, packaging, and Pi smoke validation passes
+
+#### Story 6 completion ledger
+
+Deleted:
+
+- the public observed-service controller and response model
+- the frontend observed-service type and the old full-page existing-app resolution route
+- the nested observed-service details sheet and its obsolete page logic and tests
+- observed-service capture from support bundles
+- retired pin, unpin, visibility, health-check, category, and ignore fields from the active host-evidence model and repository mapping
+- generic observed-service action/status DTOs and the old shared mutation result used by the retired API
+- redundant `installCopyWarningRequired` and `reviewExistingHref` fields from `ApplicationView`; relationship and primary action now carry that state directly
+
+Replaced:
+
+- public observed-service projections with explicit `ApplicationEvidence` nested under the canonical `ApplicationView`
+- `/apps/found` and `/resolve-existing-apps` with a canonical `/apps?review={catalogAppId}` review route
+- the full-page resolution flow with the existing fixed-size recovery dialog mounted directly in My Apps
+- Pro snapshot `foundServices` and its pinned/found counts with `applicationExceptions`, containing only recoverable and blocked totals
+- the remaining “found apps” prompt component and state names with an application-review prompt based on canonical relationships
+
+Hardened:
+
+- only current Docker observations and Autark-OS failed-install evidence can enter canonical application state
+- a successful empty Docker scan now removes stale Docker evidence; a failed scan still preserves the last known evidence
+- every recoverable or blocked catalog application receives a valid canonical review route, including name-matched Docker evidence without a stored catalog ID
+- Discover shows recovery review for recoverable apps and reserves “install second copy” for genuinely blocked apps
+- clean backend reruns now require managed fixtures to contain a usable Compose definition instead of relying on partial-management behavior
+
+Schema and data decision:
+
+- historical migrations remain unchanged
+- historical pinned/manual rows remain dormant in SQLite rather than being silently deleted
+- active inventory filters those retired sources before classification, so they cannot appear as applications or block installation
+- fresh-schema migration and a version-9-to-current upgrade retaining historical pinned data are covered by database tests
+
+Validation:
+
+- backend: 672 tests executed, 0 failures, 0 errors, 3 skipped, including a clean `--rerun-tasks` pass
+- frontend: ESLint, TypeScript, UI-token policy, production build, 95 files and 317 tests passed
+- browser smoke: 24 mobile/desktop route and interaction tests passed, including recovery review and viewport checks
+- portable release artifact and installer support-bundle contracts passed
+- repository whitespace and retired-contract searches passed
+- production source moved from 858 files and 103,514 lines to 854 files and 102,782 lines: 4 fewer files and 732 fewer lines
+- Raspberry Pi validation remains intentionally deferred by product-owner direction during this refactor sequence
 
 ## Refactor controls
 

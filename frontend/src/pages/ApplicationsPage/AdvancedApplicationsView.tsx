@@ -69,7 +69,7 @@ export function AdvancedApplicationsView({ actions, actionLoadingByItemId, empty
               </colgroup>
               <TableHeader>
                 <TableRow className="h-10 border-transparent hover:bg-transparent">
-                  <TableHead className={cn(tableHeadClass, 'sticky left-0 z-30 bg-slate-950 px-3 shadow-app-pinned-column')}>Name</TableHead>
+                  <TableHead className={cn(tableHeadClass, 'sticky left-0 z-30 bg-slate-950 px-3 shadow-app-sticky-column')}>Name</TableHead>
                   <TableHead className={tableHeadClass}>Type</TableHead>
                   <TableHead className={tableHeadClass}>State</TableHead>
                   <TableHead className={tableHeadClass}>Access</TableHead>
@@ -116,7 +116,7 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
     selected && 'bg-app-card-harbor-hover ring-1 ring-cyan-100/60 shadow-xl shadow-cyan-200/15',
   );
   const pinnedCellClassName = cn(
-    'sticky left-0 z-10 h-16 rounded-l-xl bg-app-card-harbor px-3 py-0 shadow-app-pinned-column',
+    'sticky left-0 z-10 h-16 rounded-l-xl bg-app-card-harbor px-3 py-0 shadow-app-sticky-column',
     !managementOpen && 'group-hover/app-card:bg-app-card-harbor-hover',
     selected && 'bg-app-card-harbor-hover',
   );

@@ -17,7 +17,7 @@ class SpaNavigationFallbackFilterTests {
     @Test
     void forwardsHtmlNavigationForDeclaredClientRoutes() throws Exception {
         assertForwarded("/pro");
-        assertForwarded("/apps/found");
+        assertForwarded("/apps");
         assertForwarded("/overview");
     }
 

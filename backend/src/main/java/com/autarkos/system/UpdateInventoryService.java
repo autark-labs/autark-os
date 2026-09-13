@@ -12,7 +12,7 @@ import com.autarkos.apps.ApplicationRelationship;
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.apps.ApplicationView;
-import com.autarkos.host.ObservedServiceView;
+import com.autarkos.apps.ApplicationEvidence;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.system.UpdateInventoryModels.AppOutcome;
 import com.autarkos.system.UpdateInventoryModels.ManagedApp;
@@ -161,18 +161,17 @@ public class UpdateInventoryService {
                 && requiredEqual(before.ownershipState(), after.ownershipState());
     }
 
-    private boolean recoveryEvidenceMatches(ManagedApp before, ObservedServiceView evidence) {
-        if (evidence == null || evidence.metadata() == null) {
+    private boolean recoveryEvidenceMatches(ManagedApp before, ApplicationEvidence evidence) {
+        if (evidence == null) {
             return false;
         }
-        Map<String, String> metadata = evidence.metadata();
-        boolean stableIdentityPresent = !value(metadata.get("appInstanceId")).isBlank()
-                || !value(metadata.get("autarkOsInstanceId")).isBlank()
-                || !value(metadata.get("composeProject")).isBlank();
+        boolean stableIdentityPresent = !value(evidence.appInstanceId()).isBlank()
+                || !value(evidence.ownerInstanceId()).isBlank()
+                || !value(evidence.composeProject()).isBlank();
         return stableIdentityPresent
-                && optionalEqual(before.appInstanceId(), metadata.get("appInstanceId"))
-                && optionalEqual(before.ownerInstanceId(), metadata.get("autarkOsInstanceId"))
-                && optionalEqual(before.composeProject(), metadata.get("composeProject"));
+                && optionalEqual(before.appInstanceId(), evidence.appInstanceId())
+                && optionalEqual(before.ownerInstanceId(), evidence.ownerInstanceId())
+                && optionalEqual(before.composeProject(), evidence.composeProject());
     }
 
     private boolean requiredEqual(String before, String after) {

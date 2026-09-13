@@ -180,8 +180,8 @@ function cardActions(item: ApplicationSurfaceItem, actionLoading: ApplicationRun
       actions.push({
         ...action,
         href: action.href || (action.id === 'open' ? item.href : undefined),
-        disabled: action.disabled || (!action.href && action.id !== 'open' && action.id !== 'pin' && action.id !== 'unpin'),
-        reason: action.reason || (!action.href && action.id !== 'open' && action.id !== 'pin' && action.id !== 'unpin' ? 'Open the app details to complete this action.' : undefined),
+        disabled: action.disabled || (!action.href && action.id !== 'open'),
+        reason: action.reason || (!action.href && action.id !== 'open' ? 'Open the app details to complete this action.' : undefined),
       });
     }
   });

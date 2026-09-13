@@ -151,7 +151,7 @@ public final class NormalizedHostSnapshotAssembler {
                         safeActivity,
                         generatedAt,
                         partial),
-                foundServices(applications),
+                applicationExceptions(applications),
                 access(applications, access, resources, partial),
                 backups(
                         backups,
@@ -262,13 +262,12 @@ public final class NormalizedHostSnapshotAssembler {
                 partial);
     }
 
-    private NormalizedHostSnapshot.FoundServicesSnapshot foundServices(
+    private NormalizedHostSnapshot.ApplicationExceptionsSnapshot applicationExceptions(
             ApplicationState state) {
         List<ApplicationView> views =
                 state == null || state.applications() == null
                         ? List.of()
                         : state.applications();
-        int found = 0;
         int recoverable = countState(
                 views,
                 ApplicationRelationship.RECOVERY_REQUIRED);
@@ -276,18 +275,16 @@ public final class NormalizedHostSnapshotAssembler {
                 views,
                 ApplicationRelationship.BLOCKED);
         Set<String> categories = new LinkedHashSet<>();
-        if (views.stream().anyMatch(view -> view.evidence() != null && "managed_elsewhere".equals(view.evidence().userStatus()))) {
+        if (views.stream().anyMatch(view -> view.evidence() != null && "foreign_autark_os".equals(view.evidence().ownershipState()))) {
             categories.add("ownership_foreign");
         }
         if (blocked > 0) {
             categories.add("ownership_blocked");
         }
-        if (views.stream().anyMatch(view -> view.evidence() != null && "failed_install".equals(view.evidence().userStatus()))) {
+        if (views.stream().anyMatch(view -> view.evidence() != null && "failed_install".equals(view.evidence().ownershipState()))) {
             categories.add("failed_install");
         }
-        return new NormalizedHostSnapshot.FoundServicesSnapshot(
-                found,
-                0,
+        return new NormalizedHostSnapshot.ApplicationExceptionsSnapshot(
                 recoverable,
                 blocked,
                 List.copyOf(categories));
@@ -845,7 +842,7 @@ public final class NormalizedHostSnapshotAssembler {
                 source.generatedAt(),
                 source.system(),
                 source.apps(),
-                source.foundServices(),
+                source.applicationExceptions(),
                 source.access(),
                 source.backups(),
                 source.storage(),

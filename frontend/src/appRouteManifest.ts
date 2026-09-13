@@ -8,7 +8,5 @@ export const canonicalRoutePaths = Object.values(appRoutes);
 export const directRoutePaths = [
   specialRoutes.root,
   specialRoutes.setup,
-  specialRoutes.foundApps,
-  specialRoutes.resolveExistingApps,
   ...canonicalRoutePaths,
 ];

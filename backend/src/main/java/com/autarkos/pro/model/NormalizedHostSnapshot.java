@@ -9,7 +9,7 @@ public record NormalizedHostSnapshot(
         Instant generatedAt,
         SystemSnapshot system,
         List<AppSnapshot> apps,
-        FoundServicesSnapshot foundServices,
+        ApplicationExceptionsSnapshot applicationExceptions,
         List<AccessSnapshot> access,
         BackupSnapshot backups,
         StorageSnapshot storage,
@@ -37,9 +37,7 @@ public record NormalizedHostSnapshot(
             String jobConflict) {
     }
 
-    public record FoundServicesSnapshot(
-            int found,
-            int pinned,
+    public record ApplicationExceptionsSnapshot(
             int recoverable,
             int blocked,
             List<String> conflictCategories) {

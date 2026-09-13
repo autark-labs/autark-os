@@ -2332,7 +2332,6 @@ SUPPORT_USAGE
     application-state.json
     jobs.json
     recent-activity.json
-    observed-services.json
     docker-inventory.txt
   )
 
@@ -2351,7 +2350,6 @@ SUPPORT_USAGE
   support_bundle_api_capture "/api/application-state" "${bundle_dir}/application-state.json"
   support_bundle_api_capture "/api/jobs" "${bundle_dir}/jobs.json"
   support_bundle_api_capture "/api/system/support/logs?limit=120" "${bundle_dir}/recent-activity.json"
-  support_bundle_api_capture "/api/observed-services" "${bundle_dir}/observed-services.json"
   write_docker_inventory "${bundle_dir}/docker-inventory.txt"
   write_selected_options "${state_dir}" "${bundle_dir}/selected-options.json"
   redact_file_to "${CONFIG_FILE}" "${bundle_dir}/config-redacted.env"

@@ -16,7 +16,6 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
 import com.autarkos.host.ObservedServiceService;
-import com.autarkos.host.ObservedServiceView;
 import com.autarkos.host.ObservedService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobStep;
@@ -52,12 +51,12 @@ class ApplicationStateServiceTests {
     Path runtimeRoot;
 
     @Test
-    void snapshotTreatsRetiredPinnedRecordsAsFoundServices() {
+    void snapshotLeavesRetiredManualLinksDormantButKeepsDockerEvidence() {
         ObservedServiceRepository repository = repository();
         repository.upsert(pinned("manual:gitlab", "gitlab"));
         repository.upsert(pinned("docker:compassionate_mclean", "compassionate_mclean"));
         repository.upsert(found("docker:vaultwarden", "vaultwarden"));
-        ObservedServiceService observedServiceService = new ObservedServiceService(repository, noScan());
+        ObservedServiceService observedServiceService = new ObservedServiceService(repository, null);
         ApplicationStateService service = new ApplicationStateService(
                 List::of,
                 List::of,
@@ -68,8 +67,8 @@ class ApplicationStateServiceTests {
         ApplicationState state = service.refreshNow();
 
         assertThat(evidence(state))
-                .extracting(ObservedServiceView::id)
-                .containsExactlyInAnyOrder("manual:gitlab", "docker:compassionate_mclean", "docker:vaultwarden");
+                .extracting(ApplicationEvidence::resourceId)
+                .containsExactlyInAnyOrder("docker:compassionate_mclean", "docker:vaultwarden");
     }
 
     @Test
@@ -179,8 +178,7 @@ class ApplicationStateServiceTests {
 
         assertThat(observedServiceService.refreshCalls).hasValue(1);
         assertThat(evidence(state))
-                .extracting(ObservedServiceView::id)
-                .containsExactly("manual:gitlab");
+                .isEmpty();
     }
 
     @Test
@@ -540,25 +538,24 @@ class ApplicationStateServiceTests {
                 }
                 for (ObservedService service : observed) {
                     applications.add(new ApplicationView(
-                            service.id(), service.displayName(), service.category(), "", "", "",
+                            service.id(), service.displayName(), "Apps", "", "", "",
                             ApplicationRelationship.BLOCKED, "unavailable", "", service.runtimeState(),
                             service.ownershipState(), "not_ready", "backup_disabled", List.of(),
-                            "Found on server", "Detected host resource", "neutral", "observed", true,
-                            "/apps/found?service=" + service.id(),
-                            new ApplicationAction("review_existing", "Review existing service", "route", "/apps/found", null, false, ""),
-                            List.of(), null, ObservedServiceService.toView(service)));
+                            "Found on server", "Detected host resource", "neutral", "observed",
+                            new ApplicationAction("review_existing", "Review existing service", "route", "/apps", null, false, ""),
+                            List.of(), null, evidence(service)));
                 }
                 return List.copyOf(applications);
             }
         };
     }
 
-    private ApplicationView application(String id, String name, String appInstanceId, AppRuntimeView runtime, ObservedServiceView evidence) {
+    private ApplicationView application(String id, String name, String appInstanceId, AppRuntimeView runtime, ApplicationEvidence evidence) {
         return new ApplicationView(
                 id, name, "Apps", "", "", "", ApplicationRelationship.MANAGED, "installable",
                 appInstanceId, runtime == null ? "unknown" : runtime.technicalStatus(), "owned", "local_ready",
-                "backup_disabled", List.of(), "Installed", "Managed by Autark-OS", "success", "success", false,
-                null, new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""),
+                "backup_disabled", List.of(), "Installed", "Managed by Autark-OS", "success", "success",
+                new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""),
                 List.of(), runtime, evidence);
     }
 
@@ -570,7 +567,7 @@ class ApplicationStateServiceTests {
         return state.applications().stream().map(ApplicationView::runtime).filter(java.util.Objects::nonNull).toList();
     }
 
-    private List<ObservedServiceView> evidence(ApplicationState state) {
+    private List<ApplicationEvidence> evidence(ApplicationState state) {
         return state.applications().stream().map(ApplicationView::evidence).filter(java.util.Objects::nonNull).toList();
     }
 
@@ -585,24 +582,24 @@ class ApplicationStateServiceTests {
     private com.autarkos.host.ObservedService service(String id, String name, String visibility) {
         return new com.autarkos.host.ObservedService(
                 id,
-                "docker",
+                id.startsWith("manual:") ? "manual_url" : "docker",
                 id,
                 name,
                 null,
-                "External",
                 "LAN",
                 null,
                 "unknown",
                 "external",
-                visibility,
                 "running",
-                false,
                 "",
                 Instant.parse("2026-06-21T12:00:00Z"),
                 Instant.parse("2026-06-21T12:00:00Z"),
-                "pinned".equals(visibility) ? Instant.parse("2026-06-21T12:00:00Z") : null,
-                null,
                 "{}");
+    }
+
+    private ApplicationEvidence evidence(ObservedService service) {
+        return new ApplicationEvidence(service.id(), service.source(), service.url(), service.accessScope(),
+                service.ownershipState(), service.runtimeState(), "Conflict", "Detected host resource", "", "", "", "");
     }
 
     private AppInstanceView appInstance() {
@@ -733,9 +730,9 @@ class ApplicationStateServiceTests {
         }
 
         @Override
-        public List<ObservedServiceView> refresh() {
+        public void refresh() {
             refreshCalls.incrementAndGet();
-            return super.list(true);
+            super.refresh();
         }
     }
 }

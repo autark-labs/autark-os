@@ -34,8 +34,6 @@ test('active user-facing surfaces use shared disabled action reasons', () => {
     'src/pages/MonitoringPage/MonitoringActivitySections.tsx',
     'src/pages/NetworkPage/ReachabilityMatrix.tsx',
     'src/pages/OnboardingPage/OnboardingWizard.tsx',
-    'src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx',
-    'src/pages/ResolveExistingAppsPage/ResolveExistingAppsPage.tsx',
     'src/pages/SettingsPage/SettingsPage.tsx',
     'src/pages/StoragePage/StoragePage.tsx',
     'src/pages/SupportPage/SupportPage.tsx',

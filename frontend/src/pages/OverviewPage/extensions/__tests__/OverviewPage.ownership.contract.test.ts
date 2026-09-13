@@ -18,6 +18,6 @@ test('Home is managed-only while My Apps links recovery-worthy resources to revi
   assert.doesNotMatch(repository, /pinnedExternalServices/);
   assert.doesNotMatch(home, /foundServices|observedServices|pinnedExternalServices|Pinned services/);
   assert.match(applications, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
-  assert.match(applications, /<FoundAppsPrompt/);
-  assert.match(applications, /reviewHref: '\/apps\/found'/);
+  assert.match(applications, /<ApplicationReviewPrompt/);
+  assert.match(applications, /reviewApplications\[0\]\?\.primaryAction\.href/);
 });

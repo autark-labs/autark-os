@@ -13,9 +13,7 @@
   },
   "specialRoutes": {
     "root": "/",
-    "setup": "/setup",
-    "foundApps": "/apps/found",
-    "resolveExistingApps": "/resolve-existing-apps"
+    "setup": "/setup"
   },
   "aliases": {
     "/overview": "/home",

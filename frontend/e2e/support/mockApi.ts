@@ -181,56 +181,20 @@ const managedApp = {
   updatedAt: fixedAt,
 };
 
-const observedServices = [
-  {
-    id: 'foreign-immich',
-    source: 'docker',
-    displayName: 'Immich from another Autark-OS installation with a long descriptive name',
-    url: 'http://immich.local:2283',
-    category: 'Photos',
-    accessScope: 'Home network',
-    catalogAppId: 'immich',
-    catalogMatchConfidence: 'high',
-    userStatus: 'managed_elsewhere',
-    userStatusLabel: 'Owned by another Autark-OS instance',
-    userStatusDescription: 'Review this service before recovering or installing another copy.',
-    managementState: 'found',
-    readinessState: 'ready',
-    attentionState: 'needs_review',
-    ownershipState: 'foreign_autark_os',
-    runtimeState: 'running',
-    pinned: false,
-    managedByThisAutarkOs: false,
-    adoptable: true,
-    duplicateInstallWarningRequired: true,
-    availableActions: [{ id: 'review', label: 'Review service', kind: 'route', href: '/apps/found?service=foreign-immich', method: null, disabled: false, reason: '' }],
-    metadata: { composeProject: 'legacy-immich', container: 'immich-server' },
-  },
-  {
-    id: 'linked-router',
-    source: 'manual',
-    displayName: 'Home router administration',
-    url: 'http://router.local',
-    category: 'Network',
-    accessScope: 'Home network',
-    catalogAppId: null,
-    catalogMatchConfidence: 'none',
-    userStatus: 'pinned_external',
-    userStatusLabel: 'Linked service',
-    userStatusDescription: 'A pinned shortcut that Autark-OS does not manage.',
-    managementState: 'linked',
-    readinessState: 'ready',
-    attentionState: 'none',
-    ownershipState: 'external',
-    runtimeState: 'reachable',
-    pinned: true,
-    managedByThisAutarkOs: false,
-    adoptable: false,
-    duplicateInstallWarningRequired: false,
-    availableActions: [{ id: 'open', label: 'Open service', kind: 'external', href: 'http://router.local', method: null, disabled: false, reason: '' }],
-    metadata: {},
-  },
-];
+const managedApplication = {
+  id: 'vaultwarden', name: runtimeApp.appName, category: 'Security', image: '', summary: 'Private password vault', description: 'Private password vault',
+  relationship: 'managed', catalogAvailability: 'installable', appInstanceId: runtimeApp.appInstanceId, runtimeState: 'running', ownershipState: 'owned_managed', accessState: 'private_ready', backupState: 'protected_by_restore_point', issues: [],
+  relationshipLabel: 'Installed', relationshipDescription: 'Managed by this Autark-OS installation.', statusTone: 'success', cardTone: 'success',
+  primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden&panel=manage', method: null, disabled: false, reason: '' }, availableActions: [], runtime: runtimeApp, evidence: null,
+};
+
+const immichApplication = {
+  id: 'immich', name: 'Immich', category: 'Photos', image: '', summary: 'Private photo library', description: 'Keep photos on your own server.',
+  relationship: 'recovery_required', catalogAvailability: 'installable', appInstanceId: '', runtimeState: 'running', ownershipState: 'foreign_autark_os', accessState: 'not_ready', backupState: 'backup_disabled', issues: [],
+  relationshipLabel: 'Recovery required', relationshipDescription: 'This app belongs to another Autark-OS installation.', statusTone: 'warning', cardTone: 'warning',
+  primaryAction: { id: 'review_existing', label: 'Review existing service', kind: 'route', href: '/apps?review=immich', method: null, disabled: false, reason: '' }, availableActions: [{ id: 'review_existing', label: 'Review existing service', kind: 'route', href: '/apps?review=immich', method: null, disabled: false, reason: '' }], runtime: null,
+  evidence: { resourceId: 'foreign-immich', source: 'docker', url: 'http://immich.local:2283', accessScope: 'Home network', ownershipState: 'foreign_autark_os', runtimeState: 'running', statusLabel: 'Owned elsewhere', summary: 'This app belongs to another Autark-OS installation.', appInstanceId: 'appinst_immich', ownerInstanceId: 'other-instance', runtimePath: '/var/lib/autark-os/apps/immich', composeProject: 'legacy-immich' },
+};
 
 const activeJob = {
   jobId: 'backup-vaultwarden',
@@ -381,47 +345,23 @@ const catalogApp = {
 
 const discoverApps = [
   {
-    id: 'vaultwarden',
+    application: managedApplication,
     app: catalogApp,
-    name: catalogApp.name,
-    image: '',
-    summary: catalogApp.shortValue,
-    description: catalogApp.description,
-    categoryLabel: 'Security',
     serviceKindLabel: 'Web app',
     estimatedInstallTime: catalogApp.installTime,
     difficulty: catalogApp.difficulty,
-    state: 'installed_managed',
-    stateLabel: 'Installed',
-    stateDescription: 'Managed by this Autark-OS instance.',
-    statusTone: 'success',
-    cardTone: 'success',
-    ownedByCurrentInstance: true,
-    installCopyWarningRequired: false,
-    reviewExistingHref: null,
-    primaryAction: { id: 'manage', label: 'Manage app', kind: 'route', href: '/apps?app=vaultwarden', method: null, disabled: false, reason: '' },
-    availableActions: [],
-    installed: true,
-    installedApp: { appId: 'vaultwarden', appName: runtimeApp.appName, status: 'Ready', accessUrl: runtimeApp.accessUrl, backupState: 'protected_by_restore_point', protectedByBackups: true, firstBackupRecommended: false },
-    observedService: null,
     setupSchema: { appId: 'vaultwarden', version: 1, inputs: [{ id: 'access', label: 'Access', type: 'choice', tier: 'recommended', required: true, defaultValue: 'local-and-private', help: 'Choose where the app can be opened.', options: [{ value: 'local-and-private', label: 'Home and private', description: 'Use your local network and Tailscale.', recommended: true, advanced: false }], showWhen: {} }] },
   },
   {
-    id: 'immich',
+    application: immichApplication,
     app: { ...catalogApp, id: 'immich', name: 'Immich', category: 'Photos', shortValue: 'Private photo library', description: 'Keep photos on your own server.', tags: ['Photos', 'Starter'], badge: 'Found on server' },
-    name: 'Immich', image: '', summary: 'Private photo library', description: 'Keep photos on your own server.', categoryLabel: 'Photos', serviceKindLabel: 'Photo library', estimatedInstallTime: 'About 5 minutes', difficulty: 'Easy',
-    state: 'managed_elsewhere', stateLabel: 'Found on this server', stateDescription: 'Owned by another Autark-OS instance.', statusTone: 'warning', cardTone: 'warning', ownedByCurrentInstance: false, installCopyWarningRequired: true, reviewExistingHref: '/apps/found?service=foreign-immich',
-    primaryAction: { id: 'review', label: 'Review existing service', kind: 'route', href: '/apps/found?service=foreign-immich', method: null, disabled: false, reason: '' }, availableActions: [], installed: false, installedApp: null, observedService: observedServices[0], setupSchema: { appId: 'immich', version: 1, inputs: [] },
+    serviceKindLabel: 'Photo library', estimatedInstallTime: 'About 5 minutes', difficulty: 'Easy',
+    setupSchema: { appId: 'immich', version: 1, inputs: [] },
   },
 ];
 
 const appState = {
-  managedApps: [managedApp],
-  runtimeApps: [runtimeApp],
-  observedServices,
-  pinnedExternalServices: [observedServices[1]],
-  foundServices: [observedServices[0]],
-  ownershipViews: [],
+  applications: [managedApplication, immichApplication],
   updatedAt: fixedAt,
   stale: false,
   refreshStatus: 'idle',
@@ -433,11 +373,7 @@ const appState = {
 
 const emptyAppState = {
   ...appState,
-  managedApps: [],
-  runtimeApps: [],
-  observedServices: [],
-  pinnedExternalServices: [],
-  foundServices: [],
+  applications: [],
 };
 
 const systemSummary = {
@@ -566,15 +502,25 @@ function defaultResponse(pathname: string, method: string, scenario: FixtureScen
   if (pathname.includes('/api/backups/restore-points/') && pathname.endsWith('/plan')) return restorePlan;
   if (pathname.startsWith('/api/backups/')) return activeJob;
   if (pathname === '/api/discover/apps') return discoverApps;
+  if (pathname === '/api/app-recovery/immich/plan') return {
+    appId: 'immich', appName: 'Immich', reason: 'previous_instance', applicable: true,
+    summary: 'Autark-OS can transfer this app while preserving its existing data.', planId: 'fixture-recovery-plan', ownershipTransferRequired: true,
+    runtimePath: '/var/lib/autark-os/apps/immich', sourceComposeProject: 'legacy-immich', targetComposeProject: 'autark-os-immich', appInstanceId: 'appinst_immich',
+    containers: ['immich-server'], mounts: ['/var/lib/immich'], ports: ['2283'],
+    checks: [
+      { id: 'catalog_identity', label: 'App identity', status: 'ok', message: 'Immich identity verified.', detail: 'Catalog and runtime metadata agree.' },
+      { id: 'mounts', label: 'App data', status: 'ok', message: 'Existing data will stay in place.', detail: '/var/lib/immich' },
+      { id: 'ports', label: 'Network ports', status: 'ok', message: 'The existing port is available.', detail: '2283' },
+      { id: 'docker_ownership', label: 'Ownership', status: 'ok', message: 'Previous Autark-OS ownership is consistent.', detail: 'other-instance' },
+    ],
+    steps: ['Create safety checkpoint', 'Transfer ownership', 'Verify app'], blockedReasons: [],
+  };
   if (pathname.includes('/install-preview')) {
-    const previewApp = discoverApps.find((app) => pathname.includes(app.id)) ?? discoverApps[0];
-    const appName = previewApp.name;
-    return { valid: true, blockingIssues: [], warnings: [], sections: [{ id: 'create', title: 'Autark-OS will create', items: [{ label: `${appName} service`, description: 'Fixture install plan', tone: 'success' }] }], technicalDetails: { friendly: { headline: 'Ready to install', willCreate: [appName], willExpose: ['Local link'], willConfigure: [], willBackUp: ['Daily backup'] }, technical: { runtimeRoot: '/var/lib/autark-os', composeProject: `autark-${previewApp.id}`, network: 'autark', containers: [{ name: previewApp.id, image: previewApp.app.image || `${previewApp.id}:latest` }], ports: ['8080'], volumes: [`${previewApp.id}-data`], labels: [], backupPaths: ['data'] } }, installOptions: { ports: { hostPort: 8080 }, access: { tailscaleEnabled: true }, storage: { subfolders: { data: 'data' } }, backup: { enabled: true, frequency: 'daily', retention: 14 } } };
+    const previewApp = discoverApps.find((app) => pathname.includes(app.application.id)) ?? discoverApps[0];
+    const appName = previewApp.application.name;
+    return { valid: true, blockingIssues: [], warnings: [], sections: [{ id: 'create', title: 'Autark-OS will create', items: [{ label: `${appName} service`, description: 'Fixture install plan', tone: 'success' }] }], technicalDetails: { friendly: { headline: 'Ready to install', willCreate: [appName], willExpose: ['Local link'], willConfigure: [], willBackUp: ['Daily backup'] }, technical: { runtimeRoot: '/var/lib/autark-os', composeProject: `autark-${previewApp.application.id}`, network: 'autark', containers: [{ name: previewApp.application.id, image: previewApp.app.image || `${previewApp.application.id}:latest` }], ports: ['8080'], volumes: [`${previewApp.application.id}-data`], labels: [], backupPaths: ['data'] } }, installOptions: { ports: { hostPort: 8080 }, access: { tailscaleEnabled: true }, storage: { subfolders: { data: 'data' } }, backup: { enabled: true, frequency: 'daily', retention: 14 } } };
   }
-  if (pathname.startsWith('/api/discover/apps/')) return discoverApps.find((app) => pathname.includes(app.id)) ?? discoverApps[0];
-  if (pathname === '/api/observed-services') return observedServices;
-  if (pathname.includes('/adoption-plan')) return { serviceId: 'foreign-immich', displayName: observedServices[0].displayName, available: true, summary: 'Review the fixture recovery plan.', confirmationText: 'RECOVER', blockedReasons: [], warnings: ['Existing data is preserved.'], steps: ['Apply current instance labels.'], containers: ['immich-server'], catalogAppId: 'immich', labels: [], labelsToApply: [], dataPaths: ['/var/lib/immich'], dataPreservation: 'Existing data is preserved.', restartRequired: false, safetyCheckpointAvailable: true, disabledReason: null };
-  if (pathname.startsWith('/api/observed-services/')) return { ok: true, severity: 'success', title: 'Fixture action complete', message: 'The fixture state is unchanged.', applicationState: currentAppState };
+  if (pathname.startsWith('/api/discover/apps/')) return discoverApps.find((app) => pathname.includes(app.application.id)) ?? discoverApps[0];
   if (pathname.startsWith('/api/apps/')) return method === 'GET' ? runtimeApp : activeJob;
   return {};
 }

@@ -49,7 +49,7 @@ test('wide view opens global popovers, app management, and the Discover dialog',
 
   await page.getByRole('button', { name: /^Manage app$/i }).click();
   await expect(page.getByText(/^Management$/i)).toBeVisible();
-  await page.getByRole('searchbox', { name: /Search managed and linked apps/i }).click();
+  await page.getByRole('searchbox', { name: /Search managed apps/i }).click();
   await expect(page.getByText(/^Management$/i).locator('xpath=ancestor::section[1]')).toHaveAttribute('aria-hidden', 'true');
   await expect(page.getByRole('button', { name: /^Manage app$/i })).toBeVisible();
   await expect(page.getByText(/A private password manager for this house/i)).toBeVisible();
@@ -81,9 +81,7 @@ test('wide view opens global popovers, app management, and the Discover dialog',
 });
 
 test('narrow view keeps sheets and the backup dialog within the viewport', async ({ page }) => {
-  await openReadyRoute(page, '/apps/found', { width: 390, height: 844 });
-  await expect(page.getByText(/Resolve Existing Apps/i).first()).toBeVisible();
-  await page.getByRole('button', { name: /Review/i }).first().click();
+  await openReadyRoute(page, '/apps?review=immich', { width: 390, height: 844 });
   await expect(page.getByRole('dialog')).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.keyboard.press('Escape');
@@ -99,10 +97,9 @@ test('narrow view keeps sheets and the backup dialog within the viewport', async
 
   await openReadyRoute(page, '/discover?detail=immich', { width: 390, height: 844 });
   await expect(page.getByRole('dialog')).toContainText(/Immich/i);
-  await page.getByRole('button', { name: /Install second copy/i }).click();
-  await expect(page.getByRole('dialog').filter({ hasText: /Install a second copy/i })).toBeVisible();
-  await page.getByRole('button', { name: /Install second copy anyway/i }).click();
-  await expect(page.getByRole('dialog').filter({ hasText: /Install Immich/i })).toBeVisible();
+  await page.getByRole('dialog').getByRole('link', { name: /Review existing service/i }).first().click();
+  await expect(page).toHaveURL(/\/apps\?review=immich/);
+  await expect(page.getByRole('dialog')).toContainText(/Recover Immich/i);
   await expectNoHorizontalOverflow(page);
 
   await openReadyRoute(page, '/backups', { width: 390, height: 844 }, 'idle');

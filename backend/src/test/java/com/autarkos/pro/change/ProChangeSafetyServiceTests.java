@@ -123,7 +123,7 @@ class ProChangeSafetyServiceTests {
                 now,
                 new NormalizedHostSnapshot.SystemSnapshot("1.0.0", "linux/arm64", "available", "available"),
                 List.of(new NormalizedHostSnapshot.AppSnapshot(RESOURCE_REF, "Vaultwarden", "running", "available", true, 0, 0, null)),
-                new NormalizedHostSnapshot.FoundServicesSnapshot(0, 0, 0, 0, List.of()),
+                new NormalizedHostSnapshot.ApplicationExceptionsSnapshot(0, 0, List.of()),
                 List.of(),
                 new NormalizedHostSnapshot.BackupSnapshot(
                         "available",

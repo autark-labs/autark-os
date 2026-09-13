@@ -2,6 +2,8 @@ package com.autarkos.apps.recovery;
 
 import java.util.List;
 
+import com.autarkos.apps.ApplicationState;
+
 public final class AppRecoveryModels {
 
     private AppRecoveryModels() {
@@ -46,5 +48,15 @@ public final class AppRecoveryModels {
     public record RecoveryApplyRequest(
             String planId,
             boolean ownershipTransferConfirmed) {
+    }
+
+    public record RecoveryResult(
+            boolean ok,
+            String severity,
+            String title,
+            String message,
+            String resourceId,
+            String nextAction,
+            ApplicationState applicationState) {
     }
 }

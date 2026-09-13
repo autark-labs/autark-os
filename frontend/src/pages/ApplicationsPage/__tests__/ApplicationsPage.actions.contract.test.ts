@@ -132,12 +132,13 @@ test('applications page only exposes concrete next actions from the rail', () =>
   assert.doesNotMatch(rail, />\s*Run\s*</);
 });
 
-test('applications page sends found-service review to the dedicated existing-app flow', () => {
+test('applications page opens canonical app review without a second observed-service route', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
   assert.match(page, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
-  assert.match(page, /<FoundAppsPrompt/);
-  assert.match(page, /reviewHref: '\/apps\/found'/);
+  assert.match(page, /<ApplicationReviewPrompt/);
+  assert.match(page, /reviewApplications\[0\]\?\.primaryAction\.href/);
+  assert.match(page, /<ApplicationReviewDialog/);
   assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);
   assert.doesNotMatch(page, /reviewNextButtonLabel|setFilter\('needs_review'\)/);
 });

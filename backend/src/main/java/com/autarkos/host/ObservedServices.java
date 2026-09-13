@@ -18,23 +18,14 @@ final class ObservedServices {
                 entity.fingerprint(),
                 entity.displayName(),
                 entity.url(),
-                entity.category(),
                 entity.accessScope(),
                 entity.catalogAppId(),
                 entity.catalogMatchConfidence(),
                 entity.ownershipState(),
-                entity.userVisibility(),
                 entity.runtimeState(),
-                entity.healthCheckEnabled(),
                 entity.autarkOsInstanceId(),
                 Instant.parse(entity.firstSeenAt()),
                 Instant.parse(entity.lastSeenAt()),
-                instant(entity.pinnedAt()),
-                instant(entity.ignoredAt()),
                 entity.metadataJson());
-    }
-
-    private static Instant instant(String value) {
-        return value == null || value.isBlank() ? null : Instant.parse(value);
     }
 }

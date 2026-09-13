@@ -79,7 +79,6 @@ class DiscoverServiceTests {
                     assertThat(app.application().primaryAction().id()).isEqualTo("manage");
                     assertThat(app.application().statusTone()).isEqualTo("success");
                     assertThat(app.application().cardTone()).isEqualTo("success");
-                    assertThat(app.application().installCopyWarningRequired()).isFalse();
                 });
         assertThat(apps).filteredOn(app -> app.application().id().equals("jellyfin"))
                 .singleElement()
@@ -89,7 +88,6 @@ class DiscoverServiceTests {
                     assertThat(app.application().primaryAction().id()).isEqualTo("review_existing");
                     assertThat(app.application().statusTone()).isEqualTo("warning");
                     assertThat(app.application().cardTone()).isEqualTo("warning");
-                    assertThat(app.application().installCopyWarningRequired()).isFalse();
                     assertThat(app.application().availableActions()).extracting(com.autarkos.apps.ApplicationAction::id).contains("review_existing");
                     assertThat(app.application().runtime()).isNull();
                     assertThat(app.application().evidence()).isNotNull();
@@ -106,7 +104,7 @@ class DiscoverServiceTests {
 
         assertThat(app.application().relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(app.application().cardTone()).isEqualTo("danger");
-        assertThat(app.application().installCopyWarningRequired()).isTrue();
+        assertThat(app.application().relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
     }
 
     @Test
@@ -343,19 +341,14 @@ class DiscoverServiceTests {
                 id.replace("docker:", ""),
                 catalogAppId,
                 "http://localhost:8096",
-                "External",
                 "LAN",
                 catalogAppId,
                 "user",
                 ownershipState,
-                visibility,
                 "running",
-                false,
                 "foreign_autark_os".equals(ownershipState) ? "other-instance" : "",
                 seenAt,
                 seenAt,
-                "pinned".equals(visibility) ? seenAt : null,
-                null,
                 "{}");
     }
 

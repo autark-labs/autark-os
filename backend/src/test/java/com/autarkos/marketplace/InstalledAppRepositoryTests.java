@@ -65,8 +65,8 @@ class InstalledAppRepositoryTests {
                         case 3 -> {
                             observed.upsert(new com.autarkos.host.ObservedService(
                                     "docker:syncthing", "docker", "syncthing", "Syncthing", "http://localhost:8384",
-                                    "Productivity", "local", "syncthing", "exact", "owned_managed", "observed", "running",
-                                    true, "test-instance", now, now.plusSeconds(iteration), null, null, "{}"));
+                                    "local", "syncthing", "exact", "owned_managed", "running",
+                                    "test-instance", now, now.plusSeconds(iteration), "{}"));
                         }
                         default -> throw new AssertionError();
                     }
@@ -78,7 +78,7 @@ class InstalledAppRepositoryTests {
         }
         assertThat(repository.eventsFor("syncthing", 100)).hasSize(30);
         assertThat(repository.healthFor("syncthing")).isPresent();
-        assertThat(observed.findServiceById("docker:syncthing")).isPresent();
+        assertThat(observed.findAllServices()).extracting(com.autarkos.host.ObservedService::id).contains("docker:syncthing");
     }
 
     @Test

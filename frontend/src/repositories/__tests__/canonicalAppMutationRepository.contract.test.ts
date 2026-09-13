@@ -58,21 +58,13 @@ test('applications page uses canonical synchronization for managed lifecycle act
 });
 
 test('existing-app recovery tracks a durable job and refreshes canonical state after verification', () => {
-  const page = source('src/pages/ResolveExistingAppsPage/ResolveExistingAppsPage.tsx');
-  const sheet = source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx');
+  const dialog = source('src/pages/ApplicationsPage/ApplicationReviewDialog.tsx');
 
-  assert.doesNotMatch(page, /ObservedServicesAPIClient\.(pin|unpin|match)/);
-  assert.match(page, /onRefresh=\{refreshObservedServices\}/);
-  assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache/);
-  assert.doesNotMatch(page, /setApplicationStateFromActionResultCache/);
-
-  assert.match(sheet, /syncCanonicalAppMutationResult\(queryClient, job\)/);
-  assert.match(sheet, /useAutarkOsJobQuery\(activeRecoveryJobId\)/);
-  assert.match(sheet, /useAutarkOsJobsQuery\(\)/);
-  assert.match(sheet, /job\.type === 'recover_app'[\s\S]*job\.subjectId === currentService\.catalogAppId[\s\S]*!terminalJob\(job\)/);
-  assert.match(sheet, /AppRecoveryAPIClient\.apply\([\s\S]*plan\.planId[\s\S]*transferAcknowledged/);
-  assert.match(sheet, /await onRefresh\(\)/);
-  assert.doesNotMatch(sheet, /ObservedServicesAPIClient/);
-  assert.doesNotMatch(sheet, /setObservedServicePinnedInApplicationStateCache/);
-  assert.doesNotMatch(sheet, /setApplicationStateFromActionResultCache/);
+  assert.match(dialog, /syncCanonicalAppMutationResult\(queryClient, job\)/);
+  assert.match(dialog, /useAutarkOsJobQuery\(activeRecoveryJobId\)/);
+  assert.match(dialog, /useAutarkOsJobsQuery\(\)/);
+  assert.match(dialog, /job\.type === 'recover_app'[\s\S]*job\.subjectId === currentApplication\.id[\s\S]*!terminalJob\(job\)/);
+  assert.match(dialog, /AppRecoveryAPIClient\.apply\([\s\S]*plan\.planId[\s\S]*transferAcknowledged/);
+  assert.match(dialog, /await onRefresh\(\)/);
+  assert.doesNotMatch(dialog, /ObservedServicesAPIClient|setObservedServicePinnedInApplicationStateCache|setApplicationStateFromActionResultCache/);
 });

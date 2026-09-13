@@ -13,7 +13,6 @@ const visualCases: VisualCase[] = [
   { name: 'home-1440', path: '/home', expected: /Your Apps/i, viewport: { width: 1440, height: 1000 } },
   { name: 'setup-390', path: '/setup', expected: /Set up Autark-OS/i, scenario: 'onboarding', viewport: { width: 390, height: 844 } },
   { name: 'my-apps-1280', path: '/apps', expected: /My Apps/i, viewport: { width: 1280, height: 960 } },
-  { name: 'found-apps-1024', path: '/apps/found', expected: /Resolve Existing Apps/i, viewport: { width: 1024, height: 960 } },
   { name: 'discover-1280', path: '/discover', expected: /^Discover$/i, viewport: { width: 1280, height: 960 } },
   { name: 'access-1024', path: '/access', expected: /^Access$/i, viewport: { width: 1024, height: 960 } },
   { name: 'backups-1440', path: '/backups', expected: /^Backups$/i, viewport: { width: 1440, height: 1000 } },

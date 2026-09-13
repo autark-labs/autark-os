@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { AppUpdatePlanChangedError, InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
+import { ApplicationReviewPrompt } from '@/components/autark-os/ApplicationReviewPrompt';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
@@ -21,6 +21,7 @@ import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutat
 import { terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
+import { ApplicationReviewDialog } from './ApplicationReviewDialog';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
 import { AppsPageHeader } from './components/AppsPageHeader';
@@ -50,15 +51,15 @@ import {
 } from './extensions/ApplicationsPage.presentation';
 
 type ManagedLifecycleAction = Extract<ApplicationRuntimeAction, 'start' | 'stop' | 'restart'>;
-const foundAppsPromptDismissalKey = 'autark-os.my-apps.found-apps-prompt-dismissed.v1';
+const applicationReviewPromptDismissalKey = 'autark-os.my-apps.review-prompt-dismissed.v1';
 
-function readFoundAppsPromptDismissal() {
+function readApplicationReviewPromptDismissal() {
   if (typeof window === 'undefined') {
     return '';
   }
 
   try {
-    return window.sessionStorage.getItem(foundAppsPromptDismissalKey) || '';
+    return window.sessionStorage.getItem(applicationReviewPromptDismissalKey) || '';
   } catch {
     return '';
   }
@@ -79,7 +80,7 @@ export const ApplicationsPage = () => {
   const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
   const [trackedAppJobIds, setTrackedAppJobIds] = useState<string[]>([]);
-  const [dismissedFoundServicesSignature, setDismissedFoundServicesSignature] = useState(readFoundAppsPromptDismissal);
+  const [dismissedReviewSignature, setDismissedReviewSignature] = useState(readApplicationReviewPromptDismissal);
   const appliedDeepLinkKeyRef = useRef('');
   const railRef = useRef<HTMLDivElement | null>(null);
   const deepLinkTarget = useMemo(() => parseApplicationsDeepLink(location.search), [location.search]);
@@ -111,17 +112,19 @@ export const ApplicationsPage = () => {
   ]);
 
   const managedItems = useMemo(() => items.filter((item) => item.managementState === 'managed'), [items]);
-  const foundServices = useMemo(
+  const reviewApplications = useMemo(
     () => appState.applications
       .filter((application) => application.relationship === 'recovery_required' || application.relationship === 'blocked')
-      .flatMap((application) => application.evidence ? [application.evidence] : []),
+      .filter((application) => Boolean(application.evidence)),
     [appState.applications],
   );
-  const foundServicesSignature = useMemo(
-    () => foundServices.map((service) => service.id).sort().join('|'),
-    [foundServices],
+  const reviewApplicationsSignature = useMemo(
+    () => reviewApplications.map((application) => application.id).sort().join('|'),
+    [reviewApplications],
   );
-  const showFoundAppsPrompt = Boolean(foundServicesSignature && dismissedFoundServicesSignature !== foundServicesSignature);
+  const reviewAppId = useMemo(() => new URLSearchParams(location.search).get('review'), [location.search]);
+  const reviewedApplication = reviewApplications.find((application) => application.id === reviewAppId) ?? null;
+  const showApplicationReviewPrompt = Boolean(reviewApplicationsSignature && dismissedReviewSignature !== reviewApplicationsSignature);
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items.filter((item) => {
@@ -149,18 +152,18 @@ export const ApplicationsPage = () => {
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
 
-  const dismissFoundAppsPrompt = useCallback(() => {
-    if (!foundServicesSignature) {
+  const dismissApplicationReviewPrompt = useCallback(() => {
+    if (!reviewApplicationsSignature) {
       return;
     }
 
-    setDismissedFoundServicesSignature(foundServicesSignature);
+    setDismissedReviewSignature(reviewApplicationsSignature);
     try {
-      window.sessionStorage.setItem(foundAppsPromptDismissalKey, foundServicesSignature);
+      window.sessionStorage.setItem(applicationReviewPromptDismissalKey, reviewApplicationsSignature);
     } catch {
       // The in-memory state still dismisses the prompt when session storage is unavailable.
     }
-  }, [foundServicesSignature]);
+  }, [reviewApplicationsSignature]);
 
   const focusApplicationItem = useCallback((item: ApplicationSurfaceItem, managementOpen = false) => {
     setSelectedId(item.id);
@@ -591,8 +594,12 @@ export const ApplicationsPage = () => {
         <AppsPageHeader attentionCount={attentionCount} managedCount={managedCount} />
       </ExtensionActionTarget>
 
-      {showFoundAppsPrompt && (
-        <FoundAppsPrompt className="gap-2 p-3" model={{ count: foundServices.length, reviewHref: '/apps/found' }} onDismiss={dismissFoundAppsPrompt} />
+      {showApplicationReviewPrompt && (
+        <ApplicationReviewPrompt
+          className="gap-2 p-3"
+          model={{ count: reviewApplications.length, reviewHref: reviewApplications[0]?.primaryAction.href || '/apps' }}
+          onDismiss={dismissApplicationReviewPrompt}
+        />
       )}
 
       <div className="grid gap-3">
@@ -666,6 +673,13 @@ export const ApplicationsPage = () => {
           />
         </section>
       )}
+
+      <ApplicationReviewDialog
+        application={reviewedApplication}
+        onOpenChange={(open) => !open && navigate('/apps', { replace: true })}
+        onRefresh={appState.refresh}
+        open={Boolean(reviewedApplication)}
+      />
     </PageShell>
   );
 };

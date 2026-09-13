@@ -25,9 +25,7 @@ public final class ProAgentSmokeSnapshotFactory {
                         "available",
                         "unknown"),
                 List.of(),
-                new NormalizedHostSnapshot.FoundServicesSnapshot(
-                        0,
-                        0,
+                new NormalizedHostSnapshot.ApplicationExceptionsSnapshot(
                         0,
                         0,
                         List.of()),

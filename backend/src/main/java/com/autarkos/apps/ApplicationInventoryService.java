@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
-import com.autarkos.host.ObservedServiceView;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.AppInstanceView;
@@ -114,8 +113,8 @@ public class ApplicationInventoryService {
 
         ApplicationRelationship relationship = relationship(installed, storedRegistration, registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
         ObservedService observedService = firstPresent(registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
-        ObservedServiceView observedView = observedService == null ? null : ObservedServiceService.toView(observedService);
-        String reviewExistingHref = reviewExistingHref(observedService);
+        ApplicationEvidence applicationEvidence = evidence(observedService);
+        String reviewExistingHref = reviewExistingHref(manifest.id());
         ApplicationAction primaryAction = primaryAction(manifest.id(), relationship, installed, observedService, reviewExistingHref);
         return new ApplicationView(
                 manifest.id(),
@@ -133,15 +132,13 @@ public class ApplicationInventoryService {
                 managed == null ? AutarkOsStates.BackupState.DISABLED : managed.backupState(),
                 managed == null ? List.of() : managed.issues(),
                 relationshipLabel(relationship),
-                relationshipDescription(relationship, observedView),
+                relationshipDescription(relationship, applicationEvidence),
                 statusTone(relationship),
                 cardTone(relationship),
-                duplicateWarningRequired(relationship),
-                reviewExistingHref,
                 primaryAction,
                 availableActions(manifest.id(), relationship, installed, observedService, reviewExistingHref),
                 relationship == ApplicationRelationship.MANAGED ? runtime : null,
-                observedView);
+                applicationEvidence);
     }
 
     private boolean ownershipCompatible(String appId) {
@@ -252,11 +249,8 @@ public class ApplicationInventoryService {
         };
     }
 
-    private String reviewExistingHref(ObservedService observedService) {
-        if (observedService != null) {
-            return "/apps/found?service=" + encode(observedService.id());
-        }
-        return null;
+    private String reviewExistingHref(String appId) {
+        return "/apps?review=" + encode(appId);
     }
 
     private ApplicationAction reviewSetup(String appId) {
@@ -295,13 +289,70 @@ public class ApplicationInventoryService {
         };
     }
 
-    private String relationshipDescription(ApplicationRelationship relationship, ObservedServiceView evidence) {
+    private String relationshipDescription(ApplicationRelationship relationship, ApplicationEvidence evidence) {
         return switch (relationship) {
             case MANAGED -> "Managed by this Autark-OS installation.";
-            case RECOVERY_REQUIRED -> evidence == null ? "Autark-OS found app resources that require recovery." : evidence.userStatusDescription();
-            case BLOCKED -> evidence == null ? "A server resource blocks installation." : evidence.userStatusDescription();
+            case RECOVERY_REQUIRED -> evidence == null ? "Autark-OS found app resources that require recovery." : evidence.summary();
+            case BLOCKED -> evidence == null ? "A server resource blocks installation." : evidence.summary();
             case AVAILABLE -> "Ready to review before install.";
         };
+    }
+
+    private ApplicationEvidence evidence(ObservedService service) {
+        if (service == null) {
+            return null;
+        }
+        Map<String, String> metadata = metadata(service.metadataJson());
+        return new ApplicationEvidence(
+                service.id(),
+                service.source(),
+                service.url(),
+                service.accessScope(),
+                service.ownershipState(),
+                service.runtimeState(),
+                evidenceLabel(service),
+                evidenceSummary(service),
+                metadata.getOrDefault("appInstanceId", ""),
+                firstPresent(service.autarkOsInstanceId(), metadata.get("autarkOsInstanceId")),
+                metadata.getOrDefault("runtimePath", ""),
+                metadata.getOrDefault("composeProject", ""));
+    }
+
+    private String evidenceLabel(ObservedService service) {
+        return switch (service.ownershipState()) {
+            case AutarkOsStates.OwnershipState.OWNED_MANAGED -> "Registration missing";
+            case AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS -> "Recoverable";
+            case AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS -> "Owned elsewhere";
+            case AutarkOsStates.OwnershipState.FAILED_INSTALL -> "Install failed";
+            default -> "Conflict";
+        };
+    }
+
+    private String evidenceSummary(ObservedService service) {
+        return switch (service.ownershipState()) {
+            case AutarkOsStates.OwnershipState.OWNED_MANAGED -> "Autark-OS found this app's current runtime, but its managed registration is missing.";
+            case AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS -> "Autark-OS found recoverable app metadata from an earlier installation.";
+            case AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS -> "This app belongs to another Autark-OS installation.";
+            case AutarkOsStates.OwnershipState.FAILED_INSTALL -> BetaScope.allowsInstall(service.catalogAppId())
+                    ? "Autark-OS started creating this app but did not finish. Review setup or try the install again."
+                    : "A previous installation did not finish. Existing resources have not been deleted.";
+            default -> "A service already on this server may conflict with a managed installation.";
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> metadata(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> values = new com.fasterxml.jackson.databind.ObjectMapper().readValue(json, Map.class);
+            return values.entrySet().stream()
+                    .filter(entry -> entry.getValue() != null)
+                    .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, entry -> String.valueOf(entry.getValue())));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            return Map.of();
+        }
     }
 
     private String statusTone(ApplicationRelationship relationship) {
@@ -320,10 +371,6 @@ public class ApplicationInventoryService {
             case BLOCKED -> "danger";
             case AVAILABLE -> "neutral";
         };
-    }
-
-    private boolean duplicateWarningRequired(ApplicationRelationship relationship) {
-        return relationship == ApplicationRelationship.BLOCKED;
     }
 
     private String firstPresent(String... values) {

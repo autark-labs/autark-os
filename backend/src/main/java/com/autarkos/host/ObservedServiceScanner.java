@@ -69,19 +69,14 @@ public class ObservedServiceScanner {
                 clean(container.name()),
                 displayName(appId, container.name()),
                 url,
-                "External",
                 "LAN",
                 cleanToNull(appId),
                 appId == null || appId.isBlank() ? "unknown" : "inferred",
                 ownershipState,
-                "observed",
                 runtimeState(container.status()),
-                false,
                 instanceId.isBlank() ? null : instanceId,
                 now,
                 now,
-                null,
-                null,
                 metadata(container, identity));
     }
 

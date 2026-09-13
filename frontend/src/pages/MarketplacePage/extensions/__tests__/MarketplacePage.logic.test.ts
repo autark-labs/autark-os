@@ -87,8 +87,8 @@ test('marketplacePrimaryRoute follows My Apps management and existing-service ac
     application: application('vaultwarden', 'managed', { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false }),
   }), '/apps?focus=managed%3Avaultwarden&panel=manage');
   assert.equal(marketplacePrimaryRoute({
-    application: application('vaultwarden', 'blocked', { id: 'review_existing', kind: 'route', href: '/apps/found?service=docker%3Avaultwarden', disabled: false }),
-  }), '/apps/found?service=docker%3Avaultwarden');
+    application: application('vaultwarden', 'blocked', { id: 'review_existing', kind: 'route', href: '/apps?review=vaultwarden', disabled: false }),
+  }), '/apps?review=vaultwarden');
   assert.equal(marketplacePrimaryRoute({
     application: application('vaultwarden', 'available', { id: 'review_setup', kind: 'route', href: '/discover?app=vaultwarden', disabled: false }),
   }), null);
@@ -122,7 +122,7 @@ function application(id, relationship, primaryAction = { id: 'review_setup', kin
   return {
     id, name: id, category: 'Apps', image: '', summary: '', description: '', relationship, catalogAvailability: 'installable', appInstanceId: relationship === 'managed' ? id : '',
     runtimeState: relationship === 'managed' ? 'running' : 'unknown', ownershipState: relationship === 'managed' ? 'owned' : 'unowned', accessState: 'not_ready', backupState: 'backup_disabled', issues: [],
-    relationshipLabel: relationship, relationshipDescription: '', statusTone: 'neutral', cardTone: 'neutral', installCopyWarningRequired: relationship === 'blocked', reviewExistingHref: null,
+    relationshipLabel: relationship, relationshipDescription: '', statusTone: 'neutral', cardTone: 'neutral',
     primaryAction: { label: 'Action', method: null, reason: '', ...primaryAction }, availableActions: [], runtime: null, evidence: null,
   };
 }

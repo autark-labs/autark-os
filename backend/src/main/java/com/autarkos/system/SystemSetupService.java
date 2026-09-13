@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
-import com.autarkos.host.ObservedServiceView;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
@@ -80,7 +79,7 @@ public class SystemSetupService {
         AutarkOsIdentity identity = identitySupplier.get();
         SystemSetupModels.SystemSetupExistingInstallReport existingInstall = existingInstallReport(identity);
         if (existingInstall.conflict()) {
-            checks.add(warn("existing-install", "Existing Autark-OS install", existingInstall.headline(), existingInstall.summary(), "Recover existing apps", "/resolve-existing-apps"));
+            checks.add(warn("existing-install", "Existing Autark-OS install", existingInstall.headline(), existingInstall.summary(), "Review existing apps", "/apps"));
         } else if (!existingInstall.resources().isEmpty()) {
             checks.add(neutral("existing-install", "Development instance", existingInstall.headline(), existingInstall.summary(), null, null));
         }
@@ -318,7 +317,6 @@ public class SystemSetupService {
 
     private SystemSetupModels.SystemSetupExistingInstallReport existingInstallReport(AutarkOsIdentity identity) {
         List<SystemSetupModels.SystemSetupExistingInstallResource> resources = observedServices.get().stream()
-                .filter(service -> !"ignored".equals(service.userVisibility()))
                 .filter(this::isExistingAutarkOsResource)
                 .map(service -> existingResource(service, identity))
                 .toList();
@@ -340,7 +338,7 @@ public class SystemSetupService {
                     "Development instance detected",
                     "Autark-OS found other Autark-OS resources, but this development instance is isolated as " + identity.instanceSlug() + ".",
                     resources,
-                    List.of(new SystemSetupModels.SystemSetupAction("review_existing_apps", "Review found apps", "/resolve-existing-apps", "secondary")));
+                    List.of(new SystemSetupModels.SystemSetupAction("review_existing_apps", "Review found apps", "/apps", "secondary")));
         }
         return new SystemSetupModels.SystemSetupExistingInstallReport(
                 true,
@@ -350,7 +348,7 @@ public class SystemSetupService {
                 "Review apps found on this server before creating another production Autark-OS instance.",
                 resources,
                 List.of(
-                        new SystemSetupModels.SystemSetupAction("recover_existing_apps", "Recover existing apps", "/resolve-existing-apps", "primary"),
+                        new SystemSetupModels.SystemSetupAction("recover_existing_apps", "Recover existing apps", "/apps", "primary"),
                         new SystemSetupModels.SystemSetupAction("abort", "Abort setup", "/", "secondary")));
     }
 
@@ -361,20 +359,27 @@ public class SystemSetupService {
     }
 
     private SystemSetupModels.SystemSetupExistingInstallResource existingResource(ObservedService service, AutarkOsIdentity identity) {
-        ObservedServiceView view = ObservedServiceService.toView(service);
         String kind = "legacy_autark_os".equals(service.ownershipState()) ? "recoverable_app" : "autark_os_resource";
         String owner = service.autarkOsInstanceId();
         if (owner == null || owner.isBlank()) {
             owner = identity.instanceId();
         }
         return new SystemSetupModels.SystemSetupExistingInstallResource(
-                view.id(),
-                view.displayName(),
+                service.id(),
+                service.displayName(),
                 kind,
-                view.ownershipState(),
+                service.ownershipState(),
                 owner,
-                view.userStatusDescription(),
-                "/resolve-existing-apps");
+                existingResourceSummary(service),
+                "/apps");
+    }
+
+    private String existingResourceSummary(ObservedService service) {
+        return switch (service.ownershipState()) {
+            case "legacy_autark_os" -> "Autark-OS found recoverable app metadata from an earlier installation.";
+            case "foreign_autark_os" -> "This app belongs to another Autark-OS installation.";
+            default -> "This resource needs review before Autark-OS can safely install or recover the app.";
+        };
     }
 
     record CommandResult(int exitCode, String output) {

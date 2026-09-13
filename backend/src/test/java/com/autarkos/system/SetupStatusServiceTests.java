@@ -70,19 +70,14 @@ class SetupStatusServiceTests {
                 "autark-os-legacy",
                 "legacy_autark_os",
                 "http://localhost:8080",
-                "Apps",
                 "local",
                 "homepage",
                 "label",
                 ownershipState,
-                userVisibility,
                 "running",
-                true,
                 "",
                 Instant.parse("2026-06-20T12:00:00Z"),
                 Instant.parse("2026-06-20T12:00:00Z"),
-                null,
-                null,
                 "{}");
     }
 }

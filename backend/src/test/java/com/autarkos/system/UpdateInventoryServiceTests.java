@@ -11,11 +11,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.apps.ApplicationEvidence;
 import com.autarkos.apps.ApplicationRelationship;
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.apps.ApplicationView;
-import com.autarkos.host.ObservedServiceView;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.system.UpdateInventoryModels.Snapshot;
 
@@ -156,8 +156,10 @@ class UpdateInventoryServiceTests {
     }
 
     private ApplicationView recoveryRequired(String appId, Map<String, String> metadata) {
-        ObservedServiceView evidence = mock(ObservedServiceView.class);
-        when(evidence.metadata()).thenReturn(metadata);
+        ApplicationEvidence evidence = new ApplicationEvidence(
+                "docker:" + appId, "docker", null, "LAN", "owned_managed", "running",
+                "Registration missing", "Registration missing.", metadata.getOrDefault("appInstanceId", ""),
+                metadata.getOrDefault("autarkOsInstanceId", ""), "", metadata.getOrDefault("composeProject", ""));
         return application(appId, ApplicationRelationship.RECOVERY_REQUIRED, null, evidence);
     }
 
@@ -165,7 +167,7 @@ class UpdateInventoryServiceTests {
             String appId,
             ApplicationRelationship relationship,
             AppRuntimeView runtime,
-            ObservedServiceView evidence) {
+            ApplicationEvidence evidence) {
         ApplicationView application = mock(ApplicationView.class);
         when(application.id()).thenReturn(appId);
         when(application.relationship()).thenReturn(relationship);

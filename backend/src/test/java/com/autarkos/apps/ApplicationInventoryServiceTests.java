@@ -2,6 +2,7 @@ package com.autarkos.apps;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -15,7 +16,6 @@ import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
 import com.autarkos.host.ObservedServiceService;
-import com.autarkos.host.ObservedServiceView;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -35,8 +35,9 @@ class ApplicationInventoryServiceTests {
     Path runtimeRoot;
 
     @Test
-    void discoverOpenUsesTheSameVerifiedPrivateLinkAsManagedAppViews() {
+    void discoverOpenUsesTheSameVerifiedPrivateLinkAsManagedAppViews() throws Exception {
         var repository = installedRepository();
+        writeManagedCompose("syncthing");
         repository.save(new InstalledApp("syncthing", "Syncthing", "Ready", runtimeRoot.resolve("apps/syncthing").toString(),
                 "owned_syncthing", "http://localhost:18384", Instant.now()));
         repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
@@ -54,8 +55,9 @@ class ApplicationInventoryServiceTests {
     }
 
     @Test
-    void returnsCanonicalOwnershipViewsSortedByNameWithManagedAppsOnlyMarkedInstalled() {
+    void returnsCanonicalOwnershipViewsSortedByNameWithManagedAppsOnlyMarkedInstalled() throws Exception {
         InstalledAppRepository installedRepository = installedRepository();
+        writeManagedCompose("vaultwarden");
         installedRepository.save(new InstalledApp(
                 "vaultwarden",
                 "Family Passwords",
@@ -109,7 +111,6 @@ class ApplicationInventoryServiceTests {
                     assertThat(view.statusTone()).isEqualTo("success");
                     assertThat(view.cardTone()).isEqualTo("success");
                     assertThat(view.managed()).isTrue();
-                    assertThat(view.installCopyWarningRequired()).isFalse();
                     assertThat(view.primaryAction()).isEqualTo(new ApplicationAction("manage", "Manage", "route", "/apps?focus=managed%3Avaultwarden&panel=manage", null, false, ""));
                     assertThat(view.appInstanceId()).isEmpty();
                     assertThat(view.evidence()).isNull();
@@ -119,10 +120,9 @@ class ApplicationInventoryServiceTests {
                 .satisfies(view -> {
                     assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
                     assertThat(view.managed()).isFalse();
-                    assertThat(view.installCopyWarningRequired()).isFalse();
-                    assertThat(view.reviewExistingHref()).isEqualTo("/apps/found?service=docker%3Afound_jellyfin");
+                    assertThat(view.primaryAction().href()).isEqualTo("/apps?review=jellyfin");
                     assertThat(view.primaryAction().id()).isEqualTo("review_existing");
-                    assertThat(view.availableActions()).extracting(ApplicationAction::id).contains("review_existing", "unavailable");
+                    assertThat(view.availableActions()).extracting(ApplicationAction::id).containsExactly("review_existing");
                     assertThat(view.runtime()).isNull();
                     assertThat(view.evidence()).isNotNull();
                 });
@@ -130,9 +130,8 @@ class ApplicationInventoryServiceTests {
                 .singleElement()
                 .satisfies(view -> {
                     assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
-                    assertThat(view.relationshipLabel()).isEqualTo("Recoverable");
+                    assertThat(view.relationshipLabel()).isEqualTo("Recovery required");
                     assertThat(view.primaryAction().id()).isEqualTo("review_existing");
-                    assertThat(view.installCopyWarningRequired()).isTrue();
                 });
         assertThat(views).filteredOn(view -> view.id().equals("actual-budget"))
                 .singleElement()
@@ -144,7 +143,7 @@ class ApplicationInventoryServiceTests {
     }
 
     @Test
-    void retiredPinnedRecordIsClassifiedAsFoundAndNeverLooksInstalled() {
+    void retiredPinnedRecordStaysDormantWhileCurrentDockerEvidenceBlocksInstall() {
         ObservedServiceRepository observedRepository = observedRepository();
         ObservedService pinned = observed("manual:jellyfin", "jellyfin", "external", "pinned");
         observedRepository.upsert(pinned);
@@ -157,15 +156,14 @@ class ApplicationInventoryServiceTests {
         assertThat(view.statusTone()).isEqualTo("danger");
         assertThat(view.cardTone()).isEqualTo("danger");
         assertThat(view.managed()).isFalse();
-        assertThat(view.installCopyWarningRequired()).isTrue();
-        assertThat(view.primaryAction()).isEqualTo(new ApplicationAction("review_existing", "Review existing service", "route", "/apps/found?service=manual%3Ajellyfin", null, false, ""));
-        assertThat(view.availableActions()).extracting(ApplicationAction::id).contains("open", "review_existing", "unavailable");
+        assertThat(view.primaryAction()).isEqualTo(new ApplicationAction("review_existing", "Review existing service", "route", "/apps?review=jellyfin", null, false, ""));
+        assertThat(view.availableActions()).extracting(ApplicationAction::id).contains("review_existing", "unavailable");
         assertThat(view.evidence()).isNotNull();
-        assertThat(view.evidence().id()).isEqualTo(pinned.id());
+        assertThat(view.evidence().resourceId()).isEqualTo("docker:jellyfin");
     }
 
     @Test
-    void observedServiceWithoutCatalogAppIdCanStillMatchByName() {
+    void retiredManualLinkWithoutCatalogAppIdDoesNotEnterApplicationState() {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(new ObservedService(
                 "manual:vaultwarden",
@@ -173,31 +171,25 @@ class ApplicationInventoryServiceTests {
                 "http://localhost:8081",
                 "homelab-vaultwarden",
                 "http://localhost:8081",
-                "External",
                 "LAN",
                 null,
                 "unknown",
                 "external",
-                "pinned",
                 "unknown",
-                true,
                 "",
                 Instant.parse("2026-06-21T12:00:00Z"),
                 Instant.parse("2026-06-21T12:00:00Z"),
-                Instant.parse("2026-06-21T12:00:00Z"),
-                null,
                 "{}"));
 
         ApplicationView view = service(installedRepository(), observedRepository).app("vaultwarden").orElseThrow();
 
-        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE);
         assertThat(view.managed()).isFalse();
-        assertThat(view.evidence()).isNotNull();
-        assertThat(view.primaryAction().href()).isEqualTo("/apps/found?service=manual%3Avaultwarden");
+        assertThat(view.evidence()).isNull();
     }
 
     @Test
-    void unpinnedObservedServiceIsFoundOnServerNotAvailable() {
+    void externalDockerEvidenceBlocksInstall() {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));
 
@@ -206,12 +198,11 @@ class ApplicationInventoryServiceTests {
         assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(view.relationshipLabel()).isEqualTo("Blocked");
         assertThat(view.cardTone()).isEqualTo("danger");
-        assertThat(view.installCopyWarningRequired()).isTrue();
-        assertThat(view.reviewExistingHref()).isEqualTo("/apps/found?service=docker%3Avaultwarden");
+        assertThat(view.primaryAction().href()).isEqualTo("/apps?review=vaultwarden");
     }
 
     @Test
-    void failedInstallObservedServiceIsVisibleWithoutBlockingDeliberateInstall() {
+    void failedInstallEvidenceBlocksInstallWithoutBecomingManaged() {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("autark-os-install:vaultwarden", "vaultwarden", "failed_install", "observed"));
 
@@ -220,12 +211,11 @@ class ApplicationInventoryServiceTests {
         assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(view.relationshipLabel()).isEqualTo("Blocked");
         assertThat(view.statusTone()).isEqualTo("danger");
-        assertThat(view.installCopyWarningRequired()).isTrue();
         assertThat(view.primaryAction().id()).isEqualTo("review_existing");
         assertThat(view.availableActions()).extracting(ApplicationAction::id).contains("review_existing", "unavailable");
         assertThat(view.evidence()).isNotNull();
-        assertThat(view.evidence().userStatus()).isEqualTo("failed_install");
-        assertThat(view.evidence().userStatusLabel()).isEqualTo("Install failed");
+        assertThat(view.evidence().ownershipState()).isEqualTo("failed_install");
+        assertThat(view.evidence().statusLabel()).isEqualTo("Install failed");
     }
 
     @Test
@@ -243,10 +233,10 @@ class ApplicationInventoryServiceTests {
         List<ApplicationView> views = service.apps();
 
         assertThat(observedServiceService.refreshCalls).hasValue(0);
-        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE);
         assertThat(views).filteredOn(item -> item.id().equals("vaultwarden"))
                 .singleElement()
-                .satisfies(item -> assertThat(item.relationship()).isEqualTo(ApplicationRelationship.BLOCKED));
+                .satisfies(item -> assertThat(item.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE));
     }
 
     @Test
@@ -315,27 +305,28 @@ class ApplicationInventoryServiceTests {
         return new RuntimeLayout(properties);
     }
 
+    private void writeManagedCompose(String appId) throws Exception {
+        Path appDirectory = runtimeRoot.resolve("apps").resolve(appId);
+        Files.createDirectories(appDirectory);
+        Files.writeString(appDirectory.resolve("compose.yaml"), "services: {}\n");
+    }
+
     private ObservedService observed(String id, String catalogAppId, String ownershipState, String visibility) {
         Instant seenAt = Instant.parse("2026-06-21T12:00:00Z");
         return new ObservedService(
                 id,
-                id.startsWith("manual:") ? "manual_url" : "docker",
+                id.startsWith("manual:") ? "manual_url" : id.startsWith("autark-os-install:") ? "autark_os_install" : "docker",
                 id.replaceFirst("^[^:]+:", ""),
                 catalogAppId,
                 id.startsWith("manual:") ? "http://localhost:8080" : null,
-                "External",
                 "LAN",
                 catalogAppId,
                 "user",
                 ownershipState,
-                visibility,
                 "running",
-                false,
                 "foreign_autark_os".equals(ownershipState) ? "other-instance" : "",
                 seenAt,
                 seenAt,
-                "pinned".equals(visibility) ? seenAt : null,
-                null,
                 "{}");
     }
 
@@ -347,9 +338,9 @@ class ApplicationInventoryServiceTests {
         }
 
         @Override
-        public List<ObservedServiceView> refresh() {
+        public void refresh() {
             refreshCalls.incrementAndGet();
-            return super.list(true);
+            super.refresh();
         }
     }
 }

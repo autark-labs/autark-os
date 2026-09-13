@@ -16,7 +16,7 @@ test('story 9 pages route mutation feedback through shared action notification h
     'src/pages/SettingsPage/useSettingsPageController.ts',
     'src/pages/StoragePage/StoragePage.tsx',
     'src/pages/SupportPage/SupportPage.tsx',
-    'src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx',
+    'src/pages/ApplicationsPage/ApplicationReviewDialog.tsx',
   ];
 
   for (const relativePath of mutationSurfaces) {

@@ -70,7 +70,7 @@ test('marketplace detail sends installed apps to My Apps and found resources to 
 
   assert.match(detail, /applicationDeepLinkForManagedApp/);
   assert.doesNotMatch(detail, /applicationDeepLinkForObservedService|applicationRouteWithManagementPanel/);
-  assert.match(detail, /const reviewExistingHref = application\.reviewExistingHref/);
+  assert.match(detail, /application\.primaryAction\.id === 'review_existing'/);
   assert.doesNotMatch(detail, /<Link to="\/apps">View in My Apps<\/Link>/);
   assert.doesNotMatch(detail, /<Link to="\/apps">Manage in My Apps<\/Link>/);
 });

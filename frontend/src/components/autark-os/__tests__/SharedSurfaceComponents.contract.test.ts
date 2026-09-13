@@ -16,7 +16,7 @@ test('shared surface components provide typed accessible primitives', () => {
     'StatusBadge',
     'AppCardName',
     'CopyField',
-    'FoundAppsPrompt',
+    'ApplicationReviewPrompt',
     'ResponsiveDetailsSheet',
     'LocalizedDateTime',
     'JobProgress',
@@ -105,7 +105,6 @@ test('active pages use shared surface components instead of local page state car
     'src/pages/MarketplacePage/MarketplacePage.tsx',
     'src/pages/NetworkPage/NetworkPage.shared.tsx',
     'src/pages/OnboardingPage/OnboardingWizard.tsx',
-    'src/pages/ResolveExistingAppsPage/ResolveExistingAppsPage.tsx',
     'src/pages/SettingsPage/SettingsPage.tsx',
     'src/pages/StoragePage/StoragePage.tsx',
     'src/pages/SupportPage/SupportPage.tsx',
@@ -120,10 +119,10 @@ test('active pages use shared surface components instead of local page state car
   }
 
   assert.match(source('src/pages/MarketplacePage/MarketplaceAppDetail.tsx'), /ResponsiveDetailsSheet/);
-  assert.match(source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx'), /ResponsiveDetailsSheet/);
+  assert.match(source('src/pages/ApplicationsPage/ApplicationReviewDialog.tsx'), /DialogContent/);
   assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationGuideTab.tsx'), /CopyField/);
   assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationLinksTab.tsx'), /CopyField/);
   assert.match(source('src/components/autark-os/NotificationCenter.tsx'), /useRecommendedActionQuery/);
-  assert.match(source('src/pages/ApplicationsPage/ApplicationsPage.tsx'), /FoundAppsPrompt/);
+  assert.match(source('src/pages/ApplicationsPage/ApplicationsPage.tsx'), /ApplicationReviewPrompt/);
   assert.match(source('src/pages/OverviewPage/components/HomeDashboardPanels.tsx'), /InstalledAppsLauncher/);
 });

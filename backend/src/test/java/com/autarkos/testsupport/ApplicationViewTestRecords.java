@@ -19,7 +19,7 @@ public final class ApplicationViewTestRecords {
                 ApplicationRelationship.MANAGED, "installable", runtime.appId(), runtime.technicalStatus(), "owned",
                 runtime.accessRoute() != null && runtime.accessRoute().privateUrl() != null ? "private_ready" : "local_ready",
                 runtime.canonicalBackupState() == null ? "backup_disabled" : runtime.canonicalBackupState(), List.of(),
-                "Installed", "Managed by this Autark-OS instance.", "success", "success", false, null,
+                "Installed", "Managed by this Autark-OS instance.", "success", "success",
                 new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""), List.of(), runtime, null);
     }
 
@@ -31,7 +31,7 @@ public final class ApplicationViewTestRecords {
         return new ApplicationView(
                 app.catalogAppId(), app.name(), app.category(), app.icon(), "", "", ApplicationRelationship.MANAGED,
                 "installable", app.appInstanceId(), app.runtimeState(), app.ownershipState(), app.accessState(), app.backupState(),
-                app.issues(), "Installed", "Managed by this Autark-OS instance.", "success", "success", false, null,
+                app.issues(), "Installed", "Managed by this Autark-OS instance.", "success", "success",
                 new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""), List.of(), runtime, null);
     }
 }

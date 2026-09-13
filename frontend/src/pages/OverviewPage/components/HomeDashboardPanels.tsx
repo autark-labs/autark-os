@@ -36,7 +36,7 @@ export function InstalledAppsLauncher({ apps }: { apps: ApplicationView[] }) {
       </div>
       {apps.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6" role="list">
-          {apps.slice(0, 6).map((app, index) => <InstalledAppCard app={app} index={index} key={app.appInstanceId} />)}
+          {apps.slice(0, 6).map((app, index) => <InstalledAppCard app={app} index={index} key={app.id} />)}
         </div>
       ) : (
         <EmptyAppCard />

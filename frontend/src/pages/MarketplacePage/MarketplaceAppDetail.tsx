@@ -57,10 +57,13 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
   const application = appView.application;
-  const needsExistingServiceReview = !isInstalled && application.installCopyWarningRequired;
+  const needsExistingServiceReview = !isInstalled && (
+    application.relationship === 'recovery_required' || application.relationship === 'blocked'
+  );
+  const canInstallSecondCopy = application.relationship === 'blocked';
   const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appInstanceId) : '/apps';
   const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appInstanceId, { panel: 'manage' }) : '/apps';
-  const reviewExistingHref = application.reviewExistingHref ?? null;
+  const reviewExistingHref = application.primaryAction.id === 'review_existing' ? application.primaryAction.href : null;
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`
@@ -105,7 +108,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
               </Link>
             </ProjectPrimaryButton>
           ) : needsExistingServiceReview ? (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className={cn('grid gap-2', canInstallSecondCopy && 'sm:grid-cols-2')}>
               {reviewExistingHref && (
                 <ProjectWarningButton asChild>
                   <Link to={reviewExistingHref}>
@@ -114,11 +117,13 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
                   </Link>
                 </ProjectWarningButton>
               )}
-              <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
-                <ProjectDarkControlButton className="w-full" disabled={installDisabled} onClick={openDuplicateWarning} type="button">
-                  Install second copy
-                </ProjectDarkControlButton>
-              </DisabledAction>
+              {canInstallSecondCopy && (
+                <DisabledAction disabled={installDisabled} reason={installDisabledReason}>
+                  <ProjectDarkControlButton className="w-full" disabled={installDisabled} onClick={openDuplicateWarning} type="button">
+                    Install second copy
+                  </ProjectDarkControlButton>
+                </DisabledAction>
+              )}
             </div>
           ) : (
             <DisabledAction disabled={installDisabled} reason={installDisabledReason}>

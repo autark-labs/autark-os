@@ -42,9 +42,10 @@ test('My Apps uses quiet status dots and compact action affordances on dark app 
   assert.match(card, /aria-label=\{`Open \$\{item\.name\}`\}/);
 });
 
-test('My Apps sends non-managed services to the dedicated existing-app review flow', () => {
+test('My Apps reviews non-managed applications in place', () => {
   assert.match(page, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
-  assert.match(page, /FoundAppsPrompt/);
-  assert.match(page, /reviewHref: '\/apps\/found'/);
+  assert.match(page, /ApplicationReviewPrompt/);
+  assert.match(page, /reviewApplications\[0\]\?\.primaryAction\.href/);
+  assert.match(page, /<ApplicationReviewDialog/);
   assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);
 });

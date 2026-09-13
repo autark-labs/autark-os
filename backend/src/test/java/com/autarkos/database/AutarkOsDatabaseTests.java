@@ -212,6 +212,46 @@ class AutarkOsDatabaseTests {
         }
     }
 
+    @Test
+    void preservesHistoricalPinnedLinksWhenUpgradingTheOwnershipSchema() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        String jdbcUrl = "jdbc:sqlite:" + runtimeLayout.databasePath();
+
+        Flyway.configure()
+                .dataSource(jdbcUrl, null, null)
+                .baselineOnMigrate(true)
+                .baselineVersion("0")
+                .target("9")
+                .load()
+                .migrate();
+
+        try (Connection connection = java.sql.DriverManager.getConnection(jdbcUrl); Statement statement = connection.createStatement()) {
+            statement.executeUpdate("""
+                    insert into observed_services(
+                        id, source, fingerprint, display_name, url, category, access_scope,
+                        catalog_app_id, catalog_match_confidence, ownership_state, user_visibility,
+                        runtime_state, health_check_enabled, first_seen_at, last_seen_at, pinned_at,
+                        metadata_json
+                    ) values (
+                        'manual:legacy-link', 'manual_url', 'https://legacy.example', 'Legacy link',
+                        'https://legacy.example', 'External', 'LAN', null, 'unknown', 'external',
+                        'pinned', 'unknown', false, '2026-01-01T00:00:00Z',
+                        '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '{}'
+                    )
+                    """);
+        }
+
+        new AutarkOsDatabase(runtimeLayout).migrate();
+
+        try (Connection connection = java.sql.DriverManager.getConnection(jdbcUrl);
+                Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery("select user_visibility, pinned_at from observed_services where id = 'manual:legacy-link'")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getString("user_visibility")).isEqualTo("pinned");
+            assertThat(result.getString("pinned_at")).isEqualTo("2026-01-01T00:00:00Z");
+        }
+    }
+
     private boolean tableExists(Statement statement, String tableName) throws Exception {
         try (ResultSet resultSet = statement.executeQuery("select name from sqlite_master where type = 'table' and name = '" + tableName + "'")) {
             return resultSet.next();

@@ -92,7 +92,7 @@ function application(id: string, relationship: ApplicationView['relationship'], 
     id, name: id, category: 'Apps', image: '', summary: '', description: '', relationship, catalogAvailability: 'installable',
     appInstanceId: relationship === 'managed' ? id : '', runtimeState: runtime?.technicalStatus ?? 'unknown', ownershipState: relationship === 'managed' ? 'owned' : 'unowned',
     accessState: runtime ? 'local_ready' : 'not_ready', backupState: 'backup_disabled', issues: [], relationshipLabel: relationship === 'managed' ? 'Installed' : 'Blocked', relationshipDescription: '',
-    statusTone: relationship === 'managed' ? 'success' : 'danger', cardTone: relationship === 'managed' ? 'success' : 'danger', installCopyWarningRequired: relationship === 'blocked', reviewExistingHref: null,
+    statusTone: relationship === 'managed' ? 'success' : 'danger', cardTone: relationship === 'managed' ? 'success' : 'danger',
     primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps', method: null, disabled: false, reason: '' }, availableActions: [], runtime, evidence: null,
   };
 }

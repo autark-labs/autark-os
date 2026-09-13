@@ -114,7 +114,6 @@ for required_file in \
   application-state.json \
   jobs.json \
   recent-activity.json \
-  observed-services.json \
   docker-inventory.txt; do
   [[ -f "${bundle_root}/${required_file}" ]]
 done

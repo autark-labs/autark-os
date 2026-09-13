@@ -47,8 +47,8 @@ function application(runtime: AppRuntimeView) {
     id: runtime.appId, name: runtime.appName, category: runtime.category, image: '/app-images/vaultwarden.svg',
     summary: '', description: '', relationship: 'managed' as const, catalogAvailability: 'installable', appInstanceId: runtime.appId,
     runtimeState: runtime.technicalStatus ?? 'unknown', ownershipState: 'owned', accessState: 'local_ready', backupState: 'backup_disabled', issues: [],
-    relationshipLabel: 'Installed', relationshipDescription: '', statusTone: 'success', cardTone: 'success', installCopyWarningRequired: false,
-    reviewExistingHref: null, primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps', method: null, disabled: false, reason: '' },
+    relationshipLabel: 'Installed', relationshipDescription: '', statusTone: 'success', cardTone: 'success',
+    primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps', method: null, disabled: false, reason: '' },
     availableActions: [], runtime, evidence: null,
   };
 }

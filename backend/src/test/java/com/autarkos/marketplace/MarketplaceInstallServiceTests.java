@@ -607,7 +607,7 @@ class MarketplaceInstallServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
         ObservedServiceService observedService = new ObservedServiceService(
                 observedRepository,
-                new ObservedServiceScanner(List::of, () -> new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1)));
+                null);
         return new MarketplaceInstallService(
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
@@ -637,19 +637,14 @@ class MarketplaceInstallServiceTests {
                 id.replace("docker:", ""),
                 catalogAppId,
                 "http://localhost:8090",
-                "External",
                 "LAN",
                 catalogAppId,
                 "user",
                 ownershipState,
-                visibility,
                 "running",
-                false,
                 "",
                 seenAt,
                 seenAt,
-                "pinned".equals(visibility) ? seenAt : null,
-                null,
                 "{}");
     }
 

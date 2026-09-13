@@ -294,11 +294,11 @@ public class AppRecoveryService {
                 && (!plan.ownershipTransferRequired() || request.ownershipTransferConfirmed());
     }
 
-    public HostModels.ActionResult apply(String appId, AppRecoveryModels.RecoveryApplyRequest request) {
+    public AppRecoveryModels.RecoveryResult apply(String appId, AppRecoveryModels.RecoveryApplyRequest request) {
         return apply(appId, request, ignored -> { });
     }
 
-    public HostModels.ActionResult apply(
+    public AppRecoveryModels.RecoveryResult apply(
             String appId,
             AppRecoveryModels.RecoveryApplyRequest request,
             Consumer<String> progress) {
@@ -311,7 +311,7 @@ public class AppRecoveryService {
                 () -> applyLocked(appId, request, sink));
     }
 
-    private HostModels.ActionResult applyLocked(
+    private AppRecoveryModels.RecoveryResult applyLocked(
             String appId,
             AppRecoveryModels.RecoveryApplyRequest request,
             Consumer<String> progress) {
@@ -407,14 +407,14 @@ public class AppRecoveryService {
         }
     }
 
-    private HostModels.ActionResult completed(
+    private AppRecoveryModels.RecoveryResult completed(
             AppRecoveryModels.RecoveryPlan plan,
             ApplicationManifest manifest,
             String eventMessage) {
         installedApps.recordEvent(plan.appId(), "app_recovered", eventMessage);
         activityLog.success("applications", "app_recovered", "App recovery completed",
                 manifest.name() + " is fully managed by this Autark-OS installation.", plan.appId());
-        return new HostModels.ActionResult(true, "success", "App recovery completed",
+        return new AppRecoveryModels.RecoveryResult(true, "success", "App recovery completed",
                 manifest.name() + " is fully managed by Autark-OS.", plan.appId(), "open_apps",
                 applicationState.refreshNow());
     }

@@ -3,7 +3,6 @@ package com.autarkos.apps;
 import java.util.List;
 
 import com.autarkos.api.AutarkOsIssue;
-import com.autarkos.host.ObservedServiceView;
 import com.autarkos.marketplace.install.AppRuntimeView;
 
 public record ApplicationView(
@@ -25,12 +24,10 @@ public record ApplicationView(
         String relationshipDescription,
         String statusTone,
         String cardTone,
-        boolean installCopyWarningRequired,
-        String reviewExistingHref,
         ApplicationAction primaryAction,
         List<ApplicationAction> availableActions,
         AppRuntimeView runtime,
-        ObservedServiceView evidence) {
+        ApplicationEvidence evidence) {
 
     public boolean managed() {
         return relationship == ApplicationRelationship.MANAGED;

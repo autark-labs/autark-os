@@ -191,7 +191,7 @@ class SystemSetupServiceTests {
         assertThat(status.checks()).anySatisfy(check -> {
             assertThat(check.id()).isEqualTo("existing-install");
             assertThat(check.status()).isEqualTo("warning");
-            assertThat(check.actionCommand()).isEqualTo("/resolve-existing-apps");
+            assertThat(check.actionCommand()).isEqualTo("/apps");
         });
     }
 
@@ -228,19 +228,14 @@ class SystemSetupServiceTests {
                 "autark-os-" + ownershipState,
                 ownershipState,
                 "http://localhost:8080",
-                "Apps",
                 "local",
                 "homepage",
                 "label",
                 ownershipState,
-                "observed",
                 "running",
-                true,
                 ownerInstanceId,
                 Instant.parse("2026-06-20T12:00:00Z"),
                 Instant.parse("2026-06-20T12:00:00Z"),
-                null,
-                null,
                 "{}");
     }
 

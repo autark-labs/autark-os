@@ -38,16 +38,7 @@ class ObservedServiceServiceTests {
         ObservedServiceService service = new ObservedServiceService(repository, new ObservedServiceScanner(unavailableDocker, currentIdentity()));
 
         assertThatThrownBy(service::refresh).isInstanceOf(HostInventoryException.class);
-        assertThat(repository.findServiceById("docker:existing")).isPresent();
-    }
-
-    @Test
-    void foundAppsExposeNoPinOrManualMatchActions() {
-        var found = ObservedServiceService.toView(observed("obs_vaultwarden", "manual_url", "http://vault.local", "Vaultwarden", "vaultwarden", "external", "pinned"));
-        assertThat(found.availableActions()).extracting(HostModels.ObservedServiceAction::id)
-                .contains("open", "unavailable").doesNotContain("pin", "unpin", "change_match", "install_copy", "recovery_plan");
-        var eligible = ObservedServiceService.toView(observed("obs_homepage", "manual_url", "http://homepage.local", "Homepage", "homepage", "external", "pinned"));
-        assertThat(eligible.availableActions()).extracting(HostModels.ObservedServiceAction::id).contains("install_copy");
+        assertThat(service(repository, "docker:existing")).isPresent();
     }
 
     @Test
@@ -59,7 +50,7 @@ class ObservedServiceServiceTests {
 
         service.refresh();
 
-        assertThat(repository.findServiceById("docker:autark-os-vault")).hasValueSatisfying(observed -> {
+        assertThat(service(repository, "docker:autark-os-vault")).hasValueSatisfying(observed -> {
             assertThat(observed.ownershipState()).isEqualTo("external_docker");
             assertThat(observed.autarkOsInstanceId()).isNull();
             assertThat(observed.url()).isEqualTo("http://localhost:8081");
@@ -67,18 +58,17 @@ class ObservedServiceServiceTests {
     }
 
     @Test
-    void refreshReturnsUnmatchedAndIgnoredContainers() {
+    void refreshReturnsEveryCurrentDockerContainer() {
         ObservedServiceRepository repository = repository();
         repository.upsert(observed("docker:ignored-postgres", "docker", "ignored-postgres", "Postgres", null, "external_docker", "ignored"));
         ObservedServiceService service = service(repository, List.of(
                 new HostModels.HostDockerContainer("unmatched-worker", "worker:latest", "Up 5 seconds", Map.of(), ""),
                 new HostModels.HostDockerContainer("ignored-postgres", "postgres:16", "Up 1 hour", Map.of(), "")));
 
-        List<ObservedServiceView> observed = service.refresh();
+        service.refresh();
+        List<ObservedService> observed = service.observedServices();
 
-        assertThat(observed).extracting(ObservedServiceView::id).contains("docker:unmatched-worker", "docker:ignored-postgres");
-        assertThat(repository.findServiceById("docker:ignored-postgres")).hasValueSatisfying(serviceView ->
-                assertThat(serviceView.userVisibility()).isEqualTo("ignored"));
+        assertThat(observed).extracting(ObservedService::id).contains("docker:unmatched-worker", "docker:ignored-postgres");
     }
 
     @Test
@@ -90,24 +80,23 @@ class ObservedServiceServiceTests {
 
         service.refresh();
 
-        assertThat(repository.findServiceById("docker:old-autark-os-vault")).isEmpty();
-        assertThat(repository.findServiceById("manual:gitlab")).isPresent();
-        assertThat(repository.findServiceById("docker:current-worker")).isPresent();
+        assertThat(service(repository, "docker:old-autark-os-vault")).isEmpty();
+        assertThat(service(repository, "manual:gitlab")).isPresent();
+        assertThat(service(repository, "docker:current-worker")).isPresent();
+        assertThat(service.observedServices()).extracting(ObservedService::id)
+                .contains("docker:current-worker").doesNotContain("manual:gitlab");
     }
 
     @Test
-    void recoverableDockerEvidenceLinksOnlyToTheRecoveryApi() {
-        ObservedServiceView view = ObservedServiceService.toView(observed(
-                "docker:recoverable", "docker", "recoverable", "Vaultwarden", "vaultwarden", "legacy_autark_os", "observed"));
+    void successfulEmptyDockerScanRemovesStaleEvidenceWithoutDeletingHistoricalLinks() {
+        ObservedServiceRepository repository = repository();
+        repository.upsert(observed("docker:old", "docker", "old", "Old", "homepage", "external_docker", "observed"));
+        repository.upsert(observed("manual:old", "manual_url", "http://old.local", "Old link", "homepage", "external", "pinned"));
 
-        assertThat(view.recoveryCandidate()).isTrue();
-        assertThat(view.availableActions()).extracting(HostModels.ObservedServiceAction::id)
-                .contains("recovery_plan").doesNotContain("adoption_plan");
-        assertThat(view.availableActions()).filteredOn(action -> action.id().equals("recovery_plan"))
-                .singleElement().satisfies(action -> {
-                    assertThat(action.href()).isEqualTo("/api/app-recovery/vaultwarden/plan");
-                    assertThat(action.method()).isEqualTo("GET");
-                });
+        service(repository, List.of()).refresh();
+
+        assertThat(service(repository, "docker:old")).isEmpty();
+        assertThat(service(repository, "manual:old")).isPresent();
     }
 
     private ObservedServiceService service(ObservedServiceRepository repository, List<HostModels.HostDockerContainer> containers) {
@@ -124,6 +113,10 @@ class ObservedServiceServiceTests {
         return JpaTestRepositories.observedServiceRepository(runtimeLayout());
     }
 
+    private java.util.Optional<ObservedService> service(ObservedServiceRepository repository, String id) {
+        return repository.findAllServices().stream().filter(service -> id.equals(service.id())).findFirst();
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -134,8 +127,7 @@ class ObservedServiceServiceTests {
         Instant seenAt = Instant.parse("2026-06-21T12:00:00Z");
         return new ObservedService(
                 id, source, fingerprint, displayName, source.equals("manual_url") ? fingerprint : null,
-                "External", "LAN", catalogAppId, catalogAppId == null ? "unknown" : "user",
-                ownershipState, visibility, "unknown", false, "", seenAt, seenAt, null,
-                visibility.equals("ignored") ? seenAt : null, "{}");
+                "LAN", catalogAppId, catalogAppId == null ? "unknown" : "user",
+                ownershipState, "unknown", "", seenAt, seenAt, "{}");
     }
 }

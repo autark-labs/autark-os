@@ -26,7 +26,6 @@ const MonitoringPage = lazy(() => import('./pages/MonitoringPage/MonitoringPage'
 const NetworkPage = lazy(() => import('./pages/NetworkPage/NetworkPage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage/OverviewPage'));
 const ProPage = lazy(() => import('./pages/ProPage/ProPage'));
-const ResolveExistingAppsPage = lazy(() => import('./pages/ResolveExistingAppsPage/ResolveExistingAppsPage'));
 const StoragePage = lazy(() => import('./pages/StoragePage/StoragePage'));
 const SupportPage = lazy(() => import('./pages/SupportPage/SupportPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage/NotFoundPage'));
@@ -197,8 +196,6 @@ function ReadyApplication({ bootstrap, onRebootstrap }: { bootstrap: Application
             <Route path={appRoutes.home} element={<LazyRoute pageName="Home"><OverviewPage /></LazyRoute>} />
             <Route path={specialRoutes.setup} element={<Navigate replace to={appRoutes.home} />} />
             <Route path={appRoutes.apps} element={<LazyRoute pageName="My Apps"><ApplicationsPage /></LazyRoute>} />
-            <Route path={specialRoutes.foundApps} element={<LazyRoute pageName="Existing apps"><ResolveExistingAppsPage /></LazyRoute>} />
-            <Route path={specialRoutes.resolveExistingApps} element={<Navigate replace to={specialRoutes.foundApps} />} />
             <Route path={appRoutes.discover} element={<LazyRoute pageName="Discover"><MarketplacePage /></LazyRoute>} />
             <Route path={appRoutes.access} element={<LazyRoute pageName="Access"><NetworkPage /></LazyRoute>} />
             <Route path={appRoutes.storage} element={<LazyRoute pageName="Storage"><StoragePage /></LazyRoute>} />

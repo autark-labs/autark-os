@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArchiveRestore,
   Check,
   CheckCircle2,
   CircleAlert,
-  ExternalLink,
   HardDrive,
   Info,
   Loader2,
@@ -18,12 +17,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AppRecoveryAPIClient } from '@/api/AppRecoveryAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
-import { ApplicationStateNotice } from '@/components/autark-os/ApplicationStateNotice';
-import { DisabledAction } from '@/components/autark-os/DisabledAction';
-import { ResponsiveDetailsSheet } from '@/components/autark-os/ResponsiveDetailsSheet';
-import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
+import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -44,115 +39,52 @@ import {
   useAutarkOsJobQuery,
   useAutarkOsJobsQuery,
 } from '@/repositories/jobRepository';
-import {
-  catalogAppIsManaged,
-  useApplicationStateRepository,
-} from '@/repositories/applicationStateRepository';
+import type { ApplicationView } from '@/types/applicationState';
 import type { AppRecoveryCheck, AppRecoveryPlan } from '@/types/appRecovery';
 import type { AutarkOsJob, AutarkOsJobStep } from '@/types/jobs';
-import type { ObservedServiceView } from '@/types/observedService';
 
-type ObservedServiceDetailsSheetProps = {
+type ApplicationReviewDialogProps = {
+  application: ApplicationView | null;
   onOpenChange: (open: boolean) => void;
-  onRefresh: () => Promise<void>;
+  onRefresh: () => Promise<unknown>;
   open: boolean;
-  service: ObservedServiceView | null;
 };
 
 type RecoveryStage = 'review' | 'confirm';
 
-export function ObservedServiceDetailsSheet({ onOpenChange, onRefresh, open, service }: ObservedServiceDetailsSheetProps) {
-  const appState = useApplicationStateRepository();
+export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, open }: ApplicationReviewDialogProps) {
   const queryClient = useQueryClient();
   const jobsQuery = useAutarkOsJobsQuery();
-  const [recoveryService, setRecoveryService] = useState<ObservedServiceView | null>(service);
+  const [reviewedApplication, setReviewedApplication] = useState<ApplicationView | null>(application);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [plan, setPlan] = useState<AppRecoveryPlan | null>(null);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [recoveryStage, setRecoveryStage] = useState<RecoveryStage>('review');
   const [transferAcknowledged, setTransferAcknowledged] = useState(false);
   const [recoveryJob, setRecoveryJob] = useState<AutarkOsJob | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-  const preparedServiceId = useRef<string | null>(null);
+  const preparedAppId = useRef<string | null>(null);
+  const loadedPlanAppId = useRef<string | null>(null);
   const notifiedJob = useRef<string | null>(null);
-  const currentService = service ?? recoveryService;
+  const currentApplication = application ?? reviewedApplication;
   const activeRecoveryJobId = recoveryJob && !terminalJob(recoveryJob) ? recoveryJob.jobId : null;
   const recoveryJobQuery = useAutarkOsJobQuery(activeRecoveryJobId);
 
   useEffect(() => {
-    if (!service) return;
-    setRecoveryService(service);
-    if (preparedServiceId.current === service.id) return;
-    preparedServiceId.current = service.id;
+    if (!application) return;
+    setReviewedApplication(application);
+    if (preparedAppId.current === application.id) return;
+    preparedAppId.current = application.id;
     setPlan(null);
-    setRecoveryOpen(false);
     setRecoveryStage('review');
     setTransferAcknowledged(false);
     setRecoveryJob(null);
     setLocalError(null);
     notifiedJob.current = null;
-  }, [service]);
+  }, [application]);
 
-  useEffect(() => {
-    if (recoveryJobQuery.data) setRecoveryJob(recoveryJobQuery.data);
-  }, [recoveryJobQuery.data]);
-
-  useEffect(() => {
-    if (!open || recoveryJob || !currentService?.catalogAppId) return;
-    const activeJob = (jobsQuery.data ?? []).find((job) =>
-      job.type === 'recover_app'
-      && job.subjectId === currentService.catalogAppId
-      && !terminalJob(job));
-    if (!activeJob) return;
-    setRecoveryJob(activeJob);
-    setRecoveryOpen(true);
-  }, [currentService?.catalogAppId, jobsQuery.data, open, recoveryJob]);
-
-  useEffect(() => {
-    if (!recoveryJob || !terminalJob(recoveryJob) || notifiedJob.current === recoveryJob.jobId) return;
-    notifiedJob.current = recoveryJob.jobId;
-    const succeeded = recoveryJob.status === 'succeeded';
-    showActionNotification({
-      ok: succeeded,
-      severity: succeeded ? 'success' : 'error',
-      title: succeeded ? 'App recovery completed' : 'App recovery needs attention',
-      message: succeeded
-        ? `${currentService?.displayName || 'The app'} is fully managed. Its lifecycle controls are ready.`
-        : recoveryJob.error?.message || 'Autark-OS restored the previous runtime and left the app recoverable.',
-    }, succeeded ? 'App recovery completed' : 'App recovery failed');
-  }, [currentService?.displayName, recoveryJob]);
-
-  const actions = useMemo(
-    () => new Map((currentService?.availableActions || []).map((action) => [action.id, action])),
-    [currentService?.availableActions],
-  );
-
-  if (!currentService) {
-    return (
-      <ResponsiveDetailsSheet
-        className="sm:max-w-lg"
-        model={{ description: 'Autark-OS could not find that observed service in the current inventory.', title: 'Service not found' }}
-        onOpenChange={onOpenChange}
-        open={open}
-      >
-        <p className="text-sm leading-6 text-slate-300">Refresh the existing-app inventory and choose the service again.</p>
-      </ResponsiveDetailsSheet>
-    );
-  }
-
-  const recoveryAction = actions.get('recovery_plan');
-  const canReviewRecovery = Boolean(recoveryAction) && !recoveryAction?.disabled
-    && currentService.recoveryCandidate && Boolean(currentService.catalogAppId);
-  const installCopyAction = actions.get('install_copy');
-  const installCopyHref = installCopyAction?.href
-    || (currentService.catalogAppId ? `/discover?app=${encodeURIComponent(currentService.catalogAppId)}` : null);
-  const canInstallCopy = Boolean(installCopyHref)
-    && !catalogAppIsManaged(appState.applicationState, currentService.catalogAppId);
-
-  async function loadPlan() {
-    const appId = currentService?.catalogAppId;
+  const loadPlan = useCallback(async () => {
+    const appId = currentApplication?.id;
     if (!appId) return;
-    setRecoveryOpen(true);
     setRecoveryStage('review');
     setTransferAcknowledged(false);
     setRecoveryJob(null);
@@ -166,10 +98,45 @@ export function ObservedServiceDetailsSheet({ onOpenChange, onRefresh, open, ser
     } finally {
       setBusyAction(null);
     }
-  }
+  }, [currentApplication?.id]);
+
+  useEffect(() => {
+    if (!open || currentApplication?.relationship !== 'recovery_required' || plan || busyAction) return;
+    if (loadedPlanAppId.current === currentApplication.id) return;
+    loadedPlanAppId.current = currentApplication.id;
+    void loadPlan();
+  }, [busyAction, currentApplication?.id, currentApplication?.relationship, loadPlan, open, plan]);
+
+  useEffect(() => {
+    if (recoveryJobQuery.data) setRecoveryJob(recoveryJobQuery.data);
+  }, [recoveryJobQuery.data]);
+
+  useEffect(() => {
+    if (!open || recoveryJob || !currentApplication?.id) return;
+    const activeJob = (jobsQuery.data ?? []).find((job) =>
+      job.type === 'recover_app'
+      && job.subjectId === currentApplication.id
+      && !terminalJob(job));
+    if (!activeJob) return;
+    setRecoveryJob(activeJob);
+  }, [currentApplication?.id, jobsQuery.data, open, recoveryJob]);
+
+  useEffect(() => {
+    if (!recoveryJob || !terminalJob(recoveryJob) || notifiedJob.current === recoveryJob.jobId) return;
+    notifiedJob.current = recoveryJob.jobId;
+    const succeeded = recoveryJob.status === 'succeeded';
+    showActionNotification({
+      ok: succeeded,
+      severity: succeeded ? 'success' : 'error',
+      title: succeeded ? 'App recovery completed' : 'App recovery needs attention',
+      message: succeeded
+        ? `${currentApplication?.name || 'The app'} is fully managed. Its lifecycle controls are ready.`
+        : recoveryJob.error?.message || 'Autark-OS restored the previous runtime and left the app recoverable.',
+    }, succeeded ? 'App recovery completed' : 'App recovery failed');
+  }, [currentApplication?.name, recoveryJob]);
 
   async function runRecovery() {
-    const appId = currentService?.catalogAppId;
+    const appId = currentApplication?.id;
     if (!appId || !plan) return;
     setBusyAction('recover');
     setLocalError(null);
@@ -198,86 +165,19 @@ export function ObservedServiceDetailsSheet({ onOpenChange, onRefresh, open, ser
   }
 
   async function finishRecovery() {
-    setRecoveryOpen(false);
     onOpenChange(false);
     await onRefresh();
   }
 
+  if (!currentApplication) {
+    return null;
+  }
+
+  if (currentApplication.relationship !== 'recovery_required') {
+    return <ConflictReviewDialog application={currentApplication} onOpenChange={onOpenChange} open={open} />;
+  }
+
   return (
-    <>
-      <ResponsiveDetailsSheet
-        className="sm:max-w-xl"
-        footer={<Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" onClick={() => onOpenChange(false)} type="button" variant="outline">Close</Button>}
-        headerAccessory={<StatusBadge tone={stateBadgeTone(currentService)}>{currentService.userStatusLabel || 'Found'}</StatusBadge>}
-        model={{ description: currentService.userStatusDescription || 'Autark-OS observes this service but does not manage it.', title: currentService.displayName }}
-        onOpenChange={onOpenChange}
-        open={open}
-        titleClassName="font-black"
-      >
-        <div className="grid gap-5">
-          <ApplicationStateNotice />
-
-          <section className="grid gap-3 rounded-lg border border-slate-800 bg-slate-900/45 p-4">
-            <div className="grid gap-2 text-sm sm:grid-cols-2">
-              <Detail label="Runtime" value={currentService.runtimeState || 'Unknown'} />
-              <Detail label="Access" value={currentService.accessScope || 'Unknown'} />
-              <Detail label="Source" value={currentService.source || 'Unknown'} />
-              <Detail label="Catalog match" value={currentService.catalogAppId || 'Unmatched'} />
-            </div>
-          </section>
-
-          <section className="grid gap-3">
-            <h3 className="text-sm font-black uppercase tracking-normal text-slate-400">Actions</h3>
-            <div className="flex flex-wrap gap-2">
-              {currentService.url && (
-                <Button asChild className="bg-sky-500 text-slate-950 hover:bg-sky-400" size="sm">
-                  <AppBrowserLink href={currentService.url} rel="noreferrer" target="_blank">
-                    <ExternalLink className="size-4" />
-                    Open
-                  </AppBrowserLink>
-                </Button>
-              )}
-              {canInstallCopy && (
-                <Button asChild className="border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15" size="sm" variant="outline">
-                  <Link to={installCopyHref || '/discover'}>
-                    <ShieldAlert className="size-4" />
-                    Install separate copy
-                  </Link>
-                </Button>
-              )}
-            </div>
-          </section>
-
-          {recoveryAction && (
-            <section className="grid gap-3 rounded-lg border border-amber-300/20 bg-amber-500/8 p-4">
-              <div>
-                <h3 className="font-bold text-white">Recovery available</h3>
-                <p className="mt-1 text-sm leading-6 text-amber-100/75">
-                  {recoveryAction.disabled
-                    ? recoveryAction.reason || 'This app cannot be recovered safely yet.'
-                    : 'Review how Autark-OS can restore complete management while preserving this app’s data.'}
-                </p>
-              </div>
-              {canReviewRecovery && (
-                <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish.">
-                  <Button className="w-fit bg-amber-500 text-slate-950 hover:bg-amber-400" disabled={busyAction !== null} onClick={() => void loadPlan()} type="button">
-                    {busyAction === 'recovery_plan' ? <Loader2 className="size-4 animate-spin" /> : <ArchiveRestore className="size-4" />}
-                    Review recovery
-                  </Button>
-                </DisabledAction>
-              )}
-            </section>
-          )}
-
-          <section className="grid gap-2 border-t border-slate-800 pt-5 text-sm text-slate-400">
-            <h3 className="font-bold text-white">Technical details</h3>
-            {Object.entries(currentService.metadata || {}).length
-              ? Object.entries(currentService.metadata || {}).map(([key, value]) => <Detail key={key} label={key} value={value || 'Unknown'} />)
-              : <p>No extra details reported.</p>}
-          </section>
-        </div>
-      </ResponsiveDetailsSheet>
-
       <RecoveryDialog
         acknowledged={transferAcknowledged}
         busy={busyAction === 'recover'}
@@ -285,17 +185,43 @@ export function ObservedServiceDetailsSheet({ onOpenChange, onRefresh, open, ser
         job={recoveryJob}
         loading={busyAction === 'recovery_plan'}
         onAcknowledged={setTransferAcknowledged}
-        onClose={() => setRecoveryOpen(false)}
+        onClose={() => onOpenChange(false)}
         onFinish={() => void finishRecovery()}
         onRecover={() => void runRecovery()}
         onReload={() => void loadPlan()}
         onStageChange={setRecoveryStage}
-        open={recoveryOpen}
+        open={open}
         plan={plan}
-        service={currentService}
+        application={currentApplication}
         stage={recoveryStage}
       />
-    </>
+  );
+}
+
+function ConflictReviewDialog({ application, onOpenChange, open }: { application: ApplicationView; onOpenChange: (open: boolean) => void; open: boolean }) {
+  const evidence = application.evidence;
+  const canInstallSecondCopy = application.availableActions.some((action) => action.id === 'install_copy' && !action.disabled);
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center gap-2 pr-8"><DialogTitle>{application.name} needs review</DialogTitle><StatusBadge tone="danger">{evidence?.statusLabel || 'Blocked'}</StatusBadge></div>
+          <DialogDescription>{application.relationshipDescription}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 rounded-lg border bg-muted/35 p-4 text-sm sm:grid-cols-2">
+          <Detail label="Runtime" value={evidence?.runtimeState || 'Unknown'} />
+          <Detail label="Source" value={evidence?.source || 'Unknown'} />
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} variant="outline">Close</Button>
+          {canInstallSecondCopy && (
+            <Button asChild>
+              <Link to={`/discover?app=${encodeURIComponent(application.id)}`}>Review install options</Link>
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -313,7 +239,7 @@ function RecoveryDialog({
   onStageChange,
   open,
   plan,
-  service,
+  application,
   stage,
 }: {
   acknowledged: boolean;
@@ -329,7 +255,7 @@ function RecoveryDialog({
   onStageChange: (stage: RecoveryStage) => void;
   open: boolean;
   plan: AppRecoveryPlan | null;
-  service: ObservedServiceView;
+  application: ApplicationView;
   stage: RecoveryStage;
 }) {
   const running = job && !terminalJob(job);
@@ -341,7 +267,7 @@ function RecoveryDialog({
       <DialogContent className="h-[calc(100dvh-2rem)] grid-rows-[minmax(0,1fr)] overflow-hidden sm:h-[34rem] sm:max-w-xl">
         {loading && !plan ? <RecoveryLoading />
           : running ? <RecoveryRunning job={job} />
-            : succeeded ? <RecoveryVerified onFinish={onFinish} service={service} />
+            : succeeded ? <RecoveryVerified application={application} onFinish={onFinish} />
               : failed ? <RecoveryFailed job={job} onClose={onClose} onReload={onReload} />
                 : stage === 'confirm' && plan ? (
                   <RecoveryConfirmation
@@ -397,7 +323,7 @@ function RecoveryReview({ busy, error, onCancel, onContinue, onReload, plan }: {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <DialogTitle className="text-lg">Recover {plan?.appName || 'app'}</DialogTitle>
-              {plan?.applicable && <Badge className="border-success/30 bg-success/10 text-success" variant="outline">Ready</Badge>}
+              {plan?.applicable && <StatusBadge tone="success">Ready</StatusBadge>}
             </div>
             <DialogDescription className="mt-1">Bring this app under your current Autark-OS installation.</DialogDescription>
           </div>
@@ -521,21 +447,21 @@ function RecoveryRunning({ job }: { job: AutarkOsJob }) {
   );
 }
 
-function RecoveryVerified({ onFinish, service }: { onFinish: () => void; service: ObservedServiceView }) {
+function RecoveryVerified({ application, onFinish }: { application: ApplicationView; onFinish: () => void }) {
   return (
     <div className="flex min-h-0 flex-col gap-4">
       <DialogHeader className="flex-1 items-center justify-center text-center">
         <span className="grid size-12 place-items-center rounded-full bg-success/10 text-success">
           <CheckCircle2 className="size-7" />
         </span>
-        <DialogTitle className="text-lg">{service.displayName} is fully managed</DialogTitle>
+        <DialogTitle className="text-lg">{application.name} is fully managed</DialogTitle>
         <DialogDescription>Ownership, health, access, settings, backup, and lifecycle controls are ready.</DialogDescription>
       </DialogHeader>
       <DialogFooter>
         <Button onClick={onFinish} variant="outline">Close</Button>
-        {service.url && (
+        {application.evidence?.url && (
           <Button asChild>
-            <AppBrowserLink href={service.url} onClick={onFinish} rel="noreferrer" target="_blank">Open {service.displayName}</AppBrowserLink>
+            <AppBrowserLink href={application.evidence.url} onClick={onFinish} rel="noreferrer" target="_blank">Open {application.name}</AppBrowserLink>
           </Button>
         )}
       </DialogFooter>
@@ -634,10 +560,4 @@ function Detail({ label, value }: { label: string; value: string }) {
       <dd className="m-0 mt-1 truncate text-slate-200" title={value}>{value}</dd>
     </div>
   );
-}
-
-function stateBadgeTone(service: ObservedServiceView): StatusBadgeTone {
-  if (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') return 'warning';
-  if (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') return 'danger';
-  return 'neutral';
 }

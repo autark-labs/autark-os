@@ -12,7 +12,6 @@ const routes: RouteCase[] = [
   { name: 'Home', path: '/home', expected: /Your Apps/i },
   { name: 'setup', path: '/setup', expected: /Set up Autark-OS/i, scenario: 'onboarding' },
   { name: 'My Apps', path: '/apps', expected: /My Apps/i },
-  { name: 'found apps', path: '/apps/found', expected: /Resolve Existing Apps/i },
   { name: 'Discover', path: '/discover', expected: /^Discover$/i },
   { name: 'Access', path: '/access', expected: /^Access$/i },
   { name: 'Backups', path: '/backups', expected: /^Backups$/i },
@@ -70,7 +69,7 @@ test('loading, empty, and error fixtures retain clear user-facing states', async
 
   await installMockApi(page, 'empty');
   await page.goto('/apps', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText(/No managed apps or linked services/i)).toBeVisible();
+  await expect(page.getByText(/^No managed apps$/i)).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await installMockApi(page, 'error');

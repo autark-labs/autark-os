@@ -387,8 +387,8 @@ class AppRecoveryServiceTests {
         Instant now = Instant.parse("2026-09-12T12:00:00Z");
         return new ObservedService(
                 "docker:vaultwarden", "docker", "vaultwarden", "Vaultwarden", "http://localhost:8090",
-                "Applications", "LAN", "vaultwarden", "label", ownership, "observed", runtimeState, false,
-                ownerInstance, now, now, null, null,
+                "LAN", "vaultwarden", "label", ownership, runtimeState,
+                ownerInstance, now, now,
                 "{\"dataPaths\":\"" + appRoot + "\",\"appInstanceId\":\"appinst_vaultwarden\",\"ports\":\"0.0.0.0:8090->80/tcp\"}");
     }
 
