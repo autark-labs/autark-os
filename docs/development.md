@@ -35,8 +35,10 @@ cd frontend
 AUTARK_OS_BACKEND_URL=http://localhost:8092 yarn dev
 ```
 
-Replace `8092` with the reported port. If a production service already owns
-8082, either keep it running and use `--auto-port`, or stop it deliberately:
+Replace `8092` with the reported port. If an installed service already owns
+8082, either keep it running and use `--auto-port`, or stop it deliberately.
+The stop option recognizes both `autark-os.service` and the legacy
+`project-os.service` left by pre-rename installations:
 
 ```bash
 ./scripts/dev-backend.sh --stop-service

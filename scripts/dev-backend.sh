@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${AUTARK_OS_BACKEND_PORT:-8082}"
 SERVICE_NAME="${AUTARK_OS_SERVICE_NAME:-autark-os}"
+SERVICE_NAMES=("${SERVICE_NAME}")
+if [[ -z "${AUTARK_OS_SERVICE_NAME:-}" && "${SERVICE_NAME}" != "project-os" ]]; then
+  SERVICE_NAMES+=("project-os")
+fi
 FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-/opt/autark-os/bin/autark-os-fileops}"
 AUTO_PORT=0
 STOP_SERVICE=0
@@ -16,13 +20,14 @@ Usage: $0 [options]
 Options:
   --port PORT       Run the dev backend on PORT.
   --auto-port       If PORT is busy, choose the next available port.
-  --stop-service    Stop ${SERVICE_NAME}.service if it is holding the dev port.
+  --stop-service    Stop installed Autark-OS services that may hold the dev port.
   --status          Show current dev/prod backend port state and exit.
   -h, --help        Show this help.
 
 Environment:
   AUTARK_OS_BACKEND_PORT      Default backend port for dev mode. Defaults to 8082.
-  AUTARK_OS_SERVICE_NAME      Production systemd service name. Defaults to autark-os.
+  AUTARK_OS_SERVICE_NAME      Production systemd service name. Defaults to autark-os;
+                              the legacy project-os service is also checked by default.
   AUTARK_OS_FILEOPS_HELPER    Bounded privileged file helper. Defaults to /opt/autark-os/bin/autark-os-fileops.
 
 Examples:
@@ -76,7 +81,24 @@ command_exists() {
 }
 
 service_active() {
-  command_exists systemctl && systemctl is-active --quiet "${SERVICE_NAME}.service"
+  local service_name
+  command_exists systemctl || return 1
+  for service_name in "${SERVICE_NAMES[@]}"; do
+    if systemctl is-active --quiet "${service_name}.service"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+active_services() {
+  local service_name
+  command_exists systemctl || return 0
+  for service_name in "${SERVICE_NAMES[@]}"; do
+    if systemctl is-active --quiet "${service_name}.service"; then
+      printf '%s.service\n' "${service_name}"
+    fi
+  done
 }
 
 port_busy() {
@@ -102,10 +124,11 @@ show_status() {
   else
     log "Port ${PORT}: available"
   fi
-  if service_active; then
-    log "${SERVICE_NAME}.service: active"
-  elif command_exists systemctl; then
-    log "${SERVICE_NAME}.service: $(systemctl is-active "${SERVICE_NAME}.service" 2>/dev/null || true)"
+  if command_exists systemctl; then
+    local service_name
+    for service_name in "${SERVICE_NAMES[@]}"; do
+      log "${service_name}.service: $(systemctl is-active "${service_name}.service" 2>/dev/null || true)"
+    done
   else
     log "systemd: unavailable"
   fi
@@ -117,22 +140,26 @@ show_status() {
 }
 
 stop_service_if_requested() {
+  local active_service_list=()
   if [[ "${STOP_SERVICE}" -ne 1 ]]; then
     return 0
   fi
-  if ! service_active; then
-    log "${SERVICE_NAME}.service is not active."
+  mapfile -t active_service_list < <(active_services)
+  if [[ "${#active_service_list[@]}" -eq 0 ]]; then
+    log "No installed Autark-OS service is active."
     return 0
   fi
-  command_exists sudo || die "sudo is required to stop ${SERVICE_NAME}.service."
-  log "Stopping ${SERVICE_NAME}.service so dev mode can use port ${PORT}."
-  sudo systemctl stop "${SERVICE_NAME}.service"
+  command_exists sudo || die "sudo is required to stop ${active_service_list[*]}."
+  log "Stopping ${active_service_list[*]} so dev mode can use port ${PORT}."
+  sudo systemctl stop "${active_service_list[@]}"
 }
 
 explain_conflict() {
   log "Port ${PORT} is already in use."
   if service_active; then
-    log "${SERVICE_NAME}.service is active and is likely holding the production backend port."
+    local active_service_list=()
+    mapfile -t active_service_list < <(active_services)
+    log "${active_service_list[*]} is active and is likely holding the production backend port."
     log "Choose one workflow:"
     log "  1. Stop production for this dev session: ./scripts/dev-backend.sh --stop-service"
     log "  2. Keep production running and use another port: ./scripts/dev-backend.sh --auto-port"
