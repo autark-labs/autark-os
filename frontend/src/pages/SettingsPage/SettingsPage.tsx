@@ -155,7 +155,7 @@ function SettingsPage({
       {sectionsForGroup(activeGroupId).map((sectionId) => (
         <SettingsPanelBySection
           advancedChecks={advancedChecks}
-          apps={appState.apps}
+          apps={appState.applications.flatMap((application) => application.relationship === 'managed' && application.runtime ? [application.runtime] : [])}
           backupDestination={state.backupDestination}
           backupSchedule={state.backupSchedule}
           copied={copied}

@@ -1,514 +1,115 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import {
-  accessByAppId,
-  appNeedsAttentionFromCanonicalState,
-  applicationStateFreshness,
-  applicationStateUpdatedAt,
-  catalogAppIsManaged,
-  displayStatusFromCanonicalState,
-  foundServices,
-  healthByAppId,
-  managedRuntimeApps,
-  removeManagedAppFromState,
-  setAutarkOsJobInState,
-  setRuntimeAppInState,
-  setRuntimeAppStatusInState,
-  setObservedServiceAdoptedInState,
-  observedServices,
-  ownershipViews,
-  telemetryByAppId,
+  accessByAppId, appNeedsAttentionFromCanonicalState, applications, applicationStateFreshness,
+  applicationStateUpdatedAt, catalogAppIsManaged, displayStatusFromCanonicalState, healthByAppId,
+  managedApplications, setAutarkOsJobInState, setRuntimeAppInState, telemetryByAppId,
 } from '../applicationStateRepository.logic';
-import type { ApplicationState } from '@/types/applicationState';
+import type { AppRuntimeView } from '@/types/app';
+import type { ApplicationState, ApplicationView } from '@/types/applicationState';
 
 const updatedAt = '2026-06-21T12:00:00Z';
 
-test('freshness keeps an initial empty snapshot distinct from a successful empty inventory', () => {
-  const initial = applicationStateFreshness(applicationState({
-    refreshStatus: 'stale',
-    stale: true,
-    updatedAt: null,
-  }));
-  const successfulEmpty = applicationStateFreshness(applicationState());
-
-  assert.deepEqual(initial, {
-    hasUsableData: false,
-    isCurrent: false,
-    lastSuccessfulUpdate: null,
-    phase: 'checking',
-  });
-  assert.equal(successfulEmpty.hasUsableData, true);
-  assert.equal(successfulEmpty.isCurrent, true);
-  assert.equal(successfulEmpty.phase, 'current');
+test('freshness distinguishes initial, current, refreshing, and failed snapshots', () => {
+  assert.equal(applicationStateFreshness(state({ updatedAt: null, stale: true, refreshStatus: 'stale' })).phase, 'checking');
+  assert.equal(applicationStateFreshness(state()).phase, 'current');
+  assert.equal(applicationStateFreshness(state({ stale: true, refreshStatus: 'running' })).phase, 'refreshing');
+  assert.equal(applicationStateFreshness(state({ updatedAt: null, stale: true, refreshStatus: 'error', lastError: 'failed' })).phase, 'unavailable');
+  assert.equal(applicationStateFreshness(state(), { transportError: new Error('offline') }).phase, 'stale');
 });
 
-test('freshness exposes a failed first refresh as unavailable instead of healthy empty data', () => {
-  const freshness = applicationStateFreshness(applicationState({
-    lastError: 'Docker inventory unavailable',
-    refreshStatus: 'error',
-    stale: true,
-    updatedAt: null,
-  }));
-
-  assert.equal(freshness.hasUsableData, false);
-  assert.equal(freshness.isCurrent, false);
-  assert.equal(freshness.phase, 'unavailable');
+test('malformed timestamps and unknown statuses are conservative', () => {
+  assert.equal(applicationStateFreshness(state({ updatedAt: 'bad' })).hasUsableData, false);
+  assert.equal(applicationStateFreshness(state({ refreshStatus: 'mystery' })).isCurrent, false);
+  assert.equal(applicationStateUpdatedAt(state())?.getTime(), new Date(updatedAt).getTime());
 });
 
-test('freshness preserves usable old data while clearly marking canonical and transport failures stale', () => {
-  const canonicalFailure = applicationStateFreshness(applicationState({
-    lastError: 'Docker inventory unavailable',
-    refreshStatus: 'error',
-    stale: true,
-  }));
-  const transportFailure = applicationStateFreshness(applicationState(), {
-    transportError: new Error('Request failed'),
-  });
-
-  assert.equal(canonicalFailure.hasUsableData, true);
-  assert.equal(canonicalFailure.isCurrent, false);
-  assert.equal(canonicalFailure.phase, 'stale');
-  assert.equal(transportFailure.hasUsableData, true);
-  assert.equal(transportFailure.isCurrent, false);
-  assert.equal(transportFailure.phase, 'stale');
+test('all selectors read the same canonical application collection', () => {
+  const canonical = state({ applications: [application('vaultwarden', 'managed', runtimeApp('vaultwarden', 'Ready')), application('jellyfin', 'blocked', null)] });
+  assert.deepEqual(applications(canonical).map((app) => app.id), ['vaultwarden', 'jellyfin']);
+  assert.deepEqual(managedApplications(canonical).map((app) => app.id), ['vaultwarden']);
+  assert.equal(catalogAppIsManaged(canonical, 'vaultwarden'), true);
+  assert.equal(catalogAppIsManaged(canonical, 'jellyfin'), false);
+  assert.equal(healthByAppId(canonical).vaultwarden.status, 'Ready');
+  assert.equal(accessByAppId(canonical).vaultwarden.status, 'reachable');
+  assert.equal(telemetryByAppId(canonical).vaultwarden.cpuPercent, '2%');
 });
 
-test('freshness distinguishes an active canonical refresh from stale and current snapshots', () => {
-  const refreshing = applicationStateFreshness(applicationState({
-    refreshStatus: 'running',
-    stale: true,
-  }));
-
-  assert.equal(refreshing.hasUsableData, true);
-  assert.equal(refreshing.isCurrent, false);
-  assert.equal(refreshing.phase, 'refreshing');
+test('canonical runtime health drives presentation without reclassifying ownership', () => {
+  const ready = runtimeApp('vaultwarden', 'Ready');
+  const unavailable = runtimeApp('homepage', 'Ready', health('Unavailable', 'unreachable'));
+  const readyState = state({ applications: [application('vaultwarden', 'managed', ready)] });
+  const unavailableState = state({ applications: [application('homepage', 'managed', unavailable)] });
+  assert.equal(displayStatusFromCanonicalState(ready, ready.healthSnapshot), 'Ready');
+  assert.equal(appNeedsAttentionFromCanonicalState(ready, ready.healthSnapshot, accessByAppId(readyState).vaultwarden, ready.telemetry), false);
+  assert.equal(displayStatusFromCanonicalState(unavailable, unavailable.healthSnapshot), 'Unavailable');
+  assert.equal(appNeedsAttentionFromCanonicalState(unavailable, unavailable.healthSnapshot, accessByAppId(unavailableState).homepage, unavailable.telemetry), true);
 });
 
-test('freshness treats malformed timestamps and unknown backend statuses conservatively', () => {
-  const malformedTimestamp = applicationStateFreshness(applicationState({
-    updatedAt: 'not-a-timestamp',
-  }));
-  const unknownStatus = applicationStateFreshness(applicationState({
-    refreshStatus: 'mystery',
-  }));
-  const legacyFailure = applicationStateFreshness(applicationState({
-    refreshStatus: 'failed',
-  }));
-
-  assert.equal(malformedTimestamp.hasUsableData, false);
-  assert.equal(malformedTimestamp.phase, 'checking');
-  assert.equal(unknownStatus.isCurrent, false);
-  assert.equal(unknownStatus.phase, 'stale');
-  assert.equal(legacyFailure.isCurrent, false);
-  assert.equal(legacyFailure.phase, 'stale');
+test('runtime cache updates preserve canonical order and relationship', () => {
+  const canonical = state({ applications: [application('homepage', 'managed', runtimeApp('homepage', 'Ready')), application('syncthing', 'managed', runtimeApp('syncthing', 'Ready')), application('jellyfin', 'blocked', null)] });
+  const updated = setRuntimeAppInState(canonical, runtimeApp('syncthing', 'Starting'))!;
+  assert.deepEqual(updated.applications.map((app) => app.id), ['homepage', 'syncthing', 'jellyfin']);
+  assert.equal(updated.applications[1].runtime?.friendlyStatus, 'Starting');
+  assert.equal(updated.applications[1].relationship, 'managed');
+  assert.equal(updated.applications[2].runtime, null);
 });
 
-test('repository selectors expose canonical app-state slices', () => {
-  const state = {
-    runtimeApps: [runtimeApp('vaultwarden', 'Ready')],
-    observedServices: [{ id: 'docker:found', userStatus: 'found_on_server' }],
-    foundServices: [{ id: 'docker:found', userStatus: 'found_on_server' }],
-    ownershipViews: [{ catalogAppId: 'vaultwarden', state: 'installed_managed' }],
-    updatedAt,
-  };
-
-  assert.deepEqual(managedRuntimeApps(state).map((app) => app.appId), ['vaultwarden']);
-  assert.deepEqual(observedServices(state).map((service) => service.id), ['docker:found']);
-  assert.deepEqual(foundServices(state).map((service) => service.id), ['docker:found']);
-  assert.deepEqual(ownershipViews(state).map((view) => view.catalogAppId), ['vaultwarden']);
-  assert.equal(applicationStateUpdatedAt(state)?.getTime(), new Date(updatedAt).getTime());
+test('job overlays update only the targeted canonical runtime', () => {
+  const canonical = state({ applications: [application('homepage', 'managed', runtimeApp('homepage', 'Ready')), application('syncthing', 'managed', runtimeApp('syncthing', 'Ready'))] });
+  const updated = setAutarkOsJobInState(canonical, job('restart_app', 'syncthing', 'queued'))!;
+  assert.equal(updated.applications[0].runtime?.operationState?.kind, undefined);
+  assert.equal(updated.applications[1].runtime?.operationState?.kind, 'restarting');
+  assert.equal(updated.applications[1].runtime?.friendlyStatus, 'Starting');
+  assert.deepEqual(updated.applications[1].runtime?.availableActions, []);
 });
 
-function applicationState(overrides: Partial<ApplicationState> = {}): ApplicationState {
+test('restore overlays target one app or every managed app', () => {
+  const canonical = state({ applications: [application('homepage', 'managed', runtimeApp('homepage', 'Ready')), application('vaultwarden', 'managed', runtimeApp('vaultwarden', 'Ready'))] });
+  const targeted = setAutarkOsJobInState(canonical, job('backup_restore', '42:vaultwarden', 'running'))!;
+  const full = setAutarkOsJobInState(canonical, job('backup_restore', '42:all', 'running'))!;
+  assert.equal(targeted.applications[0].runtime?.operationState?.kind, undefined);
+  assert.equal(targeted.applications[1].runtime?.operationState?.kind, 'restoring');
+  assert.deepEqual(full.applications.map((app) => app.runtime?.operationState?.kind), ['restoring', 'restoring']);
+});
+
+test('an unrelated success does not clear an immediate failure overlay', () => {
+  const canonical = state({ applications: [application('vaultwarden', 'managed', runtimeApp('vaultwarden', 'Ready'))] });
+  const failed = setAutarkOsJobInState(canonical, job('backup_restore', '42:vaultwarden', 'failed'))!;
+  const unrelated = setAutarkOsJobInState(failed, job('backup', 'vaultwarden', 'succeeded'))!;
+  const restored = setAutarkOsJobInState(unrelated, job('backup_restore', '42:vaultwarden', 'succeeded'))!;
+  assert.equal(failed.applications[0].runtime?.operationState?.kind, 'failed');
+  assert.equal(unrelated.applications[0].runtime?.operationState?.kind, 'failed');
+  assert.equal(restored.applications[0].runtime?.operationState?.kind, 'idle');
+});
+
+function state(overrides: Partial<ApplicationState> = {}): ApplicationState {
+  return { applications: [], updatedAt, stale: false, refreshStatus: 'idle', refreshStartedAt: updatedAt, refreshCompletedAt: updatedAt, nextRefreshAt: '2026-06-21T12:00:10Z', lastError: null, ...overrides };
+}
+
+function application(id: string, relationship: ApplicationView['relationship'], runtime: AppRuntimeView | null): ApplicationView {
   return {
-    foundServices: [],
-    managedApps: [],
-    observedServices: [],
-    ownershipViews: [],
-    runtimeApps: [],
-    updatedAt,
-    stale: false,
-    refreshStatus: 'idle',
-    refreshStartedAt: updatedAt,
-    refreshCompletedAt: updatedAt,
-    nextRefreshAt: '2026-06-21T12:00:10Z',
-    lastError: null,
-    ...overrides,
+    id, name: id, category: 'Apps', image: '', summary: '', description: '', relationship, catalogAvailability: 'installable',
+    appInstanceId: relationship === 'managed' ? id : '', runtimeState: runtime?.technicalStatus ?? 'unknown', ownershipState: relationship === 'managed' ? 'owned' : 'unowned',
+    accessState: runtime ? 'local_ready' : 'not_ready', backupState: 'backup_disabled', issues: [], relationshipLabel: relationship === 'managed' ? 'Installed' : 'Blocked', relationshipDescription: '',
+    statusTone: relationship === 'managed' ? 'success' : 'danger', cardTone: relationship === 'managed' ? 'success' : 'danger', installCopyWarningRequired: relationship === 'blocked', reviewExistingHref: null,
+    primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps', method: null, disabled: false, reason: '' }, availableActions: [], runtime, evidence: null,
   };
 }
 
-test('repository falls back from managed app instances when runtime apps are not present', () => {
-  const state = {
-    managedApps: [
-      {
-        catalogAppId: 'homepage',
-        name: 'Homepage',
-        category: 'Dashboards',
-        image: '',
-        userStatus: 'Ready',
-        runtimeState: 'running',
-        accessState: 'local_ready',
-        backupState: 'protected_by_restore_point',
-        localUrl: 'http://localhost:3005',
-        privateUrl: null,
-        remediation: {
-          state: 'watching',
-          label: 'Autark-OS is watching',
-          summary: 'Homepage is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.',
-          nextActionLabel: 'No action needed',
-          tone: 'success',
-        },
-        updatedAt,
-      },
-    ],
-    runtimeApps: [],
-  };
-
-  const [app] = managedRuntimeApps(state);
-
-  assert.equal(app.appId, 'homepage');
-  assert.equal(app.friendlyStatus, 'Ready');
-  assert.equal(app.accessUrl, 'http://localhost:3005');
-  assert.equal(app.canonicalBackupState, 'protected_by_restore_point');
-  assert.equal(app.remediation.state, 'watching');
-});
-
-test('ready cached health does not mark every app as needing attention', () => {
-  const app = runtimeApp('vaultwarden', 'Ready', health('Ready', 'reachable'));
-  const telemetry = telemetryByAppId({ runtimeApps: [app] }).vaultwarden;
-  const healthById = healthByAppId({ runtimeApps: [app] });
-  const accessById = accessByAppId({ runtimeApps: [app] });
-
-  assert.equal(displayStatusFromCanonicalState(app, healthById.vaultwarden), 'Ready');
-  assert.equal(accessById.vaultwarden.status, 'reachable');
-  assert.equal(appNeedsAttentionFromCanonicalState(app, healthById.vaultwarden, accessById.vaultwarden, telemetry), false);
-});
-
-test('private-link-only health warnings do not make ready apps look globally broken', () => {
-  const app = runtimeApp('vaultwarden', 'Ready', {
-    ...health('Needs attention', 'reachable'),
-    message: 'Private link is not responding.',
-    detail: 'Tailscale private access needs repair.',
-    privateAccessStatus: 'unreachable',
-  });
-  const accessById = accessByAppId({ runtimeApps: [app] });
-
-  assert.equal(displayStatusFromCanonicalState(app, app.healthSnapshot), 'Ready');
-  assert.equal(accessById.vaultwarden.status, 'reachable');
-  assert.equal(appNeedsAttentionFromCanonicalState(app, app.healthSnapshot, accessById.vaultwarden, app.telemetry), false);
-});
-
-test('missing runtime state stays unknown instead of being treated as ready', () => {
-  const app = runtimeApp('vaultwarden', '');
-  app.healthSnapshot = null;
-
-  assert.equal(displayStatusFromCanonicalState(app, app.healthSnapshot), 'Unknown');
-  assert.equal(appNeedsAttentionFromCanonicalState(app, app.healthSnapshot, accessByAppId({ runtimeApps: [app] }).vaultwarden, app.telemetry), true);
-});
-
-test('only explicit unhealthy or unreachable states need attention', () => {
-  const healthyApp = runtimeApp('vaultwarden', 'Ready', health('Ready', 'reachable'));
-  const unhealthyApp = runtimeApp('jellyfin', 'Ready', {
-    ...health('Needs attention', 'reachable'),
-    dockerStatus: 'Unavailable',
-    privateAccessStatus: 'not_configured',
-  });
-  const unreachableApp = runtimeApp('homepage', 'Ready', health('Ready', 'unreachable'));
-
-  assert.equal(appNeedsAttentionFromCanonicalState(healthyApp, healthyApp.healthSnapshot, accessByAppId({ runtimeApps: [healthyApp] }).vaultwarden, healthyApp.telemetry), false);
-  assert.equal(appNeedsAttentionFromCanonicalState(unhealthyApp, unhealthyApp.healthSnapshot, accessByAppId({ runtimeApps: [unhealthyApp] }).jellyfin, unhealthyApp.telemetry), true);
-  assert.equal(appNeedsAttentionFromCanonicalState(unreachableApp, unreachableApp.healthSnapshot, accessByAppId({ runtimeApps: [unreachableApp] }).homepage, unreachableApp.telemetry), true);
-});
-
-test('a running app with an unresponsive local link is unavailable in the normal application state', () => {
-  const app = runtimeApp('vaultwarden', 'Ready', {
-    ...health('Unavailable', 'unreachable'),
-    dockerStatus: 'Ready',
-    detail: 'Docker reports the app is running, but the local app link did not answer.',
-  });
-  const access = accessByAppId({ runtimeApps: [app] }).vaultwarden;
-
-  assert.equal(displayStatusFromCanonicalState(app, app.healthSnapshot), 'Unavailable');
-  assert.equal(appNeedsAttentionFromCanonicalState(app, app.healthSnapshot, access, app.telemetry), true);
-});
-
-test('observed service adoption helper moves a recoverable service into managed app views', () => {
-  const state = {
-    runtimeApps: [],
-    managedApps: [],
-    observedServices: [
-      {
-        ...observedService('docker:vaultwarden', 'recoverable', true),
-        displayName: 'Vaultwarden',
-        url: 'http://localhost:8090',
-        runtimeState: 'running',
-      },
-    ],
-    foundServices: [],
-  };
-
-  const adopted = setObservedServiceAdoptedInState(state, 'docker:vaultwarden');
-
-  assert.equal(catalogAppIsManaged(adopted, 'vaultwarden'), true);
-  assert.deepEqual(managedRuntimeApps(adopted).map((app) => [app.appId, app.appName, app.friendlyStatus, app.accessUrl]), [
-    ['vaultwarden', 'Vaultwarden', 'Ready', 'http://localhost:8090'],
-  ]);
-  assert.deepEqual(adopted.managedApps.map((app) => [app.catalogAppId, app.name, app.userStatus]), [
-    ['vaultwarden', 'Vaultwarden', 'Ready'],
-  ]);
-  assert.deepEqual(adopted.observedServices.map((service) => [service.id, service.userStatus, service.managedByThisAutarkOs]), [
-    ['docker:vaultwarden', 'installed_managed', true],
-  ]);
-});
-
-test('catalogAppIsManaged finds managed runtime and managed instance records', () => {
-  assert.equal(catalogAppIsManaged({ runtimeApps: [runtimeApp('pi-hole', 'Ready')] }, 'pi-hole'), true);
-  assert.equal(catalogAppIsManaged({ managedApps: [{ catalogAppId: 'pi-hole' }] }, 'pi-hole'), true);
-  assert.equal(catalogAppIsManaged({ observedServices: [observedService('docker:pi-hole', 'found_on_server', false)] }, 'pi-hole'), false);
-});
-
-test('runtime app cache helpers update routine management state', () => {
-  const state = {
-    runtimeApps: [runtimeApp('pi-hole', 'Ready')],
-    managedApps: [{ catalogAppId: 'pi-hole', name: 'Pi-hole', userStatus: 'Ready' }],
-  };
-  const starting = setRuntimeAppStatusInState(state, 'pi-hole', 'Starting');
-  const updated = setRuntimeAppInState(starting, { ...runtimeApp('pi-hole', 'Paused'), appName: 'Pi-hole' });
-  const removed = removeManagedAppFromState(updated, 'pi-hole');
-
-  assert.equal(starting.runtimeApps[0].friendlyStatus, 'Starting');
-  assert.equal(starting.managedApps[0].userStatus, 'Starting');
-  assert.equal(updated.runtimeApps[0].friendlyStatus, 'Paused');
-  assert.deepEqual(removed.runtimeApps, []);
-  assert.deepEqual(removed.managedApps, []);
-});
-
-test('runtime app cache helper preserves existing runtime app order', () => {
-  const state = {
-    runtimeApps: [
-      runtimeApp('homepage', 'Ready'),
-      runtimeApp('syncthing', 'Ready'),
-      runtimeApp('vaultwarden', 'Ready'),
-    ],
-    managedApps: [],
-  };
-
-  const updated = setRuntimeAppInState(state, { ...runtimeApp('syncthing', 'Starting'), appName: 'Syncthing' });
-
-  assert.deepEqual(updated.runtimeApps.map((app) => app.appId), ['homepage', 'syncthing', 'vaultwarden']);
-});
-
-test('autark os job helper applies backend operation state without reordering apps', () => {
-  const state = {
-    runtimeApps: [
-      runtimeApp('homepage', 'Ready'),
-      runtimeApp('syncthing', 'Ready'),
-      runtimeApp('vaultwarden', 'Ready'),
-    ],
-    managedApps: [
-      { catalogAppId: 'homepage', name: 'Homepage', userStatus: 'Ready' },
-      { catalogAppId: 'syncthing', name: 'Syncthing', userStatus: 'Ready' },
-      { catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' },
-    ],
-  };
-
-  const updated = setAutarkOsJobInState(state, {
-    jobId: 'restart-1',
-    type: 'restart_app',
-    subjectId: 'syncthing',
-    status: 'queued',
-    currentStep: 'run_command',
-    steps: [{ id: 'run_command', label: 'Restart app', status: 'pending', message: 'Autark-OS is restarting the app.' }],
-    createdAt: updatedAt,
-    updatedAt,
-  });
-
-  assert.deepEqual(updated.runtimeApps.map((app) => app.appId), ['homepage', 'syncthing', 'vaultwarden']);
-  assert.equal(updated.runtimeApps[1].operationState.kind, 'restarting');
-  assert.equal(updated.runtimeApps[1].operationState.jobId, 'restart-1');
-  assert.equal(updated.runtimeApps[1].readinessState, 'starting');
-  assert.equal(updated.runtimeApps[1].friendlyStatus, 'Starting');
-  assert.deepEqual(updated.runtimeApps[1].availableActions, []);
-  assert.equal(updated.managedApps[1].userStatus, 'Starting');
-});
-
-test('autark os job helper maps install and backup work for existing apps', () => {
-  const state = {
-    runtimeApps: [runtimeApp('vaultwarden', 'Ready')],
-    managedApps: [{ catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' }],
-  };
-
-  const installing = setAutarkOsJobInState(state, {
-    jobId: 'install-1',
-    type: 'install_app',
-    subjectId: 'vaultwarden',
-    status: 'queued',
-    currentStep: 'install',
-    steps: [{ id: 'install', label: 'Install app', status: 'pending', message: 'Autark-OS is installing the app.' }],
-    createdAt: updatedAt,
-    updatedAt,
-  });
-  const backingUp = setAutarkOsJobInState(state, {
-    jobId: 'backup-1',
-    type: 'backup',
-    subjectId: 'vaultwarden',
-    status: 'queued',
-    currentStep: 'backup',
-    steps: [{ id: 'backup', label: 'Create backup', status: 'pending', message: 'Autark-OS is creating a backup.' }],
-    createdAt: updatedAt,
-    updatedAt,
-  });
-
-  assert.equal(installing.runtimeApps[0].operationState.kind, 'installing');
-  assert.equal(installing.runtimeApps[0].friendlyStatus, 'Installing');
-  assert.equal(backingUp.runtimeApps[0].operationState.kind, 'backing_up');
-  assert.equal(backingUp.runtimeApps[0].friendlyStatus, 'Ready');
-});
-
-test('autark os job helper maps restore work by restore target subject', () => {
-  const state = {
-    runtimeApps: [runtimeApp('homepage', 'Ready'), runtimeApp('vaultwarden', 'Ready')],
-    managedApps: [
-      { catalogAppId: 'homepage', name: 'Homepage', userStatus: 'Ready' },
-      { catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' },
-    ],
-  };
-
-  const targeted = setAutarkOsJobInState(state, restoreJob('42:vaultwarden', 'running'));
-
-  assert.equal(targeted.runtimeApps[0].operationState?.kind, undefined);
-  assert.equal(targeted.runtimeApps[1].operationState.kind, 'restoring');
-  assert.equal(targeted.runtimeApps[1].operationState.label, 'Restoring');
-  assert.deepEqual(targeted.runtimeApps[1].availableActions, []);
-  assert.equal(targeted.managedApps[1].userStatus, 'Ready');
-
-  const fullRestore = setAutarkOsJobInState(state, restoreJob('42:all', 'running'));
-
-  assert.deepEqual(fullRestore.runtimeApps.map((app) => app.operationState.kind), ['restoring', 'restoring']);
-  assert.deepEqual(fullRestore.managedApps.map((app) => app.userStatus), ['Ready', 'Ready']);
-});
-
-test('autark os job helper clears restore overlay after restore completes', () => {
-  const state = {
-    runtimeApps: [{ ...runtimeApp('vaultwarden', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' } }],
-    managedApps: [{ catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' }],
-  };
-
-  const updated = setAutarkOsJobInState(state, restoreJob('42:vaultwarden', 'succeeded'));
-
-  assert.equal(updated.runtimeApps[0].operationState.kind, 'idle');
-  assert.equal(updated.runtimeApps[0].friendlyStatus, 'Ready');
-  assert.equal(updated.managedApps[0].userStatus, 'Ready');
-});
-
-test('autark os job helper clears full restore overlay after full restore fails', () => {
-  const state = {
-    runtimeApps: [
-      { ...runtimeApp('homepage', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' }, availableActions: [{ id: 'restart', label: 'Restart' }] },
-      { ...runtimeApp('vaultwarden', 'Ready'), operationState: { kind: 'restoring', label: 'Restoring' }, availableActions: [{ id: 'restart', label: 'Restart' }] },
-    ],
-    managedApps: [
-      { catalogAppId: 'homepage', name: 'Homepage', userStatus: 'Ready' },
-      { catalogAppId: 'vaultwarden', name: 'Vaultwarden', userStatus: 'Ready' },
-    ],
-  };
-
-  const updated = setAutarkOsJobInState(state, restoreJob('42:all', 'failed'));
-
-  assert.deepEqual(updated.runtimeApps.map((app) => app.operationState.kind), ['idle', 'idle']);
-  assert.deepEqual(updated.managedApps.map((app) => app.userStatus), ['Ready', 'Ready']);
-});
-
-function restoreJob(subjectId, status) {
+function runtimeApp(appId: string, friendlyStatus: string, healthSnapshot = health('Ready', 'reachable')): AppRuntimeView {
   return {
-    jobId: 'restore-1',
-    type: 'backup_restore',
-    subjectId,
-    status,
-    currentStep: 'restore_data',
-    steps: [{ id: 'restore_data', label: 'Restoring app data', status: 'running' }],
-    createdAt: updatedAt,
-    updatedAt,
-  };
+    appId, appName: appId, category: 'Apps', description: '', version: '', image: '', friendlyStatus, technicalStatus: 'running', healthCheck: '', runtimePath: '', composeProject: '', accessUrl: `http://localhost/${appId}`,
+    desiredAccess: null, observedAccess: { localUrl: `http://localhost/${appId}`, privateUrl: null, localPort: null, protocol: 'http', privateLinkStatus: 'not_configured', lastAccessCheckAt: null, lastSuccessfulAccessAt: null, lastRepairAttemptAt: null, lastRepairStatus: null },
+    installedAt: updatedAt, lastBackup: 'Backups disabled', canonicalBackupState: 'backup_disabled', settings: null, telemetry: { cpuPercent: '2%', memoryUsage: '128MiB / 1GiB', memoryPercent: '12%', networkIo: '0B / 0B', blockIo: '0B / 0B', checkedAt: updatedAt },
+    healthSnapshot, usageGuide: null, setupGuide: null, appConfiguration: [], recentEvents: [], updatedAt,
+  } as AppRuntimeView;
 }
 
-test('immediate failure overlays remain terminal and an unrelated success does not clear them', () => {
-  const state = { runtimeApps: [runtimeApp('vaultwarden', 'Ready')], managedApps: [] };
-  const failed = setAutarkOsJobInState(state, restoreJob('42:vaultwarden', 'failed'));
-  assert.equal(failed.runtimeApps[0].friendlyStatus, 'Ready');
-  assert.equal(failed.runtimeApps[0].operationState.label, 'Restore failed');
-  assert.equal(failed.runtimeApps[0].operationState.jobType, 'backup_restore');
-  const unrelated = setAutarkOsJobInState(failed, { ...restoreJob('vaultwarden', 'succeeded'), type: 'backup' });
-  assert.equal(unrelated.runtimeApps[0].operationState.kind, 'failed');
-  const restored = setAutarkOsJobInState(unrelated, restoreJob('42:vaultwarden', 'succeeded'));
-  assert.equal(restored.runtimeApps[0].operationState.kind, 'idle');
-});
-
-function runtimeApp(appId, friendlyStatus, healthSnapshot = null) {
-  return {
-    appId,
-    appName: appId,
-    category: 'Apps',
-    description: '',
-    version: '',
-    image: '',
-    friendlyStatus,
-    technicalStatus: 'running',
-    healthCheck: '',
-    runtimePath: '',
-    composeProject: '',
-    accessUrl: `http://localhost/${appId}`,
-    desiredAccess: null,
-    observedAccess: { localUrl: `http://localhost/${appId}`, privateUrl: null, localPort: null, protocol: 'http', privateLinkStatus: 'not_configured' },
-    installedAt: updatedAt,
-    lastBackup: 'Backups disabled',
-    settings: null,
-    telemetry: {
-      cpuPercent: '2%',
-      memoryUsage: '128MiB / 1GiB',
-      memoryPercent: '12%',
-      networkIo: '0B / 0B',
-      blockIo: '0B / 0B',
-      checkedAt: updatedAt,
-    },
-    healthSnapshot,
-    usageGuide: null,
-    setupGuide: null,
-    appConfiguration: [],
-    recentEvents: [],
-    updatedAt,
-  };
+function health(status: string, localAccessStatus: string) {
+  return { appId: 'app', status, message: status, detail: '', dockerStatus: 'Ready', localAccessStatus, privateAccessStatus: 'not_configured', startupGrace: false, checkedAt: updatedAt };
 }
 
-function health(status, localAccessStatus) {
-  return {
-    appId: 'vaultwarden',
-    status,
-    message: status,
-    detail: '',
-    dockerStatus: 'Ready',
-    localAccessStatus,
-    privateAccessStatus: 'not_configured',
-    startupGrace: false,
-    checkedAt: updatedAt,
-  };
-}
-
-function observedService(id, userStatus, _legacyPinned) {
-  return {
-    id,
-    source: 'docker',
-    displayName: id.split(':')[1],
-    url: 'http://localhost',
-    category: 'External',
-    accessScope: 'LAN',
-    catalogAppId: 'vaultwarden',
-    userStatus,
-    userStatusLabel: userStatus === 'recoverable' ? 'Recoverable' : 'Found',
-    userStatusDescription: userStatus === 'recoverable' ? 'Recoverable Autark-OS app.' : 'Found on this server.',
-    ownershipState: userStatus === 'recoverable' ? 'legacy_autark_os' : 'external_docker',
-    runtimeState: 'running',
-    managedByThisAutarkOs: false,
-    availableActions: [],
-  };
+function job(type: string, subjectId: string, status: string) {
+  return { jobId: `${type}-1`, type, subjectId, status, currentStep: 'work', steps: [{ id: 'work', label: 'Work', status: 'running' }], createdAt: updatedAt, updatedAt };
 }

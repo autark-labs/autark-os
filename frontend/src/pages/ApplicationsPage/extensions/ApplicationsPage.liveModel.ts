@@ -1,9 +1,5 @@
-import {
-  appNeedsAttentionFromCanonicalState,
-  displayStatusFromCanonicalState,
-  type ApplicationStateRepositoryView,
-} from '@/repositories/applicationStateRepository';
-import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
+import type { AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
+import type { ApplicationView } from '@/types/applicationState';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import type {
   AppAttentionState,
@@ -14,41 +10,35 @@ import type {
   ApplicationSurfaceItem,
 } from './ApplicationsPage.types';
 
-type ApplicationSurfaceInput = Pick<
-  ApplicationStateRepositoryView,
-  'accessByAppId' | 'apps' | 'healthByAppId' | 'telemetryByAppId'
->;
+type ApplicationSurfaceInput = { applications: ApplicationView[] };
 
 export function buildApplicationSurfaceItems({
-  accessByAppId,
-  apps,
-  healthByAppId,
-  telemetryByAppId,
+  applications,
 }: ApplicationSurfaceInput): ApplicationSurfaceItem[] {
-  return apps.map((app) => managedAppSurfaceItem(
-      app,
-      healthByAppId[app.appId] ?? app.healthSnapshot,
-      accessByAppId[app.appId],
-      telemetryByAppId[app.appId] ?? app.telemetry,
-    )).slice().sort(compareSurfaceItems);
+  return applications
+    .filter((application): application is ApplicationView & { runtime: AppRuntimeView } => application.relationship === 'managed' && Boolean(application.runtime))
+    .map(managedAppSurfaceItem)
+    .slice()
+    .sort(compareSurfaceItems);
 }
 
-function managedAppSurfaceItem(
-  app: AppRuntimeView,
-  health?: AppHealthSnapshot | null,
-  access?: AppAccessCheck,
-  telemetry?: AppTelemetry | null,
-): ApplicationSurfaceItem {
-  const displayStatus = displayStatusFromCanonicalState(app, health);
-  const backup = backupLabel(app);
-  const needsAttention = appNeedsAttentionFromCanonicalState(app, health, access, telemetry);
-  const managementState = backendManagementState(app.managementState ?? 'managed');
-  const readinessState = backendReadinessState(app.readinessState ?? managedReadinessState(displayStatus, app, access));
-  const attentionState = backendAttentionState(app.attentionState ?? managedAttentionState(displayStatus, app, needsAttention));
+function managedAppSurfaceItem(application: ApplicationView & { runtime: AppRuntimeView }): ApplicationSurfaceItem {
+  const app = application.runtime;
+  const health = app.healthSnapshot;
+  const telemetry = app.telemetry;
+  const displayStatus = app.friendlyStatus || 'Unknown';
+  const backup = backupLabel(application);
+  const managementState = 'managed';
+  const readinessState = backendReadinessState(app.readinessState ?? application.runtimeState);
+  const attentionState = backendAttentionState(app.attentionState ?? (
+    application.issues.length > 0 || readinessState === 'unknown' || readinessState === 'unreachable'
+      ? 'needs_review'
+      : 'none'
+  ));
   const status = managedStatus(displayStatus, app);
 
   return {
-    access: accessLabel(app, access),
+    access: accessLabel(application, app),
     attentionState,
     availableActions: (app.availableActions ?? []).map((action) => ({
       id: action.id,
@@ -68,7 +58,7 @@ function managedAppSurfaceItem(
     links: appLinks(app),
     managementState,
     name: app.appName,
-    nextAction: managedNextAction(app, readinessState, attentionState),
+    nextAction: managedNextAction(application, app, readinessState, attentionState),
     operationState: backendOperationState(app.operationState),
     readinessState,
     runtime: appRuntimeDetails(app, health, telemetry),
@@ -103,45 +93,6 @@ function managedStatus(displayStatus: string, app: AppRuntimeView): ApplicationS
     return 'Needs review';
   }
   return 'Ready';
-}
-
-function managedReadinessState(displayStatus: string, app: AppRuntimeView, access?: AppAccessCheck): AppReadinessState {
-  if (displayStatus === 'Starting') {
-    return 'starting';
-  }
-  if (displayStatus === 'Paused') {
-    return 'paused';
-  }
-  if (displayStatus === 'Stopped' || app.friendlyStatus === 'Stopped' || app.canonicalRuntimeState === 'stopped') {
-    return 'stopped';
-  }
-  if (displayStatus === 'Unavailable' || access?.status === 'unreachable') {
-    return 'unreachable';
-  }
-  if (displayStatus === 'Missing' || displayStatus === 'Managed elsewhere' || displayStatus === 'Unknown') {
-    return 'unknown';
-  }
-  return 'ready';
-}
-
-function managedAttentionState(displayStatus: string, app: AppRuntimeView, needsAttention: boolean): AppAttentionState {
-  if (displayStatus === 'Managed elsewhere') {
-    return 'conflict';
-  }
-  if (displayStatus === 'Missing' || app.canonicalIssues?.some((issue) => issue.severity === 'error')) {
-    return 'blocked';
-  }
-  if (needsAttention || displayStatus === 'Needs attention' || displayStatus === 'Unavailable' || displayStatus === 'Unknown') {
-    return 'needs_review';
-  }
-  return 'none';
-}
-
-function backendManagementState(value: string): ApplicationSurfaceItem['managementState'] {
-  if (value === 'managed') {
-    return value;
-  }
-  return 'managed';
 }
 
 function backendReadinessState(value: string): AppReadinessState {
@@ -217,6 +168,7 @@ function managedRuntimeState(status: ApplicationSurfaceItem['status'], app: AppR
 }
 
 function managedNextAction(
+  application: ApplicationView,
   app: AppRuntimeView,
   readinessState: AppReadinessState,
   attentionState: AppAttentionState,
@@ -231,13 +183,13 @@ function managedNextAction(
 
   if (attentionState !== 'none' || readinessState === 'unreachable' || readinessState === 'unknown') {
     return {
-      description: app.remediation?.summary || app.canonicalIssues?.[0]?.summary || 'Review the app state before making changes.',
+    description: app.remediation?.summary || application.issues[0]?.summary || 'Review the app state before making changes.',
       id: 'review_issue',
-      label: app.remediation?.nextActionLabel || app.canonicalIssues?.[0]?.primaryAction?.label || 'Review issue',
+      label: app.remediation?.nextActionLabel || application.issues[0]?.primaryAction?.label || 'Review issue',
     };
   }
 
-  if (app.canonicalBackupState === 'backup_enabled_no_restore_point') {
+  if (application.backupState === 'backup_enabled_no_restore_point') {
     return {
       description: 'Create the first backup snapshot before making larger changes.',
       id: 'create_backup',
@@ -248,21 +200,21 @@ function managedNextAction(
   return undefined;
 }
 
-function accessLabel(app: AppRuntimeView, access?: AppAccessCheck): ApplicationSurfaceItem['access'] {
-  if (app.canonicalAccessState === 'private_ready' || app.accessRoute?.privateLinkStatus === 'verified' || app.observedAccess?.privateLinkStatus === 'verified') {
+function accessLabel(application: ApplicationView, app: AppRuntimeView): ApplicationSurfaceItem['access'] {
+  if (application.accessState === 'private_ready') {
     return 'Private';
   }
-  if (app.canonicalAccessState === 'local_ready' || app.accessRoute?.localUrl || app.observedAccess?.localUrl || app.accessUrl) {
-    return access?.status === 'unreachable' ? 'Local only' : 'Open';
+  if (application.accessState === 'local_ready' || application.accessState === 'private_waiting' || application.accessState === 'private_needs_setup') {
+    return 'Open';
   }
   return 'No link';
 }
 
-function backupLabel(app: AppRuntimeView): ApplicationSurfaceItem['backup'] {
-  if (app.canonicalBackupState === 'protected_by_restore_point') {
+function backupLabel(application: ApplicationView): ApplicationSurfaceItem['backup'] {
+  if (application.backupState === 'protected_by_restore_point') {
     return 'Protected';
   }
-  if (app.canonicalBackupState === 'backup_disabled') {
+  if (application.backupState === 'backup_disabled') {
     return 'Not managed';
   }
   return 'Needs backup';

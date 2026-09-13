@@ -109,10 +109,10 @@ export function MarketplaceAppList({ apps, installingAppId = null, onRestoreStar
           {apps.map((app) => (
             <DenseLauncherCard
               app={app}
-              installing={installingAppId === app.id}
-              key={app.id}
-              onSelect={() => onSelect(app.id)}
-              selected={selectedAppId === app.id}
+              installing={installingAppId === app.application.id}
+              key={app.application.id}
+              onSelect={() => onSelect(app.application.id)}
+              selected={selectedAppId === app.application.id}
             />
           ))}
         </div>
@@ -160,7 +160,8 @@ function RestoreStarterGuidance({ onRestore }: { onRestore: () => void }) {
 }
 
 function DenseLauncherCard({ app, installing, onSelect, selected }: { app: DiscoverAppView; installing: boolean; onSelect: () => void; selected: boolean }) {
-  const canOpen = Boolean(app.installedApp?.accessUrl);
+  const application = app.application;
+  const canOpen = Boolean(application.runtime?.accessUrl);
 
   return (
     <article
@@ -173,7 +174,7 @@ function DenseLauncherCard({ app, installing, onSelect, selected }: { app: Disco
     >
       <button
         aria-pressed={selected}
-        aria-label={`Select ${app.name}`}
+        aria-label={`Select ${application.name}`}
         className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-200/80"
         onClick={onSelect}
         type="button"
@@ -188,16 +189,16 @@ function DenseLauncherCard({ app, installing, onSelect, selected }: { app: Disco
               <div className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center gap-0.5">
                 {canOpen && (
                   <AppBrowserLink
-                    aria-label={`Open ${app.name}`}
+                    aria-label={`Open ${application.name}`}
                     className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-200 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
-                    href={app.installedApp?.accessUrl}
+                    href={application.runtime?.accessUrl ?? undefined}
                     rel="noreferrer"
                     target="_blank"
                   >
                     <ExternalLink className="size-3.5" />
                   </AppBrowserLink>
                 )}
-                <button aria-label={`Review ${app.name}`} className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80" onClick={onSelect} type="button">
+                <button aria-label={`Review ${application.name}`} className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80" onClick={onSelect} type="button">
                   <MoreVertical className="size-3.5" />
                 </button>
               </div>
@@ -206,11 +207,11 @@ function DenseLauncherCard({ app, installing, onSelect, selected }: { app: Disco
           presentation="launcher"
         />
         <div className="flex min-h-0 flex-1 flex-col px-3 pb-2 pt-2">
-          <AppCardName className="text-sm font-semibold text-white" name={app.name} />
-          <p className="m-0 truncate text-xs text-slate-200/70">{app.categoryLabel}</p>
+          <AppCardName className="text-sm font-semibold text-white" name={application.name} />
+          <p className="m-0 truncate text-xs text-slate-200/70">{application.category}</p>
           <div className="mt-auto flex items-center gap-2 border-t border-sky-200/10 pt-2 text-[0.7rem] font-medium text-slate-200/80">
-            <AppStatusDot installing={installing} tone={marketplaceStatusTone(app.statusTone)} />
-            <span>{installing ? 'Installing' : app.stateLabel}</span>
+            <AppStatusDot installing={installing} tone={marketplaceStatusTone(application.statusTone)} />
+            <span>{installing ? 'Installing' : application.relationshipLabel}</span>
           </div>
         </div>
       </div>
@@ -219,8 +220,8 @@ function DenseLauncherCard({ app, installing, onSelect, selected }: { app: Disco
 }
 
 function launcherCardAttentionClass(app: DiscoverAppView) {
-  if (app.statusTone === 'danger') return 'border-red-300/45';
-  if (app.statusTone === 'warning' || app.statusTone === 'observed') return 'border-amber-300/45';
+  if (app.application.statusTone === 'danger') return 'border-red-300/45';
+  if (app.application.statusTone === 'warning' || app.application.statusTone === 'observed') return 'border-amber-300/45';
   return '';
 }
 

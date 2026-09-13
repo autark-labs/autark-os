@@ -4,16 +4,8 @@ import java.time.Instant;
 import java.util.List;
 
 import com.autarkos.api.AutarkOsStates;
-import com.autarkos.host.ObservedServiceView;
-import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.marketplace.install.AppRuntimeView;
-
 public record ApplicationState(
-        List<AppInstanceView> managedApps,
-        List<AppRuntimeView> runtimeApps,
-        List<ObservedServiceView> observedServices,
-        List<ObservedServiceView> foundServices,
-        List<AppOwnershipView> ownershipViews,
+        List<ApplicationView> applications,
         Instant updatedAt,
         String refreshStatus,
         Instant refreshStartedAt,
@@ -23,18 +15,10 @@ public record ApplicationState(
         Instant nextRefreshAt) {
 
     public ApplicationState(
-            List<AppInstanceView> managedApps,
-            List<AppRuntimeView> runtimeApps,
-            List<ObservedServiceView> observedServices,
-            List<ObservedServiceView> foundServices,
-            List<AppOwnershipView> ownershipViews,
+            List<ApplicationView> applications,
             Instant updatedAt) {
         this(
-                managedApps,
-                runtimeApps,
-                observedServices,
-                foundServices,
-                ownershipViews,
+                applications,
                 updatedAt,
                 AutarkOsStates.SnapshotState.IDLE,
                 updatedAt,

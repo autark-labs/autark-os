@@ -1,6 +1,6 @@
 package com.autarkos.apps;
 
-public record AppOwnershipAction(
+public record ApplicationAction(
         String id,
         String label,
         String kind,

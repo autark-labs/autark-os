@@ -12,6 +12,7 @@ import {
   starterCatalogForDiscover,
   starterAppsForMarketplace,
 } from '../MarketplacePage.logic';
+import { buildApplicationSurfaceItems } from '../../../ApplicationsPage/extensions/ApplicationsPage.liveModel';
 
 function app(overrides = {}) {
   return {
@@ -55,9 +56,9 @@ test('marketplaceVisibleApps filters by category, installed state, and search qu
 
 test('marketplaceVisibleAppViews hides only canonical current-instance installs', () => {
   const views = [
-    { id: 'vaultwarden', name: 'Vaultwarden', state: 'installed_managed', app: app({ id: 'vaultwarden', category: 'Security' }) },
-    { id: 'jellyfin', name: 'Jellyfin', state: 'found_on_server', app: app({ id: 'jellyfin', name: 'Jellyfin', category: 'Media' }) },
-    { id: 'homepage', name: 'Homepage', state: 'found_on_server', app: app({ id: 'homepage', name: 'Homepage', category: 'Utilities' }) },
+    discoverView('vaultwarden', 'managed', { category: 'Security' }),
+    discoverView('jellyfin', 'blocked', { name: 'Jellyfin', category: 'Media' }),
+    discoverView('homepage', 'blocked', { name: 'Homepage', category: 'Utilities' }),
   ];
 
   const visible = marketplaceVisibleAppViews({
@@ -67,34 +68,64 @@ test('marketplaceVisibleAppViews hides only canonical current-instance installs'
     sortBy: 'Recommended',
   });
 
-  assert.deepEqual(visible.map((view) => view.id), ['homepage', 'jellyfin']);
+  assert.deepEqual(visible.map((view) => view.application.id), ['homepage', 'jellyfin']);
 });
 
 test('marketplaceVisibleAppViews filters canonical availability and installs', () => {
   const views = [
-    { id: 'available', name: 'Available', state: 'available', app: app({ id: 'available' }) },
-    { id: 'installed', name: 'Installed', state: 'installed_managed', app: app({ id: 'installed' }) },
-    { id: 'found', name: 'Found', state: 'found_on_server', app: app({ id: 'found' }) },
+    discoverView('available', 'available'),
+    discoverView('installed', 'managed'),
+    discoverView('found', 'blocked'),
   ];
 
-  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'available' }).map((view) => view.id), ['available']);
-  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'installed' }).map((view) => view.id), ['installed']);
+  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'available' }).map((view) => view.application.id), ['available']);
+  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'installed' }).map((view) => view.application.id), ['installed']);
 });
 
 test('marketplacePrimaryRoute follows My Apps management and existing-service actions', () => {
   assert.equal(marketplacePrimaryRoute({
-    primaryAction: { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false },
+    application: application('vaultwarden', 'managed', { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false }),
   }), '/apps?focus=managed%3Avaultwarden&panel=manage');
   assert.equal(marketplacePrimaryRoute({
-    primaryAction: { id: 'review_existing', kind: 'route', href: '/apps/found?service=docker%3Avaultwarden', disabled: false },
+    application: application('vaultwarden', 'blocked', { id: 'review_existing', kind: 'route', href: '/apps/found?service=docker%3Avaultwarden', disabled: false }),
   }), '/apps/found?service=docker%3Avaultwarden');
   assert.equal(marketplacePrimaryRoute({
-    primaryAction: { id: 'review_setup', kind: 'route', href: '/discover?app=vaultwarden', disabled: false },
+    application: application('vaultwarden', 'available', { id: 'review_setup', kind: 'route', href: '/discover?app=vaultwarden', disabled: false }),
   }), null);
   assert.equal(marketplacePrimaryRoute({
-    primaryAction: { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: true },
+    application: application('vaultwarden', 'managed', { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: true }),
   }), null);
 });
+
+test('Discover and My Apps consume the same canonical relationship', () => {
+  const canonical = application('vaultwarden', 'managed');
+  canonical.runtime = {
+    appId: 'vaultwarden', appName: 'Vaultwarden', category: 'Security', description: '', image: '', friendlyStatus: 'Ready',
+    technicalStatus: 'running', readinessState: 'ready', attentionState: 'none', availableActions: [], recentEvents: [], appConfiguration: [],
+  };
+  const discover = discoverView('vaultwarden', 'available');
+  discover.application = canonical;
+
+  assert.deepEqual(marketplaceVisibleAppViews({ views: [discover], statusFilter: 'installed' }).map((view) => view.application.id), ['vaultwarden']);
+  assert.deepEqual(buildApplicationSurfaceItems({ applications: [canonical] }).map((item) => item.id), ['vaultwarden']);
+
+  canonical.relationship = 'blocked';
+  assert.deepEqual(marketplaceVisibleAppViews({ views: [discover], statusFilter: 'installed' }), []);
+  assert.deepEqual(buildApplicationSurfaceItems({ applications: [canonical] }), []);
+});
+
+function discoverView(id, relationship, appOverrides = {}) {
+  return { application: application(id, relationship), app: app({ id, name: id, ...appOverrides }), serviceKindLabel: 'App', estimatedInstallTime: '2 minutes', difficulty: 'Easy', setupSchema: { appId: id, version: 1, inputs: [] } };
+}
+
+function application(id, relationship, primaryAction = { id: 'review_setup', kind: 'route', href: `/discover?app=${id}`, disabled: false }) {
+  return {
+    id, name: id, category: 'Apps', image: '', summary: '', description: '', relationship, catalogAvailability: 'installable', appInstanceId: relationship === 'managed' ? id : '',
+    runtimeState: relationship === 'managed' ? 'running' : 'unknown', ownershipState: relationship === 'managed' ? 'owned' : 'unowned', accessState: 'not_ready', backupState: 'backup_disabled', issues: [],
+    relationshipLabel: relationship, relationshipDescription: '', statusTone: 'neutral', cardTone: 'neutral', installCopyWarningRequired: relationship === 'blocked', reviewExistingHref: null,
+    primaryAction: { label: 'Action', method: null, reason: '', ...primaryAction }, availableActions: [], runtime: null, evidence: null,
+  };
+}
 
 test('marketplaceVisibleApps applies supported sort modes', () => {
   const apps = [

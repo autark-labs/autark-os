@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.apps.ApplicationViews;
 import com.autarkos.automation.AutomationService;
 import com.autarkos.backups.RecoveryOperationConflictException;
 import com.autarkos.marketplace.install.models.InstallModels;
@@ -87,7 +88,7 @@ public class AppGuardianService {
                 }
                 return;
             }
-            Map<String, AppRuntimeView> runtimeByAppId = applicationStateService.snapshot().runtimeApps().stream()
+            Map<String, AppRuntimeView> runtimeByAppId = ApplicationViews.managedRuntimes(applicationStateService.snapshot()).stream()
                     .collect(Collectors.toMap(AppRuntimeView::appId, view -> view, (left, right) -> left));
             for (InstalledApp app : managedInstalledAppsFromSnapshot(runtimeByAppId.keySet())) {
                 inspectCachedApp(app, runtimeByAppId.get(app.appId()));

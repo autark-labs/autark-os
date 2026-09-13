@@ -1,27 +1,25 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { visibleResolveExistingServices } from '../ResolveExistingAppsPage.logic';
+import { visibleRecoveryApplications } from '../ResolveExistingAppsPage.logic';
 
-function service(overrides = {}) {
+function application(overrides = {}) {
   return {
-    id: 'obs_vaultwarden',
-    displayName: 'Vaultwarden',
-    managedByThisAutarkOs: false,
-    userStatus: 'found_on_server',
-    userStatusLabel: 'Found',
-    userStatusDescription: 'Found on this server.',
-    availableActions: [],
+    id: 'vaultwarden',
+    name: 'Vaultwarden',
+    relationship: 'available',
+    evidence: { id: 'obs_vaultwarden' },
     ...overrides,
   };
 }
 
-test('visibleResolveExistingServices keeps only recoverable and blocking resources', () => {
-  const services = [
-    service({ id: 'managed', managedByThisAutarkOs: true, userStatus: 'installed_managed' }),
-    service({ id: 'found' }),
-    service({ id: 'recoverable', userStatus: 'recoverable' }),
-    service({ id: 'blocked', userStatus: 'blocked' }),
+test('visibleRecoveryApplications uses the canonical relationship and requires evidence', () => {
+  const applications = [
+    application({ id: 'managed', relationship: 'managed' }),
+    application({ id: 'available', relationship: 'available' }),
+    application({ id: 'missing-evidence', relationship: 'blocked', evidence: null }),
+    application({ id: 'recoverable', relationship: 'recovery_required' }),
+    application({ id: 'blocked', relationship: 'blocked' }),
   ];
 
-  assert.deepEqual(visibleResolveExistingServices(services).map((item) => item.id), ['recoverable', 'blocked']);
+  assert.deepEqual(visibleRecoveryApplications(applications).map((item) => item.id), ['recoverable', 'blocked']);
 });

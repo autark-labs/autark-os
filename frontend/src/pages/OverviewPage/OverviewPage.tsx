@@ -11,8 +11,8 @@ function OverviewPage() {
   const appState = useApplicationStateRepository();
   const home = useHomeRepository();
 
-  const apps = useMemo(() => appState.applicationState?.managedApps ?? [], [appState.applicationState]);
-  const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
+  const apps = useMemo(() => appState.applications.filter((application) => application.relationship === 'managed'), [appState.applications]);
+  const readyApps = useMemo(() => apps.filter((application) => application.runtime?.friendlyStatus === 'Ready'), [apps]);
   const deviceName = home.summary?.deviceName || 'Autark-OS';
   const summaryAvailability = homeSummaryAvailability(home.summary, home.summaryError);
   const systemMetrics = homeSystemMetrics(home.summary, summaryAvailability);

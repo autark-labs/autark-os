@@ -14,10 +14,10 @@ test('Home is managed-only while My Apps links recovery-worthy resources to revi
   const applications = source('pages/ApplicationsPage/ApplicationsPage.tsx');
   const repository = source('repositories/applicationStateRepository.ts');
 
-  assert.match(repository, /foundServices: foundServices\(state\)/);
+  assert.match(repository, /applications: applications\(state\)/);
   assert.doesNotMatch(repository, /pinnedExternalServices/);
   assert.doesNotMatch(home, /foundServices|observedServices|pinnedExternalServices|Pinned services/);
-  assert.match(applications, /appState\.foundServices\.filter/);
+  assert.match(applications, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
   assert.match(applications, /<FoundAppsPrompt/);
   assert.match(applications, /reviewHref: '\/apps\/found'/);
 });

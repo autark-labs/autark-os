@@ -15,11 +15,10 @@ test('frontend recovery flows do not use legacy ownership or host inventory clie
   assert.equal(existsSync(resolve(root, 'src/components/autark-os/FoundResourcesBanner.tsx')), false);
   assert.equal(existsSync(resolve(root, 'src/types/host.ts')), false);
 
-  const appOwnershipTypes = source('src/types/appOwnership.ts');
   const discoverTypes = source('src/types/discover.ts');
   const applicationStateLogic = source('src/repositories/applicationStateRepository.logic.ts');
 
-  assert.doesNotMatch(appOwnershipTypes, /foundResource|HostInventoryResource/);
+  assert.equal(existsSync(resolve(root, 'src/types/appOwnership.ts')), false);
   assert.doesNotMatch(discoverTypes, /foundResource|HostInventoryResource/);
   assert.doesNotMatch(applicationStateLogic, /foundResource/);
 });

@@ -37,9 +37,8 @@ function StoragePage() {
   const report = storage.report;
   const appIconUrlById = useMemo(() => storageAppIconUrls(
     report?.apps ?? [],
-    applicationState.applicationState?.managedApps ?? [],
-    applicationState.apps,
-  ), [applicationState.applicationState?.managedApps, applicationState.apps, report?.apps]);
+    applicationState.applications,
+  ), [applicationState.applications, report?.apps]);
   const currentError = actionError ?? (storage.error ? apiErrorMessage(storage.error, 'Storage data could not be loaded.') : null);
   const error = currentError === dismissedError ? null : currentError;
 
@@ -144,17 +143,14 @@ function StoragePage() {
 
 function storageAppIconUrls(
   storageApps: AppStorageUsage[],
-  managedApps: Array<{ catalogAppId: string; icon: string }>,
-  runtimeApps: Array<{ appId: string; image: string | null }>,
+  applications: Array<{ id: string; image: string; runtime: { image: string | null } | null }>,
 ) {
-  const managedIconByAppId = new Map(managedApps.map((app) => [app.catalogAppId, app.icon]));
-  const runtimeImageByAppId = new Map(runtimeApps.map((app) => [app.appId, app.image]));
+  const imageByAppId = new Map(applications.map((application) => [application.id, application.runtime?.image || application.image]));
 
   return Object.fromEntries(storageApps.map((app) => [
     app.appId,
     preferredAppImageUrl(
-      managedIconByAppId.get(app.appId),
-      runtimeImageByAppId.get(app.appId),
+      imageByAppId.get(app.appId),
       catalogAppImageUrl(app.appId),
     ),
   ]));

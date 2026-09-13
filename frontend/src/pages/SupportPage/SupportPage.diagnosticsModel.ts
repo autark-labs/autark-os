@@ -1,5 +1,4 @@
-import type { AppRuntimeView } from '@/types/app';
-import type { ObservedServiceView } from '@/types/observedService';
+import type { ApplicationView } from '@/types/applicationState';
 import type { SupportSummary, SystemDoctorStatus, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
 
 const summaryOrder = ['docker', 'apps', 'tailscale', 'backups', 'storage'];
@@ -21,18 +20,16 @@ export function diagnosticsHeadline(summary: SupportSummary | null | undefined, 
 }
 
 /**
- * @param {{ summary?: any, doctor?: any, setup?: any, managedApps?: any[], observedServices?: any[] }} params
+ * @param {{ summary?: any, doctor?: any, setup?: any, applications?: any[] }} params
  */
 export function diagnosticsSummaryRows({
   summary,
   doctor,
   setup,
-  managedApps = [],
-  observedServices = [],
+  applications = [],
 }: {
   doctor?: SystemDoctorStatus | null;
-  managedApps?: AppRuntimeView[];
-  observedServices?: ObservedServiceView[];
+  applications?: ApplicationView[];
   setup?: SystemSetupStatus | null;
   summary?: SupportSummary | null;
 }) {
@@ -40,7 +37,7 @@ export function diagnosticsSummaryRows({
   const checks = new Map<string, SystemSetupCheck>((doctor?.checks || setup?.checks || []).map((check) => [check.id, check]));
   const rows: Record<DiagnosticsSummaryRowId, DiagnosticsSummaryRow> = {
     docker: statusRow('Docker', checkLabel(checks.get('docker'), summary?.dockerStatus), statusUnavailable),
-    apps: appRow(observedServices, managedApps, statusUnavailable),
+    apps: appRow(applications, statusUnavailable),
     tailscale: statusRow('Tailscale', checkLabel(checks.get('tailscale'), summary?.tailscaleStatus), statusUnavailable),
     backups: statusRow('Backups', backupLabel(summary), statusUnavailable),
     storage: statusRow('Storage', storageLabel(summary), statusUnavailable),
@@ -77,14 +74,15 @@ function statusRow(label: string, value: string | null | undefined, unavailable 
   return { label, value: value || 'Unknown', tone };
 }
 
-function appRow(observedServices: ObservedServiceView[], managedApps: AppRuntimeView[], unavailable = false): DiagnosticsSummaryRow {
+function appRow(applications: ApplicationView[], unavailable = false): DiagnosticsSummaryRow {
   if (unavailable) {
     return { label: 'Apps', value: 'Status unavailable', tone: 'warning' };
   }
-  const issues = (observedServices || []).filter((service) => service.userStatus !== 'installed_managed');
-  const repairing = (managedApps || []).filter((app) => app?.remediation?.state === 'auto_repairing').length;
-  const failed = (managedApps || []).filter((app) => ['repair_failed', 'restore_recommended'].includes(app?.remediation?.state ?? '')).length;
-  const needsReview = (managedApps || []).filter((app) => app?.remediation?.state === 'needs_user_action').length;
+  const issues = applications.filter((application) => application.relationship !== 'managed' && application.relationship !== 'available');
+  const managedRuntimes = applications.flatMap((application) => application.relationship === 'managed' && application.runtime ? [application.runtime] : []);
+  const repairing = managedRuntimes.filter((app) => app.remediation?.state === 'auto_repairing').length;
+  const failed = managedRuntimes.filter((app) => ['repair_failed', 'restore_recommended'].includes(app.remediation?.state ?? '')).length;
+  const needsReview = managedRuntimes.filter((app) => app.remediation?.state === 'needs_user_action').length;
   const parts: string[] = [];
   if (issues.length) parts.push(`${issues.length} found on this server`);
   if (repairing) parts.push(`${repairing} repairing`);

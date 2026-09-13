@@ -18,7 +18,7 @@ import { useApplicationStateRepository } from '@/repositories/applicationStateRe
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
-import { visibleResolveExistingServices } from './ResolveExistingAppsPage.logic';
+import { visibleRecoveryApplications } from './ResolveExistingAppsPage.logic';
 
 function ResolveExistingAppsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -28,9 +28,9 @@ function ResolveExistingAppsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(requestedServiceId);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const services = appState.observedServices;
   const error = localError;
-  const visibleServices = useMemo(() => visibleResolveExistingServices(services) as ObservedServiceView[], [services]);
+  const visibleServices = useMemo(() => visibleRecoveryApplications(appState.applications)
+    .flatMap((application) => application.evidence ? [application.evidence] : []) as ObservedServiceView[], [appState.applications]);
 
   useEffect(() => {
     if (!visibleServices.length) {

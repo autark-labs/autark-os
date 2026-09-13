@@ -135,7 +135,7 @@ test('applications page only exposes concrete next actions from the rail', () =>
 test('applications page sends found-service review to the dedicated existing-app flow', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
-  assert.match(page, /appState\.foundServices\.filter/);
+  assert.match(page, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
   assert.match(page, /<FoundAppsPrompt/);
   assert.match(page, /reviewHref: '\/apps\/found'/);
   assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);

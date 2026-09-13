@@ -10,8 +10,7 @@ import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.autarkos.apps.AppOwnershipState;
-import com.autarkos.apps.AppOwnershipView;
+import com.autarkos.apps.ApplicationView;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.jobs.AutarkOsJob;
@@ -28,7 +27,7 @@ import com.autarkos.marketplace.model.ApplicationManifest;
 public class DiscoverService {
 
     private final MarketplaceCatalogService catalogService;
-    private final Supplier<List<AppOwnershipView>> ownershipViews;
+    private final Supplier<List<ApplicationView>> applications;
     private final DiscoverSetupService setupService;
     private final DiscoverInstallPreviewService previewService;
     private final MarketplaceInstallService marketplaceInstallService;
@@ -43,37 +42,37 @@ public class DiscoverService {
             DiscoverInstallPreviewService previewService,
             MarketplaceInstallService marketplaceInstallService,
             AutarkOsJobService jobService) {
-        this(catalogService, () -> applicationStateService.snapshot().ownershipViews(), setupService, previewService, marketplaceInstallService, jobService, applicationStateService::invalidate);
+        this(catalogService, () -> applicationStateService.snapshot().applications(), setupService, previewService, marketplaceInstallService, jobService, applicationStateService::invalidate);
     }
 
     public DiscoverService(
             MarketplaceCatalogService catalogService,
-            Supplier<List<AppOwnershipView>> ownershipViews,
+            Supplier<List<ApplicationView>> applications,
             DiscoverSetupService setupService,
             DiscoverInstallPreviewService previewService) {
-        this(catalogService, ownershipViews, setupService, previewService, null, null, () -> {});
+        this(catalogService, applications, setupService, previewService, null, null, () -> {});
     }
 
     public DiscoverService(
             MarketplaceCatalogService catalogService,
-            Supplier<List<AppOwnershipView>> ownershipViews,
+            Supplier<List<ApplicationView>> applications,
             DiscoverSetupService setupService,
             DiscoverInstallPreviewService previewService,
             MarketplaceInstallService marketplaceInstallService,
             AutarkOsJobService jobService) {
-        this(catalogService, ownershipViews, setupService, previewService, marketplaceInstallService, jobService, () -> {});
+        this(catalogService, applications, setupService, previewService, marketplaceInstallService, jobService, () -> {});
     }
 
     private DiscoverService(
             MarketplaceCatalogService catalogService,
-            Supplier<List<AppOwnershipView>> ownershipViews,
+            Supplier<List<ApplicationView>> applications,
             DiscoverSetupService setupService,
             DiscoverInstallPreviewService previewService,
             MarketplaceInstallService marketplaceInstallService,
             AutarkOsJobService jobService,
             Runnable invalidateApplicationState) {
         this.catalogService = catalogService;
-        this.ownershipViews = ownershipViews;
+        this.applications = applications;
         this.setupService = setupService;
         this.previewService = previewService;
         this.marketplaceInstallService = marketplaceInstallService;
@@ -82,19 +81,19 @@ public class DiscoverService {
     }
 
     public List<DiscoverAppView> apps() {
-        Map<String, AppOwnershipView> ownershipByAppId = ownershipViews.get().stream()
-                .collect(java.util.stream.Collectors.toMap(AppOwnershipView::catalogAppId, view -> view, (left, right) -> left));
+        Map<String, ApplicationView> applicationsById = applications.get().stream()
+                .collect(java.util.stream.Collectors.toMap(ApplicationView::id, view -> view, (left, right) -> left));
         return catalogService.findAll().stream()
-                .map(manifest -> appView(manifest, ownershipOrAvailable(manifest, ownershipByAppId.get(manifest.id()))))
-                .sorted(Comparator.comparing(DiscoverAppView::name, String.CASE_INSENSITIVE_ORDER))
+                .map(manifest -> appView(manifest, requiredApplication(manifest, applicationsById.get(manifest.id()))))
+                .sorted(Comparator.comparing(view -> view.application().name(), String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
     public Optional<DiscoverAppView> app(String appId) {
-        Map<String, AppOwnershipView> ownershipByAppId = ownershipViews.get().stream()
-                .collect(java.util.stream.Collectors.toMap(AppOwnershipView::catalogAppId, view -> view, (left, right) -> left));
+        Map<String, ApplicationView> applicationsById = applications.get().stream()
+                .collect(java.util.stream.Collectors.toMap(ApplicationView::id, view -> view, (left, right) -> left));
         return catalogService.findById(appId)
-                .map(manifest -> appView(manifest, ownershipOrAvailable(manifest, ownershipByAppId.get(manifest.id()))));
+                .map(manifest -> appView(manifest, requiredApplication(manifest, applicationsById.get(manifest.id()))));
     }
 
     public DiscoverSetupModels.DiscoverSetupSchema setupSchema(String appId) {
@@ -148,59 +147,21 @@ public class DiscoverService {
                 request != null && request.duplicateAcknowledgedRequested());
     }
 
-    private DiscoverAppView appView(ApplicationManifest manifest, AppOwnershipView ownership) {
+    private DiscoverAppView appView(ApplicationManifest manifest, ApplicationView ownership) {
         return new DiscoverAppView(
-                manifest.id(),
+                ownership,
                 manifest,
-                manifest.name(),
-                manifest.image(),
-                firstPresent(manifest.shortValue(), manifest.plainLanguage(), manifest.description()),
-                firstPresent(manifest.plainLanguage(), manifest.description()),
-                manifest.category(),
                 serviceKindLabel(manifest.usage().kind()),
                 manifest.installTime(),
                 manifest.difficulty(),
-                ownership.state(),
-                ownership.stateLabel(),
-                ownership.stateDescription(),
-                ownership.statusTone(),
-                ownership.cardTone(),
-                ownership.installed(),
-                ownership.ownedByCurrentInstance(),
-                ownership.installCopyWarningRequired(),
-                ownership.reviewExistingHref(),
-                ownership.primaryAction(),
-                ownership.availableActions(),
-                ownership.installedApp(),
-                ownership.observedService(),
                 setupService.schema(manifest));
     }
 
-    private AppOwnershipView ownershipOrAvailable(ApplicationManifest manifest, AppOwnershipView ownership) {
-        if (ownership != null) {
-            return ownership;
+    private ApplicationView requiredApplication(ApplicationManifest manifest, ApplicationView application) {
+        if (application == null) {
+            throw new IllegalStateException("Canonical application inventory is missing " + manifest.id() + ".");
         }
-        AppOwnershipState state = AppOwnershipState.AVAILABLE;
-        return new AppOwnershipView(
-                manifest.id(),
-                manifest.name(),
-                manifest.category(),
-                manifest.image(),
-                firstPresent(manifest.shortValue(), manifest.plainLanguage(), manifest.description()),
-                firstPresent(manifest.plainLanguage(), manifest.description()),
-                state,
-                "Available",
-                "Ready to review before install.",
-                "neutral",
-                "neutral",
-                false,
-                false,
-                false,
-                null,
-                new com.autarkos.apps.AppOwnershipAction("review_setup", "Review setup", "route", "/discover?app=" + encode(manifest.id()), null, false, ""),
-                List.of(new com.autarkos.apps.AppOwnershipAction("review_setup", "Review setup", "route", "/discover?app=" + encode(manifest.id()), null, false, "")),
-                null,
-                null);
+        return application;
     }
 
     private String serviceKindLabel(String kind) {
@@ -212,19 +173,6 @@ public class DiscoverService {
             case "infrastructure" -> "Infrastructure";
             default -> kind == null ? "App" : kind.replace("-", " ");
         };
-    }
-
-    private String firstPresent(String... values) {
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return "";
-    }
-
-    private String encode(String value) {
-        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private List<AutarkOsJobStep> installJobSteps(String appName) {

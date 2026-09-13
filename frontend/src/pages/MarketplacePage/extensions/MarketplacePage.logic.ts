@@ -2,7 +2,8 @@ export const START_HERE_DISMISSAL_KEY = 'autark-os:discover:start-here-dismissed
 
 import betaScope from '@beta-scope';
 import { applicationRouteWithManagementPanel } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
-import type { DiscoverAppView, DiscoverInstalledAppSummary } from '@/types/discover';
+import type { DiscoverAppView } from '@/types/discover';
+import type { ApplicationView } from '@/types/applicationState';
 import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
 import type { StorageReport, SystemDoctorStatus } from '@/types/system';
 import type { MarketplaceStatusFilter } from './MarketplacePage.constants';
@@ -78,23 +79,23 @@ export function marketplaceVisibleAppViews({
 
   return views
     .filter((view) => appOrder.has(view.app.id))
-    .filter((view) => !hideInstalled || view.state !== 'installed_managed')
+    .filter((view) => !hideInstalled || view.application.relationship !== 'managed')
     .filter((view) => marketplaceStatusMatches(view, statusFilter))
     .sort((left, right) => (appOrder.get(left.app.id) ?? 0) - (appOrder.get(right.app.id) ?? 0));
 }
 
-export function marketplaceStatusMatches(view: Pick<DiscoverAppView, 'state'>, statusFilter: MarketplaceStatusFilter) {
+export function marketplaceStatusMatches(view: Pick<DiscoverAppView, 'application'>, statusFilter: MarketplaceStatusFilter) {
   if (statusFilter === 'installed') {
-    return view.state === 'installed_managed';
+    return view.application.relationship === 'managed';
   }
   if (statusFilter === 'available') {
-    return view.state === 'available';
+    return view.application.relationship === 'available';
   }
   return true;
 }
 
-export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'primaryAction'> | null | undefined = null) {
-  const action = view?.primaryAction;
+export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'application'> | null | undefined = null) {
+  const action = view?.application.primaryAction;
   if (!action || action.disabled || action.kind !== 'route' || !action.href) {
     return null;
   }
@@ -117,7 +118,7 @@ export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'primaryActi
 export function starterAppsForMarketplace(
   apps: MarketplaceApp[],
   recommendedApps: string[],
-  installedById: Map<string, DiscoverInstalledAppSummary | null>,
+  installedById: Map<string, ApplicationView>,
   doctor: SystemDoctorStatus | null | undefined,
   storage: StorageReport | null | undefined,
 ) {

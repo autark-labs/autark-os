@@ -70,7 +70,7 @@ test('marketplace detail sends installed apps to My Apps and found resources to 
 
   assert.match(detail, /applicationDeepLinkForManagedApp/);
   assert.doesNotMatch(detail, /applicationDeepLinkForObservedService|applicationRouteWithManagementPanel/);
-  assert.match(detail, /const reviewExistingHref = appView\.reviewExistingHref/);
+  assert.match(detail, /const reviewExistingHref = application\.reviewExistingHref/);
   assert.doesNotMatch(detail, /<Link to="\/apps">View in My Apps<\/Link>/);
   assert.doesNotMatch(detail, /<Link to="\/apps">Manage in My Apps<\/Link>/);
 });
@@ -79,10 +79,8 @@ test('marketplace first-backup prompt uses canonical installed backup protection
   const detail = source('MarketplaceAppDetail.tsx');
   const discoverTypes = projectSource('types/discover.ts');
 
-  assert.match(discoverTypes, /protectedByBackups: boolean/);
-  assert.match(discoverTypes, /firstBackupRecommended: boolean/);
-  assert.match(detail, /firstBackupRecommended/);
-  assert.match(detail, /protectedByBackups/);
+  assert.doesNotMatch(discoverTypes, /DiscoverInstalledAppSummary/);
+  assert.match(detail, /app\.backupState === 'backup_enabled_no_restore_point'/);
   assert.doesNotMatch(detail, /function shouldOfferFirstBackup\([^)]*\) \{\s*return true;\s*\}/s);
 });
 
@@ -99,7 +97,7 @@ test('dense launcher cards keep canonical app states visible and long app names 
 
   assert.match(list, /<AppCardName/);
   assert.match(list, /launcherCardAttentionClass\(app\)/);
-  assert.match(list, /app\.stateLabel/);
-  assert.match(list, /aria-label=\{`Select \$\{app\.name\}`\}/);
-  assert.match(list, /aria-label=\{`Review \$\{app\.name\}`\}/);
+  assert.match(list, /application\.relationshipLabel/);
+  assert.match(list, /aria-label=\{`Select \$\{application\.name\}`\}/);
+  assert.match(list, /aria-label=\{`Review \$\{application\.name\}`\}/);
 });

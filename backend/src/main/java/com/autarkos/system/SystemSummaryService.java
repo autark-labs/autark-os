@@ -9,17 +9,18 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.apps.ApplicationView;
+import com.autarkos.apps.ApplicationViews;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.BackupModels;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
-import com.autarkos.marketplace.install.AppInstanceView;
 
 @Service
 public class SystemSummaryService implements SystemSummaryProvider {
 
-    private final Supplier<List<AppInstanceView>> appViews;
+    private final Supplier<List<ApplicationView>> appViews;
     private final Supplier<ProjectSettings> settings;
     private final Supplier<AutarkOsIdentity> identity;
     private final Supplier<SystemSetupModels.SystemSetupStatus> setupStatus;
@@ -37,11 +38,11 @@ public class SystemSummaryService implements SystemSummaryProvider {
             SetupProgressService setupProgressService,
             BackupDestinationService backupDestinationService,
             @org.springframework.beans.factory.annotation.Value("${server.port:8082}") String port) {
-        this(() -> applicationStateService.snapshot().managedApps(), settingsService::current, identityService::current, setupService::status, setupProgressService::status, () -> "http://" + com.autarkos.network.HostAddress.lanAddress() + ":" + port, Instant::now, backupDestinationService::current);
+        this(() -> ApplicationViews.managed(applicationStateService.snapshot()), settingsService::current, identityService::current, setupService::status, setupProgressService::status, () -> "http://" + com.autarkos.network.HostAddress.lanAddress() + ":" + port, Instant::now, backupDestinationService::current);
     }
 
     public SystemSummaryService(
-            Supplier<List<AppInstanceView>> appViews,
+            Supplier<List<ApplicationView>> appViews,
             Supplier<ProjectSettings> settings,
             Supplier<AutarkOsIdentity> identity,
             Supplier<SystemSetupModels.SystemSetupStatus> setupStatus,
@@ -51,7 +52,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
     }
 
     public SystemSummaryService(
-            Supplier<List<AppInstanceView>> appViews,
+            Supplier<List<ApplicationView>> appViews,
             Supplier<ProjectSettings> settings,
             Supplier<AutarkOsIdentity> identity,
             Supplier<SystemSetupModels.SystemSetupStatus> setupStatus,
@@ -62,7 +63,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
     }
 
     public SystemSummaryService(
-            Supplier<List<AppInstanceView>> appViews,
+            Supplier<List<ApplicationView>> appViews,
             Supplier<ProjectSettings> settings,
             Supplier<AutarkOsIdentity> identity,
             Supplier<SystemSetupModels.SystemSetupStatus> setupStatus,
@@ -81,7 +82,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
     }
 
     public SystemSummaryModels.SystemSummary summary() {
-        List<AppInstanceView> apps = appViews.get();
+        List<ApplicationView> apps = appViews.get();
         SystemSetupModels.SystemSetupStatus setup = setupStatus.get();
         ProjectSettings currentSettings = settings.get();
         AutarkOsIdentity currentIdentity = identity.get();
@@ -120,7 +121,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
         return new SystemSummaryModels.DockerSummary(ready, ready ? "Docker is ready." : "Docker is not ready for app installs.");
     }
 
-    private SystemSummaryModels.AccessSummary access(List<AppInstanceView> apps) {
+    private SystemSummaryModels.AccessSummary access(List<ApplicationView> apps) {
         boolean privateReady = apps.stream().anyMatch(app -> "private_ready".equals(app.accessState()));
         boolean localReady = apps.stream().anyMatch(app -> List.of("local_ready", "private_waiting", "private_needs_setup").contains(app.accessState()));
         if (privateReady) {
@@ -132,20 +133,20 @@ public class SystemSummaryService implements SystemSummaryProvider {
         return new SystemSummaryModels.AccessSummary("not_ready", "No app access is ready yet.");
     }
 
-    private SystemSummaryModels.AppsSummary apps(List<AppInstanceView> apps) {
+    private SystemSummaryModels.AppsSummary apps(List<ApplicationView> apps) {
         List<SystemSummaryModels.ReadyAppSummary> readyToOpen = apps.stream()
-                .filter(app -> "Ready".equals(app.userStatus()))
-                .filter(app -> app.localUrl() != null && !app.localUrl().isBlank())
-                .map(app -> new SystemSummaryModels.ReadyAppSummary(app.appInstanceId(), app.name(), app.localUrl()))
+                .filter(app -> app.runtime() != null && "Ready".equals(app.runtime().friendlyStatus()))
+                .filter(app -> app.runtime().accessUrl() != null && !app.runtime().accessUrl().isBlank())
+                .map(app -> new SystemSummaryModels.ReadyAppSummary(app.appInstanceId(), app.name(), app.runtime().accessUrl()))
                 .toList();
         return new SystemSummaryModels.AppsSummary(
                 apps.size(),
-                (int) apps.stream().filter(app -> AutarkOsStates.AppStatus.READY.equals(app.userStatus())).count(),
-                (int) apps.stream().filter(app -> List.of(AutarkOsStates.AppStatus.MISSING, AutarkOsStates.AppStatus.NEEDS_ATTENTION, "Managed elsewhere").contains(app.userStatus())).count(),
+                (int) apps.stream().filter(app -> app.runtime() != null && AutarkOsStates.AppStatus.READY.equals(app.runtime().friendlyStatus())).count(),
+                (int) apps.stream().filter(app -> app.runtime() != null && List.of(AutarkOsStates.AppStatus.MISSING, AutarkOsStates.AppStatus.NEEDS_ATTENTION, "Managed elsewhere").contains(app.runtime().friendlyStatus())).count(),
                 readyToOpen);
     }
 
-    private SystemSummaryModels.BackupSummary backups(List<AppInstanceView> apps) {
+    private SystemSummaryModels.BackupSummary backups(List<ApplicationView> apps) {
         BackupModels.BackupDestination destination = backupDestination.get();
         if (destination != null && !destination.ready()) {
             return new SystemSummaryModels.BackupSummary("destination_unavailable", destination.message());
@@ -163,7 +164,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
         return new SystemSummaryModels.StorageSummary("unknown", "Storage details are available from the Storage page.");
     }
 
-    private List<AutarkOsIssue> issues(List<AppInstanceView> apps, SystemSetupModels.SystemSetupStatus setup) {
+    private List<AutarkOsIssue> issues(List<ApplicationView> apps, SystemSetupModels.SystemSetupStatus setup) {
         java.util.ArrayList<AutarkOsIssue> issues = new java.util.ArrayList<>();
         if (!docker(setup).ready()) {
             issues.add(AutarkOsIssueFactory.systemIssue(

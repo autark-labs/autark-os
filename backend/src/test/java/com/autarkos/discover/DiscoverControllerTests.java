@@ -9,6 +9,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.apps.ApplicationView;
 import com.autarkos.marketplace.api.MarketplaceExceptionHandler;
 import com.autarkos.system.BetaScope;
 
@@ -36,8 +37,12 @@ class DiscoverControllerTests {
         var service = mock(DiscoverService.class);
         var included = mock(DiscoverAppView.class);
         var excluded = mock(DiscoverAppView.class);
-        when(included.id()).thenReturn("freshrss");
-        when(excluded.id()).thenReturn("vaultwarden");
+        var includedApplication = mock(ApplicationView.class);
+        var excludedApplication = mock(ApplicationView.class);
+        when(included.application()).thenReturn(includedApplication);
+        when(excluded.application()).thenReturn(excludedApplication);
+        when(includedApplication.id()).thenReturn("freshrss");
+        when(excludedApplication.id()).thenReturn("vaultwarden");
         when(service.apps()).thenReturn(List.of(included, excluded));
         var controller = new DiscoverController(service);
         assertThat(controller.apps()).containsExactly(included);

@@ -126,14 +126,16 @@ function MarketplacePage() {
   const doctor = readinessQuery.data?.doctor ?? null;
   const storage = readinessQuery.data?.storage ?? null;
   const lastRefreshAt = appsQuery.dataUpdatedAt > 0 ? new Date(appsQuery.dataUpdatedAt) : null;
-  const installedById = useMemo(() => new Map(apps.filter((app) => app.state === 'installed_managed' && app.installedApp).map((app) => [app.id, app.installedApp])), [apps]);
+  const installedById = useMemo(() => new Map(apps
+    .filter((view) => view.application.relationship === 'managed' && view.application.runtime)
+    .map((view) => [view.application.id, view.application])), [apps]);
   const starterCatalogApps = useMemo(() => {
     const starterIds = new Set(starterCatalogForDiscover(apps.map((view) => view.app)).map((app: MarketplaceApp) => app.id));
-    return apps.filter((view) => starterIds.has(view.id));
+    return apps.filter((view) => starterIds.has(view.application.id));
   }, [apps]);
   const safeBasicCatalogApps = useMemo(() => {
     const safeIds = new Set(safeBasicCatalogForDiscover(apps.map((view) => view.app)).map((app: MarketplaceApp) => app.id));
-    return apps.filter((view) => safeIds.has(view.id));
+    return apps.filter((view) => safeIds.has(view.application.id));
   }, [apps]);
   const catalogApps = useMemo(() => {
     if (showAdvancedMetrics) {
@@ -141,10 +143,10 @@ function MarketplacePage() {
     }
     return basicCatalogMode === 'all-safe' ? safeBasicCatalogApps : starterCatalogApps;
   }, [apps, basicCatalogMode, safeBasicCatalogApps, showAdvancedMetrics, starterCatalogApps]);
-  const detailView = useMemo(() => detailAppId ? apps.find((app) => app.id === detailAppId) ?? null : null, [apps, detailAppId]);
-  const selectedView = useMemo(() => detailView ?? apps.find((app) => app.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, detailView, selectedAppId]);
+  const detailView = useMemo(() => detailAppId ? apps.find((view) => view.application.id === detailAppId) ?? null : null, [apps, detailAppId]);
+  const selectedView = useMemo(() => detailView ?? apps.find((view) => view.application.id === selectedAppId) ?? catalogApps[0] ?? apps[0], [apps, catalogApps, detailView, selectedAppId]);
   const selectedApp = selectedView?.app;
-  const selectedInstalledApp = selectedView?.installedApp ?? null;
+  const selectedInstalledApp = selectedView?.application.relationship === 'managed' ? selectedView.application : null;
   const fallbackInstallOptions: InstallOptions = {
     ports: { hostPort: null },
     access: { tailscaleEnabled: false },
@@ -190,7 +192,7 @@ function MarketplacePage() {
   }
 
   useEffect(() => {
-    if (recoveryAppId && apps.some((app) => app.id === recoveryAppId)) {
+    if (recoveryAppId && apps.some((view) => view.application.id === recoveryAppId)) {
       setSearchQuery('');
       setSelectedCategory('All');
       setSelectedAppId(recoveryAppId);
@@ -198,7 +200,7 @@ function MarketplacePage() {
   }, [apps, recoveryAppId]);
 
   useEffect(() => {
-    if (detailAppId && apps.some((app) => app.id === detailAppId)) {
+    if (detailAppId && apps.some((view) => view.application.id === detailAppId)) {
       setSelectedAppId(detailAppId);
     }
   }, [apps, detailAppId]);
@@ -222,7 +224,7 @@ function MarketplacePage() {
   useEffect(() => {
     if (!showAdvancedMetrics) {
       setSelectedCategory('All');
-      setSelectedAppId((currentAppId) => catalogApps.some((app) => app.id === currentAppId) ? currentAppId : catalogApps[0]?.id ?? currentAppId);
+      setSelectedAppId((currentAppId) => catalogApps.some((view) => view.application.id === currentAppId) ? currentAppId : catalogApps[0]?.application.id ?? currentAppId);
     }
   }, [catalogApps, showAdvancedMetrics]);
 
@@ -232,7 +234,7 @@ function MarketplacePage() {
   }, [selectedAppId]);
 
   useEffect(() => {
-    const view = apps.find((nextApp) => nextApp.id === selectedAppId);
+    const view = apps.find((nextApp) => nextApp.application.id === selectedAppId);
     if (!view || setupAnswersAppId === selectedAppId) {
       return;
     }
@@ -248,13 +250,13 @@ function MarketplacePage() {
       setMarketplaceError('Refresh app information before reviewing or starting an install.');
       return;
     }
-    const app = apps.find((candidate) => candidate.id === appId);
+    const app = apps.find((candidate) => candidate.application.id === appId);
     if (mode === 'install' && appId === selectedApp?.id && installPreview && !installPreview.valid) {
       setMarketplaceError(installPreview.blockingIssues[0]?.message || 'Finish setup choices before installing.');
       return;
     }
     if (installJob && !terminalJob(installJob) && installJob.subjectId !== appId) {
-      setMarketplaceError(`${appNameForJob(installJob, apps)} is installing. Finish that install before starting ${app?.name || appId}.`);
+      setMarketplaceError(`${appNameForJob(installJob, apps)} is installing. Finish that install before starting ${app?.application.name || appId}.`);
       return;
     }
     try {
@@ -347,7 +349,7 @@ function MarketplacePage() {
     if (detailAppId || !visibleApps.length) {
       return;
     }
-    setSelectedAppId((currentAppId) => visibleApps.some((app) => app.id === currentAppId) ? currentAppId : visibleApps[0].id);
+    setSelectedAppId((currentAppId) => visibleApps.some((view) => view.application.id === currentAppId) ? currentAppId : visibleApps[0].application.id);
   }, [detailAppId, visibleApps]);
 
   function openAppDetails(appId: string) {
@@ -372,11 +374,11 @@ function MarketplacePage() {
   }
 
   function openInstallReview() {
-    if (!selectedView || selectedView.installedApp) {
+    if (!selectedView || selectedView.application.relationship === 'managed') {
       return;
     }
     setInstallReviewOpen(true);
-    void requestPlan(selectedView.id);
+    void requestPlan(selectedView.application.id);
   }
 
   function changeDiscoverFilter(nextFilter: string) {
@@ -445,7 +447,7 @@ function MarketplacePage() {
         dismissed={dismissedInstallJobId === installJob?.jobId}
         installJob={installJob}
         onDismiss={() => setDismissedInstallJobId(installJob?.jobId ?? null)}
-        selectedAppId={selectedApp.id}
+        selectedAppId={selectedView.application.id}
       />
 
       <ExtensionActionTarget actionId="review-app" className="min-h-0 flex-1" routeId="discover">
@@ -470,7 +472,7 @@ function MarketplacePage() {
             installingAppId={installJob && !terminalJob(installJob) ? installJob.subjectId ?? null : null}
             onRestoreStarterGuidance={canRestoreStarterGuidance ? restoreStartHere : undefined}
             onSelect={selectApp}
-            selectedAppId={selectedView?.id ?? ''}
+            selectedAppId={selectedView?.application.id ?? ''}
             starterGuidance={starterGuidanceVisible && starterRecommendation ? {
               appName: starterRecommendation.app.name,
               onDismiss: dismissStartHere,
@@ -497,9 +499,9 @@ function MarketplacePage() {
             installStatusMessage={installStatusMessage}
             installing={selectedAppInstalling}
             onConfigureSettings={() => setSettingsOpen(true)}
-            onDetailsOpenChange={(open) => open ? openAppDetails(selectedView.id) : closeAppDetails()}
+            onDetailsOpenChange={(open) => open ? openAppDetails(selectedView.application.id) : closeAppDetails()}
             onInstallSecondCopy={() => {
-              setDuplicateAcknowledgedAppId(selectedView.id);
+              setDuplicateAcknowledgedAppId(selectedView.application.id);
               openInstallReview();
             }}
             onReviewInstall={openInstallReview}
@@ -510,7 +512,7 @@ function MarketplacePage() {
 
       {selectedView && selectedAppHasSettings && (
         <MarketplaceAppSettingsDialog
-          appName={selectedView.name}
+          appName={selectedView.application.name}
           answers={setupAnswers}
           issues={installPreview?.blockingIssues}
           onAnswersChange={changeSetupAnswers}
@@ -524,23 +526,23 @@ function MarketplacePage() {
         <MarketplaceAppDetail
           app={detailView.app}
           appView={detailView}
-          backupJob={backupJob?.subjectId === detailView.id ? backupJob : null}
-          installJob={installJob?.subjectId === detailView.id ? installJob : null}
+          backupJob={backupJob?.subjectId === detailView.application.id ? backupJob : null}
+          installJob={installJob?.subjectId === detailView.application.id ? installJob : null}
           installLocked={selectedAppInstallLocked}
           installOptions={installOptions ?? fallbackInstallOptions}
           installPlan={installPlan}
           installPreview={installPreview}
           installStatusMessage={installStatusMessage}
           installing={selectedAppInstalling}
-          installedApp={detailView.installedApp ?? null}
+          installedApp={detailView.application.relationship === 'managed' ? detailView.application : null}
           onBack={closeAppDetails}
           onCreateBackup={createFirstBackup}
-          onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(detailView.id)}
-          onInstall={(options) => installApp(detailView.id, options)}
+          onDuplicateInstallAcknowledged={() => setDuplicateAcknowledgedAppId(detailView.application.id)}
+          onInstall={(options) => installApp(detailView.application.id, options)}
           onOpenSettings={() => setSettingsOpen(true)}
           onReinstallCurrent={reinstallWithCurrentSettings}
-          onRequestPlan={(options) => requestPlan(detailView.id, options)}
-          recoveryMode={recoveryAppId === detailView.id ? recoveryMode : null}
+          onRequestPlan={(options) => requestPlan(detailView.application.id, options)}
+          recoveryMode={recoveryAppId === detailView.application.id ? recoveryMode : null}
           hasAppSettings={selectedAppHasSettings}
           setupAnswers={setupAnswers}
           setupReady={installPreview?.valid ?? true}
@@ -548,7 +550,7 @@ function MarketplacePage() {
         />
       )}
 
-      {selectedView && wideRailLayout && !selectedView.installedApp && (
+      {selectedView && wideRailLayout && selectedView.application.relationship !== 'managed' && (
         <InstallWizard
           app={selectedView.app}
           hasAppSettings={selectedAppHasSettings}
@@ -559,7 +561,7 @@ function MarketplacePage() {
           installPreview={installPreview}
           installStatusMessage={!(installPreview?.valid ?? true) ? 'Finish the required app settings before installing.' : installStatusMessage}
           installing={selectedAppInstalling}
-          onInstall={(options) => installApp(selectedView.id, options)}
+          onInstall={(options) => installApp(selectedView.application.id, options)}
           onOpenChange={setInstallReviewOpen}
           onOpenSettings={() => setSettingsOpen(true)}
           open={installReviewOpen}
@@ -740,7 +742,7 @@ function readStartHereDismissed() {
 }
 
 function appNameForJob(job: AutarkOsJob, apps: DiscoverAppView[]) {
-  return apps.find((app) => app.id === job.subjectId)?.name || job.subjectId || 'this app';
+  return apps.find((view) => view.application.id === job.subjectId)?.application.name || job.subjectId || 'this app';
 }
 
 function useDiscoverRailLayout() {

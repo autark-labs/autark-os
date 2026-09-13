@@ -93,7 +93,9 @@ function NetworkPage() {
   const pendingReachabilityTokenRef = useRef(0);
   const deepLinkTarget = useMemo(() => parseAccessDeepLink(location.search), [location.search]);
 
-  const apps = appState.apps;
+  const apps = useMemo(() => appState.applications.flatMap((application) => (
+    application.relationship === 'managed' && application.runtime ? [application.runtime] : []
+  )), [appState.applications]);
   const pageLoading = network.isLoading || appState.isLoading;
   const pageRefreshing = network.isFetching || appState.isFetching;
   const pageError = actionError ?? (network.error ? apiErrorMessage(network.error, 'Unable to load network status.') : null);

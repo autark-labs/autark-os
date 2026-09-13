@@ -1,22 +1,15 @@
 import type {
   AppAccessCheck,
   AppHealthSnapshot,
-  AppInstanceView,
-  AppTelemetry,
   AppRuntimeView,
+  AppTelemetry,
   BackendAppOperationState,
 } from '@/types/app';
-import type { ApplicationState, ApplicationStateFreshness } from '@/types/applicationState';
-import type { AppOwnershipView } from '@/types/appOwnership';
+import type { ApplicationState, ApplicationStateFreshness, ApplicationView } from '@/types/applicationState';
 import type { AutarkOsJob } from '@/types/jobs';
 import { jobTypeLabel } from './jobRepository.logic';
-import type { ObservedServiceView } from '@/types/observedService';
 
 export const applicationStateQueryKey = ['application-state'];
-
-type ExtendedApplicationState = ApplicationState & {
-  privateAccessSummary?: unknown;
-};
 
 type AppOperationKind = BackendAppOperationState['kind'] | 'installing' | 'repairing' | 'restoring';
 
@@ -29,20 +22,12 @@ type AppOperation = {
   message?: string;
 };
 
-export function managedRuntimeApps(state?: ApplicationState | null): AppRuntimeView[] {
-  return state?.runtimeApps?.length ? state.runtimeApps : (state?.managedApps ?? []).map(appInstanceToRuntimeView);
+export function applications(state?: ApplicationState | null): ApplicationView[] {
+  return state?.applications ?? [];
 }
 
-export function observedServices(state?: ApplicationState | null): ObservedServiceView[] {
-  return state?.observedServices ?? [];
-}
-
-export function foundServices(state?: ApplicationState | null): ObservedServiceView[] {
-  return state?.foundServices ?? [];
-}
-
-export function ownershipViews(state?: ApplicationState | null): AppOwnershipView[] {
-  return state?.ownershipViews ?? [];
+export function managedApplications(state?: ApplicationState | null): ApplicationView[] {
+  return applications(state).filter((application) => application.relationship === 'managed' && application.runtime);
 }
 
 export function applicationStateUpdatedAt(state?: ApplicationState | null) {
@@ -100,27 +85,23 @@ export function applicationStateFreshness(
 }
 
 export function telemetryByAppId(state?: ApplicationState | null): Record<string, AppTelemetry> {
-  return Object.fromEntries(managedRuntimeApps(state).map((app) => [app.appId, app.telemetry ?? unavailableTelemetry()]));
+  return Object.fromEntries(managedApplications(state).map(({ id, runtime }) => [id, runtime?.telemetry ?? unavailableTelemetry()]));
 }
 
 export function healthByAppId(state?: ApplicationState | null): Record<string, AppHealthSnapshot> {
   return Object.fromEntries(
-    managedRuntimeApps(state)
-      .filter((app): app is AppRuntimeView & { healthSnapshot: AppHealthSnapshot } => Boolean(app.healthSnapshot))
-      .map((app) => [app.appId, app.healthSnapshot]),
+    managedApplications(state)
+      .filter((application): application is ApplicationView & { runtime: AppRuntimeView & { healthSnapshot: AppHealthSnapshot } } => Boolean(application.runtime?.healthSnapshot))
+      .map((application) => [application.id, application.runtime.healthSnapshot]),
   );
 }
 
 export function accessByAppId(state?: ApplicationState | null): Record<string, AppAccessCheck> {
-  return Object.fromEntries(managedRuntimeApps(state).map((app) => [app.appId, accessCheckFromApp(app)]));
+  return Object.fromEntries(managedApplications(state).map(({ id, runtime }) => [id, accessCheckFromApp(runtime!)]));
 }
 
 export function catalogAppIsManaged(state: ApplicationState | null | undefined, catalogAppId?: string | null) {
-  if (!catalogAppId) {
-    return false;
-  }
-  return managedRuntimeApps(state).some((app) => app.appId === catalogAppId)
-    || (state?.managedApps ?? []).some((app) => app.catalogAppId === catalogAppId);
+  return Boolean(catalogAppId && applications(state).some((application) => application.id === catalogAppId && application.relationship === 'managed'));
 }
 
 export function displayStatusFromCanonicalState(app?: AppRuntimeView | null, health?: AppHealthSnapshot | null) {
@@ -152,52 +133,21 @@ export function appNeedsAttentionFromCanonicalState(
   return resourceAlert(telemetry) !== null;
 }
 
-export function privateAccessSummaryFromState(state?: ExtendedApplicationState | null) {
-  return state?.privateAccessSummary ?? null;
-}
-
-export function setObservedServiceAdoptedInState(state: ApplicationState | undefined, serviceId: string) {
-  if (!state || !Array.isArray(state.observedServices)) {
-    return state;
-  }
-  const service = state.observedServices.find((item) => item.id === serviceId);
-  if (!service?.catalogAppId) {
-    return state;
-  }
-  const runtimeApp = runtimeAppFromObservedService(service);
-  const managedApp = managedAppFromObservedService(service);
-  const observedServices = state.observedServices.map((item) => item.id === serviceId ? observedServiceAsManaged(item) : item);
-  return {
-    ...state,
-    runtimeApps: upsertByKey(state.runtimeApps ?? [], runtimeApp, (app) => app.appId),
-    managedApps: upsertByKey(state.managedApps ?? [], managedApp, (app) => app.catalogAppId),
-    observedServices,
-    foundServices: observedServices.filter((item) => !item.managedByThisAutarkOs),
-  };
-}
-
 export function setAutarkOsJobInState(state: ApplicationState | undefined, job?: AutarkOsJob | null) {
   if (!state || !job?.subjectId || !lifecycleJobTypes().has(job.type)) {
     return state;
   }
-
   const operation = operationStateFromAutarkOsJob(job);
-  const runtimeApps = (state.runtimeApps ?? []).map((app) => jobTargetsApp(job, app.appId) && !preservesUnrelatedFailure(app.operationState, job)
-    ? runtimeAppWithOperation(app, operation)
-    : app);
-  const managedApps = (state.managedApps ?? []).map((app) => jobTargetsApp(job, app.catalogAppId)
-    ? managedAppWithOperation(app, operation)
-    : app);
-
   return {
     ...state,
-    runtimeApps,
-    managedApps,
+    applications: state.applications.map((application) => {
+      const runtime = application.runtime;
+      if (!runtime || !jobTargetsApp(job, application.id) || preservesUnrelatedFailure(runtime.operationState, job)) {
+        return application;
+      }
+      return { ...application, runtime: runtimeAppWithOperation(runtime, operation) };
+    }),
   };
-}
-
-function preservesUnrelatedFailure(operation: BackendAppOperationState | null | undefined, job: AutarkOsJob) {
-  return operation?.kind === 'failed' && operation.jobType && operation.jobType !== job.type && job.status === 'succeeded';
 }
 
 export function setRuntimeAppInState(state: ApplicationState | undefined, app: AppRuntimeView) {
@@ -206,26 +156,21 @@ export function setRuntimeAppInState(state: ApplicationState | undefined, app: A
   }
   return {
     ...state,
-    runtimeApps: upsertByKey(state.runtimeApps ?? [], app, (item) => item.appId),
-    managedApps: (state.managedApps ?? []).map((item) => item.catalogAppId === app.appId ? {
-      ...item,
-      name: app.appName || item.name,
-      userStatus: app.friendlyStatus || item.userStatus,
-      runtimeState: app.technicalStatus || item.runtimeState,
-      localUrl: app.accessUrl || item.localUrl,
-      updatedAt: new Date().toISOString(),
-    } : item),
+    applications: state.applications.map((application) => application.id === app.appId && application.relationship === 'managed'
+      ? { ...application, runtime: app, runtimeState: app.technicalStatus || application.runtimeState }
+      : application),
   };
 }
 
-function lifecycleJobTypes() {
-  return new Set(['install_app', 'repair_app', 'save_app_settings', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app']);
+function preservesUnrelatedFailure(operation: BackendAppOperationState | null | undefined, job: AutarkOsJob) {
+  return operation?.kind === 'failed' && operation.jobType && operation.jobType !== job.type && job.status === 'succeeded';
 }
 
-function jobTargetsApp(job: AutarkOsJob | null | undefined, appId?: string | null) {
-  if (!job || !appId) {
-    return false;
-  }
+function lifecycleJobTypes() {
+  return new Set(['install_app', 'repair_app', 'save_app_settings', 'start_app', 'stop_app', 'restart_app', 'backup', 'backup_verify', 'backup_restore', 'uninstall_app', 'update_app', 'rollback_app']);
+}
+
+function jobTargetsApp(job: AutarkOsJob, appId: string) {
   if (job.subjectId === appId) {
     return true;
   }
@@ -245,15 +190,10 @@ function restoreTarget(subjectId?: string | null) {
 }
 
 function operationStateFromAutarkOsJob(job: AutarkOsJob): AppOperation {
+  const currentStep = currentAutarkOsJobStepText(job);
   if (job.status === 'failed') {
-    if (isFailedFullRestore(job)) {
-      return {
-        kind: 'idle',
-        label: 'Idle',
-        jobId: job.jobId,
-        currentStep: currentAutarkOsJobStepText(job),
-        message: currentAutarkOsJobStepText(job),
-      };
+    if (job.type === 'backup_restore' && restoreTarget(job.subjectId) === 'all') {
+      return { kind: 'idle', label: 'Idle', jobId: job.jobId, currentStep, message: currentStep };
     }
     return {
       kind: 'failed',
@@ -265,22 +205,9 @@ function operationStateFromAutarkOsJob(job: AutarkOsJob): AppOperation {
     };
   }
   if (job.status !== 'queued' && job.status !== 'running') {
-    return {
-      kind: 'idle',
-      label: 'Idle',
-      jobId: job.jobId,
-      currentStep: currentAutarkOsJobStepText(job),
-      message: currentAutarkOsJobStepText(job),
-    };
+    return { kind: 'idle', label: 'Idle', jobId: job.jobId, currentStep, message: currentStep };
   }
-
-  return {
-    kind: operationKind(job.type),
-    label: operationLabel(job.type),
-    jobId: job.jobId,
-    currentStep: currentAutarkOsJobStepText(job),
-    message: currentAutarkOsJobStepText(job),
-  };
+  return { kind: operationKind(job.type), label: operationLabel(job.type), jobId: job.jobId, currentStep, message: currentStep };
 }
 
 function runtimeAppWithOperation(app: AppRuntimeView, operation: AppOperation): AppRuntimeView {
@@ -293,15 +220,6 @@ function runtimeAppWithOperation(app: AppRuntimeView, operation: AppOperation): 
   };
 }
 
-function managedAppWithOperation(app: AppInstanceView, operation: AppOperation): AppInstanceView {
-  return {
-    ...app,
-    userStatus: friendlyStatusForOperation(operation, app.userStatus),
-    runtimeState: runtimeStateForOperation(operation, app.runtimeState),
-    updatedAt: new Date().toISOString(),
-  };
-}
-
 function operationKind(type: string): AppOperationKind {
   if (type === 'start_app') return 'starting';
   if (type === 'stop_app') return 'stopping';
@@ -311,9 +229,9 @@ function operationKind(type: string): AppOperationKind {
   if (type === 'install_app') return 'installing';
   if (type === 'backup' || type === 'backup_verify') return 'backing_up';
   if (type === 'backup_restore') return 'restoring';
-  if (type === 'uninstall_app') return 'uninstalling';
   if (type === 'update_app') return 'updating';
   if (type === 'rollback_app') return 'rolling_back';
+  if (type === 'uninstall_app') return 'uninstalling';
   return 'idle';
 }
 
@@ -332,45 +250,17 @@ function operationLabel(type: string) {
   return 'Working';
 }
 
-function readinessStateForOperation(operation: AppOperation | null | undefined, current: AppRuntimeView['readinessState']) {
-  if (!operation || operation.kind === 'idle' || operation.kind === 'failed') {
-    return current;
-  }
-  if (operation.kind === 'starting' || operation.kind === 'restarting' || operation.kind === 'installing') {
-    return 'starting';
-  }
-  if (operation.kind === 'stopping') {
-    return 'paused';
-  }
+function readinessStateForOperation(operation: AppOperation, current: AppRuntimeView['readinessState']) {
+  if (operation.kind === 'idle' || operation.kind === 'failed') return current;
+  if (operation.kind === 'starting' || operation.kind === 'restarting' || operation.kind === 'installing') return 'starting';
+  if (operation.kind === 'stopping') return 'paused';
   return current;
 }
 
-function friendlyStatusForOperation(operation: AppOperation | null | undefined, current: string) {
-  if (!operation || operation.kind === 'idle' || operation.kind === 'failed') {
-    return current;
-  }
-  if (operation.kind === 'starting' || operation.kind === 'restarting') {
-    return 'Starting';
-  }
-  if (operation.kind === 'installing') {
-    return 'Installing';
-  }
-  if (operation.kind === 'stopping') {
-    return 'Paused';
-  }
-  return current;
-}
-
-function runtimeStateForOperation(operation: AppOperation | null | undefined, current: string) {
-  if (!operation || operation.kind === 'idle' || operation.kind === 'failed') {
-    return current;
-  }
-  if (operation.kind === 'starting' || operation.kind === 'restarting' || operation.kind === 'installing') {
-    return 'starting';
-  }
-  if (operation.kind === 'stopping') {
-    return 'stopped';
-  }
+function friendlyStatusForOperation(operation: AppOperation, current: string) {
+  if (operation.kind === 'starting' || operation.kind === 'restarting') return 'Starting';
+  if (operation.kind === 'installing') return 'Installing';
+  if (operation.kind === 'stopping') return 'Paused';
   return current;
 }
 
@@ -379,187 +269,6 @@ function currentAutarkOsJobStepText(job: AutarkOsJob) {
     ?? job.steps?.find((candidate) => candidate.status === 'running')
     ?? job.steps?.find((candidate) => candidate.status === 'pending');
   return step?.message || step?.label || '';
-}
-
-function isFailedFullRestore(job: AutarkOsJob) {
-  return job?.type === 'backup_restore' && job.status === 'failed' && restoreTarget(job.subjectId) === 'all';
-}
-
-export function setRuntimeAppStatusInState(state: ApplicationState | undefined, appId: string, status: string) {
-  if (!state || !appId) {
-    return state;
-  }
-  return {
-    ...state,
-    runtimeApps: (state.runtimeApps ?? []).map((app) => app.appId === appId ? {
-      ...app,
-      friendlyStatus: status,
-      canonicalUserStatus: status,
-    } : app),
-    managedApps: (state.managedApps ?? []).map((app) => app.catalogAppId === appId ? {
-      ...app,
-      userStatus: status,
-      runtimeState: status === 'Ready' ? 'running' : status === 'Paused' || status === 'Stopped' ? 'stopped' : app.runtimeState,
-      updatedAt: new Date().toISOString(),
-    } : app),
-  };
-}
-
-export function removeManagedAppFromState(state: ApplicationState | undefined, appId: string) {
-  if (!state || !appId) {
-    return state;
-  }
-  return {
-    ...state,
-    runtimeApps: (state.runtimeApps ?? []).filter((app) => app.appId !== appId),
-    managedApps: (state.managedApps ?? []).filter((app) => app.catalogAppId !== appId),
-  };
-}
-
-function appInstanceToRuntimeView(app: AppInstanceView): AppRuntimeView {
-  return {
-    appId: app.catalogAppId,
-    appName: app.name,
-    category: app.category,
-    description: '',
-    version: '',
-    image: app.icon,
-    friendlyStatus: app.userStatus,
-    technicalStatus: app.runtimeState,
-    healthCheck: '',
-    runtimePath: '',
-    composeProject: '',
-    accessUrl: app.localUrl,
-    desiredAccess: null,
-    observedAccess: {
-      localUrl: app.localUrl,
-      privateUrl: app.privateUrl,
-      localPort: null,
-      protocol: 'http',
-      privateLinkStatus: app.privateUrl ? 'verified' : 'not_configured',
-      lastAccessCheckAt: null,
-      lastSuccessfulAccessAt: null,
-      lastRepairAttemptAt: null,
-      lastRepairStatus: null,
-    },
-    installedAt: app.updatedAt,
-    lastBackup: app.backupState,
-    settings: null,
-    telemetry: unavailableTelemetry(),
-    healthSnapshot: null,
-    usageGuide: null,
-    setupGuide: null,
-    appConfiguration: [],
-    recentEvents: [],
-    canonicalUserStatus: app.userStatus,
-    managementState: app.managementState,
-    readinessState: app.readinessState,
-    attentionState: app.attentionState,
-    canonicalRuntimeState: app.runtimeState,
-    canonicalOwnershipState: app.ownershipState,
-    canonicalAccessState: app.accessState,
-    canonicalBackupState: app.backupState,
-    canonicalIssues: app.issues ?? [],
-    canonicalActions: app.actions ?? [],
-    remediation: app.remediation ?? null,
-  };
-}
-
-function observedServiceAsManaged(service: ObservedServiceView): ObservedServiceView {
-  return {
-    ...service,
-    userStatus: 'installed_managed',
-    userStatusLabel: 'Managed',
-    userStatusDescription: 'Managed by this Autark-OS installation.',
-    ownershipState: 'owned_managed',
-    managementState: 'managed',
-    readinessState: service.readinessState ?? (service.runtimeState === 'running' ? 'ready' : 'starting'),
-    attentionState: 'none',
-    managedByThisAutarkOs: true,
-  };
-}
-
-function runtimeAppFromObservedService(service: ObservedServiceView): AppRuntimeView {
-  const appId = service.catalogAppId ?? service.id;
-  return {
-    appId,
-    appName: service.displayName || appId,
-    category: service.category || 'Application',
-    description: 'Recovered by Autark-OS.',
-    version: '',
-    image: null,
-    friendlyStatus: service.runtimeState === 'running' ? 'Ready' : 'Starting',
-    technicalStatus: service.runtimeState || 'recovering',
-    healthCheck: service.runtimeState || 'recovering',
-    runtimePath: '',
-    composeProject: service.id,
-    accessUrl: service.url || null,
-    desiredAccess: null,
-    observedAccess: {
-      localUrl: service.url || null,
-      privateUrl: null,
-      localPort: null,
-      protocol: service.url?.startsWith('https://') ? 'https' : 'http',
-      privateLinkStatus: 'not_enabled',
-      lastAccessCheckAt: null,
-      lastSuccessfulAccessAt: null,
-      lastRepairAttemptAt: null,
-      lastRepairStatus: null,
-    },
-    installedAt: new Date().toISOString(),
-    lastBackup: 'Backups disabled',
-    settings: null,
-    telemetry: unavailableTelemetry(),
-    healthSnapshot: null,
-    usageGuide: null,
-    setupGuide: null,
-    appConfiguration: [],
-    recentEvents: [],
-    canonicalUserStatus: service.runtimeState === 'running' ? 'Ready' : 'Starting',
-    managementState: 'managed',
-    readinessState: service.readinessState ?? (service.runtimeState === 'running' ? 'ready' : 'starting'),
-    attentionState: 'none',
-    canonicalRuntimeState: service.runtimeState || 'recovering',
-    canonicalOwnershipState: 'owned',
-    canonicalAccessState: service.url ? 'local_ready' : 'not_ready',
-    canonicalBackupState: 'backup_disabled',
-    canonicalIssues: [],
-    canonicalActions: [],
-  };
-}
-
-function managedAppFromObservedService(service: ObservedServiceView): AppInstanceView {
-  const appId = service.catalogAppId ?? service.id;
-  return {
-    appInstanceId: `appinst_adopted_${appId}`,
-    catalogAppId: appId,
-    name: service.displayName || appId,
-    category: service.category || 'Application',
-    icon: '',
-    userStatus: service.runtimeState === 'running' ? 'Ready' : 'Starting',
-    managementState: 'managed',
-    readinessState: service.readinessState ?? (service.runtimeState === 'running' ? 'ready' : 'starting'),
-    attentionState: 'none',
-    installState: 'adopted',
-    runtimeState: service.runtimeState || 'recovering',
-    ownershipState: 'owned',
-    accessState: service.url ? 'local_ready' : 'not_ready',
-    backupState: 'backup_disabled',
-    localUrl: service.url || '',
-    privateUrl: '',
-    issues: [],
-    actions: [],
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-function upsertByKey<T>(items: T[], nextItem: T, keyFor: (item: T) => string | null | undefined) {
-  const key = keyFor(nextItem);
-  const index = items.findIndex((item) => keyFor(item) === key);
-  if (index === -1) {
-    return [...items, nextItem];
-  }
-  return items.map((item, currentIndex) => currentIndex === index ? nextItem : item);
 }
 
 function accessCheckFromApp(app: AppRuntimeView): AppAccessCheck {
@@ -573,14 +282,13 @@ function accessCheckFromApp(app: AppRuntimeView): AppAccessCheck {
       checkedAt: health.checkedAt,
     };
   }
-  const privateStatus = app.observedAccess?.privateLinkStatus;
-  if (privateStatus === 'missing') {
+  if (app.observedAccess?.privateLinkStatus === 'missing') {
     return {
       appId: app.appId,
-      url: app.observedAccess?.privateUrl ?? app.accessUrl,
+      url: app.observedAccess.privateUrl ?? app.accessUrl,
       status: 'unreachable',
       message: 'Private link is missing.',
-      checkedAt: app.healthSnapshot?.checkedAt ?? '',
+      checkedAt: health?.checkedAt ?? '',
     };
   }
   return {
@@ -588,61 +296,37 @@ function accessCheckFromApp(app: AppRuntimeView): AppAccessCheck {
     url: app.accessUrl ?? null,
     status: app.accessUrl ? 'reachable' : 'not_configured',
     message: app.accessUrl ? 'App link is available.' : 'No app link has been configured yet.',
-    checkedAt: app.healthSnapshot?.checkedAt ?? '',
+    checkedAt: health?.checkedAt ?? '',
   };
 }
 
 function normalizeDisplayStatus(status?: string | null) {
-  if (status === 'Stopped') {
-    return 'Paused';
-  }
-  if (!status) {
-    return 'Unknown';
-  }
-  return status;
+  if (status === 'Stopped') return 'Paused';
+  return status || 'Unknown';
 }
 
 function isPrivateAccessOnlyWarning(app?: AppRuntimeView | null, health?: AppHealthSnapshot | null) {
-  if (health?.status !== 'Needs attention') {
-    return false;
-  }
-  const appLooksReady = app?.friendlyStatus === 'Ready';
-  const containerLooksReady = health.dockerStatus === 'Ready';
-  const localAccessWorks = health.localAccessStatus === 'reachable' || health.localAccessStatus === 'not_configured';
-  const privateAccessProblem = !['verified', 'not_enabled'].includes(health.privateAccessStatus);
-  return appLooksReady && containerLooksReady && localAccessWorks && privateAccessProblem;
+  if (health?.status !== 'Needs attention') return false;
+  return app?.friendlyStatus === 'Ready'
+    && health.dockerStatus === 'Ready'
+    && (health.localAccessStatus === 'reachable' || health.localAccessStatus === 'not_configured')
+    && !['verified', 'not_enabled'].includes(health.privateAccessStatus);
 }
 
 function resourceAlert(telemetry?: AppTelemetry | null) {
   const cpu = percentFromTelemetry(telemetry?.cpuPercent);
   const memory = percentFromTelemetry(telemetry?.memoryPercent);
-  if (typeof cpu === 'number' && cpu >= 85) {
-    return 'CPU is higher than usual.';
-  }
-  if (typeof memory === 'number' && memory >= 85) {
-    return 'Memory use is higher than usual.';
-  }
+  if (typeof cpu === 'number' && cpu >= 85) return 'CPU is higher than usual.';
+  if (typeof memory === 'number' && memory >= 85) return 'Memory use is higher than usual.';
   return null;
 }
 
 function percentFromTelemetry(value?: string | null) {
-  if (!value || value === 'Unavailable') {
-    return null;
-  }
-  const parsed = Number.parseFloat(String(value).replace('%', ''));
-  if (Number.isNaN(parsed)) {
-    return null;
-  }
-  return Math.max(0, Math.min(100, Math.round(parsed)));
+  if (!value) return null;
+  const parsed = Number.parseFloat(value.replace('%', '').trim());
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function unavailableTelemetry(): AppTelemetry {
-  return {
-    cpuPercent: 'Unavailable',
-    memoryUsage: 'Unavailable',
-    memoryPercent: 'Unavailable',
-    networkIo: 'Unavailable',
-    blockIo: 'Unavailable',
-    checkedAt: '',
-  };
+  return { cpuPercent: 'Unavailable', memoryUsage: 'Unavailable', memoryPercent: 'Unavailable', networkIo: 'Unavailable', blockIo: 'Unavailable', checkedAt: '' };
 }

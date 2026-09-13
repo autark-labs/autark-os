@@ -24,7 +24,6 @@ import com.autarkos.api.AutarkOsAction;
 import com.autarkos.host.HostModels;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
-import com.autarkos.host.ObservedServiceView;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
@@ -38,10 +37,10 @@ public class ApplicationStateService {
 
     private static final Duration SNAPSHOT_REFRESH_INTERVAL = Duration.ofSeconds(10);
 
-    private final Supplier<List<AppInstanceView>> managedApps;
-    private final Supplier<List<AppRuntimeView>> runtimeApps;
+    private final Supplier<List<AppInstanceView>> managedAppViews;
+    private final Supplier<List<AppRuntimeView>> runtimeAppViews;
     private final ObservedServiceService observedServiceService;
-    private final AppOwnershipService appOwnershipService;
+    private final ApplicationInventoryService applicationInventoryService;
     private final Supplier<Instant> clock;
     private final Supplier<List<AutarkOsJob>> jobs;
     private final Executor backgroundRefreshExecutor;
@@ -55,13 +54,13 @@ public class ApplicationStateService {
             AppInstanceViewProvider appInstanceViewProvider,
             AppLifecycleService appLifecycleService,
             ObservedServiceService observedServiceService,
-            AppOwnershipService appOwnershipService,
+            ApplicationInventoryService applicationInventoryService,
             AutarkOsJobService jobService) {
         this(
                 appInstanceViewProvider::list,
                 appLifecycleService::listApps,
                 observedServiceService,
-                appOwnershipService,
+                applicationInventoryService,
                 Instant::now,
                 jobService::list,
                 defaultBackgroundRefreshExecutor(),
@@ -69,57 +68,53 @@ public class ApplicationStateService {
     }
 
     public ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedApps,
-            Supplier<List<AppRuntimeView>> runtimeApps,
+            Supplier<List<AppInstanceView>> managedAppViews,
+            Supplier<List<AppRuntimeView>> runtimeAppViews,
             ObservedServiceService observedServiceService,
-            AppOwnershipService appOwnershipService,
+            ApplicationInventoryService applicationInventoryService,
             Supplier<Instant> clock) {
-        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, List::of, Runnable::run, false);
+        this(managedAppViews, runtimeAppViews, observedServiceService, applicationInventoryService, clock, List::of, Runnable::run, false);
     }
 
     public ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedApps,
-            Supplier<List<AppRuntimeView>> runtimeApps,
+            Supplier<List<AppInstanceView>> managedAppViews,
+            Supplier<List<AppRuntimeView>> runtimeAppViews,
             ObservedServiceService observedServiceService,
-            AppOwnershipService appOwnershipService,
+            ApplicationInventoryService applicationInventoryService,
             Supplier<Instant> clock,
             Supplier<List<AutarkOsJob>> jobs) {
-        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, jobs, Runnable::run, false);
+        this(managedAppViews, runtimeAppViews, observedServiceService, applicationInventoryService, clock, jobs, Runnable::run, false);
     }
 
     public ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedApps,
-            Supplier<List<AppRuntimeView>> runtimeApps,
+            Supplier<List<AppInstanceView>> managedAppViews,
+            Supplier<List<AppRuntimeView>> runtimeAppViews,
             ObservedServiceService observedServiceService,
-            AppOwnershipService appOwnershipService,
+            ApplicationInventoryService applicationInventoryService,
             Supplier<Instant> clock,
             Executor backgroundRefreshExecutor) {
-        this(managedApps, runtimeApps, observedServiceService, appOwnershipService, clock, List::of, backgroundRefreshExecutor, false);
+        this(managedAppViews, runtimeAppViews, observedServiceService, applicationInventoryService, clock, List::of, backgroundRefreshExecutor, false);
     }
 
     private ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedApps,
-            Supplier<List<AppRuntimeView>> runtimeApps,
+            Supplier<List<AppInstanceView>> managedAppViews,
+            Supplier<List<AppRuntimeView>> runtimeAppViews,
             ObservedServiceService observedServiceService,
-            AppOwnershipService appOwnershipService,
+            ApplicationInventoryService applicationInventoryService,
             Supplier<Instant> clock,
             Supplier<List<AutarkOsJob>> jobs,
             Executor backgroundRefreshExecutor,
             boolean ownsBackgroundRefreshExecutor) {
-        this.managedApps = managedApps;
-        this.runtimeApps = runtimeApps;
+        this.managedAppViews = managedAppViews;
+        this.runtimeAppViews = runtimeAppViews;
         this.observedServiceService = observedServiceService;
-        this.appOwnershipService = appOwnershipService;
+        this.applicationInventoryService = applicationInventoryService;
         this.clock = clock;
         this.jobs = jobs == null ? List::of : jobs;
         this.backgroundRefreshExecutor = backgroundRefreshExecutor;
         this.ownedBackgroundRefreshExecutor = ownsBackgroundRefreshExecutor && backgroundRefreshExecutor instanceof ThreadPoolExecutor executor ? executor : null;
         Instant now = clock.get();
         this.cached = new AtomicReference<>(new ApplicationState(
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
                 List.of(),
                 null,
                 AutarkOsStates.SnapshotState.STALE,
@@ -195,24 +190,14 @@ public class ApplicationStateService {
     }
 
     private ApplicationState buildSnapshot(Instant startedAt) {
-        List<AppRuntimeView> runtime = runtimeApps(runtimeApps.get());
+        List<AppRuntimeView> runtime = decorateRuntimeApps(runtimeAppViews.get());
         // Runtime observation writes the freshly derived status; build management views only afterwards.
-        List<AppInstanceView> managed = managedApps.get();
+        List<AppInstanceView> managed = managedAppViews.get();
         List<ObservedService> observed = cachedObservedServices();
-        List<ObservedServiceView> observedViews = observed.stream()
-                .map(ObservedServiceService::toView)
-                .toList();
-        List<ObservedServiceView> found = observedViews.stream()
-                .filter(service -> !service.managedByThisAutarkOs())
-                .toList();
-        List<AppOwnershipView> ownership = appOwnershipService == null ? List.of() : appOwnershipService.apps(observed, managed);
+        List<ApplicationView> applications = applicationInventoryService.apps(observed, managed, runtime);
         Instant completedAt = clock.get();
         return new ApplicationState(
-                managed,
-                runtime,
-                observedViews,
-                found,
-                ownership,
+                applications,
                 completedAt,
                 AutarkOsStates.SnapshotState.IDLE,
                 startedAt,
@@ -222,7 +207,7 @@ public class ApplicationStateService {
                 completedAt.plus(SNAPSHOT_REFRESH_INTERVAL));
     }
 
-    private List<AppRuntimeView> runtimeApps(List<AppRuntimeView> apps) {
+    private List<AppRuntimeView> decorateRuntimeApps(List<AppRuntimeView> apps) {
         List<AutarkOsJob> operationJobs = lifecycleOperationJobs();
         List<AppRuntimeView> sorted = apps.stream()
                 .sorted(Comparator.comparing(this::managedSortName).thenComparing(AppRuntimeView::appId))
@@ -439,11 +424,7 @@ public class ApplicationStateService {
     private ApplicationState markFailed(ApplicationState previous, Instant startedAt, RuntimeException exception) {
         Instant completedAt = clock.get();
         return new ApplicationState(
-                previous.managedApps(),
-                previous.runtimeApps(),
-                previous.observedServices(),
-                previous.foundServices(),
-                previous.ownershipViews(),
+                previous.applications(),
                 previous.updatedAt(),
                 AutarkOsStates.SnapshotState.ERROR,
                 startedAt,
@@ -455,11 +436,7 @@ public class ApplicationStateService {
 
     private ApplicationState markRunning(ApplicationState previous, Instant startedAt) {
         return new ApplicationState(
-                previous.managedApps(),
-                previous.runtimeApps(),
-                previous.observedServices(),
-                previous.foundServices(),
-                previous.ownershipViews(),
+                previous.applications(),
                 previous.updatedAt(),
                 AutarkOsStates.JobStatus.RUNNING,
                 startedAt,

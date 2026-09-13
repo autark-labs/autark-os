@@ -43,7 +43,7 @@ test('My Apps uses quiet status dots and compact action affordances on dark app 
 });
 
 test('My Apps sends non-managed services to the dedicated existing-app review flow', () => {
-  assert.match(page, /appState\.foundServices\.filter/);
+  assert.match(page, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
   assert.match(page, /FoundAppsPrompt/);
   assert.match(page, /reviewHref: '\/apps\/found'/);
   assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);

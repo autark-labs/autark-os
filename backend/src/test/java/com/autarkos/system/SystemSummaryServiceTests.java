@@ -12,6 +12,7 @@ import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
 import com.autarkos.backups.BackupModels;
 import com.autarkos.marketplace.install.AppInstanceView;
+import com.autarkos.testsupport.ApplicationViewTestRecords;
 
 class SystemSummaryServiceTests {
 
@@ -28,7 +29,7 @@ class SystemSummaryServiceTests {
         AppInstanceView ready = app("appinst_homepage", "homepage", "Homepage", "Ready", "http://localhost:3000", List.of());
         AppInstanceView missing = app("appinst_vaultwarden", "vaultwarden", "Vaultwarden", "Missing", "", List.of(missingIssue));
         SystemSummaryService service = new SystemSummaryService(
-                () -> List.of(ready, missing),
+                () -> List.of(ApplicationViewTestRecords.managed(ready), ApplicationViewTestRecords.managed(missing)),
                 () -> ProjectSettings.defaults("autark-os-test"),
                 () -> new AutarkOsIdentity("pos_test", "autark-os-test", "/runtime", "sha256:test", Instant.parse("2026-06-20T12:00:00Z"), 1),
                 () -> setupStatus("ready", "Docker 29.6.0"),
@@ -83,7 +84,7 @@ class SystemSummaryServiceTests {
                 List.of(),
                 "protected_by_restore_point");
         SystemSummaryService service = new SystemSummaryService(
-                () -> List.of(protectedApp),
+                () -> List.of(ApplicationViewTestRecords.managed(protectedApp)),
                 () -> ProjectSettings.defaults("autark-os-test"),
                 () -> new AutarkOsIdentity("pos_test", "autark-os-test", "/runtime", "sha256:test", Instant.parse("2026-06-20T12:00:00Z"), 1),
                 () -> setupStatus("ready", "Docker 29.6.0"),

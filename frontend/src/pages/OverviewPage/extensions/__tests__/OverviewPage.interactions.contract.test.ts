@@ -32,7 +32,7 @@ test('global notification center owns session-local recommendation dismissal', (
 test('Home app shortcuts deep-link to the specific managed or linked service', () => {
   const page = source('pages/OverviewPage/components/HomeDashboardPanels.tsx');
 
-  assert.match(page, /applicationDeepLinkForManagedApp\(app\.catalogAppId, \{ panel: 'manage' \}\)/);
+  assert.match(page, /applicationDeepLinkForManagedApp\(app\.id, \{ panel: 'manage' \}\)/);
   assert.match(page, /href=\{openUrl \|\| detailRoute\}/);
   assert.doesNotMatch(page, /Open<\/.*button/);
 });

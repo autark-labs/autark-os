@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.apps.ApplicationViews;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.network.tailscale.TailscaleServeConfig;
@@ -28,7 +29,7 @@ public class PrivateAccessReconciliationService {
 
     @Autowired
     public PrivateAccessReconciliationService(ApplicationStateService applicationStateService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService, InstalledAppRepository repository) {
-        this(() -> applicationStateService.snapshot().runtimeApps(), catalogService, tailscaleService, repository);
+        this(() -> ApplicationViews.managedRuntimes(applicationStateService.snapshot()), catalogService, tailscaleService, repository);
     }
 
     public PrivateAccessReconciliationService(AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService) {

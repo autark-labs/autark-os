@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.apps.ApplicationViews;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
 import com.autarkos.jobs.AutarkOsJobService;
@@ -55,13 +56,13 @@ public class InstalledAppsController {
 
     @GetMapping
     public List<AppRuntimeView> apps() {
-        return applicationStateService.snapshot().runtimeApps();
+        return ApplicationViews.managedRuntimes(applicationStateService.snapshot());
     }
 
     @GetMapping("/access")
     public Map<String, AccessModels.AppAccessCheck> accessChecks() {
         Map<String, AccessModels.AppAccessCheck> checks = new LinkedHashMap<>();
-        for (AppRuntimeView app : applicationStateService.snapshot().runtimeApps()) {
+        for (AppRuntimeView app : ApplicationViews.managedRuntimes(applicationStateService.snapshot())) {
             checks.put(app.appId(), cachedAccessCheck(app));
         }
         return checks;
@@ -70,7 +71,7 @@ public class InstalledAppsController {
     @GetMapping("/telemetry")
     public Map<String, RuntimeModels.AppTelemetry> telemetry() {
         Map<String, RuntimeModels.AppTelemetry> telemetry = new LinkedHashMap<>();
-        for (AppRuntimeView app : applicationStateService.snapshot().runtimeApps()) {
+        for (AppRuntimeView app : ApplicationViews.managedRuntimes(applicationStateService.snapshot())) {
             telemetry.put(app.appId(), app.telemetry() == null ? RuntimeModels.AppTelemetry.unavailable() : app.telemetry());
         }
         monitoringMetricsService.recordApps(telemetry);
@@ -80,7 +81,7 @@ public class InstalledAppsController {
     @GetMapping("/health")
     public Map<String, AppHealthSnapshot> healthSnapshots() {
         Map<String, AppHealthSnapshot> snapshots = new LinkedHashMap<>();
-        for (AppRuntimeView app : applicationStateService.snapshot().runtimeApps()) {
+        for (AppRuntimeView app : ApplicationViews.managedRuntimes(applicationStateService.snapshot())) {
             if (app.healthSnapshot() != null) {
                 snapshots.put(app.appId(), app.healthSnapshot());
             }

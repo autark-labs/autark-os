@@ -86,10 +86,7 @@ export const ApplicationsPage = () => {
 
   const items = useMemo(() => {
     const liveItems = buildApplicationSurfaceItems({
-      accessByAppId: appState.accessByAppId,
-      apps: appState.apps,
-      healthByAppId: appState.healthByAppId,
-      telemetryByAppId: appState.telemetryByAppId,
+      applications: appState.applications,
     });
 
     return liveItems.map((item) => {
@@ -108,20 +105,17 @@ export const ApplicationsPage = () => {
     });
   }, [
     actionLoadingByAppId,
-    appState.accessByAppId,
-    appState.apps,
-    appState.healthByAppId,
-    appState.telemetryByAppId,
+    appState.applications,
     jobsQuery.data,
     settingsLoadingByAppId,
   ]);
 
   const managedItems = useMemo(() => items.filter((item) => item.managementState === 'managed'), [items]);
   const foundServices = useMemo(
-    () => appState.foundServices.filter((service) => (
-      ['recoverable', 'managed_elsewhere', 'blocked', 'failed_install'].includes(service.userStatus)
-    )),
-    [appState.foundServices],
+    () => appState.applications
+      .filter((application) => application.relationship === 'recovery_required' || application.relationship === 'blocked')
+      .flatMap((application) => application.evidence ? [application.evidence] : []),
+    [appState.applications],
   );
   const foundServicesSignature = useMemo(
     () => foundServices.map((service) => service.id).sort().join('|'),
@@ -149,7 +143,9 @@ export const ApplicationsPage = () => {
   const managedCount = managedItems.length;
   const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
   const emptyState = emptyStateForApplicationCollection(collectionFilters, query);
-  const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
+  const managedAppById = useMemo(() => new Map(appState.applications.flatMap((application) => (
+    application.relationship === 'managed' && application.runtime ? [[application.id, application.runtime] as const] : []
+  ))), [appState.applications]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
 

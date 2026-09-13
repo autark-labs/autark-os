@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import type { AppInstanceView } from '@/types/app';
+import type { ApplicationView } from '@/types/applicationState';
 import type { HomeSystemMetric } from '../extensions/OverviewPage.systemStatus';
 import { managedAppIconUrl } from '../extensions/OverviewPage.appTiles';
 import { applicationDeepLinkForManagedApp } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
@@ -24,7 +24,7 @@ import { AppArtwork } from '@/components/autark-os/AppArtwork';
 import { AppCardName } from '@/components/autark-os/AppCardName';
 
 
-export function InstalledAppsLauncher({ apps }: { apps: AppInstanceView[] }) {
+export function InstalledAppsLauncher({ apps }: { apps: ApplicationView[] }) {
   return (
     <section className="relative z-10" aria-labelledby="home-apps-heading">
       <div className="mb-3 flex items-end justify-between gap-3 px-1">
@@ -45,11 +45,11 @@ export function InstalledAppsLauncher({ apps }: { apps: AppInstanceView[] }) {
   );
 }
 
-function InstalledAppCard({ app, index }: { app: AppInstanceView; index: number }) {
-  const openUrl = app.privateUrl || app.localUrl;
-  const detailRoute = applicationDeepLinkForManagedApp(app.catalogAppId, { panel: 'manage' });
-  const iconUrl = managedAppIconUrl(app);
-  const status = appStatus(app.userStatus);
+function InstalledAppCard({ app, index }: { app: ApplicationView; index: number }) {
+  const openUrl = app.runtime?.accessRoute?.privateUrl || app.runtime?.accessUrl;
+  const detailRoute = applicationDeepLinkForManagedApp(app.id, { panel: 'manage' });
+  const iconUrl = managedAppIconUrl(app.runtime) || app.image;
+  const status = appStatus(app.runtime?.friendlyStatus || 'Unknown');
   return (
     <article className="group/app-card relative h-56 min-w-0 overflow-hidden rounded-xl border border-sky-200/20 bg-app-card-harbor text-slate-50 shadow-lg shadow-slate-950/20 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-app-card-harbor-hover hover:shadow-xl hover:shadow-cyan-950/30" role="listitem">
       <AppBrowserLink

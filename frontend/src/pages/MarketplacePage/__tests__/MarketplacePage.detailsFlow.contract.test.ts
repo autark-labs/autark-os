@@ -40,7 +40,7 @@ test('Discover keeps details anchored to the persistent rail and reserves the sh
   assert.match(page, /onSelect=\{selectApp\}/);
   assert.match(list, /grid-cols-\[repeat\(auto-fill,minmax\(11rem,1fr\)\)\]/);
   assert.match(list, /launcherCardAttentionClass\(app\)/);
-  assert.match(list, /app\.stateLabel/);
+  assert.match(list, /application\.relationshipLabel/);
   assert.match(rail, /<MarketplaceAppDetailsCard/);
   assert.match(rail, /w-\[59\.5rem\] overflow-hidden/);
   assert.match(rail, /right-\[calc\(17\.5rem-1px\)\]/);

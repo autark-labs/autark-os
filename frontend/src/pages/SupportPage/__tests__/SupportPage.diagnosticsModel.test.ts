@@ -24,10 +24,10 @@ test('Diagnostics summary includes apps found on the server without treating own
   const rows = diagnosticsSummaryRows({
     summary: { dockerStatus: 'Ready', tailscaleStatus: 'Ready', findings: [] },
     doctor: { checks: [{ id: 'docker', status: 'ok' }, { id: 'tailscale', status: 'ok' }] },
-    observedServices: [
-      { id: 'docker:owned', userStatus: 'installed_managed' },
-      { id: 'docker:legacy', userStatus: 'recoverable' },
-      { id: 'docker:pinned', userStatus: 'pinned_external' },
+    applications: [
+      application('owned', 'managed'),
+      application('legacy', 'recovery_required'),
+      application('conflict', 'blocked'),
     ],
   });
 
@@ -44,12 +44,11 @@ test('Diagnostics summary surfaces app repair state from canonical managed apps'
   const rows = diagnosticsSummaryRows({
     summary: { dockerStatus: 'Ready', tailscaleStatus: 'Ready', findings: [] },
     doctor: { checks: [{ id: 'docker', status: 'ok' }, { id: 'tailscale', status: 'ok' }] },
-    managedApps: [
-      { appId: 'vaultwarden', remediation: { state: 'auto_repairing' } },
-      { appId: 'home-assistant', remediation: { state: 'repair_failed' } },
-      { appId: 'homepage', remediation: { state: 'watching' } },
+    applications: [
+      application('vaultwarden', 'managed', 'auto_repairing'),
+      application('home-assistant', 'managed', 'repair_failed'),
+      application('homepage', 'managed', 'watching'),
     ],
-    observedServices: [],
   });
 
   assert.deepEqual(rows.find((row) => row.id === 'apps'), {
@@ -59,6 +58,13 @@ test('Diagnostics summary surfaces app repair state from canonical managed apps'
     tone: 'warning',
   });
 });
+
+function application(id, relationship, remediationState = null) {
+  return {
+    id, relationship,
+    runtime: relationship === 'managed' ? { appId: id, remediation: remediationState ? { state: remediationState } : null } : null,
+  };
+}
 
 test('Diagnostics copy separates production conflicts from allowed development instances', () => {
   assert.equal(productionConflictSummary({ existingInstall: { conflict: false } }), null);

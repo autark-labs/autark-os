@@ -14,6 +14,7 @@ import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.plan.InstallPlan;
 import com.autarkos.marketplace.plan.InstallPlanService;
+import com.autarkos.apps.ApplicationStateService;
 
 @SpringBootTest(properties =
         "autark-os.runtime-root=build/test-runtime/catalog-context")
@@ -27,6 +28,9 @@ class MarketplaceCatalogServiceTests {
 
     @Autowired
     DiscoverController discoverController;
+
+    @Autowired
+    ApplicationStateService applicationStateService;
 
     @Test
     void loadsCatalogAppsFromManifests() {
@@ -64,7 +68,8 @@ class MarketplaceCatalogServiceTests {
 
     @Test
     void exposesCatalogAndInstallPreviewThroughDiscoverController() {
-        assertThat(discoverController.apps()).extracting(com.autarkos.discover.DiscoverAppView::id).containsExactlyInAnyOrder("freshrss", "homepage", "syncthing");
+        applicationStateService.refreshNow();
+        assertThat(discoverController.apps()).extracting(view -> view.application().id()).containsExactlyInAnyOrder("freshrss", "homepage", "syncthing");
         DiscoverInstallModels.DiscoverInstallPreview preview = discoverController.installPreview("homepage", new DiscoverSetupModels.DiscoverSetupAnswersRequest(java.util.Map.of()));
 
         assertThat(preview.technicalDetails())

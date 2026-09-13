@@ -82,10 +82,13 @@ describe('My Apps presentation helpers', () => {
     } as AppRuntimeView;
 
     const [item] = buildApplicationSurfaceItems({
-      accessByAppId: {},
-      apps: [app],
-      healthByAppId: {},
-      telemetryByAppId: {},
+      applications: [{
+        id: app.appId, name: app.appName, category: 'Security', image: '', summary: '', description: '', relationship: 'managed',
+        catalogAvailability: 'installable', appInstanceId: app.appId, runtimeState: 'running', ownershipState: 'owned', accessState: 'private_needs_setup',
+        backupState: 'backup_disabled', issues: [], relationshipLabel: 'Installed', relationshipDescription: '', statusTone: 'success', cardTone: 'success',
+        installCopyWarningRequired: false, reviewExistingHref: null, primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps', method: null, disabled: false, reason: '' },
+        availableActions: [], runtime: app, evidence: null,
+      }],
     });
 
     expect(item.href).toBe('http://localhost:8090');

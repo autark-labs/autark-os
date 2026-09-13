@@ -1,6 +1,5 @@
-import type { AppOwnershipAction, AppOwnershipTone } from './appOwnership';
+import type { ApplicationView } from './applicationState';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from './marketplace';
-import type { ObservedServiceView } from './observedService';
 
 export type DiscoverSetupOption = {
   value: string;
@@ -28,40 +27,12 @@ export type DiscoverSetupSchema = {
   inputs: DiscoverSetupInput[];
 };
 
-export type DiscoverInstalledAppSummary = {
-  appId: string;
-  appName: string;
-  status: string;
-  accessUrl: string;
-  backupState: string;
-  protectedByBackups: boolean;
-  firstBackupRecommended: boolean;
-};
-
 export type DiscoverAppView = {
-  id: string;
+  application: ApplicationView;
   app: MarketplaceApp;
-  name: string;
-  image: string;
-  summary: string;
-  description: string;
-  categoryLabel: string;
   serviceKindLabel: string;
   estimatedInstallTime: string;
   difficulty: string;
-  state: 'available' | 'installed_managed' | 'found_on_server' | 'recoverable' | 'managed_elsewhere' | 'blocked' | 'failed_install' | 'coming_soon' | string;
-  stateLabel: string;
-  stateDescription: string;
-  statusTone: AppOwnershipTone;
-  cardTone: AppOwnershipTone;
-  ownedByCurrentInstance: boolean;
-  installCopyWarningRequired: boolean;
-  reviewExistingHref: string | null;
-  primaryAction: AppOwnershipAction;
-  availableActions: AppOwnershipAction[];
-  installed: boolean;
-  installedApp: DiscoverInstalledAppSummary | null;
-  observedService: ObservedServiceView | null;
   setupSchema: DiscoverSetupSchema;
 };
 

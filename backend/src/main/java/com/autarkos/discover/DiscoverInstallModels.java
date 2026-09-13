@@ -3,7 +3,6 @@ package com.autarkos.discover;
 import java.util.List;
 import java.util.Map;
 
-import com.autarkos.api.AutarkOsStates;
 import com.autarkos.discover.DiscoverSetupModels.DiscoverSetupAnswersRequest;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.install.models.InstallModels;
@@ -63,17 +62,4 @@ public final class DiscoverInstallModels {
         }
     }
 
-    public record DiscoverInstalledAppSummary(
-            String appId,
-            String appName,
-            String status,
-            String accessUrl,
-            String backupState,
-            boolean protectedByBackups,
-            boolean firstBackupRecommended) {
-
-        public DiscoverInstalledAppSummary(String appId, String appName, String status, String accessUrl) {
-            this(appId, appName, status, accessUrl, AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT, false, true);
-        }
-    }
 }

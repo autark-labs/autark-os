@@ -27,7 +27,7 @@ class LegacyHostInventoryApiDeletionTests {
 
     @Test
     void appOwnershipAndDiscoverDtosDoNotCarryLegacyHostInventoryResources() {
-        assertThat(recordComponentNames(com.autarkos.apps.AppOwnershipView.class)).doesNotContain("foundResource");
+        assertThat(recordComponentNames(com.autarkos.apps.ApplicationView.class)).doesNotContain("foundResource");
         assertThat(recordComponentNames(com.autarkos.discover.DiscoverAppView.class)).doesNotContain("foundResource");
     }
 

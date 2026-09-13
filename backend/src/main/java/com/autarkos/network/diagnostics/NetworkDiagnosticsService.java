@@ -7,6 +7,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.apps.ApplicationViews;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.PrivateAccessReconciliationService;
 import com.autarkos.marketplace.install.models.AccessModels;
@@ -30,7 +31,7 @@ public class NetworkDiagnosticsService {
     public NetworkDiagnosticsReport report() {
         TailscaleStatus tailscale = tailscaleService.status();
         List<TailscaleDevice> devices = tailscaleService.devices();
-        List<AppRuntimeView> apps = applicationStateService.snapshot().runtimeApps();
+        List<AppRuntimeView> apps = ApplicationViews.managedRuntimes(applicationStateService.snapshot());
         AccessModels.PrivateAccessReconciliationReport reconciliation = reconciliationService.report();
         int privateAppCount = reconciliation.apps().size();
 

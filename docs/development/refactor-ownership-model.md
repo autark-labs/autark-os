@@ -307,6 +307,40 @@ Acceptance criteria:
 
 This is an atomic vertical cutover. A long-lived compatibility model is not acceptable.
 
+#### Story 2 implementation ledger
+
+Local implementation completed 2026-09-12. Raspberry Pi validation was intentionally deferred during the refactor.
+
+Replaced:
+
+- the six parallel application-state collections with one `applications: ApplicationView[]` contract
+- the ownership DTO family with `ApplicationView`, `ApplicationRelationship`, `ApplicationAction`, and `ApplicationInventoryService`
+- Discover's duplicated installed/found projection with the canonical `ApplicationView`
+- recovery and Support filtering based on observed-service labels with filtering based on the canonical relationship
+- independent Home, My Apps, Access, Backups, Storage, Monitoring, Settings, Support, and setup consumers with canonical application/runtime queries
+
+Removed:
+
+- `AppOwnershipService`, `AppOwnershipState`, `AppOwnershipView`, and `AppOwnershipAction`
+- frontend `appOwnership` types and `DiscoverInstalledAppSummary`
+- backend `DiscoverInstalledAppSummary`
+- compatibility selectors and cache transforms for `managedApps`, `runtimeApps`, `observedServices`, `foundServices`, and `ownershipViews`
+- the unused backup-repository dependency from canonical inventory assembly
+
+Hardened:
+
+- an absent runtime status now renders as `Needs review` instead of silently falling through to `Ready`
+- optimistic runtime and job updates mutate only the runtime nested in the matching canonical application
+- Discover and My Apps regression coverage exercises the same application relationship record
+- managed-runtime consumers ignore a missing runtime payload without changing the application's canonical relationship
+
+Validation:
+
+- backend: 652 tests executed, 0 failures, 0 errors, 3 skipped
+- frontend: 96 files and 319 tests passed
+- TypeScript, ESLint, production frontend build, and whitespace validation passed
+- production source delta: approximately 900 net lines removed
+
 ### Story 3: Replace adoption with strict recovery
 
 Delete the current adoption mutation and partial-management behavior.

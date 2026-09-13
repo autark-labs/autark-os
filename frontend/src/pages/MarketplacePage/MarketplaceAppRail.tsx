@@ -27,6 +27,7 @@ type MarketplaceAppRailProps = {
 
 export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, installLocked, installStatusMessage, installing, onConfigureSettings, onDetailsOpenChange, onInstallSecondCopy, onReviewInstall }: MarketplaceAppRailProps) {
   const detailsPanelRef = useRef<HTMLElement | null>(null);
+  const application = appView.application;
 
   useEffect(() => {
     const detailsPanel = detailsPanelRef.current;
@@ -88,13 +89,13 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
           <div className="p-4">
             <div className="flex min-w-0 items-start gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-sky-100/60">{appView.categoryLabel}</p>
-                <h3 className="mt-1 line-clamp-2 break-words text-lg font-semibold leading-6 text-white">{appView.name}</h3>
+                <p className="text-xs text-sky-100/60">{application.category}</p>
+                <h3 className="mt-1 line-clamp-2 break-words text-lg font-semibold leading-6 text-white">{application.name}</h3>
               </div>
-              <StatusBadge className="shrink-0" tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
+              <StatusBadge className="shrink-0" tone={marketplaceStatusTone(application.statusTone)}>{application.relationshipLabel}</StatusBadge>
             </div>
 
-            <p className="mt-3 line-clamp-2 text-sm leading-6 text-sky-100/70">{appView.description}</p>
+            <p className="mt-3 line-clamp-2 text-sm leading-6 text-sky-100/70">{application.description}</p>
 
             <RailPrimaryAction
               appView={appView}
@@ -133,11 +134,12 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
 function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, onPanelRef, open }: { appView: DiscoverAppView; onClose: () => void; onInstallSecondCopy: () => void; onPanelRef: (panel: HTMLElement | null) => void; open: boolean }) {
   const [tab, setTab] = useState('overview');
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
-  const reviewExistingHref = appView.reviewExistingHref ?? null;
+  const application = appView.application;
+  const reviewExistingHref = application.reviewExistingHref ?? null;
 
   useEffect(() => {
     setTab('overview');
-  }, [appView.id]);
+  }, [application.id]);
 
   return (
     <section
@@ -154,7 +156,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
       <div className="flex items-start justify-between gap-3 border-b border-sky-300/15 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-white">App details</p>
-          <p className="mt-1 text-xs leading-5 text-sky-100/60">Everything you need to evaluate {appView.name} before installing it.</p>
+          <p className="mt-1 text-xs leading-5 text-sky-100/60">Everything you need to evaluate {application.name} before installing it.</p>
         </div>
         <ProjectDarkControlButton aria-label="Close app details" onClick={onClose} size="icon" type="button">
           <X className="size-4" />
@@ -173,7 +175,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
               <AppImage app={appView.app} size="large" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
+                  <StatusBadge tone={marketplaceStatusTone(application.statusTone)}>{application.relationshipLabel}</StatusBadge>
                   <SupportBadge level={appView.app.supportLevel} />
                 </div>
                 <p className="mt-2 text-sm leading-6 text-sky-100/70">{appView.app.plainLanguage}</p>
@@ -183,7 +185,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
               <AppFactList items={appView.app.highlights} title="Key features" />
               <AppFactList items={appView.app.bestFor} title="Best for" />
             </div>
-            {appView.installCopyWarningRequired && (
+            {application.installCopyWarningRequired && (
               <ProjectDarkControlButton className="w-fit" onClick={() => setDuplicateWarningOpen(true)} type="button">
                 Install second copy
               </ProjectDarkControlButton>
@@ -196,7 +198,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
         </div>
       </Tabs>
 
-      <DuplicateInstallWarningDialog appName={appView.name} onInstallCopy={onInstallSecondCopy} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={reviewExistingHref} />
+      <DuplicateInstallWarningDialog appName={application.name} onInstallCopy={onInstallSecondCopy} onOpenChange={setDuplicateWarningOpen} open={duplicateWarningOpen} reviewHref={reviewExistingHref} />
     </section>
   );
 }
@@ -213,14 +215,15 @@ function AppFactList({ items, title }: { items: string[]; title: string }) {
 }
 
 function RailPrimaryAction({ appView, installLocked, installing, onReviewInstall }: { appView: DiscoverAppView; installLocked: boolean; installing: boolean; onReviewInstall: () => void }) {
+  const application = appView.application;
   const actionRoute = marketplacePrimaryRoute(appView);
-  const actionDisabled = appView.primaryAction.disabled || installLocked || installing;
-  const actionReason = appView.primaryAction.reason || (installing ? `${appView.name} is already installing.` : installLocked ? 'Another app is installing right now.' : 'This app action is not available right now.');
+  const actionDisabled = application.primaryAction.disabled || installLocked || installing;
+  const actionReason = application.primaryAction.reason || (installing ? `${application.name} is already installing.` : installLocked ? 'Another app is installing right now.' : 'This app action is not available right now.');
   const actionLabel = railActionLabel(appView, installing, installLocked);
-  const attentionState = appView.statusTone === 'warning' || appView.statusTone === 'observed' || appView.statusTone === 'danger';
+  const attentionState = application.statusTone === 'warning' || application.statusTone === 'observed' || application.statusTone === 'danger';
   const ButtonComponent = attentionState ? ProjectWarningButton : ProjectPrimaryButton;
 
-  if (actionRoute && !appView.primaryAction.disabled) {
+  if (actionRoute && !application.primaryAction.disabled) {
     return (
       <ButtonComponent asChild className="mt-4 w-full">
         <Link to={actionRoute}>
@@ -245,7 +248,7 @@ function RailPrimaryAction({ appView, installLocked, installing, onReviewInstall
 function railActionLabel(appView: DiscoverAppView, installing: boolean, installLocked: boolean) {
   if (installing) return 'Installing...';
   if (installLocked) return 'Install blocked';
-  if (appView.primaryAction.id === 'review_setup') return 'Review install';
-  if (appView.primaryAction.id === 'manage') return 'View in My Apps';
-  return appView.primaryAction.label;
+  if (appView.application.primaryAction.id === 'review_setup') return 'Review install';
+  if (appView.application.primaryAction.id === 'manage') return 'View in My Apps';
+  return appView.application.primaryAction.label;
 }

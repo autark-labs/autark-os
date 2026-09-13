@@ -26,7 +26,7 @@ public class DiscoverController {
 
     @GetMapping
     public List<DiscoverAppView> apps() {
-        return discoverService.apps().stream().filter(app -> BetaScope.allowsInstall(app.id())).toList();
+        return discoverService.apps().stream().filter(app -> BetaScope.allowsInstall(app.application().id())).toList();
     }
 
     @GetMapping("/{appId}")

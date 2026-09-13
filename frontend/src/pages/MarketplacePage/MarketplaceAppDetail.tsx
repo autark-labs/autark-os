@@ -14,7 +14,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { backupSafetyWarning } from '@/lib/backupSafety';
 import { cn } from '@/lib/utils';
 import { currentJobStepText, queuedJobText, terminalJob } from '@/repositories/jobRepository';
-import type { DiscoverAppView, DiscoverInstalledAppSummary, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
+import type { ApplicationView } from '@/types/applicationState';
+import type { DiscoverAppView, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
 import {
@@ -35,7 +36,7 @@ type AppDetailProps = {
   installLocked: boolean;
   installStatusMessage: string;
   installing: boolean;
-  installedApp: DiscoverInstalledAppSummary | null;
+  installedApp: ApplicationView | null;
   installPreview: DiscoverInstallPreview | null;
   hasAppSettings: boolean;
   onBack: () => void;
@@ -55,10 +56,11 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
   const isInstalled = Boolean(installedApp);
-  const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
-  const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId) : '/apps';
-  const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId, { panel: 'manage' }) : '/apps';
-  const reviewExistingHref = appView.reviewExistingHref ?? null;
+  const application = appView.application;
+  const needsExistingServiceReview = !isInstalled && application.installCopyWarningRequired;
+  const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appInstanceId) : '/apps';
+  const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appInstanceId, { panel: 'manage' }) : '/apps';
+  const reviewExistingHref = application.reviewExistingHref ?? null;
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`
@@ -87,7 +89,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
           <AppImage app={app} size="large" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>
+              <StatusBadge tone={marketplaceStatusTone(application.statusTone)}>{application.relationshipLabel}</StatusBadge>
               <SupportBadge level={app.supportLevel} />
             </div>
             <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-300">{app.description}</p>
@@ -177,7 +179,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
   return (
     <ResponsiveDetailsSheet
       className="border-sky-300/30 bg-app-overlay-panel sm:!max-w-xl lg:!max-w-[42rem]"
-      headerAccessory={<StatusBadge tone={marketplaceStatusTone(appView.statusTone)}>{appView.stateLabel}</StatusBadge>}
+      headerAccessory={<StatusBadge tone={marketplaceStatusTone(application.statusTone)}>{application.relationshipLabel}</StatusBadge>}
       model={{ description: `${app.category} · ${app.installTime}`, title: app.name }}
       onOpenChange={(open) => !open && onBack()}
       open
@@ -266,8 +268,8 @@ function ExistingServiceNotice({ appView, reviewHref }: { appView: DiscoverAppVi
       <div className="flex items-start gap-3">
         <TriangleAlert className="mt-0.5 size-5 shrink-0 text-orange-200" />
         <div>
-          <h4 className="font-bold text-current">{appView.stateLabel}</h4>
-          <p className="mt-1 leading-6 text-current/80">{appView.stateDescription}</p>
+          <h4 className="font-bold text-current">{appView.application.relationshipLabel}</h4>
+          <p className="mt-1 leading-6 text-current/80">{appView.application.relationshipDescription}</p>
           <p className="mt-2 leading-6 text-current/80">Review or adopt the existing service before creating another copy.</p>
           {reviewHref && (
             <Button asChild className="mt-3" size="sm" variant="outline">
@@ -323,7 +325,7 @@ function RecoveryInstallNotice({ disabled, mode: _mode, onReinstallCurrent }: { 
   );
 }
 
-function InstalledAppNotice({ app, manageHref }: { app: DiscoverInstalledAppSummary | null; manageHref: string }) {
+function InstalledAppNotice({ app, manageHref }: { app: ApplicationView | null; manageHref: string }) {
   if (!app) {
     return null;
   }
@@ -333,11 +335,11 @@ function InstalledAppNotice({ app, manageHref }: { app: DiscoverInstalledAppSumm
         <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" />
         <div className="min-w-0">
           <h4 className="font-bold text-slate-50">Already installed</h4>
-          <p className="mt-1 text-sm text-slate-300">{app.appName} is already managed by Autark-OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
+          <p className="mt-1 text-sm text-slate-300">{app.name} is already managed by Autark-OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {app.accessUrl && (
+            {app.runtime?.accessUrl && (
               <ProjectPrimaryButton asChild size="sm">
-                <AppBrowserLink href={app.accessUrl} rel="noreferrer" target="_blank">Open app</AppBrowserLink>
+                <AppBrowserLink href={app.runtime.accessUrl} rel="noreferrer" target="_blank">Open app</AppBrowserLink>
               </ProjectPrimaryButton>
             )}
             <ProjectDarkControlButton asChild size="sm">
@@ -360,7 +362,7 @@ function InlineInstallStatus({
 }: {
   app: MarketplaceApp;
   backupJob: AutarkOsJob | null;
-  installedApp: DiscoverInstalledAppSummary | null;
+  installedApp: ApplicationView | null;
   installing: boolean;
   job: AutarkOsJob | null;
   onCreateBackup: (appId: string) => Promise<void>;
@@ -384,21 +386,21 @@ function InlineInstallStatus({
             <JobStepList job={job} />
             {succeeded && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {installedApp?.accessUrl && (
+                {installedApp?.runtime?.accessUrl && (
                   <ProjectPrimaryButton asChild size="sm">
-                    <AppBrowserLink href={installedApp.accessUrl} rel="noreferrer" target="_blank">Open {app.name}</AppBrowserLink>
+                    <AppBrowserLink href={installedApp.runtime.accessUrl} rel="noreferrer" target="_blank">Open {app.name}</AppBrowserLink>
                   </ProjectPrimaryButton>
                 )}
                 {installedApp && shouldOfferFirstBackup(installedApp) && (
                   <DisabledAction disabled={backupJob ? !terminalJob(backupJob) : false} reason="Autark-OS is already creating the first backup for this app.">
-                    <ProjectDarkControlButton disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appId)} size="sm" type="button">
+                    <ProjectDarkControlButton disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appInstanceId)} size="sm" type="button">
                       {backupJob && !terminalJob(backupJob) ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
                       {backupJob?.status === 'succeeded' ? 'Backup created' : backupJob && !terminalJob(backupJob) ? 'Creating backup' : 'Create first backup'}
                     </ProjectDarkControlButton>
                   </DisabledAction>
                 )}
                 <ProjectDarkControlButton asChild size="sm">
-                  <Link to={applicationDeepLinkForManagedApp(installedApp?.appId || app.id)}>View in My Apps</Link>
+                  <Link to={applicationDeepLinkForManagedApp(installedApp?.appInstanceId || app.id)}>View in My Apps</Link>
                 </ProjectDarkControlButton>
               </div>
             )}
@@ -453,8 +455,8 @@ function JobStepList({ job }: { job: AutarkOsJob }) {
   );
 }
 
-function shouldOfferFirstBackup(app: DiscoverInstalledAppSummary) {
-  return app.firstBackupRecommended && !app.protectedByBackups;
+function shouldOfferFirstBackup(app: ApplicationView) {
+  return app.backupState === 'backup_enabled_no_restore_point';
 }
 
 function requiresInstallCaution(app: MarketplaceApp) {

@@ -14,7 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.autarkos.apps.AppOwnershipState;
+import com.autarkos.apps.ApplicationRelationship;
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.host.ObservedService;
@@ -70,30 +70,27 @@ class DiscoverServiceTests {
 
         List<DiscoverAppView> apps = service.apps();
 
-        assertThat(apps).filteredOn(app -> app.id().equals("vaultwarden"))
+        assertThat(apps).filteredOn(app -> app.application().id().equals("vaultwarden"))
                 .singleElement()
                 .satisfies(app -> {
-                    assertThat(app.state()).isEqualTo(AppOwnershipState.INSTALLED_MANAGED);
-                    assertThat(app.primaryAction().id()).isEqualTo("manage");
-                    assertThat(app.statusTone()).isEqualTo("success");
-                    assertThat(app.cardTone()).isEqualTo("success");
-                    assertThat(app.ownedByCurrentInstance()).isTrue();
-                    assertThat(app.installCopyWarningRequired()).isFalse();
-                    assertThat(app.installedApp()).isNotNull();
+                    assertThat(app.application().relationship()).isEqualTo(ApplicationRelationship.MANAGED);
+                    assertThat(app.application().primaryAction().id()).isEqualTo("manage");
+                    assertThat(app.application().statusTone()).isEqualTo("success");
+                    assertThat(app.application().cardTone()).isEqualTo("success");
+                    assertThat(app.application().installCopyWarningRequired()).isFalse();
                 });
-        assertThat(apps).filteredOn(app -> app.id().equals("jellyfin"))
+        assertThat(apps).filteredOn(app -> app.application().id().equals("jellyfin"))
                 .singleElement()
                 .satisfies(app -> {
-                    assertThat(app.state()).isEqualTo(AppOwnershipState.MANAGED_ELSEWHERE);
-                    assertThat(app.stateLabel()).isEqualTo("Managed elsewhere");
-                    assertThat(app.primaryAction().id()).isEqualTo("review_existing");
-                    assertThat(app.statusTone()).isEqualTo("danger");
-                    assertThat(app.cardTone()).isEqualTo("danger");
-                    assertThat(app.ownedByCurrentInstance()).isFalse();
-                    assertThat(app.installCopyWarningRequired()).isTrue();
-                    assertThat(app.availableActions()).extracting(com.autarkos.apps.AppOwnershipAction::id).contains("review_existing", "unavailable");
-                    assertThat(app.installedApp()).isNull();
-                    assertThat(app.observedService()).isNotNull();
+                    assertThat(app.application().relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
+                    assertThat(app.application().relationshipLabel()).isEqualTo("Recovery required");
+                    assertThat(app.application().primaryAction().id()).isEqualTo("review_existing");
+                    assertThat(app.application().statusTone()).isEqualTo("warning");
+                    assertThat(app.application().cardTone()).isEqualTo("warning");
+                    assertThat(app.application().installCopyWarningRequired()).isFalse();
+                    assertThat(app.application().availableActions()).extracting(com.autarkos.apps.ApplicationAction::id).contains("review_existing");
+                    assertThat(app.application().runtime()).isNull();
+                    assertThat(app.application().evidence()).isNotNull();
                 });
     }
 
@@ -105,9 +102,9 @@ class DiscoverServiceTests {
 
         DiscoverAppView app = service.app("vaultwarden").orElseThrow();
 
-        assertThat(app.state()).isEqualTo(AppOwnershipState.FOUND_ON_SERVER);
-        assertThat(app.cardTone()).isEqualTo("observed");
-        assertThat(app.installCopyWarningRequired()).isTrue();
+        assertThat(app.application().relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
+        assertThat(app.application().cardTone()).isEqualTo("danger");
+        assertThat(app.application().installCopyWarningRequired()).isTrue();
     }
 
     @Test
@@ -261,12 +258,7 @@ class DiscoverServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         when(applicationStateService.snapshot()).thenReturn(new ApplicationState(
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                Instant.parse("2026-06-21T12:00:00Z")));
+                List.of(), Instant.parse("2026-06-21T12:00:00Z")));
         DiscoverService service = new DiscoverService(
                 catalogService(),
                 applicationStateService,
@@ -288,7 +280,7 @@ class DiscoverServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
                 catalogService(),
-                () -> appOwnershipService(installedAppRepository, observedRepository).apps(),
+                () -> applicationInventoryService(installedAppRepository, observedRepository).apps(),
                 setupService,
                 new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService));
     }
@@ -301,23 +293,22 @@ class DiscoverServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
                 catalogService(),
-                () -> appOwnershipService(installedAppRepository, observedRepository).apps(),
+                () -> applicationInventoryService(installedAppRepository, observedRepository).apps(),
                 setupService,
                 new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService),
                 installService,
                 jobService);
     }
 
-    private com.autarkos.apps.AppOwnershipService appOwnershipService(InstalledAppRepository installedAppRepository, ObservedServiceRepository observedRepository) {
-        return new com.autarkos.apps.AppOwnershipService(
+    private com.autarkos.apps.ApplicationInventoryService applicationInventoryService(InstalledAppRepository installedAppRepository, ObservedServiceRepository observedRepository) {
+        return new com.autarkos.apps.ApplicationInventoryService(
                 catalogService(),
                 installedAppRepository,
                 new ObservedServiceService(observedRepository, new ObservedServiceScanner(List::of, () -> new com.autarkos.system.AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1))),
                 new com.autarkos.marketplace.install.DockerOwnershipService(
                         () -> new com.autarkos.system.AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                         () -> "0.2.0",
-                        false),
-                JpaTestRepositories.backupRepository(runtimeLayout()));
+                        false));
     }
 
     private MarketplaceCatalogService catalogService() {

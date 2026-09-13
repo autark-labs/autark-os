@@ -43,10 +43,6 @@ class ApplicationStateControllerTests {
         Instant now = Instant.parse("2026-06-21T12:00:00Z");
         return new ApplicationState(
                 List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
                 now,
                 refreshStatus,
                 now,

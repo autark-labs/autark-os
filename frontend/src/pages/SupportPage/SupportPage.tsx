@@ -154,16 +154,21 @@ function SupportPage() {
   }
 
   const summary = state.summary;
-  const observedServices = appState.observedServices;
+  const observedServices = useMemo(() => appState.applications.flatMap((application) => application.evidence ? [application.evidence] : []), [appState.applications]);
+  const managedApps = useMemo(() => appState.applications.flatMap((application) => (
+    application.relationship === 'managed' && application.runtime ? [application.runtime] : []
+  )), [appState.applications]);
   const findings = summary?.findings || state.bundle?.findings || [];
   const redactionRules = summary?.redactionRules || state.bundle?.redactionRules || [];
-  const summaryRows = diagnosticsSummaryRows({ summary, doctor: state.doctor, setup: state.setup, managedApps: appState.apps, observedServices });
+  const summaryRows = diagnosticsSummaryRows({ summary, doctor: state.doctor, setup: state.setup, applications: appState.applications });
   const healthChecks = notebookHealthChecks(state.doctor, state.setup, summaryRows);
   const headline = diagnosticsHeadline(summary, state.doctor);
   const conflict = productionConflictSummary(state.setup);
-  const ownershipResources = useMemo(() => observedServices.filter((service) => service.userStatus !== 'installed_managed'), [observedServices]);
+  const ownershipResources = useMemo(() => appState.applications
+    .filter((application) => application.relationship !== 'managed' && application.relationship !== 'available')
+    .flatMap((application) => application.evidence ? [application.evidence] : []), [appState.applications]);
   const dockerResources = useMemo(() => observedServices.filter((service) => service.source === 'docker'), [observedServices]);
-  const repairResources = useMemo(() => appState.apps.filter((app) => hasRepairDetail(app)), [appState.apps]);
+  const repairResources = useMemo(() => managedApps.filter((app) => hasRepairDetail(app)), [managedApps]);
   const tailscaleCheck = state.setup?.checks?.find((check) => check.id === 'tailscale');
   const operatorCheck = state.setup?.checks?.find((check) => check.id === 'tailscale-operator');
 

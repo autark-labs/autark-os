@@ -30,13 +30,14 @@ test('My Apps uses split managed-app behavior states instead of a single status 
   assert.match(types, /attentionState: AppAttentionState/);
   assert.match(types, /operationState: AppOperationState/);
 
-  assert.match(liveModel, /app\.managementState \?\? 'managed'/);
-  assert.match(liveModel, /app\.readinessState \?\? managedReadinessState/);
-  assert.match(liveModel, /app\.attentionState \?\? managedAttentionState/);
+  assert.match(liveModel, /const managementState = 'managed'/);
+  assert.match(liveModel, /app\.readinessState \?\? application\.runtimeState/);
+  assert.match(liveModel, /app\.attentionState \?\? \(/);
+  assert.match(liveModel, /readinessState === 'unknown'/);
   assert.match(liveModel, /readinessState,/);
   assert.match(liveModel, /attentionState,/);
   assert.match(liveModel, /value\.kind === 'repairing'/);
-  assert.match(liveModel, /app\.canonicalBackupState === 'protected_by_restore_point'/);
+  assert.match(liveModel, /application\.backupState === 'protected_by_restore_point'/);
   assert.doesNotMatch(liveModel, /if \(backup === 'Needs backup'\)/);
   assert.doesNotMatch(liveModel, /observedService|pinned_external|linked/);
 

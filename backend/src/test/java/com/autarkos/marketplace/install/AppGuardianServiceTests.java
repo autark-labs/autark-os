@@ -87,11 +87,7 @@ class AppGuardianServiceTests {
 
     private ApplicationState applicationStateWith(AppRuntimeView app) {
         return new ApplicationState(
-                List.of(),
-                List.of(app),
-                List.of(),
-                List.of(),
-                List.of(),
+                List.of(com.autarkos.testsupport.ApplicationViewTestRecords.managed(app)),
                 Instant.parse("2026-06-21T12:00:00Z"));
     }
 

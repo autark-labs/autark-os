@@ -1,59 +1,44 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { ApplicationStateAPIClient } from '@/api/ApplicationStateAPIClient';
-import type { ApplicationState, ApplicationStateFreshness } from '@/types/applicationState';
+import type { ApplicationState, ApplicationStateFreshness, ApplicationView } from '@/types/applicationState';
 import {
   accessByAppId,
   appNeedsAttentionFromCanonicalState,
+  applications,
   applicationStateFreshness,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
   catalogAppIsManaged,
   displayStatusFromCanonicalState,
-  foundServices,
   healthByAppId,
-  managedRuntimeApps,
-  removeManagedAppFromState,
-  observedServices,
-  ownershipViews,
   setAutarkOsJobInState,
   setRuntimeAppInState,
-  setRuntimeAppStatusInState,
   telemetryByAppId,
 } from './applicationStateRepository.logic';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
-import type { AppOwnershipView } from '@/types/appOwnership';
-import type { ObservedServiceView } from '@/types/observedService';
 import type { AutarkOsJob } from '@/types/jobs';
 
 export {
   accessByAppId,
   appNeedsAttentionFromCanonicalState,
+  applications,
   applicationStateFreshness,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
   catalogAppIsManaged,
   displayStatusFromCanonicalState,
-  foundServices,
   healthByAppId,
-  managedRuntimeApps,
-  removeManagedAppFromState,
-  observedServices,
-  ownershipViews,
   setAutarkOsJobInState,
   setRuntimeAppInState,
-  setRuntimeAppStatusInState,
   telemetryByAppId,
 };
 
 export type ApplicationStateRepositoryView = {
   accessByAppId: Record<string, AppAccessCheck>;
-  apps: AppRuntimeView[];
-  foundServices: ObservedServiceView[];
+  applications: ApplicationView[];
   freshness: ApplicationStateFreshness;
   healthByAppId: Record<string, AppHealthSnapshot>;
   lastError: string | null;
-  observedServices: ObservedServiceView[];
-  ownershipViews: AppOwnershipView[];
   refreshStatus: string;
   stale: boolean;
   telemetryByAppId: Record<string, AppTelemetry>;
@@ -95,16 +80,13 @@ export function useApplicationStateRepository(): ApplicationStateRepositoryView 
   return {
     accessByAppId: accessByAppId(state),
     applicationState: state,
-    apps: managedRuntimeApps(state),
+    applications: applications(state),
     error,
-    foundServices: foundServices(state),
     freshness,
     healthByAppId: healthByAppId(state),
     isFetching: query.isFetching || refreshMutation.isPending,
     isLoading: query.isLoading,
     lastError: state?.lastError?.trim() || null,
-    observedServices: observedServices(state),
-    ownershipViews: ownershipViews(state),
     refreshStatus: state?.refreshStatus || (state ? 'unknown' : 'stale'),
     refresh: async () => refreshMutation.mutateAsync(),
     stale: state?.stale ?? !state,
@@ -140,12 +122,4 @@ export function setAutarkOsJobInApplicationStateCache(queryClient: QueryClient, 
 
 export function setRuntimeAppInApplicationStateCache(queryClient: QueryClient, app: AppRuntimeView) {
   queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setRuntimeAppInState(current, app));
-}
-
-export function setRuntimeAppStatusInApplicationStateCache(queryClient: QueryClient, appId: string, status: string) {
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setRuntimeAppStatusInState(current, appId, status));
-}
-
-export function removeManagedAppFromApplicationStateCache(queryClient: QueryClient, appId: string) {
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => removeManagedAppFromState(current, appId));
 }

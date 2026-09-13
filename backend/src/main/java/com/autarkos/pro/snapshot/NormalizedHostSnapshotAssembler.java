@@ -26,13 +26,12 @@ import com.autarkos.access.AccessAppStatus;
 import com.autarkos.access.AccessStatus;
 import com.autarkos.activity.ActivityLog;
 import com.autarkos.api.AutarkOsStates;
-import com.autarkos.apps.AppOwnershipState;
-import com.autarkos.apps.AppOwnershipView;
+import com.autarkos.apps.ApplicationRelationship;
+import com.autarkos.apps.ApplicationView;
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.backups.BackupModels;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.jobs.AutarkOsJob;
-import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.pro.model.NormalizedHostSnapshot;
 import com.autarkos.marketplace.install.models.InstallModels;
@@ -219,16 +218,16 @@ public final class NormalizedHostSnapshotAssembler {
             List<ActivityLog> activity,
             Instant generatedAt,
             PartialTracker partial) {
-        if (state == null || state.managedApps() == null) {
+        if (state == null || state.applications() == null) {
             return List.of();
         }
         Instant cutoff = generatedAt.minus(RECENT_WINDOW);
         Map<String, NormalizedHostSnapshot.AppSnapshot> unique =
                 new TreeMap<>();
-        for (AppInstanceView app : state.managedApps()) {
+        for (ApplicationView app : state.applications().stream().filter(ApplicationView::managed).toList()) {
             String ref = resources.resolve(
                     app.appInstanceId(),
-                    app.catalogAppId());
+                    app.id());
             if (ref == null) {
                 partial.mark();
                 continue;
@@ -265,27 +264,25 @@ public final class NormalizedHostSnapshotAssembler {
 
     private NormalizedHostSnapshot.FoundServicesSnapshot foundServices(
             ApplicationState state) {
-        List<AppOwnershipView> views =
-                state == null || state.ownershipViews() == null
+        List<ApplicationView> views =
+                state == null || state.applications() == null
                         ? List.of()
-                        : state.ownershipViews();
-        int found = countState(
-                views,
-                AppOwnershipState.FOUND_ON_SERVER);
+                        : state.applications();
+        int found = 0;
         int recoverable = countState(
                 views,
-                AppOwnershipState.RECOVERABLE);
+                ApplicationRelationship.RECOVERY_REQUIRED);
         int blocked = countState(
                 views,
-                AppOwnershipState.BLOCKED);
+                ApplicationRelationship.BLOCKED);
         Set<String> categories = new LinkedHashSet<>();
-        if (countState(views, AppOwnershipState.MANAGED_ELSEWHERE) > 0) {
+        if (views.stream().anyMatch(view -> view.evidence() != null && "managed_elsewhere".equals(view.evidence().userStatus()))) {
             categories.add("ownership_foreign");
         }
         if (blocked > 0) {
             categories.add("ownership_blocked");
         }
-        if (countState(views, AppOwnershipState.FAILED_INSTALL) > 0) {
+        if (views.stream().anyMatch(view -> view.evidence() != null && "failed_install".equals(view.evidence().userStatus()))) {
             categories.add("failed_install");
         }
         return new NormalizedHostSnapshot.FoundServicesSnapshot(
@@ -313,8 +310,12 @@ public final class NormalizedHostSnapshotAssembler {
         }
         Map<String, AppRuntimeView> runtimeByReference =
                 new HashMap<>();
-        if (applications != null && applications.runtimeApps() != null) {
-            for (AppRuntimeView app : applications.runtimeApps()) {
+        if (applications != null && applications.applications() != null) {
+            for (ApplicationView application : applications.applications()) {
+                AppRuntimeView app = application.runtime();
+                if (app == null) {
+                    continue;
+                }
                 String ref = resources.resolve(app.appId());
                 if (ref != null) {
                     runtimeByReference.put(ref, app);
@@ -623,9 +624,12 @@ public final class NormalizedHostSnapshotAssembler {
         Map<String, AppRuntimeView> runtimeByReference =
                 new TreeMap<>();
         if (applications != null
-                && applications.runtimeApps() != null) {
-            for (AppRuntimeView runtime :
-                    nonNull(applications.runtimeApps())) {
+                && applications.applications() != null) {
+            for (ApplicationView application : nonNull(applications.applications())) {
+                AppRuntimeView runtime = application.runtime();
+                if (runtime == null) {
+                    continue;
+                }
                 String ref = resources.resolve(runtime.appId());
                 if (ref != null) {
                     runtimeByReference.putIfAbsent(ref, runtime);
@@ -633,14 +637,13 @@ public final class NormalizedHostSnapshotAssembler {
             }
         }
         if (applications == null
-                || applications.managedApps() == null) {
+                || applications.applications() == null) {
             return List.copyOf(values);
         }
-        for (AppInstanceView app :
-                nonNull(applications.managedApps())) {
+        for (ApplicationView app : applications.applications().stream().filter(ApplicationView::managed).toList()) {
             String ref = resources.resolve(
                     app.appInstanceId(),
-                    app.catalogAppId());
+                    app.id());
             if (ref == null) {
                 continue;
             }
@@ -1217,8 +1220,8 @@ public final class NormalizedHostSnapshotAssembler {
                 .orElse(null);
     }
 
-    private String lifecycle(AppInstanceView app) {
-        return switch (cleanToken(app.userStatus())) {
+    private String lifecycle(ApplicationView app) {
+        return switch (cleanToken(app.runtime() == null ? null : app.runtime().friendlyStatus())) {
             case "ready", "installed" -> "running";
             case "starting" -> "starting";
             case "paused" -> "paused";
@@ -1228,8 +1231,8 @@ public final class NormalizedHostSnapshotAssembler {
         };
     }
 
-    private String readiness(AppInstanceView app) {
-        return switch (cleanToken(app.readinessState())) {
+    private String readiness(ApplicationView app) {
+        return switch (cleanToken(app.runtime() == null ? null : app.runtime().readinessState())) {
             case "ready", "reachable" -> "available";
             case "starting", "degraded" -> "degraded";
             case "paused", "stopped", "unreachable", "missing" ->
@@ -1367,11 +1370,11 @@ public final class NormalizedHostSnapshotAssembler {
     }
 
     private int countState(
-            List<AppOwnershipView> views,
-            AppOwnershipState state) {
+            List<ApplicationView> views,
+            ApplicationRelationship state) {
         return boundedCount(views.stream()
                 .filter(view -> view != null
-                        && state == view.state())
+                        && state == view.relationship())
                 .count());
     }
 
@@ -1455,13 +1458,13 @@ public final class NormalizedHostSnapshotAssembler {
                 PartialTracker partial) {
             ResourceIndex result = new ResourceIndex();
             if (applications == null
-                    || applications.managedApps() == null) {
+                    || applications.applications() == null) {
                 return result;
             }
-            for (AppInstanceView app : applications.managedApps()) {
+            for (ApplicationView app : applications.applications().stream().filter(ApplicationView::managed).toList()) {
                 String raw = firstText(
                         app.appInstanceId(),
-                        app.catalogAppId());
+                        app.id());
                 if (raw == null) {
                     partial.mark();
                     continue;
@@ -1469,10 +1472,10 @@ public final class NormalizedHostSnapshotAssembler {
                 String ref = "app:" + hash(namespace, raw);
                 result.labelsByReference.putIfAbsent(
                         ref,
-                        safeDisplayName(app.catalogAppId()));
+                        safeDisplayName(app.id()));
                 result.add(raw, ref);
                 result.add(app.appInstanceId(), ref);
-                result.add(app.catalogAppId(), ref);
+                result.add(app.id(), ref);
             }
             return result;
         }
