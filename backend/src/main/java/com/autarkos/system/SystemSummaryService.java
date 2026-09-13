@@ -142,7 +142,7 @@ public class SystemSummaryService implements SystemSummaryProvider {
         return new SystemSummaryModels.AppsSummary(
                 apps.size(),
                 (int) apps.stream().filter(app -> app.runtime() != null && AutarkOsStates.AppStatus.READY.equals(app.runtime().friendlyStatus())).count(),
-                (int) apps.stream().filter(app -> app.runtime() != null && List.of(AutarkOsStates.AppStatus.MISSING, AutarkOsStates.AppStatus.NEEDS_ATTENTION, "Managed elsewhere").contains(app.runtime().friendlyStatus())).count(),
+                (int) apps.stream().filter(app -> app.runtime() != null && List.of(AutarkOsStates.AppStatus.MISSING, AutarkOsStates.AppStatus.NEEDS_ATTENTION).contains(app.runtime().friendlyStatus())).count(),
                 readyToOpen);
     }
 

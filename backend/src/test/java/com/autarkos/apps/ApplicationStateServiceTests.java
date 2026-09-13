@@ -210,6 +210,34 @@ class ApplicationStateServiceTests {
     }
 
     @Test
+    void exclusiveRefreshWaitsAndBuildsFreshStateDuringAnotherRefresh() throws Exception {
+        CountDownLatch refreshStarted = new CountDownLatch(1);
+        CountDownLatch releaseRefresh = new CountDownLatch(1);
+        AtomicReference<List<AppInstanceView>> managed = new AtomicReference<>(List.of(appInstance()));
+        ApplicationStateService service = new ApplicationStateService(
+                managed::get,
+                List::of,
+                new ObservedServiceService(repository(), noScan()),
+                inventory(),
+                () -> Instant.parse("2026-06-21T12:00:00Z"));
+        ApplicationState previous = service.refreshNow();
+        managed.set(List.of(blockingAppInstance(refreshStarted, releaseRefresh)));
+
+        Thread refreshThread = new Thread(service::refreshNow);
+        refreshThread.start();
+
+        assertThat(refreshStarted.await(2, TimeUnit.SECONDS)).isTrue();
+        AtomicReference<ApplicationState> exclusiveResult = new AtomicReference<>();
+        Thread exclusiveRefresh = new Thread(() -> exclusiveResult.set(service.refreshNowExclusively()));
+        exclusiveRefresh.start();
+        releaseRefresh.countDown();
+        refreshThread.join(2_000);
+        exclusiveRefresh.join(2_000);
+
+        assertThat(exclusiveResult.get()).isNotNull().isNotSameAs(previous);
+    }
+
+    @Test
     void backgroundRefreshUsesProvidedExecutorInsteadOfRunningInline() {
         AtomicInteger managedCalls = new AtomicInteger();
         RecordingExecutor executor = new RecordingExecutor();

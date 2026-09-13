@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { httpClient } from './httpClient';
-import type { AppAccessCheck, AppActionResult, AppHealthSnapshot, AppInstanceView, AppReliabilitySummary, AppRuntimeView, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, InstallSettings, UninstallPlan } from '@/types/app';
+import type { AppActionResult, AppReliabilitySummary, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, InstallSettings, UninstallPlan } from '@/types/app';
 import type { AutarkOsJob } from '@/types/jobs';
 
 export type InstalledAppLifecycleAction = 'start' | 'stop' | 'restart';
@@ -14,31 +14,6 @@ export class AppUpdatePlanChangedError extends Error {
 }
 
 export const InstalledAppsAPIClient = {
-  async listApps() {
-    const response = await httpClient.get<AppRuntimeView[]>('/api/apps');
-    return response.data;
-  },
-
-  async listAppInstances() {
-    const response = await httpClient.get<AppInstanceView[]>('/api/app-instances');
-    return response.data;
-  },
-
-  async accessChecks() {
-    const response = await httpClient.get<Record<string, AppAccessCheck>>('/api/apps/access');
-    return response.data;
-  },
-
-  async telemetry() {
-    const response = await httpClient.get<Record<string, AppTelemetry>>('/api/apps/telemetry');
-    return response.data;
-  },
-
-  async healthSnapshots() {
-    const response = await httpClient.get<Record<string, AppHealthSnapshot>>('/api/apps/health');
-    return response.data;
-  },
-
   async reliabilitySummary() {
     const response = await httpClient.get<AppReliabilitySummary>('/api/apps/reliability');
     return response.data;
@@ -46,11 +21,6 @@ export const InstalledAppsAPIClient = {
 
   async appTelemetry(appId: string) {
     const response = await httpClient.get<AppTelemetry>(`/api/apps/${appId}/telemetry`);
-    return response.data;
-  },
-
-  async appHealthSnapshot(appId: string) {
-    const response = await httpClient.get<AppHealthSnapshot>(`/api/apps/${appId}/health`);
     return response.data;
   },
 
@@ -99,11 +69,6 @@ export const InstalledAppsAPIClient = {
 
   async enablePrivateAccess(appId: string) {
     const response = await httpClient.post<AppActionResult>(`/api/apps/${appId}/private-access/enable`);
-    return response.data;
-  },
-
-  async repairPrivateAccess(appId: string) {
-    const response = await httpClient.post<AppActionResult>(`/api/apps/${appId}/private-access/repair`);
     return response.data;
   },
 

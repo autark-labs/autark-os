@@ -1,6 +1,7 @@
 package com.autarkos.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -35,7 +36,7 @@ class UpdateInventoryServiceTests {
         List<ApplicationView> after = List.of(
                 managed("homepage", "appinst_home", "/var/lib/autark-os/apps/homepage", "autarkos_current_homepage"),
                 managed("vaultwarden", "appinst_vault", "/var/lib/autark-os/apps/vaultwarden", "autarkos_current_vaultwarden"));
-        when(states.refreshNow()).thenReturn(state(before), state(after));
+        when(states.refreshNowExclusively()).thenReturn(state(before), state(after));
         when(identities.current()).thenReturn(IDENTITY);
         UpdateInventoryService service = new UpdateInventoryService(states, identities);
 
@@ -133,13 +134,61 @@ class UpdateInventoryServiceTests {
                 .containsExactly("recovery_identity_mismatch");
     }
 
+    @Test
+    void captureRejectsAStaleInventoryAfterRefreshFailure() {
+        ApplicationStateService states = mock(ApplicationStateService.class);
+        InstanceIdentityService identities = mock(InstanceIdentityService.class);
+        ApplicationState stale = new ApplicationState(
+                List.of(managed("vaultwarden", "appinst_vault", "/var/lib/autark-os/apps/vaultwarden", "autarkos_current_vaultwarden")),
+                NOW,
+                AutarkOsStates.SnapshotState.ERROR,
+                NOW,
+                NOW,
+                true,
+                "Docker inventory unavailable",
+                NOW.plusSeconds(10));
+        when(states.refreshNowExclusively()).thenReturn(stale);
+        when(identities.current()).thenReturn(IDENTITY);
+
+        assertThatThrownBy(() -> new UpdateInventoryService(states, identities).capture())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("fresh managed-app inventory");
+    }
+
+    @Test
+    void verificationRejectsAStalePostUpdateInventory() {
+        ApplicationStateService states = mock(ApplicationStateService.class);
+        InstanceIdentityService identities = mock(InstanceIdentityService.class);
+        ApplicationState initialState = state(List.of(managed(
+                "vaultwarden", "appinst_vault", "/var/lib/autark-os/apps/vaultwarden", "autarkos_current_vaultwarden")));
+        ApplicationState staleState = new ApplicationState(
+                initialState.applications(),
+                NOW,
+                AutarkOsStates.SnapshotState.ERROR,
+                NOW,
+                NOW,
+                true,
+                "Docker inventory unavailable",
+                NOW.plusSeconds(10));
+        when(states.refreshNowExclusively())
+                .thenReturn(initialState)
+                .thenReturn(staleState);
+        when(identities.current()).thenReturn(IDENTITY);
+        UpdateInventoryService service = new UpdateInventoryService(states, identities);
+        Snapshot before = service.capture();
+
+        assertThatThrownBy(() -> service.verify(before))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("fresh managed-app inventory");
+    }
+
     private UpdateInventoryModels.Verification verifyTransition(
             List<ApplicationView> before,
             List<ApplicationView> after,
             AutarkOsIdentity afterIdentity) {
         ApplicationStateService states = mock(ApplicationStateService.class);
         InstanceIdentityService identities = mock(InstanceIdentityService.class);
-        when(states.refreshNow()).thenReturn(state(before), state(after));
+        when(states.refreshNowExclusively()).thenReturn(state(before), state(after));
         when(identities.current()).thenReturn(IDENTITY, afterIdentity);
         UpdateInventoryService service = new UpdateInventoryService(states, identities);
         return service.verify(service.capture());

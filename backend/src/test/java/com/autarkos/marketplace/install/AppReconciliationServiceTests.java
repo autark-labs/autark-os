@@ -9,9 +9,6 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import com.autarkos.marketplace.catalog.ManifestValidator;
-import com.autarkos.marketplace.catalog.ManifestYamlReader;
-import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -37,7 +34,6 @@ class AppReconciliationServiceTests {
                 .satisfies(item -> {
                     assertThat(item.appId()).isEqualTo("vaultwarden");
                     assertThat(item.status()).isEqualTo("Ready");
-                    assertThat(item.lifecycleEligible()).isTrue();
                 });
     }
 
@@ -51,7 +47,6 @@ class AppReconciliationServiceTests {
                 .singleElement()
                 .satisfies(item -> {
                     assertThat(item.status()).isEqualTo("Missing");
-                    assertThat(item.lifecycleEligible()).isFalse();
                 });
     }
 
@@ -63,21 +58,11 @@ class AppReconciliationServiceTests {
 
         assertThat(service(repository, List.of(
                 new RuntimeModels.ManagedContainer("vaultwarden", "autark-os-vaultwarden", "Up 2 minutes", DockerResourceOwnership.LEGACY_UNSCOPED, "", ""))).reconcile())
-                .singleElement()
-                .satisfies(item -> {
-                    assertThat(item.status()).isEqualTo("Needs attention");
-                    assertThat(item.ownership()).isEqualTo(DockerResourceOwnership.LEGACY_UNSCOPED);
-                    assertThat(item.lifecycleEligible()).isFalse();
-                });
+                .isEmpty();
 
         assertThat(service(repository, List.of(
                 new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_other_vaultwarden", "Up 2 minutes", DockerResourceOwnership.FOREIGN, "appinst_other", "autarkos_other_vaultwarden"))).reconcile())
-                .singleElement()
-                .satisfies(item -> {
-                    assertThat(item.status()).isEqualTo("Managed elsewhere");
-                    assertThat(item.ownership()).isEqualTo(DockerResourceOwnership.FOREIGN);
-                    assertThat(item.lifecycleEligible()).isFalse();
-                });
+                .isEmpty();
     }
 
     @Test
@@ -88,13 +73,7 @@ class AppReconciliationServiceTests {
 
         assertThat(service(repository, List.of(
                 new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_old_vaultwarden", "Exited (0) 2 hours ago", DockerResourceOwnership.FOREIGN, "appinst_old", "autarkos_old_vaultwarden"))).reconcile())
-                .singleElement()
-                .satisfies(item -> {
-                    assertThat(item.status()).isEqualTo("Managed elsewhere");
-                    assertThat(item.ownership()).isEqualTo(DockerResourceOwnership.FOREIGN);
-                    assertThat(item.lifecycleEligible()).isFalse();
-                    assertThat(item.detail()).contains("another Autark-OS instance");
-                });
+                .isEmpty();
     }
 
     @Test
@@ -103,19 +82,14 @@ class AppReconciliationServiceTests {
 
         assertThat(service(repository, List.of(
                 new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden"))).reconcile())
-                .singleElement()
-                .satisfies(item -> {
-                    assertThat(item.status()).isEqualTo("Needs setup");
-                    assertThat(item.lifecycleEligible()).isFalse();
-                });
+                .isEmpty();
         assertThat(repository.findAppById("vaultwarden")).isEmpty();
     }
 
     private AppReconciliationService service(InstalledAppRepository repository, List<RuntimeModels.ManagedContainer> containers) {
         return new AppReconciliationService(
                 repository,
-                () -> containers,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()));
+                () -> containers);
     }
 
     private InstalledAppRepository repository() {

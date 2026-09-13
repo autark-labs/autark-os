@@ -22,7 +22,6 @@ public final class ApplicationBehaviorStates {
     public static String managedAttentionState(String status) {
         return switch (normalize(status)) {
             case "missing" -> AutarkOsStates.AttentionState.BLOCKED;
-            case "managed elsewhere" -> AutarkOsStates.AttentionState.CONFLICT;
             case "needs attention", "unavailable" -> AutarkOsStates.AttentionState.NEEDS_REVIEW;
             default -> AutarkOsStates.AttentionState.NONE;
         };

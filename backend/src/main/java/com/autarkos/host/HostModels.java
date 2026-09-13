@@ -1,6 +1,7 @@
 package com.autarkos.host;
 
 import java.util.Map;
+import java.util.List;
 
 public final class HostModels {
 
@@ -12,7 +13,24 @@ public final class HostModels {
             String image,
             String status,
             Map<String, String> labels,
-            String ports) {
+            String ports,
+            List<HostDockerMount> mounts) {
+
+        public HostDockerContainer(String name, String image, String status, Map<String, String> labels, String ports) {
+            this(name, image, status, labels, ports, List.of());
+        }
+
+        public HostDockerContainer {
+            labels = Map.copyOf(labels == null ? Map.of() : labels);
+            mounts = List.copyOf(mounts == null ? List.of() : mounts);
+        }
+    }
+
+    public record HostDockerMount(
+            String type,
+            String source,
+            String destination,
+            boolean readOnly) {
     }
 
     public static final class ObservedServiceSource {

@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationRelationship;
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
@@ -34,7 +35,7 @@ public class UpdateInventoryService {
     }
 
     public Snapshot capture() {
-        ApplicationState state = applicationStateService.refreshNow();
+        ApplicationState state = freshApplicationState();
         Snapshot snapshot = snapshot(state, identityService.current());
         requireUsableSnapshot(snapshot);
         return snapshot;
@@ -42,7 +43,7 @@ public class UpdateInventoryService {
 
     public Verification verify(Snapshot before) {
         requireUsableSnapshot(before);
-        ApplicationState currentState = applicationStateService.refreshNow();
+        ApplicationState currentState = freshApplicationState();
         AutarkOsIdentity currentIdentity = identityService.current();
         Snapshot after = snapshot(currentState, currentIdentity);
         Map<String, ApplicationView> currentById = new LinkedHashMap<>();
@@ -72,6 +73,19 @@ public class UpdateInventoryService {
                 after,
                 List.copyOf(outcomes),
                 List.copyOf(violations));
+    }
+
+    private ApplicationState freshApplicationState() {
+        ApplicationState state = applicationStateService.refreshNowExclusively();
+        if (state == null
+                || state.stale()
+                || !AutarkOsStates.SnapshotState.IDLE.equals(state.refreshStatus())
+                || state.updatedAt() == null
+                || state.refreshCompletedAt() == null
+                || (state.lastError() != null && !state.lastError().isBlank())) {
+            throw new IllegalStateException("A fresh managed-app inventory could not be collected.");
+        }
+        return state;
     }
 
     private Snapshot snapshot(ApplicationState state, AutarkOsIdentity identity) {

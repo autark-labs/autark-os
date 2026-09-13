@@ -21,7 +21,6 @@ public final class AutarkOsStates {
 
     public static final class ManagementState {
         public static final String MANAGED = "managed";
-        public static final String FOUND = "found";
 
         private ManagementState() {
         }
@@ -53,7 +52,6 @@ public final class AutarkOsStates {
     public static final class AttentionState {
         public static final String NONE = "none";
         public static final String NEEDS_REVIEW = "needs_review";
-        public static final String CONFLICT = "conflict";
         public static final String BLOCKED = "blocked";
 
         private AttentionState() {

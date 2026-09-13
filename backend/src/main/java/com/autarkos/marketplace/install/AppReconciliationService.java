@@ -1,34 +1,26 @@
 package com.autarkos.marketplace.install;
 
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
-import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.RuntimeModels;
-import com.autarkos.marketplace.model.ApplicationManifest;
 
 @Service
 public class AppReconciliationService {
 
     private final InstalledAppRepository repository;
     private final ManagedContainerDiscovery managedContainerDiscovery;
-    private final MarketplaceCatalogService catalogService;
 
     public AppReconciliationService(
             InstalledAppRepository repository,
-            ManagedContainerDiscovery managedContainerDiscovery,
-            MarketplaceCatalogService catalogService) {
+            ManagedContainerDiscovery managedContainerDiscovery) {
         this.repository = repository;
         this.managedContainerDiscovery = managedContainerDiscovery;
-        this.catalogService = catalogService;
     }
 
     public List<AppReconciliationItem> reconcile() {
@@ -38,73 +30,36 @@ public class AppReconciliationService {
                 .filter(container -> container.appId() != null && !container.appId().isBlank())
                 .collect(Collectors.groupingBy(RuntimeModels.ManagedContainer::appId));
 
-        List<AppReconciliationItem> items = new ArrayList<>();
-        Set<String> seenAppIds = new LinkedHashSet<>();
-        for (InstalledApp app : installedApps) {
-            seenAppIds.add(app.appId());
-            items.add(reconcileInstalled(app, containersByApp.getOrDefault(app.appId(), List.of())));
-        }
-        containersByApp.entrySet().stream()
-                .filter(entry -> !seenAppIds.contains(entry.getKey()))
-                .forEach(entry -> items.add(reconcileUnregistered(entry.getKey(), entry.getValue())));
-        return items.stream()
+        return installedApps.stream()
+                .filter(this::hasCurrentOwnershipRecord)
+                .filter(app -> containsOnlyCurrentContainers(containersByApp.getOrDefault(app.appId(), List.of())))
+                .map(app -> reconcileInstalled(app, containersByApp.getOrDefault(app.appId(), List.of())))
                 .sorted(Comparator.comparing(AppReconciliationItem::appName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
     private AppReconciliationItem reconcileInstalled(InstalledApp app, List<RuntimeModels.ManagedContainer> containers) {
-        RuntimeModels.InstalledAppOwnershipMetadata metadata = repository.ownershipFor(app.appId()).orElse(null);
-        if (metadata != null && !isOwnedMetadata(metadata)) {
-            return item(app.appId(), app.appName(), "Managed elsewhere", ownershipFrom(metadata), false, "Stored app metadata is not owned by this Autark-OS instance.");
-        }
         if (containers.isEmpty()) {
-            return item(app.appId(), app.appName(), AutarkOsStates.AppStatus.MISSING, DockerResourceOwnership.OWNED, false, "No owned containers were found for this app.");
-        }
-        DockerResourceOwnership ownership = strongestOwnership(containers);
-        if (ownership == DockerResourceOwnership.FOREIGN) {
-            return item(app.appId(), app.appName(), "Managed elsewhere", ownership, false, "Docker reports containers owned by another Autark-OS instance.");
-        }
-        if (ownership == DockerResourceOwnership.LEGACY_UNSCOPED) {
-            return item(app.appId(), app.appName(), AutarkOsStates.AppStatus.NEEDS_ATTENTION, ownership, false, "Docker reports legacy Autark-OS containers without instance ownership labels.");
+            return new AppReconciliationItem(
+                    app.appId(), app.appName(), AutarkOsStates.AppStatus.MISSING,
+                    "No owned containers were found for this app.");
         }
         String status = statusFromContainers(containers);
-        return item(app.appId(), app.appName(), status, ownership, lifecycleEligible(status, ownership), "Reconciled from owned Docker containers.");
+        return new AppReconciliationItem(
+                app.appId(), app.appName(), status, "Reconciled from owned Docker containers.");
     }
 
-    private AppReconciliationItem reconcileUnregistered(String appId, List<RuntimeModels.ManagedContainer> containers) {
-        DockerResourceOwnership ownership = strongestOwnership(containers);
-        String name = catalogService.findById(appId).map(ApplicationManifest::name).orElse(appId);
-        if (ownership == DockerResourceOwnership.OWNED) {
-            return item(appId, name, "Needs setup", ownership, false, "Owned containers exist, but no installed app record was found.");
-        }
-        return item(appId, name, "Managed elsewhere", ownership, false, "Containers require reviewed recovery before this installation can manage them.");
+    private boolean hasCurrentOwnershipRecord(InstalledApp app) {
+        return repository.ownershipFor(app.appId()).map(this::isOwnedMetadata).orElse(true);
     }
 
     private boolean isOwnedMetadata(RuntimeModels.InstalledAppOwnershipMetadata metadata) {
         return "owned".equalsIgnoreCase(metadata.ownershipStatus()) || metadata.ownershipStatus().isBlank();
     }
 
-    private DockerResourceOwnership ownershipFrom(RuntimeModels.InstalledAppOwnershipMetadata metadata) {
-        if ("legacy_unscoped".equalsIgnoreCase(metadata.ownershipStatus())) {
-            return DockerResourceOwnership.LEGACY_UNSCOPED;
-        }
-        if ("foreign".equalsIgnoreCase(metadata.ownershipStatus()) || "managed_elsewhere".equalsIgnoreCase(metadata.ownershipStatus())) {
-            return DockerResourceOwnership.FOREIGN;
-        }
-        return DockerResourceOwnership.UNMANAGED;
-    }
-
-    private DockerResourceOwnership strongestOwnership(List<RuntimeModels.ManagedContainer> containers) {
-        if (containers.stream().anyMatch(container -> container.ownership() == DockerResourceOwnership.FOREIGN)) {
-            return DockerResourceOwnership.FOREIGN;
-        }
-        if (containers.stream().anyMatch(container -> container.ownership() == DockerResourceOwnership.LEGACY_UNSCOPED)) {
-            return DockerResourceOwnership.LEGACY_UNSCOPED;
-        }
-        if (containers.stream().anyMatch(container -> container.ownership() == DockerResourceOwnership.OWNED)) {
-            return DockerResourceOwnership.OWNED;
-        }
-        return DockerResourceOwnership.UNMANAGED;
+    private boolean containsOnlyCurrentContainers(List<RuntimeModels.ManagedContainer> containers) {
+        return containers.isEmpty()
+                || containers.stream().allMatch(container -> container.ownership() == DockerResourceOwnership.OWNED);
     }
 
     private String statusFromContainers(List<RuntimeModels.ManagedContainer> containers) {
@@ -127,12 +82,4 @@ public class AppReconciliationService {
         return AutarkOsStates.AppStatus.STARTING;
     }
 
-    private boolean lifecycleEligible(String status, DockerResourceOwnership ownership) {
-        return ownership == DockerResourceOwnership.OWNED
-                && (AutarkOsStates.AppStatus.READY.equals(status) || AutarkOsStates.AppStatus.STARTING.equals(status) || AutarkOsStates.AppStatus.STOPPED.equals(status));
-    }
-
-    private AppReconciliationItem item(String appId, String appName, String status, DockerResourceOwnership ownership, boolean lifecycleEligible, String detail) {
-        return new AppReconciliationItem(appId, appName, status, ownership, lifecycleEligible, detail);
-    }
 }

@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 
 import jakarta.annotation.PreDestroy;
@@ -46,7 +47,7 @@ public class ApplicationStateService {
     private final Executor backgroundRefreshExecutor;
     private final ThreadPoolExecutor ownedBackgroundRefreshExecutor;
     private final AtomicReference<ApplicationState> cached;
-    private final AtomicBoolean refreshRunning = new AtomicBoolean(false);
+    private final ReentrantLock refreshLock = new ReentrantLock();
     private final AtomicBoolean backgroundRefreshQueued = new AtomicBoolean(false);
 
     @Autowired
@@ -130,10 +131,19 @@ public class ApplicationStateService {
     }
 
     public ApplicationState refreshNow() {
-        Instant now = clock.get();
-        if (!refreshRunning.compareAndSet(false, true)) {
+        if (!refreshLock.tryLock()) {
             return cached.get();
         }
+        return refreshLocked();
+    }
+
+    public ApplicationState refreshNowExclusively() {
+        refreshLock.lock();
+        return refreshLocked();
+    }
+
+    private ApplicationState refreshLocked() {
+        Instant now = clock.get();
         try {
             ApplicationState refreshed = buildSnapshot(now);
             cached.set(refreshed);
@@ -143,7 +153,7 @@ public class ApplicationStateService {
             cached.set(failed);
             return failed;
         } finally {
-            refreshRunning.set(false);
+            refreshLock.unlock();
         }
     }
 

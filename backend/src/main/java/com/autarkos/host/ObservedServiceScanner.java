@@ -13,6 +13,7 @@ import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.DockerResourceOwnership;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.system.AutarkOsIdentity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class ObservedServiceScanner {
@@ -20,6 +21,7 @@ public class ObservedServiceScanner {
     private final HostDockerContainerDiscovery containerDiscovery;
     private final Supplier<AutarkOsIdentity> currentIdentity;
     private final DockerOwnershipService ownershipService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ObservedServiceScanner(HostDockerContainerDiscovery containerDiscovery, Supplier<AutarkOsIdentity> currentIdentity) {
         this(containerDiscovery, currentIdentity, null);
@@ -81,25 +83,31 @@ public class ObservedServiceScanner {
     }
 
     private String metadata(HostModels.HostDockerContainer container, AutarkOsIdentity identity) {
-        Map<String, String> metadata = new LinkedHashMap<>();
+        Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("containerName", clean(container.name()));
         metadata.put("image", clean(container.image()));
         metadata.put("status", clean(container.status()));
         metadata.put("ports", clean(container.ports()));
+        metadata.put("liveMounts", container.mounts().stream().map(mount -> Map.of(
+                "type", clean(mount.type()),
+                "source", clean(mount.source()),
+                "target", clean(mount.destination()),
+                "readOnly", mount.readOnly())).toList());
         metadata.put("currentInstanceId", identity.instanceId());
         putIfPresent(metadata, "catalogAppId", container.labels().get(DockerOwnershipService.APP_ID));
         putIfPresent(metadata, "managed", container.labels().get(DockerOwnershipService.MANAGED));
         putIfPresent(metadata, "composeProject", firstPresent(
                 container.labels().get(DockerOwnershipService.COMPOSE_PROJECT),
                 container.labels().get("com.docker.compose.project")));
+        putIfPresent(metadata, "composeService", container.labels().get("com.docker.compose.service"));
         putIfPresent(metadata, "appInstanceId", container.labels().get(DockerOwnershipService.APP_INSTANCE_ID));
         putIfPresent(metadata, "autarkOsInstanceId", container.labels().get(DockerOwnershipService.INSTANCE_ID));
         putIfPresent(metadata, "runtimeRootHash", container.labels().get(DockerOwnershipService.RUNTIME_ROOT_HASH));
-        return "{"
-                + metadata.entrySet().stream()
-                .map(entry -> "\"" + escape(entry.getKey()) + "\":\"" + escape(entry.getValue()) + "\"")
-                .collect(java.util.stream.Collectors.joining(","))
-                + "}";
+        try {
+            return objectMapper.writeValueAsString(metadata);
+        } catch (java.io.IOException exception) {
+            throw new HostInventoryException("Docker inventory metadata could not be recorded.");
+        }
     }
 
     private String ownershipState(DockerResourceOwnership ownership) {
@@ -168,7 +176,7 @@ public class ObservedServiceScanner {
         return null;
     }
 
-    private void putIfPresent(Map<String, String> metadata, String key, String value) {
+    private void putIfPresent(Map<String, Object> metadata, String key, String value) {
         if (value != null && !value.isBlank()) {
             metadata.put(key, value.trim());
         }
@@ -183,7 +191,4 @@ public class ObservedServiceScanner {
         return cleaned.isBlank() ? null : cleaned;
     }
 
-    private String escape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
 }

@@ -202,7 +202,7 @@ function QuickLinkItem({ description, icon: Icon, label, to }: { description: st
 
 function appStatus(status: string) {
   if (status === 'Ready') return { label: 'Running', tone: 'success' as const };
-  if (status === 'Needs setup' || status === 'Needs attention' || status === 'Missing') return { label: status, tone: 'warning' as const };
+  if (status === 'Needs attention' || status === 'Missing') return { label: status, tone: 'warning' as const };
   if (status === 'Starting') return { label: 'Starting', tone: 'info' as const };
   return { label: status || 'Unavailable', tone: 'neutral' as const };
 }

@@ -89,7 +89,7 @@ function managedStatus(displayStatus: string, app: AppRuntimeView): ApplicationS
   if (displayStatus === 'Paused' || displayStatus === 'Stopped' || app.friendlyStatus === 'Stopped') {
     return 'Paused';
   }
-  if (['Needs attention', 'Unavailable', 'Missing', 'Managed elsewhere', 'Unknown'].includes(displayStatus)) {
+  if (['Needs attention', 'Unavailable', 'Missing', 'Unknown'].includes(displayStatus)) {
     return 'Needs review';
   }
   return 'Ready';

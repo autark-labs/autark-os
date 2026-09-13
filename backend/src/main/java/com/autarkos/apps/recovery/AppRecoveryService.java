@@ -218,7 +218,10 @@ public class AppRecoveryService {
                         : "The runtime folder is missing or outside managed Autark-OS storage.", runtimePath.toString()));
 
         checks.add(check("compose", "Compose configuration", compose.valid(), compose.message(), runtimePath.resolve("compose.yaml").toString()));
-        checks.add(check("mounts", "Mounted data", compose.mountsValid(), compose.mountMessage(), String.join(", ", compose.mounts())));
+        checks.add(check("mounts", "Saved data layout", compose.mountsValid(), compose.mountMessage(), String.join(", ", compose.mounts())));
+
+        LiveRuntimeInspection liveRuntime = inspectLiveRuntime(containers, compose, deployedManifest);
+        checks.add(check("live_runtime", "Running containers", liveRuntime.valid(), liveRuntime.message(), liveRuntime.detail()));
 
         boolean ownershipConsistent = ownershipConsistent(reason, containers, identity);
         checks.add(check("docker_ownership", "Previous ownership", ownershipConsistent,
@@ -810,7 +813,8 @@ public class AppRecoveryService {
         if (parts.length < 2) return null;
         int targetIndex = parts.length > 2 && Set.of("ro", "rw").contains(parts[parts.length - 1]) ? parts.length - 2 : parts.length - 1;
         if (targetIndex != 1) return null;
-        return new Mount(parts[0], parts[targetIndex]);
+        boolean readOnly = parts.length > 2 && "ro".equals(parts[parts.length - 1]);
+        return new Mount(parts[0], parts[targetIndex], readOnly);
     }
 
     private Integer publishedPort(String mapping) {
@@ -859,12 +863,97 @@ public class AppRecoveryService {
         List<String> evidence = containers.stream().map(service -> String.join(":",
                         blank(service.fingerprint(), ""), blank(service.ownershipState(), ""),
                         blank(service.autarkOsInstanceId(), ""), blank(service.runtimeState(), ""),
-                        metadataValue(service, "appInstanceId")))
+                        metadataValue(service, "appInstanceId"), metadataValue(service, "image"),
+                        metadataValue(service, "composeService"), liveMountMaterial(service)))
                 .sorted().toList();
         String material = String.join("|", appId, reason, runtimePath.toString(), sourceProject, targetProject,
                 appInstanceId, fileHash(runtimePath.resolve("compose.yaml")),
+                fileHash(runtimePath.resolve("manifest.yaml")),
                 fileHash(runtimePath.resolve(AppRuntimeMetadataWriter.METADATA_FILE)), String.join(",", evidence), json(settings));
         return "recovery_" + sha256(material);
+    }
+
+    private LiveRuntimeInspection inspectLiveRuntime(
+            List<ObservedService> containers,
+            ComposeInspection compose,
+            ApplicationManifest manifest) {
+        if (!compose.valid() || containers.isEmpty()) {
+            return LiveRuntimeInspection.invalid("Running container configuration cannot be verified until Docker and Compose evidence are complete.");
+        }
+        List<String> expectedServices = expectedServices(manifest).stream().sorted().toList();
+        List<String> actualServices = containers.stream()
+                .map(service -> metadataValue(service, "composeService"))
+                .sorted().toList();
+        if (!actualServices.equals(expectedServices)) {
+            return LiveRuntimeInspection.invalid("The running containers do not exactly match the saved app services.");
+        }
+        List<String> expectedImages = expectedImages(manifest).values().stream().sorted().toList();
+        List<String> actualImages = containers.stream()
+                .map(service -> metadataValue(service, "image"))
+                .sorted().toList();
+        if (!actualImages.equals(expectedImages)) {
+            return LiveRuntimeInspection.invalid("A running container image does not match the saved app release.");
+        }
+        List<String> expectedMounts = compose.mounts().stream()
+                .map(this::mount)
+                .filter(java.util.Objects::nonNull)
+                .map(this::mountSignature)
+                .sorted().toList();
+        List<String> actualMounts = new ArrayList<>();
+        for (ObservedService container : containers) {
+            Optional<List<Mount>> mounts = liveMounts(container);
+            if (mounts.isEmpty()) {
+                return LiveRuntimeInspection.invalid("Docker did not provide complete live mount details for every app container.");
+            }
+            mounts.orElseThrow().stream().map(this::mountSignature).forEach(actualMounts::add);
+        }
+        actualMounts.sort(String::compareTo);
+        if (!actualMounts.equals(expectedMounts)) {
+            return LiveRuntimeInspection.invalid("The running container mounts differ from the saved app configuration. Existing data will not be changed.");
+        }
+        return new LiveRuntimeInspection(
+                true,
+                "The running containers, images, and mounted data match the saved app release.",
+                containers.size() + " container(s), " + actualMounts.size() + " mounted data path(s)");
+    }
+
+    private Optional<List<Mount>> liveMounts(ObservedService service) {
+        try {
+            JsonNode metadata = objectMapper.readTree(service.metadataJson());
+            JsonNode mounts = metadata == null ? null : metadata.get("liveMounts");
+            if (mounts == null || !mounts.isArray()) return Optional.empty();
+            List<Mount> values = new ArrayList<>();
+            for (JsonNode mount : mounts) {
+                String source = mount.path("source").asText("");
+                String target = mount.path("target").asText("");
+                if (!"bind".equals(mount.path("type").asText(""))
+                        || source.isBlank() || !source.startsWith("/")
+                        || target.isBlank() || !target.startsWith("/")) {
+                    return Optional.empty();
+                }
+                values.add(new Mount(source, target, mount.path("readOnly").asBoolean(false)));
+            }
+            return Optional.of(List.copyOf(values));
+        } catch (IOException | RuntimeException exception) {
+            return Optional.empty();
+        }
+    }
+
+    private String liveMountMaterial(ObservedService service) {
+        return liveMounts(service)
+                .map(mounts -> mounts.stream().map(this::mountSignature).sorted()
+                        .collect(java.util.stream.Collectors.joining(",")))
+                .orElse("unavailable");
+    }
+
+    private String mountSignature(Mount mount) {
+        String source;
+        try {
+            source = Path.of(mount.source()).toAbsolutePath().normalize().toString();
+        } catch (RuntimeException exception) {
+            source = mount.source();
+        }
+        return source + "|" + mount.target() + "|" + (mount.readOnly() ? "ro" : "rw");
     }
 
     private String fileHash(Path path) {
@@ -1020,7 +1109,14 @@ public class AppRecoveryService {
         }
     }
 
-    private record Mount(String source, String target) {
+    private record LiveRuntimeInspection(boolean valid, String message, String detail) {
+
+        private static LiveRuntimeInspection invalid(String message) {
+            return new LiveRuntimeInspection(false, message, "Existing containers and data remain unchanged.");
+        }
+    }
+
+    private record Mount(String source, String target, boolean readOnly) {
     }
 
     private record RuntimeSnapshot(byte[] compose, byte[] metadata) {

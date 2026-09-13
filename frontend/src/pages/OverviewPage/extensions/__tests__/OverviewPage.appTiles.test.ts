@@ -8,7 +8,7 @@ import {
 } from '../OverviewPage.appTiles';
 
 test('managed app tile uses its canonical app icon', () => {
-  assert.equal(managedAppIconUrl({ icon: '/app-images/pi-hole.svg' }), '/app-images/pi-hole.svg');
+  assert.equal(managedAppIconUrl({ appId: 'pi-hole', image: '/app-images/pi-hole.svg' }), '/app-images/pi-hole.svg');
   assert.equal(managedAppIconUrl({ appId: 'vaultwarden', image: 'vaultwarden/server:1.36.0' }), '/app-images/vaultwarden.svg');
 });
 

@@ -72,7 +72,7 @@ class BackupServiceCanonicalAppTests {
         assertThat(report.apps().getFirst().latestBackup().verificationStatus()).isNotEqualTo("verified");
         assertThat(report.apps().getFirst().restorePoints()).extracting(RestorePoint::id).contains(full.id());
         var views = new com.autarkos.marketplace.install.AppInstanceViewService(installed,
-                new com.autarkos.marketplace.install.AppReconciliationService(installed, List::of, catalog), catalog, backups, new TailscaleService());
+                new com.autarkos.marketplace.install.AppReconciliationService(installed, List::of), catalog, backups, new TailscaleService());
         assertThat(views.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
         assertThat(appLifecycleService(layout, installed, catalog, backups, new NoopDockerComposeExecutor())
                 .getApp(appId).canonicalBackupState()).isEqualTo("protected_by_restore_point");

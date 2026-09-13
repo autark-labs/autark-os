@@ -210,7 +210,7 @@ function ConflictReviewDialog({ application, onOpenChange, open }: { application
         </DialogHeader>
         <div className="grid gap-3 rounded-lg border bg-muted/35 p-4 text-sm sm:grid-cols-2">
           <Detail label="Runtime" value={evidence?.runtimeState || 'Unknown'} />
-          <Detail label="Source" value={evidence?.source || 'Unknown'} />
+          <Detail label="Detected as" value={evidenceSourceLabel(evidence?.source)} />
         </div>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} variant="outline">Close</Button>
@@ -542,15 +542,21 @@ function RecoveryProgressRow({ step }: { step: AutarkOsJobStep }) {
 }
 
 function compactChecks(checks: AppRecoveryCheck[]) {
-  const preferred = ['catalog_identity', 'mounts', 'ports', 'docker_ownership'];
+  const preferred = ['catalog_identity', 'live_runtime', 'ports', 'docker_ownership'];
   return preferred.flatMap((id) => checks.find((check) => check.id === id) || []);
 }
 
 function recoveryCheckIcon(id: string) {
-  if (id === 'mounts') return HardDrive;
+  if (id === 'mounts' || id === 'live_runtime') return HardDrive;
   if (id === 'ports') return Network;
   if (id === 'docker_ownership') return LockKeyhole;
   return CheckCircle2;
+}
+
+function evidenceSourceLabel(source: string | null | undefined) {
+  if (source === 'docker') return 'Running service';
+  if (source === 'autark_os_install') return 'Interrupted Autark-OS install';
+  return 'Detected service';
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

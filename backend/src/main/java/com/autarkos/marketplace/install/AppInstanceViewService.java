@@ -45,14 +45,8 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
 
     public List<AppInstanceView> list() {
         return reconciliationService.reconcile().stream()
-                .filter(this::userFacingManagedApp)
                 .map(this::view)
                 .toList();
-    }
-
-    private boolean userFacingManagedApp(AppReconciliationItem item) {
-        return item.ownership() == DockerResourceOwnership.OWNED
-                && repository.findAppById(item.appId()).isPresent();
     }
 
     private AppInstanceView view(AppReconciliationItem item) {
@@ -76,7 +70,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                 item.status(),
                 firstPresent(ownership == null ? null : ownership.installState(), app == null ? "unregistered" : app.status()),
                 runtimeState(item.status()),
-                ownershipState(item.ownership()),
+                "owned",
                 accessState(item.status(), localUrl, privateAccess),
                 backupState,
                 localUrl,
@@ -111,15 +105,6 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     item.appName() + " is missing",
                     "Autark-OS cannot find the container for this app.",
                     AutarkOsAction.post("repair-" + item.appId(), "Repair", "/api/apps/" + item.appId() + "/repair", false, false)));
-        } else if ("Managed elsewhere".equals(item.status())) {
-            issues.add(AutarkOsIssueFactory.appIssue(
-                    "app-managed-elsewhere-" + item.appId(),
-                    item.appId(),
-                    "warning",
-                    "app_managed_elsewhere",
-                    item.appName() + " is managed elsewhere",
-                    "Autark-OS found this app, but it belongs to another Autark-OS instance or an older unscoped install.",
-                    AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics")));
         } else if (AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(item.status())) {
             issues.add(AutarkOsIssueFactory.appIssue(
                     "app-needs-attention-" + item.appId(),
@@ -129,15 +114,6 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                     item.appName() + " needs attention",
                     item.detail(),
                     app == null ? null : AutarkOsAction.post("repair-" + item.appId(), "Repair", "/api/apps/" + item.appId() + "/repair", false, false)));
-        } else if ("Needs setup".equals(item.status())) {
-            issues.add(AutarkOsIssueFactory.appIssue(
-                    "app-needs-setup-" + item.appId(),
-                    item.appId(),
-                    "info",
-                    "app_needs_setup",
-                    item.appName() + " needs setup",
-                    "Autark-OS found app resources without a complete installed app record.",
-                    AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics")));
         }
         if (AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(backupState)) {
             issues.add(AutarkOsIssueFactory.backupIssue(
@@ -166,13 +142,11 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         if (AutarkOsStates.AppStatus.READY.equals(item.status()) && app != null) {
             actions.add(AutarkOsAction.get("open-" + item.appId(), "Open", firstPresent(privateUrl, localUrl, app.accessUrl())));
             actions.add(AutarkOsAction.post("restart-" + item.appId(), "Restart", "/api/apps/" + item.appId() + "/restart", false, false));
-        } else if (AutarkOsStates.AppStatus.MISSING.equals(item.status()) && item.ownership() == DockerResourceOwnership.OWNED && app != null) {
+        } else if (AutarkOsStates.AppStatus.MISSING.equals(item.status()) && app != null) {
             actions.add(AutarkOsAction.post("repair-" + item.appId(), "Repair", "/api/apps/" + item.appId() + "/repair", false, false));
             actions.add(AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics"));
         } else if (AutarkOsStates.AppStatus.STOPPED.equals(item.status()) && app != null) {
             actions.add(AutarkOsAction.post("start-" + item.appId(), "Start", "/api/apps/" + item.appId() + "/start", false, false));
-        } else if ("Managed elsewhere".equals(item.status()) || "Needs setup".equals(item.status())) {
-            actions.add(AutarkOsAction.route("view-diagnostics-" + item.appId(), "View diagnostics", "/diagnostics"));
         }
         return actions;
     }
@@ -183,23 +157,12 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
             case AutarkOsStates.AppStatus.STARTING -> AutarkOsStates.ReadinessState.STARTING;
             case AutarkOsStates.AppStatus.STOPPED -> AutarkOsStates.ReadinessState.STOPPED;
             case AutarkOsStates.AppStatus.MISSING -> "missing";
-            case "Managed elsewhere" -> "foreign";
-            case "Needs setup" -> "needs_setup";
             default -> "needs_attention";
         };
     }
 
     private boolean needsUserAction(String status) {
         return AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(status) || AutarkOsStates.AppStatus.UNAVAILABLE.equals(status) || AutarkOsStates.AppStatus.MISSING.equals(status);
-    }
-
-    private String ownershipState(DockerResourceOwnership ownership) {
-        return switch (ownership) {
-            case OWNED -> "owned";
-            case FOREIGN -> "foreign";
-            case LEGACY_UNSCOPED -> "legacy_unscoped";
-            case UNMANAGED -> "unmanaged";
-        };
     }
 
     private java.util.Optional<AutarkOsIssue> privateAccessIssue(AppReconciliationItem item, PrivateAccessState state) {

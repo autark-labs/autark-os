@@ -267,7 +267,7 @@ class AppInstanceViewServiceTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         return new AppInstanceViewService(
                 repository,
-                new AppReconciliationService(repository, () -> containers, catalogService),
+                new AppReconciliationService(repository, () -> containers),
                 catalogService,
                 backupRepository,
                 tailscaleService);

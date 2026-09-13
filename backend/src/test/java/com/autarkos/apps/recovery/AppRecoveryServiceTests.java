@@ -193,6 +193,42 @@ class AppRecoveryServiceTests {
     }
 
     @Test
+    void runningContainerMountsMustMatchTheSavedRelease() throws Exception {
+        Path appRoot = writeRuntime(true);
+        ObservedService evidence = evidence(
+                "owned_managed", appRoot, "current-instance", "running",
+                appRoot.resolve("unexpected-data"), manifest.runtime().image());
+        stubEvidence(evidence);
+        when(installedApps.findAppById("vaultwarden")).thenReturn(Optional.empty());
+        when(installedApps.settingsFor("vaultwarden"))
+                .thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
+
+        AppRecoveryModels.RecoveryPlan plan = service.plan("vaultwarden");
+
+        assertThat(plan.applicable()).isFalse();
+        assertThat(plan.checks()).filteredOn(check -> check.id().equals("live_runtime"))
+                .singleElement().satisfies(check -> assertThat(check.message()).contains("mounts differ"));
+    }
+
+    @Test
+    void runningContainerImageMustMatchTheSavedRelease() throws Exception {
+        Path appRoot = writeRuntime(true);
+        ObservedService evidence = evidence(
+                "owned_managed", appRoot, "current-instance", "running",
+                appRoot.resolve("data"), "example.invalid/drifted:latest");
+        stubEvidence(evidence);
+        when(installedApps.findAppById("vaultwarden")).thenReturn(Optional.empty());
+        when(installedApps.settingsFor("vaultwarden"))
+                .thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
+
+        AppRecoveryModels.RecoveryPlan plan = service.plan("vaultwarden");
+
+        assertThat(plan.applicable()).isFalse();
+        assertThat(plan.checks()).filteredOn(check -> check.id().equals("live_runtime"))
+                .singleElement().satisfies(check -> assertThat(check.message()).contains("image"));
+    }
+
+    @Test
     void currentInstanceRegistrationIsBlockedWhenComposeProjectDoesNotMatch() throws Exception {
         Path appRoot = writeRuntime(true);
         markPreviousProject(appRoot);
@@ -294,6 +330,25 @@ class AppRecoveryServiceTests {
     }
 
     @Test
+    void rejectsAPlanWhenSavedManifestChangesAfterReview() throws Exception {
+        Path appRoot = writeRuntime(true);
+        ObservedService evidence = evidence("owned_managed", appRoot, "current-instance");
+        stubEvidence(evidence);
+        when(installedApps.findAppById("vaultwarden")).thenReturn(Optional.empty());
+        when(installedApps.settingsFor("vaultwarden"))
+                .thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
+        AppRecoveryModels.RecoveryPlan reviewed = service.plan("vaultwarden");
+        Files.writeString(appRoot.resolve("manifest.yaml"), Files.readString(appRoot.resolve("manifest.yaml")) + "\n# changed\n");
+
+        assertThatThrownBy(() -> service.apply(
+                "vaultwarden",
+                new AppRecoveryModels.RecoveryApplyRequest(reviewed.planId(), false)))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("changed after this recovery plan");
+        verify(installedApps, never()).commitRecoveredApp(any(), any(), any());
+    }
+
+    @Test
     void restoresPreviousRuntimeWhenTransferredContainerFailsHealthVerification() throws Exception {
         Path appRoot = writeRuntime(true);
         markPreviousProject(appRoot);
@@ -384,12 +439,26 @@ class AppRecoveryServiceTests {
     }
 
     private ObservedService evidence(String ownership, Path appRoot, String ownerInstance, String runtimeState) {
+        return evidence(ownership, appRoot, ownerInstance, runtimeState, appRoot.resolve("data"), manifest.runtime().image());
+    }
+
+    private ObservedService evidence(
+            String ownership,
+            Path appRoot,
+            String ownerInstance,
+            String runtimeState,
+            Path liveDataPath,
+            String liveImage) {
         Instant now = Instant.parse("2026-09-12T12:00:00Z");
         return new ObservedService(
                 "docker:vaultwarden", "docker", "vaultwarden", "Vaultwarden", "http://localhost:8090",
                 "LAN", "vaultwarden", "label", ownership, runtimeState,
                 ownerInstance, now, now,
-                "{\"dataPaths\":\"" + appRoot + "\",\"appInstanceId\":\"appinst_vaultwarden\",\"ports\":\"0.0.0.0:8090->80/tcp\"}");
+                "{\"dataPaths\":\"" + appRoot
+                        + "\",\"appInstanceId\":\"appinst_vaultwarden\",\"ports\":\"0.0.0.0:8090->80/tcp\""
+                        + ",\"image\":\"" + liveImage + "\",\"composeService\":\"" + manifest.runtime().containerName() + "\""
+                        + ",\"liveMounts\":[{\"type\":\"bind\",\"source\":\"" + liveDataPath
+                        + "\",\"target\":\"/data\",\"readOnly\":false}]}");
     }
 
     private void stubEvidence(ObservedService evidence) {
