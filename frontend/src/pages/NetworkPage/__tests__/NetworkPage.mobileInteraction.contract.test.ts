@@ -10,6 +10,7 @@ function source(relativePath: string) {
 }
 
 test('Access renders a compact, tabbed zone view below desktop widths', () => {
+  const page = source('src/pages/NetworkPage/NetworkPage.tsx');
   const matrix = source('src/pages/NetworkPage/ReachabilityMatrix.tsx');
   const mobileZone = matrix.slice(matrix.indexOf('function MobileReachabilityZone'));
 
@@ -21,6 +22,8 @@ test('Access renders a compact, tabbed zone view below desktop widths', () => {
   assert.match(matrix, /title: 'Home Network \/ LAN'/);
   assert.match(matrix, /title: 'This Server'/);
   assert.doesNotMatch(mobileZone, /min-h-\[22rem\]/);
+  assert.match(page, /className="min-h-\[32rem\] xl:min-h-0 xl:flex-1"/);
+  assert.doesNotMatch(page, /className="min-h-\[32rem\] lg:min-h-0 lg:flex-1"/);
 });
 
 test('reachability cards support keyboard details and non-drag access changes', () => {

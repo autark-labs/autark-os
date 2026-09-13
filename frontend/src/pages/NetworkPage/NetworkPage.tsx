@@ -306,7 +306,7 @@ function NetworkPage() {
             <TabsContent className="m-0 min-h-0 flex-1 overflow-hidden" value="matrix">
               <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
                 <ReachabilityMatrix
-                  className="min-h-[32rem] lg:min-h-0 lg:flex-1"
+                  className="min-h-[32rem] xl:min-h-0 xl:flex-1"
                   copiedLinkKey={copiedLinkKey}
                   focusedServiceId={focusedServiceId}
                   items={filteredReachabilityServices}
