@@ -1,6 +1,5 @@
 package com.autarkos.host;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -35,16 +34,6 @@ public interface ObservedServiceRepository extends JpaRepository<ObservedService
                 .orElseGet(() -> ObservedServices.entity(service));
         entity.updateFrom(service);
         save(entity);
-    }
-
-    default boolean markManaged(String id, String autarkOsInstanceId, Instant now) {
-        return findById(id)
-                .map(entity -> {
-                    entity.markManaged(autarkOsInstanceId, now.toString());
-                    save(entity);
-                    return true;
-                })
-                .orElse(false);
     }
 
     default void deleteFailedInstall(String catalogAppId) {

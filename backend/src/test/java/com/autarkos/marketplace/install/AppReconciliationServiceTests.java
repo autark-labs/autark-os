@@ -23,10 +23,12 @@ class AppReconciliationServiceTests {
     Path runtimeRoot;
 
     @Test
-    void reportsOwnedInstalledAppAsReadyFromContainerState() {
+    void reportsOwnedInstalledAppAsReadyFromContainerState() throws Exception {
         InstalledAppRepository repository = repository();
         repository.save(installed("vaultwarden", "Ready"));
         repository.saveOwnershipMetadata(owned("vaultwarden", "ready"));
+        java.nio.file.Files.createDirectories(runtimeRoot.resolve("apps/vaultwarden"));
+        java.nio.file.Files.writeString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"), "services: {}\n");
         AppReconciliationService service = service(repository, List.of(
                 new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_homelab-box_vaultwarden", "Up 2 minutes (healthy)", DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden")));
 
@@ -79,19 +81,19 @@ class AppReconciliationServiceTests {
     }
 
     @Test
-    void explicitAdoptionOverridesTheOldInstanceLabelsAcrossCanonicalState() {
+    void storedRecoveryStateDoesNotOverrideForeignDockerOwnership() {
         InstalledAppRepository repository = repository();
         repository.save(installed("vaultwarden", "Needs attention"));
-        repository.saveOwnershipMetadata(owned("vaultwarden", "adopted_missing_compose"));
+        repository.saveOwnershipMetadata(owned("vaultwarden", "recovery_required"));
 
         assertThat(service(repository, List.of(
                 new RuntimeModels.ManagedContainer("vaultwarden", "autarkos_old_vaultwarden", "Exited (0) 2 hours ago", DockerResourceOwnership.FOREIGN, "appinst_old", "autarkos_old_vaultwarden"))).reconcile())
                 .singleElement()
                 .satisfies(item -> {
-                    assertThat(item.status()).isEqualTo("Stopped");
-                    assertThat(item.ownership()).isEqualTo(DockerResourceOwnership.OWNED);
-                    assertThat(item.lifecycleEligible()).isTrue();
-                    assertThat(item.detail()).contains("Compose configuration is missing");
+                    assertThat(item.status()).isEqualTo("Managed elsewhere");
+                    assertThat(item.ownership()).isEqualTo(DockerResourceOwnership.FOREIGN);
+                    assertThat(item.lifecycleEligible()).isFalse();
+                    assertThat(item.detail()).contains("another Autark-OS instance");
                 });
     }
 

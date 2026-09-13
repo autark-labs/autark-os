@@ -389,6 +389,37 @@ Acceptance criteria:
 - no `adopted_missing_compose` state remains
 - customer-facing code and APIs no longer use the term `adopt`
 
+#### Story 3 completion ledger
+
+Implemented:
+
+- the focused `GET /api/app-recovery`, `GET /api/app-recovery/{appId}/plan`, and `POST /api/app-recovery/{appId}/apply` contract
+- explicit recovery reasons for lost current-instance registration, previous instances, legacy installs, and insufficient evidence
+- plan checks for catalog and app-instance identity, runtime location, Compose structure, mount mappings, Docker ownership, ports, managed-record conflicts, retained settings, and complete lifecycle availability
+- a strict apply path limited to lost current-instance registrations whose exact settings and current Docker ownership still exist
+- recovery-plan rendering and confirmation through the existing-app review surface
+
+Removed:
+
+- observed-service adoption endpoints, DTOs, mutation code, and browser client
+- the write path that created managed records with guessed default settings
+- the Docker-observation override that preserved a database ownership claim over current container labels
+- partial lifecycle behavior for missing Compose files
+
+Hardened:
+
+- a database row is no longer sufficient for the canonical application model to report `managed`
+- missing Compose remains `recovery_required`
+- previous-instance, legacy, arbitrary, incomplete, and conflicting resources produce a blocked plan and no managed record
+- migration `V31` retires persisted partial-management install-state names
+
+Validation:
+
+- backend: 652 tests executed, 0 failures, 0 errors, 3 skipped
+- frontend: 96 files and 319 tests passed
+- TypeScript, ESLint, production frontend build, and whitespace validation passed
+- Pi validation intentionally deferred for the refactor sequence
+
 ### Story 4: Implement the complete recovery transaction
 
 Create an isolated wireframe for the recovery review and confirmation flow before production UI implementation.

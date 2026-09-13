@@ -273,7 +273,7 @@ public class MarketplaceInstallService {
     }
 
     private String duplicateWarningMessage(ApplicationManifest manifest) {
-        return "Autark-OS already sees " + manifest.name() + " on your system. Installing another copy can cause confusing behavior across your network. Pin or adopt the existing service when possible, or acknowledge that you intentionally want a separate copy.";
+        return "Autark-OS already sees " + manifest.name() + " on your system. Installing another copy can cause confusing behavior across your network. Review recovery for the existing service when possible, or acknowledge that you intentionally want a separate copy.";
     }
 
     private boolean ownershipReconcilesToManaged(String appId) {

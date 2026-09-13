@@ -12,19 +12,11 @@ import java.util.function.Supplier;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.ApplicationBehaviorStates;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.AppRuntimeFiles;
-import com.autarkos.marketplace.install.AppRuntimeMetadataReader;
 import com.autarkos.marketplace.install.DockerOwnershipService;
-import com.autarkos.marketplace.install.InstalledApp;
-import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.models.InstallModels;
-import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.system.AutarkOsIdentity;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -32,65 +24,39 @@ public class ObservedServiceService {
 
     private final ObservedServiceRepository repository;
     private final ObservedServiceScanner scanner;
-    private final InstalledAppRepository installedAppRepository;
     private final MarketplaceCatalogService catalogService;
     private final Supplier<AutarkOsIdentity> currentIdentity;
-    private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final AppRuntimeMetadataReader runtimeMetadataReader = new AppRuntimeMetadataReader();
 
     @Autowired
     public ObservedServiceService(
             ObservedServiceRepository repository,
             ObservedServiceScanner scanner,
-            InstalledAppRepository installedAppRepository,
             MarketplaceCatalogService catalogService,
-            DockerOwnershipService ownershipService,
-            ActivityLogService activityLogService) {
+            DockerOwnershipService ownershipService) {
         this.repository = repository;
         this.scanner = scanner;
-        this.installedAppRepository = installedAppRepository;
         this.catalogService = catalogService;
         this.currentIdentity = ownershipService::currentIdentity;
-        this.activityLogService = activityLogService;
     }
 
     public ObservedServiceService(ObservedServiceRepository repository, ObservedServiceScanner scanner) {
-        this(repository, scanner, null, null, () -> new AutarkOsIdentity("", "autark-os", "", "", Instant.EPOCH, 1), null, true);
-    }
-
-    public ObservedServiceService(ObservedServiceRepository repository, ObservedServiceScanner scanner, InstalledAppRepository installedAppRepository, MarketplaceCatalogService catalogService, Supplier<AutarkOsIdentity> currentIdentity) {
-        this(repository, scanner, installedAppRepository, catalogService, currentIdentity, null, true);
-    }
-
-    public ObservedServiceService(
-            ObservedServiceRepository repository,
-            ObservedServiceScanner scanner,
-            InstalledAppRepository installedAppRepository,
-            MarketplaceCatalogService catalogService,
-            Supplier<AutarkOsIdentity> currentIdentity,
-            ActivityLogService activityLogService) {
-        this(repository, scanner, installedAppRepository, catalogService, currentIdentity, activityLogService, true);
+        this(repository, scanner, null, () -> new AutarkOsIdentity("", "autark-os", "", "", Instant.EPOCH, 1));
     }
 
     protected ObservedServiceService() {
-        this(null, null, null, null, () -> new AutarkOsIdentity("", "autark-os", "", "", Instant.EPOCH, 1), null, true);
+        this(null, null, null, () -> new AutarkOsIdentity("", "autark-os", "", "", Instant.EPOCH, 1));
     }
 
     private ObservedServiceService(
             ObservedServiceRepository repository,
             ObservedServiceScanner scanner,
-            InstalledAppRepository installedAppRepository,
             MarketplaceCatalogService catalogService,
-            Supplier<AutarkOsIdentity> currentIdentity,
-            ActivityLogService activityLogService,
-            boolean ignored) {
+            Supplier<AutarkOsIdentity> currentIdentity) {
         this.repository = repository;
         this.scanner = scanner;
-        this.installedAppRepository = installedAppRepository;
         this.catalogService = catalogService;
         this.currentIdentity = currentIdentity;
-        this.activityLogService = activityLogService;
     }
 
     public List<ObservedServiceView> refresh() {
@@ -173,177 +139,6 @@ public class ObservedServiceService {
         repository.deleteFailedInstall(catalogAppId);
     }
 
-    public HostModels.ObservedServiceAdoptionPlan adoptionPlan(String id) {
-        ObservedService service = repository.findServiceById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
-        String displayName = displayName(service);
-        if (!HostModels.ObservedServiceSource.DOCKER.equals(service.source())) {
-            return unavailablePlan(id, displayName, service.catalogAppId(), "This service is not a local Docker container.", "Only Docker-backed services can be adopted.");
-        }
-        boolean adoptable = "legacy_autark_os".equals(service.ownershipState()) || "foreign_autark_os".equals(service.ownershipState());
-        if (!adoptable) {
-            return unavailablePlan(id, displayName, service.catalogAppId(), "Autark-OS cannot safely adopt this service yet.", "This service does not expose recoverable Autark-OS ownership metadata.");
-        }
-        if (service.catalogAppId() == null || service.catalogAppId().isBlank()) {
-            return unavailablePlan(id, displayName, null, "Autark-OS cannot adopt this service until it is matched to a catalog app.", "Choose the matching app first.");
-        }
-        if (installedAppRepository != null && installedAppRepository.findAppById(service.catalogAppId()).isPresent()) {
-            return unavailablePlan(
-                    id,
-                    displayName,
-                    service.catalogAppId(),
-                    "Autark-OS already manages " + displayName + ".",
-                    "This installation already has a managed record for this app. Review the existing app and this found service separately instead of adopting one over the other.");
-        }
-        String runtimePath = resolvedRuntimePath(service);
-        boolean composeAvailable = AppRuntimeFiles.hasComposeFile(runtimePath);
-        return new HostModels.ObservedServiceAdoptionPlan(
-                id,
-                true,
-                composeAvailable
-                        ? "Autark-OS will take control of " + displayName + " without deleting its data or recreating its container."
-                        : "Autark-OS can add " + displayName + " for visibility and safe recovery, but its original Compose file is missing.",
-                containers(service),
-                service.catalogAppId(),
-                composeAvailable
-                        ? List.of("Current Autark-OS ownership record", "Managed app access settings")
-                        : List.of("Current Autark-OS ownership record", "Managed app access settings", "Recovery-limited state until Compose configuration is restored"),
-                false,
-                composeAvailable
-                        ? "Existing data paths and the running container are preserved."
-                        : "The existing container is unchanged during adoption. A later reviewed uninstall will export its writable filesystem before removal and leave mounted storage in place.",
-                composeAvailable
-                        ? List.of("Autark-OS will treat this service as managed after adoption. Do not run another installer for the same app unless you intentionally want multiple copies.")
-                        : List.of(
-                                "Start, restart, repair, and settings changes are unavailable while the Compose file is missing.",
-                                "Stopping and archive-first cleanup remain available.",
-                                "Do not remove the container manually if you may need files from its writable layer."),
-                "",
-                confirmationText(displayName),
-                List.of(
-                        "Add " + displayName + " to My Apps as a managed app.",
-                        "Keep the existing Docker container and access URL.",
-                        composeAvailable
-                                ? "Record this Autark-OS installation as the owner for app recovery and Discover status."
-                                : "Record this app as adopted with recovery limits so every page reports the missing configuration honestly."),
-                List.of());
-    }
-
-    public HostModels.ActionResult adopt(String id, HostModels.ObservedServiceAdoptionRequest request) {
-        HostModels.ObservedServiceAdoptionPlan plan = adoptionPlan(id);
-        if (!plan.available()) {
-            return new HostModels.ActionResult(false, "warning", "Adoption unavailable", String.join(" ", plan.blockedReasons()), id, "review_adoption_plan");
-        }
-        if (request == null
-                || !request.confirmed()
-                || !request.takeControlConfirmed()
-                || request.confirmation() == null
-                || !request.confirmation().equals(plan.confirmationText())) {
-            return new HostModels.ActionResult(false, "warning", "Confirmation required", "Type the confirmation text exactly before Autark-OS takes control of this service.", id, "confirm_adoption");
-        }
-        if (installedAppRepository == null || catalogService == null) {
-            return new HostModels.ActionResult(false, "error", "Adoption unavailable", "Autark-OS cannot save managed app state in this runtime.", id, "review_adoption_plan");
-        }
-        ObservedService service = repository.findServiceById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
-        String appId = service.catalogAppId();
-        ApplicationManifest manifest = catalogService.findById(appId).orElse(null);
-        String displayName = manifest == null ? displayName(service) : manifest.name();
-        Instant now = Instant.now();
-        AutarkOsIdentity identity = currentIdentity.get();
-        String accessUrl = firstPresent(service.url(), manifest == null ? null : manifest.accessUrl());
-        String runtimePath = resolvedRuntimePath(service);
-        Optional<RuntimeModels.AppRuntimeMetadata> runtimeMetadata = runtimeMetadataReader.read(java.nio.file.Path.of(runtimePath))
-                .filter(metadata -> appId.equals(metadata.catalogAppId()));
-        String composeProject = firstPresent(
-                runtimeMetadata.map(RuntimeModels.AppRuntimeMetadata::composeProject).orElse(""),
-                metadataValue(service, "composeProject"),
-                service.fingerprint());
-        String appInstanceId = firstPresent(
-                runtimeMetadata.map(RuntimeModels.AppRuntimeMetadata::appInstanceId).orElse(""),
-                metadataValue(service, "appInstanceId"),
-                "appinst_adopted_" + appId);
-        String autarkOsInstanceId = identity.instanceId();
-        boolean composeAvailable = AppRuntimeFiles.hasComposeFile(runtimePath);
-        String installState = composeAvailable ? "adopted" : "adopted_missing_compose";
-
-        installedAppRepository.save(new InstalledApp(
-                appId,
-                displayName,
-                composeAvailable ? "Ready" : "Needs attention",
-                runtimePath,
-                composeProject,
-                accessUrl,
-                now));
-        installedAppRepository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
-                appId,
-                appInstanceId,
-                appId,
-                autarkOsInstanceId,
-                runtimePath,
-                installState,
-                "owned",
-                now,
-                now));
-        installedAppRepository.saveSettings(appId, InstallModels.InstallSettings.defaults(accessUrl));
-        repository.markManaged(id, identity.instanceId(), now);
-        if (!composeAvailable) {
-            if (activityLogService != null) {
-                activityLogService.warning("host", "adopt_observed_service", "Service adopted with recovery limits", displayName + " is visible, but its Compose file is missing.", appId);
-            }
-            return new HostModels.ActionResult(
-                    true,
-                    "warning",
-                    "Service adopted with recovery limits",
-                    displayName + " is visible in My Apps. Its Compose file is missing, so Autark-OS can stop it or archive it safely, but cannot start or reconfigure it.",
-                    id,
-                    "open_apps");
-        }
-        if (activityLogService != null) {
-            activityLogService.success("host", "adopt_observed_service", "Service adopted", "Autark-OS now manages " + displayName + ".", appId);
-        }
-        return new HostModels.ActionResult(true, "success", "Service adopted", displayName + " now appears as a managed app in Autark-OS.", id, "open_apps");
-    }
-
-    private HostModels.ObservedServiceAdoptionPlan unavailablePlan(String id, String displayName, String catalogAppId, String summary, String reason) {
-        return new HostModels.ObservedServiceAdoptionPlan(
-                id,
-                false,
-                summary,
-                List.of(),
-                catalogAppId,
-                List.of(),
-                false,
-                "No local data paths will be changed.",
-                List.of(),
-                reason,
-                confirmationText(displayName),
-                List.of(),
-                List.of(reason));
-    }
-
-    private String metadataValue(ObservedService service, String key) {
-        if (service.metadataJson() == null || service.metadataJson().isBlank()) {
-            return "";
-        }
-        try {
-            JsonNode node = objectMapper.readTree(service.metadataJson());
-            JsonNode value = node.path(key);
-            return value.isMissingNode() || value.isNull() ? "" : value.asText("");
-        } catch (RuntimeException exception) {
-            return "";
-        } catch (java.io.IOException exception) {
-            return "";
-        }
-    }
-
-    private String resolvedRuntimePath(ObservedService service) {
-        AutarkOsIdentity identity = currentIdentity.get();
-        String appId = service.catalogAppId();
-        String fallback = appId == null || appId.isBlank() ? identity.runtimeRoot() + "/apps/unknown" : identity.runtimeRoot() + "/apps/" + appId;
-        return firstPresent(metadataValue(service, "dataPaths"), metadataValue(service, "runtimePath"), fallback);
-    }
-
     private String displayName(ObservedService service) {
         if (catalogService != null && service.catalogAppId() != null && !service.catalogAppId().isBlank()) {
             Optional<ApplicationManifest> manifest = catalogService.findById(service.catalogAppId());
@@ -352,10 +147,6 @@ public class ObservedServiceService {
             }
         }
         return service.displayName() == null || service.displayName().isBlank() ? service.fingerprint() : titleCase(service.displayName());
-    }
-
-    private String confirmationText(String displayName) {
-        return "ADOPT " + displayName.toUpperCase(java.util.Locale.ROOT);
     }
 
     private String firstPresent(String... values) {
@@ -398,17 +189,13 @@ public class ObservedServiceService {
                 service.ownershipState(),
                 service.runtimeState(),
                 managedByThisAutarkOs,
-                adoptable(service),
+                recoveryCandidate(service),
                 actions(service),
                 metadata(service));
     }
 
     private ObservedService merge(ObservedService existing, ObservedService scanned) {
-        boolean explicitAdoption = "owned_managed".equals(existing.ownershipState())
-                && !"owned_managed".equals(scanned.ownershipState());
         boolean ignored = "ignored".equals(existing.userVisibility());
-        String ownershipState = explicitAdoption ? existing.ownershipState() : scanned.ownershipState();
-        String autarkOsInstanceId = explicitAdoption ? existing.autarkOsInstanceId() : scanned.autarkOsInstanceId();
         return new ObservedService(
                 existing.id(),
                 existing.source(),
@@ -419,11 +206,11 @@ public class ObservedServiceService {
                 scanned.accessScope(),
                 scanned.catalogAppId(),
                 scanned.catalogMatchConfidence(),
-                ownershipState,
+                scanned.ownershipState(),
                 ignored ? "ignored" : "observed",
                 scanned.runtimeState(),
                 existing.healthCheckEnabled(),
-                autarkOsInstanceId,
+                scanned.autarkOsInstanceId(),
                 existing.firstSeenAt(),
                 scanned.lastSeenAt(),
                 null,
@@ -485,8 +272,8 @@ public class ObservedServiceService {
             }
             return List.copyOf(actions);
         }
-        if (adoptable(service)) {
-            actions.add(new HostModels.ObservedServiceAction("adoption_plan", "Review adoption plan", "api", "/api/observed-services/" + encode(service.id()) + "/adoption-plan", "POST", false, ""));
+        if (recoveryCandidate(service) && service.catalogAppId() != null && !service.catalogAppId().isBlank()) {
+            actions.add(new HostModels.ObservedServiceAction("recovery_plan", "Review recovery plan", "api", "/api/app-recovery/" + encode(service.catalogAppId()) + "/plan", "GET", false, ""));
         }
         if (service.catalogAppId() != null && !"owned_managed".equals(service.ownershipState())) {
             actions.add(installAction(service.catalogAppId(), "install_copy", "Install separate copy"));
@@ -501,9 +288,11 @@ public class ObservedServiceService {
         return new HostModels.ObservedServiceAction(id, label, "route", "/discover?app=" + encode(appId), null, false, "");
     }
 
-    private static boolean adoptable(ObservedService service) {
+    private static boolean recoveryCandidate(ObservedService service) {
         return HostModels.ObservedServiceSource.DOCKER.equals(service.source())
-                && ("legacy_autark_os".equals(service.ownershipState()) || "foreign_autark_os".equals(service.ownershipState()));
+                && ("owned_managed".equals(service.ownershipState())
+                        || "legacy_autark_os".equals(service.ownershipState())
+                        || "foreign_autark_os".equals(service.ownershipState()));
     }
 
     private String failedInstallMetadata(String runtimePath, String composeProject, String message, List<String> logs) {
@@ -523,10 +312,6 @@ public class ObservedServiceService {
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put("metadataJson", service.metadataJson());
         return metadata;
-    }
-
-    private static List<String> containers(ObservedService service) {
-        return List.of(service.fingerprint());
     }
 
     private boolean matchesNameOrUrl(ObservedService service, String normalizedAppId) {

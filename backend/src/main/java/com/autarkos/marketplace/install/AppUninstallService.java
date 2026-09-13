@@ -111,7 +111,7 @@ class AppUninstallService {
                     ? "Autark-OS will create a complete safety checkpoint before removing containers. If it cannot read every file, the app will stay installed. Your app data is still kept on disk."
                     : "Autark-OS did not find app data to checkpoint. The remove step will still keep the app folder if it exists.";
         List<String> willStop = !composeAvailable
-                ? List.of("Export each matching container filesystem to a recovery archive", "Verify every recovery archive", "Remove only the matching adopted containers", "Hide the app from the managed Applications list")
+                ? List.of("Export each matching container filesystem to a recovery archive", "Verify every recovery archive", "Remove only the matching recovery containers", "Remove the incomplete app registration")
                 : List.of("Create a complete safety checkpoint when app data is present", "Stop the app containers", "Remove the Compose project", "Hide the app from the managed Applications list");
         List<String> willKeep = !composeAvailable
                 ? List.of("Verified container writable-filesystem recovery archives", "Named volumes and bind-mounted app files", "Backups and historical activity events")
@@ -121,7 +121,7 @@ class AppUninstallService {
                 app.appName(),
                 composeAvailable
                         ? "Autark-OS can remove the running app while keeping your data on disk."
-                        : "Autark-OS can safely clean up this adopted container even though its original Compose file is gone.",
+                        : "Autark-OS can safely clean up this recovery container even though its original Compose file is gone.",
                 checkpointPlanned,
                 checkpointMessage,
                 willStop,

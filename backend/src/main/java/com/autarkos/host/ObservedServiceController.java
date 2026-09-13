@@ -5,7 +5,6 @@ import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,20 +47,4 @@ public class ObservedServiceController {
         return service.get(id);
     }
 
-    @PostMapping("/{id}/adoption-plan")
-    public HostModels.ObservedServiceAdoptionPlan adoptionPlan(@PathVariable String id) {
-        return service.adoptionPlan(id);
-    }
-
-    @PostMapping("/{id}/adopt")
-    public HostModels.ActionResult adopt(@PathVariable String id, @RequestBody HostModels.ObservedServiceAdoptionRequest request) {
-        return refreshAfter(service.adopt(id, request));
-    }
-
-    private HostModels.ActionResult refreshAfter(HostModels.ActionResult result) {
-        if (applicationStateService != null && result.ok()) {
-            return result.withApplicationState(applicationStateService.refreshNow());
-        }
-        return result;
-    }
 }

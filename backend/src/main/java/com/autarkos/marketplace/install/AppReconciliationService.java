@@ -61,13 +61,6 @@ public class AppReconciliationService {
             return item(app.appId(), app.appName(), AutarkOsStates.AppStatus.MISSING, DockerResourceOwnership.OWNED, false, "No owned containers were found for this app.");
         }
         DockerResourceOwnership ownership = strongestOwnership(containers);
-        if (isExplicitlyAdopted(metadata)) {
-            String status = statusFromContainers(containers);
-            String detail = metadata.installState() != null && metadata.installState().toLowerCase().contains("missing_compose")
-                    ? "Autark-OS adopted this container, but its Compose configuration is missing. Stop and archive-first cleanup remain available."
-                    : "Autark-OS explicitly adopted this existing container.";
-            return item(app.appId(), app.appName(), status, DockerResourceOwnership.OWNED, lifecycleEligible(status, DockerResourceOwnership.OWNED), detail);
-        }
         if (ownership == DockerResourceOwnership.FOREIGN) {
             return item(app.appId(), app.appName(), "Managed elsewhere", ownership, false, "Docker reports containers owned by another Autark-OS instance.");
         }
@@ -84,19 +77,11 @@ public class AppReconciliationService {
         if (ownership == DockerResourceOwnership.OWNED) {
             return item(appId, name, "Needs setup", ownership, false, "Owned containers exist, but no installed app record was found.");
         }
-        return item(appId, name, "Managed elsewhere", ownership, false, "Containers are not eligible for automatic adoption.");
+        return item(appId, name, "Managed elsewhere", ownership, false, "Containers require reviewed recovery before this installation can manage them.");
     }
 
     private boolean isOwnedMetadata(RuntimeModels.InstalledAppOwnershipMetadata metadata) {
         return "owned".equalsIgnoreCase(metadata.ownershipStatus()) || metadata.ownershipStatus().isBlank();
-    }
-
-    private boolean isExplicitlyAdopted(RuntimeModels.InstalledAppOwnershipMetadata metadata) {
-        if (metadata == null || !isOwnedMetadata(metadata)) {
-            return false;
-        }
-        return (metadata.installState() != null && metadata.installState().toLowerCase().startsWith("adopted"))
-                || "recovered".equalsIgnoreCase(metadata.installState());
     }
 
     private DockerResourceOwnership ownershipFrom(RuntimeModels.InstalledAppOwnershipMetadata metadata) {

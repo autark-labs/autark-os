@@ -270,7 +270,7 @@ function ExistingServiceNotice({ appView, reviewHref }: { appView: DiscoverAppVi
         <div>
           <h4 className="font-bold text-current">{appView.application.relationshipLabel}</h4>
           <p className="mt-1 leading-6 text-current/80">{appView.application.relationshipDescription}</p>
-          <p className="mt-2 leading-6 text-current/80">Review or adopt the existing service before creating another copy.</p>
+          <p className="mt-2 leading-6 text-current/80">Review recovery for the existing service before creating another copy.</p>
           {reviewHref && (
             <Button asChild className="mt-3" size="sm" variant="outline">
               <Link to={reviewHref}>Review existing service</Link>

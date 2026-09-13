@@ -92,6 +92,8 @@ public class ObservedServiceScanner {
         metadata.put("status", clean(container.status()));
         metadata.put("ports", clean(container.ports()));
         metadata.put("currentInstanceId", identity.instanceId());
+        putIfPresent(metadata, "catalogAppId", container.labels().get(DockerOwnershipService.APP_ID));
+        putIfPresent(metadata, "managed", container.labels().get(DockerOwnershipService.MANAGED));
         putIfPresent(metadata, "composeProject", firstPresent(
                 container.labels().get(DockerOwnershipService.COMPOSE_PROJECT),
                 container.labels().get("com.docker.compose.project")));

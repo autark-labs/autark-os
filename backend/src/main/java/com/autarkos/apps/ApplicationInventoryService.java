@@ -96,19 +96,24 @@ public class ApplicationInventoryService {
             java.util.Map<String, String> links,
             AppInstanceView managed,
             AppRuntimeView runtime) {
-        InstalledApp installed = installedAppRepository.findAppById(manifest.id())
+        InstalledApp storedRegistration = installedAppRepository.findAppById(manifest.id())
                 .filter(app -> ownershipCompatible(manifest.id()))
                 .map(app -> new InstalledApp(app.appId(), app.appName(), app.status(), app.runtimePath(), app.composeProject(),
                         links.getOrDefault(app.appId(), app.accessUrl()), app.installedAt()))
                 .orElse(null);
+        ObservedService registrationLost = matchingObserved(manifest.id(), evidence,
+                service -> AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
         ObservedService recoverable = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);
         ObservedService managedElsewhere = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS.equals(service.ownershipState())).orElse(null);
+        InstalledApp installed = storedRegistration == null || recoverable != null || managedElsewhere != null
+                || !com.autarkos.marketplace.install.AppRuntimeFiles.hasComposeFile(storedRegistration.runtimePath())
+                        ? null : storedRegistration;
         ObservedService failedInstall = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.FAILED_INSTALL.equals(service.ownershipState())).orElse(null);
         ObservedService blocked = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.UNKNOWN_CONFLICT.equals(service.ownershipState())).orElse(null);
         ObservedService found = matchingObserved(manifest.id(), evidence, service -> !AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
 
-        ApplicationRelationship relationship = relationship(installed, recoverable, managedElsewhere, failedInstall, blocked, found);
-        ObservedService observedService = firstPresent(recoverable, managedElsewhere, failedInstall, blocked, found);
+        ApplicationRelationship relationship = relationship(installed, storedRegistration, registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
+        ObservedService observedService = firstPresent(registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
         ObservedServiceView observedView = observedService == null ? null : ObservedServiceService.toView(observedService);
         String reviewExistingHref = reviewExistingHref(observedService);
         ApplicationAction primaryAction = primaryAction(manifest.id(), relationship, installed, observedService, reviewExistingHref);
@@ -154,6 +159,8 @@ public class ApplicationInventoryService {
 
     private ApplicationRelationship relationship(
             InstalledApp installed,
+            InstalledApp storedRegistration,
+            ObservedService registrationLost,
             ObservedService recoverable,
             ObservedService managedElsewhere,
             ObservedService failedInstall,
@@ -162,7 +169,7 @@ public class ApplicationInventoryService {
         if (installed != null) {
             return ApplicationRelationship.MANAGED;
         }
-        if (recoverable != null || managedElsewhere != null) {
+        if (storedRegistration != null || registrationLost != null || recoverable != null || managedElsewhere != null) {
             return ApplicationRelationship.RECOVERY_REQUIRED;
         }
         if (failedInstall != null || blocked != null || found != null) {

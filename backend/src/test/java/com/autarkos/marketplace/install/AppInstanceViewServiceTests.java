@@ -141,23 +141,15 @@ class AppInstanceViewServiceTests {
     }
 
     @Test
-    void adoptedLegacyContainerAppearsAsManagedApp() {
+    void legacyContainerCannotBePromotedByAStoredRecoveryRecord() {
         InstalledAppRepository repository = repository();
         repository.save(installed("homepage", "Ready"));
-        repository.saveOwnershipMetadata(owned("homepage", "adopted"));
+        repository.saveOwnershipMetadata(owned("homepage", "recovery_required"));
         repository.saveSettings("homepage", new InstallModels.InstallSettings("http://localhost:3005", null, false, java.util.Map.of(), new InstallModels.BackupPolicy(false, "daily", 7)));
         AppInstanceViewService service = service(repository, List.of(
                 new RuntimeModels.ManagedContainer("homepage", "autark-os-homepage", "Up 2 minutes (healthy)", DockerResourceOwnership.LEGACY_UNSCOPED, "", "")));
 
-        assertThat(service.list())
-                .singleElement()
-                .satisfies(view -> {
-                    assertThat(view.catalogAppId()).isEqualTo("homepage");
-                    assertThat(view.name()).isEqualTo("Homepage");
-                    assertThat(view.userStatus()).isEqualTo("Ready");
-                    assertThat(view.ownershipState()).isEqualTo("owned");
-                    assertThat(view.localUrl()).isEqualTo("http://localhost:3005");
-                });
+        assertThat(service.list()).isEmpty();
     }
 
     @Test

@@ -96,14 +96,6 @@ class ObservedServiceEntity {
         this.metadataJson = blankDefault(service.metadataJson(), "{}");
     }
 
-    void markManaged(String autarkOsInstanceId, String lastSeenAt) {
-        this.ownershipState = "owned_managed";
-        this.autarkOsInstanceId = cleanToNull(autarkOsInstanceId);
-        this.userVisibility = "observed";
-        this.ignoredAt = null;
-        this.lastSeenAt = lastSeenAt;
-    }
-
     String id() {
         return id;
     }

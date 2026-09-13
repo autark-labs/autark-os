@@ -21,7 +21,7 @@ public record ObservedServiceView(
         String ownershipState,
         String runtimeState,
         boolean managedByThisAutarkOs,
-        boolean adoptable,
+        boolean recoveryCandidate,
         List<HostModels.ObservedServiceAction> availableActions,
         Map<String, String> metadata) {
 }

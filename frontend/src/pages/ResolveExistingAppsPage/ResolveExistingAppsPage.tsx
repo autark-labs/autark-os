@@ -16,7 +16,8 @@ import { showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
-import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
+import type { AppRecoveryResult } from '@/types/appRecovery';
+import type { ObservedServiceView } from '@/types/observedService';
 import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
 import { visibleRecoveryApplications } from './ResolveExistingAppsPage.logic';
 
@@ -68,7 +69,7 @@ function ResolveExistingAppsPage() {
     await appState.refresh();
   }
 
-  function handleObservedServiceResult(result: ObservedServiceActionResult) {
+  function handleRecoveryResult(result: AppRecoveryResult) {
     syncCanonicalAppMutationResult(queryClient, result);
     showActionNotification(result, result.title || 'Service action finished');
   }
@@ -132,7 +133,7 @@ function ResolveExistingAppsPage() {
       ) : null}
 
       <ObservedServiceDetailsSheet
-        onActionComplete={handleObservedServiceResult}
+        onActionComplete={handleRecoveryResult}
         onOpenChange={(open) => !open && closeDetailsSheet()}
         onRefresh={refreshObservedServices}
         open={Boolean(requestedServiceId)}

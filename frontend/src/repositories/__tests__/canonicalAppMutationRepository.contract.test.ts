@@ -63,13 +63,13 @@ test('existing-app recovery synchronizes its action result without pin mutations
 
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.doesNotMatch(page, /ObservedServicesAPIClient\.(pin|unpin|match)/);
-  assert.match(page, /onActionComplete=\{handleObservedServiceResult\}/);
+  assert.match(page, /onActionComplete=\{handleRecoveryResult\}/);
   assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache/);
   assert.doesNotMatch(page, /setApplicationStateFromActionResultCache/);
 
   assert.match(sheet, /onActionComplete\(result\)/);
-  assert.match(sheet, /ObservedServicesAPIClient\.adopt\(service\.id, confirmation\)/);
-  assert.doesNotMatch(sheet, /ObservedServicesAPIClient\.(pin|unpin|match)/);
+  assert.match(sheet, /AppRecoveryAPIClient\.apply\(currentService\.catalogAppId, confirmation\)/);
+  assert.doesNotMatch(sheet, /ObservedServicesAPIClient/);
   assert.doesNotMatch(sheet, /setObservedServicePinnedInApplicationStateCache/);
   assert.doesNotMatch(sheet, /setApplicationStateFromActionResultCache/);
 });

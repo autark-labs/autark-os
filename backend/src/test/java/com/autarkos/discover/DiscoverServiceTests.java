@@ -44,7 +44,7 @@ class DiscoverServiceTests {
     Path runtimeRoot;
 
     @Test
-    void returnsMergedDiscoverCardsWithoutShowingForeignAppsAsInstalled() {
+    void returnsMergedDiscoverCardsWithoutShowingForeignAppsAsInstalled() throws Exception {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("docker:autarkos_other_jellyfin", "jellyfin", "foreign_autark_os", "observed"));
         DiscoverService service = discoverService(observedRepository);
@@ -67,6 +67,8 @@ class DiscoverServiceTests {
                 "owned",
                 Instant.parse("2026-06-21T12:00:00Z"),
                 Instant.parse("2026-06-21T12:00:00Z")));
+        Files.createDirectories(runtimeRoot.resolve("apps/vaultwarden"));
+        Files.writeString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"), "services: {}\n");
 
         List<DiscoverAppView> apps = service.apps();
 
