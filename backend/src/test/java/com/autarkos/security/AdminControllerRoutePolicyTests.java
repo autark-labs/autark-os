@@ -28,7 +28,9 @@ class AdminControllerRoutePolicyTests {
             "POST /api/admin/security/login");
     private static final Set<String> LOCAL_ADMIN_ROUTES = Set.of(
             "POST /api/admin/security/local/reset-password",
-            "POST /api/v1/pro/identity/local/rotate-installation");
+            "POST /api/v1/pro/identity/local/rotate-installation",
+            "GET /api/system/update-inventory",
+            "POST /api/system/update-inventory/verify");
 
     @Test
     void everyControllerRouteFallsUnderTheExplicitPolicyAndOnlyApprovedRoutesArePublic() throws Exception {

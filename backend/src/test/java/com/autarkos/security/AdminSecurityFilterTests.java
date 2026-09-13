@@ -76,10 +76,20 @@ class AdminSecurityFilterTests {
         allowed.addHeader(AdminSecurityFilter.LOCAL_SECRET_HEADER, "local-secret");
         assertAllowed(filter, allowed);
 
+        MockHttpServletRequest updateInventory = new MockHttpServletRequest("GET", "/api/system/update-inventory");
+        updateInventory.setRemoteAddr("127.0.0.1");
+        updateInventory.addHeader(AdminSecurityFilter.LOCAL_SECRET_HEADER, "local-secret");
+        assertAllowed(filter, updateInventory);
+
         MockHttpServletRequest remote = new MockHttpServletRequest("POST", "/api/admin/security/local/reset-password");
         remote.setRemoteAddr("192.168.1.22");
         remote.addHeader(AdminSecurityFilter.LOCAL_SECRET_HEADER, "local-secret");
         assertRejected(filter, remote, 403, "local_admin_required");
+
+        MockHttpServletRequest remoteInventory = new MockHttpServletRequest("POST", "/api/system/update-inventory/verify");
+        remoteInventory.setRemoteAddr("192.168.1.22");
+        remoteInventory.addHeader(AdminSecurityFilter.LOCAL_SECRET_HEADER, "local-secret");
+        assertRejected(filter, remoteInventory, 403, "local_admin_required");
     }
 
     @Test

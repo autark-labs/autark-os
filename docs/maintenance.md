@@ -13,10 +13,13 @@ autark-os update
 ```
 
 It checks the installed stable or beta channel, shows the update plan, asks for
-confirmation, downloads the correct build for this device, verifies it, creates
-a recovery snapshot, installs it, and checks that Autark-OS is healthy. If the
-new release does not become healthy, Autark-OS restores the previous program,
-configuration, service, and local database automatically.
+confirmation, downloads the correct build for this device, verifies it, records
+the canonical managed-app inventory, and creates a recovery snapshot while the
+service is stopped. After installation, Autark-OS must be healthy and every app
+that was managed before the update must still be managed or explicitly marked
+for recovery. If either check fails, Autark-OS restores the previous program,
+configuration, service, and local database automatically and verifies the
+restored app inventory.
 
 You can run each part separately when troubleshooting or automating a host:
 

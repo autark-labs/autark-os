@@ -19,6 +19,8 @@ class AdminEndpointAccessPolicyTests {
         assertThat(policy.accessMode("POST", "/api/admin/security/login")).isEqualTo(AccessMode.PUBLIC);
         assertThat(policy.accessMode("POST", "/api/admin/security/local/reset-password")).isEqualTo(AccessMode.LOCAL_ADMIN);
         assertThat(policy.accessMode("POST", "/api/v1/pro/identity/local/rotate-installation")).isEqualTo(AccessMode.LOCAL_ADMIN);
+        assertThat(policy.accessMode("GET", "/api/system/update-inventory")).isEqualTo(AccessMode.LOCAL_ADMIN);
+        assertThat(policy.accessMode("POST", "/api/system/update-inventory/verify")).isEqualTo(AccessMode.LOCAL_ADMIN);
         assertThat(policy.accessMode("GET", "/api/v1/pro/status")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("GET", "/api/v1/extensions/autark-pro/ui-manifest")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("GET", "/api/v1/extensions/autark-pro/assets/entry.js")).isEqualTo(AccessMode.AUTHENTICATED);

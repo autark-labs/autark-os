@@ -165,7 +165,7 @@ docs/          Installation, operation, recovery, and technical-admin guides
 - Dependency automation is focused on Debian, Ubuntu, and Raspberry Pi OS.
 - App catalog coverage is still early and should be tested app by app.
 - New managed-app updates are deferred during beta. Existing rollback records remain available for recovery; Core updates use `autark-os update`.
-- Managed app health verification is conservative during beta. A target release that is not ready when checked is rolled back; do not repeatedly retry it without reviewing Activity or Diagnostics.
+- Core update verification is conservative during beta. A release is rolled back if the backend is unhealthy or a previously managed app becomes unavailable, blocked, disappears, or changes durable identity.
 - Public network exposure should remain an intentional advanced workflow.
 
 Autark-OS is being built as a guided runtime, not a generic infrastructure dashboard. The product should stay calm, clear, and honest about app ownership, readiness, safety, and recovery.

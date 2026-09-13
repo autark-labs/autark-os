@@ -529,6 +529,40 @@ Acceptance criteria:
 - rollback restores the prior application inventory
 - the Pi update smoke workflow reports the before-and-after inventory comparison
 
+#### Story 5 completion ledger
+
+Implemented:
+
+- a compact, versioned update inventory derived from a forced refresh of the canonical `ApplicationView` state
+- durable capture of catalog app ID, app-instance ID, owner instance ID, runtime root, runtime path, Compose project, ownership state, and relationship
+- a loopback-and-local-secret-only verification API for the privileged updater; it is not exposed as a browser product control
+- pre-update inventory capture before service shutdown while retaining the stopped-service SQLite snapshot
+- post-update comparison after backend health succeeds, with a durable before/after report
+- the same inventory gate for portable release bundles and Debian package upgrades
+
+Hardened:
+
+- backend health can no longer complete an update by itself
+- a previously managed app becoming available, blocked, absent, or managed under changed durable identity fails the update
+- a recovery-required result is accepted only when current Autark provenance still matches the prior app identity
+- an owner-instance or runtime-root change fails verification even if the backend is healthy
+- inventory failure restores release files, configuration, service metadata, and SQLite, then verifies the restored canonical inventory before reporting rollback success
+- the advanced no-restart path is recorded as `awaiting_restart`, never as a completed verified update
+- package upgrade ordering keeps the old service available until inventory capture is complete
+
+Evidence:
+
+- the local Pi deployment helper downloads `inventory-report.json` beside the deploy log and doctor response
+- support bundles include a redacted copy of the latest inventory comparison
+- Raspberry Pi execution remains intentionally deferred during the refactor sequence
+
+Validation:
+
+- backend: 668 tests executed, 0 failures, 0 errors, 3 skipped
+- portable update delivery, healthy-update, health-failure rollback, inventory-regression rollback, and support-bundle contracts passed
+- Debian release artifact and maintainer-script contracts passed with the cached release-compatible Java runtime
+- shell syntax and repository whitespace checks passed
+
 ### Story 6: Delete obsolete infrastructure and close the schema
 
 Perform the final deletion pass after all active consumers have moved.

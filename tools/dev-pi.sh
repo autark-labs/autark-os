@@ -41,9 +41,9 @@ Examples:
 Safety:
   deploy is the only mutating command. It calls the installed appliance's
   official `autark-os update apply --release-bundle` path, which verifies the
-  bundle, creates its normal update snapshot, checks health and rolls back on
-  failed health verification. sudo prompts occur in this terminal, not on the
-  Pi's display.
+  bundle, creates its normal update snapshot, checks health and managed-app
+  ownership, and rolls back if either verification fails. sudo prompts occur
+  in this terminal, not on the Pi's display.
 USAGE
 }
 
@@ -189,9 +189,14 @@ deploy() {
     sha256sum -c SHA256SUMS --ignore-missing
     sudo /usr/local/bin/autark-os update apply --release-bundle '${stage}/bundle' --yes
     sudo /usr/local/bin/autark-os doctor --json
+    runtime_root=\$(sudo awk -F= '\$1 == \"AUTARK_OS_RUNTIME_ROOT\" {print \$2; exit}' /etc/autark-os/autark-os.env)
+    test -n \"\${runtime_root}\" || runtime_root=/var/lib/autark-os
+    sudo cp \"\${runtime_root}/updates/latest-inventory-report.json\" '${stage}/inventory-report.json'
+    sudo chown \"\$(id -u):\$(id -g)\" '${stage}/inventory-report.json'
   "
+  scp_from_pi "${stage}/inventory-report.json" "${run_dir}/inventory-report.json"
   printf '%s\n' "${stage}" >"${run_dir}/remote-stage.txt"
-  log "Deployment and doctor check passed. Evidence: ${run_dir}"
+  log "Deployment, doctor, and managed-app inventory checks passed. Evidence: ${run_dir}"
 }
 
 collect() {

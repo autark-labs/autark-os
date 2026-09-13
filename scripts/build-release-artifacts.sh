@@ -298,12 +298,31 @@ if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system
   if [[ -r "${env_file}" ]]; then
     configured_runtime="$(awk -F= '$1 == "AUTARK_OS_RUNTIME_ROOT" {print $2; exit}' "${env_file}")"
     configured_install="$(awk -F= '$1 == "AUTARK_OS_INSTALL_DIR" {print $2; exit}' "${env_file}")"
+    server_port="$(awk -F= '$1 == "SERVER_PORT" {print $2; exit}' "${env_file}")"
     [[ -n "${configured_runtime}" ]] && runtime_dir="${configured_runtime}"
     [[ -n "${configured_install}" ]] && install_dir="${configured_install}"
   fi
+  [[ -n "${server_port:-}" ]] || server_port=8082
   checkpoint_dir="${runtime_dir}/backups/package-upgrades"
   mkdir -p "${checkpoint_dir}"
   checkpoint="${checkpoint_dir}/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
+  inventory="${checkpoint}.managed-app-inventory.json"
+  local_secret_file="${runtime_dir}/config/admin-local-secret"
+  [[ -r "${local_secret_file}" ]] || { echo "Autark-OS: cannot verify managed apps because the local update credential is missing." >&2; exit 1; }
+  local_secret="$(head -n 1 "${local_secret_file}" 2>/dev/null || true)"
+  [[ -n "${local_secret}" ]] || { echo "Autark-OS: cannot verify managed apps because the local update credential is empty." >&2; exit 1; }
+  header_file="$(mktemp)"
+  chmod 600 "${header_file}"
+  printf 'X-Autark-OS-Local-Secret: %s\n' "${local_secret}" >"${header_file}"
+  if ! curl --fail --silent --show-error --max-time 30 -H "@${header_file}" \
+      "http://127.0.0.1:${server_port}/api/system/update-inventory" >"${inventory}"; then
+    rm -f "${header_file}" "${inventory}"
+    echo "Autark-OS: could not record the managed-app inventory; package files were not changed." >&2
+    exit 1
+  fi
+  rm -f "${header_file}"
+  chmod 600 "${inventory}"
+  grep -q '"ownerInstanceId"' "${inventory}" || { rm -f "${inventory}"; echo "Autark-OS: the managed-app inventory response was invalid." >&2; exit 1; }
   checkpoint_paths=()
   for path in "${install_dir}" "${config_dir}" /etc/systemd/system/autark-os.service /etc/sudoers.d/autark-os-fileops "${runtime_dir}/autark-os.db" "${runtime_dir}/autark-os.db-shm" "${runtime_dir}/autark-os.db-wal"; do
     [[ -e "${path}" || -L "${path}" ]] && checkpoint_paths+=("${path}")
@@ -314,11 +333,13 @@ if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system
     systemctl stop autark-os.service >/dev/null 2>&1 || true
   fi
   if ! tar -czf "${checkpoint}" "${checkpoint_paths[@]}"; then
+    rm -f "${inventory}"
     [[ "${service_was_active}" -eq 0 ]] || systemctl start autark-os.service >/dev/null 2>&1 || true
     exit 1
   fi
   printf '%s\n' "${checkpoint}" >"${checkpoint_dir}/latest"
   printf '%s\n' "${checkpoint}" >/run/autark-os-package-upgrade-checkpoint
+  printf '%s\n' "${inventory}" >/run/autark-os-package-upgrade-inventory
   echo "Autark-OS: saved package configuration checkpoint at ${checkpoint}." >&2
 fi
 PREINST
@@ -394,6 +415,26 @@ if [[ "\${1:-configure}" == "configure" ]]; then
   if [[ "\${ready}" -eq 1 ]] && ! "\${install_dir}/bin/autark-os" doctor >/dev/null 2>&1; then
     ready=0
   fi
+  inventory_file=/run/autark-os-package-upgrade-inventory
+  inventory_report="\${runtime_dir}/updates/latest-inventory-report.json"
+  if [[ "\${ready}" -eq 1 && -r "\${inventory_file}" ]]; then
+    inventory="\$(cat "\${inventory_file}")"
+    local_secret_file="\${runtime_dir}/config/admin-local-secret"
+    local_secret="\$(head -n 1 "\${local_secret_file}" 2>/dev/null || true)"
+    header_file="\$(mktemp)"
+    chmod 600 "\${header_file}"
+    printf 'X-Autark-OS-Local-Secret: %s\n' "\${local_secret}" >"\${header_file}"
+    mkdir -p "\${runtime_dir}/updates"
+    if [[ -z "\${local_secret}" || ! -r "\${inventory}" ]] \
+        || ! curl --fail --silent --show-error --max-time 30 -X POST \
+          -H 'Content-Type: application/json' -H "@\${header_file}" --data-binary "@\${inventory}" \
+          "http://127.0.0.1:\${server_port}/api/system/update-inventory/verify" >"\${inventory_report}" \
+        || ! grep -q '"safe":true' "\${inventory_report}"; then
+      ready=0
+    fi
+    rm -f "\${header_file}"
+    chmod 600 "\${inventory_report}" 2>/dev/null || true
+  fi
   if [[ "\${ready}" -ne 1 ]]; then
     checkpoint_file=/run/autark-os-package-upgrade-checkpoint
     if [[ -r "\${checkpoint_file}" ]]; then
@@ -406,13 +447,38 @@ if [[ "\${1:-configure}" == "configure" ]]; then
         tar -xzf "\${checkpoint}" -C /
         systemctl daemon-reload
         systemctl start autark-os.service >/dev/null 2>&1 || true
-        echo "Autark-OS: the package failed health verification; restored the pre-upgrade service snapshot." >&2
+        rollback_verified=0
+        for _attempt in \$(seq 1 60); do
+          if curl --fail --silent "http://127.0.0.1:\${server_port}/api/health" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        local_secret="\$(head -n 1 "\${runtime_dir}/config/admin-local-secret" 2>/dev/null || true)"
+        if [[ -n "\${local_secret}" && -r "\${inventory:-}" ]]; then
+          header_file="\$(mktemp)"
+          printf 'X-Autark-OS-Local-Secret: %s\n' "\${local_secret}" >"\${header_file}"
+          rollback_report="\${runtime_dir}/updates/rollback-inventory-report.json"
+          if curl --fail --silent --show-error --max-time 30 -X POST \
+              -H 'Content-Type: application/json' -H "@\${header_file}" --data-binary "@\${inventory}" \
+              "http://127.0.0.1:\${server_port}/api/system/update-inventory/verify" >"\${rollback_report}" \
+              && grep -q '"safe":true' "\${rollback_report}"; then
+            rollback_verified=1
+          fi
+          rm -f "\${header_file}"
+          chmod 600 "\${rollback_report}" 2>/dev/null || true
+        fi
+        if [[ "\${rollback_verified}" -eq 1 ]]; then
+          echo "Autark-OS: the package failed health or managed-app verification; restored and verified the pre-upgrade release, database, and managed apps." >&2
+        else
+          echo "Autark-OS: the package failed health or managed-app verification; restored the pre-upgrade snapshot, but its managed apps need attention." >&2
+        fi
       fi
     fi
-    rm -f "\${checkpoint_file}"
+    rm -f "\${checkpoint_file}" "\${inventory_file}"
     exit 1
   fi
-  rm -f /run/autark-os-package-upgrade-checkpoint
+  rm -f /run/autark-os-package-upgrade-checkpoint /run/autark-os-package-upgrade-inventory
   echo "Autark-OS base service installed."
   echo "Next: open http://localhost:\${server_port} to complete setup."
   echo "Logs: journalctl -u autark-os.service -f"
@@ -428,7 +494,7 @@ POSTINST
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${1:-}" == "remove" || "${1:-}" == "deconfigure" || "${1:-}" == "upgrade" ]]; then
+if [[ "${1:-}" == "remove" || "${1:-}" == "deconfigure" ]]; then
   if command -v systemctl >/dev/null 2>&1; then
     systemctl stop autark-os.service >/dev/null 2>&1 || true
   fi

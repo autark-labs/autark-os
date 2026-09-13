@@ -1278,6 +1278,70 @@ update_paths() {
   [[ -n "${UPDATE_LOG_DIR}" ]] || UPDATE_LOG_DIR="/var/log/autark-os"
 }
 
+update_inventory_request() {
+  local method="$1"
+  local path="$2"
+  local output_file="$3"
+  local body_file="${4:-}"
+  local secret_file="${UPDATE_RUNTIME_DIR}/config/admin-local-secret"
+  [[ -r "${secret_file}" ]] || {
+    log "The local update-verification credential is unavailable at ${secret_file}."
+    return 1
+  }
+  local local_secret header_file base_url exit_code=0
+  local_secret="$(head -n 1 "${secret_file}" 2>/dev/null || true)"
+  [[ -n "${local_secret}" ]] || {
+    log "The local update-verification credential is empty."
+    return 1
+  }
+  header_file="$(mktemp)"
+  chmod 600 "${header_file}" 2>/dev/null || true
+  printf 'X-Autark-OS-Local-Secret: %s\n' "${local_secret}" >"${header_file}"
+  base_url="http://127.0.0.1:$(resolve_port)"
+  if [[ "${method}" == "GET" ]]; then
+    curl --fail --silent --show-error --max-time 30 -H "@${header_file}" \
+      "${base_url}${path}" >"${output_file}" || exit_code=$?
+  else
+    [[ -r "${body_file}" ]] || exit_code=1
+    if [[ "${exit_code}" -eq 0 ]]; then
+      curl --fail --silent --show-error --max-time 30 -X POST \
+        -H 'Content-Type: application/json' -H "@${header_file}" --data-binary "@${body_file}" \
+        "${base_url}${path}" >"${output_file}" || exit_code=$?
+    fi
+  fi
+  rm -f "${header_file}"
+  chmod 600 "${output_file}" 2>/dev/null || true
+  return "${exit_code}"
+}
+
+capture_update_inventory() {
+  local output_file="$1"
+  update_inventory_request GET "/api/system/update-inventory" "${output_file}" || return 1
+  [[ -s "${output_file}" && -n "$(json_value ownerInstanceId "${output_file}")" ]] || return 1
+}
+
+verify_update_inventory() {
+  local before_file="$1"
+  local report_file="$2"
+  update_inventory_request POST "/api/system/update-inventory/verify" "${report_file}" "${before_file}" || return 1
+  [[ "$(json_bool safe "${report_file}")" == "true" ]]
+}
+
+save_update_inventory_report() {
+  local report_file="$1"
+  local state_dir="${UPDATE_RUNTIME_DIR}/updates"
+  mkdir -p "${state_dir}"
+  cp "${report_file}" "${state_dir}/latest-inventory-report.json"
+  chmod 600 "${state_dir}/latest-inventory-report.json" 2>/dev/null || true
+}
+
+verify_restored_update_inventory() {
+  local snapshot_dir="$1"
+  local report_file="${UPDATE_RUNTIME_DIR}/updates/rollback-inventory-report.json"
+  [[ -r "${snapshot_dir}/managed-app-inventory.json" ]] || return 1
+  verify_update_inventory "${snapshot_dir}/managed-app-inventory.json" "${report_file}"
+}
+
 write_update_state() {
   local status="$1"
   local phase="$2"
@@ -1577,7 +1641,7 @@ apply_release_bundle_update() {
   [[ -f "${CONFIG_FILE}" ]] || die "No installed Autark-OS configuration was found at ${CONFIG_FILE}. Use 'autark-os install' for a first installation."
 
   local release_json="${release_bundle}/autark-os-release.json"
-  local target_version previous_version previous_sha previous_date snapshot_dir
+  local target_version previous_version previous_sha previous_date snapshot_dir inventory_before
   target_version="$(json_value version "${release_json}")"
   previous_version="$(configured_value AUTARK_OS_VERSION)"
   previous_sha="$(configured_value AUTARK_OS_BUILD_SHA)"
@@ -1589,11 +1653,19 @@ apply_release_bundle_update() {
   if has_command systemctl && systemctl is-enabled --quiet "${SERVICE_NAME}.service" 2>/dev/null; then
     service_was_enabled=1
   fi
+  [[ "${service_was_active}" -eq 1 ]] || die "Autark-OS must be running so its managed-app inventory can be verified before updating. Start the service and retry."
+  inventory_before="$(mktemp)"
+  if ! capture_update_inventory "${inventory_before}"; then
+    rm -f "${inventory_before}"
+    die "Autark-OS could not record its managed-app inventory. No update files were changed."
+  fi
   write_update_state "running" "stopping-service" "${target_version}" "" "Preparing the installed service for update."
   if has_command systemctl; then
     systemctl stop "${SERVICE_NAME}.service" >/dev/null 2>&1 || true
   fi
   snapshot_dir="$(create_update_snapshot "${target_version}")"
+  mv "${inventory_before}" "${snapshot_dir}/managed-app-inventory.json"
+  chmod 600 "${snapshot_dir}/managed-app-inventory.json" 2>/dev/null || true
   [[ -f "${CONFIG_FILE}" ]] && cp -a "${CONFIG_FILE}" "${snapshot_dir}/autark-os.env"
   cp "${release_json}" "${snapshot_dir}/autark-os-release.json"
   [[ "${service_was_active}" -eq 0 ]] || : >"${snapshot_dir}/service-was-active"
@@ -1609,15 +1681,19 @@ apply_release_bundle_update() {
   if [[ "${install_failed}" -eq 1 ]]; then
     write_update_state "rolling_back" "install-failed" "${target_version}" "${snapshot_dir}" "Release installation failed; restoring the previous version."
     restore_update_snapshot "${snapshot_dir}" || true
-    write_update_state "rolled_back" "complete" "${target_version}" "${snapshot_dir}" "The update failed and the previous release was restored."
-    die "The update could not be installed. Autark-OS restored the previous release."
+    if wait_for_update_health && verify_restored_update_inventory "${snapshot_dir}"; then
+      write_update_state "rolled_back" "complete" "${target_version}" "${snapshot_dir}" "The update failed and the previous release and managed-app inventory were restored."
+      die "The update could not be installed. Autark-OS restored the previous release and verified its managed apps."
+    fi
+    write_update_state "rollback_failed" "inventory-verification" "${target_version}" "${snapshot_dir}" "The release was restored, but its managed-app inventory could not be verified."
+    die "The update failed and the restored managed-app inventory needs attention. Run 'autark-os logs' and 'autark-os support-bundle'."
   fi
   ensure_cli_command_access
   write_installed_update_metadata "${release_json}" "${previous_version}" "${previous_sha}" "${previous_date}" "${snapshot_dir}"
 
   if [[ "${skip_service_restart}" -eq 1 ]]; then
-    write_update_state "completed" "restart-skipped" "${target_version}" "${snapshot_dir}" "Files were updated without restarting the service."
-    log "Updated Autark-OS to ${target_version}; service restart was skipped."
+    write_update_state "awaiting_restart" "inventory-not-verified" "${target_version}" "${snapshot_dir}" "Files were replaced, but the managed-app inventory cannot be verified until the service is restarted."
+    log "Updated Autark-OS files to ${target_version}; service restart and managed-app verification were skipped."
     return 0
   fi
 
@@ -1626,17 +1702,34 @@ apply_release_bundle_update() {
     print_update_health_diagnostics "new release ${target_version}"
     write_update_state "rolling_back" "health-failed" "${target_version}" "${snapshot_dir}" "The new release did not become healthy; restoring the previous version."
     restore_update_snapshot "${snapshot_dir}" || true
-    if wait_for_update_health; then
-      write_update_state "rolled_back" "complete" "${target_version}" "${snapshot_dir}" "The new release failed health verification and the previous release is healthy again."
-      die "Autark-OS ${target_version} did not become healthy. The previous release was restored successfully."
+    if wait_for_update_health && verify_restored_update_inventory "${snapshot_dir}"; then
+      write_update_state "rolled_back" "complete" "${target_version}" "${snapshot_dir}" "The new release failed health verification; the previous release and managed-app inventory were restored."
+      die "Autark-OS ${target_version} did not become healthy. The previous release and its managed apps were restored successfully."
     fi
     print_update_health_diagnostics "restored release"
     write_update_state "rollback_failed" "health-failed" "${target_version}" "${snapshot_dir}" "Neither the new release nor the restored release became healthy."
     die "The update failed and the restored release also needs attention. Run 'autark-os logs' and 'autark-os support-bundle'."
   fi
-  write_update_state "completed" "complete" "${target_version}" "${snapshot_dir}" "Autark-OS updated successfully and passed health verification."
+  local inventory_report="${UPDATE_RUNTIME_DIR}/updates/inventory-report-${target_version}.json"
+  write_update_state "running" "verifying-managed-apps" "${target_version}" "${snapshot_dir}" "Comparing the managed-app inventory before and after the update."
+  if ! verify_update_inventory "${snapshot_dir}/managed-app-inventory.json" "${inventory_report}"; then
+    save_update_inventory_report "${inventory_report}" 2>/dev/null || true
+    write_update_state "rolling_back" "inventory-regressed" "${target_version}" "${snapshot_dir}" "Managed-app ownership regressed; restoring the previous release and database snapshot."
+    restore_update_snapshot "${snapshot_dir}" || true
+    if wait_for_update_health && verify_restored_update_inventory "${snapshot_dir}"; then
+      write_update_state "rolled_back" "complete" "${target_version}" "${snapshot_dir}" "The update regressed managed apps; the previous release and managed-app inventory were restored."
+      die "Autark-OS ${target_version} did not preserve the managed-app inventory. The previous release and database were restored successfully."
+    fi
+    write_update_state "rollback_failed" "inventory-verification" "${target_version}" "${snapshot_dir}" "The update regressed managed apps and the restored inventory could not be verified."
+    die "The update regressed managed apps and rollback needs attention. Run 'autark-os logs' and 'autark-os support-bundle'."
+  fi
+  save_update_inventory_report "${inventory_report}"
+  local inventory_summary
+  inventory_summary="$(json_value summary "${inventory_report}")"
+  write_update_state "completed" "complete" "${target_version}" "${snapshot_dir}" "Autark-OS passed health and managed-app inventory verification."
   prune_update_snapshots
-  log "Autark-OS ${target_version} is installed and healthy."
+  log "Autark-OS ${target_version} is installed, healthy, and retained its managed-app inventory."
+  [[ -z "${inventory_summary}" ]] || log "${inventory_summary}"
 }
 
 apply_package_update() {
@@ -1657,7 +1750,12 @@ apply_package_update() {
     write_update_state "failed" "package-health" "${target_version}" "" "The package transaction completed, but Autark-OS did not become healthy."
     die "The package was installed, but Autark-OS did not become healthy. Run 'autark-os logs'."
   fi
-  write_update_state "completed" "complete" "${target_version}" "" "The package-managed Autark-OS update completed and passed health verification."
+  local inventory_report="${UPDATE_RUNTIME_DIR}/updates/latest-inventory-report.json"
+  if [[ ! -r "${inventory_report}" || "$(json_bool safe "${inventory_report}")" != "true" ]]; then
+    write_update_state "failed" "package-inventory" "${target_version}" "" "The package transaction did not prove that managed apps retained their ownership state."
+    die "The package update did not produce a successful managed-app inventory report. Review apt output and 'autark-os update status'."
+  fi
+  write_update_state "completed" "complete" "${target_version}" "" "The package-managed Autark-OS update passed health and managed-app inventory verification."
 }
 
 print_update_check() {
@@ -1708,16 +1806,17 @@ print_update_plan() {
     json_string "${UPDATE_CANDIDATE_URL}"
     printf ',"snapshotRoot":'
     json_string "${UPDATE_RUNTIME_DIR}/updates"
-    printf ',"steps":["verify release","stop service","snapshot program, configuration, and database","install release","start service","verify health","rollback automatically on failure"]'
+    printf ',"steps":["verify release","record managed-app inventory","stop service","snapshot program, configuration, and database","install release","start service","verify health and managed-app inventory","rollback automatically on failure"]'
     printf ',"preserves":["managed app data","backups","Tailscale identity","Docker installation"]}\n'
     return 0
   fi
   log "Update plan for Autark-OS ${UPDATE_CANDIDATE_VERSION}"
   log "  1. Verify the architecture-specific release and checksums."
-  log "  2. Stop ${SERVICE_NAME}.service and snapshot program files, configuration, and the Autark-OS database."
-  log "  3. Install the backend, bundled Java runtime, helper commands, and service configuration."
-  log "  4. Start Autark-OS and wait for bounded health verification."
-  log "  5. Restore the snapshot automatically if installation or health verification fails."
+  log "  2. Record the canonical managed-app inventory."
+  log "  3. Stop ${SERVICE_NAME}.service and snapshot program files, configuration, and the Autark-OS database."
+  log "  4. Install the backend, bundled Java runtime, helper commands, and service configuration."
+  log "  5. Start Autark-OS and verify both health and managed-app ownership."
+  log "  6. Restore the release and database snapshot if either verification fails."
   log "Managed app data, backups, Docker, and the host Tailscale identity are not replaced by this update."
 }
 
@@ -2229,6 +2328,7 @@ SUPPORT_USAGE
     release-metadata.json
     update-state.json
     update.log
+    update-inventory-report.json
     application-state.json
     jobs.json
     recent-activity.json
@@ -2260,6 +2360,7 @@ SUPPORT_USAGE
   [[ -n "${installed_runtime_dir}" ]] || installed_runtime_dir="/var/lib/autark-os"
   redact_file_to "${installed_runtime_dir}/updates/update-state.json" "${bundle_dir}/update-state.json"
   redact_file_to "${installed_runtime_dir}/updates/update.log" "${bundle_dir}/update.log"
+  redact_file_to "${installed_runtime_dir}/updates/latest-inventory-report.json" "${bundle_dir}/update-inventory-report.json"
   if [[ -n "${installer_log}" ]]; then
     redact_file_to "${installer_log}" "${bundle_dir}/installer-stage.log"
   elif [[ -n "$(configured_value AUTARK_OS_LOG_DIR)" && -r "$(configured_value AUTARK_OS_LOG_DIR)/installer.log" ]]; then

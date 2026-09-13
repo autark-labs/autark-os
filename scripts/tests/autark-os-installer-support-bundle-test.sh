@@ -110,6 +110,7 @@ for required_file in \
   config-redacted.env \
   installer-stage.log \
   release-metadata.json \
+  update-inventory-report.json \
   application-state.json \
   jobs.json \
   recent-activity.json \
@@ -130,6 +131,7 @@ assert manifest["supportConsoleCompatible"] is True
 assert "install-plan.json" in manifest["files"]
 assert "pre-install-doctor.json" in manifest["files"]
 assert "installer-stage.log" in manifest["files"]
+assert "update-inventory-report.json" in manifest["files"]
 assert "application-state.json" in manifest["files"]
 assert "jobs.json" in manifest["files"]
 assert "docker-inventory.txt" in manifest["files"]

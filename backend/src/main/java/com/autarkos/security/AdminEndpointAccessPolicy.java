@@ -20,7 +20,11 @@ public class AdminEndpointAccessPolicy {
         }
         if ("POST".equalsIgnoreCase(method)
                 && ("/api/admin/security/local/reset-password".equals(path)
-                        || "/api/v1/pro/identity/local/rotate-installation".equals(path))) {
+                        || "/api/v1/pro/identity/local/rotate-installation".equals(path)
+                        || "/api/system/update-inventory/verify".equals(path))) {
+            return AccessMode.LOCAL_ADMIN;
+        }
+        if (isRead(method) && "/api/system/update-inventory".equals(path)) {
             return AccessMode.LOCAL_ADMIN;
         }
         return AccessMode.AUTHENTICATED;

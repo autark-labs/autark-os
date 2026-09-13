@@ -13,12 +13,26 @@ bundle_dir="${tmp_dir}/bundle"
 config_file="${config_dir}/autark-os.env"
 current_jar="${install_dir}/backend/autark-os-backend.jar"
 cli_link="${tmp_dir}/bin/autark-os"
+fake_bin="${tmp_dir}/fake-bin"
 
-mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin" "${bundle_dir}/scripts"
+mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}/config" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin" "${bundle_dir}/scripts" "${fake_bin}"
 printf 'old backend jar\n' >"${current_jar}"
 printf 'old autark-os helper\n' >"${install_dir}/bin/autark-os"
 printf 'old fileops helper\n' >"${install_dir}/bin/autark-os-fileops"
 printf 'old bootstrap\n' >"${install_dir}/bin/bootstrap-autark-os.sh"
+printf 'local-update-secret\n' >"${runtime_dir}/config/admin-local-secret"
+cat >"${fake_bin}/systemctl" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  is-active|is-enabled) exit 0 ;;
+  *) exit 0 ;;
+esac
+SH
+cat >"${fake_bin}/curl" <<'SH'
+#!/usr/bin/env bash
+printf '{"schemaVersion":1,"ownerInstanceId":"pos_current","runtimeRoot":"%s","runtimeRootHash":"sha256:runtime","managedApps":[]}\n' "${TEST_RUNTIME_DIR}"
+SH
+chmod +x "${fake_bin}/systemctl" "${fake_bin}/curl"
 cat >"${config_file}" <<ENV
 AUTARK_OS_INSTALL_DIR=${install_dir}
 AUTARK_OS_RUNTIME_ROOT=${runtime_dir}
@@ -70,6 +84,8 @@ assert check["requiresSourceCheckout"] is False
 assert check["requiresNodeYarnOrGit"] is False
 PY
 
+PATH="${fake_bin}:${PATH}" \
+TEST_RUNTIME_DIR="${runtime_dir}" \
 AUTARK_OS_CONFIG_FILE="${config_file}" \
 AUTARK_OS_CLI_LINK="${cli_link}" \
   "${repo_root}/scripts/autark-os" update \
@@ -79,7 +95,7 @@ AUTARK_OS_CLI_LINK="${cli_link}" \
 
 grep -q 'Update check' /tmp/autark-os-update-output.txt
 grep -q 'Update plan for Autark-OS 1.1.0' /tmp/autark-os-update-output.txt
-grep -q 'service restart was skipped' /tmp/autark-os-update-output.txt
+grep -q 'service restart and managed-app verification were skipped' /tmp/autark-os-update-output.txt
 
 grep -q 'new backend jar' "${current_jar}"
 grep -q 'new autark-os helper' "${install_dir}/bin/autark-os"
@@ -90,6 +106,7 @@ grep -q 'AUTARK_OS_VERSION=1.1.0' "${config_file}"
 grep -q 'AUTARK_OS_BUILD_SHA=new-sha' "${config_file}"
 grep -q 'AUTARK_OS_PREVIOUS_VERSION=1.0.0' "${config_file}"
 grep -q 'AUTARK_OS_PREVIOUS_BUILD_SHA=old-sha' "${config_file}"
+grep -q '"status":"awaiting_restart"' "${runtime_dir}/updates/update-state.json"
 
 previous_jar="$(awk -F= '$1 == "AUTARK_OS_PREVIOUS_BACKEND_JAR" {print $2; exit}' "${config_file}")"
 [[ -n "${previous_jar}" && -f "${previous_jar}" ]]
