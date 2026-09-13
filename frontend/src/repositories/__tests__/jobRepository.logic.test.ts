@@ -78,6 +78,7 @@ test('job progress and current step derive stable user-facing progress', () => {
   assert.equal(jobProgressPercent(running), 50);
   assert.equal(jobProgressPercent({ ...running, status: 'succeeded' }), 100);
   assert.equal(jobTypeLabel('backup_verify'), 'Backup verification');
+  assert.equal(jobTypeLabel('recover_app'), 'Recovery');
   assert.equal(jobTypeLabel('uninstall_app'), 'Uninstall');
 });
 

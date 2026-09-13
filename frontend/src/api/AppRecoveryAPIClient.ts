@@ -1,4 +1,5 @@
-import type { AppRecoveryPlan, AppRecoveryResult } from '@/types/appRecovery';
+import type { AppRecoveryPlan } from '@/types/appRecovery';
+import type { AutarkOsJob } from '@/types/jobs';
 import { httpClient } from './httpClient';
 
 export const AppRecoveryAPIClient = {
@@ -7,8 +8,11 @@ export const AppRecoveryAPIClient = {
     return response.data;
   },
 
-  async apply(appId: string, confirmation: string) {
-    const response = await httpClient.post<AppRecoveryResult>(`/api/app-recovery/${encodeURIComponent(appId)}/apply`, { confirmation });
+  async apply(appId: string, planId: string, ownershipTransferConfirmed: boolean) {
+    const response = await httpClient.post<AutarkOsJob>(`/api/app-recovery/${encodeURIComponent(appId)}/apply`, {
+      planId,
+      ownershipTransferConfirmed,
+    });
     return response.data;
   },
 };

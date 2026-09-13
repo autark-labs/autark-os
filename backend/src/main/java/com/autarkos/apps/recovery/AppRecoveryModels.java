@@ -29,18 +29,22 @@ public final class AppRecoveryModels {
             String reason,
             boolean applicable,
             String summary,
+            String planId,
+            boolean ownershipTransferRequired,
             String runtimePath,
-            String composeProject,
+            String sourceComposeProject,
+            String targetComposeProject,
             String appInstanceId,
             List<String> containers,
             List<String> mounts,
             List<String> ports,
             List<RecoveryCheck> checks,
             List<String> steps,
-            List<String> blockedReasons,
-            String confirmationText) {
+            List<String> blockedReasons) {
     }
 
-    public record RecoveryApplyRequest(String confirmation) {
+    public record RecoveryApplyRequest(
+            String planId,
+            boolean ownershipTransferConfirmed) {
     }
 }

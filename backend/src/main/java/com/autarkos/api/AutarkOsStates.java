@@ -93,6 +93,7 @@ public final class AutarkOsStates {
         public static final String STOP_APP = "stop_app";
         public static final String RESTART_APP = "restart_app";
         public static final String REPAIR_APP = "repair_app";
+        public static final String RECOVER_APP = "recover_app";
         public static final String BACKUP = "backup";
         public static final String BACKUP_VERIFY = "backup_verify";
         public static final String BACKUP_RESTORE = "backup_restore";

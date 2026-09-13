@@ -79,6 +79,7 @@ public class RecoveryOperationCoordinator {
         STORAGE_CLEANUP("storage cleanup", "cleaning up unused app data"),
         BACKUP_DESTINATION_CHANGE("a backup destination change", "changing the backup destination"),
         APP_LIFECYCLE("an app lifecycle action", "changing an app's running state"),
+        APP_RECOVERY("an app recovery", "recovering an app"),
         UNINSTALL_CHECKPOINT("an app uninstall", "creating an uninstall safety checkpoint"),
         APP_UPDATE("an app update", "updating an app safely"),
         APP_ROLLBACK("an app rollback", "rolling an app back safely");

@@ -27,6 +27,8 @@ test('frontend recovery flows do not use legacy ownership or host inventory clie
   assert.match(recoveryClient, /GET|httpClient\.get<AppRecoveryPlan>/);
   assert.match(recoveryClient, /\/api\/app-recovery\/\$\{encodeURIComponent\(appId\)\}\/plan/);
   assert.match(recoveryClient, /\/api\/app-recovery\/\$\{encodeURIComponent\(appId\)\}\/apply/);
-  assert.match(recoverySheet, /RecoveryChecks/);
+  assert.match(recoverySheet, /CompactRecoveryCheck/);
+  assert.match(recoverySheet, /useAutarkOsJobQuery/);
+  assert.match(recoverySheet, /ownershipTransferRequired/);
   assert.doesNotMatch(recoverySheet, /adopt|adoption/i);
 });

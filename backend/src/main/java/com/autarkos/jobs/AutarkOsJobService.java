@@ -287,6 +287,7 @@ public class AutarkOsJobService {
         }
         if (List.of(
                 AutarkOsStates.JobType.INSTALL_APP,
+                AutarkOsStates.JobType.RECOVER_APP,
                 AutarkOsStates.JobType.START_APP,
                 AutarkOsStates.JobType.STOP_APP,
                 AutarkOsStates.JobType.RESTART_APP,
@@ -439,6 +440,7 @@ public class AutarkOsJobService {
     private String interruptedMessage(AutarkOsJob job) {
         return switch (job.type()) {
             case AutarkOsStates.JobType.INSTALL_APP -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";
+            case AutarkOsStates.JobType.RECOVER_APP -> "This app recovery was interrupted when Autark-OS stopped. Autark-OS kept the safety checkpoint; review the app before starting recovery again.";
             case AutarkOsStates.JobType.UPDATE_APP -> "This app update was interrupted when Autark-OS stopped. Review My Apps and roll back the saved release before trying again.";
             case AutarkOsStates.JobType.SAVE_APP_SETTINGS -> "This settings change was interrupted. Autark-OS will try the saved recovery. If attention is still needed, use Repair in My Apps.";
             case AutarkOsStates.JobType.ROLLBACK_APP -> "This app rollback was interrupted when Autark-OS stopped. Review My Apps before starting another release action.";
@@ -452,6 +454,7 @@ public class AutarkOsJobService {
         return List.of(
                 AutarkOsStates.JobType.SAVE_APP_SETTINGS,
                 AutarkOsStates.JobType.INSTALL_APP,
+                AutarkOsStates.JobType.RECOVER_APP,
                 AutarkOsStates.JobType.UPDATE_APP,
                 AutarkOsStates.JobType.ROLLBACK_APP,
                 "pro_module_change").contains(type);

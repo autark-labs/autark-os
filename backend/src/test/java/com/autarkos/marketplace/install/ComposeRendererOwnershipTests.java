@@ -90,6 +90,50 @@ class ComposeRendererOwnershipTests {
                 .doesNotContain("/apps/portainer/var/run/docker.sock");
     }
 
+    @Test
+    void transfersOwnershipWithoutChangingImageEnvironmentPortsOrMountedData() throws Exception {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        DockerOwnershipService ownershipService = ownershipService(false);
+        ApplicationManifest manifest = manifest("vaultwarden");
+        ComposeRenderer renderer = new ComposeRenderer(runtimeLayout, ownershipService);
+        Path appRoot = runtimeLayout.appRoot(manifest.id());
+        Files.createDirectories(appRoot);
+        Path compose = appRoot.resolve("compose.yaml");
+        Files.writeString(compose, """
+                services:
+                  vaultwarden:
+                    image: vaultwarden/server:1.36.0
+                    container_name: autarkos_previous_vaultwarden
+                    environment:
+                      - SIGNUPS_ALLOWED=false
+                    ports:
+                      - "8090:80"
+                    volumes:
+                      - "%s:/data"
+                    labels:
+                      - "example.keep=this"
+                      - "autark-os.managed=true"
+                      - "autark-os.instance-id=previous-instance"
+                """.formatted(appRoot.resolve("data")));
+
+        renderer.transferOwnership(
+                compose,
+                manifest,
+                "appinst_vaultwarden",
+                "autarkos_homelab-box_vaultwarden");
+
+        assertThat(Files.readString(compose))
+                .contains("image: vaultwarden/server:1.36.0")
+                .contains("SIGNUPS_ALLOWED=false")
+                .contains("8090:80")
+                .contains(appRoot.resolve("data") + ":/data")
+                .contains("example.keep=this")
+                .contains("container_name: autarkos_homelab-box_vaultwarden")
+                .contains("autark-os.instance-id=pos_abcdef1234567890")
+                .doesNotContain("previous-instance")
+                .doesNotContain("autarkos_previous_vaultwarden");
+    }
+
     private DockerOwnershipService ownershipService(boolean devMode) {
         AutarkOsIdentity identity = new AutarkOsIdentity(
                 "pos_abcdef1234567890",

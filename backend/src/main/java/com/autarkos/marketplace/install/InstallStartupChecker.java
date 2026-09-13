@@ -7,11 +7,11 @@ import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.HealthManifest;
 
 /** Waits for Docker startup states and turns them into the install job contract. */
-final class InstallStartupChecker {
+public final class InstallStartupChecker {
 
     private final DockerComposeExecutor dockerComposeExecutor;
 
-    InstallStartupChecker(DockerComposeExecutor dockerComposeExecutor) {
+    public InstallStartupChecker(DockerComposeExecutor dockerComposeExecutor) {
         this.dockerComposeExecutor = dockerComposeExecutor;
     }
 
@@ -19,7 +19,7 @@ final class InstallStartupChecker {
         return waitForStartup(composeFile, composeProject, health, List.of());
     }
 
-    StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health, List<String> requiredServices) {
+    public StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health, List<String> requiredServices) {
         List<String> lastStatus = List.of();
         List<RuntimeModels.DockerContainerStatus> lastContainers = List.of();
         for (int attempt = 1; attempt <= 20; attempt++) {
@@ -108,7 +108,7 @@ final class InstallStartupChecker {
         }
     }
 
-    record StartupCheck(boolean ready, boolean failed, boolean warmingUp, String detail, List<String> logs) {
+    public record StartupCheck(boolean ready, boolean failed, boolean warmingUp, String detail, List<String> logs) {
         private static StartupCheck ready(String detail, List<String> logs) {
             return new StartupCheck(true, false, false, detail, logs);
         }

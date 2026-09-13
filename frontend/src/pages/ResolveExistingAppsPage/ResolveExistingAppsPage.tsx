@@ -1,7 +1,6 @@
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ExternalLink, RefreshCw, ShieldAlert } from 'lucide-react';
 import { PageShell } from '@/components/layout/PageShell';
@@ -12,11 +11,8 @@ import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
-import { showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
-import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
-import type { AppRecoveryResult } from '@/types/appRecovery';
 import type { ObservedServiceView } from '@/types/observedService';
 import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
 import { visibleRecoveryApplications } from './ResolveExistingAppsPage.logic';
@@ -24,7 +20,6 @@ import { visibleRecoveryApplications } from './ResolveExistingAppsPage.logic';
 function ResolveExistingAppsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedServiceId = searchParams.get('service') || searchParams.get('resource');
-  const queryClient = useQueryClient();
   const appState = useApplicationStateRepository();
   const [selectedId, setSelectedId] = useState<string | null>(requestedServiceId);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -67,11 +62,6 @@ function ResolveExistingAppsPage() {
   async function refreshObservedServices() {
     setLocalError(null);
     await appState.refresh();
-  }
-
-  function handleRecoveryResult(result: AppRecoveryResult) {
-    syncCanonicalAppMutationResult(queryClient, result);
-    showActionNotification(result, result.title || 'Service action finished');
   }
 
   return (
@@ -133,7 +123,6 @@ function ResolveExistingAppsPage() {
       ) : null}
 
       <ObservedServiceDetailsSheet
-        onActionComplete={handleRecoveryResult}
         onOpenChange={(open) => !open && closeDetailsSheet()}
         onRefresh={refreshObservedServices}
         open={Boolean(requestedServiceId)}

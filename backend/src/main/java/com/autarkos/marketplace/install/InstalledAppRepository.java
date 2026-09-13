@@ -71,6 +71,17 @@ public interface InstalledAppRepository extends JpaRepository<InstalledAppEntity
         });
     }
 
+    /** Makes a recovered app visible only after its runtime and access have been verified. */
+    @Transactional
+    default void commitRecoveredApp(
+            InstalledApp app,
+            InstallModels.InstallSettings settings,
+            RuntimeModels.InstalledAppOwnershipMetadata ownership) {
+        save(app);
+        saveSettings(app.appId(), settings);
+        saveOwnershipMetadata(ownership);
+    }
+
     default Optional<RuntimeModels.InstalledAppOwnershipMetadata> ownershipFor(String appId) {
         return findById(appId).map(InstalledApps::ownership);
     }

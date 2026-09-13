@@ -24,7 +24,7 @@ public class AppAccessChecker {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
-    boolean shouldCheckLocalAccess(ApplicationManifest manifest, String accessUrl) {
+    public boolean shouldCheckLocalAccess(ApplicationManifest manifest, String accessUrl) {
         if (accessUrl == null || accessUrl.isBlank()) {
             return false;
         }
@@ -43,7 +43,7 @@ public class AppAccessChecker {
         return manifest.health();
     }
 
-    protected AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
+    public AccessModels.AppAccessCheck localHealthCheck(String appId, ApplicationManifest manifest, String accessUrl) {
         HealthManifest health = healthContract(manifest);
         String probeUrl = com.autarkos.network.HostAddress.probeUrl(accessUrl);
         if ("tcp".equals(health.type())) {

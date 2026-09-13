@@ -57,18 +57,21 @@ test('applications page uses canonical synchronization for managed lifecycle act
   assert.doesNotMatch(page, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);
 });
 
-test('existing-app recovery synchronizes its action result without pin mutations', () => {
+test('existing-app recovery tracks a durable job and refreshes canonical state after verification', () => {
   const page = source('src/pages/ResolveExistingAppsPage/ResolveExistingAppsPage.tsx');
   const sheet = source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx');
 
-  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
   assert.doesNotMatch(page, /ObservedServicesAPIClient\.(pin|unpin|match)/);
-  assert.match(page, /onActionComplete=\{handleRecoveryResult\}/);
+  assert.match(page, /onRefresh=\{refreshObservedServices\}/);
   assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache/);
   assert.doesNotMatch(page, /setApplicationStateFromActionResultCache/);
 
-  assert.match(sheet, /onActionComplete\(result\)/);
-  assert.match(sheet, /AppRecoveryAPIClient\.apply\(currentService\.catalogAppId, confirmation\)/);
+  assert.match(sheet, /syncCanonicalAppMutationResult\(queryClient, job\)/);
+  assert.match(sheet, /useAutarkOsJobQuery\(activeRecoveryJobId\)/);
+  assert.match(sheet, /useAutarkOsJobsQuery\(\)/);
+  assert.match(sheet, /job\.type === 'recover_app'[\s\S]*job\.subjectId === currentService\.catalogAppId[\s\S]*!terminalJob\(job\)/);
+  assert.match(sheet, /AppRecoveryAPIClient\.apply\([\s\S]*plan\.planId[\s\S]*transferAcknowledged/);
+  assert.match(sheet, /await onRefresh\(\)/);
   assert.doesNotMatch(sheet, /ObservedServicesAPIClient/);
   assert.doesNotMatch(sheet, /setObservedServicePinnedInApplicationStateCache/);
   assert.doesNotMatch(sheet, /setApplicationStateFromActionResultCache/);

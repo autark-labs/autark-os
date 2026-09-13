@@ -1,5 +1,3 @@
-import type { ApplicationState } from './applicationState';
-
 export type AppRecoveryCheck = {
   id: string;
   label: string;
@@ -14,8 +12,11 @@ export type AppRecoveryPlan = {
   reason: 'current_instance_registration_lost' | 'previous_instance' | 'legacy_autark' | 'insufficient_evidence' | string;
   applicable: boolean;
   summary: string;
+  planId: string;
+  ownershipTransferRequired: boolean;
   runtimePath: string;
-  composeProject: string;
+  sourceComposeProject: string;
+  targetComposeProject: string;
   appInstanceId: string;
   containers: string[];
   mounts: string[];
@@ -23,15 +24,4 @@ export type AppRecoveryPlan = {
   checks: AppRecoveryCheck[];
   steps: string[];
   blockedReasons: string[];
-  confirmationText: string;
-};
-
-export type AppRecoveryResult = {
-  ok: boolean;
-  severity: 'success' | 'info' | 'warning' | 'error' | string;
-  title: string;
-  message?: string | null;
-  resourceId?: string | null;
-  nextAction?: string | null;
-  applicationState?: ApplicationState | null;
 };

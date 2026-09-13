@@ -458,6 +458,41 @@ Acceptance criteria:
 - another active Autark-OS owner cannot be silently displaced
 - no partial managed result is possible
 
+#### Story 4 completion ledger
+
+Implemented:
+
+- a stable recovery-plan fingerprint over Docker evidence, Compose, runtime metadata, saved settings, and ownership identities
+- a durable `recover_app` job with serialized app mutation, live progress, refresh recovery, and global completion feedback
+- a cold, verified pre-recovery checkpoint before ownership files or containers are replaced
+- ownership transfer that preserves the reviewed image, environment, ports, mounts, and non-Autark labels while replacing Autark ownership labels
+- startup, health, local-access, private-access, and final Docker ownership verification before database state is committed
+- one transactional installed-app, settings, and ownership commit after every runtime check succeeds
+- rollback of Compose, runtime metadata, the previous project state, and private-access mappings after a failed transfer
+- preservation of the app's prior running or stopped state
+
+Hardened:
+
+- recovery requires the exact managed runtime folder and a valid saved release manifest matching runtime metadata
+- Compose must exactly match the saved release's service topology and images, with representable mounts and conflict-free ports
+- current-instance registration repair cannot silently change Compose project identity
+- a stale plan, inconsistent previous owner, managed-record collision, or unrepresentable setting produces no managed record
+- recovery success remains visible when canonical refresh removes the app from the recovery list
+
+UI:
+
+- replaced the long recovery sheet flow with the approved fixed-size dialog
+- kept the opening review static and concise, with four primary checks and details behind info tooltips
+- retained explicit ownership-transfer confirmation only when another Autark-OS instance or a legacy install owns the app
+- added durable progress, failure, and verified-completion states without exposing raw recovery protocol controls
+
+Validation:
+
+- backend: 660 tests executed, 0 failures, 0 errors, 3 skipped
+- frontend: 96 files and 319 tests passed
+- TypeScript, ESLint, production frontend build, and whitespace validation passed
+- Raspberry Pi validation intentionally deferred during the refactor sequence
+
 ### Story 5: Harden Autark-OS updates against lost applications
 
 Before updating, record a compact inventory of:
