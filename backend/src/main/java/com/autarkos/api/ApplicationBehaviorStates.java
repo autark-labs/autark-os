@@ -11,12 +11,9 @@ public final class ApplicationBehaviorStates {
         return AutarkOsStates.ManagementState.MANAGED;
     }
 
-    public static String observedManagementState(String userStatus, boolean pinned, boolean managedByThisAutarkOs) {
+    public static String observedManagementState(String userStatus, boolean managedByThisAutarkOs) {
         if (managedByThisAutarkOs || HostModels.ObservedServiceStatus.MANAGED.equals(userStatus)) {
             return AutarkOsStates.ManagementState.MANAGED;
-        }
-        if (pinned || HostModels.ObservedServiceStatus.PINNED.equals(userStatus)) {
-            return AutarkOsStates.ManagementState.LINKED;
         }
         return AutarkOsStates.ManagementState.FOUND;
     }
@@ -31,7 +28,7 @@ public final class ApplicationBehaviorStates {
         };
     }
 
-    public static String observedReadinessState(String runtimeState, String url, boolean pinned) {
+    public static String observedReadinessState(String runtimeState, String url) {
         String normalized = normalize(runtimeState);
         if (normalized.contains("start")) {
             return AutarkOsStates.ReadinessState.STARTING;
@@ -42,7 +39,7 @@ public final class ApplicationBehaviorStates {
         if (normalized.contains("unhealthy") || normalized.contains("unreachable") || normalized.contains("fail")) {
             return AutarkOsStates.ReadinessState.UNREACHABLE;
         }
-        if (normalized.contains("running") || hasText(url) || pinned) {
+        if (normalized.contains("running") || hasText(url)) {
             return AutarkOsStates.ReadinessState.READY;
         }
         return AutarkOsStates.ReadinessState.UNKNOWN;

@@ -121,7 +121,6 @@ public class ApplicationStateService {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(),
                 null,
                 AutarkOsStates.SnapshotState.STALE,
                 null,
@@ -203,11 +202,8 @@ public class ApplicationStateService {
         List<ObservedServiceView> observedViews = observed.stream()
                 .map(ObservedServiceService::toView)
                 .toList();
-        List<ObservedServiceView> pinned = observedViews.stream()
-                .filter(service -> HostModels.ObservedServiceStatus.PINNED.equals(service.userStatus()))
-                .toList();
         List<ObservedServiceView> found = observedViews.stream()
-                .filter(service -> !service.managedByThisAutarkOs() && !HostModels.ObservedServiceStatus.PINNED.equals(service.userStatus()))
+                .filter(service -> !service.managedByThisAutarkOs())
                 .toList();
         List<AppOwnershipView> ownership = appOwnershipService == null ? List.of() : appOwnershipService.apps(observed, managed);
         Instant completedAt = clock.get();
@@ -215,7 +211,6 @@ public class ApplicationStateService {
                 managed,
                 runtime,
                 observedViews,
-                pinned,
                 found,
                 ownership,
                 completedAt,
@@ -447,7 +442,6 @@ public class ApplicationStateService {
                 previous.managedApps(),
                 previous.runtimeApps(),
                 previous.observedServices(),
-                previous.pinnedExternalServices(),
                 previous.foundServices(),
                 previous.ownershipViews(),
                 previous.updatedAt(),
@@ -464,7 +458,6 @@ public class ApplicationStateService {
                 previous.managedApps(),
                 previous.runtimeApps(),
                 previous.observedServices(),
-                previous.pinnedExternalServices(),
                 previous.foundServices(),
                 previous.ownershipViews(),
                 previous.updatedAt(),

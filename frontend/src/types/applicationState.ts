@@ -6,7 +6,6 @@ export type ApplicationState = {
   managedApps: AppInstanceView[];
   runtimeApps: AppRuntimeView[];
   observedServices: ObservedServiceView[];
-  pinnedExternalServices: ObservedServiceView[];
   foundServices: ObservedServiceView[];
   ownershipViews: AppOwnershipView[];
   updatedAt: string | null;

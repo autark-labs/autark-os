@@ -2,7 +2,6 @@ import type { ApplicationState } from './applicationState';
 
 export type ObservedServiceUserStatus =
   | 'installed_managed'
-  | 'pinned_external'
   | 'found_on_server'
   | 'recoverable'
   | 'managed_elsewhere'
@@ -22,7 +21,7 @@ export type ObservedServiceAction = {
   reason: string;
 };
 
-export type ObservedServiceManagementState = 'managed' | 'found' | 'linked' | string;
+export type ObservedServiceManagementState = 'managed' | 'found' | string;
 export type ObservedServiceReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown' | string;
 export type ObservedServiceAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked' | string;
 
@@ -43,10 +42,8 @@ export type ObservedServiceView = {
   attentionState?: ObservedServiceAttentionState;
   ownershipState: string;
   runtimeState: string;
-  pinned: boolean;
   managedByThisAutarkOs: boolean;
   adoptable: boolean;
-  duplicateInstallWarningRequired: boolean;
   availableActions: ObservedServiceAction[];
   metadata: Record<string, string>;
 };

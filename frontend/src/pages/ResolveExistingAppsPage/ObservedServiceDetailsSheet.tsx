@@ -1,6 +1,6 @@
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Loader2, Pin, PinOff, RotateCcw, Search, ShieldAlert } from 'lucide-react';
+import { ExternalLink, Loader2, RotateCcw, ShieldAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
@@ -31,17 +31,15 @@ type ObservedServiceDetailsSheetProps = {
 export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, onRefresh, open, service }: ObservedServiceDetailsSheetProps) {
   const appState = useApplicationStateRepository();
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [matchValue, setMatchValue] = useState('');
   const [plan, setPlan] = useState<ObservedServiceAdoptionPlan | null>(null);
   const [confirmation, setConfirmation] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
-    setMatchValue(service?.catalogAppId || '');
     setPlan(null);
     setConfirmation('');
     setLocalError(null);
-  }, [service?.id, service?.catalogAppId]);
+  }, [service?.id]);
 
   const actions = useMemo(() => new Map((service?.availableActions || []).map((action) => [action.id, action])), [service?.availableActions]);
 
@@ -60,9 +58,6 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
 
   const currentService = service;
 
-  const canPin = Boolean(actions.get('pin')) && !service.pinned;
-  const canUnpin = Boolean(actions.get('unpin')) && service.pinned;
-  const canChangeMatch = Boolean(actions.get('change_match'));
   const adoptionAction = actions.get('adoption_plan');
   const canAdopt = Boolean(adoptionAction) && !adoptionAction?.disabled && service.adoptable;
   const installCopyAction = actions.get('install_copy');
@@ -108,7 +103,7 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
     <ResponsiveDetailsSheet
       className="sm:max-w-xl"
       footer={<Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" onClick={() => onOpenChange(false)} type="button" variant="outline">Close</Button>}
-      headerAccessory={<StatusBadge tone={stateBadgeTone(service)}>{service.userStatusLabel || (service.pinned ? 'Pinned' : 'Found')}</StatusBadge>}
+      headerAccessory={<StatusBadge tone={stateBadgeTone(service)}>{service.userStatusLabel || 'Found'}</StatusBadge>}
       model={{ description: service.userStatusDescription || 'Autark-OS observes this service but does not manage it.', title: service.displayName }}
       onOpenChange={onOpenChange}
       open={open}
@@ -144,22 +139,6 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
                   </AppBrowserLink>
                 </Button>
               )}
-              {canPin && (
-                <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before pinning.">
-                  <Button disabled={busyAction !== null} onClick={() => runMutation('pin', () => ObservedServicesAPIClient.pin(service.id), { refresh: false })} size="sm" type="button">
-                    {busyAction === 'pin' ? <Loader2 className="size-4 animate-spin" /> : <Pin className="size-4" />}
-                    Pin to My Apps
-                  </Button>
-                </DisabledAction>
-              )}
-              {canUnpin && (
-                <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before unpinning.">
-                  <Button className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-900" disabled={busyAction !== null} onClick={() => runMutation('unpin', () => ObservedServicesAPIClient.unpin(service.id), { refresh: false })} size="sm" type="button" variant="outline">
-                    {busyAction === 'unpin' ? <Loader2 className="size-4 animate-spin" /> : <PinOff className="size-4" />}
-                    Unpin from My Apps
-                  </Button>
-                </DisabledAction>
-              )}
               {canInstallCopy && (
                 <Button asChild className="border-amber-300/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15" size="sm" variant="outline">
                   <Link to={installCopyHref || '/discover'}>
@@ -170,27 +149,6 @@ export function ObservedServiceDetailsSheet({ onActionComplete, onOpenChange, on
               )}
             </div>
           </section>
-
-          {canChangeMatch && (
-            <section className="grid gap-3 rounded-lg border border-slate-800 bg-slate-900/45 p-4">
-              <div>
-                <h3 className="font-bold text-white">Change app match</h3>
-                <p className="mt-1 text-sm leading-6 text-slate-400">Use a catalog app ID when this service should affect Discover warnings for a specific app.</p>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="observed-service-match">Catalog app id</Label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input id="observed-service-match" onChange={(event) => setMatchValue(event.target.value)} placeholder="vaultwarden" value={matchValue} />
-                  <DisabledAction disabled={busyAction !== null} reason="Wait for the current service action to finish before saving this match.">
-                    <Button disabled={busyAction !== null} onClick={() => runMutation('match', () => ObservedServicesAPIClient.match(service.id, matchValue.trim() || null))} type="button" variant="outline">
-                      {busyAction === 'match' ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                      Save match
-                    </Button>
-                  </DisabledAction>
-                </div>
-              </div>
-            </section>
-          )}
 
           {adoptionAction && (
             <section className="grid gap-3 rounded-lg border border-amber-300/20 bg-amber-500/8 p-4">
@@ -274,7 +232,6 @@ function planList(value: unknown) {
 }
 
 function stateBadgeTone(service: ObservedServiceView): StatusBadgeTone {
-  if (service.userStatus === 'pinned_external') return 'info';
   if (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') return 'warning';
   if (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') return 'danger';
   return 'neutral';

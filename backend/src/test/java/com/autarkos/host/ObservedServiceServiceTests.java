@@ -47,33 +47,16 @@ class ObservedServiceServiceTests {
     }
 
     @Test
-    void excludedFoundAppsKeepReviewAndVisibilityActionsButCannotOfferNewInstalls() {
+    void foundAppsExposeNoPinOrManualMatchActions() {
         var found = ObservedServiceService.toView(observed("obs_vaultwarden", "manual_url", "http://vault.local", "Vaultwarden", "vaultwarden", "external", "pinned"));
         assertThat(found.availableActions()).extracting(HostModels.ObservedServiceAction::id)
-                .contains("open", "unpin", "unavailable").doesNotContain("install_copy");
+                .contains("open", "unavailable").doesNotContain("pin", "unpin", "change_match", "install_copy");
         var eligible = ObservedServiceService.toView(observed("obs_homepage", "manual_url", "http://homepage.local", "Homepage", "homepage", "external", "pinned"));
         assertThat(eligible.availableActions()).extracting(HostModels.ObservedServiceAction::id).contains("install_copy");
     }
 
     @Test
-    void unpinRemovesServiceFromMyAppsButDoesNotDeleteObservedTruth() {
-        ObservedServiceRepository repository = repository();
-        ObservedServiceService service = service(repository, List.of());
-        repository.upsert(observed("obs_vaultwarden", "manual_url", "http://vault.local", "Vaultwarden", "vaultwarden", "external", "pinned"));
-
-        HostModels.ActionResult result = service.unpin("obs_vaultwarden");
-
-        assertThat(result.ok()).isTrue();
-        assertThat(repository.findServiceById("obs_vaultwarden")).hasValueSatisfying(observed -> {
-            assertThat(observed.userVisibility()).isEqualTo("observed");
-            assertThat(observed.pinnedAt()).isNull();
-        });
-        assertThat(service.list(true)).extracting(ObservedServiceView::id).contains("obs_vaultwarden");
-        assertThat(service.matchingCatalogServices("vaultwarden")).extracting(ObservedService::id).contains("obs_vaultwarden");
-    }
-
-    @Test
-    void refreshPreservesPinnedStateAndUserCatalogMatch() {
+    void refreshClearsRetiredPinAndUserMatchState() {
         ObservedServiceRepository repository = repository();
         Instant pinnedAt = Instant.parse("2026-06-21T12:00:00Z");
         repository.upsert(observed("docker:autark-os-vault", "docker", "autark-os-vault", "Vault", "vaultwarden", "external_docker", "pinned", pinnedAt));
@@ -88,34 +71,12 @@ class ObservedServiceServiceTests {
 
         assertThat(repository.findServiceById("docker:autark-os-vault")).hasValueSatisfying(observed -> {
             assertThat(observed.catalogAppId()).isEqualTo("vaultwarden");
-            assertThat(observed.catalogMatchConfidence()).isEqualTo("user");
-            assertThat(observed.userVisibility()).isEqualTo("pinned");
-            assertThat(observed.pinnedAt()).isEqualTo(pinnedAt);
+            assertThat(observed.catalogMatchConfidence()).isNotEqualTo("user");
+            assertThat(observed.userVisibility()).isEqualTo("observed");
+            assertThat(observed.pinnedAt()).isNull();
             assertThat(observed.runtimeState()).isEqualTo("running");
             assertThat(observed.url()).isEqualTo("http://localhost:8081");
         });
-    }
-
-    @Test
-    void onlyAllowsFoundServicesToMatchIncludedCatalogApps() {
-        ObservedServiceRepository repository = repository();
-        repository.upsert(observed("docker:portainer", "docker", "portainer", "Portainer", null, "external_docker", "observed"));
-        ObservedServiceService service = new ObservedServiceService(
-                repository,
-                new ObservedServiceScanner(List::of, currentIdentity()),
-                null,
-                new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                currentIdentity(),
-                null);
-
-        HostModels.ActionResult saved = service.updateCatalogMatch("docker:portainer", "portainer");
-        HostModels.ActionResult rejected = service.updateCatalogMatch("docker:portainer", "not-a-catalog-app");
-
-        assertThat(saved.ok()).isTrue();
-        assertThat(rejected.ok()).isFalse();
-        assertThat(rejected.title()).isEqualTo("Catalog app not found");
-        assertThat(repository.findServiceById("docker:portainer"))
-                .hasValueSatisfying(observed -> assertThat(observed.catalogAppId()).isEqualTo("portainer"));
     }
 
     @Test
@@ -135,15 +96,18 @@ class ObservedServiceServiceTests {
                 .satisfies(view -> {
                     assertThat(view.catalogAppId()).isNull();
                     assertThat(view.userStatus()).isEqualTo("found_on_server");
-                    assertThat(view.availableActions()).extracting(HostModels.ObservedServiceAction::id).contains("pin", "change_match");
+                    assertThat(view.availableActions()).extracting(HostModels.ObservedServiceAction::id)
+                            .doesNotContain("pin", "unpin", "change_match");
                 });
         assertThat(observed).filteredOn(view -> view.id().equals("docker:ignored-postgres"))
                 .singleElement()
                 .satisfies(view -> assertThat(view.ownershipState()).isEqualTo("external_docker"));
+        assertThat(repository.findServiceById("docker:ignored-postgres")).hasValueSatisfying(observedService ->
+                assertThat(observedService.userVisibility()).isEqualTo("ignored"));
     }
 
     @Test
-    void refreshRemovesStaleUnpinnedDockerServicesAfterSuccessfulScan() {
+    void refreshRemovesAllStaleDockerServicesAfterSuccessfulScan() {
         ObservedServiceRepository repository = repository();
         repository.upsert(observed("docker:old-autark-os-vault", "docker", "old-autark-os-vault", "Old Vault", "vaultwarden", "legacy_autark_os", "observed"));
         repository.upsert(observed("docker:pinned-lab-link", "docker", "pinned-lab-link", "Pinned Lab", null, "external_docker", "pinned", Instant.parse("2026-06-21T12:00:00Z")));
@@ -158,7 +122,7 @@ class ObservedServiceServiceTests {
         service.refresh();
 
         assertThat(repository.findServiceById("docker:old-autark-os-vault")).isEmpty();
-        assertThat(repository.findServiceById("docker:pinned-lab-link")).isPresent();
+        assertThat(repository.findServiceById("docker:pinned-lab-link")).isEmpty();
         assertThat(repository.findServiceById("manual:gitlab")).isPresent();
         assertThat(repository.findServiceById("docker:current-worker")).isPresent();
     }
@@ -226,7 +190,7 @@ class ObservedServiceServiceTests {
     void observedServiceViewsExposeCanonicalApplicationStates() {
         ObservedServiceRepository repository = repository();
         repository.upsert(observed("docker:managed", "docker", "managed", "Managed", "homepage", "owned_managed", "observed", "running"));
-        repository.upsert(observed("docker:linked", "docker", "linked", "Linked", "gitlab", "external_docker", "pinned", "running"));
+        repository.upsert(observed("docker:retired-pin", "docker", "retired-pin", "Retired pin", "gitlab", "external_docker", "pinned", "running"));
         repository.upsert(observed("docker:found", "docker", "found", "Found", null, "external_docker", "visible", "paused"));
         repository.upsert(observed("docker:recoverable", "docker", "recoverable", "Recoverable", "vaultwarden", "legacy_autark_os", "visible", "running"));
         repository.upsert(observed("docker:foreign", "docker", "foreign", "Foreign", "jellyfin", "foreign_autark_os", "visible", "running"));
@@ -242,12 +206,12 @@ class ObservedServiceServiceTests {
                     assertThat(view.readinessState()).isEqualTo("ready");
                     assertThat(view.attentionState()).isEqualTo("none");
                 });
-        assertThat(views).filteredOn(view -> view.id().equals("docker:linked"))
+        assertThat(views).filteredOn(view -> view.id().equals("docker:retired-pin"))
                 .singleElement()
                 .satisfies(view -> {
-                    assertThat(view.managementState()).isEqualTo("linked");
+                    assertThat(view.managementState()).isEqualTo("found");
                     assertThat(view.readinessState()).isEqualTo("ready");
-                    assertThat(view.attentionState()).isEqualTo("none");
+                    assertThat(view.attentionState()).isEqualTo("needs_review");
                 });
         assertThat(views).filteredOn(view -> view.id().equals("docker:found"))
                 .singleElement()

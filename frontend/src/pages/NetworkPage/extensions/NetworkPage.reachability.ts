@@ -22,8 +22,7 @@ export function filterReachabilityServices(
     if (filters.length === 0) return true;
     return filters.some((filter) => {
       if (filter === 'attention') return Boolean(service.issue);
-      if (filter === 'managed') return service.type === 'managed-app';
-      return service.type === 'external-service';
+      return service.type === 'managed-app';
     });
   });
 }

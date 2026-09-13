@@ -2,9 +2,9 @@ import type { ReachabilityService } from './NetworkPage.types';
 
 const ACCESS_PATH = '/access';
 const ACCESS_TABS = new Set(['matrix', 'issues', 'devices', 'advanced']);
-const FOCUS_KINDS = new Set(['managed', 'app', 'service', 'observed']);
+const FOCUS_KINDS = new Set(['managed', 'app']);
 
-type AccessDeepLinkKind = 'managed' | 'service';
+type AccessDeepLinkKind = 'managed';
 export type AccessDeepLinkTab = 'matrix' | 'issues' | 'devices' | 'advanced';
 
 export type AccessDeepLinkTarget = {
@@ -20,7 +20,7 @@ export function accessDeepLinkForService(service: ReachabilityService | null | u
     return accessDeepLink({ tab });
   }
   return accessDeepLink({
-    focus: `${service.type === 'managed-app' ? 'managed' : 'service'}:${service.id}`,
+    focus: `managed:${service.id}`,
     tab,
   });
 }
@@ -28,13 +28,6 @@ export function accessDeepLinkForService(service: ReachabilityService | null | u
 export function accessDeepLinkForManagedApp(appId: string, options: { tab?: AccessDeepLinkTab | null } = {}) {
   return accessDeepLink({
     focus: `managed:${appId}`,
-    tab: options.tab || 'matrix',
-  });
-}
-
-export function accessDeepLinkForObservedService(serviceId: string, options: { tab?: AccessDeepLinkTab | null } = {}) {
-  return accessDeepLink({
-    focus: `service:${serviceId}`,
     tab: options.tab || 'matrix',
   });
 }
@@ -73,12 +66,7 @@ export function findAccessDeepLinkTarget(services: ReachabilityService[], target
   if (!target?.kind || !target.id) {
     return null;
   }
-  return services.find((service) => {
-    if (target.kind === 'managed') {
-      return service.type === 'managed-app' && service.id === target.id;
-    }
-    return service.type === 'external-service' && service.id === target.id;
-  }) ?? null;
+  return services.find((service) => service.id === target.id) ?? null;
 }
 
 function accessDeepLink({ focus, tab }: { focus?: string | null; tab: AccessDeepLinkTab }) {
@@ -91,10 +79,6 @@ function accessDeepLink({ focus, tab }: { focus?: string | null; tab: AccessDeep
 }
 
 function legacyFocusParam(params: URLSearchParams) {
-  const serviceId = params.get('service');
-  if (serviceId) {
-    return `service:${serviceId}`;
-  }
   const appId = params.get('app');
   if (appId) {
     return `managed:${appId}`;
@@ -108,9 +92,6 @@ function normalizeKind(kind: string): AccessDeepLinkKind | null {
   }
   if (kind === 'app') {
     return 'managed';
-  }
-  if (kind === 'observed') {
-    return 'service';
   }
   return kind as AccessDeepLinkKind;
 }

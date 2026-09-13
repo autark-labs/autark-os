@@ -19,8 +19,6 @@ import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
 import {
   applicationDeepLinkForManagedApp,
-  applicationDeepLinkForObservedService,
-  applicationRouteWithManagementPanel,
 } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { InstallWizard } from './MarketplaceInstallWizard';
 import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
@@ -60,9 +58,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
   const needsExistingServiceReview = !isInstalled && appView.installCopyWarningRequired;
   const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId) : '/apps';
   const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appId, { panel: 'manage' }) : '/apps';
-  const reviewExistingHref = appView.observedService
-    ? applicationDeepLinkForObservedService(appView.observedService, { panel: 'manage' })
-    : applicationRouteWithManagementPanel(appView.reviewExistingHref) ?? null;
+  const reviewExistingHref = appView.reviewExistingHref ?? null;
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`

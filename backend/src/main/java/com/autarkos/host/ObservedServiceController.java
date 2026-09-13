@@ -48,21 +48,6 @@ public class ObservedServiceController {
         return service.get(id);
     }
 
-    @PostMapping("/{id}/pin")
-    public HostModels.ActionResult pin(@PathVariable String id) {
-        return refreshAfter(service.pin(id));
-    }
-
-    @PostMapping("/{id}/unpin")
-    public HostModels.ActionResult unpin(@PathVariable String id) {
-        return refreshAfter(service.unpin(id));
-    }
-
-    @PostMapping("/{id}/match")
-    public HostModels.ActionResult match(@PathVariable String id, @RequestBody HostModels.ObservedServiceMatchRequest request) {
-        return refreshAfter(service.updateCatalogMatch(id, request == null ? null : request.catalogAppId()));
-    }
-
     @PostMapping("/{id}/adoption-plan")
     public HostModels.ObservedServiceAdoptionPlan adoptionPlan(@PathVariable String id) {
         return service.adoptionPlan(id);

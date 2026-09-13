@@ -39,75 +39,16 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   assert.match(rail, /runtimeActionDisabled\(item, action, loadingAction\)/);
 });
 
-test('applications page pins and unpins observed services through canonical application state', () => {
+test('My Apps exposes only managed applications and no linked-service controls', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
+  const liveModel = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.liveModel.ts');
   const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
-  const observedSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
   const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
-  assert.match(types, /onPinObservedService: \(serviceId: string\) => Promise<void>/);
-  assert.match(types, /onUnpinObservedService: \(serviceId: string\) => Promise<void>/);
-
-  assert.match(page, /ObservedServicesAPIClient/);
-  assert.match(page, /ObservedServicesAPIClient\.pin\(serviceId\)/);
-  assert.match(page, /ObservedServicesAPIClient\.unpin\(serviceId\)/);
-  assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
-  assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache\(queryClient/);
-  assert.doesNotMatch(page, /appState\.refresh\(\)/);
-  assert.match(page, /showActionNotification\(result/);
-  assert.match(page, /showActionErrorNotification\(err, 'Service could not be pinned'\)/);
-  assert.match(page, /showActionErrorNotification\(err, 'Service could not be unpinned'\)/);
-  assert.doesNotMatch(page, /queryClient\.setQueryData\(applicationStateQueryKey, previousState\)/);
-
-  assert.match(panel, /ObservedServiceManagementSection/);
-  assert.match(observedSection, /actions\.onPinObservedService\(serviceId\)/);
-  assert.match(observedSection, /actions\.onUnpinObservedService\(serviceId\)/);
-  assert.match(observedSection, /item\.managementState === 'found'/);
-  assert.match(observedSection, /item\.managementState === 'linked'/);
-  assert.match(observedSection, /Pin to My Apps/);
-  assert.match(observedSection, /Unpin/);
-  assert.doesNotMatch(panel, />\s*Match\s*</);
-  assert.doesNotMatch(panel, />\s*Adopt\s*</);
-});
-
-test('applications page manages observed-service matching and adoption inside the pullout', () => {
-  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
-  const observedSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
-  const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
-
-  assert.match(types, /onMatchObservedService: \(serviceId: string, catalogAppId: string \| null\) => Promise<void>/);
-  assert.match(types, /onLoadObservedServiceAdoptionPlan: \(serviceId: string\) => Promise<ObservedServiceAdoptionPlan>/);
-  assert.match(types, /onAdoptObservedService: \(serviceId: string, confirmation: string\) => Promise<void>/);
-
-  assert.match(page, /ObservedServicesAPIClient\.match\(serviceId, catalogAppId\)/);
-  assert.match(page, /ObservedServicesAPIClient\.adoptionPlan\(serviceId\)/);
-  assert.match(page, /ObservedServicesAPIClient\.adopt\(serviceId, confirmation\)/);
-  assert.match(page, /showActionErrorNotification\(err, 'Service match could not be saved'\)/);
-  assert.match(page, /showActionErrorNotification\(err, 'Service could not be adopted'\)/);
-
-  assert.match(panel, /ObservedServiceManagementSection/);
-  assert.match(observedSection, /Recovery plan/);
-  assert.match(observedSection, /Review recovery plan/);
-  assert.match(observedSection, /Adopt service/);
-  assert.match(observedSection, /Install copy/);
-  assert.match(observedSection, /adoption_plan/);
-  assert.match(observedSection, /planList\(/);
-});
-
-test('applications page keeps catalog matching in the advanced pullout tab', () => {
-  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
-  const observedSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
-  const catalogSection = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceCatalogMatchSection.tsx');
-
-  assert.match(panel, /ObservedServiceCatalogMatchSection/);
-  assert.match(panel, /<TabsContent[^>]+value="advanced"[\s\S]*<ObservedServiceCatalogMatchSection/);
-  assert.doesNotMatch(observedSection, /Catalog match/);
-  assert.doesNotMatch(observedSection, /Clear match/);
-  assert.doesNotMatch(observedSection, /change_match/);
-  assert.match(catalogSection, /Catalog match/);
-  assert.match(catalogSection, /Clear match/);
-  assert.match(catalogSection, /change_match/);
+  assert.doesNotMatch(page, /ObservedServicesAPIClient|Pin to My Apps|Unpin|Change app match/);
+  assert.doesNotMatch(liveModel, /observedServices|observedServiceSurfaceItem|pinned_external|managementState.*linked/);
+  assert.doesNotMatch(panel, /ObservedServiceManagementSection|ObservedServiceCatalogMatchSection/);
+  assert.doesNotMatch(types, /onPinObservedService|onUnpinObservedService|onMatchObservedService/);
 });
 
 test('applications page exposes a red recovery tab for failed app operations', () => {
@@ -194,10 +135,10 @@ test('applications page only exposes concrete next actions from the rail', () =>
 test('applications page sends found-service review to the dedicated existing-app flow', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
-  assert.match(page, /const foundServices = appState\.foundServices/);
+  assert.match(page, /appState\.foundServices\.filter/);
   assert.match(page, /<FoundAppsPrompt/);
   assert.match(page, /reviewHref: '\/apps\/found'/);
-  assert.match(page, /navigate\(`\/apps\/found\$\{serviceQuery\}`, \{ replace: true \}\)/);
+  assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);
   assert.doesNotMatch(page, /reviewNextButtonLabel|setFilter\('needs_review'\)/);
 });
 
@@ -244,7 +185,6 @@ test('applications page surfaces backup-aware safety warnings around risky flows
   const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
   const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
-  const observed = source('src/pages/ApplicationsPage/managementTabs/ObservedServiceManagementSection.tsx');
 
   assert.match(panel, /backupSafetyMessage\(item\)/);
   assert.match(panel, /No verified backup/);
@@ -252,7 +192,6 @@ test('applications page surfaces backup-aware safety warnings around risky flows
   assert.match(recovery, /Repair preserves data/);
   assert.match(settings, /item\.backup !== 'Protected'/);
   assert.match(settings, /No verified restore point/);
-  assert.match(observed, /Backup protection starts after recovery/);
 });
 
 test('applications page finish pass removes placeholders and explains disabled runtime controls', () => {
@@ -282,8 +221,8 @@ test('applications page has managed-app empty states and compact recent activity
 
   assert.match(page, /emptyStateForApplicationCollection\(collectionFilters, query\)/);
   assert.match(page, /emptyState=\{emptyState\}/);
-  assert.match(presentation, /No managed apps or linked services/);
-  assert.match(presentation, /No matching apps or linked services/);
+  assert.match(presentation, /No managed apps/);
+  assert.match(presentation, /No matching apps/);
   assert.match(basic, /emptyState: ApplicationEmptyState/);
   assert.match(advanced, /emptyState: ApplicationEmptyState/);
 

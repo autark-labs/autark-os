@@ -18,10 +18,6 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
   const [loading, setLoading] = useState<'update' | 'rollback' | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  if (item.managementState !== 'managed') {
-    return null;
-  }
-
   const blockedByOperation = operationBlocksManagement(item.operationState);
   const planLines = plan?.canApply
     ? plan.changes

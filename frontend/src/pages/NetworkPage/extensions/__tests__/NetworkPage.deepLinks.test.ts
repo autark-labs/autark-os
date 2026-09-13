@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import {
   accessDeepLinkForManagedApp,
-  accessDeepLinkForObservedService,
   accessDeepLinkForService,
   accessDeepLinkForTab,
   findAccessDeepLinkTarget,
@@ -14,12 +13,6 @@ const managedService = {
   id: 'vaultwarden',
   type: 'managed-app',
   label: 'Vaultwarden',
-} as ReachabilityService;
-
-const pinnedService = {
-  id: 'obs_router',
-  type: 'external-service',
-  label: 'Router',
 } as ReachabilityService;
 
 test('access deep links default to the matrix tab and parse service focus', () => {
@@ -38,18 +31,15 @@ test('access deep links default to the matrix tab and parse service focus', () =
   });
 });
 
-test('access deep links generate stable managed and pinned-service routes', () => {
+test('access deep links generate stable managed-app routes', () => {
   assert.equal(accessDeepLinkForService(managedService), '/access?tab=matrix&focus=managed%3Avaultwarden');
-  assert.equal(accessDeepLinkForService(pinnedService, { tab: 'issues' }), '/access?tab=issues&focus=service%3Aobs_router');
   assert.equal(accessDeepLinkForManagedApp('syncthing'), '/access?tab=matrix&focus=managed%3Asyncthing');
-  assert.equal(accessDeepLinkForObservedService('docker:homepage'), '/access?tab=matrix&focus=service%3Adocker%3Ahomepage');
   assert.equal(accessDeepLinkForTab('advanced'), '/access?tab=advanced');
 });
 
 test('access deep links find the focused reachability service', () => {
-  const services = [managedService, pinnedService];
+  const services = [managedService];
 
   assert.equal(findAccessDeepLinkTarget(services, parseAccessDeepLink('?focus=managed:vaultwarden'))?.id, 'vaultwarden');
-  assert.equal(findAccessDeepLinkTarget(services, parseAccessDeepLink('?focus=service:obs_router'))?.id, 'obs_router');
-  assert.equal(findAccessDeepLinkTarget(services, parseAccessDeepLink('?focus=service:missing')), null);
+  assert.equal(findAccessDeepLinkTarget(services, parseAccessDeepLink('?focus=service:obs_router')), null);
 });

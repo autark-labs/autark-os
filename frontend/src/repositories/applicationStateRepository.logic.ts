@@ -10,7 +10,7 @@ import type { ApplicationState, ApplicationStateFreshness } from '@/types/applic
 import type { AppOwnershipView } from '@/types/appOwnership';
 import type { AutarkOsJob } from '@/types/jobs';
 import { jobTypeLabel } from './jobRepository.logic';
-import type { ObservedServiceAction, ObservedServiceView } from '@/types/observedService';
+import type { ObservedServiceView } from '@/types/observedService';
 
 export const applicationStateQueryKey = ['application-state'];
 
@@ -35,10 +35,6 @@ export function managedRuntimeApps(state?: ApplicationState | null): AppRuntimeV
 
 export function observedServices(state?: ApplicationState | null): ObservedServiceView[] {
   return state?.observedServices ?? [];
-}
-
-export function pinnedExternalServices(state?: ApplicationState | null): ObservedServiceView[] {
-  return state?.pinnedExternalServices ?? [];
 }
 
 export function foundServices(state?: ApplicationState | null): ObservedServiceView[] {
@@ -160,24 +156,6 @@ export function privateAccessSummaryFromState(state?: ExtendedApplicationState |
   return state?.privateAccessSummary ?? null;
 }
 
-export function setObservedServicePinnedInState(state: ApplicationState | undefined, serviceId: string, pinned: boolean) {
-  if (!state || !Array.isArray(state.observedServices)) {
-    return state;
-  }
-  const observedServices = state.observedServices.map((service) => {
-    if (service.id !== serviceId) {
-      return service;
-    }
-    return serviceWithPinnedState(service, pinned);
-  });
-  return {
-    ...state,
-    observedServices,
-    pinnedExternalServices: observedServices.filter((service) => service.pinned || service.userStatus === 'pinned_external'),
-    foundServices: observedServices.filter((service) => !service.managedByThisAutarkOs && !service.pinned && service.userStatus !== 'pinned_external'),
-  };
-}
-
 export function setObservedServiceAdoptedInState(state: ApplicationState | undefined, serviceId: string) {
   if (!state || !Array.isArray(state.observedServices)) {
     return state;
@@ -194,8 +172,7 @@ export function setObservedServiceAdoptedInState(state: ApplicationState | undef
     runtimeApps: upsertByKey(state.runtimeApps ?? [], runtimeApp, (app) => app.appId),
     managedApps: upsertByKey(state.managedApps ?? [], managedApp, (app) => app.catalogAppId),
     observedServices,
-    pinnedExternalServices: observedServices.filter((item) => item.pinned || item.userStatus === 'pinned_external'),
-    foundServices: observedServices.filter((item) => !item.managedByThisAutarkOs && !item.pinned && item.userStatus !== 'pinned_external'),
+    foundServices: observedServices.filter((item) => !item.managedByThisAutarkOs),
   };
 }
 
@@ -488,54 +465,6 @@ function appInstanceToRuntimeView(app: AppInstanceView): AppRuntimeView {
   };
 }
 
-function serviceWithPinnedState(service: ObservedServiceView, pinned: boolean): ObservedServiceView {
-  const next = {
-    ...service,
-    pinned,
-    managementState: pinned ? 'linked' : 'found',
-    availableActions: observedServiceActionsForPinnedState(service.availableActions, pinned),
-  };
-  if (pinned && service.userStatus === 'found_on_server') {
-    return {
-      ...next,
-      userStatus: 'pinned_external',
-      attentionState: 'none',
-      userStatusLabel: 'Pinned',
-      userStatusDescription: 'Pinned to My Apps. Autark-OS can open it but does not manage its runtime.',
-    };
-  }
-  if (!pinned && service.userStatus === 'pinned_external') {
-    return {
-      ...next,
-      userStatus: 'found_on_server',
-      attentionState: 'needs_review',
-      userStatusLabel: 'Found',
-      userStatusDescription: 'Found on this server.',
-    };
-  }
-  return next;
-}
-
-function observedServiceActionsForPinnedState(actions: ObservedServiceAction[] = [], pinned: boolean) {
-  const retainedActions = actions.filter((action) => action.id !== 'pin' && action.id !== 'unpin');
-  const nextAction = pinned
-    ? observedServiceMutationAction('unpin', 'Unpin')
-    : observedServiceMutationAction('pin', 'Pin to My Apps');
-  return [...retainedActions, nextAction];
-}
-
-function observedServiceMutationAction(id: string, label: string): ObservedServiceAction {
-  return {
-    id,
-    label,
-    kind: 'mutation',
-    href: null,
-    method: 'POST',
-    disabled: false,
-    reason: '',
-  };
-}
-
 function observedServiceAsManaged(service: ObservedServiceView): ObservedServiceView {
   return {
     ...service,
@@ -547,7 +476,6 @@ function observedServiceAsManaged(service: ObservedServiceView): ObservedService
     readinessState: service.readinessState ?? (service.runtimeState === 'running' ? 'ready' : 'starting'),
     attentionState: 'none',
     managedByThisAutarkOs: true,
-    pinned: false,
   };
 }
 

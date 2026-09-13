@@ -49,7 +49,7 @@ export type DiscoverAppView = {
   serviceKindLabel: string;
   estimatedInstallTime: string;
   difficulty: string;
-  state: 'available' | 'installed_managed' | 'pinned_external' | 'found_on_server' | 'recoverable' | 'managed_elsewhere' | 'blocked' | 'failed_install' | 'coming_soon' | string;
+  state: 'available' | 'installed_managed' | 'found_on_server' | 'recoverable' | 'managed_elsewhere' | 'blocked' | 'failed_install' | 'coming_soon' | string;
   stateLabel: string;
   stateDescription: string;
   statusTone: AppOwnershipTone;

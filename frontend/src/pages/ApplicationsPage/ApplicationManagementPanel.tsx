@@ -20,21 +20,15 @@ import { ApplicationRecoveryTab } from './managementTabs/ApplicationRecoveryTab'
 import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
 import { ApplicationTelemetryTab } from './managementTabs/ApplicationTelemetryTab';
 import { ApplicationUpdateSection } from './managementTabs/ApplicationUpdateSection';
-import { ObservedServiceCatalogMatchSection } from './managementTabs/ObservedServiceCatalogMatchSection';
-import { ObservedServiceManagementSection } from './managementTabs/ObservedServiceManagementSection';
 import type { ApplicationActionHandlers, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationManagementPanelProps = {
   actions: Pick<
     ApplicationActionHandlers,
-    | 'onAdoptObservedService'
     | 'onDirtyChange'
-    | 'onLoadObservedServiceAdoptionPlan'
     | 'onLoadUninstallPlan'
     | 'onLoadUpdatePlan'
     | 'onLoadRollbackPlan'
-    | 'onMatchObservedService'
-    | 'onPinObservedService'
     | 'onRepair'
     | 'onRestart'
     | 'onRunUninstall'
@@ -45,7 +39,6 @@ type ApplicationManagementPanelProps = {
     | 'onSetPrivateNetworkAccess'
     | 'onStart'
     | 'onStop'
-    | 'onUnpinObservedService'
   >;
   item: ApplicationSurfaceItem;
   settingsLoadingAction?: ApplicationSettingsAction | null;
@@ -62,7 +55,6 @@ export function ApplicationManagementPanel({
   tabValue,
   variant = 'inline',
 }: ApplicationManagementPanelProps) {
-  const managed = item.managementState === 'managed';
   const rail = variant === 'rail';
   const recentEvents = item.runtime.recentEvents.slice(0, 5);
   const recoveryNeeded = item.operationState.kind === 'failed';
@@ -108,14 +100,12 @@ export function ApplicationManagementPanel({
               <Detail label="State" value={labelForReadiness(item.readinessState)} />
               <Detail label="Attention" value={labelForAttention(item.attentionState)} />
               <Detail label="Container" value={item.settings.containerStatus || item.runtime.health?.dockerStatus || 'Not reported'} />
-              <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
+              <Detail label="Policy" value="Plan before apply" />
             </section>
-
-            <ObservedServiceManagementSection actions={actions} item={item} />
 
             <ApplicationUpdateSection actions={actions} item={item} />
 
-            <DangerZone actions={actions} item={item} managed={managed} />
+            <DangerZone actions={actions} item={item} />
           </TabsContent>
 
           <TabsContent className="grid gap-4" value="guide">
@@ -135,7 +125,6 @@ export function ApplicationManagementPanel({
           </TabsContent>
 
           <TabsContent className="grid gap-4" value="advanced">
-            <ObservedServiceCatalogMatchSection actions={actions} item={item} />
             <div className="flex justify-end">
               <ApplicationDarkControlButton className="w-fit" onClick={() => copySupportDetails(item)} size="sm" type="button">
                 <Copy data-icon="inline-start" />
@@ -157,7 +146,7 @@ export function ApplicationManagementPanel({
                   <Detail label="Image" value={item.runtime.image || 'Not reported'} />
                   <Detail label="Category" value={labelForManagementState(item.managementState)} />
                   <Detail label="Port" value={formatPort(item.settings.expectedLocalPort)} />
-                  <Detail label="Policy" value={managed ? 'Plan before apply' : 'Read only'} />
+                  <Detail label="Policy" value="Plan before apply" />
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="events">
@@ -198,25 +187,21 @@ function Detail({ label, value }: { label: string; value: string }) {
 function DangerZone({
   actions,
   item,
-  managed,
 }: {
   actions: Pick<ApplicationActionHandlers, 'onLoadUninstallPlan' | 'onRunUninstall'>;
   item: ApplicationSurfaceItem;
-  managed: boolean;
 }) {
   const uninstallBlockedByOperation = operationBlocksManagement(item.operationState);
-  const uninstallDisabledReason = !managed
-    ? 'Only managed apps can be uninstalled from Autark-OS.'
-    : uninstallBlockedByOperation
-      ? 'Wait for the current app action to finish before uninstalling.'
-      : null;
+  const uninstallDisabledReason = uninstallBlockedByOperation
+    ? 'Wait for the current app action to finish before uninstalling.'
+    : null;
 
   return (
     <section className="rounded-xl border border-red-400/25 bg-red-500/10 p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-red-100">Uninstall</p>
-          <p className="text-xs text-red-100/70">{managed ? 'Data is preserved by default.' : 'Observed services are not managed.'}</p>
+          <p className="text-xs text-red-100/70">Data is preserved by default.</p>
           {backupSafetyMessage(item) && (
             <p className="mt-1 text-xs leading-5 text-red-100/80">{backupSafetyMessage(item)}</p>
           )}
@@ -241,7 +226,7 @@ function DangerZone({
 }
 
 function backupSafetyMessage(item: ApplicationSurfaceItem) {
-  if (item.managementState !== 'managed' || item.backup === 'Protected') {
+  if (item.backup === 'Protected') {
     return '';
   }
   if (item.backup === 'Not managed') {

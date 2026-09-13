@@ -96,21 +96,6 @@ class ObservedServiceEntity {
         this.metadataJson = blankDefault(service.metadataJson(), "{}");
     }
 
-    void pin(String pinnedAt) {
-        this.userVisibility = "pinned";
-        this.pinnedAt = pinnedAt;
-    }
-
-    void unpin() {
-        this.userVisibility = "observed";
-        this.pinnedAt = null;
-    }
-
-    void updateCatalogMatch(String catalogAppId, String confidence) {
-        this.catalogAppId = cleanToNull(catalogAppId);
-        this.catalogMatchConfidence = confidence == null || confidence.isBlank() ? "unknown" : confidence;
-    }
-
     void markManaged(String autarkOsInstanceId, String lastSeenAt) {
         this.ownershipState = "owned_managed";
         this.autarkOsInstanceId = cleanToNull(autarkOsInstanceId);

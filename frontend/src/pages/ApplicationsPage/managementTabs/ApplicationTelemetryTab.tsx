@@ -7,8 +7,8 @@ import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.type
 
 export function ApplicationTelemetryTab({ item }: { item: ApplicationSurfaceItem }) {
   const telemetryQuery = useAppTelemetryQuery(
-    item.managementState === 'managed' ? item.id : null,
-    item.managementState === 'managed',
+    item.id,
+    true,
     item.runtime.telemetry,
   );
   const telemetry = telemetryQuery.data ?? item.runtime.telemetry;

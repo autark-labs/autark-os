@@ -37,36 +37,6 @@ public interface ObservedServiceRepository extends JpaRepository<ObservedService
         save(entity);
     }
 
-    default boolean pin(String id, Instant now) {
-        return findById(id)
-                .map(entity -> {
-                    entity.pin(now.toString());
-                    save(entity);
-                    return true;
-                })
-                .orElse(false);
-    }
-
-    default boolean unpin(String id) {
-        return findById(id)
-                .map(entity -> {
-                    entity.unpin();
-                    save(entity);
-                    return true;
-                })
-                .orElse(false);
-    }
-
-    default boolean updateCatalogMatch(String id, String catalogAppId, String confidence) {
-        return findById(id)
-                .map(entity -> {
-                    entity.updateCatalogMatch(catalogAppId, confidence);
-                    save(entity);
-                    return true;
-                })
-                .orElse(false);
-    }
-
     default boolean markManaged(String id, String autarkOsInstanceId, Instant now) {
         return findById(id)
                 .map(entity -> {
@@ -81,13 +51,13 @@ public interface ObservedServiceRepository extends JpaRepository<ObservedService
         deleteAll(findByCatalogAppIdAndSourceAndOwnershipState(catalogAppId, HostModels.ObservedServiceSource.AUTARK_OS_INSTALL, "failed_install"));
     }
 
-    default void deleteUnpinnedDockerServicesNotIn(Collection<String> fingerprints) {
+    default void deleteDockerServicesNotIn(Collection<String> fingerprints) {
         if (fingerprints == null || fingerprints.isEmpty()) {
             return;
         }
+        Collection<String> currentFingerprints = fingerprints == null ? List.of() : fingerprints;
         List<ObservedServiceEntity> stale = findBySource(HostModels.ObservedServiceSource.DOCKER).stream()
-                .filter(entity -> !"pinned".equals(entity.userVisibility()))
-                .filter(entity -> !fingerprints.contains(entity.fingerprint()))
+                .filter(entity -> !currentFingerprints.contains(entity.fingerprint()))
                 .toList();
         deleteAll(stale);
     }

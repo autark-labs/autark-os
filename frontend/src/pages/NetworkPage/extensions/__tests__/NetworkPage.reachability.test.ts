@@ -26,22 +26,21 @@ const managedService: ReachabilityService = {
   iconUrl: null,
 };
 
-const externalService: ReachabilityService = {
+const attentionService: ReachabilityService = {
   ...managedService,
   id: 'paperless',
-  type: 'external-service',
+  type: 'managed-app',
   label: 'Paperless',
-  detail: 'Linked service',
+  detail: 'Managed app needs attention',
   issue: 'This link needs attention.',
 };
 
 describe('NetworkPage reachability helpers', () => {
   it('matches search and service-type filters without hiding an attention service', () => {
-    expect(filterReachabilityServices([managedService, externalService], 'vault', [])).toEqual([managedService]);
-    expect(filterReachabilityServices([managedService, externalService], '', ['external'])).toEqual([externalService]);
-    expect(filterReachabilityServices([managedService, externalService], '', ['attention'])).toEqual([externalService]);
-    expect(filterReachabilityServices([managedService, externalService], '', ['managed', 'attention']))
-      .toEqual([managedService, externalService]);
+    expect(filterReachabilityServices([managedService, attentionService], 'vault', [])).toEqual([managedService]);
+    expect(filterReachabilityServices([managedService, attentionService], '', ['attention'])).toEqual([attentionService]);
+    expect(filterReachabilityServices([managedService, attentionService], '', ['managed', 'attention']))
+      .toEqual([managedService, attentionService]);
   });
 
   it('shows an optimistic zone only until its matching canonical result settles', () => {

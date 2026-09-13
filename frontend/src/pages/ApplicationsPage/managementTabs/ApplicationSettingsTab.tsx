@@ -52,7 +52,7 @@ const backupFrequencies = ['daily', 'weekly', 'monthly'] as const;
 
 export function ApplicationSettingsTab({ actions, item, loadingAction }: ApplicationSettingsTabProps) {
   const settingsRestriction = applicationActionRestriction(item, 'settings');
-  const editable = item.managementState === 'managed' && item.settings.canEdit && !settingsRestriction.disabled;
+  const editable = item.settings.canEdit && !settingsRestriction.disabled;
   const { autoRepairEnabled, backupEnabled, backupFrequency, backupRetention, expectedLocalPort } = item.settings;
   // Parent dirty-state updates and runtime polling replace the item object.
   // Only changed persisted form values should reset a draft, not object identity.
@@ -154,11 +154,11 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
         {!editable && (
           <Alert className="border-sky-400/20 bg-slate-900 text-sky-50">
             <AlertTriangle />
-            <AlertTitle>{settingsRestriction.disabled ? 'Settings unavailable' : 'Read-only service'}</AlertTitle>
+            <AlertTitle>Settings unavailable</AlertTitle>
             <AlertDescription className="text-sky-100/70">
               {settingsRestriction.disabled
                 ? settingsRestriction.reason
-                : 'Autark-OS can show settings for found and pinned services, but it cannot change them until the service is managed here.'}
+                : 'Autark-OS cannot change settings for this app in its current state.'}
             </AlertDescription>
           </Alert>
         )}

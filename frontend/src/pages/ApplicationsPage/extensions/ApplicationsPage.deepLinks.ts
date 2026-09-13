@@ -1,11 +1,10 @@
-import type { ObservedServiceView } from '@/types/observedService';
 import type { ApplicationSurfaceItem } from './ApplicationsPage.types';
 
 const APPLICATIONS_PATH = '/apps';
-const FOCUS_KINDS = new Set(['managed', 'app', 'service', 'observed', 'catalog']);
+const FOCUS_KINDS = new Set(['managed', 'app']);
 const MANAGEMENT_PANEL = 'manage';
 
-type ApplicationDeepLinkKind = 'managed' | 'service' | 'catalog';
+type ApplicationDeepLinkKind = 'managed';
 type ApplicationDeepLinkPanel = typeof MANAGEMENT_PANEL;
 type ApplicationDeepLinkOptions = {
   panel?: ApplicationDeepLinkPanel | null;
@@ -24,16 +23,6 @@ export function applicationDeepLinkForManagedApp(appId: string, options: Applica
   return applicationDeepLink('managed', appId, options);
 }
 
-export function applicationDeepLinkForObservedService(service: Pick<ObservedServiceView, 'catalogAppId' | 'id'> | null | undefined, options: ApplicationDeepLinkOptions = {}) {
-  if (service?.id) {
-    return applicationDeepLink('service', service.id, options);
-  }
-  if (service?.catalogAppId) {
-    return applicationDeepLink('catalog', service.catalogAppId, options);
-  }
-  return APPLICATIONS_PATH;
-}
-
 export function applicationDeepLinkForSurfaceItem(item: ApplicationSurfaceItem | null | undefined, options: ApplicationDeepLinkOptions = {}) {
   if (!item) {
     return APPLICATIONS_PATH;
@@ -42,12 +31,6 @@ export function applicationDeepLinkForSurfaceItem(item: ApplicationSurfaceItem |
   const itemId = item.sourceId || item.id;
   if (item.managementState === 'managed' && itemId) {
     return applicationDeepLink('managed', itemId, options);
-  }
-  if ((item.managementState === 'found' || item.managementState === 'linked') && item.sourceId) {
-    return applicationDeepLink('service', item.sourceId, options);
-  }
-  if (item.catalogAppId) {
-    return applicationDeepLink('catalog', item.catalogAppId, options);
   }
   return APPLICATIONS_PATH;
 }
@@ -59,7 +42,9 @@ export function applicationRouteWithManagementPanel(href: string | null | undefi
 
   const parsed = parseAppRelativeUrl(href);
   const focus = parsed?.searchParams.get('focus');
-  if (!parsed || parsed.pathname !== APPLICATIONS_PATH || !focus) {
+  const separatorIndex = focus?.indexOf(':') ?? -1;
+  const focusKind = separatorIndex >= 0 ? normalizeKind(focus?.slice(0, separatorIndex) ?? '') : null;
+  if (!parsed || parsed.pathname !== APPLICATIONS_PATH || !focus || focusKind !== 'managed') {
     return href;
   }
 
@@ -97,10 +82,6 @@ export function parseApplicationsDeepLink(search = ''): ApplicationDeepLinkTarge
 }
 
 function legacyFocusParam(params: URLSearchParams) {
-  const serviceId = params.get('service');
-  if (serviceId) {
-    return `service:${serviceId}`;
-  }
   const appId = params.get('app');
   if (appId) {
     return `managed:${appId}`;
@@ -119,12 +100,6 @@ export function findApplicationDeepLinkTarget(items: ApplicationSurfaceItem[], t
 export function filterForApplicationDeepLinkTarget(item: ApplicationSurfaceItem | null | undefined) {
   if (item?.managementState === 'managed') {
     return 'managed';
-  }
-  if (item?.managementState === 'linked') {
-    return 'pinned';
-  }
-  if (item?.managementState === 'found') {
-    return 'found';
   }
   return 'all';
 }
@@ -160,9 +135,6 @@ function normalizeKind(kind: string): ApplicationDeepLinkKind | null {
   if (kind === 'app') {
     return 'managed';
   }
-  if (kind === 'observed') {
-    return 'service';
-  }
   return kind as ApplicationDeepLinkKind;
 }
 
@@ -170,12 +142,6 @@ function matchesApplicationDeepLinkTarget(item: ApplicationSurfaceItem, target: 
   const itemIds = new Set([item.id, item.sourceId].filter((id): id is string => Boolean(id)));
   if (target.kind === 'managed') {
     return target.id !== null && item.managementState === 'managed' && itemIds.has(target.id);
-  }
-  if (target.kind === 'service') {
-    return target.id !== null && item.managementState !== 'managed' && itemIds.has(target.id);
-  }
-  if (target.kind === 'catalog') {
-    return target.id !== null && (item.catalogAppId === target.id || itemIds.has(target.id));
   }
   return false;
 }

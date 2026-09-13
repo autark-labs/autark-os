@@ -9,12 +9,10 @@ const card = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/com
 const header = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppsPageHeader.tsx'), 'utf8');
 const stateBadges = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppStateBadges.tsx'), 'utf8');
 
-test('My Apps renders canonical managed and linked collections without mixing in found services', () => {
+test('My Apps renders only canonical managed applications', () => {
   assert.match(page, /const managedItems = useMemo\(\(\) => items\.filter\(\(item\) => item\.managementState === 'managed'\)/);
-  assert.match(page, /const linkedItems = useMemo\(\(\) => items\.filter\(\(item\) => item\.managementState === 'linked'\)/);
-  assert.match(page, /if \(item\.managementState === 'found'\) \{\s+return false;/);
   assert.match(page, /<ApplicationCollectionFilterDropdown filters=\{collectionFilters\}/);
-  assert.match(page, /Linked services/);
+  assert.doesNotMatch(page, /Linked services|linkedItems|pinned_external/);
   assert.match(page, /<BasicApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(page, /<AdvancedApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(card, /<AppArtwork/);
@@ -45,8 +43,8 @@ test('My Apps uses quiet status dots and compact action affordances on dark app 
 });
 
 test('My Apps sends non-managed services to the dedicated existing-app review flow', () => {
-  assert.match(page, /const foundServices = appState\.foundServices/);
+  assert.match(page, /appState\.foundServices\.filter/);
   assert.match(page, /FoundAppsPrompt/);
   assert.match(page, /reviewHref: '\/apps\/found'/);
-  assert.match(page, /navigate\(`\/apps\/found\$\{serviceQuery\}`, \{ replace: true \}\)/);
+  assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);
 });

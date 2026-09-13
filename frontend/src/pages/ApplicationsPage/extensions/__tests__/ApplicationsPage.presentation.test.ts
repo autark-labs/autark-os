@@ -13,18 +13,17 @@ const managedItem = {
   attentionState: 'none',
 } as ApplicationSurfaceItem;
 
-const linkedItem = {
-  managementState: 'linked',
+const attentionItem = {
+  managementState: 'managed',
   attentionState: 'needs_review',
 } as ApplicationSurfaceItem;
 
 describe('My Apps presentation helpers', () => {
-  it('keeps linked services visible to the matching and attention filters', () => {
+  it('filters managed apps by ownership and attention state', () => {
     expect(matchesCollectionFilters(managedItem, ['managed'])).toBe(true);
-    expect(matchesCollectionFilters(linkedItem, ['linked'])).toBe(true);
-    expect(matchesCollectionFilters(linkedItem, ['attention'])).toBe(true);
-    expect(matchesCollectionFilters(managedItem, ['linked'])).toBe(false);
-    expect(emptyStateForApplicationCollection(['linked'], '')).toMatchObject({ title: 'No linked services' });
+    expect(matchesCollectionFilters(attentionItem, ['attention'])).toBe(true);
+    expect(matchesCollectionFilters(managedItem, ['attention'])).toBe(false);
+    expect(emptyStateForApplicationCollection([], '')).toMatchObject({ title: 'No managed apps' });
   });
 
   it('preserves canonical settings while applying the values from the app form', () => {
@@ -86,7 +85,6 @@ describe('My Apps presentation helpers', () => {
       accessByAppId: {},
       apps: [app],
       healthByAppId: {},
-      observedServices: [],
       telemetryByAppId: {},
     });
 

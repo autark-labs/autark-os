@@ -35,8 +35,8 @@ Choose **Finish setup** when the review screen says the server is ready.
 ## Understand what you see
 
 - **Managed app**: this Autark-OS server owns and maintains it, including eligible backup-gated image updates and rollback snapshots.
-- **Found on this server**: Autark-OS detected it but does not own it. Review it before making changes.
-- **Linked service**: a visible shortcut to something managed elsewhere.
+- **Recovery required**: Autark-OS found app resources it can identify but does not currently manage. Review them before making changes.
+- **Blocked**: another service conflicts with an install and must be resolved first.
 - **Protected by a restore point**: a completed, verified backup is available.
 
 If anything is unclear, open **Diagnostics** and generate a support report before making a destructive change.

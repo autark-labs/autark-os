@@ -102,16 +102,14 @@ public class AppOwnershipService {
         ObservedService managedElsewhere = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS.equals(service.ownershipState())).orElse(null);
         ObservedService failedInstall = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.FAILED_INSTALL.equals(service.ownershipState())).orElse(null);
         ObservedService blocked = matchingObserved(manifest.id(), observedServices, service -> AutarkOsStates.OwnershipState.UNKNOWN_CONFLICT.equals(service.ownershipState())).orElse(null);
-        ObservedService pinned = matchingObserved(manifest.id(), observedServices, service -> "pinned".equals(service.userVisibility())).orElse(null);
         ObservedService found = matchingObserved(manifest.id(), observedServices, service -> !AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
 
-        AppOwnershipState state = state(installed, recoverable, managedElsewhere, failedInstall, blocked, pinned, found);
+        AppOwnershipState state = state(installed, recoverable, managedElsewhere, failedInstall, blocked, found);
         ObservedService observedService = switch (state) {
             case RECOVERABLE -> recoverable;
             case MANAGED_ELSEWHERE -> managedElsewhere;
             case FAILED_INSTALL -> failedInstall;
             case BLOCKED -> blocked;
-            case PINNED_EXTERNAL -> pinned;
             case FOUND_ON_SERVER -> found;
             default -> null;
         };
@@ -179,7 +177,6 @@ public class AppOwnershipService {
             ObservedService managedElsewhere,
             ObservedService failedInstall,
             ObservedService blocked,
-            ObservedService pinned,
             ObservedService found) {
         if (installed != null) {
             return AppOwnershipState.INSTALLED_MANAGED;
@@ -195,9 +192,6 @@ public class AppOwnershipService {
         }
         if (blocked != null) {
             return AppOwnershipState.BLOCKED;
-        }
-        if (pinned != null) {
-            return AppOwnershipState.PINNED_EXTERNAL;
         }
         if (found != null) {
             return AppOwnershipState.FOUND_ON_SERVER;
@@ -233,7 +227,7 @@ public class AppOwnershipService {
         return switch (state) {
             case INSTALLED_MANAGED -> installedActions(installed);
             case FAILED_INSTALL -> List.of(reviewSetup(appId));
-            case PINNED_EXTERNAL, FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> existingServiceActions(appId, observedService, reviewExistingHref);
+            case FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> existingServiceActions(appId, observedService, reviewExistingHref);
             case COMING_SOON -> List.of(unavailable());
             default -> List.of(reviewSetup(appId));
         };
@@ -262,7 +256,7 @@ public class AppOwnershipService {
         return switch (state) {
             case INSTALLED_MANAGED -> manage(appId);
             case FAILED_INSTALL -> reviewSetup(appId);
-            case PINNED_EXTERNAL, FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> reviewExisting(reviewExistingHref);
+            case FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED -> reviewExisting(reviewExistingHref);
             case COMING_SOON -> unavailable();
             default -> reviewSetup(appId);
         };
@@ -270,7 +264,7 @@ public class AppOwnershipService {
 
     private String reviewExistingHref(ObservedService observedService) {
         if (observedService != null) {
-            return myAppsFocusHref("service", observedService.id());
+            return "/apps/found?service=" + encode(observedService.id());
         }
         return null;
     }
@@ -309,7 +303,6 @@ public class AppOwnershipService {
     private String stateLabel(AppOwnershipState state) {
         return switch (state) {
             case INSTALLED_MANAGED -> "Installed";
-            case PINNED_EXTERNAL -> "Pinned";
             case FOUND_ON_SERVER -> "Found on server";
             case RECOVERABLE -> "Recoverable";
             case MANAGED_ELSEWHERE -> "Managed elsewhere";
@@ -323,7 +316,6 @@ public class AppOwnershipService {
     private String stateDescription(AppOwnershipState state, ObservedServiceView observedService) {
         return switch (state) {
             case INSTALLED_MANAGED -> "Managed by this Autark-OS installation.";
-            case PINNED_EXTERNAL -> "Pinned to My Apps. Autark-OS can open it but does not manage its runtime.";
             case FOUND_ON_SERVER, RECOVERABLE, MANAGED_ELSEWHERE, BLOCKED, FAILED_INSTALL -> observedService == null ? "" : observedService.userStatusDescription();
             case COMING_SOON -> "This app is not available yet.";
             default -> "Ready to review before install.";
@@ -333,7 +325,6 @@ public class AppOwnershipService {
     private String statusTone(AppOwnershipState state) {
         return switch (state) {
             case INSTALLED_MANAGED -> "success";
-            case PINNED_EXTERNAL -> "info";
             case RECOVERABLE, FAILED_INSTALL -> "warning";
             case MANAGED_ELSEWHERE, BLOCKED -> "danger";
             default -> "neutral";
@@ -343,7 +334,6 @@ public class AppOwnershipService {
     private String cardTone(AppOwnershipState state) {
         return switch (state) {
             case INSTALLED_MANAGED -> "success";
-            case PINNED_EXTERNAL -> "info";
             case FOUND_ON_SERVER -> "observed";
             case RECOVERABLE, FAILED_INSTALL -> "warning";
             case MANAGED_ELSEWHERE, BLOCKED -> "danger";
@@ -353,8 +343,7 @@ public class AppOwnershipService {
     }
 
     private boolean duplicateWarningRequired(AppOwnershipState state) {
-        return state == AppOwnershipState.PINNED_EXTERNAL
-                || state == AppOwnershipState.FOUND_ON_SERVER
+        return state == AppOwnershipState.FOUND_ON_SERVER
                 || state == AppOwnershipState.RECOVERABLE
                 || state == AppOwnershipState.MANAGED_ELSEWHERE
                 || state == AppOwnershipState.BLOCKED;

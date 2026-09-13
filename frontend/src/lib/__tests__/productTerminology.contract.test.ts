@@ -9,17 +9,18 @@ function source(relativePath: string) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('active product copy distinguishes Discover, managed apps, found services, and linked services', () => {
+test('active product copy distinguishes managed apps, recovery, and conflicts', () => {
   const firstRunGuide = source('../docs/first-run.md');
   const applicationsHeader = source('src/pages/ApplicationsPage/components/AppsPageHeader.tsx');
   const foundServiceDetails = source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx');
   const installer = source('../scripts/autark-os-gui-installer.sh');
 
   assert.match(firstRunGuide, /\*\*Managed app\*\*/);
-  assert.match(firstRunGuide, /\*\*Found on this server\*\*/);
-  assert.match(firstRunGuide, /\*\*Linked service\*\*/);
-  assert.match(applicationsHeader, /Open, manage, and monitor all apps on your server\./);
-  assert.match(foundServiceDetails, /Discover warnings/);
+  assert.match(firstRunGuide, /\*\*Recovery required\*\*/);
+  assert.match(firstRunGuide, /\*\*Blocked\*\*/);
+  assert.doesNotMatch(firstRunGuide, /Linked service/);
+  assert.match(applicationsHeader, /Open, manage, and monitor apps installed by Autark-OS\./);
+  assert.match(foundServiceDetails, /Catalog match/);
   assert.match(installer, /Discover app installs/);
   assert.doesNotMatch(installer, /Marketplace app installs/);
 });

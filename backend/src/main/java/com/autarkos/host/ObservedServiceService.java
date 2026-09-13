@@ -109,7 +109,7 @@ public class ObservedServiceService {
                     .filter(fingerprint -> fingerprint != null && !fingerprint.isBlank())
                     .distinct()
                     .toList();
-            repository.deleteUnpinnedDockerServicesNotIn(dockerFingerprints);
+            repository.deleteDockerServicesNotIn(dockerFingerprints);
         }
         return list(true);
     }
@@ -129,39 +129,6 @@ public class ObservedServiceService {
         return repository.findServiceById(id)
                 .map(ObservedServiceService::toView)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown observed service: " + id));
-    }
-
-    public HostModels.ActionResult pin(String id) {
-        if (!repository.pin(id, Instant.now())) {
-            return new HostModels.ActionResult(false, "warning", "Observed service not found", "Autark-OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
-        }
-        return new HostModels.ActionResult(true, "success", "Service pinned", "The service now appears in My Apps. Autark-OS will not manage its runtime.", id, "refresh_observed_services");
-    }
-
-    public HostModels.ActionResult unpin(String id) {
-        if (!repository.unpin(id)) {
-            return new HostModels.ActionResult(false, "warning", "Observed service not found", "Autark-OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
-        }
-        return new HostModels.ActionResult(true, "success", "Service unpinned", "The service was removed from My Apps but remains listed as observed on this system.", id, "refresh_observed_services");
-    }
-
-    public HostModels.ActionResult updateCatalogMatch(String id, String catalogAppId) {
-        if (catalogAppId != null && !catalogAppId.isBlank()) {
-            if (catalogService == null) {
-                return new HostModels.ActionResult(false, "warning", "Catalog unavailable", "Autark-OS cannot verify that catalog app while the catalog is unavailable. Try again after the catalog loads.", id, "refresh_observed_services");
-            }
-            if (catalogService.findById(catalogAppId).isEmpty()) {
-                return new HostModels.ActionResult(false, "warning", "Catalog app not found", "Choose an app that is currently included in the Autark-OS catalog.", id, "refresh_observed_services");
-            }
-        }
-        boolean updated = repository.updateCatalogMatch(id, catalogAppId, catalogAppId == null || catalogAppId.isBlank() ? "unknown" : "user");
-        if (!updated) {
-            return new HostModels.ActionResult(false, "warning", "Observed service not found", "Autark-OS could not find that observed service. Refresh the page and try again.", id, "refresh_observed_services");
-        }
-        String message = catalogAppId == null || catalogAppId.isBlank()
-                ? "The service no longer has a catalog app match."
-                : "The service now affects Discover status for " + catalogAppId + ".";
-        return new HostModels.ActionResult(true, "success", "App match saved", message, id, "refresh_observed_services");
     }
 
     public List<ObservedService> matchingCatalogServices(String appId) {
@@ -412,7 +379,6 @@ public class ObservedServiceService {
 
     public static ObservedServiceView toView(ObservedService service) {
         String userStatus = userStatus(service);
-        boolean pinned = "pinned".equals(service.userVisibility());
         boolean managedByThisAutarkOs = "owned_managed".equals(service.ownershipState());
         return new ObservedServiceView(
                 service.id(),
@@ -426,30 +392,21 @@ public class ObservedServiceService {
                 userStatus,
                 userStatusLabel(userStatus),
                 userStatusDescription(service, userStatus),
-                ApplicationBehaviorStates.observedManagementState(userStatus, pinned, managedByThisAutarkOs),
-                ApplicationBehaviorStates.observedReadinessState(service.runtimeState(), service.url(), pinned),
+                ApplicationBehaviorStates.observedManagementState(userStatus, managedByThisAutarkOs),
+                ApplicationBehaviorStates.observedReadinessState(service.runtimeState(), service.url()),
                 ApplicationBehaviorStates.observedAttentionState(userStatus),
                 service.ownershipState(),
                 service.runtimeState(),
-                pinned,
                 managedByThisAutarkOs,
                 adoptable(service),
-                service.catalogAppId() != null
-                        && !"owned_managed".equals(service.ownershipState())
-                        && !"failed_install".equals(service.ownershipState()),
                 actions(service),
                 metadata(service));
     }
 
     private ObservedService merge(ObservedService existing, ObservedService scanned) {
-        String catalogAppId = existing.catalogAppId() != null && !existing.catalogAppId().isBlank()
-                ? existing.catalogAppId()
-                : scanned.catalogAppId();
-        String confidence = existing.catalogAppId() != null && !existing.catalogAppId().isBlank()
-                ? existing.catalogMatchConfidence()
-                : scanned.catalogMatchConfidence();
         boolean explicitAdoption = "owned_managed".equals(existing.ownershipState())
                 && !"owned_managed".equals(scanned.ownershipState());
+        boolean ignored = "ignored".equals(existing.userVisibility());
         String ownershipState = explicitAdoption ? existing.ownershipState() : scanned.ownershipState();
         String autarkOsInstanceId = explicitAdoption ? existing.autarkOsInstanceId() : scanned.autarkOsInstanceId();
         return new ObservedService(
@@ -460,17 +417,17 @@ public class ObservedServiceService {
                 scanned.url(),
                 scanned.category(),
                 scanned.accessScope(),
-                catalogAppId,
-                confidence,
+                scanned.catalogAppId(),
+                scanned.catalogMatchConfidence(),
                 ownershipState,
-                existing.userVisibility(),
+                ignored ? "ignored" : "observed",
                 scanned.runtimeState(),
                 existing.healthCheckEnabled(),
                 autarkOsInstanceId,
                 existing.firstSeenAt(),
                 scanned.lastSeenAt(),
-                existing.pinnedAt(),
-                existing.ignoredAt(),
+                null,
+                ignored ? existing.ignoredAt() : null,
                 scanned.metadataJson());
     }
 
@@ -490,16 +447,12 @@ public class ObservedServiceService {
         if ("failed_install".equals(service.ownershipState())) {
             return HostModels.ObservedServiceStatus.FAILED_INSTALL;
         }
-        if ("pinned".equals(service.userVisibility())) {
-            return HostModels.ObservedServiceStatus.PINNED;
-        }
         return HostModels.ObservedServiceStatus.FOUND;
     }
 
     private static String userStatusLabel(String status) {
         return switch (status) {
             case HostModels.ObservedServiceStatus.MANAGED -> "Managed";
-            case HostModels.ObservedServiceStatus.PINNED -> "Pinned";
             case HostModels.ObservedServiceStatus.RECOVERABLE -> "Recoverable";
             case HostModels.ObservedServiceStatus.OWNED_ELSEWHERE -> "Owned elsewhere";
             case HostModels.ObservedServiceStatus.CONFLICT -> "Conflict";
@@ -511,7 +464,6 @@ public class ObservedServiceService {
     private static String userStatusDescription(ObservedService service, String status) {
         return switch (status) {
             case HostModels.ObservedServiceStatus.MANAGED -> "Managed by this Autark-OS installation.";
-            case HostModels.ObservedServiceStatus.PINNED -> "Pinned to My Apps. Autark-OS can open it but does not manage its runtime.";
             case HostModels.ObservedServiceStatus.RECOVERABLE -> "Autark-OS found recoverable app metadata for this service.";
             case HostModels.ObservedServiceStatus.OWNED_ELSEWHERE -> "Owned by another Autark-OS installation.";
             case HostModels.ObservedServiceStatus.CONFLICT -> "This service may block installing a managed copy.";
@@ -533,19 +485,11 @@ public class ObservedServiceService {
             }
             return List.copyOf(actions);
         }
-        if ("pinned".equals(service.userVisibility())) {
-            actions.add(new HostModels.ObservedServiceAction("unpin", "Unpin from My Apps", "api", "/api/observed-services/" + encode(service.id()) + "/unpin", "POST", false, ""));
-        } else {
-            actions.add(new HostModels.ObservedServiceAction("pin", "Pin to My Apps", "api", "/api/observed-services/" + encode(service.id()) + "/pin", "POST", false, ""));
-        }
         if (adoptable(service)) {
             actions.add(new HostModels.ObservedServiceAction("adoption_plan", "Review adoption plan", "api", "/api/observed-services/" + encode(service.id()) + "/adoption-plan", "POST", false, ""));
         }
         if (service.catalogAppId() != null && !"owned_managed".equals(service.ownershipState())) {
             actions.add(installAction(service.catalogAppId(), "install_copy", "Install separate copy"));
-        }
-        if (!"owned_managed".equals(service.ownershipState())) {
-            actions.add(new HostModels.ObservedServiceAction("change_match", "Change app match", "api", "/api/observed-services/" + encode(service.id()) + "/match", "POST", false, ""));
         }
         return List.copyOf(actions);
     }

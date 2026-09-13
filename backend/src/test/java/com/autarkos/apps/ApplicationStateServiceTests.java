@@ -51,7 +51,7 @@ class ApplicationStateServiceTests {
     Path runtimeRoot;
 
     @Test
-    void snapshotIncludesEveryPinnedObservedServiceEvenWithoutCatalogMatch() {
+    void snapshotTreatsRetiredPinnedRecordsAsFoundServices() {
         ObservedServiceRepository repository = repository();
         repository.upsert(pinned("manual:gitlab", "gitlab"));
         repository.upsert(pinned("docker:compassionate_mclean", "compassionate_mclean"));
@@ -66,9 +66,9 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(state.pinnedExternalServices())
+        assertThat(state.foundServices())
                 .extracting(ObservedServiceView::id)
-                .containsExactlyInAnyOrder("manual:gitlab", "docker:compassionate_mclean");
+                .containsExactlyInAnyOrder("manual:gitlab", "docker:compassionate_mclean", "docker:vaultwarden");
     }
 
     @Test

@@ -7,7 +7,7 @@ import type {
   ApplicationSurfaceItem,
 } from './ApplicationsPage.types';
 
-export type ApplicationCollectionFilter = 'managed' | 'linked' | 'attention';
+export type ApplicationCollectionFilter = 'managed' | 'attention';
 
 /** Maps an app's canonical settings into the form contract used by My Apps. */
 export function settingsFromFormValues(app: AppRuntimeView, values: ApplicationSettingsFormValues): InstallSettings {
@@ -46,7 +46,6 @@ export function matchesCollectionFilters(item: ApplicationSurfaceItem, filters: 
   if (!filters.length) return true;
   return filters.some((filter) => (
     (filter === 'managed' && item.managementState === 'managed')
-    || (filter === 'linked' && item.managementState === 'linked')
     || (filter === 'attention' && item.attentionState !== 'none')
   ));
 }
@@ -54,25 +53,19 @@ export function matchesCollectionFilters(item: ApplicationSurfaceItem, filters: 
 export function emptyStateForApplicationCollection(filters: ApplicationCollectionFilter[], query: string): ApplicationEmptyState {
   if (query.trim()) {
     return {
-      title: 'No matching apps or linked services',
-      description: 'Adjust the search or app-type filters to see the matching services.',
-    };
-  }
-  if (filters.length === 1 && filters[0] === 'linked') {
-    return {
-      title: 'No linked services',
-      description: 'Link a service from the existing-app review flow to keep it visible here without managing its runtime.',
+      title: 'No matching apps',
+      description: 'Adjust the search or filters to see matching managed apps.',
     };
   }
   if (filters.length === 1 && filters[0] === 'attention') {
     return {
       title: 'No apps need review',
-      description: 'The managed apps and linked services in this view are not asking for action right now.',
+      description: 'The managed apps in this view are not asking for action right now.',
     };
   }
   return {
-    title: 'No managed apps or linked services',
-    description: 'Install an app from Discover or link an existing service to keep it visible without managing its runtime.',
+    title: 'No managed apps',
+    description: 'Install an app from Discover to manage it here.',
   };
 }
 

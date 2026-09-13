@@ -20,10 +20,8 @@ public record ObservedServiceView(
         String attentionState,
         String ownershipState,
         String runtimeState,
-        boolean pinned,
         boolean managedByThisAutarkOs,
         boolean adoptable,
-        boolean duplicateInstallWarningRequired,
         List<HostModels.ObservedServiceAction> availableActions,
         Map<String, String> metadata) {
 }

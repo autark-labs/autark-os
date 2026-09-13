@@ -92,7 +92,6 @@ class AppGuardianServiceTests {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(),
                 Instant.parse("2026-06-21T12:00:00Z"));
     }
 

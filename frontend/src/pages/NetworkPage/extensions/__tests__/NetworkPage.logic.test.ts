@@ -1,11 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import type { AppRuntimeView } from '@/types/app';
-import type { ObservedServiceView } from '@/types/observedService';
 import type { TailscaleStatus } from '@/types/network';
 import { buildReachabilityServices } from '../NetworkPage.logic';
 
-test('reachability services include app and observed service icon URLs', () => {
+test('reachability services include managed app icon URLs', () => {
   const services = buildReachabilityServices({
     apps: [{
       appId: 'vaultwarden',
@@ -16,24 +15,12 @@ test('reachability services include app and observed service icon URLs', () => {
       observedAccess: { privateUrl: 'https://vault.tailnet', privateLinkStatus: 'verified', localUrl: 'http://localhost:8080' },
       accessRoute: { privateUrl: 'https://vault.tailnet', privateLinkStatus: 'verified' },
     } as unknown as AppRuntimeView],
-    pinnedExternalServices: [{
-      id: 'obs_router',
-      displayName: 'Router',
-      url: 'http://192.168.1.1',
-      catalogAppId: 'homepage',
-      metadata: { iconUrl: '/custom/router.svg' },
-      pinned: true,
-      userStatus: 'pinned_external',
-      userStatusLabel: 'Pinned',
-    } as unknown as ObservedServiceView],
     reconciliation: null,
     tailscale: { connected: true } as unknown as TailscaleStatus,
   });
 
   assert.equal(services[0].iconUrl, '/app-images/vaultwarden.svg');
-  assert.equal(services[1].iconUrl, '/custom/router.svg');
   assert.equal(services[0].zone, 'tailnet');
-  assert.equal(services[1].zone, 'lan');
 });
 
 test('requested but unverified private access keeps the app in its reachable local zone', () => {
@@ -47,7 +34,6 @@ test('requested but unverified private access keeps the app in its reachable loc
       observedAccess: { privateUrl: null, privateLinkStatus: 'missing', localUrl: 'http://localhost:8090' },
       accessRoute: { primaryOpenUrl: 'http://localhost:8090', privateUrl: null, privateLinkStatus: 'missing' },
     } as unknown as AppRuntimeView],
-    pinnedExternalServices: [],
     reconciliation: {
       apps: [{ appId: 'vaultwarden', status: 'missing', message: 'Private link is missing' }],
     } as never,
@@ -58,26 +44,6 @@ test('requested but unverified private access keeps the app in its reachable loc
   assert.equal(services[0].privateUrl, null);
   assert.equal(services[0].openUrl, 'http://localhost:8090');
   assert.equal(services[0].status, 'warning');
-});
-
-test('observed reachability services fall back to catalog icons', () => {
-  const services = buildReachabilityServices({
-    apps: [],
-    pinnedExternalServices: [{
-      id: 'obs_pihole',
-      displayName: 'Pi-hole',
-      url: 'http://192.168.1.2',
-      catalogAppId: 'pi-hole',
-      metadata: {},
-      pinned: true,
-      userStatus: 'pinned_external',
-      userStatusLabel: 'Pinned',
-    } as unknown as ObservedServiceView],
-    reconciliation: null,
-    tailscale: null,
-  });
-
-  assert.equal(services[0].iconUrl, '/app-images/pi-hole.svg');
 });
 
 test('reachability services prefer saved desired access mode before URL heuristics', () => {
@@ -98,7 +64,6 @@ test('reachability services prefer saved desired access mode before URL heuristi
         settings: { desiredAccessMode: 'local', accessUrl: 'http://192.168.1.40:3000', tailscaleEnabled: false },
       } as unknown as AppRuntimeView,
     ],
-    pinnedExternalServices: [],
     reconciliation: null,
     tailscale: null,
   });

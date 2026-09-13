@@ -1,21 +1,19 @@
-import { AppWindow, Link2, TriangleAlert } from 'lucide-react';
+import { AppWindow, TriangleAlert } from 'lucide-react';
 import { Surface } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 
 type AppsPageHeaderProps = {
   attentionCount: number;
-  linkedCount: number;
   managedCount: number;
 };
 
 const metrics = [
   { key: 'managed', label: 'Managed apps', icon: AppWindow },
-  { key: 'linked', label: 'Linked services', icon: Link2 },
   { key: 'attention', label: 'Needs review', icon: TriangleAlert },
 ] as const;
 
-export function AppsPageHeader({ attentionCount, linkedCount, managedCount }: AppsPageHeaderProps) {
-  const values = { attention: attentionCount, linked: linkedCount, managed: managedCount };
+export function AppsPageHeader({ attentionCount, managedCount }: AppsPageHeaderProps) {
+  const values = { attention: attentionCount, managed: managedCount };
 
   return (
     <Surface as="header" className="overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
@@ -26,10 +24,10 @@ export function AppsPageHeader({ attentionCount, linkedCount, managedCount }: Ap
           </span>
           <div className="min-w-0 space-y-1">
             <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]" title="My Apps">My Apps</h1>
-            <p className="m-0 text-sm text-sky-100/70">Open, manage, and monitor all apps on your server.</p>
+            <p className="m-0 text-sm text-sky-100/70">Open, manage, and monitor apps installed by Autark-OS.</p>
           </div>
         </div>
-        <div className="grid shrink-0 grid-cols-3 gap-2 sm:min-w-[24rem]">
+        <div className="grid shrink-0 grid-cols-2 gap-2 sm:min-w-[16rem]">
           {metrics.map(({ icon: Icon, key, label }) => (
             <div
               className={cn(
@@ -40,7 +38,6 @@ export function AppsPageHeader({ attentionCount, linkedCount, managedCount }: Ap
             >
               <span className={cn(
                 'grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200',
-                key === 'linked' && 'border-emerald-300/15 bg-emerald-400/10 text-emerald-200',
                 key === 'attention' && 'border-amber-300/15 bg-amber-400/10 text-amber-200',
               )}>
                 <Icon aria-hidden="true" className="size-3.5" />

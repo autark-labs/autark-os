@@ -272,9 +272,6 @@ public final class NormalizedHostSnapshotAssembler {
         int found = countState(
                 views,
                 AppOwnershipState.FOUND_ON_SERVER);
-        int pinned = countState(
-                views,
-                AppOwnershipState.PINNED_EXTERNAL);
         int recoverable = countState(
                 views,
                 AppOwnershipState.RECOVERABLE);
@@ -293,7 +290,7 @@ public final class NormalizedHostSnapshotAssembler {
         }
         return new NormalizedHostSnapshot.FoundServicesSnapshot(
                 found,
-                pinned,
+                0,
                 recoverable,
                 blocked,
                 List.copyOf(categories));

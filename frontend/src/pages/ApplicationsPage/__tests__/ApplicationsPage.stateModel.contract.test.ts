@@ -9,7 +9,7 @@ function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
 
-test('applications page uses split behavior states instead of a single app status source', () => {
+test('My Apps uses split managed-app behavior states instead of a single status source', () => {
   const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
   const liveModel = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.liveModel.ts');
   const visuals = source('src/pages/ApplicationsPage/extensions/ApplicationVisuals.tsx');
@@ -21,7 +21,7 @@ test('applications page uses split behavior states instead of a single app statu
   const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
   const managementPanel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
 
-  assert.match(types, /export type AppManagementState = 'managed' \| 'found' \| 'linked'/);
+  assert.match(types, /export type AppManagementState = 'managed'/);
   assert.match(types, /export type AppReadinessState = 'ready' \| 'starting' \| 'paused' \| 'stopped' \| 'unreachable' \| 'unknown'/);
   assert.match(types, /export type AppAttentionState = 'none' \| 'needs_review' \| 'conflict' \| 'blocked'/);
   assert.match(types, /export type AppOperationState =/);
@@ -31,20 +31,14 @@ test('applications page uses split behavior states instead of a single app statu
   assert.match(types, /operationState: AppOperationState/);
 
   assert.match(liveModel, /app\.managementState \?\? 'managed'/);
-  assert.match(liveModel, /service\.managementState \?\? \(pinned \? 'linked' : 'found'\)/);
   assert.match(liveModel, /app\.readinessState \?\? managedReadinessState/);
   assert.match(liveModel, /app\.attentionState \?\? managedAttentionState/);
-  assert.match(liveModel, /service\.managementState \?\? \(pinned \? 'linked' : 'found'\)/);
-  assert.match(liveModel, /service\.readinessState \?\? observedReadinessState/);
-  assert.match(liveModel, /service\.attentionState \?\? observedAttentionState/);
   assert.match(liveModel, /readinessState,/);
   assert.match(liveModel, /attentionState,/);
-  assert.match(liveModel, /operationState: idleOperationState\(\)/);
   assert.match(liveModel, /value\.kind === 'repairing'/);
   assert.match(liveModel, /app\.canonicalBackupState === 'protected_by_restore_point'/);
   assert.doesNotMatch(liveModel, /if \(backup === 'Needs backup'\)/);
-  assert.match(liveModel, /service\.userStatus === 'blocked'/);
-  assert.match(liveModel, /service\.userStatus === 'managed_elsewhere'/);
+  assert.doesNotMatch(liveModel, /observedService|pinned_external|linked/);
 
   assert.doesNotMatch(visuals, /ApplicationReadinessBadge/);
   assert.doesNotMatch(visuals, /ApplicationManagementBadge/);

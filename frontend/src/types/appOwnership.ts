@@ -4,7 +4,6 @@ import type { ObservedServiceView } from './observedService';
 export type AppOwnershipState =
   | 'available'
   | 'installed_managed'
-  | 'pinned_external'
   | 'found_on_server'
   | 'recoverable'
   | 'managed_elsewhere'

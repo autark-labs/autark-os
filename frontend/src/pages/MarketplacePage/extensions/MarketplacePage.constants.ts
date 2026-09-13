@@ -6,7 +6,6 @@ export const marketplaceStatusOptions = [
   { label: 'All statuses', value: 'all' },
   { label: 'Available', value: 'available' },
   { label: 'Installed', value: 'installed' },
-  { label: 'Pinned', value: 'pinned' },
 ] as const;
 
 export type MarketplaceStatusFilter = (typeof marketplaceStatusOptions)[number]['value'];

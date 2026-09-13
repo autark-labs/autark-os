@@ -44,7 +44,7 @@ test('app-affecting repositories use canonical app-state synchronization after m
   assert.doesNotMatch(networkPage, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);
 });
 
-test('applications page uses canonical synchronization for lifecycle, repair, backup, uninstall, access, and observed-service actions', () => {
+test('applications page uses canonical synchronization for managed lifecycle actions', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
   assert.match(page, /syncCanonicalAppMutationResult/);
@@ -53,26 +53,23 @@ test('applications page uses canonical synchronization for lifecycle, repair, ba
   assert.match(page, /BackupAPIClient\.run\(appId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /InstalledAppsAPIClient\.uninstall\(appId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /InstalledAppsAPIClient\.enablePrivateAccess\(appId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, result\)/);
-  assert.match(page, /ObservedServicesAPIClient\.pin\(serviceId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, result\)/);
-  assert.match(page, /ObservedServicesAPIClient\.unpin\(serviceId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, result\)/);
-  assert.match(page, /ObservedServicesAPIClient\.match\(serviceId, catalogAppId\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, result\)/);
-  assert.match(page, /ObservedServicesAPIClient\.adopt\(serviceId, confirmation\)[\s\S]*syncCanonicalAppMutationResult\(queryClient, result\)/);
-
-  assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache\(queryClient/);
+  assert.doesNotMatch(page, /ObservedServicesAPIClient|setObservedServicePinnedInApplicationStateCache\(queryClient/);
   assert.doesNotMatch(page, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);
 });
 
-test('existing-app resolution surfaces use canonical synchronization for observed-service actions', () => {
+test('existing-app recovery synchronizes its action result without pin mutations', () => {
   const page = source('src/pages/ResolveExistingAppsPage/ResolveExistingAppsPage.tsx');
   const sheet = source('src/pages/ResolveExistingAppsPage/ObservedServiceDetailsSheet.tsx');
 
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, result\)/);
-  assert.match(page, /ObservedServicesAPIClient\.pin\(service\.id\)/);
+  assert.doesNotMatch(page, /ObservedServicesAPIClient\.(pin|unpin|match)/);
   assert.match(page, /onActionComplete=\{handleObservedServiceResult\}/);
   assert.doesNotMatch(page, /setObservedServicePinnedInApplicationStateCache/);
   assert.doesNotMatch(page, /setApplicationStateFromActionResultCache/);
 
   assert.match(sheet, /onActionComplete\(result\)/);
+  assert.match(sheet, /ObservedServicesAPIClient\.adopt\(service\.id, confirmation\)/);
+  assert.doesNotMatch(sheet, /ObservedServicesAPIClient\.(pin|unpin|match)/);
   assert.doesNotMatch(sheet, /setObservedServicePinnedInApplicationStateCache/);
   assert.doesNotMatch(sheet, /setApplicationStateFromActionResultCache/);
 });

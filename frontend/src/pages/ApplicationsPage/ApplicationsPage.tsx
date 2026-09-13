@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { AppUpdatePlanChangedError, InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
 import { FoundAppsPrompt } from '@/components/autark-os/FoundAppsPrompt';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
@@ -21,7 +20,6 @@ import { invalidateBackupQueries } from '@/repositories/backupRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import { terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
-import type { ObservedServiceActionResult, ObservedServiceAdoptionPlan } from '@/types/observedService';
 import { ApplicationDetailsRail } from './ApplicationDetailsRail';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
@@ -91,7 +89,6 @@ export const ApplicationsPage = () => {
       accessByAppId: appState.accessByAppId,
       apps: appState.apps,
       healthByAppId: appState.healthByAppId,
-      observedServices: appState.observedServices,
       telemetryByAppId: appState.telemetryByAppId,
     });
 
@@ -114,15 +111,18 @@ export const ApplicationsPage = () => {
     appState.accessByAppId,
     appState.apps,
     appState.healthByAppId,
-    appState.observedServices,
     appState.telemetryByAppId,
     jobsQuery.data,
     settingsLoadingByAppId,
   ]);
 
   const managedItems = useMemo(() => items.filter((item) => item.managementState === 'managed'), [items]);
-  const linkedItems = useMemo(() => items.filter((item) => item.managementState === 'linked'), [items]);
-  const foundServices = appState.foundServices;
+  const foundServices = useMemo(
+    () => appState.foundServices.filter((service) => (
+      ['recoverable', 'managed_elsewhere', 'blocked', 'failed_install'].includes(service.userStatus)
+    )),
+    [appState.foundServices],
+  );
   const foundServicesSignature = useMemo(
     () => foundServices.map((service) => service.id).sort().join('|'),
     [foundServices],
@@ -131,10 +131,6 @@ export const ApplicationsPage = () => {
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items.filter((item) => {
-      if (item.managementState === 'found') {
-        return false;
-      }
-
       if (!matchesCollectionFilters(item, collectionFilters)) {
         return false;
       }
@@ -151,8 +147,7 @@ export const ApplicationsPage = () => {
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
   const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
   const managedCount = managedItems.length;
-  const linkedCount = linkedItems.length;
-  const attentionCount = items.filter((item) => item.managementState !== 'found' && item.attentionState !== 'none').length;
+  const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
   const emptyState = emptyStateForApplicationCollection(collectionFilters, query);
   const managedAppById = useMemo(() => new Map(appState.apps.map((app) => [app.appId, app])), [appState.apps]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
@@ -212,7 +207,7 @@ export const ApplicationsPage = () => {
 
   const handleCollectionFilterChange = useCallback((nextFilters: string[]) => {
     const normalizedFilters = nextFilters.filter((filter): filter is ApplicationCollectionFilter => (
-      filter === 'managed' || filter === 'linked' || filter === 'attention'
+      filter === 'managed' || filter === 'attention'
     ));
 
     if (selectedItem && !matchesCollectionFilters(selectedItem, normalizedFilters)) {
@@ -236,9 +231,8 @@ export const ApplicationsPage = () => {
     }
 
     const targetItem = findApplicationDeepLinkTarget(items, deepLinkTarget);
-    if (!targetItem || targetItem.managementState === 'found') {
-      const serviceQuery = deepLinkTarget.kind === 'service' ? `?service=${encodeURIComponent(deepLinkTarget.id)}` : '';
-      navigate(`/apps/found${serviceQuery}`, { replace: true });
+    if (!targetItem) {
+      navigate('/apps', { replace: true });
       return;
     }
 
@@ -248,9 +242,8 @@ export const ApplicationsPage = () => {
 
     setQuery('');
     const requiredFilter = filterForApplicationDeepLinkTarget(targetItem);
-    if (requiredFilter === 'managed' || requiredFilter === 'pinned') {
-      const filter = requiredFilter === 'pinned' ? 'linked' : requiredFilter;
-      setCollectionFilters((current) => current.length === 0 || current.includes(filter) ? current : [...current, filter]);
+    if (requiredFilter === 'managed') {
+      setCollectionFilters((current) => current.length === 0 || current.includes(requiredFilter) ? current : [...current, requiredFilter]);
     }
     setSelectedId(targetItem.id);
     setManagementOpen(deepLinkTarget.panel === 'manage');
@@ -537,57 +530,6 @@ export const ApplicationsPage = () => {
     }
   }
 
-  async function pinObservedService(serviceId: string) {
-    try {
-      const result = await ObservedServicesAPIClient.pin(serviceId);
-      syncCanonicalAppMutationResult(queryClient, result);
-      showActionNotification(result, result.title || 'Service pinned');
-    } catch (err) {
-      showActionErrorNotification(err, 'Service could not be pinned');
-      throw err;
-    }
-  }
-
-  async function unpinObservedService(serviceId: string) {
-    try {
-      const result = await ObservedServicesAPIClient.unpin(serviceId);
-      syncCanonicalAppMutationResult(queryClient, result);
-      showActionNotification(result, result.title || 'Service unpinned');
-    } catch (err) {
-      showActionErrorNotification(err, 'Service could not be unpinned');
-      throw err;
-    }
-  }
-
-  async function matchObservedService(serviceId: string, catalogAppId: string | null) {
-    try {
-      const result = await ObservedServicesAPIClient.match(serviceId, catalogAppId);
-      handleObservedServiceActionResult(result, result.title || 'Service match saved');
-    } catch (err) {
-      showActionErrorNotification(err, 'Service match could not be saved');
-      throw err;
-    }
-  }
-
-  async function loadObservedServiceAdoptionPlan(serviceId: string): Promise<ObservedServiceAdoptionPlan> {
-    return ObservedServicesAPIClient.adoptionPlan(serviceId);
-  }
-
-  async function adoptObservedService(serviceId: string, confirmation: string) {
-    try {
-      const result = await ObservedServicesAPIClient.adopt(serviceId, confirmation);
-      handleObservedServiceActionResult(result, result.title || 'Service adopted');
-    } catch (err) {
-      showActionErrorNotification(err, 'Service could not be adopted');
-      throw err;
-    }
-  }
-
-  function handleObservedServiceActionResult(result: ObservedServiceActionResult, fallbackTitle: string) {
-    syncCanonicalAppMutationResult(queryClient, result);
-    showActionNotification(result, fallbackTitle);
-  }
-
   const handleStart = (id: string) => void runManagedAction(id, 'start');
   const handleStop = (id: string) => void runManagedAction(id, 'stop');
   const handleRestart = (id: string) => void runManagedAction(id, 'restart');
@@ -608,7 +550,7 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    if (item && item.managementState !== 'found') {
+    if (item) {
       focusApplicationItem(item, true);
     }
     void invalidateApplicationState(queryClient);
@@ -616,14 +558,10 @@ export const ApplicationsPage = () => {
 
   const actions = {
     onCreateBackup: handleCreateBackup,
-    onAdoptObservedService: adoptObservedService,
     onDirtyChange: handleDirtyChange,
-    onLoadObservedServiceAdoptionPlan: loadObservedServiceAdoptionPlan,
     onLoadRollbackPlan: loadRollbackPlan,
     onLoadUninstallPlan: loadUninstallPlan,
     onLoadUpdatePlan: loadUpdatePlan,
-    onMatchObservedService: matchObservedService,
-    onPinObservedService: pinObservedService,
     onRepair: handleRepair,
     onRestart: handleRestart,
     onRunNextAction: handleRunNextAction,
@@ -635,7 +573,6 @@ export const ApplicationsPage = () => {
     onSetPrivateNetworkAccess: runPrivateNetworkAccessChange,
     onStart: handleStart,
     onStop: handleStop,
-    onUnpinObservedService: unpinObservedService,
   };
 
   const handleCardAction = (item: ApplicationSurfaceItem, actionId: string) => {
@@ -645,8 +582,6 @@ export const ApplicationsPage = () => {
     if (actionId === 'restart') return handleRestart(id);
     if (actionId === 'repair') return handleRepair(id);
     if (actionId === 'backup') return handleCreateBackup(id);
-    if (actionId === 'pin') return void pinObservedService(id);
-    if (actionId === 'unpin') return void unpinObservedService(id);
     return undefined;
   };
 
@@ -657,7 +592,7 @@ export const ApplicationsPage = () => {
       contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
     >
       <ExtensionActionTarget actionId="review-app" routeId="apps">
-        <AppsPageHeader attentionCount={attentionCount} linkedCount={linkedCount} managedCount={managedCount} />
+        <AppsPageHeader attentionCount={attentionCount} managedCount={managedCount} />
       </ExtensionActionTarget>
 
       {showFoundAppsPrompt && (
@@ -691,8 +626,8 @@ export const ApplicationsPage = () => {
           )}
           filterAriaLabel="Filter app types"
           onSearchChange={setQuery}
-          searchAriaLabel="Search managed and linked apps"
-          searchPlaceholder="Search managed and linked apps"
+          searchAriaLabel="Search managed apps"
+          searchPlaceholder="Search managed apps"
           searchValue={query}
         />
       </div>
@@ -751,7 +686,6 @@ function ApplicationCollectionFilterDropdown({
       onValueChange={onChange}
       options={[
         { label: 'Managed apps', value: 'managed' },
-        { label: 'Linked services', value: 'linked' },
         { label: 'Needs attention', value: 'attention' },
       ]}
       placeholder="All app types"

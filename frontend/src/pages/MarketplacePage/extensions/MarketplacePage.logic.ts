@@ -87,9 +87,6 @@ export function marketplaceStatusMatches(view: Pick<DiscoverAppView, 'state'>, s
   if (statusFilter === 'installed') {
     return view.state === 'installed_managed';
   }
-  if (statusFilter === 'pinned') {
-    return view.state === 'pinned_external';
-  }
   if (statusFilter === 'available') {
     return view.state === 'available';
   }
@@ -101,8 +98,11 @@ export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'primaryActi
   if (!action || action.disabled || action.kind !== 'route' || !action.href) {
     return null;
   }
-  if (action.id === 'manage' || action.id === 'review_existing') {
+  if (action.id === 'manage') {
     return applicationRouteWithManagementPanel(action.href) ?? null;
+  }
+  if (action.id === 'review_existing') {
+    return action.href;
   }
   return null;
 }

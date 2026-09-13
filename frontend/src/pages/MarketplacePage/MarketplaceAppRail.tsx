@@ -11,7 +11,6 @@ import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
 import { marketplacePrimaryRoute } from './extensions/MarketplacePage.logic';
 import { AppImage, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
 import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
-import { applicationDeepLinkForObservedService, applicationRouteWithManagementPanel } from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 
 type MarketplaceAppRailProps = {
   appView: DiscoverAppView;
@@ -134,9 +133,7 @@ export function MarketplaceAppRail({ appView, detailsOpen, hasAppSettings, insta
 function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, onPanelRef, open }: { appView: DiscoverAppView; onClose: () => void; onInstallSecondCopy: () => void; onPanelRef: (panel: HTMLElement | null) => void; open: boolean }) {
   const [tab, setTab] = useState('overview');
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
-  const reviewExistingHref = appView.observedService
-    ? applicationDeepLinkForObservedService(appView.observedService, { panel: 'manage' })
-    : applicationRouteWithManagementPanel(appView.reviewExistingHref) ?? null;
+  const reviewExistingHref = appView.reviewExistingHref ?? null;
 
   useEffect(() => {
     setTab('overview');

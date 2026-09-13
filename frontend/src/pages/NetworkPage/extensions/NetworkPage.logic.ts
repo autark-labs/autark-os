@@ -1,7 +1,6 @@
 import { MonitorSmartphone, ShieldCheck } from 'lucide-react';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import type { AppRuntimeView } from '@/types/app';
-import type { ObservedServiceView } from '@/types/observedService';
 import type { NetworkDiagnosticsReport, PrivateAccessReconciliationItem, PrivateAccessReconciliationReport, TailscaleDevice, TailscaleStatus } from '@/types/network';
 import type { AppExposureGroup, AppExposureLevel, NetworkDeviceView, NetworkIssueView, NetworkNodeStatus, NetworkPosture, PrivateAppAccess, ReachabilityService, ReachabilityZoneId } from './NetworkPage.types';
 import { privateAccessUrlForApp } from './NetworkPage.privateAccess';
@@ -153,12 +152,10 @@ export function buildPrivateAppAccess(privateApps: AppRuntimeView[], tailscale: 
 
 export function buildReachabilityServices({
   apps,
-  pinnedExternalServices = [],
   reconciliation,
   tailscale,
 }: {
   apps: AppRuntimeView[];
-  pinnedExternalServices?: ObservedServiceView[];
   reconciliation: PrivateAccessReconciliationReport | null;
   tailscale: TailscaleStatus | null;
 }): ReachabilityService[] {
@@ -188,44 +185,11 @@ export function buildReachabilityServices({
     };
   });
 
-  const external = pinnedExternalServices.map((service) => ({
-    app: null,
-    detail: service.url || 'Pinned external service',
-    draggable: false,
-    iconUrl: observedServiceIconUrl(service),
-    id: service.id,
-    issue: null,
-    label: service.displayName,
-    localUrl: service.url || null,
-    openUrl: service.url || null,
-    privateUrl: null,
-    status: 'neutral' as const,
-    statusLabel: service.userStatus === 'pinned_external' || service.pinned ? 'Pinned external' : service.userStatusLabel,
-    type: 'external-service' as const,
-    zone: 'lan' as const,
-  }));
-
-  return [...managed, ...external].sort((left, right) => {
-    if (left.type !== right.type) {
-      return left.type === 'managed-app' ? -1 : 1;
-    }
-    return left.label.localeCompare(right.label);
-  });
+  return managed.sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function managedAppIconUrl(app: AppRuntimeView) {
   return preferredAppImageUrl(app.image, catalogAppImageUrl(app.appId));
-}
-
-function observedServiceIconUrl(service: ObservedServiceView) {
-  return preferredAppImageUrl(
-    service.metadata?.iconUrl,
-    service.metadata?.icon,
-    service.metadata?.appIcon,
-    service.metadata?.imageUrl,
-    service.metadata?.catalogImage,
-    catalogAppImageUrl(service.catalogAppId),
-  );
 }
 
 function reachabilityIssue(app: AppRuntimeView, reconciliationItem: PrivateAccessReconciliationItem | null) {

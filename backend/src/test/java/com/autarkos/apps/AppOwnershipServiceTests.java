@@ -125,7 +125,7 @@ class AppOwnershipServiceTests {
                     assertThat(view.installed()).isFalse();
                     assertThat(view.ownedByCurrentInstance()).isFalse();
                     assertThat(view.installCopyWarningRequired()).isTrue();
-                    assertThat(view.reviewExistingHref()).isEqualTo("/apps?focus=service%3Adocker%3Afound_jellyfin&panel=manage");
+                    assertThat(view.reviewExistingHref()).isEqualTo("/apps/found?service=docker%3Afound_jellyfin");
                     assertThat(view.primaryAction().id()).isEqualTo("review_existing");
                     assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("review_existing", "unavailable");
                     assertThat(view.installedApp()).isNull();
@@ -149,7 +149,7 @@ class AppOwnershipServiceTests {
     }
 
     @Test
-    void pinnedObservedServiceWinsBeforeFoundOnServerAndNeverLooksInstalled() {
+    void retiredPinnedRecordIsClassifiedAsFoundAndNeverLooksInstalled() {
         ObservedServiceRepository observedRepository = observedRepository();
         ObservedService pinned = observed("manual:jellyfin", "jellyfin", "external", "pinned");
         observedRepository.upsert(pinned);
@@ -157,14 +157,14 @@ class AppOwnershipServiceTests {
 
         AppOwnershipView view = service(installedRepository(), observedRepository).app("jellyfin").orElseThrow();
 
-        assertThat(view.state()).isEqualTo(AppOwnershipState.PINNED_EXTERNAL);
-        assertThat(view.stateLabel()).isEqualTo("Pinned");
-        assertThat(view.statusTone()).isEqualTo("info");
-        assertThat(view.cardTone()).isEqualTo("info");
+        assertThat(view.state()).isEqualTo(AppOwnershipState.FOUND_ON_SERVER);
+        assertThat(view.stateLabel()).isEqualTo("Found on server");
+        assertThat(view.statusTone()).isEqualTo("neutral");
+        assertThat(view.cardTone()).isEqualTo("observed");
         assertThat(view.installed()).isFalse();
         assertThat(view.ownedByCurrentInstance()).isFalse();
         assertThat(view.installCopyWarningRequired()).isTrue();
-        assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("review_existing", "Review existing service", "route", "/apps?focus=service%3Amanual%3Ajellyfin&panel=manage", null, false, ""));
+        assertThat(view.primaryAction()).isEqualTo(new AppOwnershipAction("review_existing", "Review existing service", "route", "/apps/found?service=manual%3Ajellyfin", null, false, ""));
         assertThat(view.availableActions()).extracting(AppOwnershipAction::id).contains("open", "review_existing", "unavailable");
         assertThat(view.observedService()).isNotNull();
         assertThat(view.observedService().id()).isEqualTo(pinned.id());
@@ -196,10 +196,10 @@ class AppOwnershipServiceTests {
 
         AppOwnershipView view = service(installedRepository(), observedRepository).app("vaultwarden").orElseThrow();
 
-        assertThat(view.state()).isEqualTo(AppOwnershipState.PINNED_EXTERNAL);
+        assertThat(view.state()).isEqualTo(AppOwnershipState.FOUND_ON_SERVER);
         assertThat(view.installed()).isFalse();
         assertThat(view.observedService()).isNotNull();
-        assertThat(view.primaryAction().href()).isEqualTo("/apps?focus=service%3Amanual%3Avaultwarden&panel=manage");
+        assertThat(view.primaryAction().href()).isEqualTo("/apps/found?service=manual%3Avaultwarden");
     }
 
     @Test
@@ -213,7 +213,7 @@ class AppOwnershipServiceTests {
         assertThat(view.stateLabel()).isEqualTo("Found on server");
         assertThat(view.cardTone()).isEqualTo("observed");
         assertThat(view.installCopyWarningRequired()).isTrue();
-        assertThat(view.reviewExistingHref()).isEqualTo("/apps?focus=service%3Adocker%3Avaultwarden&panel=manage");
+        assertThat(view.reviewExistingHref()).isEqualTo("/apps/found?service=docker%3Avaultwarden");
     }
 
     @Test
@@ -297,10 +297,10 @@ class AppOwnershipServiceTests {
         List<AppOwnershipView> views = service.apps();
 
         assertThat(observedServiceService.refreshCalls).hasValue(0);
-        assertThat(view.state()).isEqualTo(AppOwnershipState.PINNED_EXTERNAL);
+        assertThat(view.state()).isEqualTo(AppOwnershipState.FOUND_ON_SERVER);
         assertThat(views).filteredOn(item -> item.catalogAppId().equals("vaultwarden"))
                 .singleElement()
-                .satisfies(item -> assertThat(item.state()).isEqualTo(AppOwnershipState.PINNED_EXTERNAL));
+                .satisfies(item -> assertThat(item.state()).isEqualTo(AppOwnershipState.FOUND_ON_SERVER));
     }
 
     @Test

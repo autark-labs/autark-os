@@ -49,6 +49,6 @@ yarn-error.log*
 
 # Local screenshots, planning, and assistant workspace
 screenshots/
-/docs/development/
+/docs/development/*
 /build/
 /.superpowers/

@@ -66,11 +66,11 @@ export type AppExposureGroup = {
 
 export type ReachabilityZoneId = 'local' | 'lan' | 'tailnet' | 'public';
 
-export type ReachabilityTypeFilter = 'managed' | 'external' | 'attention';
+export type ReachabilityTypeFilter = 'managed' | 'attention';
 
 export type ReachabilityService = {
   id: string;
-  type: 'managed-app' | 'external-service';
+  type: 'managed-app';
   app: AppRuntimeView | null;
   label: string;
   detail: string;

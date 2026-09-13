@@ -15,9 +15,7 @@ import {
   removeManagedAppFromState,
   observedServices,
   ownershipViews,
-  pinnedExternalServices,
   setAutarkOsJobInState,
-  setObservedServicePinnedInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   telemetryByAppId,
@@ -41,9 +39,7 @@ export {
   removeManagedAppFromState,
   observedServices,
   ownershipViews,
-  pinnedExternalServices,
   setAutarkOsJobInState,
-  setObservedServicePinnedInState,
   setRuntimeAppInState,
   setRuntimeAppStatusInState,
   telemetryByAppId,
@@ -58,7 +54,6 @@ export type ApplicationStateRepositoryView = {
   lastError: string | null;
   observedServices: ObservedServiceView[];
   ownershipViews: AppOwnershipView[];
-  pinnedExternalServices: ObservedServiceView[];
   refreshStatus: string;
   stale: boolean;
   telemetryByAppId: Record<string, AppTelemetry>;
@@ -110,7 +105,6 @@ export function useApplicationStateRepository(): ApplicationStateRepositoryView 
     lastError: state?.lastError?.trim() || null,
     observedServices: observedServices(state),
     ownershipViews: ownershipViews(state),
-    pinnedExternalServices: pinnedExternalServices(state),
     refreshStatus: state?.refreshStatus || (state ? 'unknown' : 'stale'),
     refresh: async () => refreshMutation.mutateAsync(),
     stale: state?.stale ?? !state,
@@ -131,10 +125,6 @@ export function setApplicationStateFromActionResultCache(queryClient: QueryClien
   }
   setApplicationStateCache(queryClient, result.applicationState);
   return true;
-}
-
-export function setObservedServicePinnedInApplicationStateCache(queryClient: QueryClient, serviceId: string, pinned: boolean) {
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setObservedServicePinnedInState(current, serviceId, pinned));
 }
 
 export function invalidateApplicationState(queryClient: QueryClient) {

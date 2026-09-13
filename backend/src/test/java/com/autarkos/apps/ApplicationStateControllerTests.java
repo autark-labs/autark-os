@@ -47,7 +47,6 @@ class ApplicationStateControllerTests {
                 List.of(),
                 List.of(),
                 List.of(),
-                List.of(),
                 now,
                 refreshStatus,
                 now,

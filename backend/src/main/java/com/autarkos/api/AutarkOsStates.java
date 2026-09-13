@@ -21,7 +21,6 @@ public final class AutarkOsStates {
 
     public static final class ManagementState {
         public static final String MANAGED = "managed";
-        public static final String LINKED = "linked";
         public static final String FOUND = "found";
 
         private ManagementState() {

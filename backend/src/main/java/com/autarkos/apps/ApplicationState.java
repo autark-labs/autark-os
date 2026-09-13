@@ -12,7 +12,6 @@ public record ApplicationState(
         List<AppInstanceView> managedApps,
         List<AppRuntimeView> runtimeApps,
         List<ObservedServiceView> observedServices,
-        List<ObservedServiceView> pinnedExternalServices,
         List<ObservedServiceView> foundServices,
         List<AppOwnershipView> ownershipViews,
         Instant updatedAt,
@@ -27,7 +26,6 @@ public record ApplicationState(
             List<AppInstanceView> managedApps,
             List<AppRuntimeView> runtimeApps,
             List<ObservedServiceView> observedServices,
-            List<ObservedServiceView> pinnedExternalServices,
             List<ObservedServiceView> foundServices,
             List<AppOwnershipView> ownershipViews,
             Instant updatedAt) {
@@ -35,7 +33,6 @@ public record ApplicationState(
                 managedApps,
                 runtimeApps,
                 observedServices,
-                pinnedExternalServices,
                 foundServices,
                 ownershipViews,
                 updatedAt,

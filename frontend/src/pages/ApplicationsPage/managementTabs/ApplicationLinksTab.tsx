@@ -4,7 +4,7 @@ import { CopyField } from '@/components/autark-os/CopyField';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
-import { accessDeepLinkForManagedApp, accessDeepLinkForObservedService } from '@/pages/NetworkPage/extensions/NetworkPage.deepLinks';
+import { accessDeepLinkForManagedApp } from '@/pages/NetworkPage/extensions/NetworkPage.deepLinks';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) {
@@ -38,13 +38,7 @@ export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) 
 
 function accessRouteForApplicationItem(item: ApplicationSurfaceItem) {
   const itemId = item.sourceId || item.id;
-  if (item.managementState === 'managed' && itemId) {
-    return accessDeepLinkForManagedApp(itemId);
-  }
-  if ((item.managementState === 'found' || item.managementState === 'linked') && item.sourceId) {
-    return accessDeepLinkForObservedService(item.sourceId);
-  }
-  return '/access';
+  return itemId ? accessDeepLinkForManagedApp(itemId) : '/access';
 }
 
 function LiveLinkRow({ icon: Icon, label, value }: { icon: typeof ExternalLink; label: string; value?: string }) {

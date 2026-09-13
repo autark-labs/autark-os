@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CircleHelp, Link2, Loader2, Pause, Search, Server, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleHelp, Loader2, Pause, Server, XCircle } from 'lucide-react';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { cn } from '@/lib/utils';
@@ -25,11 +25,9 @@ export function ReadinessBadge({ item, overlay = false }: { item: ApplicationSur
 }
 
 export function ManagementBadge({ item }: { item: ApplicationSurfaceItem }) {
-  const Icon = item.managementState === 'managed' ? Server : item.managementState === 'linked' ? Link2 : Search;
-
   return (
     <MetadataBadge appearance="solid" tone="neutral">
-      <Icon data-icon="inline-start" />
+      <Server data-icon="inline-start" />
       {labelForManagementState(item.managementState)}
     </MetadataBadge>
   );
@@ -68,14 +66,8 @@ export function OperationBadge({ item, overlay = false }: { item: ApplicationSur
   );
 }
 
-export function labelForManagementState(state: ApplicationSurfaceItem['managementState'], length: 'short' | 'long' = 'long') {
-  if (state === 'managed') {
-    return length === 'short' ? 'Managed' : 'Managed app';
-  }
-  if (state === 'linked') {
-    return length === 'short' ? 'Linked' : 'Linked service';
-  }
-  return length === 'short' ? 'Found' : 'Found on this server';
+export function labelForManagementState(_state: ApplicationSurfaceItem['managementState'], length: 'short' | 'long' = 'long') {
+  return length === 'short' ? 'Managed' : 'Managed app';
 }
 
 export function labelForReadiness(state: ApplicationSurfaceItem['readinessState']) {

@@ -56,7 +56,7 @@ test('marketplaceVisibleApps filters by category, installed state, and search qu
 test('marketplaceVisibleAppViews hides only canonical current-instance installs', () => {
   const views = [
     { id: 'vaultwarden', name: 'Vaultwarden', state: 'installed_managed', app: app({ id: 'vaultwarden', category: 'Security' }) },
-    { id: 'jellyfin', name: 'Jellyfin', state: 'pinned_external', app: app({ id: 'jellyfin', name: 'Jellyfin', category: 'Media' }) },
+    { id: 'jellyfin', name: 'Jellyfin', state: 'found_on_server', app: app({ id: 'jellyfin', name: 'Jellyfin', category: 'Media' }) },
     { id: 'homepage', name: 'Homepage', state: 'found_on_server', app: app({ id: 'homepage', name: 'Homepage', category: 'Utilities' }) },
   ];
 
@@ -70,17 +70,15 @@ test('marketplaceVisibleAppViews hides only canonical current-instance installs'
   assert.deepEqual(visible.map((view) => view.id), ['homepage', 'jellyfin']);
 });
 
-test('marketplaceVisibleAppViews filters canonical availability, installs, and pinned services', () => {
+test('marketplaceVisibleAppViews filters canonical availability and installs', () => {
   const views = [
     { id: 'available', name: 'Available', state: 'available', app: app({ id: 'available' }) },
     { id: 'installed', name: 'Installed', state: 'installed_managed', app: app({ id: 'installed' }) },
-    { id: 'pinned', name: 'Pinned', state: 'pinned_external', app: app({ id: 'pinned' }) },
     { id: 'found', name: 'Found', state: 'found_on_server', app: app({ id: 'found' }) },
   ];
 
   assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'available' }).map((view) => view.id), ['available']);
   assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'installed' }).map((view) => view.id), ['installed']);
-  assert.deepEqual(marketplaceVisibleAppViews({ views, statusFilter: 'pinned' }).map((view) => view.id), ['pinned']);
 });
 
 test('marketplacePrimaryRoute follows My Apps management and existing-service actions', () => {
@@ -88,8 +86,8 @@ test('marketplacePrimaryRoute follows My Apps management and existing-service ac
     primaryAction: { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false },
   }), '/apps?focus=managed%3Avaultwarden&panel=manage');
   assert.equal(marketplacePrimaryRoute({
-    primaryAction: { id: 'review_existing', kind: 'route', href: '/apps?focus=service%3Adocker%3Avaultwarden', disabled: false },
-  }), '/apps?focus=service%3Adocker%3Avaultwarden&panel=manage');
+    primaryAction: { id: 'review_existing', kind: 'route', href: '/apps/found?service=docker%3Avaultwarden', disabled: false },
+  }), '/apps/found?service=docker%3Avaultwarden');
   assert.equal(marketplacePrimaryRoute({
     primaryAction: { id: 'review_setup', kind: 'route', href: '/discover?app=vaultwarden', disabled: false },
   }), null);

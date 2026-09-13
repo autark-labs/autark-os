@@ -4,7 +4,6 @@ import {
   type ApplicationStateRepositoryView,
 } from '@/repositories/applicationStateRepository';
 import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
-import type { ObservedServiceView } from '@/types/observedService';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import type {
   AppAttentionState,
@@ -17,27 +16,21 @@ import type {
 
 type ApplicationSurfaceInput = Pick<
   ApplicationStateRepositoryView,
-  'accessByAppId' | 'apps' | 'healthByAppId' | 'observedServices' | 'telemetryByAppId'
+  'accessByAppId' | 'apps' | 'healthByAppId' | 'telemetryByAppId'
 >;
 
 export function buildApplicationSurfaceItems({
   accessByAppId,
   apps,
   healthByAppId,
-  observedServices,
   telemetryByAppId,
 }: ApplicationSurfaceInput): ApplicationSurfaceItem[] {
-  return [
-    ...apps.map((app) => managedAppSurfaceItem(
+  return apps.map((app) => managedAppSurfaceItem(
       app,
       healthByAppId[app.appId] ?? app.healthSnapshot,
       accessByAppId[app.appId],
       telemetryByAppId[app.appId] ?? app.telemetry,
-    )),
-    ...observedServices
-      .filter((service) => !service.managedByThisAutarkOs && service.userStatus !== 'installed_managed')
-      .map(observedServiceSurfaceItem),
-  ].slice().sort(compareSurfaceItems);
+    )).slice().sort(compareSurfaceItems);
 }
 
 function managedAppSurfaceItem(
@@ -85,58 +78,6 @@ function managedAppSurfaceItem(
     displayOrder: app.displayOrder,
     sourceId: app.appId,
     status,
-  };
-}
-
-function observedServiceSurfaceItem(service: ObservedServiceView): ApplicationSurfaceItem {
-  const pinned = service.pinned || service.userStatus === 'pinned_external';
-  const needsReview = ['recoverable', 'managed_elsewhere', 'blocked', 'failed_install'].includes(service.userStatus) || !pinned;
-  const managementState = backendManagementState(service.managementState ?? (pinned ? 'linked' : 'found'));
-  const readinessState = backendReadinessState(service.readinessState ?? observedReadinessState(service, pinned));
-  const attentionState = backendAttentionState(service.attentionState ?? observedAttentionState(service, needsReview));
-
-  return {
-    access: observedAccessLabel(service),
-    attentionState,
-    availableActions: (service.availableActions ?? []).map((action) => ({
-      id: action.id,
-      label: action.label,
-      href: action.href,
-      disabled: action.disabled,
-      reason: action.reason,
-    })),
-    backup: 'Not managed',
-    category: service.category || 'Service',
-    catalogAppId: service.catalogAppId,
-    catalogMatchConfidence: service.catalogMatchConfidence,
-    description: service.userStatusDescription || service.category || 'Found service',
-    href: service.url || undefined,
-    id: `observed:${service.id}`,
-    iconUrl: preferredAppImageUrl(
-      service.metadata?.iconUrl,
-      service.metadata?.icon,
-      service.metadata?.appIcon,
-      service.metadata?.imageUrl,
-      service.metadata?.catalogImage,
-      catalogAppImageUrl(service.catalogAppId),
-    ) || undefined,
-    kind: pinned ? 'pinned' : 'observed',
-    lastEvent: service.userStatusLabel || undefined,
-    links: observedLinks(service),
-    managementState,
-    name: service.displayName || service.id,
-    nextAction: needsReview ? observedNextAction(service) : undefined,
-    operationState: idleOperationState(),
-    readinessState,
-    runtime: observedRuntimeDetails(service),
-    runtimeState: pinned ? 'shortcut' : 'found',
-    settings: observedSettings(service),
-    sortKey: `${managementState}:${(service.displayName || service.id).toLowerCase()}:${service.id}`,
-    sourceId: service.id,
-    status: pinned ? 'Pinned' : needsReview ? 'Needs review' : 'Found',
-    userStatus: service.userStatus,
-    userStatusDescription: service.userStatusDescription,
-    userStatusLabel: service.userStatusLabel,
   };
 }
 
@@ -196,44 +137,11 @@ function managedAttentionState(displayStatus: string, app: AppRuntimeView, needs
   return 'none';
 }
 
-function observedReadinessState(service: ObservedServiceView, pinned: boolean): AppReadinessState {
-  const runtimeState = service.runtimeState?.toLowerCase() ?? '';
-  if (!service.url && !pinned) {
-    return 'unknown';
-  }
-  if (runtimeState.includes('start')) {
-    return 'starting';
-  }
-  if (runtimeState.includes('pause')) {
-    return 'paused';
-  }
-  if (runtimeState.includes('stop') || runtimeState.includes('exit')) {
-    return 'stopped';
-  }
-  if (runtimeState.includes('unhealthy') || runtimeState.includes('unreachable')) {
-    return 'unreachable';
-  }
-  return service.url || pinned ? 'ready' : 'unknown';
-}
-
-function observedAttentionState(service: ObservedServiceView, needsReview: boolean): AppAttentionState {
-  if (service.userStatus === 'blocked') {
-    return 'blocked';
-  }
-  if (service.userStatus === 'managed_elsewhere') {
-    return 'conflict';
-  }
-  if (needsReview) {
-    return 'needs_review';
-  }
-  return 'none';
-}
-
 function backendManagementState(value: string): ApplicationSurfaceItem['managementState'] {
-  if (value === 'managed' || value === 'found' || value === 'linked') {
+  if (value === 'managed') {
     return value;
   }
-  return 'found';
+  return 'managed';
 }
 
 function backendReadinessState(value: string): AppReadinessState {
@@ -340,38 +248,6 @@ function managedNextAction(
   return undefined;
 }
 
-function observedNextAction(service: ObservedServiceView): ApplicationNextAction {
-  if (service.userStatus === 'failed_install') {
-    return {
-      description: service.userStatusDescription || 'Review this failed install before trying again.',
-      id: 'review_found_service',
-      label: 'Review install',
-    };
-  }
-
-  if (service.userStatus === 'recoverable') {
-    return {
-      description: service.userStatusDescription || 'Review this service before recovering it into Autark-OS.',
-      id: 'review_found_service',
-      label: 'Review recovery',
-    };
-  }
-
-  if (service.userStatus === 'managed_elsewhere') {
-    return {
-      description: service.userStatusDescription || 'This service appears to be owned outside this Autark-OS instance.',
-      id: 'review_found_service',
-      label: 'Review owner',
-    };
-  }
-
-  return {
-    description: service.userStatusDescription || 'Review this service before linking or recovering it.',
-    id: 'review_found_service',
-    label: 'Review service',
-  };
-}
-
 function accessLabel(app: AppRuntimeView, access?: AppAccessCheck): ApplicationSurfaceItem['access'] {
   if (app.canonicalAccessState === 'private_ready' || app.accessRoute?.privateLinkStatus === 'verified' || app.observedAccess?.privateLinkStatus === 'verified') {
     return 'Private';
@@ -380,17 +256,6 @@ function accessLabel(app: AppRuntimeView, access?: AppAccessCheck): ApplicationS
     return access?.status === 'unreachable' ? 'Local only' : 'Open';
   }
   return 'No link';
-}
-
-function observedAccessLabel(service: ObservedServiceView): ApplicationSurfaceItem['access'] {
-  const scope = service.accessScope.toLowerCase();
-  if (scope.includes('private') || scope.includes('tailscale')) {
-    return 'Private';
-  }
-  if (scope.includes('public') || scope.includes('internet')) {
-    return 'Open';
-  }
-  return service.url ? 'Local only' : 'No link';
 }
 
 function backupLabel(app: AppRuntimeView): ApplicationSurfaceItem['backup'] {
@@ -427,13 +292,6 @@ function appLinks(app: AppRuntimeView): ApplicationSurfaceItem['links'] {
     privateUrl: app.accessRoute?.privateLinkStatus === 'verified'
       ? app.accessRoute.privateUrl || undefined
       : app.observedAccess?.privateLinkStatus === 'verified' ? app.observedAccess.privateUrl || undefined : undefined,
-  };
-}
-
-function observedLinks(service: ObservedServiceView): ApplicationSurfaceItem['links'] {
-  return {
-    primaryUrl: service.url || undefined,
-    localUrl: service.url || undefined,
   };
 }
 
@@ -474,42 +332,6 @@ function appRuntimeDetails(
     telemetry: telemetry ?? app.telemetry ?? null,
     usageGuide: app.usageGuide ?? null,
     version: app.version || undefined,
-  };
-}
-
-function observedSettings(service: ObservedServiceView): ApplicationSurfaceItem['settings'] {
-  return {
-    autoRepairEnabled: false,
-    backupEnabled: false,
-    backupFrequency: 'daily',
-    backupRetention: 7,
-    canEdit: false,
-    containerDetail: service.userStatusDescription || 'Autark-OS observes this service but does not manage its container.',
-    containerStatus: service.runtimeState || service.userStatusLabel || 'Observed',
-    desiredAccessMode: service.accessScope || 'external',
-    expectedLocalPort: portFromUrl(service.url || undefined),
-    expectedProtocol: protocolFromUrl(service.url || undefined),
-    privateAccessRequired: false,
-    privateAccessUrl: undefined,
-    privateLinkStatus: service.accessScope || 'not_managed',
-    tailscaleEnabled: service.accessScope.toLowerCase().includes('tailscale') || service.accessScope.toLowerCase().includes('private'),
-  };
-}
-
-function observedRuntimeDetails(service: ObservedServiceView): ApplicationSurfaceItem['runtime'] {
-  return {
-    appConfiguration: [],
-    checkedAt: undefined,
-    composeProject: service.metadata?.composeProject || service.id,
-    health: null,
-    image: null,
-    lastBackup: undefined,
-    recentEvents: [],
-    runtimePath: service.metadata?.runtimePath,
-    setupGuide: null,
-    telemetry: null,
-    usageGuide: null,
-    version: undefined,
   };
 }
 

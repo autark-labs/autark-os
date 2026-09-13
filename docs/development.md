@@ -112,8 +112,8 @@ both clean and previously migrated databases.
 ### Product language
 
 Use **Discover** for the catalog; call an app **installed** only when the
-current instance manages it. Host-detected resources are **Found on this
-server** and user-added shortcuts are **Linked services**. Use **Pause** and
+current instance manages it. Recoverable Autark resources are **Recovery
+required**, while unrelated services are only surfaced when they **Block** an install. Use **Pause** and
 **Resume** for routine lifecycle controls. Say **Protected by a restore point**
 only after a successful restore point exists. User-facing support output is a
 **Support report**; technical names belong in Diagnostics or advanced detail.

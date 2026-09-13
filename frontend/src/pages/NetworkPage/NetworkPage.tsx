@@ -94,7 +94,6 @@ function NetworkPage() {
   const deepLinkTarget = useMemo(() => parseAccessDeepLink(location.search), [location.search]);
 
   const apps = appState.apps;
-  const observedServices = appState.observedServices;
   const pageLoading = network.isLoading || appState.isLoading;
   const pageRefreshing = network.isFetching || appState.isFetching;
   const pageError = actionError ?? (network.error ? apiErrorMessage(network.error, 'Unable to load network status.') : null);
@@ -107,14 +106,12 @@ function NetworkPage() {
   }, [appState, network]);
 
   const devices = useMemo(() => buildDeviceViews(network.tailscale, network.tailnetDevices), [network.tailnetDevices, network.tailscale]);
-  const pinnedExternalServices = useMemo(() => observedServices.filter((service) => service.userStatus === 'pinned_external'), [observedServices]);
   const issues = useMemo(() => buildNetworkIssues(network.diagnostics, network.reconciliation), [network.diagnostics, network.reconciliation]);
   const reachabilityServices = useMemo(() => buildReachabilityServices({
     apps,
-    pinnedExternalServices,
     reconciliation: network.reconciliation,
     tailscale: network.tailscale,
-  }), [apps, network.reconciliation, network.tailscale, pinnedExternalServices]);
+  }), [apps, network.reconciliation, network.tailscale]);
   const displayedReachabilityServices = useMemo(
     () => applyPendingReachability(reachabilityServices, pendingReachabilityByServiceId),
     [pendingReachabilityByServiceId, reachabilityServices],
@@ -458,7 +455,6 @@ function ServiceTypeFilterDropdown({
 }) {
   const options: Array<{ label: string; value: ReachabilityTypeFilter }> = [
     { label: 'Managed apps', value: 'managed' },
-    { label: 'Pinned services', value: 'external' },
     { label: 'Needs attention', value: 'attention' },
   ];
 

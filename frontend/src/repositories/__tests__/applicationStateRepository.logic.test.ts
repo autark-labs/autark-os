@@ -10,7 +10,6 @@ import {
   foundServices,
   healthByAppId,
   managedRuntimeApps,
-  pinnedExternalServices,
   removeManagedAppFromState,
   setAutarkOsJobInState,
   setRuntimeAppInState,
@@ -18,7 +17,6 @@ import {
   setObservedServiceAdoptedInState,
   observedServices,
   ownershipViews,
-  setObservedServicePinnedInState,
   telemetryByAppId,
 } from '../applicationStateRepository.logic';
 import type { ApplicationState } from '@/types/applicationState';
@@ -109,7 +107,6 @@ test('repository selectors expose canonical app-state slices', () => {
   const state = {
     runtimeApps: [runtimeApp('vaultwarden', 'Ready')],
     observedServices: [{ id: 'docker:found', userStatus: 'found_on_server' }],
-    pinnedExternalServices: [{ id: 'docker:linked', userStatus: 'pinned_external' }],
     foundServices: [{ id: 'docker:found', userStatus: 'found_on_server' }],
     ownershipViews: [{ catalogAppId: 'vaultwarden', state: 'installed_managed' }],
     updatedAt,
@@ -117,7 +114,6 @@ test('repository selectors expose canonical app-state slices', () => {
 
   assert.deepEqual(managedRuntimeApps(state).map((app) => app.appId), ['vaultwarden']);
   assert.deepEqual(observedServices(state).map((service) => service.id), ['docker:found']);
-  assert.deepEqual(pinnedExternalServices(state).map((service) => service.id), ['docker:linked']);
   assert.deepEqual(foundServices(state).map((service) => service.id), ['docker:found']);
   assert.deepEqual(ownershipViews(state).map((view) => view.catalogAppId), ['vaultwarden']);
   assert.equal(applicationStateUpdatedAt(state)?.getTime(), new Date(updatedAt).getTime());
@@ -129,7 +125,6 @@ function applicationState(overrides: Partial<ApplicationState> = {}): Applicatio
     managedApps: [],
     observedServices: [],
     ownershipViews: [],
-    pinnedExternalServices: [],
     runtimeApps: [],
     updatedAt,
     stale: false,
@@ -237,36 +232,6 @@ test('a running app with an unresponsive local link is unavailable in the normal
   assert.equal(appNeedsAttentionFromCanonicalState(app, app.healthSnapshot, access, app.telemetry), true);
 });
 
-test('observed service pinned-state helper preserves recoverable state', () => {
-  const state = {
-    observedServices: [
-      observedService('docker:vaultwarden', 'recoverable', false),
-      observedService('docker:gitlab', 'found_on_server', false),
-    ],
-    pinnedExternalServices: [],
-    foundServices: [],
-  };
-
-  const pinnedRecoverable = setObservedServicePinnedInState(state, 'docker:vaultwarden', true);
-  const pinnedFound = setObservedServicePinnedInState(state, 'docker:gitlab', true);
-  const unpinnedFound = setObservedServicePinnedInState(pinnedFound, 'docker:gitlab', false);
-
-  assert.equal(pinnedRecoverable.observedServices[0].pinned, true);
-  assert.equal(pinnedRecoverable.observedServices[0].userStatus, 'recoverable');
-  assert.equal(pinnedRecoverable.observedServices[0].managementState, 'linked');
-  assert.equal(pinnedRecoverable.observedServices[0].availableActions.some((action) => action.id === 'unpin'), true);
-  assert.equal(pinnedRecoverable.observedServices[0].availableActions.some((action) => action.id === 'pin'), false);
-  assert.deepEqual(pinnedRecoverable.pinnedExternalServices.map((service) => service.id), ['docker:vaultwarden']);
-  assert.equal(pinnedFound.observedServices[1].userStatus, 'pinned_external');
-  assert.equal(pinnedFound.observedServices[1].managementState, 'linked');
-  assert.equal(pinnedFound.observedServices[1].availableActions.some((action) => action.id === 'unpin'), true);
-  assert.equal(unpinnedFound.observedServices[1].pinned, false);
-  assert.equal(unpinnedFound.observedServices[1].userStatus, 'found_on_server');
-  assert.equal(unpinnedFound.observedServices[1].managementState, 'found');
-  assert.equal(unpinnedFound.observedServices[1].availableActions.some((action) => action.id === 'pin'), true);
-  assert.equal(unpinnedFound.observedServices[1].availableActions.some((action) => action.id === 'unpin'), false);
-});
-
 test('observed service adoption helper moves a recoverable service into managed app views', () => {
   const state = {
     runtimeApps: [],
@@ -279,7 +244,6 @@ test('observed service adoption helper moves a recoverable service into managed 
         runtimeState: 'running',
       },
     ],
-    pinnedExternalServices: [],
     foundServices: [],
   };
 
@@ -292,15 +256,15 @@ test('observed service adoption helper moves a recoverable service into managed 
   assert.deepEqual(adopted.managedApps.map((app) => [app.catalogAppId, app.name, app.userStatus]), [
     ['vaultwarden', 'Vaultwarden', 'Ready'],
   ]);
-  assert.deepEqual(adopted.observedServices.map((service) => [service.id, service.userStatus, service.managedByThisAutarkOs, service.pinned]), [
-    ['docker:vaultwarden', 'installed_managed', true, false],
+  assert.deepEqual(adopted.observedServices.map((service) => [service.id, service.userStatus, service.managedByThisAutarkOs]), [
+    ['docker:vaultwarden', 'installed_managed', true],
   ]);
 });
 
 test('catalogAppIsManaged finds managed runtime and managed instance records', () => {
   assert.equal(catalogAppIsManaged({ runtimeApps: [runtimeApp('pi-hole', 'Ready')] }, 'pi-hole'), true);
   assert.equal(catalogAppIsManaged({ managedApps: [{ catalogAppId: 'pi-hole' }] }, 'pi-hole'), true);
-  assert.equal(catalogAppIsManaged({ observedServices: [observedService('docker:pi-hole', 'pinned_external', true)] }, 'pi-hole'), false);
+  assert.equal(catalogAppIsManaged({ observedServices: [observedService('docker:pi-hole', 'found_on_server', false)] }, 'pi-hole'), false);
 });
 
 test('runtime app cache helpers update routine management state', () => {
@@ -530,7 +494,7 @@ function health(status, localAccessStatus) {
   };
 }
 
-function observedService(id, userStatus, pinned) {
+function observedService(id, userStatus, _legacyPinned) {
   return {
     id,
     source: 'docker',
@@ -544,7 +508,6 @@ function observedService(id, userStatus, pinned) {
     userStatusDescription: userStatus === 'recoverable' ? 'Recoverable Autark-OS app.' : 'Found on this server.',
     ownershipState: userStatus === 'recoverable' ? 'legacy_autark_os' : 'external_docker',
     runtimeState: 'running',
-    pinned,
     managedByThisAutarkOs: false,
     availableActions: [],
   };

@@ -8,7 +8,6 @@ import {
   HardDrive,
   LockKeyhole,
   MoreVertical,
-  Pin,
   Server,
   Settings,
   ShieldCheck,
@@ -114,19 +113,18 @@ function EmptyAppCard() {
   );
 }
 
-export function DashboardSummaryGrid({ metrics, pinnedCount, observedCount }: { metrics: Record<'access' | 'backups' | 'docker' | 'storage', HomeSystemMetric>; pinnedCount: number; observedCount: number }) {
+export function DashboardSummaryGrid({ metrics }: { metrics: Record<'access' | 'backups' | 'docker' | 'storage', HomeSystemMetric> }) {
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,1.25fr)_minmax(20rem,0.75fr)]">
-      <SystemStatusSummary metrics={metrics} observedCount={observedCount} pinnedCount={pinnedCount} />
+      <SystemStatusSummary metrics={metrics} />
       <QuickLinksPanel />
     </div>
   );
 }
 
-function SystemStatusSummary({ metrics, observedCount, pinnedCount }: { metrics: Record<'access' | 'backups' | 'docker' | 'storage', HomeSystemMetric>; observedCount: number; pinnedCount: number }) {
+function SystemStatusSummary({ metrics }: { metrics: Record<'access' | 'backups' | 'docker' | 'storage', HomeSystemMetric> }) {
   const items = [
     { detail: metrics.docker.detail, icon: Server, label: 'Docker', tone: metrics.docker.tone, value: metrics.docker.value },
-    { detail: observedCount ? `${observedCount} service${observedCount === 1 ? '' : 's'} to review` : `${pinnedCount} pinned service${pinnedCount === 1 ? '' : 's'}`, icon: Pin, label: 'Pinned services', tone: 'info' as const, value: pinnedCount ? 'Available' : 'None' },
     { detail: metrics.access.detail, icon: Wifi, label: 'Access', tone: metrics.access.tone, value: metrics.access.value },
     { detail: metrics.backups.detail, icon: ShieldCheck, label: 'Backups', tone: metrics.backups.tone, value: metrics.backups.value },
     { detail: metrics.storage.detail, icon: HardDrive, label: 'Storage', tone: metrics.storage.tone, value: metrics.storage.value },

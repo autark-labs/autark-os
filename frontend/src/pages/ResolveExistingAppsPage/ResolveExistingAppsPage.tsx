@@ -3,8 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ExternalLink, Pin, RefreshCw, ShieldAlert } from 'lucide-react';
-import { ObservedServicesAPIClient } from '@/api/ObservedServicesAPIClient';
+import { ExternalLink, RefreshCw, ShieldAlert } from 'lucide-react';
 import { PageShell } from '@/components/layout/PageShell';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
@@ -13,16 +12,13 @@ import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
 import { Surface } from '@/components/primitives/Surface';
-import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { showActionNotification } from '@/lib/actionNotifications';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import type { ObservedServiceActionResult, ObservedServiceView } from '@/types/observedService';
 import { ObservedServiceDetailsSheet } from './ObservedServiceDetailsSheet';
-import {
-  resolveExistingServiceActions,
-  visibleResolveExistingServices,
-} from './ResolveExistingAppsPage.logic';
+import { visibleResolveExistingServices } from './ResolveExistingAppsPage.logic';
 
 function ResolveExistingAppsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,7 +27,6 @@ function ResolveExistingAppsPage() {
   const appState = useApplicationStateRepository();
   const [selectedId, setSelectedId] = useState<string | null>(requestedServiceId);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const services = appState.observedServices;
   const error = localError;
@@ -73,19 +68,6 @@ function ResolveExistingAppsPage() {
     await appState.refresh();
   }
 
-  async function pinService(service: ObservedServiceView) {
-    setBusyId(service.id);
-    try {
-      const result = await ObservedServicesAPIClient.pin(service.id);
-      syncCanonicalAppMutationResult(queryClient, result);
-      showActionNotification(result, result.title || `${service.displayName} pinned`);
-    } catch (pinError) {
-      showActionErrorNotification(pinError, 'Service could not be pinned');
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   function handleObservedServiceResult(result: ObservedServiceActionResult) {
     syncCanonicalAppMutationResult(queryClient, result);
     showActionNotification(result, result.title || 'Service action finished');
@@ -121,15 +103,13 @@ function ResolveExistingAppsPage() {
           <ResolvePanel>
             <div>
               <h2 className="text-lg font-bold text-white">{visibleServices.length} observed service{visibleServices.length === 1 ? '' : 's'}</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-400">Select a found or pinned service to review safe actions.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-400">Select an existing service to review safe actions.</p>
             </div>
             {visibleServices.length ? (
               <div className="grid gap-3">
                 {visibleServices.map((service) => (
                   <ServiceSummaryCard
-                    busy={busyId === service.id}
                     key={service.id}
-                    onPin={() => pinService(service)}
                     onReview={() => selectService(service.id)}
                     selected={selectedId === service.id}
                     service={service}
@@ -145,8 +125,6 @@ function ResolveExistingAppsPage() {
           </ResolvePanel>
 
           <ServiceDetailsPreview
-            busy={Boolean(selectedService && busyId === selectedService.id)}
-            onPin={selectedService ? () => pinService(selectedService) : undefined}
             onReview={selectedService ? () => selectService(selectedService.id) : undefined}
             service={selectedService}
           />
@@ -165,20 +143,14 @@ function ResolveExistingAppsPage() {
 }
 
 function ServiceSummaryCard({
-  busy,
-  onPin,
   onReview,
   selected,
   service,
 }: {
-  busy: boolean;
-  onPin: () => void;
   onReview: () => void;
   selected: boolean;
   service: ObservedServiceView;
 }) {
-  const actions = resolveExistingServiceActions(service);
-  const canPin = actions.some((action) => action.id === 'pin');
   return (
     <ResolveCard className={cn('transition hover:-translate-y-0.5 hover:border-cyan-300/45 hover:bg-slate-800', selected && 'border-cyan-300/45 shadow-lg shadow-cyan-950/30 ring-1 ring-cyan-300/40')}>
       <button className="w-full text-left" onClick={onReview} type="button">
@@ -205,27 +177,15 @@ function ServiceSummaryCard({
           <ShieldAlert className="size-4" />
           Review
         </ProjectPrimaryButton>
-        {canPin && (
-          <DisabledAction disabled={busy} reason="Autark-OS is already pinning this service.">
-            <ProjectDarkControlButton disabled={busy} onClick={onPin} size="sm" type="button">
-              <Pin className="size-4" />
-              Pin to My Apps
-            </ProjectDarkControlButton>
-          </DisabledAction>
-        )}
       </div>
     </ResolveCard>
   );
 }
 
 function ServiceDetailsPreview({
-  busy,
-  onPin,
   onReview,
   service,
 }: {
-  busy: boolean;
-  onPin?: () => void;
   onReview?: () => void;
   service: ObservedServiceView | null;
 }) {
@@ -233,13 +193,10 @@ function ServiceDetailsPreview({
     return (
       <ResolveCard>
         <p className="m-0 font-bold text-white">No service selected</p>
-        <p className="mt-1 text-sm text-slate-400">Select a found or pinned service to review actions.</p>
+        <p className="mt-1 text-sm text-slate-400">Select an existing service to review actions.</p>
       </ResolveCard>
     );
   }
-
-  const actions = resolveExistingServiceActions(service);
-  const canPin = actions.some((action) => action.id === 'pin');
 
   return (
     <ResolvePanel>
@@ -279,14 +236,6 @@ function ServiceDetailsPreview({
                 Review service details
               </ProjectPrimaryButton>
             </DisabledAction>
-            {canPin && (
-              <DisabledAction disabled={busy || !onPin} reason={busy ? 'Autark-OS is already pinning this service.' : 'Select a found service before pinning it.'}>
-                <ProjectDarkControlButton disabled={busy || !onPin} onClick={onPin} type="button">
-                  <Pin className="size-4" />
-                  Pin to My Apps
-                </ProjectDarkControlButton>
-              </DisabledAction>
-            )}
           </div>
         </div>
       </ResolveCard>
@@ -313,7 +262,6 @@ function ResolveCard({ children, className }: { children: ReactNode; className?:
 
 function stateLabel(service: ObservedServiceView) {
   if (service.managedByThisAutarkOs) return 'Managed';
-  if (service.pinned || service.userStatus === 'pinned_external') return 'Pinned';
   if (service.userStatus === 'recoverable') return 'Recoverable';
   if (service.userStatus === 'managed_elsewhere') return 'Managed elsewhere';
   if (service.userStatus === 'blocked') return 'Blocked';
@@ -325,7 +273,6 @@ function stateTone(service: ObservedServiceView): 'success' | 'warning' | 'dange
   if (service.managedByThisAutarkOs) return 'success';
   if (service.userStatus === 'managed_elsewhere' || service.userStatus === 'blocked') return 'danger';
   if (service.userStatus === 'recoverable' || service.userStatus === 'failed_install') return 'warning';
-  if (service.pinned || service.userStatus === 'pinned_external') return 'info';
   return 'neutral';
 }
 

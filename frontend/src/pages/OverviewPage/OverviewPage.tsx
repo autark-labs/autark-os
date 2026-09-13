@@ -13,8 +13,6 @@ function OverviewPage() {
 
   const apps = useMemo(() => appState.applicationState?.managedApps ?? [], [appState.applicationState]);
   const readyApps = useMemo(() => apps.filter((app) => app.userStatus === 'Ready'), [apps]);
-  const pinnedServices = appState.pinnedExternalServices;
-  const observedNeedingReview = appState.foundServices;
   const deviceName = home.summary?.deviceName || 'Autark-OS';
   const summaryAvailability = homeSummaryAvailability(home.summary, home.summaryError);
   const systemMetrics = homeSystemMetrics(home.summary, summaryAvailability);
@@ -31,11 +29,7 @@ function OverviewPage() {
         </HomeHero>
       </ExtensionActionTarget>
 
-      <DashboardSummaryGrid
-        metrics={systemMetrics}
-        observedCount={observedNeedingReview.length}
-        pinnedCount={pinnedServices.length}
-      />
+      <DashboardSummaryGrid metrics={systemMetrics} />
 
       {home.error && (
         <div className="rounded-lg border border-amber-300/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-100/80" role="status">

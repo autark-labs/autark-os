@@ -306,7 +306,6 @@ function ReachabilityCard({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               <h4 className="min-w-0 flex-1 truncate text-sm font-bold text-slate-50">{service.label}</h4>
-              {service.type === 'external-service' && <MetadataBadge className="px-2 py-0.5 text-[0.65rem]">Pinned</MetadataBadge>}
             </div>
             <p className="truncate text-xs text-cyan-50/65">{service.issue || service.detail}</p>
           </div>
@@ -347,13 +346,7 @@ function ReachabilityCard({
                 value={service.privateUrl || 'No private link'}
               />
             </div>
-            {service.draggable ? (
-              <SecurityPostureToggleGroup loading={loading} onMoveService={onMoveService} service={service} />
-            ) : (
-              <p className="mt-3 rounded-lg border border-cyan-200/15 bg-cyan-950/60 px-3 py-2 text-xs leading-5 text-cyan-50/65">
-                Pinned services are tracked here for visibility. Manage their security posture outside Autark-OS.
-              </p>
-            )}
+            <SecurityPostureToggleGroup loading={loading} onMoveService={onMoveService} service={service} />
           </AccordionContent>
         </AccordionItem>
       </Accordion>
@@ -433,8 +426,6 @@ function ServiceIcon({ loading, service, statusClass }: { loading: boolean; serv
         <Lock className="size-4 animate-pulse" />
       ) : service.iconUrl ? (
         <img alt="" className="size-full object-contain p-1" src={service.iconUrl} />
-      ) : service.type === 'external-service' ? (
-        <Router className="size-4" />
       ) : (
         <span className="text-xs font-black">{service.label.slice(0, 2).toUpperCase()}</span>
       )}
