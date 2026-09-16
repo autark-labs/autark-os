@@ -182,16 +182,34 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
 
     private long zipStrict(Map<String, Path> sources, Path destination) throws IOException {
         AtomicLong writtenBytes = new AtomicLong();
-        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(destination))) {
-            List<ArchiveFilesystemMetadata.Entry> metadata = new java.util.ArrayList<>();
-            for (Map.Entry<String, Path> source : sources.entrySet()) {
-                writeDirectoryStrict(zip, source.getValue(), source.getKey(), writtenBytes);
-                metadata.addAll(ArchiveFilesystemMetadata.capture(source.getValue(), source.getKey()));
+        Path parent = destination.toAbsolutePath().normalize().getParent();
+        if (parent == null) {
+            throw new IOException("Backup destination has no parent folder.");
+        }
+        Path staging = Files.createTempFile(parent, "." + destination.getFileName() + "-", ".tmp");
+        try {
+            try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(staging))) {
+                List<ArchiveFilesystemMetadata.Entry> metadata = new java.util.ArrayList<>();
+                for (Map.Entry<String, Path> source : sources.entrySet()) {
+                    writeDirectoryStrict(zip, source.getValue(), source.getKey(), writtenBytes);
+                    metadata.addAll(ArchiveFilesystemMetadata.capture(source.getValue(), source.getKey()));
+                }
+                ArchiveFilesystemMetadata.write(zip, metadata);
             }
-            ArchiveFilesystemMetadata.write(zip, metadata);
+            moveArchive(staging, destination);
+        } finally {
+            Files.deleteIfExists(staging);
         }
         long archiveSize = Files.size(destination);
         return archiveSize > 0 ? archiveSize : writtenBytes.get();
+    }
+
+    private void moveArchive(Path source, Path destination) throws IOException {
+        try {
+            Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException exception) {
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private void writeDirectoryStrict(ZipOutputStream zip, Path source, String prefix, AtomicLong writtenBytes) throws IOException {

@@ -205,7 +205,7 @@ public class AutarkOsFileOpsService {
         command.addAll(List.of(args));
         CommandResult result = commandRunner.run(command.toArray(String[]::new));
         if (!result.successful()) {
-            throw new IOException("Autark-OS could not complete privileged file operation " + operation + ". " + conciseOutput(result));
+            throw new IOException(operationFailureMessage(operation) + " " + conciseOutput(result));
         }
     }
 
@@ -229,15 +229,36 @@ public class AutarkOsFileOpsService {
     }
 
     private String conciseOutput(CommandResult result) {
+        Path helperPath = Path.of(helperCommand);
+        if (!Files.isRegularFile(helperPath)) {
+            return "The required file helper is not installed. Reinstall the Autark-OS system service, then try again.";
+        }
+        if (!Files.isExecutable(helperPath)) {
+            return "The required file helper is installed but cannot be run. Reinstall the Autark-OS system service to repair it, then try again.";
+        }
         if (result.missingCommand()) {
-            return "Install the autark-os-fileops helper and rerun Autark-OS setup.";
+            return "The system could not start the privileged file operation. Check that sudo is installed and available to the Autark-OS service.";
         }
         String firstLine = result.output().isEmpty() ? "" : result.output().get(0);
-        String normalized = firstLine.toLowerCase();
+        String normalized = String.join("\n", result.output()).toLowerCase();
         if (normalized.contains("sudo") && normalized.contains("password")) {
-            return "The current backend user cannot run the bounded fileops helper without a password. Run Autark-OS through the autarkos service user or rerun install-autark-os-service.sh to repair helper sudo access.";
+            return "Autark-OS does not have permission to run its file helper. Reinstall the Autark-OS system service to repair this permission, then try again.";
+        }
+        if (normalized.contains("not allowed") || normalized.contains("not in the sudoers")) {
+            return "Autark-OS does not have permission to run its file helper. Reinstall the Autark-OS system service to repair this permission, then try again.";
         }
         return firstLine.isBlank() ? "No details were returned." : firstLine;
+    }
+
+    private String operationFailureMessage(String operation) {
+        return switch (operation) {
+            case "create-safety-archive", "create-full-archive" -> "Autark-OS could not create the backup archive.";
+            case "restore-app-data" -> "Autark-OS could not restore the app data.";
+            case "delete-backup" -> "Autark-OS could not delete the backup.";
+            case "clear-runtime" -> "Autark-OS could not clear the app data.";
+            case "configure-backup-destination" -> "Autark-OS could not configure the backup destination.";
+            default -> "Autark-OS could not complete the privileged file operation.";
+        };
     }
 
     interface CommandRunner {

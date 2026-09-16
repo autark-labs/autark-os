@@ -60,6 +60,7 @@ chmod 700 "${app_root}/empty-state"
 unzip -l "${safety}" | grep -q 'config/configuration.yaml'
 unzip -l "${safety}" | grep -q 'empty-state/'
 unzip -l "${safety}" | grep -q '.autark-os-filesystem.json'
+[[ "$(stat -c '%a' "${safety}")" == "644" ]]
 
 mkdir -p "${runtime_root}/apps/grafana"
 printf 'grafana\n' >"${runtime_root}/apps/grafana/config.ini"
@@ -71,6 +72,24 @@ printf 'grafana\n' >"${runtime_root}/apps/grafana/config.ini"
 
 unzip -l "${full_archive}" | grep -q 'home-assistant/config/configuration.yaml'
 unzip -l "${full_archive}" | grep -q 'grafana/config.ini'
+
+mkdir -p "${runtime_root}/apps/broken"
+printf 'included before failure\n' >"${runtime_root}/apps/broken/content.txt"
+ln -s "${tmp_dir}/outside.txt" "${runtime_root}/apps/broken/linked.txt"
+broken_archive="${backup_root}/broken.zip"
+if "${repo_root}/scripts/autark-os-fileops" create-safety-archive \
+  --runtime-root "${runtime_root}" \
+  --backup-root "${backup_root}" \
+  --app broken \
+  --destination "${broken_archive}" >/dev/null 2>&1; then
+  echo "expected archive containing a symbolic link to fail" >&2
+  exit 1
+fi
+[[ ! -e "${broken_archive}" ]]
+if compgen -G "${backup_root}/.broken.zip-*.tmp" >/dev/null; then
+  echo "failed archive left a temporary file behind" >&2
+  exit 1
+fi
 
 if "${repo_root}/scripts/autark-os-fileops" delete-backup \
   --runtime-root "${runtime_root}" \

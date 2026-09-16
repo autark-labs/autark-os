@@ -10,6 +10,7 @@ Autark-OS service user permission to manage Tailscale Serve.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import grp
 import os
 from pathlib import Path
@@ -307,6 +308,25 @@ def write_filesystem_metadata(archive: zipfile.ZipFile, entries: list[dict[str, 
     archive.writestr(FILESYSTEM_METADATA_ENTRY, json.dumps({"schemaVersion": FILESYSTEM_METADATA_SCHEMA, "entries": entries}, separators=(",", ":")))
 
 
+def publish_archive(destination: Path, write_contents: Callable[[zipfile.ZipFile], None]) -> None:
+    descriptor, staging_name = tempfile.mkstemp(
+        prefix=f".{destination.name}-",
+        suffix=".tmp",
+        dir=destination.parent,
+    )
+    os.close(descriptor)
+    staging = Path(staging_name)
+    try:
+        with zipfile.ZipFile(staging, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            write_contents(archive)
+        # The helper runs as root, but the unprivileged service verifies the
+        # completed archive immediately after publication.
+        staging.chmod(0o644)
+        os.replace(staging, destination)
+    finally:
+        staging.unlink(missing_ok=True)
+
+
 def restore_metadata(restore_zip: zipfile.ZipFile, scope: str, app_id: str) -> dict[str, dict[str, int | str]]:
     try:
         document = json.loads(restore_zip.read(FILESYSTEM_METADATA_ENTRY))
@@ -413,8 +433,11 @@ def create_safety_archive(args: argparse.Namespace) -> None:
     if destination.suffix != ".zip":
         die("archive destination must be a .zip file")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+
+    def write_contents(archive: zipfile.ZipFile) -> None:
         write_filesystem_metadata(archive, archive_tree(archive, source))
+
+    publish_archive(destination, write_contents)
     print(f"archived {args.app}")
 
 
@@ -426,7 +449,8 @@ def create_full_archive(args: argparse.Namespace) -> None:
     if not app_ids:
         die("--apps must include at least one app id")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+
+    def write_contents(archive: zipfile.ZipFile) -> None:
         entries: list[dict[str, int | str]] = []
         for app_id in app_ids:
             source = app_root(argparse.Namespace(runtime_root=args.runtime_root, app=app_id))
@@ -434,6 +458,8 @@ def create_full_archive(args: argparse.Namespace) -> None:
                 continue
             entries.extend(archive_tree(archive, source, app_id))
         write_filesystem_metadata(archive, entries)
+
+    publish_archive(destination, write_contents)
     print(f"archived {','.join(app_ids)}")
 
 

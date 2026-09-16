@@ -185,16 +185,41 @@ class AutarkOsFileOpsServiceTests {
         Path backupRoot = layout.runtimeRoot().resolve("backups").resolve("full");
         Files.createDirectories(backupRoot);
         Path archive = backupRoot.resolve("full.zip");
+        Path helper = tempDir.resolve("autark-os-fileops");
+        Files.writeString(helper, "#!/bin/sh\n");
+        helper.toFile().setExecutable(true);
         AutarkOsFileOpsService service = new AutarkOsFileOpsService(
                 layout,
                 new DeniedAutarkOsFileOperations(),
-                command -> new AutarkOsFileOpsService.CommandResult(1, List.of("sudo: a password is required"), false));
+                command -> new AutarkOsFileOpsService.CommandResult(1, List.of("sudo: a password is required"), false),
+                helper.toString());
 
         assertThatThrownBy(() -> service.createFullArchive(List.of("grafana"), archive))
                 .isInstanceOf(java.io.IOException.class)
-                .hasMessageContaining("current backend user")
-                .hasMessageContaining("autarkos service user")
-                .hasMessageContaining("install-autark-os-service.sh");
+                .hasMessageContaining("could not create the backup archive")
+                .hasMessageContaining("does not have permission")
+                .hasMessageContaining("Reinstall the Autark-OS system service");
+    }
+
+    @Test
+    void privilegedFailureExplainsWhenBoundedHelperIsMissing() throws Exception {
+        RuntimeLayout layout = layout();
+        Path backupRoot = layout.runtimeRoot().resolve("backups").resolve("full");
+        Files.createDirectories(backupRoot);
+        Path archive = backupRoot.resolve("full.zip");
+        Path missingHelper = tempDir.resolve("missing-autark-os-fileops");
+        AutarkOsFileOpsService service = new AutarkOsFileOpsService(
+                layout,
+                new DeniedAutarkOsFileOperations(),
+                command -> new AutarkOsFileOpsService.CommandResult(1, List.of("sudo: a password is required"), false),
+                missingHelper.toString());
+
+        assertThatThrownBy(() -> service.createFullArchive(List.of("grafana"), archive))
+                .isInstanceOf(java.io.IOException.class)
+                .hasMessageContaining("could not create the backup archive")
+                .hasMessageContaining("required file helper is not installed")
+                .hasMessageContaining("Reinstall the Autark-OS system service")
+                .hasMessageNotContaining("password");
     }
 
     @Test
@@ -246,12 +271,19 @@ class AutarkOsFileOpsServiceTests {
     void localArchiveRejectsSymbolicLinksInsteadOfSilentlyOmittingThem() throws Exception {
         Path source = tempDir.resolve("source");
         Files.createDirectories(source);
+        Files.writeString(source.resolve("included-before-failure.txt"), "partial data");
         Files.writeString(tempDir.resolve("outside.txt"), "outside");
         Files.createSymbolicLink(source.resolve("linked.txt"), tempDir.resolve("outside.txt"));
+        Path archive = tempDir.resolve("backup.zip");
 
-        assertThatThrownBy(() -> new LocalAutarkOsFileOperations().createArchive(source, tempDir.resolve("backup.zip")))
+        assertThatThrownBy(() -> new LocalAutarkOsFileOperations().createArchive(source, archive))
                 .isInstanceOf(java.io.IOException.class)
                 .hasMessageContaining("symbolic links");
+        assertThat(archive).doesNotExist();
+        try (var files = Files.list(tempDir)) {
+            assertThat(files.map(path -> path.getFileName().toString()))
+                    .noneMatch(name -> name.startsWith(".backup.zip-") && name.endsWith(".tmp"));
+        }
     }
 
     private RuntimeLayout layout() {
