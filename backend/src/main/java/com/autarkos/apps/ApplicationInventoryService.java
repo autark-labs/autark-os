@@ -11,12 +11,12 @@ import com.autarkos.api.AutarkOsStates;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.AppInstanceView;
+import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.system.BetaScope;
 
@@ -26,26 +26,20 @@ public class ApplicationInventoryService {
     private final MarketplaceCatalogService catalogService;
     private final InstalledAppRepository installedAppRepository;
     private final ObservedServiceService observedServiceService;
-    private final DockerOwnershipService dockerOwnershipService;
-    private final com.autarkos.marketplace.install.AppInstanceViewProvider appViews;
+    private final ManagedAppAttestationService managedApps;
+    private final AppInstanceViewProvider appViews;
 
-    @org.springframework.beans.factory.annotation.Autowired
     public ApplicationInventoryService(
             MarketplaceCatalogService catalogService,
             InstalledAppRepository installedAppRepository,
             ObservedServiceService observedServiceService,
-            DockerOwnershipService dockerOwnershipService,
-            com.autarkos.marketplace.install.AppInstanceViewProvider appViews) {
+            ManagedAppAttestationService managedApps,
+            AppInstanceViewProvider appViews) {
         this.catalogService = catalogService;
         this.installedAppRepository = installedAppRepository;
         this.observedServiceService = observedServiceService;
-        this.dockerOwnershipService = dockerOwnershipService;
+        this.managedApps = managedApps;
         this.appViews = appViews;
-    }
-
-    public ApplicationInventoryService(MarketplaceCatalogService catalogService, InstalledAppRepository installedAppRepository,
-            ObservedServiceService observedServiceService, DockerOwnershipService dockerOwnershipService) {
-        this(catalogService, installedAppRepository, observedServiceService, dockerOwnershipService, List::of);
     }
 
     public List<ApplicationView> apps() {
@@ -83,9 +77,6 @@ public class ApplicationInventoryService {
     }
 
     private List<ObservedService> cachedObservedServices() {
-        if (observedServiceService == null) {
-            return List.of();
-        }
         return observedServiceService.observedServices();
     }
 
@@ -95,23 +86,23 @@ public class ApplicationInventoryService {
             java.util.Map<String, String> links,
             AppInstanceView managed,
             AppRuntimeView runtime) {
-        InstalledApp storedRegistration = installedAppRepository.findAppById(manifest.id())
-                .filter(app -> ownershipCompatible(manifest.id()))
-                .map(app -> new InstalledApp(app.appId(), app.appName(), app.status(), app.runtimePath(), app.composeProject(),
-                        links.getOrDefault(app.appId(), app.accessUrl()), app.installedAt()))
-                .orElse(null);
+        InstalledApp registered = installedAppRepository.findAppById(manifest.id()).orElse(null);
+        ManagedAppAttestationService.Result attestation = managedApps.attest(registered);
+        InstalledApp storedRegistration = !attestation.managed() ? null
+                : new InstalledApp(registered.appId(), registered.appName(), registered.status(), registered.runtimePath(),
+                        registered.composeProject(), links.getOrDefault(registered.appId(), registered.accessUrl()), registered.installedAt());
         ObservedService registrationLost = matchingObserved(manifest.id(), evidence,
                 service -> AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
         ObservedService recoverable = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);
         ObservedService managedElsewhere = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS.equals(service.ownershipState())).orElse(null);
-        InstalledApp installed = storedRegistration == null || recoverable != null || managedElsewhere != null
+        InstalledApp installed = storedRegistration == null || runtime == null || recoverable != null || managedElsewhere != null
                 || !com.autarkos.marketplace.install.AppRuntimeFiles.hasComposeFile(storedRegistration.runtimePath())
                         ? null : storedRegistration;
         ObservedService failedInstall = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.FAILED_INSTALL.equals(service.ownershipState())).orElse(null);
         ObservedService blocked = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.UNKNOWN_CONFLICT.equals(service.ownershipState())).orElse(null);
         ObservedService found = matchingObserved(manifest.id(), evidence, service -> !AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
 
-        ApplicationRelationship relationship = relationship(installed, storedRegistration, registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
+        ApplicationRelationship relationship = relationship(installed, registered, registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
         ObservedService observedService = firstPresent(registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
         ApplicationEvidence applicationEvidence = evidence(observedService);
         String reviewExistingHref = reviewExistingHref(manifest.id());
@@ -125,7 +116,7 @@ public class ApplicationInventoryService {
                 firstPresent(manifest.plainLanguage(), manifest.description()),
                 relationship,
                 BetaScope.allowsInstall(manifest.id()) ? "installable" : "unavailable_in_beta",
-                managed == null ? "" : managed.appInstanceId(),
+                attestation.managed() ? attestation.ownership().appInstanceId() : "",
                 managed == null ? observedService == null ? "unknown" : observedService.runtimeState() : managed.runtimeState(),
                 managed == null ? observedService == null ? "unowned" : observedService.ownershipState() : managed.ownershipState(),
                 managed == null ? "not_ready" : managed.accessState(),
@@ -139,19 +130,6 @@ public class ApplicationInventoryService {
                 availableActions(manifest.id(), relationship, installed, observedService, reviewExistingHref),
                 relationship == ApplicationRelationship.MANAGED ? runtime : null,
                 applicationEvidence);
-    }
-
-    private boolean ownershipCompatible(String appId) {
-        Optional<RuntimeModels.InstalledAppOwnershipMetadata> metadata = installedAppRepository.ownershipFor(appId);
-        if (metadata.isEmpty()) {
-            return true;
-        }
-        RuntimeModels.InstalledAppOwnershipMetadata ownership = metadata.get();
-        if ("owned".equals(ownership.ownershipStatus())) {
-            String instanceId = ownership.autarkOsInstanceId();
-            return instanceId == null || instanceId.isBlank() || instanceId.equals(dockerOwnershipService.currentIdentity().instanceId());
-        }
-        return false;
     }
 
     private ApplicationRelationship relationship(

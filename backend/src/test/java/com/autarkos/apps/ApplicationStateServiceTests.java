@@ -1,6 +1,7 @@
 package com.autarkos.apps;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import java.time.Instant;
 import java.util.List;
@@ -552,7 +553,7 @@ class ApplicationStateServiceTests {
     }
 
     private ApplicationInventoryService inventory() {
-        return new ApplicationInventoryService(null, null, null, null) {
+        return new ApplicationInventoryService(null, null, mock(ObservedServiceService.class), null, List::of) {
             @Override
             public List<ApplicationView> apps(List<ObservedService> observed, List<AppInstanceView> managed, List<AppRuntimeView> runtime) {
                 List<ApplicationView> applications = new ArrayList<>();

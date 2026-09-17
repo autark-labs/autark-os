@@ -3,6 +3,7 @@ package com.autarkos.backups;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +23,9 @@ import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppInstanceView;
+import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.AppLifecycleService;
+import com.autarkos.marketplace.install.AppTelemetryService;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
@@ -35,7 +38,9 @@ import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.system.ProjectSettingsRepository;
 import com.autarkos.system.ProjectSettingsService;
 import com.autarkos.system.RuntimeFileOperations;
+import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 import com.autarkos.testsupport.RestorePointTestRecords;
 
 class BackupServiceCanonicalAppTests {
@@ -72,7 +77,7 @@ class BackupServiceCanonicalAppTests {
         assertThat(report.apps().getFirst().latestBackup().verificationStatus()).isNotEqualTo("verified");
         assertThat(report.apps().getFirst().restorePoints()).extracting(RestorePoint::id).contains(full.id());
         var views = new com.autarkos.marketplace.install.AppInstanceViewService(installed,
-                new com.autarkos.marketplace.install.AppReconciliationService(installed, List::of), catalog, backups, new TailscaleService());
+                new com.autarkos.marketplace.install.AppReconciliationService(managedApps(installed, layout), List::of), catalog, backups, new TailscaleService());
         assertThat(views.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
         assertThat(appLifecycleService(layout, installed, catalog, backups, new NoopDockerComposeExecutor())
                 .getApp(appId).canonicalBackupState()).isEqualTo("protected_by_restore_point");
@@ -103,6 +108,7 @@ class BackupServiceCanonicalAppTests {
         installedRepository.save(staleVaultwarden);
         installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         installedRepository.saveSettings("vaultwarden", new InstallModels.InstallSettings(staleVaultwarden.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
+        AutarkOsFileOpsService fileOps = new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations());
 
         BackupService service = new BackupService(
                 runtimeLayout,
@@ -110,11 +116,14 @@ class BackupServiceCanonicalAppTests {
                 backupRepository,
                 new ActivityLogService(mock(ActivityLogRepository.class)),
                 JpaTestRepositories.projectSettingsRepository(runtimeLayout),
-                new ProjectSettingsService(JpaTestRepositories.projectSettingsRepository(runtimeLayout), new ActivityLogService(mock(ActivityLogRepository.class))),
+                projectSettingsService(runtimeLayout, installedRepository),
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository),
                 catalogService,
                 () -> List.of(appInstance("homepage", "Homepage")),
-                new RuntimeFileOperations());
+                new RuntimeFileOperations(),
+                fileOps,
+                backupDestination(runtimeLayout, fileOps),
+                new RecoveryOperationCoordinator());
 
         BackupModels.BackupReport report = service.report();
 
@@ -153,21 +162,21 @@ class BackupServiceCanonicalAppTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         InstalledApp homepage = installed("homepage", "Homepage", runtimeLayout);
         installedRepository.save(homepage);
+        saveOwned(installedRepository, homepage);
         installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(homepage.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
         Files.delete(runtimeLayout.appRoot("homepage").resolve("compose.yaml"));
         BackupService service = backupService(runtimeLayout, installedRepository, backupRepository, catalogService);
 
         BackupModels.BackupReport report = service.report();
-        BackupModels.BackupRunResult appBackup = service.run("homepage");
-        BackupModels.BackupRunResult fullBackup = service.runFullBackup("manual");
-
         assertThat(report.apps()).singleElement().satisfies(app -> {
             assertThat(app.status()).isEqualTo("recovery_limited");
             assertThat(app.backupAvailable()).isFalse();
             assertThat(app.backupUnavailableReason()).contains("original Compose file is missing").contains("archive-first cleanup");
         });
-        assertThat(appBackup.status()).isEqualTo("failed");
-        assertThat(appBackup.message()).contains("cannot use normal backups");
+        assertThatThrownBy(() -> service.run("homepage"))
+                .isInstanceOf(com.autarkos.marketplace.install.InstallationException.class)
+                .hasMessageContaining("original Compose configuration is missing");
+        BackupModels.BackupRunResult fullBackup = service.runFullBackup("manual");
         assertThat(fullBackup.status()).isEqualTo("failed");
         assertThat(fullBackup.message()).contains("Full backup is unavailable").contains("Homepage");
     }
@@ -191,10 +200,9 @@ class BackupServiceCanonicalAppTests {
         saveOwned(installedRepository, canonical);
         installedRepository.saveSettings("homepage", new InstallModels.InstallSettings(canonical.accessUrl(), null, false, java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
 
-        BackupModels.BackupRunResult result = backupService(runtimeLayout, installedRepository, backupRepository, catalogService).run("homepage");
-
-        assertThat(result.status()).isEqualTo("warning");
-        assertThat(result.message()).contains("Homepage could not restart");
+        assertThatThrownBy(() -> backupService(runtimeLayout, installedRepository, backupRepository, catalogService).run("homepage"))
+                .isInstanceOf(com.autarkos.marketplace.install.InstallationException.class)
+                .hasMessageContaining("runtime folder does not match");
     }
 
     @Test
@@ -451,27 +459,17 @@ class BackupServiceCanonicalAppTests {
         Files.delete(runtimeLayout.appRoot("homepage").resolve("compose.yaml"));
         NoopDockerComposeExecutor composeExecutor = new NoopDockerComposeExecutor();
 
-        BackupModels.BackupRunResult result = backupService(
+        assertThatThrownBy(() -> backupService(
                 runtimeLayout, installedRepository, backupRepository, catalogService,
-                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()), composeExecutor).run("homepage");
-
-        assertThat(result.status()).isEqualTo("failed");
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()), composeExecutor).run("homepage"))
+                .isInstanceOf(com.autarkos.marketplace.install.InstallationException.class)
+                .hasMessageContaining("original Compose configuration is missing");
         assertThat(composeExecutor.stopCalls).isZero();
         assertThat(composeExecutor.startCalls).isZero();
     }
 
     private AppLifecycleService appLifecycleService(RuntimeLayout runtimeLayout, InstalledAppRepository repository, MarketplaceCatalogService catalogService, BackupRepository backupRepository) {
-        return new AppLifecycleService(
-                repository,
-                new NoopDockerComposeExecutor(),
-                catalogService,
-                List::of,
-                runtimeLayout,
-                new PostInstallGuideBuilder(),
-                new TailscaleService(),
-                false,
-                null,
-                backupRepository);
+        return appLifecycleService(runtimeLayout, repository, catalogService, backupRepository, new NoopDockerComposeExecutor());
     }
 
     private BackupService backupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedRepository, BackupRepository backupRepository, MarketplaceCatalogService catalogService) {
@@ -493,26 +491,49 @@ class BackupServiceCanonicalAppTests {
                 backupRepository,
                 new ActivityLogService(mock(ActivityLogRepository.class)),
                 JpaTestRepositories.projectSettingsRepository(runtimeLayout),
-                new ProjectSettingsService(JpaTestRepositories.projectSettingsRepository(runtimeLayout), new ActivityLogService(mock(ActivityLogRepository.class))),
+                projectSettingsService(runtimeLayout, installedRepository),
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository, composeExecutor),
                 catalogService,
                 () -> List.of(appInstance(managedAppId, managedAppId.equals("homepage") ? "Homepage" : managedAppId)),
                 new RuntimeFileOperations(),
-                fileOpsService);
+                fileOpsService,
+                backupDestination(runtimeLayout, fileOpsService),
+                new RecoveryOperationCoordinator());
+    }
+
+    private BackupDestinationService backupDestination(RuntimeLayout layout, AutarkOsFileOpsService fileOps) {
+        return new BackupDestinationService(
+                layout,
+                JpaTestRepositories.projectSettingsRepository(layout),
+                fileOps);
     }
 
     private AppLifecycleService appLifecycleService(RuntimeLayout runtimeLayout, InstalledAppRepository repository, MarketplaceCatalogService catalogService, BackupRepository backupRepository, DockerComposeExecutor composeExecutor) {
+        BackupDestinationService backupDestination = mock(BackupDestinationService.class);
+        when(backupDestination.activeRoot()).thenReturn(runtimeLayout.runtimeRoot().resolve("backups"));
         return new AppLifecycleService(
                 repository,
                 composeExecutor,
                 catalogService,
-                List::of,
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 new TailscaleService(),
-                false,
-                null,
-                backupRepository);
+                new ActivityLogService(mock(ActivityLogRepository.class)),
+                backupRepository,
+                new AppTelemetryService(composeExecutor),
+                backupDestination,
+                new RecoveryOperationCoordinator(),
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                managedApps(repository, runtimeLayout),
+                new AppAccessChecker());
+    }
+
+    private ProjectSettingsService projectSettingsService(RuntimeLayout layout, InstalledAppRepository repository) {
+        return new ProjectSettingsService(
+                JpaTestRepositories.projectSettingsRepository(layout),
+                new ActivityLogService(mock(ActivityLogRepository.class)),
+                repository,
+                managedApps(repository, layout));
     }
 
     private void writeZip(Path archive, String entryName, String content) throws Exception {
@@ -547,7 +568,7 @@ class BackupServiceCanonicalAppTests {
         Path appRoot = runtimeLayout.appRoot(appId);
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services:\n  app:\n    image: test/" + appId + ":latest\n");
-        return new InstalledApp(appId, name, "Ready", appRoot.toString(), "autark-os-" + appId, "http://localhost:8090", Instant.parse("2026-06-20T12:00:00Z"));
+        return new InstalledApp(appId, name, "Ready", appRoot.toString(), "autarkos_test_" + appId, "http://localhost:8090", Instant.parse("2026-06-20T12:00:00Z"));
     }
 
     private void saveOwned(InstalledAppRepository repository, InstalledApp app) {
@@ -561,6 +582,16 @@ class BackupServiceCanonicalAppTests {
                 "owned",
                 app.installedAt(),
                 app.installedAt()));
+        ManagedAppTestContract.writeAll(repository, runtimeLayout(), new AutarkOsIdentity(
+                "pos_test", "test", runtimeRoot.toString(), "runtime-hash",
+                Instant.parse("2026-06-20T12:00:00Z"), 1));
+    }
+
+    private com.autarkos.marketplace.install.ManagedAppAttestationService managedApps(
+            InstalledAppRepository repository, RuntimeLayout layout) {
+        AutarkOsIdentity identity = new AutarkOsIdentity("pos_test", "test", runtimeRoot.toString(),
+                "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1);
+        return ManagedAppTestContract.service(repository, layout, identity);
     }
 
     private RuntimeLayout runtimeLayout() {

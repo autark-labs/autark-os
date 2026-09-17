@@ -7,13 +7,13 @@ import java.time.ZoneId;
 import java.util.Map;
 import java.util.Set;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.install.models.InstallModels;
 
 @Service
@@ -27,16 +27,14 @@ public class ProjectSettingsService {
     private final ProjectSettingsRepository repository;
     private final ActivityLogService activityLogService;
     private final InstalledAppRepository installedAppRepository;
+    private final ManagedAppAttestationService managedApps;
 
-    public ProjectSettingsService(ProjectSettingsRepository repository, ActivityLogService activityLogService) {
-        this(repository, activityLogService, null);
-    }
-
-    @Autowired
-    public ProjectSettingsService(ProjectSettingsRepository repository, ActivityLogService activityLogService, InstalledAppRepository installedAppRepository) {
+    public ProjectSettingsService(ProjectSettingsRepository repository, ActivityLogService activityLogService,
+            InstalledAppRepository installedAppRepository, ManagedAppAttestationService managedApps) {
         this.repository = repository;
         this.activityLogService = activityLogService;
         this.installedAppRepository = installedAppRepository;
+        this.managedApps = managedApps;
     }
 
     public ProjectSettings current() {
@@ -66,12 +64,9 @@ public class ProjectSettingsService {
     }
 
     private ProjectSettingsAppDefaultsResult applyAppDefaultsInternal(ProjectSettings sanitized) {
-        if (installedAppRepository == null) {
-            return new ProjectSettingsAppDefaultsResult(false, "error", "App defaults unavailable", "Autark-OS cannot update app defaults in this runtime.", 0, Instant.now());
-        }
         int updated = 0;
         InstallModels.BackupPolicy backup = new InstallModels.BackupPolicy(sanitized.automaticBackupsEnabled(), sanitized.backupFrequency(), sanitized.backupRetentionDays());
-        for (InstalledApp app : installedAppRepository.findAllApps()) {
+        for (InstalledApp app : managedApps.managedApps()) {
             InstallModels.InstallSettings current = installedAppRepository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
             installedAppRepository.saveSettings(app.appId(), new InstallModels.InstallSettings(
                     current.accessUrl(),

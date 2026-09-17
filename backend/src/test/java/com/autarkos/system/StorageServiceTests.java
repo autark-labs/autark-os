@@ -11,6 +11,11 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.activity.ActivityLogRepository;
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.RecoveryOperationCoordinator;
+import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.fileops.LocalAutarkOsFileOperations;
+import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
@@ -28,8 +33,7 @@ class StorageServiceTests {
         Files.createDirectories(layout.runtimeRoot().resolve("backups"));
         Files.writeString(layout.runtimeRoot().resolve("backups/point.zip"), "12345");
         Files.writeString(layout.runtimeRoot().resolve("unrelated.data"), "x".repeat(1000));
-        StorageService service = new StorageService(layout, JpaTestRepositories.installedAppRepository(layout),
-                new ActivityLogService(mock(ActivityLogRepository.class)), mock(StorageSampleRepository.class));
+        StorageService service = storageService(layout);
         assertThat(service.report().backupStorage().usedBytes()).isEqualTo(5);
         assertThat(service.report().backupStorage().totalBytes()).isGreaterThan(5);
         RuntimeFileOperations files = new RuntimeFileOperations();
@@ -49,13 +53,7 @@ class StorageServiceTests {
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(layout);
         repository.save(installed(layout, "homepage", "Homepage"));
         repository.save(installed(layout, "vaultwarden", "Vaultwarden"));
-        StorageService service = new StorageService(
-                layout,
-                repository,
-                new ActivityLogService(mock(ActivityLogRepository.class)),
-                mock(StorageSampleRepository.class),
-                () -> List.of(appInstance("homepage")),
-                new RuntimeFileOperations());
+        StorageService service = storageService(layout, repository, () -> List.of(appInstance("homepage")));
 
         StorageModels.StorageReport report = service.report();
 
@@ -64,12 +62,26 @@ class StorageServiceTests {
     }
 
     private StorageService storageService(RuntimeLayout layout) {
+        return storageService(layout, JpaTestRepositories.installedAppRepository(layout), List::of);
+    }
+
+    private StorageService storageService(
+            RuntimeLayout layout,
+            InstalledAppRepository repository,
+            AppInstanceViewProvider apps) {
+        AutarkOsFileOpsService fileOps = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations());
         return new StorageService(
                 layout,
-                JpaTestRepositories.installedAppRepository(layout),
+                repository,
                 new ActivityLogService(mock(ActivityLogRepository.class)),
                 mock(StorageSampleRepository.class),
-                new RuntimeFileOperations());
+                apps,
+                new RuntimeFileOperations(),
+                new BackupDestinationService(
+                        layout,
+                        JpaTestRepositories.projectSettingsRepository(layout),
+                        fileOps),
+                new RecoveryOperationCoordinator());
     }
 
     private InstalledApp installed(RuntimeLayout layout, String appId, String name) {

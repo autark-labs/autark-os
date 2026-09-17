@@ -9,8 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
@@ -21,7 +19,6 @@ import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.fileops.AutarkOsFileOpsService;
-import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.AccessModels;
@@ -48,7 +45,6 @@ public class AppLifecycleService {
     private final ActivityLogService activityLogService;
     private final BackupRepository backupRepository;
     private final AppTelemetryService appTelemetryService;
-    private final AppRuntimeMetadataReader appRuntimeMetadataReader = new AppRuntimeMetadataReader();
     private final AppRuntimeStatusResolver runtimeStatusResolver = new AppRuntimeStatusResolver();
     private final AppSettingsPolicy settingsPolicy;
     private final AppUninstallService uninstallService;
@@ -57,20 +53,23 @@ public class AppLifecycleService {
     private final AppReliabilityService reliabilityService;
     private final PrivateAccessStateResolver privateAccessStateResolver;
     private final RecoveryOperationCoordinator recoveryOperations;
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService) {
-        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, new RecoveryOperationCoordinator());
-    }
+    private final ManagedAppAttestationService managedApps;
 
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
-        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, recoveryOperations, new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
-    }
-
-    @Autowired
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, AutarkOsFileOpsService fileOpsService) {
-        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, backupDestinationService, recoveryOperations, fileOpsService, new AppAccessChecker());
-    }
-
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, AutarkOsFileOpsService fileOpsService, AppAccessChecker accessChecker) {
+    public AppLifecycleService(
+            InstalledAppRepository repository,
+            DockerComposeExecutor composeExecutor,
+            MarketplaceCatalogService catalogService,
+            RuntimeLayout runtimeLayout,
+            PostInstallGuideBuilder postInstallGuideBuilder,
+            TailscaleService tailscaleService,
+            ActivityLogService activityLogService,
+            BackupRepository backupRepository,
+            AppTelemetryService appTelemetryService,
+            BackupDestinationService backupDestinationService,
+            RecoveryOperationCoordinator recoveryOperations,
+            AutarkOsFileOpsService fileOpsService,
+            ManagedAppAttestationService managedApps,
+            AppAccessChecker accessChecker) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -81,6 +80,7 @@ public class AppLifecycleService {
         this.settingsPolicy = new AppSettingsPolicy(repository, runtimeStatusResolver);
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.recoveryOperations = recoveryOperations;
+        this.managedApps = managedApps;
         this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations, fileOpsService);
         this.healthService = new AppHealthService(repository, composeExecutor, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
         this.containerLifecycleService = new AppContainerLifecycleService(repository, composeExecutor, activityLogService, this::refresh);
@@ -90,14 +90,6 @@ public class AppLifecycleService {
         this.appTelemetryService = appTelemetryService;
     }
 
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository, AppTelemetryService appTelemetryService) {
-        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, appTelemetryService, null);
-    }
-
-    public AppLifecycleService(InstalledAppRepository repository, DockerComposeExecutor composeExecutor, MarketplaceCatalogService catalogService, ManagedContainerDiscovery managedContainerDiscovery, RuntimeLayout runtimeLayout, PostInstallGuideBuilder postInstallGuideBuilder, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, ActivityLogService activityLogService, BackupRepository backupRepository) {
-        this(repository, composeExecutor, catalogService, managedContainerDiscovery, runtimeLayout, postInstallGuideBuilder, tailscaleService, devMode, activityLogService, backupRepository, new AppTelemetryService(composeExecutor), null);
-    }
-
     public List<AppRuntimeView> listApps() {
         return managedInstalledApps().stream()
                 .map(this::refresh)
@@ -105,11 +97,11 @@ public class AppLifecycleService {
     }
 
     public AppRuntimeView getApp(String appId) {
-        return refresh(installedApp(appId));
+        return refresh(requireManagedApp(appId, "manage"));
     }
 
     public RuntimeModels.AppTelemetry telemetry(String appId) {
-        return appTelemetryService.telemetry(installedApp(appId));
+        return appTelemetryService.telemetry(requireManagedApp(appId, "inspect"));
     }
 
     public Map<String, RuntimeModels.AppTelemetry> telemetry() {
@@ -142,7 +134,11 @@ public class AppLifecycleService {
     }
 
     public AppHealthSnapshot healthSnapshot(String appId) {
-        return healthService.healthSnapshot(installedApp(appId));
+        return healthService.healthSnapshot(requireManagedApp(appId, "check"));
+    }
+
+    public InstalledApp requireManagedApp(String appId, String action) {
+        return managedApps.requireManaged(appId, action);
     }
 
     public AppActionResult start(String appId) {
@@ -150,9 +146,8 @@ public class AppLifecycleService {
     }
 
     private AppActionResult startUnlocked(String appId) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "start");
-        assertComposeAvailable(app, "start");
+        InstalledApp app = requireManagedApp(appId, "start");
+        assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.start(app, composeFile(app));
     }
 
@@ -161,8 +156,8 @@ public class AppLifecycleService {
     }
 
     private AppActionResult stopUnlocked(String appId) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "stop");
+        InstalledApp app = requireManagedApp(appId, "stop");
+        assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.stop(app, composeFile(app));
     }
 
@@ -176,8 +171,9 @@ public class AppLifecycleService {
     }
 
     private AppActionResult stopAndConfirmUnlocked(String appId) {
-        InstalledApp app = installedApp(appId);
-        AppActionResult result = stopUnlocked(appId);
+        InstalledApp app = requireManagedApp(appId, "stop");
+        assertNoPendingSettingsRecovery(app);
+        AppActionResult result = containerLifecycleService.stop(app, composeFile(app));
         RuntimeModels.DockerComposeResult status = composeExecutor.ps(composeFile(app), app.composeProject());
         if (!status.successful()) {
             throw new InstallationException("Autark-OS stopped " + app.appName() + " but could not confirm its container state.");
@@ -198,9 +194,8 @@ public class AppLifecycleService {
     }
 
     private AppActionResult restartUnlocked(String appId) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "restart");
-        assertComposeAvailable(app, "restart");
+        InstalledApp app = requireManagedApp(appId, "restart");
+        assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.restart(app, composeFile(app));
     }
 
@@ -213,8 +208,7 @@ public class AppLifecycleService {
     }
 
     private AppActionResult repairUnlocked(String appId, boolean automatic) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "repair");
+        InstalledApp app = requireManagedApp(appId, "repair");
         var pendingSettings = repository.settingsRecoveryFor(appId);
         if (pendingSettings.isPresent()) {
             if (automatic) return new AppActionResult(appId, "repair", "skipped", "Use Repair in My Apps to retry saved settings recovery.", null, List.of(), Instant.now());
@@ -225,9 +219,8 @@ public class AppLifecycleService {
             }
             var recovery = recoverFailedSettingsChange(checkpoint, new InstallationException("An earlier settings change was interrupted."));
             if (repository.settingsRecoveryFor(appId).isPresent()) throw recovery;
-            return new AppActionResult(appId, "repair", "succeeded", "Previous settings restored. Check the app and its access.", refresh(installedApp(appId)), List.of(), Instant.now());
+            return new AppActionResult(appId, "repair", "succeeded", "Previous settings restored. Check the app and its access.", refresh(requireManagedApp(appId, "repair")), List.of(), Instant.now());
         }
-        assertComposeAvailable(app, "repair");
         AppHealthSnapshot before = healthService.healthSnapshot(app);
         List<String> logs = new java.util.ArrayList<>();
         logs.add("Before repair: " + before.status() + " - " + before.message());
@@ -297,9 +290,8 @@ public class AppLifecycleService {
     }
 
     private AppRuntimeView updateSettingsUnlocked(String appId, InstallModels.InstallSettings settings) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "update settings for");
-        assertComposeAvailable(app, "update settings for");
+        InstalledApp app = requireManagedApp(appId, "update settings for");
+        assertNoPendingSettingsRecovery(app);
         String defaultAccessUrl = app.accessUrl();
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(defaultAccessUrl));
         InstallModels.InstallSettings sanitized = settingsPolicy.sanitize(settings, app);
@@ -392,17 +384,11 @@ public class AppLifecycleService {
     }
 
     public InstallModels.AppSettingsChangePlan settingsChangePlan(String appId, InstallModels.InstallSettings settings) {
-        InstalledApp app = installedApp(appId);
+        InstalledApp app = requireManagedApp(appId, "plan settings for");
         if (repository.settingsRecoveryFor(appId).isPresent()) {
             String reason = "Use Repair in My Apps to finish the saved settings recovery first.";
             return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Settings recovery required",
                     reason, false, false, false, false, List.of(), List.of(), List.of(reason));
-        }
-        if (!AppRuntimeFiles.isComposeFile(composeFile(app))) {
-            String reason = "The original Compose file is missing. Settings cannot be changed until that configuration is restored.";
-            return new InstallModels.AppSettingsChangePlan(
-                    app.appId(), app.appName(), "blocked", "Settings unavailable", reason,
-                    false, false, false, false, List.of(), List.of(), List.of(reason));
         }
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         InstallModels.InstallSettings sanitized = settingsPolicy.sanitize(settings, app);
@@ -584,8 +570,8 @@ public class AppLifecycleService {
     }
 
     private AppActionResult enablePrivateAccessUnlocked(String appId) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "enable private access for");
+        InstalledApp app = requireManagedApp(appId, "enable private access for");
+        assertNoPendingSettingsRecovery(app);
         AppRuntimeView view = refresh(app);
         String accessUrl = firstPresent(view.accessUrl(), view.settings() == null ? null : view.settings().accessUrl(), app.accessUrl());
         Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
@@ -628,8 +614,8 @@ public class AppLifecycleService {
     }
 
     private AppActionResult disablePrivateAccessUnlocked(String appId) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "disable private access for");
+        InstalledApp app = requireManagedApp(appId, "disable private access for");
+        assertNoPendingSettingsRecovery(app);
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         TailscaleServeResult disableResult = disablePrivateAccessMapping(app, current);
         InstallModels.InstallSettings updated = new InstallModels.InstallSettings(
@@ -727,13 +713,13 @@ public class AppLifecycleService {
     }
 
     public InstallModels.UninstallPlan uninstallPlan(String appId) {
-        InstalledApp app = installedApp(appId);
+        InstalledApp app = requireManagedApp(appId, "plan removal for");
         return uninstallService.uninstallPlan(app);
     }
 
     public AppActionResult uninstall(String appId) {
-        InstalledApp app = installedApp(appId);
-        assertLifecycleEligible(app, "uninstall");
+        InstalledApp app = requireManagedApp(appId, "uninstall");
+        assertNoPendingSettingsRecovery(app);
         InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         return uninstallService.uninstall(app, settings, composeFile(app));
     }
@@ -743,7 +729,6 @@ public class AppLifecycleService {
     }
 
     private AppRuntimeView refresh(InstalledApp app, boolean includeTelemetry) {
-        app = reconcileRuntimeMetadata(app);
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
         RuntimeModels.DockerContainerObservation observation = composeExecutor.observeContainersForApp(composeFile(app), app.composeProject(), app.appId());
         if (!observation.successful()) {
@@ -896,115 +881,30 @@ public class AppLifecycleService {
         return null;
     }
 
-    private InstalledApp reconcileRuntimeMetadata(InstalledApp app) {
-        return appRuntimeMetadataReader.read(Path.of(app.runtimePath()))
-                .filter(metadata -> app.appId().equals(metadata.catalogAppId()))
-                .map(metadata -> reconcileRuntimeMetadata(app, metadata))
-                .orElse(app);
-    }
-
-    private InstalledApp reconcileRuntimeMetadata(InstalledApp app, RuntimeModels.AppRuntimeMetadata metadata) {
-        String composeProject = firstPresent(metadata.composeProject(), app.composeProject());
-        InstalledApp reconciled = app;
-        if (!composeProject.equals(app.composeProject())) {
-            reconciled = new InstalledApp(
-                    app.appId(),
-                    app.appName(),
-                    app.status(),
-                    app.runtimePath(),
-                    composeProject,
-                    app.accessUrl(),
-                    app.installedAt());
-            repository.save(reconciled);
-        }
-
-        RuntimeModels.InstalledAppOwnershipMetadata current = repository.ownershipFor(app.appId()).orElse(null);
-        if (current == null) {
-            return reconciled;
-        }
-        String appInstanceId = firstPresent(metadata.appInstanceId(), current.appInstanceId());
-        String autarkOsInstanceId = firstPresent(metadata.instanceId(), current.autarkOsInstanceId());
-        if (!Objects.equals(appInstanceId, current.appInstanceId())
-                || !Objects.equals(autarkOsInstanceId, current.autarkOsInstanceId())
-                || !Objects.equals(app.runtimePath(), current.runtimePathOrHash())) {
-            repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
-                    app.appId(),
-                    appInstanceId,
-                    app.appId(),
-                    autarkOsInstanceId,
-                    app.runtimePath(),
-                    firstPresent(current.installState(), "ready"),
-                    firstPresent(current.ownershipStatus(), "owned"),
-                    current.createdAt(),
-                    Instant.now()));
-        }
-        return reconciled;
-    }
-
-    private InstalledApp installedApp(String appId) {
-        return repository.findAppById(appId)
-                .orElseThrow(() -> new InstallationException("Autark-OS is not managing an app with id " + appId + "."));
-    }
-
     private List<InstalledApp> managedInstalledApps() {
-        return repository.findAllApps().stream()
-                .filter(this::ownedByThisAutarkOs)
-                .toList();
+        return managedApps.managedApps();
     }
 
-    private boolean ownedByThisAutarkOs(InstalledApp app) {
-        return repository.ownershipFor(app.appId())
-                .filter(metadata -> "owned".equalsIgnoreCase(metadata.ownershipStatus()))
-                .filter(metadata -> metadata.appInstanceId() != null && !metadata.appInstanceId().isBlank())
-                .filter(metadata -> metadata.autarkOsInstanceId() != null && !metadata.autarkOsInstanceId().isBlank())
-                .isPresent();
-    }
-
-    private void assertLifecycleEligible(InstalledApp app, String action) {
-        if (!"repair".equals(action) && repository.settingsRecoveryFor(app.appId()).isPresent()) {
+    private void assertNoPendingSettingsRecovery(InstalledApp app) {
+        if (repository.settingsRecoveryFor(app.appId()).isPresent()) {
             throw new InstallationException("This app has an unfinished settings change. Use Repair in My Apps before changing it again.");
-        }
-        RuntimeModels.InstalledAppOwnershipMetadata metadata = repository.ownershipFor(app.appId())
-                .orElseThrow(() -> new InstallationException(app.appName() + " is not owned by this Autark-OS instance, so Autark-OS will not " + action + " it automatically."));
-        if (!"owned".equalsIgnoreCase(metadata.ownershipStatus())) {
-            throw new InstallationException(app.appName() + " is not owned by this Autark-OS instance, so Autark-OS will not " + action + " it automatically.");
-        }
-        if (metadata.appInstanceId() == null || metadata.appInstanceId().isBlank()
-                || metadata.autarkOsInstanceId() == null || metadata.autarkOsInstanceId().isBlank()) {
-            throw new InstallationException(app.appName() + " has incomplete Autark-OS ownership metadata, so Autark-OS will not " + action + " it automatically.");
-        }
-    }
-
-    private void assertComposeAvailable(InstalledApp app, String action) {
-        if (!AppRuntimeFiles.isComposeFile(composeFile(app))) {
-            throw new InstallationException(
-                    app.appName() + " cannot " + action + " because its original Compose file is missing. "
-                            + "You can still stop it or use the reviewed uninstall plan to save a recovery archive before cleanup.");
         }
     }
 
     private void activityInfo(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.info("applications", action, title, message, appId);
-        }
+        activityLogService.info("applications", action, title, message, appId);
     }
 
     private void activitySuccess(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.success("applications", action, title, message, appId);
-        }
+        activityLogService.success("applications", action, title, message, appId);
     }
 
     private void activityWarning(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.warning("applications", action, title, message, appId);
-        }
+        activityLogService.warning("applications", action, title, message, appId);
     }
 
     private void activityError(String action, String title, String message, String appId, RuntimeException exception) {
-        if (activityLogService != null) {
-            activityLogService.error("applications", action, title, message, appId, exception);
-        }
+        activityLogService.error("applications", action, title, message, appId, exception);
     }
 
     private Path composeFile(InstalledApp app) {

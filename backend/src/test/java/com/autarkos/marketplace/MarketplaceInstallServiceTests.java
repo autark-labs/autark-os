@@ -2,6 +2,7 @@ package com.autarkos.marketplace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,6 +14,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.autarkos.activity.ActivityLogService;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
@@ -47,11 +49,58 @@ import com.autarkos.network.tailscale.TailscaleServeResult;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 
 class MarketplaceInstallServiceTests {
 
     @TempDir
     Path runtimeRoot;
+
+    private MarketplaceInstallService installService(
+            RuntimeLayout runtimeLayout,
+            InstallPlanService installPlanService,
+            RuntimeDirectoryManager directoryManager,
+            CatalogPackageCopier packageCopier,
+            ComposeRenderer composeRenderer,
+            DockerComposeExecutor dockerComposeExecutor,
+            InstalledAppRepository repository,
+            InstallCustomizationResolver customizationResolver,
+            PostInstallProvisioner postInstallProvisioner,
+            PostInstallGuideBuilder postInstallGuideBuilder,
+            TailscaleService tailscaleService) {
+        AutarkOsIdentity identity = new AutarkOsIdentity(
+                "current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.now(), 1);
+        DockerOwnershipService ownership = new DockerOwnershipService(() -> identity, () -> "test", false);
+        return installService(
+                runtimeLayout, installPlanService, directoryManager, packageCopier, composeRenderer,
+                dockerComposeExecutor, repository, customizationResolver, postInstallProvisioner,
+                postInstallGuideBuilder, tailscaleService, mock(ActivityLogService.class), ownership,
+                new AppRuntimeMetadataWriter(() -> identity, Instant::now));
+    }
+
+    private MarketplaceInstallService installService(
+            RuntimeLayout runtimeLayout,
+            InstallPlanService installPlanService,
+            RuntimeDirectoryManager directoryManager,
+            CatalogPackageCopier packageCopier,
+            ComposeRenderer composeRenderer,
+            DockerComposeExecutor dockerComposeExecutor,
+            InstalledAppRepository repository,
+            InstallCustomizationResolver customizationResolver,
+            PostInstallProvisioner postInstallProvisioner,
+            PostInstallGuideBuilder postInstallGuideBuilder,
+            TailscaleService tailscaleService,
+            ActivityLogService activityLogService,
+            DockerOwnershipService ownership,
+            AppRuntimeMetadataWriter metadataWriter) {
+        ObservedServiceService observedServices = new ObservedServiceService(
+                observedRepository(runtimeLayout), null);
+        return new MarketplaceInstallService(
+                installPlanService, directoryManager, packageCopier, composeRenderer, dockerComposeExecutor,
+                repository, customizationResolver, postInstallProvisioner, postInstallGuideBuilder,
+                tailscaleService, activityLogService, ownership, metadataWriter, observedServices,
+                ManagedAppTestContract.service(repository, runtimeLayout, ownership.currentIdentity()));
+    }
 
     @Test
     void installsAppThroughRuntimeAbstractionsWithoutRealDocker() throws Exception {
@@ -62,7 +111,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -98,7 +147,7 @@ class MarketplaceInstallServiceTests {
                 .orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -138,7 +187,7 @@ class MarketplaceInstallServiceTests {
                 Instant.parse("2026-06-20T12:00:00Z"),
                 1);
         DockerOwnershipService ownershipService = new DockerOwnershipService(() -> identity, () -> "0.2.0", false);
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -149,7 +198,7 @@ class MarketplaceInstallServiceTests {
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService(),
-                null,
+                mock(ActivityLogService.class),
                 ownershipService,
                 new AppRuntimeMetadataWriter(() -> identity, () -> Instant.parse("2026-06-20T13:00:00Z")));
 
@@ -185,7 +234,7 @@ class MarketplaceInstallServiceTests {
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
         FakeTailscaleService tailscaleService = new FakeTailscaleService();
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -223,10 +272,12 @@ class MarketplaceInstallServiceTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
-        repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Ready", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "http://localhost:19090", java.time.Instant.parse("2026-06-11T00:00:00Z")));
+        InstalledApp existing = new InstalledApp("vaultwarden", "Vaultwarden", "Ready", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "http://localhost:19090", java.time.Instant.parse("2026-06-11T00:00:00Z"));
+        repository.save(existing);
+        writeManagedContract(repository, runtimeLayout, existing);
         repository.saveSettings("vaultwarden", new InstallModels.InstallSettings("http://localhost:19090", "https://vault.tailnet.ts.net", true, java.util.Map.of("data", "vault-data"), new InstallModels.BackupPolicy(true, "weekly", 4)));
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -254,9 +305,11 @@ class MarketplaceInstallServiceTests {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
-        repository.save(new InstalledApp("vaultwarden", "Vaultwarden", "Ready", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "http://localhost:19090", java.time.Instant.parse("2026-06-11T00:00:00Z")));
+        InstalledApp existing = new InstalledApp("vaultwarden", "Vaultwarden", "Ready", runtimeRoot.resolve("apps/vaultwarden").toString(), "autark-os-vaultwarden", "http://localhost:19090", java.time.Instant.parse("2026-06-11T00:00:00Z"));
+        repository.save(existing);
+        writeManagedContract(repository, runtimeLayout, existing);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -289,7 +342,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -359,7 +412,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -391,7 +444,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("obsidian-livesync").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -426,7 +479,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("obsidian-livesync").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -469,7 +522,7 @@ class MarketplaceInstallServiceTests {
         ApplicationManifest manifest = catalogService.findById("paperless-ngx").orElseThrow();
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
-        MarketplaceInstallService installService = new MarketplaceInstallService(
+        MarketplaceInstallService installService = installService(runtimeLayout,
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
@@ -578,7 +631,7 @@ class MarketplaceInstallServiceTests {
                 repository,
                 observedRepository(runtimeLayout),
                 new AppRuntimeMetadataWriter(
-                        () -> new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
+                        () -> new AutarkOsIdentity("other-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
                         () -> Instant.parse("2026-06-20T13:00:00Z")));
 
         InstallModels.InstallResult result = installService.install(manifest);
@@ -596,6 +649,17 @@ class MarketplaceInstallServiceTests {
             ObservedServiceRepository observedRepository,
             AppRuntimeMetadataWriter metadataWriter) {
         return installService(runtimeLayout, repository, observedRepository, metadataWriter, new FakeDockerComposeExecutor());
+    }
+
+    private void writeManagedContract(
+            InstalledAppRepository repository,
+            RuntimeLayout runtimeLayout,
+            InstalledApp app) {
+        AutarkOsIdentity identity = identity(runtimeLayout);
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
+                app.appId(), "appinst_" + app.appId(), app.appId(), identity.instanceId(), app.runtimePath(),
+                "ready", "owned", app.installedAt(), app.installedAt()));
+        ManagedAppTestContract.write(repository, runtimeLayout, identity, app);
     }
 
     private MarketplaceInstallService installService(
@@ -619,10 +683,24 @@ class MarketplaceInstallServiceTests {
                 new FakePostInstallProvisioner(),
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService(),
-                null,
-                null,
-                metadataWriter,
-                observedService);
+                mock(ActivityLogService.class),
+                ownership(runtimeLayout),
+                metadataWriter == null ? metadataWriter(runtimeLayout) : metadataWriter,
+                observedService,
+                ManagedAppTestContract.service(repository, runtimeLayout, identity(runtimeLayout)));
+    }
+
+    private AutarkOsIdentity identity(RuntimeLayout runtimeLayout) {
+        return new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(),
+                "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1);
+    }
+
+    private DockerOwnershipService ownership(RuntimeLayout runtimeLayout) {
+        return new DockerOwnershipService(() -> identity(runtimeLayout), () -> "test", false);
+    }
+
+    private AppRuntimeMetadataWriter metadataWriter(RuntimeLayout runtimeLayout) {
+        return new AppRuntimeMetadataWriter(() -> identity(runtimeLayout), Instant::now);
     }
 
     private ObservedServiceRepository observedRepository(RuntimeLayout runtimeLayout) {

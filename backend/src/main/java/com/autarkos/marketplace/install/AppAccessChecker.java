@@ -10,11 +10,14 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Set;
 
+import org.springframework.stereotype.Component;
+
 import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.marketplace.model.AccessManifest;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.HealthManifest;
 
+@Component
 public class AppAccessChecker {
 
     static final Duration ACCESS_CHECK_TIMEOUT = Duration.ofMillis(850);

@@ -301,14 +301,36 @@ class DiscoverServiceTests {
     }
 
     private com.autarkos.apps.ApplicationInventoryService applicationInventoryService(InstalledAppRepository installedAppRepository, ObservedServiceRepository observedRepository) {
+        com.autarkos.system.AutarkOsIdentity identity = new com.autarkos.system.AutarkOsIdentity(
+                "current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash",
+                Instant.parse("2026-06-20T12:00:00Z"), 1);
+        ObservedServiceService observedServices = new ObservedServiceService(observedRepository,
+                new ObservedServiceScanner(List::of, () -> identity));
+        var managedApps = com.autarkos.testsupport.ManagedAppTestContract.service(
+                installedAppRepository, runtimeLayout(), identity);
         return new com.autarkos.apps.ApplicationInventoryService(
                 catalogService(),
                 installedAppRepository,
-                new ObservedServiceService(observedRepository, new ObservedServiceScanner(List::of, () -> new com.autarkos.system.AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1))),
-                new com.autarkos.marketplace.install.DockerOwnershipService(
-                        () -> new com.autarkos.system.AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
-                        () -> "0.2.0",
-                        false));
+                observedServices,
+                managedApps,
+                List::of) {
+            @Override
+            public List<com.autarkos.apps.ApplicationView> apps() {
+                com.autarkos.testsupport.ManagedAppTestContract.writeAll(installedAppRepository, runtimeLayout(), identity);
+                var runtimes = installedAppRepository.findAllApps().stream()
+                        .filter(app -> managedApps.attest(app).managed())
+                        .map(DiscoverServiceTests.this::runtime)
+                        .toList();
+                return apps(observedServices.observedServices(), List.of(), runtimes);
+            }
+        };
+    }
+
+    private com.autarkos.marketplace.install.AppRuntimeView runtime(InstalledApp app) {
+        return new com.autarkos.marketplace.install.AppRuntimeView(
+                app.appId(), app.appName(), "Apps", app.appName() + " app", "1.0.0", "", "Ready",
+                "running", "healthy", app.runtimePath(), app.composeProject(), app.accessUrl(), null, null, null,
+                app.installedAt(), "Backups disabled", null, null, null, null, null, List.of(), List.of());
     }
 
     private MarketplaceCatalogService catalogService() {
@@ -356,7 +378,7 @@ class DiscoverServiceTests {
         private InstallOptionsRequest lastOptions;
 
         private RecordingMarketplaceInstallService() {
-            super(null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

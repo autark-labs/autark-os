@@ -16,9 +16,11 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.activity.ActivityLogRepository;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.marketplace.install.InstallationException;
+import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
 import com.autarkos.security.AdminSecurityService;
@@ -113,7 +115,14 @@ class OnboardingServiceTests {
     }
 
     private OnboardingService service(ProjectSettingsRepository repository, RuntimeLayout runtimeLayout) {
-        ProjectSettingsService settingsService = new ProjectSettingsService(repository, new ActivityLogService(mock(ActivityLogRepository.class)));
+        InstalledAppRepository installedApps = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        AutarkOsIdentity identity = new AutarkOsIdentity("current-instance", "test", runtimeRoot.toString(),
+                "runtime-hash", Instant.now(), 1);
+        ProjectSettingsService settingsService = new ProjectSettingsService(
+                repository,
+                new ActivityLogService(mock(ActivityLogRepository.class)),
+                installedApps,
+                ManagedAppTestContract.service(installedApps, runtimeLayout, identity));
         return new OnboardingService(repository, settingsService, runtimeLayout, new FakeTailscaleService(), new FakeSystemDoctorService());
     }
 

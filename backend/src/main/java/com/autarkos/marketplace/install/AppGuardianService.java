@@ -4,11 +4,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -20,7 +18,6 @@ import com.autarkos.apps.ApplicationViews;
 import com.autarkos.automation.AutomationService;
 import com.autarkos.backups.RecoveryOperationConflictException;
 import com.autarkos.marketplace.install.models.InstallModels;
-import com.autarkos.marketplace.install.models.ReliabilityModels;
 
 @Service
 public class AppGuardianService {
@@ -32,46 +29,19 @@ public class AppGuardianService {
     private final boolean enabled;
     private final ActivityLogService activityLogService;
     private final AutomationService automationService;
-    private final AppInstanceViewProvider appInstanceViewProvider;
     private final ApplicationStateService applicationStateService;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    @Autowired
-    public AppGuardianService(InstalledAppRepository repository, AppLifecycleService appLifecycleService, @Value("${autark-os.guardian.enabled:true}") boolean enabled, ActivityLogService activityLogService, AutomationService automationService, AppInstanceViewProvider appInstanceViewProvider, ApplicationStateService applicationStateService) {
+    public AppGuardianService(InstalledAppRepository repository, AppLifecycleService appLifecycleService,
+            @Value("${autark-os.guardian.enabled:true}") boolean enabled,
+            ActivityLogService activityLogService, AutomationService automationService,
+            ApplicationStateService applicationStateService) {
         this.repository = repository;
         this.appLifecycleService = appLifecycleService;
         this.enabled = enabled;
         this.activityLogService = activityLogService;
         this.automationService = automationService;
-        this.appInstanceViewProvider = appInstanceViewProvider;
         this.applicationStateService = applicationStateService;
-    }
-
-    public AppGuardianService(InstalledAppRepository repository, AppLifecycleService appLifecycleService, @Value("${autark-os.guardian.enabled:true}") boolean enabled, ActivityLogService activityLogService, AutomationService automationService, AppInstanceViewProvider appInstanceViewProvider) {
-        this(repository, appLifecycleService, enabled, activityLogService, automationService, appInstanceViewProvider, null);
-    }
-
-    public AppGuardianService(InstalledAppRepository repository, AppLifecycleService appLifecycleService, @Value("${autark-os.guardian.enabled:true}") boolean enabled) {
-        this(repository, appLifecycleService, enabled, null, null, () -> repository.findAllApps().stream()
-                .map(app -> new AppInstanceView(
-                        app.appId(),
-                        app.appId(),
-                        app.appName(),
-                        "",
-                        "",
-                        app.status(),
-                        app.status(),
-                        app.status(),
-                        "owned",
-                        app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        AutarkOsStates.BackupState.DISABLED,
-                        app.accessUrl(),
-                        null,
-                        List.of(),
-                        List.of(),
-                        new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
-                        Instant.now()))
-                .toList());
     }
 
     @Scheduled(
@@ -82,12 +52,6 @@ public class AppGuardianService {
             return;
         }
         try {
-            if (applicationStateService == null) {
-                for (InstalledApp app : managedInstalledApps()) {
-                    inspectApp(app);
-                }
-                return;
-            }
             Map<String, AppRuntimeView> runtimeByAppId = ApplicationViews.managedRuntimes(applicationStateService.snapshot()).stream()
                     .collect(Collectors.toMap(AppRuntimeView::appId, view -> view, (left, right) -> left));
             for (InstalledApp app : managedInstalledAppsFromSnapshot(runtimeByAppId.keySet())) {
@@ -99,7 +63,7 @@ public class AppGuardianService {
     }
 
     public void inspectApp(InstalledApp app) {
-        if (automationService != null && !automationService.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)) {
+        if (!automationService.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)) {
             return;
         }
         InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
@@ -116,9 +80,7 @@ public class AppGuardianService {
         }
 
         repository.recordEvent(app.appId(), "guardian_issue_detected", "Autark-OS noticed " + app.appName() + " needs attention: " + snapshot.message() + ".");
-        if (activityLogService != null) {
-            activityLogService.warning("stability", "guardian_issue_detected", app.appName() + " needs attention", snapshot.message(), app.appId());
-        }
+        activityLogService.warning("stability", "guardian_issue_detected", app.appName() + " needs attention", snapshot.message(), app.appId());
         Instant attemptAt = Instant.now();
         saveGuardianState(app, settings, "guardian_repair_queued", attemptAt);
         try {
@@ -126,16 +88,12 @@ public class AppGuardianService {
         } catch (RecoveryOperationConflictException exception) {
             saveGuardianState(app, settings, "guardian_repair_deferred", attemptAt);
             repository.recordEvent(app.appId(), "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
-            if (activityLogService != null) {
-                activityLogService.info("stability", "guardian_repair_deferred", "Automatic repair deferred for " + app.appName(), exception.getMessage(), app.appId());
-            }
+            activityLogService.info("stability", "guardian_repair_deferred", "Automatic repair deferred for " + app.appName(), exception.getMessage(), app.appId());
         } catch (RuntimeException exception) {
             saveGuardianState(app, settings, blockedByOwnership(exception) ? "guardian_repair_blocked" : "guardian_repair_failed", attemptAt);
             if (!hasRecentGuardianFailure(app.appId())) {
                 repository.recordEvent(app.appId(), "guardian_repair_failed", "Autark-OS could not repair " + app.appName() + ". Reason: " + failureReason(exception));
-                if (activityLogService != null) {
-                    activityLogService.error("stability", "guardian_repair_failed", "Automatic repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
-                }
+                activityLogService.error("stability", "guardian_repair_failed", "Automatic repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
             }
         }
     }
@@ -144,7 +102,7 @@ public class AppGuardianService {
         if (runtimeView == null || runtimeView.healthSnapshot() == null) {
             return;
         }
-        if (automationService != null && !automationService.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)) {
+        if (!automationService.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)) {
             return;
         }
         InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
@@ -156,9 +114,7 @@ public class AppGuardianService {
             return;
         }
         repository.recordEvent(app.appId(), "guardian_issue_detected", "Autark-OS noticed " + app.appName() + " needs attention: " + snapshot.message() + ".");
-        if (activityLogService != null) {
-            activityLogService.warning("stability", "guardian_issue_detected", app.appName() + " needs attention", snapshot.message(), app.appId());
-        }
+        activityLogService.warning("stability", "guardian_issue_detected", app.appName() + " needs attention", snapshot.message(), app.appId());
         Instant attemptAt = Instant.now();
         saveGuardianState(app, settings, "guardian_repair_queued", attemptAt);
         try {
@@ -166,16 +122,12 @@ public class AppGuardianService {
         } catch (RecoveryOperationConflictException exception) {
             saveGuardianState(app, settings, "guardian_repair_deferred", attemptAt);
             repository.recordEvent(app.appId(), "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
-            if (activityLogService != null) {
-                activityLogService.info("stability", "guardian_repair_deferred", "Automatic repair deferred for " + app.appName(), exception.getMessage(), app.appId());
-            }
+            activityLogService.info("stability", "guardian_repair_deferred", "Automatic repair deferred for " + app.appName(), exception.getMessage(), app.appId());
         } catch (RuntimeException exception) {
             saveGuardianState(app, settings, blockedByOwnership(exception) ? "guardian_repair_blocked" : "guardian_repair_failed", attemptAt);
             if (!hasRecentGuardianFailure(app.appId())) {
                 repository.recordEvent(app.appId(), "guardian_repair_failed", "Autark-OS could not repair " + app.appName() + ". Reason: " + failureReason(exception));
-                if (activityLogService != null) {
-                    activityLogService.error("stability", "guardian_repair_failed", "Automatic repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
-                }
+                activityLogService.error("stability", "guardian_repair_failed", "Automatic repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
             }
         }
     }
@@ -208,7 +160,8 @@ public class AppGuardianService {
 
     private boolean blockedByOwnership(RuntimeException exception) {
         String message = exception.getMessage();
-        return message != null && message.contains("not owned by this Autark-OS instance");
+        return message != null && (message.contains("not owned by this Autark-OS instance")
+                || message.contains("not fully managed"));
     }
 
     private String failureReason(RuntimeException exception) {
@@ -222,17 +175,7 @@ public class AppGuardianService {
                 .anyMatch(event -> "guardian_repair_failed".equals(event.type()) && event.createdAt().isAfter(cutoff));
     }
 
-    private List<InstalledApp> managedInstalledApps() {
-        Set<String> managedIds = appInstanceViewProvider.list().stream()
-                .map(AppInstanceView::catalogAppId)
-                .filter(id -> id != null && !id.isBlank())
-                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
-        return repository.findAllApps().stream()
-                .filter(app -> managedIds.contains(app.appId()))
-                .toList();
-    }
-
-    private List<InstalledApp> managedInstalledAppsFromSnapshot(Set<String> managedIds) {
+    private List<InstalledApp> managedInstalledAppsFromSnapshot(java.util.Set<String> managedIds) {
         return repository.findAllApps().stream()
                 .filter(app -> managedIds.contains(app.appId()))
                 .toList();

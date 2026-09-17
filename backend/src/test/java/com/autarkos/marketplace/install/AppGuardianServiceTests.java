@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import com.autarkos.apps.ApplicationState;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.activity.ActivityLogService;
+import com.autarkos.automation.AutomationService;
 import com.autarkos.backups.RecoveryOperationConflictException;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.marketplace.install.models.InstallModels;
@@ -52,7 +54,7 @@ class AppGuardianServiceTests {
                 null,
                 true)));
         when(applicationStateService.snapshot()).thenReturn(applicationStateWith(runtimeView("vaultwarden", health("Ready"))));
-        AppGuardianService guardian = new AppGuardianService(repository, lifecycleService, true, null, null, null, applicationStateService);
+        AppGuardianService guardian = guardian(repository, lifecycleService, applicationStateService);
 
         guardian.inspectAndRepair();
 
@@ -72,11 +74,26 @@ class AppGuardianServiceTests {
                 RecoveryOperationCoordinator.Operation.APP_BACKUP,
                 RecoveryOperationCoordinator.Operation.APP_LIFECYCLE))
                 .when(lifecycleService).repair("vaultwarden", true);
-        AppGuardianService guardian = new AppGuardianService(repository, lifecycleService, true);
+        AppGuardianService guardian = guardian(repository, lifecycleService, mock(ApplicationStateService.class));
 
         guardian.inspectApp(app);
 
         verify(repository).recordEvent("vaultwarden", "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
+    }
+
+    private AppGuardianService guardian(
+            InstalledAppRepository repository,
+            AppLifecycleService lifecycleService,
+            ApplicationStateService applicationStateService) {
+        AutomationService automation = mock(AutomationService.class);
+        when(automation.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)).thenReturn(true);
+        return new AppGuardianService(
+                repository,
+                lifecycleService,
+                true,
+                mock(ActivityLogService.class),
+                automation,
+                applicationStateService);
     }
 
     private InstallModels.InstallSettings settings() {

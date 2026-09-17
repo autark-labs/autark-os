@@ -2,6 +2,7 @@ package com.autarkos.marketplace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +17,8 @@ import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppLifecycleService;
+import com.autarkos.marketplace.install.AppAccessChecker;
+import com.autarkos.marketplace.install.AppTelemetryService;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
@@ -31,7 +34,13 @@ import com.autarkos.network.tailscale.TailscaleServeConfig;
 import com.autarkos.network.tailscale.TailscaleServeMapping;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
+import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
+import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.RecoveryOperationCoordinator;
+import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.fileops.LocalAutarkOsFileOperations;
 
 class PrivateAccessReconciliationServiceTests {
 
@@ -49,6 +58,8 @@ class PrivateAccessReconciliationServiceTests {
         properties.setRuntimeRoot(runtimeRoot.toString());
         RuntimeLayout runtimeLayout = new RuntimeLayout(properties);
         repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        AutarkOsIdentity identity = new AutarkOsIdentity("pos_test", "test", runtimeRoot.toString(),
+                "runtime-hash", Instant.parse("2026-06-11T00:00:00Z"), 1);
         composeExecutor = new FakeDockerComposeExecutor();
         tailscaleService = new FakeTailscaleService();
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
@@ -56,13 +67,17 @@ class PrivateAccessReconciliationServiceTests {
                 repository,
                 composeExecutor,
                 catalogService,
-                () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
-                false,
-                null,
-                JpaTestRepositories.backupRepository(runtimeLayout));
+                mock(com.autarkos.activity.ActivityLogService.class),
+                JpaTestRepositories.backupRepository(runtimeLayout),
+                new AppTelemetryService(composeExecutor),
+                mock(BackupDestinationService.class),
+                new RecoveryOperationCoordinator(),
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                ManagedAppTestContract.service(repository, runtimeLayout, identity),
+                new AppAccessChecker());
         reconciliationService = new PrivateAccessReconciliationService(appLifecycleService, catalogService, tailscaleService);
 
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
@@ -79,6 +94,7 @@ class PrivateAccessReconciliationServiceTests {
                 "owned",
                 Instant.parse("2026-06-11T00:00:00Z"),
                 Instant.parse("2026-06-11T00:00:00Z")));
+        ManagedAppTestContract.writeAll(repository, runtimeLayout, identity);
     }
 
     @Test

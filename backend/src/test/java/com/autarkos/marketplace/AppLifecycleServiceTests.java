@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.backups.BackupRepository;
+import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationConflictException;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoint;
@@ -41,6 +42,7 @@ import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.install.PostInstallGuideBuilder;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.ReliabilityModels;
@@ -55,7 +57,9 @@ import com.autarkos.network.tailscale.TailscaleServeMapping;
 import com.autarkos.network.tailscale.DevTailscaleService;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
+import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 import com.autarkos.testsupport.RestorePointTestRecords;
 
 class AppLifecycleServiceTests {
@@ -70,7 +74,9 @@ class AppLifecycleServiceTests {
     RuntimeLayout runtimeLayout;
     BackupRepository backupRepository;
     RecoveryOperationCoordinator recoveryOperations;
+    BackupDestinationService backupDestinationService;
     FakeAppAccessChecker accessChecker;
+    AutarkOsIdentity identity;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -80,24 +86,27 @@ class AppLifecycleServiceTests {
         repository = JpaTestRepositories.installedAppRepository(runtimeLayout);
         backupRepository = JpaTestRepositories.backupRepository(runtimeLayout);
         recoveryOperations = new RecoveryOperationCoordinator();
+        backupDestinationService = mock(BackupDestinationService.class);
+        when(backupDestinationService.activeRoot()).thenReturn(runtimeRoot.resolve("backups"));
         composeExecutor = new FakeLifecycleDockerComposeExecutor();
         tailscaleService = new FakeTailscaleService();
         accessChecker = new FakeAppAccessChecker();
+        identity = new AutarkOsIdentity("pos_test", "test", runtimeRoot.toString(),
+                "runtime-hash", Instant.parse("2026-06-11T00:00:00Z"), 1);
         service = new AppLifecycleService(
                 repository,
                 composeExecutor,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
-                false,
-                null,
+                mock(com.autarkos.activity.ActivityLogService.class),
                 backupRepository,
                 new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
-                null,
+                backupDestinationService,
                 recoveryOperations,
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                managedApps(),
                 accessChecker);
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
@@ -113,6 +122,7 @@ class AppLifecycleServiceTests {
                 "owned",
                 Instant.parse("2026-06-11T00:00:00Z"),
                 Instant.parse("2026-06-11T00:00:00Z")));
+        ManagedAppTestContract.writeAll(repository, runtimeLayout, identity);
         repository.recordEvent("vaultwarden", "installed", "Vaultwarden installed successfully.");
     }
 
@@ -199,7 +209,8 @@ class AppLifecycleServiceTests {
 
         assertThatThrownBy(() -> service.start("vaultwarden"))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("not owned by this Autark-OS instance");
+                .hasMessageContaining("not fully managed")
+                .hasMessageContaining("ownership record does not belong");
         assertThat(composeExecutor.upCalled).isFalse();
     }
 
@@ -322,7 +333,7 @@ class AppLifecycleServiceTests {
     }
 
     @Test
-    void runtimeViewReconcilesStaleComposeProjectFromRuntimeMetadata() throws Exception {
+    void runtimeViewRejectsStaleComposeProjectFromRuntimeMetadata() throws Exception {
         Path metadataFile = runtimeRoot.resolve("apps/vaultwarden/autark-os-app.json");
         Files.writeString(metadataFile, """
                 {
@@ -334,16 +345,13 @@ class AppLifecycleServiceTests {
                   "createdAt" : "2026-06-11T00:00:00Z"
                 }
                 """);
-        composeExecutor.requiredProjectName = "autarkos_dev_postest_vaultwarden";
-
-        AppRuntimeView app = service.getApp("vaultwarden");
-
-        assertThat(app.friendlyStatus()).isEqualTo("Ready");
-        assertThat(app.readinessState()).isEqualTo("ready");
+        assertThatThrownBy(() -> service.getApp("vaultwarden"))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("runtime metadata does not match");
         assertThat(repository.findAppById("vaultwarden")).hasValueSatisfying(saved ->
-                assertThat(saved.composeProject()).isEqualTo("autarkos_dev_postest_vaultwarden"));
+                assertThat(saved.composeProject()).isEqualTo("autark-os-vaultwarden"));
         assertThat(repository.ownershipFor("vaultwarden")).hasValueSatisfying(ownership ->
-                assertThat(ownership.appInstanceId()).isEqualTo("appinst_vaultwarden_runtime"));
+                assertThat(ownership.appInstanceId()).isEqualTo("appinst_vaultwarden"));
     }
 
     @Test
@@ -413,7 +421,7 @@ class AppLifecycleServiceTests {
                 "unhealthy",
                 "Up 1 minute (unhealthy)",
                 "0.0.0.0:8090->80/tcp"));
-        AppGuardianService guardian = new AppGuardianService(repository, service, true);
+        AppGuardianService guardian = guardian();
 
         guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
 
@@ -448,7 +456,7 @@ class AppLifecycleServiceTests {
                 "unhealthy",
                 "Up 1 minute (unhealthy)",
                 "0.0.0.0:8090->80/tcp"));
-        AppGuardianService guardian = new AppGuardianService(repository, service, true);
+        AppGuardianService guardian = guardian();
 
         guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
 
@@ -489,18 +497,12 @@ class AppLifecycleServiceTests {
                 "unhealthy",
                 "Up 1 minute (unhealthy)",
                 "0.0.0.0:8090->80/tcp"));
-        AppGuardianService guardian = new AppGuardianService(repository, service, true);
+        AppGuardianService guardian = guardian();
 
-        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
-        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
-
-        InstallModels.InstallSettings settings = repository.settingsFor("vaultwarden").orElseThrow();
-        assertThat(settings.lastRepairAttemptAt()).isNotNull();
-        assertThat(settings.lastRepairStatus()).isEqualTo("guardian_repair_blocked");
+        assertThatThrownBy(() -> guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow()))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("not fully managed");
         assertThat(composeExecutor.restartCalled).isFalse();
-        assertThat(repository.eventsFor("vaultwarden", 10))
-                .extracting(event -> event.type())
-                .containsOnlyOnce("guardian_issue_detected");
     }
 
     @Test
@@ -664,6 +666,7 @@ class AppLifecycleServiceTests {
                 "autark-os-gitea",
                 "http://localhost:2222",
                 Instant.parse("2026-06-11T00:00:00Z")));
+        registerManagedRuntime("gitea");
         composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-gitea",
                 "gitea",
@@ -691,6 +694,7 @@ class AppLifecycleServiceTests {
                 "autark-os-private-worker",
                 null,
                 Instant.parse("2026-06-11T00:00:00Z")));
+        registerManagedRuntime("private-worker");
         composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-private-worker",
                 "private-worker",
@@ -702,13 +706,17 @@ class AppLifecycleServiceTests {
                 repository,
                 composeExecutor,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 new com.autarkos.network.tailscale.DevTailscaleService(),
-                true,
-                null,
-                backupRepository);
+                mock(com.autarkos.activity.ActivityLogService.class),
+                backupRepository,
+                new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
+                backupDestinationService,
+                new RecoveryOperationCoordinator(),
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                managedApps(),
+                new AppAccessChecker());
         repository.saveSettings("private-worker", new InstallModels.InstallSettings(
                 null,
                 "https://autark-os-dev.tailnet.local:12890",
@@ -782,13 +790,17 @@ class AppLifecycleServiceTests {
                 repository,
                 composeExecutor,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
-                true,
-                null,
-                backupRepository);
+                mock(com.autarkos.activity.ActivityLogService.class),
+                backupRepository,
+                new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
+                backupDestinationService,
+                new RecoveryOperationCoordinator(),
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                managedApps(),
+                new AppAccessChecker());
 
         AppActionResult result = devService.repair("vaultwarden");
 
@@ -808,13 +820,17 @@ class AppLifecycleServiceTests {
                 repository,
                 composeExecutor,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                () -> List.of(new RuntimeModels.ManagedContainer("vaultwarden", "autark-os-vaultwarden", "Up 2 minutes (healthy)")),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 new FakeTailscaleService(),
-                false,
-                null,
-                backupRepository);
+                mock(com.autarkos.activity.ActivityLogService.class),
+                backupRepository,
+                new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
+                backupDestinationService,
+                new RecoveryOperationCoordinator(),
+                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
+                managedApps(),
+                new AppAccessChecker());
 
         List<AppRuntimeView> apps = rediscoveryService.listApps();
 
@@ -863,17 +879,17 @@ class AppLifecycleServiceTests {
                 repository,
                 composeExecutor,
                 new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()),
-                () -> List.of(),
                 runtimeLayout,
                 new PostInstallGuideBuilder(),
                 tailscaleService,
-                false,
-                null,
+                mock(com.autarkos.activity.ActivityLogService.class),
                 backupRepository,
                 new com.autarkos.marketplace.install.AppTelemetryService(composeExecutor),
-                null,
+                backupDestinationService,
                 recoveryOperations,
-                fileOpsService);
+                fileOpsService,
+                managedApps(),
+                new AppAccessChecker());
 
         assertThatThrownBy(() -> checkpointFailureService.uninstall("vaultwarden"))
                 .hasMessageContaining("could not create a safety checkpoint")
@@ -900,17 +916,17 @@ class AppLifecycleServiceTests {
     }
 
     @Test
-    void missingComposeUninstallArchivesContainerBeforeRemovingTheAppRecord() throws Exception {
+    void missingComposeBlocksUninstallBeforeContainerOrRegistrationChanges() throws Exception {
         Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
 
-        InstallModels.UninstallPlan plan = service.uninstallPlan("vaultwarden");
-        AppActionResult result = service.uninstall("vaultwarden");
-
-        assertThat(plan.headline()).contains("original Compose file is gone");
-        assertThat(plan.safetyCheckpointMessage()).contains("writable filesystem").contains("Mounted files");
-        assertThat(result.message()).contains("recovery archive");
-        assertThat(composeExecutor.archiveCalled).isTrue();
-        assertThat(repository.findAppById("vaultwarden")).isEmpty();
+        assertThatThrownBy(() -> service.uninstallPlan("vaultwarden"))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("original Compose configuration is missing");
+        assertThatThrownBy(() -> service.uninstall("vaultwarden"))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("original Compose configuration is missing");
+        assertThat(composeExecutor.archiveCalled).isFalse();
+        assertThat(repository.findAppById("vaultwarden")).isPresent();
     }
 
     @Test
@@ -919,9 +935,9 @@ class AppLifecycleServiceTests {
         composeExecutor.failArchive = true;
 
         assertThatThrownBy(() -> service.uninstall("vaultwarden"))
-                .hasMessageContaining("Could not uninstall Vaultwarden");
+                .hasMessageContaining("original Compose configuration is missing");
 
-        assertThat(composeExecutor.archiveCalled).isTrue();
+        assertThat(composeExecutor.archiveCalled).isFalse();
         assertThat(repository.findAppById("vaultwarden")).isPresent();
     }
 
@@ -929,30 +945,23 @@ class AppLifecycleServiceTests {
     void missingComposeBlocksStartWithARecoveryActionInsteadOfRawDockerFailure() throws Exception {
         Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
 
-        AppRuntimeView app = service.getApp("vaultwarden");
-        InstallModels.AppSettingsChangePlan settingsPlan = service.settingsChangePlan("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:8090"));
-
-        assertThat(app.availableActions())
-                .filteredOn(action -> List.of("start", "restart", "settings", "backup").contains(action.id()))
-                .allSatisfy(action -> {
-                    assertThat(action.disabled()).isTrue();
-                    assertThat(action.reason()).isPresent();
-                });
-        assertThat(settingsPlan.saveAllowed()).isFalse();
-        assertThat(settingsPlan.blockedReasons()).anySatisfy(reason -> assertThat(reason).contains("Compose file is missing"));
+        assertThatThrownBy(() -> service.getApp("vaultwarden"))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("original Compose configuration is missing");
         assertThatThrownBy(() -> service.start("vaultwarden"))
-                .hasMessageContaining("original Compose file is missing")
-                .hasMessageContaining("recovery archive");
+                .hasMessageContaining("original Compose configuration is missing");
         assertThat(composeExecutor.upCalled).isFalse();
     }
 
     @Test
-    void missingComposeCanStillStopAnAdoptedContainerByManagedLabels() throws Exception {
+    void missingComposeCannotUseContainerLabelsAsMutationAuthority() throws Exception {
         Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
 
-        service.stop("vaultwarden");
+        assertThatThrownBy(() -> service.stop("vaultwarden"))
+                .isInstanceOf(InstallationException.class)
+                .hasMessageContaining("original Compose configuration is missing");
 
-        assertThat(composeExecutor.stopManagedCalled).isTrue();
+        assertThat(composeExecutor.stopManagedCalled).isFalse();
     }
 
     @Test
@@ -994,6 +1003,7 @@ class AppLifecycleServiceTests {
                 "owned",
                 Instant.parse("2026-06-11T00:00:00Z"),
                 Instant.parse("2026-06-11T00:00:00Z")));
+        ManagedAppTestContract.writeAll(repository, runtimeLayout, identity);
 
         AppRuntimeView app = service.updateSettings("obsidian-livesync", new InstallModels.InstallSettings(
                 "http://localhost:5984",
@@ -1382,6 +1392,7 @@ class AppLifecycleServiceTests {
                 "autark-os-obsidian-livesync",
                 "http://localhost:5984",
                 Instant.parse("2026-06-11T00:00:00Z")));
+        registerManagedRuntime("obsidian-livesync");
         composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-obsidian-livesync",
                 "obsidian-livesync",
@@ -1417,6 +1428,37 @@ class AppLifecycleServiceTests {
         assertThat(saved.storageSubfolders()).isEqualTo(desired.storageSubfolders());
         assertThat(saved.autoRepairEnabled()).isFalse();
         assertThat(saved.lastAccessCheckAt()).isNotNull();
+    }
+
+    private ManagedAppAttestationService managedApps() {
+        return ManagedAppTestContract.service(repository, runtimeLayout, identity);
+    }
+
+    private AppGuardianService guardian() {
+        com.autarkos.automation.AutomationService automation = mock(com.autarkos.automation.AutomationService.class);
+        when(automation.recipeEnabled(com.autarkos.automation.AutomationService.RESTART_UNHEALTHY_APP)).thenReturn(true);
+        return new AppGuardianService(
+                repository,
+                service,
+                true,
+                mock(com.autarkos.activity.ActivityLogService.class),
+                automation,
+                mock(com.autarkos.apps.ApplicationStateService.class));
+    }
+
+    private void registerManagedRuntime(String appId) {
+        InstalledApp app = repository.findAppById(appId).orElseThrow();
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
+                appId,
+                "appinst_" + appId.replace('-', '_'),
+                appId,
+                identity.instanceId(),
+                app.runtimePath(),
+                "ready",
+                "owned",
+                app.installedAt(),
+                app.installedAt()));
+        ManagedAppTestContract.write(repository, runtimeLayout, identity, app);
     }
 
     private static class FakeAppAccessChecker extends AppAccessChecker {

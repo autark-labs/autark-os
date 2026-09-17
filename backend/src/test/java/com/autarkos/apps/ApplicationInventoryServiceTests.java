@@ -19,15 +19,17 @@ import com.autarkos.host.ObservedServiceService;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
+import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 
 class ApplicationInventoryServiceTests {
 
@@ -39,16 +41,17 @@ class ApplicationInventoryServiceTests {
         var repository = installedRepository();
         writeManagedCompose("syncthing");
         repository.save(new InstalledApp("syncthing", "Syncthing", "Ready", runtimeRoot.resolve("apps/syncthing").toString(),
-                "owned_syncthing", "http://localhost:18384", Instant.now()));
+                "autarkos_autark-os_syncthing", "http://localhost:18384", Instant.now()));
         repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
-                "syncthing", "instance", "syncthing", "current-instance", "runtime-hash",
+                "syncthing", "instance", "syncthing", "current-instance", runtimeRoot.resolve("apps/syncthing").toString(),
                 "installed", "owned", Instant.now(), Instant.now()));
         var managed = new com.autarkos.marketplace.install.AppInstanceView("instance", "syncthing", "Syncthing", "Productivity", "",
                 "Ready", "ready", "running", "owned", "private_ready", "backup_disabled", "http://localhost:18384",
                 "https://server.example.ts.net:14384", List.of(), List.of(), Instant.now());
-        var service = new ApplicationInventoryService(catalogService(), repository, observedService(observedRepository()), dockerOwnershipService(),
+        var service = new ApplicationInventoryService(catalogService(), repository, observedService(observedRepository()), managedApps(repository),
                 () -> List.of(managed));
-        var view = service.app("syncthing").orElseThrow();
+        var view = service.apps(List.of(), List.of(managed), List.of(runtime("syncthing", "Syncthing", managed.privateUrl())))
+                .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
         assertThat(view.accessState()).isEqualTo("private_ready");
         assertThat(view.availableActions()).anySatisfy(action -> assertThat(action.href()).isEqualTo(managed.privateUrl()));
         assertThat(repository.findAppById("syncthing").orElseThrow().accessUrl()).isEqualTo("http://localhost:18384");
@@ -63,7 +66,7 @@ class ApplicationInventoryServiceTests {
                 "Family Passwords",
                 "Ready",
                 runtimeRoot.resolve("apps/vaultwarden").toString(),
-                "autarkos_current_vaultwarden",
+                "autarkos_autark-os_vaultwarden",
                 "http://localhost:8090",
                 Instant.parse("2026-06-21T12:00:00Z")));
         installedRepository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
@@ -71,7 +74,7 @@ class ApplicationInventoryServiceTests {
                 "appinst_vaultwarden",
                 "vaultwarden",
                 "current-instance",
-                "runtime-hash",
+                runtimeRoot.resolve("apps/vaultwarden").toString(),
                 "installed",
                 "owned",
                 Instant.parse("2026-06-21T12:00:00Z"),
@@ -100,7 +103,9 @@ class ApplicationInventoryServiceTests {
         observedRepository.upsert(observed("docker:found_homepage", "homepage", "legacy_autark_os", "observed"));
         observedRepository.upsert(observed("docker:found_actual-budget", "actual-budget", "unknown_conflict", "observed"));
 
-        List<ApplicationView> views = service(installedRepository, observedRepository).apps();
+        List<ApplicationView> views = service(installedRepository, observedRepository).apps(
+                observedService(observedRepository).observedServices(), List.of(),
+                List.of(runtime("vaultwarden", "Family Passwords", "http://localhost:8090")));
 
         assertThat(views).isSortedAccordingTo((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.name(), right.name()));
         assertThat(views).filteredOn(view -> view.id().equals("vaultwarden"))
@@ -112,7 +117,8 @@ class ApplicationInventoryServiceTests {
                     assertThat(view.cardTone()).isEqualTo("success");
                     assertThat(view.managed()).isTrue();
                     assertThat(view.primaryAction()).isEqualTo(new ApplicationAction("manage", "Manage", "route", "/apps?focus=managed%3Avaultwarden&panel=manage", null, false, ""));
-                    assertThat(view.appInstanceId()).isEmpty();
+                    assertThat(view.appInstanceId()).isEqualTo("appinst_vaultwarden");
+                    assertThat(view.runtime()).isNotNull();
                     assertThat(view.evidence()).isNull();
                 });
         assertThat(views).filteredOn(view -> view.id().equals("jellyfin"))
@@ -227,7 +233,8 @@ class ApplicationInventoryServiceTests {
                 catalogService(),
                 installedRepository(),
                 observedServiceService,
-                dockerOwnershipService());
+                managedApps(installedRepository()),
+                List::of);
 
         ApplicationView view = service.app("vaultwarden").orElseThrow();
         List<ApplicationView> views = service.apps();
@@ -263,9 +270,32 @@ class ApplicationInventoryServiceTests {
 
         ApplicationView view = service(repository, observedRepository()).app("homepage").orElseThrow();
 
-        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE);
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
         assertThat(view.managed()).isFalse();
         assertThat(view.runtime()).isNull();
+    }
+
+    @Test
+    void inventoryAndMutationAuthorizationRejectTheSameIncompleteManagedContract() throws Exception {
+        InstalledAppRepository repository = installedRepository();
+        InstalledApp app = new InstalledApp(
+                "vaultwarden", "Vaultwarden", "Ready", runtimeRoot.resolve("apps/vaultwarden").toString(),
+                "autarkos_autark-os_vaultwarden", "http://localhost:8090", Instant.now());
+        repository.save(app);
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
+                "vaultwarden", "appinst_vaultwarden", "vaultwarden", "current-instance",
+                app.runtimePath(), "ready", "owned", Instant.now(), Instant.now()));
+        ManagedAppAttestationService managedApps = managedApps(repository);
+        Files.delete(runtimeRoot.resolve("apps/vaultwarden/manifest.yaml"));
+        ApplicationInventoryService inventory = new ApplicationInventoryService(
+                catalogService(), repository, observedService(observedRepository()), managedApps, List::of);
+
+        assertThat(inventory.app("vaultwarden").orElseThrow().relationship())
+                .isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(
+                () -> managedApps.requireManaged("vaultwarden", "start")))
+                .isInstanceOf(com.autarkos.marketplace.install.InstallationException.class)
+                .hasMessageContaining("saved app release manifest is missing");
     }
 
     private ApplicationInventoryService service(InstalledAppRepository installedRepository, ObservedServiceRepository observedRepository) {
@@ -273,7 +303,8 @@ class ApplicationInventoryServiceTests {
                 catalogService(),
                 installedRepository,
                 observedService(observedRepository),
-                dockerOwnershipService());
+                managedApps(installedRepository),
+                List::of);
     }
 
     private MarketplaceCatalogService catalogService() {
@@ -292,11 +323,11 @@ class ApplicationInventoryServiceTests {
         return new ObservedServiceService(repository, new ObservedServiceScanner(List::of, () -> new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1)));
     }
 
-    private DockerOwnershipService dockerOwnershipService() {
-        return new DockerOwnershipService(
-                () -> new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1),
-                () -> "0.2.0",
-                false);
+    private ManagedAppAttestationService managedApps(InstalledAppRepository repository) {
+        AutarkOsIdentity identity = new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(),
+                "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1);
+        ManagedAppTestContract.writeAll(repository, runtimeLayout(), identity);
+        return ManagedAppTestContract.service(repository, runtimeLayout(), identity);
     }
 
     private RuntimeLayout runtimeLayout() {
@@ -309,6 +340,14 @@ class ApplicationInventoryServiceTests {
         Path appDirectory = runtimeRoot.resolve("apps").resolve(appId);
         Files.createDirectories(appDirectory);
         Files.writeString(appDirectory.resolve("compose.yaml"), "services: {}\n");
+    }
+
+    private AppRuntimeView runtime(String appId, String name, String accessUrl) {
+        return new AppRuntimeView(
+                appId, name, "Apps", name + " app", "1.0.0", "", "Ready", "running", "healthy",
+                runtimeRoot.resolve("apps").resolve(appId).toString(), "autark-os-" + appId, accessUrl,
+                null, null, null, Instant.parse("2026-06-21T12:00:00Z"), "Backups disabled",
+                null, null, null, null, null, List.of(), List.of());
     }
 
     private ObservedService observed(String id, String catalogAppId, String ownershipState, String visibility) {

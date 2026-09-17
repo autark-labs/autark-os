@@ -190,14 +190,10 @@ class AppHealthService {
     }
 
     private void activitySuccess(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.success("applications", action, title, message, appId);
-        }
+        activityLogService.success("applications", action, title, message, appId);
     }
 
     private void activityWarning(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.warning("applications", action, title, message, appId);
-        }
+        activityLogService.warning("applications", action, title, message, appId);
     }
 }

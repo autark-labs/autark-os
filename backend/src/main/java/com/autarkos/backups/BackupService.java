@@ -11,13 +11,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.fileops.AutarkOsFileOpsService;
-import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppInstanceViewProvider;
@@ -27,7 +25,6 @@ import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
-import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettings;
 import com.autarkos.system.ProjectSettingsRepository;
@@ -58,42 +55,6 @@ public class BackupService {
     private final RecoveryOperationCoordinator recoveryOperations;
     private final BackupArchiveManifestService archiveManifestService = new BackupArchiveManifestService();
 
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, () -> installedAppRepository.findAllApps().stream()
-                .map(app -> new AppInstanceView(
-                        app.appId(),
-                        app.appId(),
-                        app.appName(),
-                        "",
-                        "",
-                        app.status(),
-                        app.status(),
-                        app.status(),
-                        "owned",
-                        app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        AutarkOsStates.BackupState.DISABLED,
-                        app.accessUrl(),
-                        null,
-                        List.of(),
-                        List.of(),
-                        new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
-                        Instant.now()))
-                .toList(), new RuntimeFileOperations());
-    }
-
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
-    }
-
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, new BackupDestinationService(runtimeLayout, settingsRepository, fileOpsService), new RecoveryOperationCoordinator());
-    }
-
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService) {
-        this(runtimeLayout, installedAppRepository, backupRepository, activityLogService, settingsRepository, projectSettingsService, appLifecycleService, catalogService, appInstanceViewProvider, fileOperations, fileOpsService, backupDestinationService, new RecoveryOperationCoordinator());
-    }
-
-    @Autowired
     public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
@@ -332,8 +293,7 @@ public class BackupService {
     }
 
     private BackupModels.BackupRunResult runAppBackup(String appId, String backupSource) {
-        InstalledApp app = installedAppRepository.findAppById(appId)
-                .orElseThrow(() -> new InstallationException("App is not installed: " + appId));
+        InstalledApp app = appLifecycleService.requireManagedApp(appId, "create a backup for");
         Path source = runtimeLayout.appRoot(app.appId())
                 .toAbsolutePath()
                 .normalize();

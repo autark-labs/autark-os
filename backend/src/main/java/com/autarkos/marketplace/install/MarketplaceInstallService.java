@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
@@ -42,8 +41,8 @@ public class MarketplaceInstallService {
     private final AppRuntimeMetadataWriter appRuntimeMetadataWriter;
     private final ObservedServiceService observedServiceService;
     private final InstallStartupChecker startupChecker;
+    private final ManagedAppAttestationService managedApps;
 
-    @Autowired
     public MarketplaceInstallService(
             InstallPlanService installPlanService,
             RuntimeDirectoryManager directoryManager,
@@ -58,7 +57,8 @@ public class MarketplaceInstallService {
             ActivityLogService activityLogService,
             DockerOwnershipService dockerOwnershipService,
             AppRuntimeMetadataWriter appRuntimeMetadataWriter,
-            ObservedServiceService observedServiceService) {
+            ObservedServiceService observedServiceService,
+            ManagedAppAttestationService managedApps) {
         this.installPlanService = installPlanService;
         this.directoryManager = directoryManager;
         this.packageCopier = packageCopier;
@@ -73,38 +73,8 @@ public class MarketplaceInstallService {
         this.dockerOwnershipService = dockerOwnershipService;
         this.appRuntimeMetadataWriter = appRuntimeMetadataWriter;
         this.observedServiceService = observedServiceService;
+        this.managedApps = managedApps;
         this.startupChecker = new InstallStartupChecker(dockerComposeExecutor);
-    }
-
-    public MarketplaceInstallService(
-            InstallPlanService installPlanService,
-            RuntimeDirectoryManager directoryManager,
-            CatalogPackageCopier packageCopier,
-            ComposeRenderer composeRenderer,
-            DockerComposeExecutor dockerComposeExecutor,
-            InstalledAppRepository installedAppRepository,
-            InstallCustomizationResolver customizationResolver,
-            PostInstallProvisioner postInstallProvisioner,
-            PostInstallGuideBuilder postInstallGuideBuilder,
-            TailscaleService tailscaleService,
-            ActivityLogService activityLogService,
-            DockerOwnershipService dockerOwnershipService,
-            AppRuntimeMetadataWriter appRuntimeMetadataWriter) {
-        this(installPlanService, directoryManager, packageCopier, composeRenderer, dockerComposeExecutor, installedAppRepository, customizationResolver, postInstallProvisioner, postInstallGuideBuilder, tailscaleService, activityLogService, dockerOwnershipService, appRuntimeMetadataWriter, null);
-    }
-
-    public MarketplaceInstallService(
-            InstallPlanService installPlanService,
-            RuntimeDirectoryManager directoryManager,
-            CatalogPackageCopier packageCopier,
-            ComposeRenderer composeRenderer,
-            DockerComposeExecutor dockerComposeExecutor,
-            InstalledAppRepository installedAppRepository,
-            InstallCustomizationResolver customizationResolver,
-            PostInstallProvisioner postInstallProvisioner,
-            PostInstallGuideBuilder postInstallGuideBuilder,
-            TailscaleService tailscaleService) {
-        this(installPlanService, directoryManager, packageCopier, composeRenderer, dockerComposeExecutor, installedAppRepository, customizationResolver, postInstallProvisioner, postInstallGuideBuilder, tailscaleService, null, null, null, null);
     }
 
     public InstallModels.InstallResult install(ApplicationManifest manifest) {
@@ -135,6 +105,13 @@ public class MarketplaceInstallService {
             return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
         }
         InstalledApp existingApp = installedAppRepository.findAppById(manifest.id()).orElse(null);
+        if (existingApp != null && !managedApps.attest(existingApp).managed()) {
+            String message = manifest.name() + " has an incomplete managed registration. Review recovery in My Apps before installing or replacing it.";
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking managed ownership", message));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message,
+                    runtimeConfiguration.accessUrl(), plan, steps, logs, null,
+                    setupGuide(manifest, existingApp.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
+        }
         if (existingApp != null && (options == null || !options.reinstallRequested())) {
             recordStep(steps, sink, InstallModels.InstallStep.completed("Already installed", manifest.name() + " is already managed by Autark-OS."));
             return new InstallModels.InstallResult(
@@ -208,15 +185,6 @@ public class MarketplaceInstallService {
             GuideModels.PostInstallGuide postInstallGuide = postInstallGuideBuilder.build(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl, provisioningResult);
 
             recordStep(steps, sink, InstallModels.InstallStep.completed(manifest.health().successLabel(), readyDetail(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl)));
-            if (!ownershipReconcilesToManaged(manifest.id())) {
-                String message = "Autark-OS could not confirm that this app is managed by this installation. The install was stopped so we do not show a service as installed when it is not under Autark-OS control.";
-                recordStep(steps, sink, InstallModels.InstallStep.failed("Confirming ownership", message));
-                installedAppRepository.recordEvent(manifest.id(), "install_failed", message);
-                recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, message, logs);
-                activityWarning("install_failed", "Install ownership check failed for " + manifest.name(), message, manifest.id());
-                return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl, provisioningResult));
-            }
-
             installedAppRepository.save(new InstalledApp(
                     manifest.id(),
                     manifest.name(),
@@ -226,6 +194,15 @@ public class MarketplaceInstallService {
                     runtimeConfiguration.accessUrl(),
                     Instant.now()));
             saveOwnershipMetadata(manifest, appRoot, runtimeMetadata, startupCheck.warmingUp() ? "starting" : "ready");
+            ManagedAppAttestationService.Result attestation = managedApps.attest(manifest.id());
+            if (!attestation.managed()) {
+                installedAppRepository.deleteApp(manifest.id());
+                String message = "Autark-OS could not confirm that this app is managed by this installation. " + attestation.message();
+                recordStep(steps, sink, InstallModels.InstallStep.failed("Confirming ownership", message));
+                recordFailedPartialInstall(manifest, runtimeConfiguration, appRoot, composeProject, message, logs);
+                activityWarning("install_failed", "Install ownership check failed for " + manifest.name(), message, manifest.id());
+                return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), verifiedPrivateUrl, provisioningResult));
+            }
             installedAppRepository.saveSettings(manifest.id(), installSettings(manifest, runtimeConfiguration, privateAccess));
             installedAppRepository.recordEvent(manifest.id(), "installed", manifest.name() + " installed successfully.");
             clearFailedPartialInstall(manifest.id());
@@ -252,9 +229,6 @@ public class MarketplaceInstallService {
     }
 
     private List<ObservedService> matchingObservedDuplicates(ApplicationManifest manifest) {
-        if (observedServiceService == null) {
-            return List.of();
-        }
         observedServiceService.refresh();
         return observedServiceService.matchingCatalogServices(manifest.id()).stream()
                 .filter(service -> !"owned_managed".equals(service.ownershipState()))
@@ -276,20 +250,6 @@ public class MarketplaceInstallService {
         return "Autark-OS already sees " + manifest.name() + " on your system. Installing another copy can cause confusing behavior across your network. Review recovery for the existing service when possible, or acknowledge that you intentionally want a separate copy.";
     }
 
-    private boolean ownershipReconcilesToManaged(String appId) {
-        if (observedServiceService == null || appRuntimeMetadataWriter == null) {
-            return true;
-        }
-        observedServiceService.refresh();
-        String currentInstanceId = dockerOwnershipService == null ? "" : dockerOwnershipService.currentIdentity().instanceId();
-        return observedServiceService.matchingCatalogServices(appId).stream()
-                .anyMatch(service -> "owned_managed".equals(service.ownershipState())
-                        && (currentInstanceId.isBlank()
-                        || service.autarkOsInstanceId() == null
-                        || service.autarkOsInstanceId().isBlank()
-                        || currentInstanceId.equals(service.autarkOsInstanceId())));
-    }
-
     private void recordFailedPartialInstall(
             ApplicationManifest manifest,
             RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration,
@@ -297,7 +257,7 @@ public class MarketplaceInstallService {
             String composeProject,
             String message,
             List<String> logs) {
-        if (observedServiceService == null || appRoot == null) {
+        if (appRoot == null) {
             return;
         }
         try {
@@ -314,9 +274,6 @@ public class MarketplaceInstallService {
     }
 
     private void clearFailedPartialInstall(String appId) {
-        if (observedServiceService == null) {
-            return;
-        }
         try {
             observedServiceService.clearFailedInstall(appId);
         } catch (RuntimeException ignored) {
@@ -330,23 +287,14 @@ public class MarketplaceInstallService {
     }
 
     private String composeProject(ApplicationManifest manifest) {
-        if (dockerOwnershipService == null) {
-            return manifest.runtime().composeProject();
-        }
         return dockerOwnershipService.composeProject(manifest.id());
     }
 
     private RuntimeModels.AppRuntimeMetadata writeRuntimeMetadata(ApplicationManifest manifest, Path appRoot, String appInstanceId, String composeProject) {
-        if (appRuntimeMetadataWriter != null) {
-            return appRuntimeMetadataWriter.write(manifest, appRoot, appInstanceId, composeProject);
-        }
-        return null;
+        return appRuntimeMetadataWriter.write(manifest, appRoot, appInstanceId, composeProject);
     }
 
     private void saveOwnershipMetadata(ApplicationManifest manifest, Path appRoot, RuntimeModels.AppRuntimeMetadata metadata, String installState) {
-        if (metadata == null) {
-            return;
-        }
         installedAppRepository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 manifest.id(),
                 metadata.appInstanceId(),
@@ -428,27 +376,19 @@ public class MarketplaceInstallService {
     }
 
     private void activityInfo(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.info("marketplace", action, title, message, appId);
-        }
+        activityLogService.info("marketplace", action, title, message, appId);
     }
 
     private void activitySuccess(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.success("marketplace", action, title, message, appId);
-        }
+        activityLogService.success("marketplace", action, title, message, appId);
     }
 
     private void activityWarning(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.warning("marketplace", action, title, message, appId);
-        }
+        activityLogService.warning("marketplace", action, title, message, appId);
     }
 
     private void activityError(String action, String title, String message, String appId, RuntimeException exception) {
-        if (activityLogService != null) {
-            activityLogService.error("marketplace", action, title, message, appId, exception);
-        }
+        activityLogService.error("marketplace", action, title, message, appId, exception);
     }
 
     private String readyDetail(ApplicationManifest manifest, String accessUrl, String privateAccessUrl) {

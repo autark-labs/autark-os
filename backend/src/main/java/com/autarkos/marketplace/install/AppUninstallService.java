@@ -15,7 +15,6 @@ import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.fileops.AutarkOsFileOpsService;
-import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -36,48 +35,6 @@ class AppUninstallService {
     private final BackupDestinationService backupDestinationService;
     private final RecoveryOperationCoordinator recoveryOperations;
     private final AutarkOsFileOpsService fileOpsService;
-
-    AppUninstallService(
-            InstalledAppRepository repository,
-            DockerComposeExecutor composeExecutor,
-            RuntimeLayout runtimeLayout,
-            BackupRepository backupRepository,
-            TailscaleService tailscaleService,
-            ActivityLogService activityLogService) {
-        this(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, null, new RecoveryOperationCoordinator());
-    }
-
-    AppUninstallService(
-            InstalledAppRepository repository,
-            DockerComposeExecutor composeExecutor,
-            RuntimeLayout runtimeLayout,
-            BackupRepository backupRepository,
-            TailscaleService tailscaleService,
-            ActivityLogService activityLogService,
-            BackupDestinationService backupDestinationService) {
-        this(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, new RecoveryOperationCoordinator());
-    }
-
-    AppUninstallService(
-            InstalledAppRepository repository,
-            DockerComposeExecutor composeExecutor,
-            RuntimeLayout runtimeLayout,
-            BackupRepository backupRepository,
-            TailscaleService tailscaleService,
-            ActivityLogService activityLogService,
-            BackupDestinationService backupDestinationService,
-            RecoveryOperationCoordinator recoveryOperations) {
-        this(
-                repository,
-                composeExecutor,
-                runtimeLayout,
-                backupRepository,
-                tailscaleService,
-                activityLogService,
-                backupDestinationService,
-                recoveryOperations,
-                new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()));
-    }
 
     AppUninstallService(
             InstalledAppRepository repository,
@@ -206,9 +163,7 @@ class AppUninstallService {
     }
 
     private Path backupRoot() {
-        return backupDestinationService == null
-                ? runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize()
-                : backupDestinationService.activeRoot();
+        return backupDestinationService.activeRoot();
     }
 
     private Path containerArchiveDirectory(InstalledApp app) {
@@ -237,15 +192,11 @@ class AppUninstallService {
     }
 
     private void activitySuccess(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.success("applications", action, title, message, appId);
-        }
+        activityLogService.success("applications", action, title, message, appId);
     }
 
     private void activityWarning(String action, String title, String message, String appId) {
-        if (activityLogService != null) {
-            activityLogService.warning("applications", action, title, message, appId);
-        }
+        activityLogService.warning("applications", action, title, message, appId);
     }
 
     private record SafetyCheckpointResult(boolean created, List<String> logs) {

@@ -41,13 +41,16 @@ import com.autarkos.testsupport.JpaTestRepositories;
 class InstalledAppsControllerTests {
 
     @Test
-    void unconfiguredUpdateRoutesRemainBlockedAndDoNotReachLifecycleServices() throws Exception {
+    void deferredUpdateRoutesRemainBlockedAndDoNotReachLifecycleServices() throws Exception {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        AppUpdateService updateService = mock(AppUpdateService.class);
+        when(updateService.rollbackPlan("vaultwarden")).thenReturn(UpdateModels.AppUpdatePlan.blocked(
+                "vaultwarden", "Vaultwarden", "rollback", "Rollback unavailable", "No rollback is available.", List.of("No rollback is available.")));
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 mock(MonitoringMetricsService.class),
-                new AppUpdateService(),
+                updateService,
                 applicationStateService,
                 jobService());
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
@@ -64,35 +67,6 @@ class InstalledAppsControllerTests {
                     .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"status\":\"blocked\""));
         }
 
-        verifyNoUpdateWork(lifecycleService, applicationStateService);
-    }
-
-    @Test
-    void unconfiguredAppUpdateServiceKeepsMutationsBlockedWithoutStartingWork() {
-        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
-        MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = new AppUpdateService();
-        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
-        InstalledAppsController controller = new InstalledAppsController(
-                lifecycleService,
-                metricsService,
-                updateService,
-                applicationStateService,
-                jobService());
-
-        UpdateModels.AppUpdateCapability listed = controller.updates();
-        var plan = controller.updatePlan("vaultwarden");
-        var update = controller.update("vaultwarden", null);
-        var rollback = controller.rollback("vaultwarden", null);
-
-        assertThat(listed.available()).isFalse();
-        assertThat(listed.status()).isEqualTo("unavailable");
-        assertThat(plan.status()).isEqualTo("blocked");
-        assertThat(update.getStatusCode().value()).isEqualTo(409);
-        assertThat(rollback.getStatusCode().value()).isEqualTo(409);
-        assertThat(plan.summary()).contains("deferred");
-        assertThat(update.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
-        assertThat(rollback.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
         verifyNoUpdateWork(lifecycleService, applicationStateService);
     }
 

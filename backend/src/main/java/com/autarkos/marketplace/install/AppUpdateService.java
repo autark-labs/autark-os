@@ -20,7 +20,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 
@@ -62,24 +61,8 @@ public class AppUpdateService {
     private final AppUpdateSnapshotStore snapshots;
     private final ActivityLogService activityLog;
     private final ProChangeSafetyService changeSafety;
+    private final ManagedAppAttestationService managedApps;
 
-    /** Keeps old direct callers explicitly unsupported outside Spring. */
-    public AppUpdateService() {
-        this.installedApps = null;
-        this.catalog = null;
-        this.manifestReader = null;
-        this.metadataReader = null;
-        this.metadataWriter = null;
-        this.catalogPackageCopier = null;
-        this.composeExecutor = null;
-        this.backupService = null;
-        this.lifecycleService = null;
-        this.snapshots = null;
-        this.activityLog = null;
-        this.changeSafety = null;
-    }
-
-    @Autowired
     public AppUpdateService(
             InstalledAppRepository installedApps,
             MarketplaceCatalogService catalog,
@@ -92,7 +75,8 @@ public class AppUpdateService {
             AppLifecycleService lifecycleService,
             AppUpdateSnapshotStore snapshots,
             ActivityLogService activityLog,
-            ProChangeSafetyService changeSafety) {
+            ProChangeSafetyService changeSafety,
+            ManagedAppAttestationService managedApps) {
         this.installedApps = installedApps;
         this.catalog = catalog;
         this.manifestReader = manifestReader;
@@ -105,16 +89,14 @@ public class AppUpdateService {
         this.snapshots = snapshots;
         this.activityLog = activityLog;
         this.changeSafety = changeSafety;
+        this.managedApps = managedApps;
     }
 
     public UpdateModels.AppUpdateCapability capability() {
-        return configured() ? UpdateModels.AppUpdateCapability.supported() : UpdateModels.AppUpdateCapability.unavailable();
+        return UpdateModels.AppUpdateCapability.supported();
     }
 
     public UpdateModels.AppUpdatePlan updatePlan(String appId) {
-        if (!configured()) {
-            return unavailablePlan(appId, "update");
-        }
         try {
             return updatePlan(updateContext(appId));
         } catch (InstallationException exception) {
@@ -171,9 +153,6 @@ public class AppUpdateService {
     }
 
     public UpdateModels.AppUpdatePlan rollbackPlan(String appId) {
-        if (!configured()) {
-            return unavailablePlan(appId, "rollback");
-        }
         InstalledApp app = installedApp(appId);
         Optional<AppUpdateSnapshot> rollback = snapshots.latestRollbackFor(appId);
         if (rollback.isEmpty()) {
@@ -332,7 +311,6 @@ public class AppUpdateService {
 
     private UpdateContext updateContext(String appId) {
         InstalledApp app = installedApp(appId);
-        assertOwned(app);
         ApplicationManifest current = readRuntimeManifest(app);
         RuntimeModels.AppRuntimeMetadata metadata = metadataReader.read(Path.of(app.runtimePath()))
                 .orElseThrow(() -> new InstallationException("Autark-OS could not verify this app's release metadata."));
@@ -545,19 +523,11 @@ public class AppUpdateService {
                 && backupService.destination().ready();
     }
 
-    private void assertOwned(InstalledApp app) {
-        String ownership = installedApps.ownershipFor(app.appId()).map(RuntimeModels.InstalledAppOwnershipMetadata::ownershipStatus).orElse("");
-        if (!AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(ownership)) {
-            throw new InstallationException("Only apps managed by this Autark-OS instance can be updated.");
-        }
-    }
-
     private InstalledApp installedApp(String appId) {
         if (appId == null || appId.isBlank()) {
             throw new InstallationException("Choose an installed app before changing its release.");
         }
-        return installedApps.findAppById(appId.trim())
-                .orElseThrow(() -> new InstallationException("App is not installed: " + appId));
+        return managedApps.requireManaged(appId.trim(), "change the release for");
     }
 
     private ApplicationManifest readRuntimeManifest(InstalledApp app) {
@@ -595,11 +565,6 @@ public class AppUpdateService {
             throw new InstallationException("The original Compose file is missing, so Autark-OS cannot perform a reversible update.");
         }
         return compose;
-    }
-
-    private UpdateModels.AppUpdatePlan unavailablePlan(String appId, String operation) {
-        UpdateModels.AppUpdateCapability capability = capability();
-        return UpdateModels.AppUpdatePlan.blocked(appId, "App", operation, capability.headline(), capability.summary(), List.of(capability.summary()));
     }
 
     private UpdateModels.AppUpdatePlan blocked(InstalledApp app, String operation, String headline, String summary, List<String> reasons) {
@@ -695,10 +660,6 @@ public class AppUpdateService {
 
     private String firstReason(UpdateModels.AppUpdatePlan plan, String fallback) {
         return plan.blockedReasons().stream().filter(reason -> reason != null && !reason.isBlank()).findFirst().orElse(fallback);
-    }
-
-    private boolean configured() {
-        return installedApps != null;
     }
 
     private String version(String primary, String fallback) {

@@ -13,25 +13,24 @@ import com.autarkos.marketplace.install.models.RuntimeModels;
 @Service
 public class AppReconciliationService {
 
-    private final InstalledAppRepository repository;
+    private final ManagedAppAttestationService managedApps;
     private final ManagedContainerDiscovery managedContainerDiscovery;
 
     public AppReconciliationService(
-            InstalledAppRepository repository,
+            ManagedAppAttestationService managedApps,
             ManagedContainerDiscovery managedContainerDiscovery) {
-        this.repository = repository;
+        this.managedApps = managedApps;
         this.managedContainerDiscovery = managedContainerDiscovery;
     }
 
     public List<AppReconciliationItem> reconcile() {
-        List<InstalledApp> installedApps = repository.findAllApps();
+        List<InstalledApp> installedApps = managedApps.managedApps();
         List<RuntimeModels.ManagedContainer> containers = managedContainerDiscovery.findManagedContainers();
         Map<String, List<RuntimeModels.ManagedContainer>> containersByApp = containers.stream()
                 .filter(container -> container.appId() != null && !container.appId().isBlank())
                 .collect(Collectors.groupingBy(RuntimeModels.ManagedContainer::appId));
 
         return installedApps.stream()
-                .filter(this::hasCurrentOwnershipRecord)
                 .filter(app -> containsOnlyCurrentContainers(containersByApp.getOrDefault(app.appId(), List.of())))
                 .map(app -> reconcileInstalled(app, containersByApp.getOrDefault(app.appId(), List.of())))
                 .sorted(Comparator.comparing(AppReconciliationItem::appName, String.CASE_INSENSITIVE_ORDER))
@@ -47,14 +46,6 @@ public class AppReconciliationService {
         String status = statusFromContainers(containers);
         return new AppReconciliationItem(
                 app.appId(), app.appName(), status, "Reconciled from owned Docker containers.");
-    }
-
-    private boolean hasCurrentOwnershipRecord(InstalledApp app) {
-        return repository.ownershipFor(app.appId()).map(this::isOwnedMetadata).orElse(true);
-    }
-
-    private boolean isOwnedMetadata(RuntimeModels.InstalledAppOwnershipMetadata metadata) {
-        return "owned".equalsIgnoreCase(metadata.ownershipStatus()) || metadata.ownershipStatus().isBlank();
     }
 
     private boolean containsOnlyCurrentContainers(List<RuntimeModels.ManagedContainer> containers) {

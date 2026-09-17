@@ -22,7 +22,9 @@ import com.autarkos.network.tailscale.TailscaleServeConfig;
 import com.autarkos.network.tailscale.TailscaleServeMapping;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
+import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 import com.autarkos.testsupport.RestorePointTestRecords;
 
 class AppInstanceViewServiceTests {
@@ -265,9 +267,12 @@ class AppInstanceViewServiceTests {
 
     private AppInstanceViewService service(InstalledAppRepository repository, BackupRepository backupRepository, List<RuntimeModels.ManagedContainer> containers, TailscaleService tailscaleService) {
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
+        AutarkOsIdentity identity = new AutarkOsIdentity("pos_abcdef1234567890", "homelab-box",
+                runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1);
+        ManagedAppTestContract.writeAll(repository, runtimeLayout(), identity);
         return new AppInstanceViewService(
                 repository,
-                new AppReconciliationService(repository, () -> containers),
+                new AppReconciliationService(ManagedAppTestContract.service(repository, runtimeLayout(), identity), () -> containers),
                 catalogService,
                 backupRepository,
                 tailscaleService);
@@ -294,9 +299,13 @@ class AppInstanceViewServiceTests {
     }
 
     private InstalledAppRepository repository() {
+        return JpaTestRepositories.installedAppRepository(runtimeLayout());
+    }
+
+    private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return JpaTestRepositories.installedAppRepository(new RuntimeLayout(properties));
+        return new RuntimeLayout(properties);
     }
 
     private BackupRepository backupRepository() {

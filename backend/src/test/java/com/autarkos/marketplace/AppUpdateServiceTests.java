@@ -44,6 +44,7 @@ import com.autarkos.marketplace.install.CatalogPackageCopier;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.install.models.UpdateModels;
@@ -77,6 +78,8 @@ class AppUpdateServiceTests {
     ActivityLogService activityLog;
     @Mock
     ProChangeSafetyService changeSafety;
+    @Mock
+    ManagedAppAttestationService managedApps;
 
     private AppUpdateService service;
     private InstalledApp app;
@@ -106,9 +109,11 @@ class AppUpdateServiceTests {
                 lifecycleService,
                 snapshots,
                 activityLog,
-                changeSafety);
+                changeSafety,
+                managedApps);
 
         when(installedApps.findAppById("example")).thenReturn(Optional.of(app));
+        when(managedApps.requireManaged("example", "change the release for")).thenReturn(app);
         when(installedApps.ownershipFor("example")).thenReturn(Optional.of(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "example", "instance-example", "example", "autark", app.runtimePath(), "ready", AutarkOsStates.OwnershipState.OWNED_MANAGED, Instant.now(), Instant.now())));
         when(installedApps.settingsFor("example")).thenReturn(Optional.of(InstallModels.InstallSettings.defaults(app.accessUrl())));

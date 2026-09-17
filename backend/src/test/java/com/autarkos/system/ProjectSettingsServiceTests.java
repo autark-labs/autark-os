@@ -15,9 +15,11 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
+import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 
 class ProjectSettingsServiceTests {
 
@@ -28,14 +30,22 @@ class ProjectSettingsServiceTests {
     void appliesBackupAndRepairDefaultsToInstalledAppsWithoutReplacingAppSpecificSettings() {
         RuntimeLayout runtimeLayout = runtimeLayout();
         InstalledAppRepository installedApps = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        Instant installedAt = Instant.parse("2026-06-21T12:00:00Z");
+        Instant checkedAt = Instant.parse("2026-06-21T12:30:00Z");
+        AutarkOsIdentity identity = new AutarkOsIdentity("current-instance", "test", runtimeRoot.toString(),
+                "runtime-hash", installedAt, 1);
+        installedApps.save(new InstalledApp("vaultwarden", "Vaultwarden", "Ready",
+                runtimeLayout.appRoot("vaultwarden").toString(), "autarkos_test_vaultwarden", "http://localhost:8090", installedAt));
+        installedApps.save(new InstalledApp("homepage", "Homepage", "Ready",
+                runtimeLayout.appRoot("homepage").toString(), "autarkos_test_homepage", "http://localhost:3000", installedAt));
+        saveOwnership(installedApps, runtimeLayout, identity, "vaultwarden", installedAt);
+        saveOwnership(installedApps, runtimeLayout, identity, "homepage", installedAt);
+        ManagedAppTestContract.writeAll(installedApps, runtimeLayout, identity);
         ProjectSettingsService service = new ProjectSettingsService(
                 JpaTestRepositories.projectSettingsRepository(runtimeLayout),
                 new ActivityLogService(mock(ActivityLogRepository.class)),
-                installedApps);
-        Instant installedAt = Instant.parse("2026-06-21T12:00:00Z");
-        Instant checkedAt = Instant.parse("2026-06-21T12:30:00Z");
-        installedApps.save(new InstalledApp("vaultwarden", "Vaultwarden", "Ready", "/apps/vaultwarden", "autark-os-vaultwarden", "http://localhost:8090", installedAt));
-        installedApps.save(new InstalledApp("homepage", "Homepage", "Ready", "/apps/homepage", "autark-os-homepage", "http://localhost:3000", installedAt));
+                installedApps,
+                ManagedAppTestContract.service(installedApps, runtimeLayout, identity));
         installedApps.saveSettings("vaultwarden", new InstallModels.InstallSettings(
                 "http://localhost:8090",
                 "https://vaultwarden.tailnet.ts.net",
@@ -93,12 +103,24 @@ class ProjectSettingsServiceTests {
         });
     }
 
+    private void saveOwnership(InstalledAppRepository repository, RuntimeLayout layout, AutarkOsIdentity identity,
+            String appId, Instant installedAt) {
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
+                appId, "appinst_" + appId, appId, identity.instanceId(), layout.appRoot(appId).toString(),
+                "ready", "owned", installedAt, installedAt));
+    }
+
     @Test
     void rejectsAnInvalidTimeZoneBeforeItCanBreakBackupScheduling() {
         RuntimeLayout runtimeLayout = runtimeLayout();
+        InstalledAppRepository installedApps = JpaTestRepositories.installedAppRepository(runtimeLayout);
+        AutarkOsIdentity identity = new AutarkOsIdentity("current-instance", "test", runtimeRoot.toString(),
+                "runtime-hash", Instant.now(), 1);
         ProjectSettingsService service = new ProjectSettingsService(
                 JpaTestRepositories.projectSettingsRepository(runtimeLayout),
-                new ActivityLogService(mock(ActivityLogRepository.class)));
+                new ActivityLogService(mock(ActivityLogRepository.class)),
+                installedApps,
+                ManagedAppTestContract.service(installedApps, runtimeLayout, identity));
         ProjectSettings defaults = ProjectSettings.defaults("autark-os");
 
         ProjectSettings saved = service.update(new ProjectSettings(

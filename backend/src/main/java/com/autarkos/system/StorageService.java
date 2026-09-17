@@ -14,11 +14,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.BackupModels;
 import com.autarkos.backups.RecoveryOperationCoordinator;
@@ -27,7 +25,6 @@ import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
-import com.autarkos.marketplace.install.models.ReliabilityModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 
 @Service
@@ -51,42 +48,6 @@ public class StorageService {
     private Instant lastStorageSampleAt = Instant.EPOCH;
     private String lastWarningStatus = "";
 
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository) {
-        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, new RuntimeFileOperations());
-    }
-
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, RuntimeFileOperations fileOperations) {
-        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, () -> installedAppRepository.findAllApps().stream()
-                .map(app -> new AppInstanceView(
-                        app.appId(),
-                        app.appId(),
-                        app.appName(),
-                        "",
-                        "",
-                        app.status(),
-                        app.status(),
-                        app.status(),
-                        "owned",
-                        app.accessUrl() == null || app.accessUrl().isBlank() ? "not_ready" : "local_ready",
-                        AutarkOsStates.BackupState.DISABLED,
-                        app.accessUrl(),
-                        null,
-                        List.of(),
-                        List.of(),
-                        new ReliabilityModels.AppRemediationView("watching", "Autark-OS is watching", app.appName() + " is ready. If it drifts, Autark-OS will try safe repair before asking you to intervene.", "No action needed", "success"),
-                        Instant.now()))
-                .toList(), fileOperations, null);
-    }
-
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations) {
-        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, appInstanceViewProvider, fileOperations, null);
-    }
-
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService) {
-        this(runtimeLayout, installedAppRepository, activityLogService, storageSampleRepository, appInstanceViewProvider, fileOperations, backupDestinationService, new RecoveryOperationCoordinator());
-    }
-
-    @Autowired
     public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
@@ -101,7 +62,7 @@ public class StorageService {
     public StorageModels.StorageReport report() {
         Path runtimeRoot = runtimeLayout.runtimeRoot();
         Path appsRoot = runtimeRoot.resolve("apps").normalize();
-        BackupModels.BackupDestination backupDestination = backupDestinationService == null ? null : backupDestinationService.current();
+        BackupModels.BackupDestination backupDestination = backupDestinationService.current();
         Path backupsRoot = backupDestination != null && backupDestination.ready()
                 ? Path.of(backupDestination.configuredPath()).normalize()
                 : runtimeRoot.resolve("backups").normalize();

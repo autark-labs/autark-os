@@ -12,7 +12,9 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
+import com.autarkos.system.AutarkOsIdentity;
 import com.autarkos.testsupport.JpaTestRepositories;
+import com.autarkos.testsupport.ManagedAppTestContract;
 
 class AppReconciliationServiceTests {
 
@@ -87,15 +89,22 @@ class AppReconciliationServiceTests {
     }
 
     private AppReconciliationService service(InstalledAppRepository repository, List<RuntimeModels.ManagedContainer> containers) {
+        AutarkOsIdentity identity = new AutarkOsIdentity("pos_abcdef1234567890", "homelab-box",
+                runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1);
+        ManagedAppTestContract.writeAll(repository, runtimeLayout(), identity);
         return new AppReconciliationService(
-                repository,
+                ManagedAppTestContract.service(repository, runtimeLayout(), identity),
                 () -> containers);
     }
 
     private InstalledAppRepository repository() {
+        return JpaTestRepositories.installedAppRepository(runtimeLayout());
+    }
+
+    private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
-        return JpaTestRepositories.installedAppRepository(new RuntimeLayout(properties));
+        return new RuntimeLayout(properties);
     }
 
     private InstalledApp installed(String appId, String status) {
