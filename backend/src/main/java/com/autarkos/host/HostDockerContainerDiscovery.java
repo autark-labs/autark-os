@@ -3,11 +3,7 @@ package com.autarkos.host;
 import java.util.List;
 
 public interface HostDockerContainerDiscovery {
-    List<HostModels.HostDockerContainer> findContainers();
-
-    default DockerInventory observeContainers() {
-        return DockerInventory.successful(findContainers());
-    }
+    DockerInventory observeContainers();
 
     record DockerInventory(boolean successful, List<HostModels.HostDockerContainer> containers, String diagnostic) {
         public DockerInventory {

@@ -31,10 +31,50 @@ import java.nio.file.Path;
 class ApplicationStateServiceTests {
 
     @Test
+    void oneDockerGenerationFeedsEveryCanonicalConsumerAndFailurePreservesIt() {
+        var inventoryCalls = new AtomicInteger();
+        var currentInventory = new AtomicReference<>(com.autarkos.testsupport.DockerInventoryTestData.empty());
+        var runtimeGeneration = new AtomicReference<com.autarkos.host.DockerInventorySnapshot>();
+        var managedGeneration = new AtomicReference<com.autarkos.host.DockerInventorySnapshot>();
+        ApplicationStateService service = new ApplicationStateService(
+                inventory -> {
+                    managedGeneration.set(inventory);
+                    return List.of(appInstance());
+                },
+                inventory -> {
+                    runtimeGeneration.set(inventory);
+                    return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
+                },
+                () -> {
+                    inventoryCalls.incrementAndGet();
+                    return currentInventory.get();
+                },
+                new ObservedServiceService(repository(), noScan()),
+                inventory(),
+                () -> Instant.parse("2026-06-21T12:00:00Z"),
+                List::of,
+                Runnable::run,
+                false);
+
+        ApplicationState successful = service.refreshNow();
+
+        assertThat(inventoryCalls).hasValue(1);
+        assertThat(runtimeGeneration.get()).isSameAs(currentInventory.get());
+        assertThat(managedGeneration.get()).isSameAs(currentInventory.get());
+        currentInventory.set(com.autarkos.testsupport.DockerInventoryTestData.unavailable("daemon unavailable"));
+
+        ApplicationState failed = service.refreshNow();
+
+        assertThat(inventoryCalls).hasValue(2);
+        assertThat(failed.applications()).isEqualTo(successful.applications());
+        assertThat(failed.refreshStatus()).isEqualTo("error");
+    }
+
+    @Test
     void failedUninstallRemainsVisibleUntilSuccessfulUninstallWithoutRewritingRuntimeReadiness() {
         var failure = lifecycleJob("uninstall-failed", "uninstall_app", "homepage", "failed", "checkpoint", "2026-06-21T12:00:00Z");
         var jobs = new AtomicReference<>(List.of(failure));
-        var service = new ApplicationStateService(List::of, () -> List.of(runtimeApp("homepage", "Homepage")),
+        var service = createService(List::of, () -> List.of(runtimeApp("homepage", "Homepage")),
                 new ObservedServiceService(repository(), noScan()), inventory(),
                 () -> Instant.parse("2026-06-21T12:05:00Z"), jobs::get);
         var app = runtimeApps(service.refreshNow()).getFirst();
@@ -58,7 +98,7 @@ class ApplicationStateServiceTests {
         repository.upsert(pinned("docker:compassionate_mclean", "compassionate_mclean"));
         repository.upsert(found("docker:vaultwarden", "vaultwarden"));
         ObservedServiceService observedServiceService = new ObservedServiceService(repository, null);
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 List::of,
                 observedServiceService,
@@ -75,7 +115,7 @@ class ApplicationStateServiceTests {
     @Test
     void snapshotDoesNotRunLiveSuppliers() {
         AtomicInteger managedCalls = new AtomicInteger();
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> {
                     managedCalls.incrementAndGet();
                     return List.of(appInstance());
@@ -97,7 +137,7 @@ class ApplicationStateServiceTests {
     @Test
     void explicitRefreshBuildsAndCachesProjection() {
         AtomicInteger managedCalls = new AtomicInteger();
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> {
                     managedCalls.incrementAndGet();
                     return List.of(appInstance());
@@ -119,7 +159,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void failedInitialRefreshDoesNotMakeTheEmptySnapshotLookSuccessful() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> {
                     throw new IllegalStateException("Docker inventory unavailable");
                 },
@@ -140,7 +180,7 @@ class ApplicationStateServiceTests {
     @Test
     void failedRefreshPreservesTheLastSuccessfulSnapshotAndMarksItStale() {
         AtomicReference<RuntimeException> failure = new AtomicReference<>();
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> {
                     if (failure.get() != null) {
                         throw failure.get();
@@ -168,7 +208,7 @@ class ApplicationStateServiceTests {
         ObservedServiceRepository repository = repository();
         repository.upsert(pinned("manual:gitlab", "gitlab"));
         CountingObservedServiceService observedServiceService = new CountingObservedServiceService(repository);
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 List::of,
                 observedServiceService,
@@ -187,7 +227,7 @@ class ApplicationStateServiceTests {
         CountDownLatch refreshStarted = new CountDownLatch(1);
         CountDownLatch releaseRefresh = new CountDownLatch(1);
         AtomicReference<List<AppInstanceView>> managed = new AtomicReference<>(List.of(appInstance()));
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> managed.get(),
                 List::of,
                 new ObservedServiceService(repository(), noScan()),
@@ -215,7 +255,7 @@ class ApplicationStateServiceTests {
         CountDownLatch refreshStarted = new CountDownLatch(1);
         CountDownLatch releaseRefresh = new CountDownLatch(1);
         AtomicReference<List<AppInstanceView>> managed = new AtomicReference<>(List.of(appInstance()));
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 managed::get,
                 List::of,
                 new ObservedServiceService(repository(), noScan()),
@@ -242,7 +282,7 @@ class ApplicationStateServiceTests {
     void backgroundRefreshUsesProvidedExecutorInsteadOfRunningInline() {
         AtomicInteger managedCalls = new AtomicInteger();
         RecordingExecutor executor = new RecordingExecutor();
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> {
                     managedCalls.incrementAndGet();
                     return List.of(appInstance());
@@ -268,7 +308,7 @@ class ApplicationStateServiceTests {
     void backgroundRefreshRequestsCoalesceWhileQueued() {
         AtomicInteger managedCalls = new AtomicInteger();
         RecordingExecutor executor = new RecordingExecutor();
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> {
                     managedCalls.incrementAndGet();
                     return List.of(appInstance());
@@ -293,7 +333,7 @@ class ApplicationStateServiceTests {
     @Test
     void backgroundRefreshMarksCachedProjectionAsRunningWhileQueued() {
         RecordingExecutor executor = new RecordingExecutor();
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 () -> List.of(appInstance()),
                 List::of,
                 new ObservedServiceService(repository(), noScan()),
@@ -318,7 +358,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotOverlaysLifecycleOperationOnTargetAppAndPreservesOrder() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("syncthing", "Syncthing")),
                 new ObservedServiceService(repository(), noScan()),
@@ -344,7 +384,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotOverlaysRepairJobOnTargetApp() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing", "Unavailable")),
                 new ObservedServiceService(repository(), noScan()),
@@ -361,7 +401,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotOverlaysBackupJobOnTargetApp() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
@@ -379,7 +419,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotOverlaysRestoreJobOnTargetApp() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
@@ -397,7 +437,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotOverlaysFullRestoreJobOnEveryManagedApp() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
@@ -417,7 +457,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotDoesNotPinFailedFullRestoreOnEveryManagedApp() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
@@ -440,7 +480,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotKeepsFailedTargetedRestoreVisibleOnTargetApp() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
@@ -457,7 +497,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotKeepsFailedBackupVisibleOnReadyApp() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
@@ -473,7 +513,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotOnlyIncludesRepairActionWhenCanonicalStateNeedsRemediation() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(
                         runtimeApp("homepage", "Homepage"),
@@ -495,7 +535,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotIgnoresOlderFailedLifecycleJobAfterNewerSuccess() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing")),
                 new ObservedServiceService(repository(), noScan()),
@@ -513,14 +553,14 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotDoesNotSurfaceFailedLifecycleJobWhenRuntimeIsHealthyOrStarting() {
-        ApplicationStateService healthyService = new ApplicationStateService(
+        ApplicationStateService healthyService = createService(
                 List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"),
                 () -> List.of(lifecycleJob("start-failed", "start_app", "syncthing", "failed", "wait_until_ready")));
-        ApplicationState startingState = new ApplicationStateService(
+        ApplicationState startingState = createService(
                 List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing", "Starting")),
                 new ObservedServiceService(repository(), noScan()),
@@ -535,7 +575,7 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotSurfacesFailedLifecycleJobWhenRuntimeStillNeedsAttention() {
-        ApplicationStateService service = new ApplicationStateService(
+        ApplicationStateService service = createService(
                 List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing", "Unavailable")),
                 new ObservedServiceService(repository(), noScan()),
@@ -548,8 +588,44 @@ class ApplicationStateServiceTests {
         assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("failed");
     }
 
+    private ApplicationStateService createService(
+            java.util.function.Supplier<List<AppInstanceView>> managed,
+            java.util.function.Supplier<List<AppRuntimeView>> runtime,
+            ObservedServiceService observed,
+            ApplicationInventoryService inventory,
+            java.util.function.Supplier<Instant> clock) {
+        return createService(managed, runtime, observed, inventory, clock,
+                (java.util.function.Supplier<List<AutarkOsJob>>) List::of);
+    }
+
+    private ApplicationStateService createService(
+            java.util.function.Supplier<List<AppInstanceView>> managed,
+            java.util.function.Supplier<List<AppRuntimeView>> runtime,
+            ObservedServiceService observed,
+            ApplicationInventoryService inventory,
+            java.util.function.Supplier<Instant> clock,
+            java.util.function.Supplier<List<AutarkOsJob>> jobs) {
+        return new ApplicationStateService(
+                ignored -> managed.get(), ignored -> runtime.get(),
+                com.autarkos.testsupport.DockerInventoryTestData::empty,
+                observed, inventory, clock, jobs, Runnable::run, false);
+    }
+
+    private ApplicationStateService createService(
+            java.util.function.Supplier<List<AppInstanceView>> managed,
+            java.util.function.Supplier<List<AppRuntimeView>> runtime,
+            ObservedServiceService observed,
+            ApplicationInventoryService inventory,
+            java.util.function.Supplier<Instant> clock,
+            java.util.concurrent.Executor executor) {
+        return new ApplicationStateService(
+                ignored -> managed.get(), ignored -> runtime.get(),
+                com.autarkos.testsupport.DockerInventoryTestData::empty,
+                observed, inventory, clock, List::of, executor, false);
+    }
+
     private ObservedServiceScanner noScan() {
-        return new ObservedServiceScanner(List::of, () -> new com.autarkos.system.AutarkOsIdentity("", "autark-os", "", "", Instant.EPOCH, 1));
+        return new ObservedServiceScanner();
     }
 
     private ApplicationInventoryService inventory() {
@@ -759,9 +835,9 @@ class ApplicationStateServiceTests {
         }
 
         @Override
-        public void refresh() {
+        public void refresh(com.autarkos.host.DockerInventorySnapshot inventory) {
             refreshCalls.incrementAndGet();
-            super.refresh();
+            super.refresh(inventory);
         }
     }
 }

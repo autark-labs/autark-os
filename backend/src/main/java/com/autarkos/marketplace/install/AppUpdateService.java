@@ -28,6 +28,7 @@ import com.autarkos.api.AutarkOsStates;
 import com.autarkos.backups.BackupModels;
 import com.autarkos.backups.BackupService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
+import com.autarkos.host.DockerInventoryService;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.RuntimeModels;
@@ -62,6 +63,7 @@ public class AppUpdateService {
     private final ActivityLogService activityLog;
     private final ProChangeSafetyService changeSafety;
     private final ManagedAppAttestationService managedApps;
+    private final DockerInventoryService dockerInventory;
 
     public AppUpdateService(
             InstalledAppRepository installedApps,
@@ -76,7 +78,8 @@ public class AppUpdateService {
             AppUpdateSnapshotStore snapshots,
             ActivityLogService activityLog,
             ProChangeSafetyService changeSafety,
-            ManagedAppAttestationService managedApps) {
+            ManagedAppAttestationService managedApps,
+            DockerInventoryService dockerInventory) {
         this.installedApps = installedApps;
         this.catalog = catalog;
         this.manifestReader = manifestReader;
@@ -90,6 +93,7 @@ public class AppUpdateService {
         this.activityLog = activityLog;
         this.changeSafety = changeSafety;
         this.managedApps = managedApps;
+        this.dockerInventory = dockerInventory;
     }
 
     public UpdateModels.AppUpdateCapability capability() {
@@ -187,6 +191,7 @@ public class AppUpdateService {
         }
         assertReviewedPlan(plan, reviewedPlanId);
         backupService.runWithUpdateSafetyCheckpoint(appId, RecoveryOperationCoordinator.Operation.APP_UPDATE, backup -> {
+            dockerInventory.requireFresh().requireMutationOwnership(appId);
             assertVerifiedSafetyCheckpoint(backup, context.app());
             applyUpdate(context, backup.restorePoint().id(), progress == null ? ignored -> { } : progress);
             return null;
@@ -207,6 +212,7 @@ public class AppUpdateService {
         }
         InstalledApp app = installedApp(appId);
         backupService.runWithUpdateSafetyCheckpoint(appId, RecoveryOperationCoordinator.Operation.APP_ROLLBACK, backup -> {
+            dockerInventory.requireFresh().requireMutationOwnership(appId);
             assertVerifiedSafetyCheckpoint(backup, app);
             applyRollback(app, previous, backup.restorePoint().id(), progress == null ? ignored -> { } : progress);
             return null;

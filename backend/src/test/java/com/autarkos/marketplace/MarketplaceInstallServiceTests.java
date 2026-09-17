@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.activity.ActivityLogService;
+import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceRepository;
 import com.autarkos.host.ObservedServiceScanner;
@@ -99,7 +100,9 @@ class MarketplaceInstallServiceTests {
                 installPlanService, directoryManager, packageCopier, composeRenderer, dockerComposeExecutor,
                 repository, customizationResolver, postInstallProvisioner, postInstallGuideBuilder,
                 tailscaleService, activityLogService, ownership, metadataWriter, observedServices,
-                ManagedAppTestContract.service(repository, runtimeLayout, ownership.currentIdentity()));
+                ManagedAppTestContract.service(repository, runtimeLayout, ownership.currentIdentity()),
+                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()),
+                new RecoveryOperationCoordinator());
     }
 
     @Test
@@ -687,7 +690,9 @@ class MarketplaceInstallServiceTests {
                 ownership(runtimeLayout),
                 metadataWriter == null ? metadataWriter(runtimeLayout) : metadataWriter,
                 observedService,
-                ManagedAppTestContract.service(repository, runtimeLayout, identity(runtimeLayout)));
+                ManagedAppTestContract.service(repository, runtimeLayout, identity(runtimeLayout)),
+                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()),
+                new RecoveryOperationCoordinator());
     }
 
     private AutarkOsIdentity identity(RuntimeLayout runtimeLayout) {

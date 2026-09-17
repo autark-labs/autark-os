@@ -107,7 +107,8 @@ class AppLifecycleServiceTests {
                 recoveryOperations,
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
-                accessChecker);
+                accessChecker,
+                dockerInventory());
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);
         Files.writeString(appRoot.resolve("compose.yaml"), "services:\n  vaultwarden:\n    image: vaultwarden/server:1.36.0\n    ports:\n      - '8090:80'\n    labels:\n      - autark-os.instance-id=test-owner\n");
@@ -716,7 +717,8 @@ class AppLifecycleServiceTests {
                 new RecoveryOperationCoordinator(),
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
-                new AppAccessChecker());
+                new AppAccessChecker(),
+                dockerInventory());
         repository.saveSettings("private-worker", new InstallModels.InstallSettings(
                 null,
                 "https://autark-os-dev.tailnet.local:12890",
@@ -800,7 +802,8 @@ class AppLifecycleServiceTests {
                 new RecoveryOperationCoordinator(),
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
-                new AppAccessChecker());
+                new AppAccessChecker(),
+                dockerInventory());
 
         AppActionResult result = devService.repair("vaultwarden");
 
@@ -830,7 +833,8 @@ class AppLifecycleServiceTests {
                 new RecoveryOperationCoordinator(),
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(),
-                new AppAccessChecker());
+                new AppAccessChecker(),
+                dockerInventory());
 
         List<AppRuntimeView> apps = rediscoveryService.listApps();
 
@@ -889,7 +893,8 @@ class AppLifecycleServiceTests {
                 recoveryOperations,
                 fileOpsService,
                 managedApps(),
-                new AppAccessChecker());
+                new AppAccessChecker(),
+                dockerInventory());
 
         assertThatThrownBy(() -> checkpointFailureService.uninstall("vaultwarden"))
                 .hasMessageContaining("could not create a safety checkpoint")
@@ -1065,7 +1070,7 @@ class AppLifecycleServiceTests {
         composeExecutor.observationFails = true;
         assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
         assertThatThrownBy(() -> service.updateSettings("vaultwarden", requested))
-                .hasMessageContaining("cannot confirm");
+                .hasMessageContaining("Previous application state is retained");
         composeExecutor.observationFails = false;
         composeExecutor.containers = List.of();
         assertThat(service.settingsChangePlan("vaultwarden", requested).saveAllowed()).isFalse();
@@ -1461,6 +1466,30 @@ class AppLifecycleServiceTests {
         ManagedAppTestContract.write(repository, runtimeLayout, identity, app);
     }
 
+    private com.autarkos.host.DockerInventoryService dockerInventory() {
+        return com.autarkos.testsupport.DockerInventoryTestData.service(() -> {
+            if (composeExecutor.observationFails) {
+                return com.autarkos.testsupport.DockerInventoryTestData.unavailable("Docker status check timed out.");
+            }
+            List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containers;
+            if (composeExecutor.realObservation != null) {
+                InstalledApp app = repository.findAppById("vaultwarden").orElseThrow();
+                containers = composeExecutor.realObservation.containers(
+                        Path.of(app.runtimePath()).resolve("compose.yaml"), app.composeProject());
+            }
+            if (containers.isEmpty()) {
+                return com.autarkos.testsupport.DockerInventoryTestData.empty();
+            }
+            String appId = containers.getFirst().service();
+            InstalledApp app = repository.findAppById(appId).orElseGet(() ->
+                    repository.findAllApps().isEmpty() ? null : repository.findAllApps().getFirst());
+            String effectiveAppId = app == null ? appId : app.appId();
+            String composeProject = app == null ? "autark-os-" + appId : app.composeProject();
+            return com.autarkos.testsupport.DockerInventoryTestData.fromRuntime(
+                    effectiveAppId, "appinst_" + effectiveAppId, composeProject, containers);
+        });
+    }
+
     private static class FakeAppAccessChecker extends AppAccessChecker {
         Runnable duringProbe = () -> { };
         @Override
@@ -1605,14 +1634,6 @@ class AppLifecycleServiceTests {
                 return List.of();
             }
             return containers;
-        }
-
-        @Override
-        public RuntimeModels.DockerContainerObservation observeContainersForApp(Path composeFile, String projectName, String appId) {
-            if (realObservation != null) return realObservation.observeContainersForApp(composeFile, projectName, appId);
-            return observationFails
-                    ? RuntimeModels.DockerContainerObservation.failed(List.of("Docker status check timed out."))
-                    : RuntimeModels.DockerContainerObservation.successful(containers(composeFile, projectName));
         }
 
         @Override

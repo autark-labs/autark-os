@@ -59,30 +59,18 @@ class ProcessDockerComposeExecutorTests {
     }
 
     @Test
-    void missingComposeStatusAndStopUseBothOwnershipLabels() {
+    void missingComposeStopUsesBothOwnershipLabels() {
         RecordingCommandRunner runner = new RecordingCommandRunner(false);
         ProcessDockerComposeExecutor executor = new ProcessDockerComposeExecutor(runner);
         Path missingCompose = runtimeRoot.resolve("apps/vaultwarden/compose.yaml");
 
-        List<RuntimeModels.DockerContainerStatus> containers = executor.containersForApp(
-                missingCompose,
-                "autarkos_raspberrypi_vaultwarden",
-                "vaultwarden");
         RuntimeModels.DockerComposeResult stopped = executor.stopManagedProject(
                 missingCompose,
                 "autarkos_raspberrypi_vaultwarden",
                 "vaultwarden");
 
-        assertThat(containers).singleElement().satisfies(container -> {
-            assertThat(container.name()).isEqualTo("autarkos_raspberrypi_vaultwarden");
-            assertThat(container.state()).isEqualTo("exited");
-        });
         assertThat(stopped.successful()).isTrue();
-        assertThat(runner.commands).allSatisfy(command -> {
-            if (command.contains("ps")) {
-                assertThat(command).contains("label=autark-os.app-id=vaultwarden");
-            }
-        });
+        assertThat(runner.commands.getFirst()).contains("label=autark-os.app-id=vaultwarden");
     }
 
     @Test

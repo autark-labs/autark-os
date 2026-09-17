@@ -84,6 +84,13 @@ public class DockerOwnershipService {
     }
 
     public RuntimeModels.DockerResourceClassification classify(String containerName, Map<String, String> labels) {
+        return classify(containerName, labels, identitySupplier.get());
+    }
+
+    public RuntimeModels.DockerResourceClassification classify(
+            String containerName,
+            Map<String, String> labels,
+            AutarkOsIdentity identity) {
         String appId = labels.getOrDefault(APP_ID, "");
         String appInstanceId = labels.getOrDefault(APP_INSTANCE_ID, "");
         String composeProject = labels.getOrDefault(COMPOSE_PROJECT, "");
@@ -94,7 +101,6 @@ public class DockerOwnershipService {
             return new RuntimeModels.DockerResourceClassification(DockerResourceOwnership.UNMANAGED, appId, appInstanceId, composeProject);
         }
 
-        AutarkOsIdentity identity = identitySupplier.get();
         if (identity.instanceId().equals(labels.get(INSTANCE_ID))
                 && identity.runtimeRootHash().equals(labels.get(RUNTIME_ROOT_HASH))) {
             return new RuntimeModels.DockerResourceClassification(DockerResourceOwnership.OWNED, appId, appInstanceId, composeProject);

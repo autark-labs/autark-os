@@ -110,7 +110,8 @@ class AppUpdateServiceTests {
                 snapshots,
                 activityLog,
                 changeSafety,
-                managedApps);
+                managedApps,
+                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
 
         when(installedApps.findAppById("example")).thenReturn(Optional.of(app));
         when(managedApps.requireManaged("example", "change the release for")).thenReturn(app);

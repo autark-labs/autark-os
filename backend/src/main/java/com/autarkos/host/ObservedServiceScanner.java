@@ -4,65 +4,34 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.DockerResourceOwnership;
 import com.autarkos.marketplace.install.models.RuntimeModels;
-import com.autarkos.system.AutarkOsIdentity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class ObservedServiceScanner {
 
-    private final HostDockerContainerDiscovery containerDiscovery;
-    private final Supplier<AutarkOsIdentity> currentIdentity;
-    private final DockerOwnershipService ownershipService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public ObservedServiceScanner(HostDockerContainerDiscovery containerDiscovery, Supplier<AutarkOsIdentity> currentIdentity) {
-        this(containerDiscovery, currentIdentity, null);
-    }
-
-    @Autowired
-    public ObservedServiceScanner(
-            HostDockerContainerDiscovery containerDiscovery,
-            DockerOwnershipService ownershipService) {
-        this(containerDiscovery, ownershipService::currentIdentity, ownershipService);
-    }
-
-    private ObservedServiceScanner(
-            HostDockerContainerDiscovery containerDiscovery,
-            Supplier<AutarkOsIdentity> currentIdentity,
-            DockerOwnershipService ownershipService) {
-        this.containerDiscovery = containerDiscovery;
-        this.currentIdentity = currentIdentity;
-        this.ownershipService = ownershipService;
-    }
-
-    public List<ObservedService> scan(Instant now) {
-        AutarkOsIdentity identity = currentIdentity.get();
-        HostDockerContainerDiscovery.DockerInventory inventory = containerDiscovery.observeContainers();
-        if (!inventory.successful()) {
-            throw new HostInventoryException("Docker inventory failed. Existing found services are retained until Docker responds again.");
-        }
+    public List<ObservedService> scan(DockerInventorySnapshot inventory, Instant now) {
+        inventory.requireUsable();
         return inventory.containers().stream()
-                .map(container -> observed(container, identity, now))
+                .map(container -> observed(container, inventory.currentInstanceId(), now))
                 .toList();
     }
 
-    private ObservedService observed(HostModels.HostDockerContainer container, AutarkOsIdentity identity, Instant now) {
-        RuntimeModels.DockerResourceClassification classification = ownershipService == null
-                ? null
-                : ownershipService.classify(container.name(), container.labels());
+    private ObservedService observed(DockerInventorySnapshot.Container inventoryContainer, String currentInstanceId, Instant now) {
+        HostModels.HostDockerContainer container = inventoryContainer.observed();
+        RuntimeModels.DockerResourceClassification classification = inventoryContainer.classification();
         String appId = firstPresent(
-                classification == null ? null : classification.appId(),
+                classification.appId(),
                 container.labels().get(DockerOwnershipService.APP_ID),
                 inferCatalogAppId(container.name(), container.image()));
-        String ownershipState = ownershipState(classification == null ? DockerResourceOwnership.UNMANAGED : classification.ownership());
+        String ownershipState = ownershipState(classification.ownership());
         String instanceId = clean(container.labels().get(DockerOwnershipService.INSTANCE_ID));
         String url = accessUrl(container.ports());
         return new ObservedService(
@@ -79,10 +48,10 @@ public class ObservedServiceScanner {
                 instanceId.isBlank() ? null : instanceId,
                 now,
                 now,
-                metadata(container, identity));
+                metadata(container, currentInstanceId));
     }
 
-    private String metadata(HostModels.HostDockerContainer container, AutarkOsIdentity identity) {
+    private String metadata(HostModels.HostDockerContainer container, String currentInstanceId) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("containerName", clean(container.name()));
         metadata.put("image", clean(container.image()));
@@ -93,7 +62,7 @@ public class ObservedServiceScanner {
                 "source", clean(mount.source()),
                 "target", clean(mount.destination()),
                 "readOnly", mount.readOnly())).toList());
-        metadata.put("currentInstanceId", identity.instanceId());
+        metadata.put("currentInstanceId", currentInstanceId);
         putIfPresent(metadata, "catalogAppId", container.labels().get(DockerOwnershipService.APP_ID));
         putIfPresent(metadata, "managed", container.labels().get(DockerOwnershipService.MANAGED));
         putIfPresent(metadata, "composeProject", firstPresent(

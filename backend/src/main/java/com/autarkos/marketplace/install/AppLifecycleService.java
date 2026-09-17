@@ -19,6 +19,8 @@ import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.host.DockerInventoryService;
+import com.autarkos.host.DockerInventorySnapshot;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.AccessModels;
@@ -54,6 +56,7 @@ public class AppLifecycleService {
     private final PrivateAccessStateResolver privateAccessStateResolver;
     private final RecoveryOperationCoordinator recoveryOperations;
     private final ManagedAppAttestationService managedApps;
+    private final DockerInventoryService dockerInventory;
 
     public AppLifecycleService(
             InstalledAppRepository repository,
@@ -69,7 +72,8 @@ public class AppLifecycleService {
             RecoveryOperationCoordinator recoveryOperations,
             AutarkOsFileOpsService fileOpsService,
             ManagedAppAttestationService managedApps,
-            AppAccessChecker accessChecker) {
+            AppAccessChecker accessChecker,
+            DockerInventoryService dockerInventory) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
@@ -81,8 +85,9 @@ public class AppLifecycleService {
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
         this.recoveryOperations = recoveryOperations;
         this.managedApps = managedApps;
-        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations, fileOpsService);
-        this.healthService = new AppHealthService(repository, composeExecutor, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
+        this.dockerInventory = dockerInventory;
+        this.uninstallService = new AppUninstallService(repository, composeExecutor, runtimeLayout, backupRepository, tailscaleService, activityLogService, backupDestinationService, recoveryOperations, fileOpsService, dockerInventory);
+        this.healthService = new AppHealthService(repository, catalogService, runtimeStatusResolver, settingsPolicy, accessChecker, activityLogService, privateAccessStateResolver);
         this.containerLifecycleService = new AppContainerLifecycleService(repository, composeExecutor, activityLogService, this::refresh);
         this.reliabilityService = new AppReliabilityService(repository, tailscaleService);
         this.activityLogService = activityLogService;
@@ -91,21 +96,28 @@ public class AppLifecycleService {
     }
 
     public List<AppRuntimeView> listApps() {
+        return listApps(dockerInventory.requireFresh());
+    }
+
+    public List<AppRuntimeView> listApps(DockerInventorySnapshot inventory) {
         return managedInstalledApps().stream()
-                .map(this::refresh)
+                .filter(app -> !inventory.hasOwnershipConflict(app.appId()))
+                .map(app -> refresh(app, inventory, false))
                 .toList();
     }
 
     public AppRuntimeView getApp(String appId) {
-        return refresh(requireManagedApp(appId, "manage"));
+        return refresh(requireManagedApp(appId, "manage"), dockerInventory.requireFresh(), false);
     }
 
     public RuntimeModels.AppTelemetry telemetry(String appId) {
-        return appTelemetryService.telemetry(requireManagedApp(appId, "inspect"));
+        InstalledApp app = requireManagedApp(appId, "inspect");
+        DockerInventorySnapshot inventory = dockerInventory.requireFresh();
+        return appTelemetryService.telemetryForContainers(inventory.ownedContainersFor(app.appId(), app.composeProject()));
     }
 
     public Map<String, RuntimeModels.AppTelemetry> telemetry() {
-        return appTelemetryService.telemetryForApps(managedInstalledApps());
+        return appTelemetryService.telemetryForApps(managedInstalledApps(), dockerInventory.requireFresh());
     }
 
     public Map<String, AccessModels.AppAccessCheck> accessChecks() {
@@ -121,9 +133,10 @@ public class AppLifecycleService {
     }
 
     public Map<String, AppHealthSnapshot> healthSnapshots() {
+        DockerInventorySnapshot inventory = dockerInventory.requireFresh();
         Map<String, AppHealthSnapshot> snapshots = new LinkedHashMap<>();
         for (InstalledApp app : managedInstalledApps()) {
-            AppHealthSnapshot snapshot = healthService.healthSnapshot(app);
+            AppHealthSnapshot snapshot = healthService.healthSnapshot(app, inventory);
             snapshots.put(app.appId(), snapshot);
         }
         return snapshots;
@@ -134,7 +147,7 @@ public class AppLifecycleService {
     }
 
     public AppHealthSnapshot healthSnapshot(String appId) {
-        return healthService.healthSnapshot(requireManagedApp(appId, "check"));
+        return healthService.healthSnapshot(requireManagedApp(appId, "check"), dockerInventory.requireFresh());
     }
 
     public InstalledApp requireManagedApp(String appId, String action) {
@@ -147,6 +160,7 @@ public class AppLifecycleService {
 
     private AppActionResult startUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "start");
+        requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.start(app, composeFile(app));
     }
@@ -157,6 +171,7 @@ public class AppLifecycleService {
 
     private AppActionResult stopUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "stop");
+        requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.stop(app, composeFile(app));
     }
@@ -172,13 +187,10 @@ public class AppLifecycleService {
 
     private AppActionResult stopAndConfirmUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "stop");
+        requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         AppActionResult result = containerLifecycleService.stop(app, composeFile(app));
-        RuntimeModels.DockerComposeResult status = composeExecutor.ps(composeFile(app), app.composeProject());
-        if (!status.successful()) {
-            throw new InstallationException("Autark-OS stopped " + app.appName() + " but could not confirm its container state.");
-        }
-        boolean stillRunning = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId()).stream()
+        boolean stillRunning = dockerInventory.requireFresh().ownedContainersFor(app.appId(), app.composeProject()).stream()
                 .anyMatch(container -> {
                     String state = container.state() == null ? "" : container.state().trim().toLowerCase();
                     return "running".equals(state) || "restarting".equals(state);
@@ -195,6 +207,7 @@ public class AppLifecycleService {
 
     private AppActionResult restartUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "restart");
+        requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.restart(app, composeFile(app));
     }
@@ -209,6 +222,7 @@ public class AppLifecycleService {
 
     private AppActionResult repairUnlocked(String appId, boolean automatic) {
         InstalledApp app = requireManagedApp(appId, "repair");
+        DockerInventorySnapshot inventory = requireFreshMutationInventory(app);
         var pendingSettings = repository.settingsRecoveryFor(appId);
         if (pendingSettings.isPresent()) {
             if (automatic) return new AppActionResult(appId, "repair", "skipped", "Use Repair in My Apps to retry saved settings recovery.", null, List.of(), Instant.now());
@@ -221,7 +235,7 @@ public class AppLifecycleService {
             if (repository.settingsRecoveryFor(appId).isPresent()) throw recovery;
             return new AppActionResult(appId, "repair", "succeeded", "Previous settings restored. Check the app and its access.", refresh(requireManagedApp(appId, "repair")), List.of(), Instant.now());
         }
-        AppHealthSnapshot before = healthService.healthSnapshot(app);
+        AppHealthSnapshot before = healthService.healthSnapshot(app, inventory);
         List<String> logs = new java.util.ArrayList<>();
         logs.add("Before repair: " + before.status() + " - " + before.message());
         String eventPrefix = automatic ? "guardian_" : "";
@@ -269,7 +283,7 @@ public class AppLifecycleService {
             repository.recordEvent(app.appId(), eventPrefix + "repair_step_completed", "Restarted " + app.appName() + " as part of repair.");
         }
 
-        AppHealthSnapshot after = healthService.healthSnapshot(app);
+        AppHealthSnapshot after = healthService.healthSnapshot(app, dockerInventory.requireFresh());
         logs.add("After repair: " + after.status() + " - " + after.message());
         boolean privateAccessRepaired = repairingPrivateAccess && "verified".equals(after.privateAccessStatus());
         String status = AutarkOsStates.AppStatus.READY.equals(after.status()) || AutarkOsStates.AppStatus.STARTING.equals(after.status()) || privateAccessRepaired ? AutarkOsStates.RestorePointStatus.COMPLETED : "needs_attention";
@@ -291,6 +305,7 @@ public class AppLifecycleService {
 
     private AppRuntimeView updateSettingsUnlocked(String appId, InstallModels.InstallSettings settings) {
         InstalledApp app = requireManagedApp(appId, "update settings for");
+        DockerInventorySnapshot inventory = requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         String defaultAccessUrl = app.accessUrl();
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(defaultAccessUrl));
@@ -306,7 +321,7 @@ public class AppLifecycleService {
             throw new InstallationException(String.join(" ", plan.blockedReasons()));
         }
         // Validate ports and runtime before removing a private link or editing Compose.
-        SettingsRedeploy redeploy = plan.redeployRequired() ? prepareSettingsRedeploy(app, sanitized) : null;
+        SettingsRedeploy redeploy = plan.redeployRequired() ? prepareSettingsRedeploy(app, sanitized, inventory) : null;
         repository.recordEvent(app.appId(), "settings_apply_started", "Applying settings change for " + app.appName() + ".");
         activityInfo("settings_apply_started", "Applying settings for " + app.appName(), plan.summary(), app.appId());
         boolean privateChange = current.tailscaleEnabled() != sanitized.tailscaleEnabled()
@@ -385,6 +400,14 @@ public class AppLifecycleService {
 
     public InstallModels.AppSettingsChangePlan settingsChangePlan(String appId, InstallModels.InstallSettings settings) {
         InstalledApp app = requireManagedApp(appId, "plan settings for");
+        DockerInventorySnapshot inventory;
+        try {
+            inventory = dockerInventory.requireFresh();
+        } catch (com.autarkos.host.HostInventoryException exception) {
+            String reason = "Docker is unavailable, so Autark-OS cannot safely review this settings change yet.";
+            return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Docker unavailable",
+                    reason, false, false, false, false, List.of(), List.of(), List.of(reason));
+        }
         if (repository.settingsRecoveryFor(appId).isPresent()) {
             String reason = "Use Repair in My Apps to finish the saved settings recovery first.";
             return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Settings recovery required",
@@ -402,7 +425,7 @@ public class AppLifecycleService {
         InstallModels.AppSettingsChangePlan plan = settingsPolicy.settingsChangePlan(app, current, sanitized);
         if (plan.saveAllowed() && plan.redeployRequired()) {
             try {
-                prepareSettingsRedeploy(app, sanitized);
+                prepareSettingsRedeploy(app, sanitized, inventory);
             } catch (InstallationException exception) {
                 return new InstallModels.AppSettingsChangePlan(appId, app.appName(), "blocked", "Settings change unavailable",
                         exception.getMessage(), false, false, false, false, plan.changes(), plan.warnings(), List.of(exception.getMessage()));
@@ -411,7 +434,10 @@ public class AppLifecycleService {
         return plan;
     }
 
-    private SettingsRedeploy prepareSettingsRedeploy(InstalledApp app, InstallModels.InstallSettings settings) {
+    private SettingsRedeploy prepareSettingsRedeploy(
+            InstalledApp app,
+            InstallModels.InstallSettings settings,
+            DockerInventorySnapshot inventory) {
         ApplicationManifest manifest = catalogService.findById(app.appId())
                 .orElseThrow(() -> new InstallationException("Autark-OS could not find the catalog template for " + app.appName() + "."));
         Path composePath = composeFile(app);
@@ -422,17 +448,17 @@ public class AppLifecycleService {
                 new InstallOptionsRequest.StorageOptions(settings.storageSubfolders()),
                 new InstallOptionsRequest.BackupOptions(settings.backup().enabled(), settings.backup().frequency(), settings.backup().retention()));
         RuntimeModels.ResolvedRuntimeConfiguration configuration = new InstallCustomizationResolver(new PortAllocator()).resolveSettings(manifest, options, previousCompose);
-        var observation = composeExecutor.observeContainersForApp(composePath, app.composeProject(), app.appId());
-        if (!observation.successful() || observation.containers().isEmpty()) {
+        List<RuntimeModels.DockerContainerStatus> containers = inventory.ownedContainersFor(app.appId(), app.composeProject());
+        if (containers.isEmpty()) {
             throw new InstallationException("Autark-OS cannot confirm this app's running state. Check Docker and the app in My Apps before changing its settings.");
         }
-        boolean running = observation.containers().stream().allMatch(container -> "running".equalsIgnoreCase(container.state()));
-        boolean stopped = observation.containers().stream().allMatch(container ->
+        boolean running = containers.stream().allMatch(container -> "running".equalsIgnoreCase(container.state()));
+        boolean stopped = containers.stream().allMatch(container ->
                 List.of("exited", "stopped", "created").contains(Objects.toString(container.state(), "").toLowerCase(java.util.Locale.ROOT)));
         if (!running && !stopped) {
             throw new InstallationException("The app is changing state or is only partly running. Wait for it to settle, or pause the whole app before changing settings.");
         }
-        return new SettingsRedeploy(manifest, composePath, previousCompose, configuration, running, List.copyOf(observation.containers()));
+        return new SettingsRedeploy(manifest, composePath, previousCompose, configuration, running, containers);
     }
 
     private record SettingsRedeploy(ApplicationManifest manifest, Path composePath, String previousCompose,
@@ -464,11 +490,11 @@ public class AppLifecycleService {
                     var result = composeExecutor.up(composeFile(app), app.composeProject());
                     if (!result.successful()) throw new InstallationException(failureReason(result.output()));
                 }
-                var observed = composeExecutor.observeContainersForApp(composeFile(app), app.composeProject(), app.appId());
-                boolean previousRuntimeRestored = observed.successful()
-                        && observed.containers().size() == checkpoint.containers().size()
+                List<RuntimeModels.DockerContainerStatus> observed = dockerInventory.requireFresh()
+                        .ownedContainersFor(app.appId(), app.composeProject());
+                boolean previousRuntimeRestored = observed.size() == checkpoint.containers().size()
                         && checkpoint.containers().stream().allMatch(previous ->
-                        observed.containers().stream().anyMatch(actual ->
+                        observed.stream().anyMatch(actual ->
                                 Objects.equals(previous.name(), actual.name())
                                 && Objects.equals(previous.service(), actual.service())
                                 && Objects.equals(previous.ports(), actual.ports())
@@ -571,6 +597,7 @@ public class AppLifecycleService {
 
     private AppActionResult enablePrivateAccessUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "enable private access for");
+        requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         AppRuntimeView view = refresh(app);
         String accessUrl = firstPresent(view.accessUrl(), view.settings() == null ? null : view.settings().accessUrl(), app.accessUrl());
@@ -615,6 +642,7 @@ public class AppLifecycleService {
 
     private AppActionResult disablePrivateAccessUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "disable private access for");
+        requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         InstallModels.InstallSettings current = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
         TailscaleServeResult disableResult = disablePrivateAccessMapping(app, current);
@@ -718,23 +746,23 @@ public class AppLifecycleService {
     }
 
     public AppActionResult uninstall(String appId) {
-        InstalledApp app = requireManagedApp(appId, "uninstall");
-        assertNoPendingSettingsRecovery(app);
-        InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-        return uninstallService.uninstall(app, settings, composeFile(app));
+        return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.UNINSTALL_CHECKPOINT, () -> {
+            InstalledApp app = requireManagedApp(appId, "uninstall");
+            requireFreshMutationInventory(app);
+            assertNoPendingSettingsRecovery(app);
+            InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
+            return uninstallService.uninstall(app, settings, composeFile(app));
+        });
     }
 
     private AppRuntimeView refresh(InstalledApp app) {
-        return refresh(app, false);
+        return refresh(app, dockerInventory.requireFresh(), false);
     }
 
-    private AppRuntimeView refresh(InstalledApp app, boolean includeTelemetry) {
+    private AppRuntimeView refresh(InstalledApp app, DockerInventorySnapshot inventory, boolean includeTelemetry) {
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
-        RuntimeModels.DockerContainerObservation observation = composeExecutor.observeContainersForApp(composeFile(app), app.composeProject(), app.appId());
-        if (!observation.successful()) {
-            throw new RuntimeObservationException("Docker observation failed. Previous application state is retained until Docker responds again.");
-        }
-        List<RuntimeModels.DockerContainerStatus> containers = observation.containers();
+        inventory.requireUsable();
+        List<RuntimeModels.DockerContainerStatus> containers = inventory.ownedContainersFor(app.appId(), app.composeProject());
         AppRuntimeStatus status = runtimeStatusResolver.normalize(containers, manifest);
         String category = manifest == null ? "Installed" : manifest.category();
         String description = manifest == null ? "Managed by Autark-OS." : manifest.description();
@@ -883,6 +911,12 @@ public class AppLifecycleService {
 
     private List<InstalledApp> managedInstalledApps() {
         return managedApps.managedApps();
+    }
+
+    private DockerInventorySnapshot requireFreshMutationInventory(InstalledApp app) {
+        DockerInventorySnapshot inventory = dockerInventory.requireFresh();
+        inventory.requireMutationOwnership(app.appId());
+        return inventory;
     }
 
     private void assertNoPendingSettingsRecovery(InstalledApp app) {

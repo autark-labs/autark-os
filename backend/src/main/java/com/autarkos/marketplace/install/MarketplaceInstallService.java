@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.backups.RecoveryOperationCoordinator;
+import com.autarkos.host.DockerInventoryService;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
 import com.autarkos.marketplace.api.InstallOptionsRequest;
@@ -42,6 +44,8 @@ public class MarketplaceInstallService {
     private final ObservedServiceService observedServiceService;
     private final InstallStartupChecker startupChecker;
     private final ManagedAppAttestationService managedApps;
+    private final DockerInventoryService dockerInventory;
+    private final RecoveryOperationCoordinator recoveryOperations;
 
     public MarketplaceInstallService(
             InstallPlanService installPlanService,
@@ -58,7 +62,9 @@ public class MarketplaceInstallService {
             DockerOwnershipService dockerOwnershipService,
             AppRuntimeMetadataWriter appRuntimeMetadataWriter,
             ObservedServiceService observedServiceService,
-            ManagedAppAttestationService managedApps) {
+            ManagedAppAttestationService managedApps,
+            DockerInventoryService dockerInventory,
+            RecoveryOperationCoordinator recoveryOperations) {
         this.installPlanService = installPlanService;
         this.directoryManager = directoryManager;
         this.packageCopier = packageCopier;
@@ -74,6 +80,8 @@ public class MarketplaceInstallService {
         this.appRuntimeMetadataWriter = appRuntimeMetadataWriter;
         this.observedServiceService = observedServiceService;
         this.managedApps = managedApps;
+        this.dockerInventory = dockerInventory;
+        this.recoveryOperations = recoveryOperations;
         this.startupChecker = new InstallStartupChecker(dockerComposeExecutor);
     }
 
@@ -87,6 +95,12 @@ public class MarketplaceInstallService {
     }
 
     public InstallModels.InstallResult install(ApplicationManifest manifest, InstallOptionsRequest options, Consumer<InstallModels.InstallStep> progressSink) {
+        return recoveryOperations.runExclusive(
+                RecoveryOperationCoordinator.Operation.APP_INSTALL,
+                () -> installUnlocked(manifest, options, progressSink));
+    }
+
+    private InstallModels.InstallResult installUnlocked(ApplicationManifest manifest, InstallOptionsRequest options, Consumer<InstallModels.InstallStep> progressSink) {
         List<InstallModels.InstallStep> steps = new ArrayList<>();
         List<String> logs = new ArrayList<>();
         Consumer<InstallModels.InstallStep> sink = progressSink == null ? ignored -> { } : progressSink;
@@ -143,6 +157,7 @@ public class MarketplaceInstallService {
             RuntimeModels.AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
             recordStep(steps, sink, InstallModels.InstallStep.completed("Configuring private access", "Rendered Compose file with Autark-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
 
+            dockerInventory.requireFresh().requireMutationOwnership(manifest.id());
             RuntimeModels.DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, composeProject);
             logs.addAll(composeResult.output());
             if (!composeResult.successful()) {
@@ -229,7 +244,7 @@ public class MarketplaceInstallService {
     }
 
     private List<ObservedService> matchingObservedDuplicates(ApplicationManifest manifest) {
-        observedServiceService.refresh();
+        observedServiceService.refresh(dockerInventory.requireFresh());
         return observedServiceService.matchingCatalogServices(manifest.id()).stream()
                 .filter(service -> !"owned_managed".equals(service.ownershipState()))
                 .filter(service -> !"failed_install".equals(service.ownershipState()))

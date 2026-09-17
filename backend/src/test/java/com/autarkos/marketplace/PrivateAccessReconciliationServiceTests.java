@@ -77,7 +77,11 @@ class PrivateAccessReconciliationServiceTests {
                 new RecoveryOperationCoordinator(),
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 ManagedAppTestContract.service(repository, runtimeLayout, identity),
-                new AppAccessChecker());
+                new AppAccessChecker(),
+                com.autarkos.testsupport.DockerInventoryTestData.service(() ->
+                        com.autarkos.testsupport.DockerInventoryTestData.fromRuntime(
+                                "vaultwarden", "appinst_vaultwarden", "autark-os-vaultwarden",
+                                composeExecutor.containers(Path.of("compose.yaml"), "autark-os-vaultwarden"))));
         reconciliationService = new PrivateAccessReconciliationService(appLifecycleService, catalogService, tailscaleService);
 
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");

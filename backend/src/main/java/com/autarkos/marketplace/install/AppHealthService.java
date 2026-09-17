@@ -1,6 +1,5 @@
 package com.autarkos.marketplace.install;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -8,6 +7,7 @@ import java.util.Set;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.host.DockerInventorySnapshot;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.marketplace.install.models.InstallModels;
@@ -18,7 +18,6 @@ import com.autarkos.marketplace.model.HealthManifest;
 class AppHealthService {
 
     private final InstalledAppRepository repository;
-    private final DockerComposeExecutor composeExecutor;
     private final MarketplaceCatalogService catalogService;
     private final AppRuntimeStatusResolver runtimeStatusResolver;
     private final AppSettingsPolicy settingsPolicy;
@@ -28,7 +27,6 @@ class AppHealthService {
 
     AppHealthService(
             InstalledAppRepository repository,
-            DockerComposeExecutor composeExecutor,
             MarketplaceCatalogService catalogService,
             AppRuntimeStatusResolver runtimeStatusResolver,
             AppSettingsPolicy settingsPolicy,
@@ -36,7 +34,6 @@ class AppHealthService {
             ActivityLogService activityLogService,
             PrivateAccessStateResolver privateAccessStateResolver) {
         this.repository = repository;
-        this.composeExecutor = composeExecutor;
         this.catalogService = catalogService;
         this.runtimeStatusResolver = runtimeStatusResolver;
         this.settingsPolicy = settingsPolicy;
@@ -45,13 +42,10 @@ class AppHealthService {
         this.privateAccessStateResolver = privateAccessStateResolver;
     }
 
-    AppHealthSnapshot healthSnapshot(InstalledApp app) {
+    AppHealthSnapshot healthSnapshot(InstalledApp app, DockerInventorySnapshot inventory) {
         ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
-        RuntimeModels.DockerContainerObservation observation = composeExecutor.observeContainersForApp(composeFile(app), app.composeProject(), app.appId());
-        if (!observation.successful()) {
-            throw new RuntimeObservationException("Docker observation failed. Previous application state is retained until Docker responds again.");
-        }
-        return healthSnapshot(app, manifest, observation.containers(), runtimeStatusResolver.normalize(observation.containers(), manifest));
+        List<RuntimeModels.DockerContainerStatus> containers = inventory.ownedContainersFor(app.appId(), app.composeProject());
+        return healthSnapshot(app, manifest, containers, runtimeStatusResolver.normalize(containers, manifest));
     }
 
     AppHealthSnapshot healthSnapshot(InstalledApp app, ApplicationManifest manifest, List<RuntimeModels.DockerContainerStatus> containers, AppRuntimeStatus runtime) {
@@ -183,10 +177,6 @@ class AppHealthService {
                 state.status(),
                 state.message(),
                 Instant.now());
-    }
-
-    private Path composeFile(InstalledApp app) {
-        return Path.of(app.runtimePath()).resolve("compose.yaml");
     }
 
     private void activitySuccess(String action, String title, String message, String appId) {

@@ -14,6 +14,8 @@ import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.RestorePoint;
 import com.autarkos.backups.RestorePoints;
+import com.autarkos.host.DockerInventoryService;
+import com.autarkos.host.DockerInventorySnapshot;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.ReliabilityModels;
@@ -25,35 +27,45 @@ import com.autarkos.network.tailscale.TailscaleService;
 public class AppInstanceViewService implements AppInstanceViewProvider {
 
     private final InstalledAppRepository repository;
-    private final AppReconciliationService reconciliationService;
+    private final ManagedAppAttestationService managedApps;
     private final MarketplaceCatalogService catalogService;
     private final BackupRepository backupRepository;
     private final PrivateAccessStateResolver privateAccessStateResolver;
+    private final DockerInventoryService dockerInventory;
 
     public AppInstanceViewService(
             InstalledAppRepository repository,
-            AppReconciliationService reconciliationService,
+            ManagedAppAttestationService managedApps,
             MarketplaceCatalogService catalogService,
             BackupRepository backupRepository,
-            TailscaleService tailscaleService) {
+            TailscaleService tailscaleService,
+            DockerInventoryService dockerInventory) {
         this.repository = repository;
-        this.reconciliationService = reconciliationService;
+        this.managedApps = managedApps;
         this.catalogService = catalogService;
         this.backupRepository = backupRepository;
         this.privateAccessStateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
+        this.dockerInventory = dockerInventory;
     }
 
     public List<AppInstanceView> list() {
-        return reconciliationService.reconcile().stream()
-                .map(this::view)
+        return list(dockerInventory.requireFresh());
+    }
+
+    public List<AppInstanceView> list(DockerInventorySnapshot inventory) {
+        inventory.requireUsable();
+        return managedApps.managedApps().stream()
+                .filter(app -> !inventory.hasOwnershipConflict(app.appId()))
+                .map(app -> view(app, inventory))
+                .sorted(java.util.Comparator.comparing(AppInstanceView::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 
-    private AppInstanceView view(AppReconciliationItem item) {
-        InstalledApp app = repository.findAppById(item.appId()).orElse(null);
+    private AppInstanceView view(InstalledApp app, DockerInventorySnapshot inventory) {
+        ApplicationManifest manifest = catalogService.findById(app.appId()).orElse(null);
+        RuntimeSummary item = runtimeSummary(app, manifest, inventory);
         RuntimeModels.InstalledAppOwnershipMetadata ownership = repository.ownershipFor(item.appId()).orElse(null);
         InstallModels.InstallSettings settings = repository.settingsFor(item.appId()).orElse(null);
-        ApplicationManifest manifest = catalogService.findById(item.appId()).orElse(null);
         String backupState = backupState(item.appId(), settings);
         String localUrl = firstPresent(settings == null ? null : settings.accessUrl(), app == null ? null : app.accessUrl());
         PrivateAccessState privateAccess = privateAccessStateResolver.resolve(item.appId(), settings, localUrl);
@@ -81,7 +93,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                 Instant.now());
     }
 
-    private ReliabilityModels.AppRemediationView remediation(AppReconciliationItem item, String backupState, InstallModels.InstallSettings settings) {
+    private ReliabilityModels.AppRemediationView remediation(RuntimeSummary item, String backupState, InstallModels.InstallSettings settings) {
         String lastRepairStatus = settings == null ? null : settings.lastRepairStatus();
         boolean autoRepairEnabled = settings == null || settings.autoRepairEnabled();
         boolean hasRestorePoint = AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(backupState);
@@ -94,7 +106,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
                 needsUserAction(item.status()));
     }
 
-    private List<AutarkOsIssue> issues(AppReconciliationItem item, InstalledApp app, String backupState) {
+    private List<AutarkOsIssue> issues(RuntimeSummary item, InstalledApp app, String backupState) {
         List<AutarkOsIssue> issues = new ArrayList<>();
         if (AutarkOsStates.AppStatus.MISSING.equals(item.status())) {
             issues.add(AutarkOsIssueFactory.appIssue(
@@ -137,7 +149,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         return issues;
     }
 
-    private List<AutarkOsAction> actions(AppReconciliationItem item, InstalledApp app, String localUrl, String privateUrl) {
+    private List<AutarkOsAction> actions(RuntimeSummary item, InstalledApp app, String localUrl, String privateUrl) {
         List<AutarkOsAction> actions = new ArrayList<>();
         if (AutarkOsStates.AppStatus.READY.equals(item.status()) && app != null) {
             actions.add(AutarkOsAction.get("open-" + item.appId(), "Open", firstPresent(privateUrl, localUrl, app.accessUrl())));
@@ -165,7 +177,7 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
         return AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(status) || AutarkOsStates.AppStatus.UNAVAILABLE.equals(status) || AutarkOsStates.AppStatus.MISSING.equals(status);
     }
 
-    private java.util.Optional<AutarkOsIssue> privateAccessIssue(AppReconciliationItem item, PrivateAccessState state) {
+    private java.util.Optional<AutarkOsIssue> privateAccessIssue(RuntimeSummary item, PrivateAccessState state) {
         if (state == null || !state.requested() || state.verified()) {
             return java.util.Optional.empty();
         }
@@ -206,5 +218,23 @@ public class AppInstanceViewService implements AppInstanceViewProvider {
             }
         }
         return "";
+    }
+
+    private RuntimeSummary runtimeSummary(
+            InstalledApp app,
+            ApplicationManifest manifest,
+            DockerInventorySnapshot inventory) {
+        List<RuntimeModels.DockerContainerStatus> containers = inventory.ownedContainersFor(
+                app.appId(), app.composeProject());
+        if (containers.isEmpty()) {
+            return new RuntimeSummary(app.appId(), app.appName(), AutarkOsStates.AppStatus.MISSING,
+                    "No owned containers were found for this app.");
+        }
+        AppRuntimeStatus status = new AppRuntimeStatusResolver().normalize(containers, manifest);
+        return new RuntimeSummary(app.appId(), app.appName(), status.friendlyStatus(),
+                "Derived from the current Docker inventory.");
+    }
+
+    private record RuntimeSummary(String appId, String appName, String status, String detail) {
     }
 }

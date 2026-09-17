@@ -38,10 +38,10 @@ class ProcessHostDockerContainerDiscoveryTests {
         ProcessHostDockerContainerDiscovery discovery =
                 new ProcessHostDockerContainerDiscovery(runner);
 
-        assertThat(discovery.findContainers())
+        assertThat(discovery.observeContainers().containers())
                 .extracting(HostModels.HostDockerContainer::name)
                 .containsExactly("vaultwarden");
-        assertThat(discovery.findContainers().getFirst().mounts())
+        assertThat(discovery.observeContainers().containers().getFirst().mounts())
                 .singleElement()
                 .satisfies(mount -> {
                     assertThat(mount.type()).isEqualTo("bind");

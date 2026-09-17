@@ -15,6 +15,7 @@ import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.backups.RestorePoints;
 import com.autarkos.fileops.AutarkOsFileOpsService;
+import com.autarkos.host.DockerInventoryService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -35,6 +36,7 @@ class AppUninstallService {
     private final BackupDestinationService backupDestinationService;
     private final RecoveryOperationCoordinator recoveryOperations;
     private final AutarkOsFileOpsService fileOpsService;
+    private final DockerInventoryService dockerInventory;
 
     AppUninstallService(
             InstalledAppRepository repository,
@@ -45,7 +47,8 @@ class AppUninstallService {
             ActivityLogService activityLogService,
             BackupDestinationService backupDestinationService,
             RecoveryOperationCoordinator recoveryOperations,
-            AutarkOsFileOpsService fileOpsService) {
+            AutarkOsFileOpsService fileOpsService,
+            DockerInventoryService dockerInventory) {
         this.repository = repository;
         this.composeExecutor = composeExecutor;
         this.runtimeLayout = runtimeLayout;
@@ -56,6 +59,7 @@ class AppUninstallService {
         this.backupDestinationService = backupDestinationService;
         this.recoveryOperations = recoveryOperations;
         this.fileOpsService = fileOpsService;
+        this.dockerInventory = dockerInventory;
     }
 
     InstallModels.UninstallPlan uninstallPlan(InstalledApp app) {
@@ -96,6 +100,7 @@ class AppUninstallService {
         List<String> logs = new java.util.ArrayList<>();
         SafetyCheckpointResult checkpoint = createPreUninstallCheckpoint(app);
         logs.addAll(checkpoint.logs());
+        dockerInventory.requireFresh().requireMutationOwnership(app.appId());
         if (settings.tailscaleEnabled() || settings.privateAccessUrl() != null) {
             TailscaleServeResult disableResult = disablePrivateAccessMapping(app, settings);
             logs.addAll(disableResult.output());

@@ -77,7 +77,9 @@ class BackupServiceCanonicalAppTests {
         assertThat(report.apps().getFirst().latestBackup().verificationStatus()).isNotEqualTo("verified");
         assertThat(report.apps().getFirst().restorePoints()).extracting(RestorePoint::id).contains(full.id());
         var views = new com.autarkos.marketplace.install.AppInstanceViewService(installed,
-                new com.autarkos.marketplace.install.AppReconciliationService(managedApps(installed, layout), List::of), catalog, backups, new TailscaleService());
+                managedApps(installed, layout),
+                catalog, backups, new TailscaleService(),
+                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
         assertThat(views.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
         assertThat(appLifecycleService(layout, installed, catalog, backups, new NoopDockerComposeExecutor())
                 .getApp(appId).canonicalBackupState()).isEqualTo("protected_by_restore_point");
@@ -525,7 +527,13 @@ class BackupServiceCanonicalAppTests {
                 new RecoveryOperationCoordinator(),
                 new AutarkOsFileOpsService(runtimeLayout, new LocalAutarkOsFileOperations()),
                 managedApps(repository, runtimeLayout),
-                new AppAccessChecker());
+                new AppAccessChecker(),
+                com.autarkos.testsupport.DockerInventoryTestData.service(() -> {
+                    InstalledApp app = repository.findAllApps().getFirst();
+                    return com.autarkos.testsupport.DockerInventoryTestData.fromRuntime(
+                            app.appId(), "appinst_" + app.appId(), app.composeProject(),
+                            composeExecutor.containers(Path.of(app.runtimePath()).resolve("compose.yaml"), app.composeProject()));
+                }));
     }
 
     private ProjectSettingsService projectSettingsService(RuntimeLayout layout, InstalledAppRepository repository) {

@@ -320,7 +320,7 @@ class ApplicationInventoryServiceTests {
     }
 
     private ObservedServiceService observedService(ObservedServiceRepository repository) {
-        return new ObservedServiceService(repository, new ObservedServiceScanner(List::of, () -> new AutarkOsIdentity("current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.parse("2026-06-20T12:00:00Z"), 1)));
+        return new ObservedServiceService(repository, new ObservedServiceScanner());
     }
 
     private ManagedAppAttestationService managedApps(InstalledAppRepository repository) {
@@ -377,9 +377,9 @@ class ApplicationInventoryServiceTests {
         }
 
         @Override
-        public void refresh() {
+        public void refresh(com.autarkos.host.DockerInventorySnapshot inventory) {
             refreshCalls.incrementAndGet();
-            super.refresh();
+            super.refresh(inventory);
         }
     }
 }

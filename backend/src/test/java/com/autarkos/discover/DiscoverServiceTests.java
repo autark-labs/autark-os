@@ -305,7 +305,7 @@ class DiscoverServiceTests {
                 "current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash",
                 Instant.parse("2026-06-20T12:00:00Z"), 1);
         ObservedServiceService observedServices = new ObservedServiceService(observedRepository,
-                new ObservedServiceScanner(List::of, () -> identity));
+                new ObservedServiceScanner());
         var managedApps = com.autarkos.testsupport.ManagedAppTestContract.service(
                 installedAppRepository, runtimeLayout(), identity);
         return new com.autarkos.apps.ApplicationInventoryService(
@@ -378,7 +378,7 @@ class DiscoverServiceTests {
         private InstallOptionsRequest lastOptions;
 
         private RecordingMarketplaceInstallService() {
-            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

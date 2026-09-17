@@ -85,7 +85,8 @@ class AppRecoveryServiceTests {
                 new AppRuntimeMetadataReader(),
                 dockerOwnership,
                 activityLog,
-                applicationState);
+                applicationState,
+                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
     }
 
     @Test
@@ -393,7 +394,8 @@ class AppRecoveryServiceTests {
         return new AppRecoveryService(
                 applicationInventory, observedServices, installedApps, catalog, new AppRuntimeMetadataReader(),
                 dockerOwnership, activityLog, applicationState, compose, renderer, metadataWriter, backups,
-                new RecoveryOperationCoordinator(), tailscale, access);
+                new RecoveryOperationCoordinator(), tailscale, access,
+                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
     }
 
     private RuntimeModels.DockerComposeResult success(String output) {

@@ -36,6 +36,7 @@ import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.backups.BackupService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.host.HostModels;
+import com.autarkos.host.DockerInventoryService;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
@@ -89,6 +90,7 @@ public class AppRecoveryService {
     private final RecoveryOperationCoordinator recoveryOperations;
     private final TailscaleService tailscaleService;
     private final AppAccessChecker accessChecker;
+    private final DockerInventoryService dockerInventory;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
@@ -106,10 +108,11 @@ public class AppRecoveryService {
             AppRuntimeMetadataWriter runtimeMetadataWriter,
             BackupService backupService,
             RecoveryOperationCoordinator recoveryOperations,
-            TailscaleService tailscaleService) {
+            TailscaleService tailscaleService,
+            DockerInventoryService dockerInventory) {
         this(applicationInventory, observedServices, installedApps, catalog, runtimeMetadataReader, dockerOwnership,
                 activityLog, applicationState, composeExecutor, composeRenderer, runtimeMetadataWriter, backupService,
-                recoveryOperations, tailscaleService, new AppAccessChecker());
+                recoveryOperations, tailscaleService, new AppAccessChecker(), dockerInventory);
     }
 
     AppRecoveryService(
@@ -127,7 +130,8 @@ public class AppRecoveryService {
             BackupService backupService,
             RecoveryOperationCoordinator recoveryOperations,
             TailscaleService tailscaleService,
-            AppAccessChecker accessChecker) {
+            AppAccessChecker accessChecker,
+            DockerInventoryService dockerInventory) {
         this.applicationInventory = applicationInventory;
         this.observedServices = observedServices;
         this.installedApps = installedApps;
@@ -143,6 +147,7 @@ public class AppRecoveryService {
         this.recoveryOperations = recoveryOperations;
         this.tailscaleService = tailscaleService;
         this.accessChecker = accessChecker;
+        this.dockerInventory = dockerInventory;
     }
 
     public AppRecoveryService(
@@ -153,9 +158,10 @@ public class AppRecoveryService {
             AppRuntimeMetadataReader runtimeMetadataReader,
             DockerOwnershipService dockerOwnership,
             ActivityLogService activityLog,
-            ApplicationStateService applicationState) {
+            ApplicationStateService applicationState,
+            DockerInventoryService dockerInventory) {
         this(applicationInventory, observedServices, installedApps, catalog, runtimeMetadataReader, dockerOwnership,
-                activityLog, applicationState, null, null, null, null, null, null, null);
+                activityLog, applicationState, null, null, null, null, null, null, null, dockerInventory);
     }
 
     public List<AppRecoveryModels.RecoveryCandidate> list() {
@@ -171,7 +177,7 @@ public class AppRecoveryService {
     }
 
     public AppRecoveryModels.RecoveryPlan plan(String appId) {
-        observedServices.refresh();
+        observedServices.refresh(dockerInventory.requireFresh());
         return buildPlan(appId);
     }
 
@@ -322,7 +328,7 @@ public class AppRecoveryService {
             AppRecoveryModels.RecoveryApplyRequest request,
             Consumer<String> progress) {
         progress.accept("inspect_current_state");
-        observedServices.refresh();
+        observedServices.refresh(dockerInventory.requireFresh());
         AppRecoveryModels.RecoveryPlan plan = buildPlan(appId);
         if (!plan.applicable()) {
             throw new InstallationException("Recovery is not safe yet. " + String.join(" ", plan.blockedReasons()));
@@ -359,6 +365,7 @@ public class AppRecoveryService {
         AccessRollback accessRollback = null;
         try {
             progress.accept("create_safety_checkpoint");
+            dockerInventory.requireFresh();
             RuntimeModels.DockerComposeResult stopped = composeExecutor.down(composePath, plan.sourceComposeProject());
             if (!stopped.successful()) {
                 throw new InstallationException("Docker could not stop the previous app project. " + output(stopped));
@@ -568,7 +575,7 @@ public class AppRecoveryService {
     }
 
     private void requireManagedOwnership(String appId, String appInstanceId) {
-        observedServices.refresh();
+        observedServices.refresh(dockerInventory.requireFresh());
         String currentInstance = dockerOwnership.currentIdentity().instanceId();
         List<ObservedService> evidence = matchingDockerEvidence(appId);
         boolean managed = !evidence.isEmpty() && evidence.stream().allMatch(service ->

@@ -25,11 +25,6 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
     }
 
     @Override
-    public List<HostModels.HostDockerContainer> findContainers() {
-        return observeContainers().containers();
-    }
-
-    @Override
     public DockerInventory observeContainers() {
         SystemCommandRunner.CommandExecutionResult result = commandRunner.run(
                 "docker",

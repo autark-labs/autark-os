@@ -1,12 +1,12 @@
 package com.autarkos.marketplace.install;
 
-import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
+import com.autarkos.host.DockerInventorySnapshot;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 
 @Service
@@ -19,15 +19,13 @@ public class AppTelemetryService {
         this.composeExecutor = composeExecutor;
     }
 
-    public RuntimeModels.AppTelemetry telemetry(InstalledApp app) {
-        List<RuntimeModels.DockerContainerStatus> containers = composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId());
-        return telemetryForContainers(containers);
-    }
-
-    public Map<String, RuntimeModels.AppTelemetry> telemetryForApps(List<InstalledApp> apps) {
+    public Map<String, RuntimeModels.AppTelemetry> telemetryForApps(
+            List<InstalledApp> apps,
+            DockerInventorySnapshot inventory) {
         Map<String, List<String>> containerNamesByAppId = new LinkedHashMap<>();
         for (InstalledApp app : apps) {
-            List<String> names = runtimeStatusResolver.containerNames(composeExecutor.containersForApp(composeFile(app), app.composeProject(), app.appId()));
+            List<String> names = runtimeStatusResolver.containerNames(
+                    inventory.ownedContainersFor(app.appId(), app.composeProject()));
             containerNamesByAppId.put(app.appId(), names);
         }
         List<String> containerNames = containerNamesByAppId.values().stream()
@@ -47,9 +45,5 @@ public class AppTelemetryService {
 
     public RuntimeModels.AppTelemetry telemetryForContainers(List<RuntimeModels.DockerContainerStatus> containers) {
         return RuntimeModels.AppTelemetry.from(composeExecutor.stats(runtimeStatusResolver.containerNames(containers)));
-    }
-
-    private Path composeFile(InstalledApp app) {
-        return Path.of(app.runtimePath()).resolve("compose.yaml");
     }
 }

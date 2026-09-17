@@ -12,6 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import java.util.function.Function;
 
 import jakarta.annotation.PreDestroy;
 
@@ -22,14 +23,15 @@ import org.springframework.stereotype.Service;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.api.AppOperationView;
 import com.autarkos.api.AutarkOsAction;
-import com.autarkos.host.HostModels;
+import com.autarkos.host.DockerInventoryService;
+import com.autarkos.host.DockerInventorySnapshot;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
 import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.marketplace.install.AppInstanceViewProvider;
+import com.autarkos.marketplace.install.AppInstanceViewService;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 
@@ -38,8 +40,9 @@ public class ApplicationStateService {
 
     private static final Duration SNAPSHOT_REFRESH_INTERVAL = Duration.ofSeconds(10);
 
-    private final Supplier<List<AppInstanceView>> managedAppViews;
-    private final Supplier<List<AppRuntimeView>> runtimeAppViews;
+    private final Function<DockerInventorySnapshot, List<AppInstanceView>> managedAppViews;
+    private final Function<DockerInventorySnapshot, List<AppRuntimeView>> runtimeAppViews;
+    private final Supplier<DockerInventorySnapshot> dockerInventory;
     private final ObservedServiceService observedServiceService;
     private final ApplicationInventoryService applicationInventoryService;
     private final Supplier<Instant> clock;
@@ -52,14 +55,16 @@ public class ApplicationStateService {
 
     @Autowired
     public ApplicationStateService(
-            AppInstanceViewProvider appInstanceViewProvider,
+            AppInstanceViewService appInstanceViewService,
             AppLifecycleService appLifecycleService,
+            DockerInventoryService dockerInventoryService,
             ObservedServiceService observedServiceService,
             ApplicationInventoryService applicationInventoryService,
             AutarkOsJobService jobService) {
         this(
-                appInstanceViewProvider::list,
+                appInstanceViewService::list,
                 appLifecycleService::listApps,
+                dockerInventoryService::requireFresh,
                 observedServiceService,
                 applicationInventoryService,
                 Instant::now,
@@ -68,38 +73,10 @@ public class ApplicationStateService {
                 true);
     }
 
-    public ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedAppViews,
-            Supplier<List<AppRuntimeView>> runtimeAppViews,
-            ObservedServiceService observedServiceService,
-            ApplicationInventoryService applicationInventoryService,
-            Supplier<Instant> clock) {
-        this(managedAppViews, runtimeAppViews, observedServiceService, applicationInventoryService, clock, List::of, Runnable::run, false);
-    }
-
-    public ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedAppViews,
-            Supplier<List<AppRuntimeView>> runtimeAppViews,
-            ObservedServiceService observedServiceService,
-            ApplicationInventoryService applicationInventoryService,
-            Supplier<Instant> clock,
-            Supplier<List<AutarkOsJob>> jobs) {
-        this(managedAppViews, runtimeAppViews, observedServiceService, applicationInventoryService, clock, jobs, Runnable::run, false);
-    }
-
-    public ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedAppViews,
-            Supplier<List<AppRuntimeView>> runtimeAppViews,
-            ObservedServiceService observedServiceService,
-            ApplicationInventoryService applicationInventoryService,
-            Supplier<Instant> clock,
-            Executor backgroundRefreshExecutor) {
-        this(managedAppViews, runtimeAppViews, observedServiceService, applicationInventoryService, clock, List::of, backgroundRefreshExecutor, false);
-    }
-
-    private ApplicationStateService(
-            Supplier<List<AppInstanceView>> managedAppViews,
-            Supplier<List<AppRuntimeView>> runtimeAppViews,
+    ApplicationStateService(
+            Function<DockerInventorySnapshot, List<AppInstanceView>> managedAppViews,
+            Function<DockerInventorySnapshot, List<AppRuntimeView>> runtimeAppViews,
+            Supplier<DockerInventorySnapshot> dockerInventory,
             ObservedServiceService observedServiceService,
             ApplicationInventoryService applicationInventoryService,
             Supplier<Instant> clock,
@@ -108,6 +85,7 @@ public class ApplicationStateService {
             boolean ownsBackgroundRefreshExecutor) {
         this.managedAppViews = managedAppViews;
         this.runtimeAppViews = runtimeAppViews;
+        this.dockerInventory = dockerInventory;
         this.observedServiceService = observedServiceService;
         this.applicationInventoryService = applicationInventoryService;
         this.clock = clock;
@@ -200,10 +178,13 @@ public class ApplicationStateService {
     }
 
     private ApplicationState buildSnapshot(Instant startedAt) {
-        List<AppRuntimeView> runtime = decorateRuntimeApps(runtimeAppViews.get());
+        DockerInventorySnapshot inventory = dockerInventory.get();
+        inventory.requireUsable();
+        observedServiceService.refresh(inventory);
+        List<AppRuntimeView> runtime = decorateRuntimeApps(runtimeAppViews.apply(inventory));
         // Runtime observation writes the freshly derived status; build management views only afterwards.
-        List<AppInstanceView> managed = managedAppViews.get();
-        List<ObservedService> observed = cachedObservedServices();
+        List<AppInstanceView> managed = managedAppViews.apply(inventory);
+        List<ObservedService> observed = observedServiceService.observedServices();
         List<ApplicationView> applications = applicationInventoryService.apps(observed, managed, runtime);
         Instant completedAt = clock.get();
         return new ApplicationState(
@@ -454,14 +435,6 @@ public class ApplicationStateService {
                 true,
                 "",
                 previous.nextRefreshAt());
-    }
-
-    private List<ObservedService> cachedObservedServices() {
-        if (observedServiceService == null) {
-            return List.of();
-        }
-        observedServiceService.refresh();
-        return observedServiceService.observedServices();
     }
 
     private static ThreadPoolExecutor defaultBackgroundRefreshExecutor() {

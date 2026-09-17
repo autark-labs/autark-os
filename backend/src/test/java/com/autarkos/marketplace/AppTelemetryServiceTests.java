@@ -17,22 +17,24 @@ import com.autarkos.marketplace.install.models.RuntimeModels;
 class AppTelemetryServiceTests {
 
     @Test
-    void telemetryForAppUsesComposeContainersAndStats() {
+    void telemetryForAppUsesSnapshotContainersAndStats() {
         FakeDockerComposeExecutor composeExecutor = new FakeDockerComposeExecutor();
         AppTelemetryService service = new AppTelemetryService(composeExecutor);
 
-        RuntimeModels.AppTelemetry telemetry = service.telemetry(installedApp("vaultwarden"));
+        RuntimeModels.AppTelemetry telemetry = service.telemetryForContainers(List.of(new RuntimeModels.DockerContainerStatus(
+                "autark-os-vaultwarden", "vaultwarden", "running", "healthy", "Up", "")));
 
         assertThat(telemetry.cpuPercent()).isEqualTo("1.25%");
-        assertThat(composeExecutor.lastComposeFile).isEqualTo(Path.of("/tmp/autark-os/apps/vaultwarden/compose.yaml"));
-        assertThat(composeExecutor.lastProjectName).isEqualTo("autark-os-vaultwarden");
     }
 
     @Test
     void telemetryForAppsUsesAppIdsAsKeys() {
         AppTelemetryService service = new AppTelemetryService(new FakeDockerComposeExecutor());
 
-        Map<String, RuntimeModels.AppTelemetry> telemetry = service.telemetryForApps(List.of(installedApp("vaultwarden")));
+        Map<String, RuntimeModels.AppTelemetry> telemetry = service.telemetryForApps(
+                List.of(installedApp("vaultwarden")),
+                com.autarkos.testsupport.DockerInventoryTestData.fromManaged(List.of(
+                        new com.autarkos.testsupport.DockerInventoryTestData.Container("vaultwarden", "autark-os-vaultwarden", "Up", com.autarkos.marketplace.install.DockerResourceOwnership.OWNED, "appinst_vaultwarden", "autark-os-vaultwarden"))));
 
         assertThat(telemetry).containsKey("vaultwarden");
         assertThat(telemetry.get("vaultwarden").memoryPercent()).isEqualTo("4.8%");

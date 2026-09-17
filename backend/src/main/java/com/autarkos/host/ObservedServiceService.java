@@ -49,10 +49,10 @@ public class ObservedServiceService {
         this.currentIdentity = currentIdentity;
     }
 
-    public void refresh() {
-        Instant now = Instant.now();
+    public void refresh(DockerInventorySnapshot inventory) {
+        Instant now = inventory.capturedAt();
         if (scanner != null) {
-            List<ObservedService> scannedServices = scanner.scan(now);
+            List<ObservedService> scannedServices = scanner.scan(inventory, now);
             for (ObservedService scanned : scannedServices) {
                 ObservedService merged = repository.findServiceBySourceAndFingerprint(scanned.source(), scanned.fingerprint())
                         .map(existing -> merge(existing, scanned))

@@ -24,20 +24,10 @@ class ObservedServiceServiceTests {
     void failedDockerInventoryRetainsPreviouslyFoundServicesInsteadOfDeletingThem() {
         ObservedServiceRepository repository = repository();
         repository.upsert(observed("docker:existing", "docker", "existing", "Existing app", "homepage", "external_docker", "observed"));
-        HostDockerContainerDiscovery unavailableDocker = new HostDockerContainerDiscovery() {
-            @Override
-            public List<HostModels.HostDockerContainer> findContainers() {
-                return List.of();
-            }
+        ObservedServiceService service = new ObservedServiceService(repository, new ObservedServiceScanner());
 
-            @Override
-            public DockerInventory observeContainers() {
-                return DockerInventory.failed("Docker status check timed out.");
-            }
-        };
-        ObservedServiceService service = new ObservedServiceService(repository, new ObservedServiceScanner(unavailableDocker, currentIdentity()));
-
-        assertThatThrownBy(service::refresh).isInstanceOf(HostInventoryException.class);
+        assertThatThrownBy(() -> service.refresh(com.autarkos.testsupport.DockerInventoryTestData.unavailable("Docker status check timed out.")))
+                .isInstanceOf(HostInventoryException.class);
         assertThat(service(repository, "docker:existing")).isPresent();
     }
 
@@ -48,7 +38,8 @@ class ObservedServiceServiceTests {
         ObservedServiceService service = service(repository, List.of(new HostModels.HostDockerContainer(
                 "autark-os-vault", "vaultwarden/server:latest", "Up 2 minutes", Map.of(), "0.0.0.0:8081->80/tcp")));
 
-        service.refresh();
+        service.refresh(com.autarkos.testsupport.DockerInventoryTestData.external(List.of(new HostModels.HostDockerContainer(
+                "autark-os-vault", "vaultwarden/server:latest", "Up 2 minutes", Map.of(), "0.0.0.0:8081->80/tcp"))));
 
         assertThat(service(repository, "docker:autark-os-vault")).hasValueSatisfying(observed -> {
             assertThat(observed.ownershipState()).isEqualTo("external_docker");
@@ -65,7 +56,9 @@ class ObservedServiceServiceTests {
                 new HostModels.HostDockerContainer("unmatched-worker", "worker:latest", "Up 5 seconds", Map.of(), ""),
                 new HostModels.HostDockerContainer("ignored-postgres", "postgres:16", "Up 1 hour", Map.of(), "")));
 
-        service.refresh();
+        service.refresh(com.autarkos.testsupport.DockerInventoryTestData.external(List.of(
+                new HostModels.HostDockerContainer("unmatched-worker", "worker:latest", "Up 5 seconds", Map.of(), ""),
+                new HostModels.HostDockerContainer("ignored-postgres", "postgres:16", "Up 1 hour", Map.of(), ""))));
         List<ObservedService> observed = service.observedServices();
 
         assertThat(observed).extracting(ObservedService::id).contains("docker:unmatched-worker", "docker:ignored-postgres");
@@ -78,7 +71,8 @@ class ObservedServiceServiceTests {
         repository.upsert(observed("manual:gitlab", "manual_url", "http://gitlab.local", "GitLab", "gitlab", "external", "pinned"));
         ObservedServiceService service = service(repository, List.of(new HostModels.HostDockerContainer("current-worker", "worker:latest", "Up 5 seconds", Map.of(), "")));
 
-        service.refresh();
+        service.refresh(com.autarkos.testsupport.DockerInventoryTestData.external(List.of(
+                new HostModels.HostDockerContainer("current-worker", "worker:latest", "Up 5 seconds", Map.of(), ""))));
 
         assertThat(service(repository, "docker:old-autark-os-vault")).isEmpty();
         assertThat(service(repository, "manual:gitlab")).isPresent();
@@ -93,14 +87,14 @@ class ObservedServiceServiceTests {
         repository.upsert(observed("docker:old", "docker", "old", "Old", "homepage", "external_docker", "observed"));
         repository.upsert(observed("manual:old", "manual_url", "http://old.local", "Old link", "homepage", "external", "pinned"));
 
-        service(repository, List.of()).refresh();
+        service(repository, List.of()).refresh(com.autarkos.testsupport.DockerInventoryTestData.empty());
 
         assertThat(service(repository, "docker:old")).isEmpty();
         assertThat(service(repository, "manual:old")).isPresent();
     }
 
     private ObservedServiceService service(ObservedServiceRepository repository, List<HostModels.HostDockerContainer> containers) {
-        return new ObservedServiceService(repository, new ObservedServiceScanner(() -> containers, currentIdentity()));
+        return new ObservedServiceService(repository, new ObservedServiceScanner());
     }
 
     private java.util.function.Supplier<com.autarkos.system.AutarkOsIdentity> currentIdentity() {

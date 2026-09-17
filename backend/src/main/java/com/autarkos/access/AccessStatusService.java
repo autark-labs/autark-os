@@ -11,23 +11,37 @@ import org.springframework.stereotype.Service;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
+import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
 @Service
 public class AccessStatusService {
 
-    private final Supplier<List<AppInstanceView>> appViews;
+    private final Supplier<List<ManagedAccessApp>> appViews;
     private final Supplier<TailscaleStatus> tailscaleStatus;
     private final Supplier<String> serverLanUrl;
     private final Supplier<Instant> clock;
 
     @Autowired
-    public AccessStatusService(AppInstanceViewProvider appInstanceViewProvider, TailscaleService tailscaleService,
+    public AccessStatusService(ApplicationStateService applicationStateService, TailscaleService tailscaleService,
             @org.springframework.beans.factory.annotation.Value("${server.port:8082}") String port) {
-        this(appInstanceViewProvider::list, tailscaleService::status, () -> "http://" + com.autarkos.network.HostAddress.lanAddress() + ":" + port, Instant::now);
+        this.appViews = () -> applicationStateService.snapshot().applications().stream()
+                        .filter(com.autarkos.apps.ApplicationView::managed)
+                        .map(application -> new ManagedAccessApp(
+                                application.appInstanceId(),
+                                application.name(),
+                                application.runtime() == null || application.runtime().accessRoute() == null
+                                        ? "" : application.runtime().accessRoute().localUrl(),
+                                application.runtime() == null || application.runtime().accessRoute() == null
+                                        ? "" : application.runtime().accessRoute().privateUrl(),
+                                application.accessState(),
+                                application.issues()))
+                        .toList();
+        this.tailscaleStatus = tailscaleService::status;
+        this.serverLanUrl = () -> "http://" + com.autarkos.network.HostAddress.lanAddress() + ":" + port;
+        this.clock = Instant::now;
     }
 
     public AccessStatusService(
@@ -35,14 +49,15 @@ public class AccessStatusService {
             Supplier<TailscaleStatus> tailscaleStatus,
             Supplier<String> serverLanUrl,
             Supplier<Instant> clock) {
-        this.appViews = appViews;
+        this.appViews = () -> appViews.get().stream().map(app -> new ManagedAccessApp(
+                app.appInstanceId(), app.name(), app.localUrl(), app.privateUrl(), app.accessState(), app.issues())).toList();
         this.tailscaleStatus = tailscaleStatus;
         this.serverLanUrl = serverLanUrl;
         this.clock = clock;
     }
 
     public AccessStatus status() {
-        List<AppInstanceView> apps = appViews.get();
+        List<ManagedAccessApp> apps = appViews.get();
         TailscaleStatus status = tailscaleStatus.get();
         AccessTailscaleStatus tailscale = tailscale(status, apps);
         List<AccessAppStatus> appStatuses = apps.stream()
@@ -53,7 +68,7 @@ public class AccessStatusService {
         return new AccessStatus(mode(tailscale, apps), serverLanUrl.get(), tailscale, appStatuses, issues, actions, clock.get());
     }
 
-    private AccessTailscaleStatus tailscale(TailscaleStatus status, List<AppInstanceView> apps) {
+    private AccessTailscaleStatus tailscale(TailscaleStatus status, List<ManagedAccessApp> apps) {
         boolean mock = "dev".equalsIgnoreCase(status.state());
         boolean magicDnsReady = status.connected() && hasText(status.dnsName());
         boolean privateAppReady = apps.stream().anyMatch(app -> "private_ready".equals(app.accessState()));
@@ -67,7 +82,7 @@ public class AccessStatusService {
                 mock ? "mock" : status.installed() ? "real" : "unavailable");
     }
 
-    private AccessAppStatus appStatus(AppInstanceView app) {
+    private AccessAppStatus appStatus(ManagedAccessApp app) {
         return new AccessAppStatus(
                 app.appInstanceId(),
                 app.name(),
@@ -77,7 +92,7 @@ public class AccessStatusService {
                 null);
     }
 
-    private String mode(AccessTailscaleStatus tailscale, List<AppInstanceView> apps) {
+    private String mode(AccessTailscaleStatus tailscale, List<ManagedAccessApp> apps) {
         if ("mock".equals(tailscale.mode())) {
             return "mocked_dev";
         }
@@ -91,7 +106,7 @@ public class AccessStatusService {
         return "local_only";
     }
 
-    private List<AutarkOsIssue> issues(TailscaleStatus status, AccessTailscaleStatus tailscale, List<AppInstanceView> apps) {
+    private List<AutarkOsIssue> issues(TailscaleStatus status, AccessTailscaleStatus tailscale, List<ManagedAccessApp> apps) {
         List<AutarkOsIssue> issues = new ArrayList<>();
         if ("mock".equals(tailscale.mode())) {
             issues.add(AutarkOsIssueFactory.accessIssue(
@@ -141,7 +156,7 @@ public class AccessStatusService {
         return issues;
     }
 
-    private List<AutarkOsAction> actions(TailscaleStatus status, AccessTailscaleStatus tailscale, List<AppInstanceView> apps) {
+    private List<AutarkOsAction> actions(TailscaleStatus status, AccessTailscaleStatus tailscale, List<ManagedAccessApp> apps) {
         List<AutarkOsAction> actions = new ArrayList<>();
         if ("mock".equals(tailscale.mode())) {
             actions.add(AutarkOsAction.route("open-diagnostics", "View diagnostics", "/diagnostics"));
@@ -159,11 +174,11 @@ public class AccessStatusService {
         return actions;
     }
 
-    private boolean privateAccessRequested(List<AppInstanceView> apps) {
+    private boolean privateAccessRequested(List<ManagedAccessApp> apps) {
         return apps.stream().anyMatch(app -> hasText(app.privateUrl()) || app.accessState().startsWith("private_"));
     }
 
-    private void appendAppAccessIssues(List<AutarkOsIssue> issues, List<AppInstanceView> apps) {
+    private void appendAppAccessIssues(List<AutarkOsIssue> issues, List<ManagedAccessApp> apps) {
         apps.stream()
                 .flatMap(app -> app.issues().stream())
                 .filter(issue -> "access".equals(issue.scope()))
@@ -180,5 +195,14 @@ public class AccessStatusService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private record ManagedAccessApp(
+            String appInstanceId,
+            String name,
+            String localUrl,
+            String privateUrl,
+            String accessState,
+            List<AutarkOsIssue> issues) {
     }
 }
