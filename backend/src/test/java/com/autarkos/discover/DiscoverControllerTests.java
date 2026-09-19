@@ -50,6 +50,5 @@ class DiscoverControllerTests {
             controller.install(app.id(), null);
             verify(service).install(app.id(), null);
         }
-        assertThat(BetaScope.CURRENT.qualificationStatus()).isEqualTo("pending");
     }
 }

@@ -2,7 +2,6 @@ import type { ReachabilityService } from './NetworkPage.types';
 
 const ACCESS_PATH = '/access';
 const ACCESS_TABS = new Set(['matrix', 'issues', 'devices', 'advanced']);
-const FOCUS_KINDS = new Set(['managed', 'app']);
 
 type AccessDeepLinkKind = 'managed';
 export type AccessDeepLinkTab = 'matrix' | 'issues' | 'devices' | 'advanced';
@@ -39,7 +38,7 @@ export function accessDeepLinkForTab(tab: AccessDeepLinkTab, focus?: Reachabilit
 export function parseAccessDeepLink(search = ''): AccessDeepLinkTarget {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
   const tab = normalizeTab(params.get('tab'));
-  const rawFocus = params.get('focus') || legacyFocusParam(params);
+  const rawFocus = params.get('focus') || '';
   const separatorIndex = rawFocus.indexOf(':');
   const rawKind = separatorIndex >= 0 ? rawFocus.slice(0, separatorIndex) : '';
   const id = separatorIndex >= 0 ? rawFocus.slice(separatorIndex + 1).trim() : '';
@@ -78,22 +77,8 @@ function accessDeepLink({ focus, tab }: { focus?: string | null; tab: AccessDeep
   return `${ACCESS_PATH}?${params.toString()}`;
 }
 
-function legacyFocusParam(params: URLSearchParams) {
-  const appId = params.get('app');
-  if (appId) {
-    return `managed:${appId}`;
-  }
-  return '';
-}
-
 function normalizeKind(kind: string): AccessDeepLinkKind | null {
-  if (!FOCUS_KINDS.has(kind)) {
-    return null;
-  }
-  if (kind === 'app') {
-    return 'managed';
-  }
-  return kind as AccessDeepLinkKind;
+  return kind === 'managed' ? kind : null;
 }
 
 function normalizeTab(tab: string | null): AccessDeepLinkTab {

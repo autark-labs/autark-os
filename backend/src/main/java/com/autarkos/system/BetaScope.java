@@ -13,7 +13,6 @@ public final class BetaScope {
 
     public static final String INSTALL_UNAVAILABLE = "This app is not available for new installs in the controlled beta. Existing apps remain available in My Apps.";
     public static final String PRO_UNAVAILABLE = "New Pro activation and extension installation are deferred during the Core beta. Existing Pro status and removal remain available.";
-    public static final String UPDATES_UNAVAILABLE = "Managed app updates are deferred during the controlled beta. Existing apps and recovery records are retained. Core updates remain available through autark-os update.";
     public static final Scope CURRENT = load();
 
     private BetaScope() {
@@ -52,9 +51,8 @@ public final class BetaScope {
         }
     }
 
-    public record Scope(String qualificationStatus, String primaryEnvironment, String installationRoute,
-            String coreUpdateRoute, List<App> apps, boolean proInstallationAvailable,
-            boolean managedAppUpdatesAvailable, boolean automaticRepairDefault) {
+    public record Scope(List<App> apps, boolean proInstallationAvailable,
+            boolean automaticRepairDefault) {
         public Scope {
             apps = List.copyOf(apps);
         }

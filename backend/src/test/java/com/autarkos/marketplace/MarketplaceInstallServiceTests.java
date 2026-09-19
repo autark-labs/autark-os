@@ -29,6 +29,7 @@ import com.autarkos.marketplace.install.CatalogPackageCopier;
 import com.autarkos.marketplace.install.ComposeRenderer;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.DockerOwnershipService;
+import com.autarkos.marketplace.install.DockerResourceOwnership;
 import com.autarkos.marketplace.install.DuplicateInstallAcknowledgementRequiredException;
 import com.autarkos.marketplace.install.InstallCustomizationResolver;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -95,7 +96,7 @@ class MarketplaceInstallServiceTests {
             DockerOwnershipService ownership,
             AppRuntimeMetadataWriter metadataWriter) {
         ObservedServiceService observedServices = new ObservedServiceService(
-                observedRepository(runtimeLayout), null);
+                observedRepository(runtimeLayout), new ObservedServiceScanner());
         return new MarketplaceInstallService(
                 installPlanService, directoryManager, packageCopier, composeRenderer, dockerComposeExecutor,
                 repository, customizationResolver, postInstallProvisioner, postInstallGuideBuilder,
@@ -591,6 +592,21 @@ class MarketplaceInstallServiceTests {
     }
 
     @Test
+    void inferredCatalogHintDoesNotRequireDuplicateAcknowledgement() {
+        RuntimeLayout runtimeLayout = runtimeLayout();
+        ApplicationManifest manifest = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator())
+                .findById("vaultwarden").orElseThrow();
+        ObservedServiceRepository observedRepository = observedRepository(runtimeLayout);
+        Instant seenAt = Instant.parse("2026-06-21T12:00:00Z");
+        observedRepository.upsert(new ObservedService(
+                "docker:vaultwarden-helper", "docker", "vaultwarden-helper", "vaultwarden-helper",
+                null, "LAN", "vaultwarden", "inferred", "external_docker", "running", "", seenAt, seenAt, "{}"));
+
+        installService(runtimeLayout, JpaTestRepositories.installedAppRepository(runtimeLayout), observedRepository, null)
+                .ensureDuplicateAcknowledgement(manifest, InstallOptionsRequest.defaults());
+    }
+
+    @Test
     void duplicateObservedServiceWithAcknowledgementProceeds() {
         RuntimeLayout runtimeLayout = runtimeLayout();
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
@@ -674,7 +690,7 @@ class MarketplaceInstallServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new FixedPortAllocator());
         ObservedServiceService observedService = new ObservedServiceService(
                 observedRepository,
-                null);
+                new ObservedServiceScanner());
         return new MarketplaceInstallService(
                 new InstallPlanService(runtimeLayout, customizationResolver),
                 new RuntimeDirectoryManager(runtimeLayout),
@@ -691,8 +707,22 @@ class MarketplaceInstallServiceTests {
                 metadataWriter == null ? metadataWriter(runtimeLayout) : metadataWriter,
                 observedService,
                 ManagedAppTestContract.service(repository, runtimeLayout, identity(runtimeLayout)),
-                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()),
+                com.autarkos.testsupport.DockerInventoryTestData.service(() -> observedInventory(observedRepository)),
                 new RecoveryOperationCoordinator());
+    }
+
+    private com.autarkos.host.DockerInventorySnapshot observedInventory(ObservedServiceRepository repository) {
+        return com.autarkos.testsupport.DockerInventoryTestData.fromManaged(repository.findAllServices().stream()
+                .filter(service -> "docker".equals(service.source()))
+                .map(service -> new com.autarkos.testsupport.DockerInventoryTestData.Container(
+                        "inferred".equals(service.catalogMatchConfidence()) ? "" : service.catalogAppId(),
+                        service.fingerprint(), "running", switch (service.ownershipState()) {
+                            case "owned_managed" -> DockerResourceOwnership.OWNED;
+                            case "legacy_autark_os" -> DockerResourceOwnership.LEGACY_UNSCOPED;
+                            case "foreign_autark_os" -> DockerResourceOwnership.FOREIGN;
+                            default -> DockerResourceOwnership.UNMANAGED;
+                        }, "", ""))
+                .toList());
     }
 
     private AutarkOsIdentity identity(RuntimeLayout runtimeLayout) {

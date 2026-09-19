@@ -33,7 +33,7 @@ export type ApplicationRuntimeState = 'ready' | 'starting' | 'stopped' | 'degrad
 
 export type BackendAppOperationState = {
   jobType?: string | null;
-  kind: 'idle' | 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling' | 'updating' | 'rolling_back' | 'failed' | string;
+  kind: 'idle' | 'starting' | 'stopping' | 'restarting' | 'saving_settings' | 'backing_up' | 'uninstalling' | 'failed' | string;
   label?: string | null;
   jobId?: string | null;
   currentStep?: string | null;
@@ -246,34 +246,6 @@ export type AppActionResult = {
   title?: string;
   nextAction?: string | null;
   jobId?: string | null;
-};
-
-export type AppUpdatePlan = {
-  appId: string;
-  appName: string;
-  operation: 'update' | 'rollback' | string;
-  planId: string;
-  status: 'available' | 'current' | 'blocked' | 'recovery_required' | 'review_required' | string;
-  headline: string;
-  summary: string;
-  currentVersion: string;
-  targetVersion: string;
-  canApply: boolean;
-  safetyBackupRequired: boolean;
-  rollbackAvailable: boolean;
-  rollbackSnapshotId: string;
-  changes: string[];
-  blockedReasons: string[];
-  guardianAdvice: {
-    state: 'ready' | 'unavailable' | string;
-    outcome: 'proceed' | 'protect_first' | 'defer' | 'blocked' | 'unavailable' | string;
-    headline: string;
-    summary: string;
-    reasons: string[];
-    analyzedAt: string | null;
-    expiresAt: string | null;
-  };
-  checkedAt: string;
 };
 
 export type AppReliabilityIssue = {

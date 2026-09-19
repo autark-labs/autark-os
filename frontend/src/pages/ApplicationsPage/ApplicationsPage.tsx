@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
-import { AppUpdatePlanChangedError, InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
+import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ApplicationReviewPrompt } from '@/components/autark-os/ApplicationReviewPrompt';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
@@ -427,72 +427,6 @@ export const ApplicationsPage = () => {
     return mapUninstallPlanToDestructiveActionPlan(plan);
   }
 
-  async function loadUpdatePlan(appId: string) {
-    try {
-      return await InstalledAppsAPIClient.updatePlan(appId);
-    } catch (err) {
-      showActionErrorNotification(err, 'Update review unavailable');
-      throw err;
-    }
-  }
-
-  async function loadRollbackPlan(appId: string) {
-    try {
-      return await InstalledAppsAPIClient.rollbackPlan(appId);
-    } catch (err) {
-      showActionErrorNotification(err, 'Rollback review unavailable');
-      throw err;
-    }
-  }
-
-  async function runUpdate(appId: string, planId: string) {
-    setAppActionLoading(appId, 'update');
-    try {
-      const job = await InstalledAppsAPIClient.update(appId, planId);
-      syncCanonicalAppMutationResult(queryClient, job);
-      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
-      showActionNotification({
-        ok: true,
-        severity: 'info',
-        title: 'App update started',
-        message: 'Autark-OS saved a verified safety checkpoint and will keep showing release progress here.',
-      });
-    } catch (err) {
-      if (err instanceof AppUpdatePlanChangedError) {
-        showActionNotification({ ok: false, severity: 'warning', title: err.plan.headline, message: err.plan.summary });
-      } else {
-        showActionErrorNotification(err, 'Update could not start');
-      }
-      throw err;
-    } finally {
-      setAppActionLoading(appId, null);
-    }
-  }
-
-  async function runRollback(appId: string, planId: string) {
-    setAppActionLoading(appId, 'rollback');
-    try {
-      const job = await InstalledAppsAPIClient.rollback(appId, planId);
-      syncCanonicalAppMutationResult(queryClient, job);
-      setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
-      showActionNotification({
-        ok: true,
-        severity: 'info',
-        title: 'App rollback started',
-        message: 'Autark-OS created a fresh safety checkpoint and is restoring the saved release.',
-      });
-    } catch (err) {
-      if (err instanceof AppUpdatePlanChangedError) {
-        showActionNotification({ ok: false, severity: 'warning', title: err.plan.headline, message: err.plan.summary });
-      } else {
-        showActionErrorNotification(err, 'Rollback could not start');
-      }
-      throw err;
-    } finally {
-      setAppActionLoading(appId, null);
-    }
-  }
-
   async function runUninstall(appId: string) {
     try {
       const job = await InstalledAppsAPIClient.uninstall(appId);
@@ -539,15 +473,11 @@ export const ApplicationsPage = () => {
   const actions = {
     onCreateBackup: handleCreateBackup,
     onDirtyChange: handleDirtyChange,
-    onLoadRollbackPlan: loadRollbackPlan,
     onLoadUninstallPlan: loadUninstallPlan,
-    onLoadUpdatePlan: loadUpdatePlan,
     onRepair: handleRepair,
     onRestart: handleRestart,
     onRunNextAction: handleRunNextAction,
     onRunUninstall: runUninstall,
-    onRunRollback: runRollback,
-    onRunUpdate: runUpdate,
     onSaveSettings: saveApplicationSettings,
     onSettingsPlanRequest: requestSettingsPlan,
     onSetPrivateNetworkAccess: runPrivateNetworkAccessChange,

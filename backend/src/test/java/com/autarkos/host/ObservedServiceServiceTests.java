@@ -93,6 +93,23 @@ class ObservedServiceServiceTests {
         assertThat(service(repository, "manual:old")).isPresent();
     }
 
+    @Test
+    void catalogQueriesExcludeImageAndNameInference() {
+        ObservedServiceRepository repository = repository();
+        repository.upsert(observed("docker:explicit", "docker", "explicit", "Vaultwarden", "vaultwarden", "external_docker", "observed"));
+        Instant seenAt = Instant.parse("2026-06-21T12:00:00Z");
+        repository.upsert(new ObservedService(
+                "docker:inferred", "docker", "inferred", "vaultwarden-helper", null, "LAN",
+                "vaultwarden", "inferred", "external_docker", "running", "", seenAt, seenAt, "{}"));
+        repository.upsert(new ObservedService(
+                "docker:image-match", "docker", "image-match", "password-helper", null, "LAN",
+                "vaultwarden", "image", "external_docker", "running", "", seenAt, seenAt, "{}"));
+
+        assertThat(new ObservedServiceService(repository, new ObservedServiceScanner()).servicesForCatalogApp("vaultwarden"))
+                .extracting(ObservedService::id)
+                .containsExactly("docker:explicit");
+    }
+
     private ObservedServiceService service(ObservedServiceRepository repository, List<HostModels.HostDockerContainer> containers) {
         return new ObservedServiceService(repository, new ObservedServiceScanner());
     }

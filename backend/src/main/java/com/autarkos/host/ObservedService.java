@@ -17,4 +17,8 @@ public record ObservedService(
         Instant firstSeenAt,
         Instant lastSeenAt,
         String metadataJson) {
+
+    public boolean catalogIdentityExplicit() {
+        return java.util.Set.of("label", "user", "autark_os_failed_install").contains(catalogMatchConfidence);
+    }
 }

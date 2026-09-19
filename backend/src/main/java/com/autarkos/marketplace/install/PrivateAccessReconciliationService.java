@@ -4,9 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Supplier;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.apps.ApplicationStateService;
@@ -22,22 +20,13 @@ import com.autarkos.network.tailscale.TailscaleStatus;
 @Service
 public class PrivateAccessReconciliationService {
 
-    private final Supplier<List<AppRuntimeView>> runtimeApps;
+    private final ApplicationStateService applicationStateService;
     private final MarketplaceCatalogService catalogService;
     private final TailscaleService tailscaleService;
     private final PrivateAccessStateResolver stateResolver;
 
-    @Autowired
     public PrivateAccessReconciliationService(ApplicationStateService applicationStateService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService, InstalledAppRepository repository) {
-        this(() -> ApplicationViews.managedRuntimes(applicationStateService.snapshot()), catalogService, tailscaleService, repository);
-    }
-
-    public PrivateAccessReconciliationService(AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, TailscaleService tailscaleService) {
-        this(appLifecycleService::listApps, catalogService, tailscaleService, null);
-    }
-
-    private PrivateAccessReconciliationService(Supplier<List<AppRuntimeView>> runtimeApps, MarketplaceCatalogService catalogService, TailscaleService tailscaleService, InstalledAppRepository repository) {
-        this.runtimeApps = runtimeApps;
+        this.applicationStateService = applicationStateService;
         this.catalogService = catalogService;
         this.tailscaleService = tailscaleService;
         this.stateResolver = new PrivateAccessStateResolver(repository, tailscaleService);
@@ -45,7 +34,7 @@ public class PrivateAccessReconciliationService {
 
     public AccessModels.PrivateAccessReconciliationReport report() {
         TailscaleStatus status = tailscaleService.status();
-        List<AppRuntimeView> privateApps = runtimeApps.get().stream()
+        List<AppRuntimeView> privateApps = runtimeApps().stream()
                 .filter(this::wantsPrivateAccess)
                 .toList();
         if (privateApps.isEmpty()) {
@@ -92,7 +81,7 @@ public class PrivateAccessReconciliationService {
         TailscaleServeConfig config = tailscale.connected()
                 ? tailscaleService.serveConfig()
                 : TailscaleServeConfig.unavailable("not_connected", "Tailscale is not connected.", List.of());
-        boolean appStillExpectsPort = runtimeApps.get().stream()
+        boolean appStillExpectsPort = runtimeApps().stream()
                 .filter(this::wantsPrivateAccess)
                 .map(app -> stateResolver.resolve(app.appId(), app.settings(), app.accessUrl(), tailscale, config).expectedHttpsPort())
                 .filter(Objects::nonNull)
@@ -186,7 +175,7 @@ public class PrivateAccessReconciliationService {
     }
 
     private Set<Integer> knownAutarkOsPorts() {
-        List<AppRuntimeView> apps = runtimeApps.get();
+        List<AppRuntimeView> apps = runtimeApps();
         Set<Integer> ports = apps.stream()
                 .map(app -> app.observedAccess() == null ? null : app.observedAccess().localPort())
                 .filter(Objects::nonNull)
@@ -228,5 +217,9 @@ public class PrivateAccessReconciliationService {
             return null;
         }
         return null;
+    }
+
+    private List<AppRuntimeView> runtimeApps() {
+        return ApplicationViews.managedRuntimes(applicationStateService.snapshot());
     }
 }

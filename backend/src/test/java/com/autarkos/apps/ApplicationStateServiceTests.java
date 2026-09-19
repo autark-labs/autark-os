@@ -90,12 +90,15 @@ class ApplicationStateServiceTests {
         repository.upsert(pinned("manual:gitlab", "gitlab"));
         repository.upsert(pinned("docker:compassionate_mclean", "compassionate_mclean"));
         repository.upsert(found("docker:vaultwarden", "vaultwarden"));
-        ObservedServiceService observedServiceService = new ObservedServiceService(repository, null);
-        ApplicationStateService service = createService(
-                List::of,
-                observedServiceService,
-                inventory(),
-                Instant::now);
+        ObservedServiceService observedServiceService = new ObservedServiceService(repository, new ObservedServiceScanner());
+        var docker = com.autarkos.testsupport.DockerInventoryTestData.external(List.of(
+                new com.autarkos.host.HostModels.HostDockerContainer(
+                        "compassionate_mclean", "worker:latest", "running", java.util.Map.of(), ""),
+                new com.autarkos.host.HostModels.HostDockerContainer(
+                        "vaultwarden", "vaultwarden/server:latest", "running", java.util.Map.of(), "")));
+        ApplicationStateService service = new ApplicationStateService(
+                ignored -> List.of(), () -> docker, observedServiceService, inventory(), Instant::now,
+                List::of, Runnable::run, false);
 
         ApplicationState state = service.refreshNow();
 

@@ -21,13 +21,15 @@ test('builds managed-app focus links', () => {
 });
 
 test('parses only managed My Apps deep links', () => {
-  assert.deepEqual(parseApplicationsDeepLink('?focus=app%3Avaultwarden'), {
+  assert.deepEqual(parseApplicationsDeepLink('?focus=managed%3Avaultwarden'), {
     id: 'vaultwarden',
     key: 'managed:vaultwarden::',
     kind: 'managed',
     panel: null,
     tab: null,
   });
+  assert.equal(parseApplicationsDeepLink('?focus=app%3Avaultwarden').kind, null);
+  assert.equal(parseApplicationsDeepLink('?app=vaultwarden').kind, null);
   assert.equal(parseApplicationsDeepLink('?focus=service%3Adocker%3Ahomepage').kind, null);
   assert.equal(parseApplicationsDeepLink('?service=docker%3Avaultwarden').kind, null);
 });

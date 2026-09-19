@@ -28,6 +28,8 @@ test('applications page splits settings and links management tabs into focused c
   assert.match(panel, /ApplicationLinksTab/);
   assert.match(panel, /ApplicationGuideTab/);
   assert.match(panel, /ApplicationTelemetryTab/);
+  assert.doesNotMatch(panel, /ApplicationUpdateSection|onRunUpdate|onRunRollback/);
+  assert.doesNotMatch(page, /updatePlan|rollbackPlan|runUpdate|runRollback/);
   assert.doesNotMatch(panel, /function SettingToggle|function LinkRow/);
   assert.doesNotMatch(panel, /function MetricBar/);
   assert.doesNotMatch(panel, /function CopyValue/);

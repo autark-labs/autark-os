@@ -138,22 +138,11 @@ public class ApplicationInventoryService {
     }
 
     private Optional<ObservedService> matchingObserved(String appId, List<ObservedService> evidence, java.util.function.Predicate<ObservedService> predicate) {
-        String normalizedAppId = normalizeToken(appId);
         return evidence.stream()
-                .filter(service -> appId.equals(service.catalogAppId()) || matchesCatalogAppName(service, normalizedAppId))
+                .filter(service -> appId.equals(service.catalogAppId()))
+                .filter(ObservedService::catalogIdentityExplicit)
                 .filter(predicate)
                 .findFirst();
-    }
-
-    private boolean matchesCatalogAppName(ObservedService service, String normalizedAppId) {
-        if (service.catalogAppId() != null && !service.catalogAppId().isBlank()) {
-            return false;
-        }
-        if (normalizedAppId.isBlank()) {
-            return false;
-        }
-        return normalizeToken(service.displayName()).contains(normalizedAppId)
-                || normalizeToken(service.url()).contains(normalizedAppId);
     }
 
     private List<ApplicationAction> availableActions(
@@ -441,7 +430,4 @@ public class ApplicationInventoryService {
         return "/apps?focus=" + encode(kind + ":" + id) + "&panel=manage";
     }
 
-    private String normalizeToken(String value) {
-        return value == null ? "" : value.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "");
-    }
 }

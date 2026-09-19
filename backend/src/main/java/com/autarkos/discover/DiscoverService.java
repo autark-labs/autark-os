@@ -5,9 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Supplier;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.apps.ApplicationView;
@@ -27,14 +25,12 @@ import com.autarkos.marketplace.model.ApplicationManifest;
 public class DiscoverService {
 
     private final MarketplaceCatalogService catalogService;
-    private final Supplier<List<ApplicationView>> applications;
+    private final ApplicationStateService applicationStateService;
     private final DiscoverSetupService setupService;
     private final DiscoverInstallPreviewService previewService;
     private final MarketplaceInstallService marketplaceInstallService;
     private final AutarkOsJobService jobService;
-    private final Runnable invalidateApplicationState;
 
-    @Autowired
     public DiscoverService(
             MarketplaceCatalogService catalogService,
             ApplicationStateService applicationStateService,
@@ -42,46 +38,16 @@ public class DiscoverService {
             DiscoverInstallPreviewService previewService,
             MarketplaceInstallService marketplaceInstallService,
             AutarkOsJobService jobService) {
-        this(catalogService, () -> applicationStateService.snapshot().applications(), setupService, previewService, marketplaceInstallService, jobService, applicationStateService::invalidate);
-    }
-
-    public DiscoverService(
-            MarketplaceCatalogService catalogService,
-            Supplier<List<ApplicationView>> applications,
-            DiscoverSetupService setupService,
-            DiscoverInstallPreviewService previewService) {
-        this(catalogService, applications, setupService, previewService, null, null, () -> {});
-    }
-
-    public DiscoverService(
-            MarketplaceCatalogService catalogService,
-            Supplier<List<ApplicationView>> applications,
-            DiscoverSetupService setupService,
-            DiscoverInstallPreviewService previewService,
-            MarketplaceInstallService marketplaceInstallService,
-            AutarkOsJobService jobService) {
-        this(catalogService, applications, setupService, previewService, marketplaceInstallService, jobService, () -> {});
-    }
-
-    private DiscoverService(
-            MarketplaceCatalogService catalogService,
-            Supplier<List<ApplicationView>> applications,
-            DiscoverSetupService setupService,
-            DiscoverInstallPreviewService previewService,
-            MarketplaceInstallService marketplaceInstallService,
-            AutarkOsJobService jobService,
-            Runnable invalidateApplicationState) {
         this.catalogService = catalogService;
-        this.applications = applications;
+        this.applicationStateService = applicationStateService;
         this.setupService = setupService;
         this.previewService = previewService;
         this.marketplaceInstallService = marketplaceInstallService;
         this.jobService = jobService;
-        this.invalidateApplicationState = invalidateApplicationState;
     }
 
     public List<DiscoverAppView> apps() {
-        Map<String, ApplicationView> applicationsById = applications.get().stream()
+        Map<String, ApplicationView> applicationsById = applicationStateService.snapshot().applications().stream()
                 .collect(java.util.stream.Collectors.toMap(ApplicationView::id, view -> view, (left, right) -> left));
         return catalogService.findAll().stream()
                 .map(manifest -> appView(manifest, requiredApplication(manifest, applicationsById.get(manifest.id()))))
@@ -90,7 +56,7 @@ public class DiscoverService {
     }
 
     public Optional<DiscoverAppView> app(String appId) {
-        Map<String, ApplicationView> applicationsById = applications.get().stream()
+        Map<String, ApplicationView> applicationsById = applicationStateService.snapshot().applications().stream()
                 .collect(java.util.stream.Collectors.toMap(ApplicationView::id, view -> view, (left, right) -> left));
         return catalogService.findById(appId)
                 .map(manifest -> appView(manifest, requiredApplication(manifest, applicationsById.get(manifest.id()))));
@@ -107,9 +73,6 @@ public class DiscoverService {
     }
 
     public AutarkOsJob install(String appId, DiscoverInstallModels.DiscoverInstallRequest request) {
-        if (marketplaceInstallService == null || jobService == null) {
-            throw new IllegalStateException("Discover install jobs are not configured.");
-        }
         ApplicationManifest manifest = catalogService.findById(appId).orElseThrow(() -> new IllegalArgumentException("Unknown app: " + appId));
         DiscoverSetupModels.DiscoverSetupAnswersRequest answersRequest = request == null ? new DiscoverSetupModels.DiscoverSetupAnswersRequest(Map.of()) : request.answersRequest();
         DiscoverSetupModels.DiscoverSetupAnswers answers = setupService.mergedAnswers(manifest, answersRequest);
@@ -130,10 +93,10 @@ public class DiscoverService {
                 liveSteps.add(installStep(step));
                 jobService.recordProgress(activeJob.jobId(), List.copyOf(liveSteps));
             });
-            invalidateApplicationState.run();
+            applicationStateService.invalidate();
             return installOutcome(result);
         });
-        invalidateApplicationState.run();
+        applicationStateService.invalidate();
         return job;
     }
 

@@ -1,12 +1,12 @@
 import type { DestructiveActionPlan } from './ApplicationsPage.destructiveActions';
-import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUpdatePlan, AppUsageGuide, ApplicationRuntimeState, AutarkOsIssue } from '@/types/app';
+import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUsageGuide, ApplicationRuntimeState, AutarkOsIssue } from '@/types/app';
 
-export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup' | 'update' | 'rollback';
+export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup';
 export type ApplicationSettingsAction = 'planning' | 'saving' | 'private_access';
 export type AppOperationState =
   | { kind: 'idle' }
   | {
-    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'restoring' | 'uninstalling' | 'updating' | 'rolling_back';
+    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'restoring' | 'uninstalling';
     label: string;
     jobId?: string;
     currentStep?: string;
@@ -53,7 +53,6 @@ export type ApplicationSurfaceItem = {
   backup: 'Protected' | 'Needs backup' | 'Not managed';
   availableActions: ApplicationAvailableAction[];
   catalogAppId?: string | null;
-  catalogMatchConfidence?: string;
   nextAction?: ApplicationNextAction;
   description: string;
   href?: string;
@@ -71,14 +70,10 @@ export type ApplicationActionHandlers = {
   onCreateBackup: (id: string) => void;
   onDirtyChange: (id: string, dirty: boolean) => void;
   onLoadUninstallPlan: (id: string) => Promise<DestructiveActionPlan>;
-  onLoadUpdatePlan: (id: string) => Promise<AppUpdatePlan>;
-  onLoadRollbackPlan: (id: string) => Promise<AppUpdatePlan>;
   onRepair: (id: string) => void;
   onRestart: (id: string) => void;
   onRunNextAction: (id: string) => void;
   onRunUninstall: (id: string) => Promise<void>;
-  onRunUpdate: (id: string, planId: string) => Promise<void>;
-  onRunRollback: (id: string, planId: string) => Promise<void>;
   onSaveSettings: (id: string, values: ApplicationSettingsFormValues) => Promise<void>;
   onSettingsPlanRequest: (id: string, values: ApplicationSettingsFormValues) => Promise<ApplicationSettingsImpact | null>;
   onSetPrivateNetworkAccess: (id: string, enabled: boolean) => Promise<void>;

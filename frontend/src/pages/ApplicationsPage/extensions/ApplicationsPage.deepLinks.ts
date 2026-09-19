@@ -1,7 +1,6 @@
 import type { ApplicationSurfaceItem } from './ApplicationsPage.types';
 
 const APPLICATIONS_PATH = '/apps';
-const FOCUS_KINDS = new Set(['managed', 'app']);
 const MANAGEMENT_PANEL = 'manage';
 
 type ApplicationDeepLinkKind = 'managed';
@@ -54,7 +53,7 @@ export function applicationRouteWithManagementPanel(href: string | null | undefi
 
 export function parseApplicationsDeepLink(search = ''): ApplicationDeepLinkTarget {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-  const rawFocus = params.get('focus') || legacyFocusParam(params);
+  const rawFocus = params.get('focus') || '';
   const separatorIndex = rawFocus.indexOf(':');
   const rawKind = separatorIndex >= 0 ? rawFocus.slice(0, separatorIndex) : '';
   const id = separatorIndex >= 0 ? rawFocus.slice(separatorIndex + 1).trim() : '';
@@ -79,14 +78,6 @@ export function parseApplicationsDeepLink(search = ''): ApplicationDeepLinkTarge
     panel,
     tab,
   };
-}
-
-function legacyFocusParam(params: URLSearchParams) {
-  const appId = params.get('app');
-  if (appId) {
-    return `managed:${appId}`;
-  }
-  return '';
 }
 
 export function findApplicationDeepLinkTarget(items: ApplicationSurfaceItem[], target: ApplicationDeepLinkTarget | null | undefined) {
@@ -129,19 +120,10 @@ function parseAppRelativeUrl(href: string) {
 }
 
 function normalizeKind(kind: string): ApplicationDeepLinkKind | null {
-  if (!FOCUS_KINDS.has(kind)) {
-    return null;
-  }
-  if (kind === 'app') {
-    return 'managed';
-  }
-  return kind as ApplicationDeepLinkKind;
+  return kind === 'managed' ? kind : null;
 }
 
 function matchesApplicationDeepLinkTarget(item: ApplicationSurfaceItem, target: ApplicationDeepLinkTarget) {
   const itemIds = new Set([item.id, item.sourceId].filter((id): id is string => Boolean(id)));
-  if (target.kind === 'managed') {
-    return target.id !== null && item.relationship === 'managed' && itemIds.has(target.id);
-  }
-  return false;
+  return target.id !== null && item.relationship === 'managed' && itemIds.has(target.id);
 }

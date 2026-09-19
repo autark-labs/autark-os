@@ -4,14 +4,10 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.model.ApplicationManifest;
-import com.autarkos.system.AutarkOsIdentity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
@@ -19,54 +15,31 @@ public class ObservedServiceService {
 
     private final ObservedServiceRepository repository;
     private final ObservedServiceScanner scanner;
-    private final Supplier<AutarkOsIdentity> currentIdentity;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Autowired
     public ObservedServiceService(
             ObservedServiceRepository repository,
-            ObservedServiceScanner scanner,
-            DockerOwnershipService ownershipService) {
+            ObservedServiceScanner scanner) {
         this.repository = repository;
         this.scanner = scanner;
-        this.currentIdentity = ownershipService::currentIdentity;
-    }
-
-    public ObservedServiceService(ObservedServiceRepository repository, ObservedServiceScanner scanner) {
-        this(repository, scanner, () -> new AutarkOsIdentity("", "autark-os", "", "", Instant.EPOCH, 1));
-    }
-
-    protected ObservedServiceService() {
-        this(null, null, () -> new AutarkOsIdentity("", "autark-os", "", "", Instant.EPOCH, 1));
-    }
-
-    private ObservedServiceService(
-            ObservedServiceRepository repository,
-            ObservedServiceScanner scanner,
-            Supplier<AutarkOsIdentity> currentIdentity) {
-        this.repository = repository;
-        this.scanner = scanner;
-        this.currentIdentity = currentIdentity;
     }
 
     public void refresh(DockerInventorySnapshot inventory) {
         Instant now = inventory.capturedAt();
-        if (scanner != null) {
-            List<ObservedService> scannedServices = scanner.scan(inventory, now);
-            for (ObservedService scanned : scannedServices) {
-                ObservedService merged = repository.findServiceBySourceAndFingerprint(scanned.source(), scanned.fingerprint())
-                        .map(existing -> merge(existing, scanned))
-                        .orElse(scanned);
-                repository.upsert(merged);
-            }
-            List<String> dockerFingerprints = scannedServices.stream()
-                    .filter(service -> HostModels.ObservedServiceSource.DOCKER.equals(service.source()))
-                    .map(ObservedService::fingerprint)
-                    .filter(fingerprint -> fingerprint != null && !fingerprint.isBlank())
-                    .distinct()
-                    .toList();
-            repository.deleteDockerServicesNotIn(dockerFingerprints);
+        List<ObservedService> scannedServices = scanner.scan(inventory, now);
+        for (ObservedService scanned : scannedServices) {
+            ObservedService merged = repository.findServiceBySourceAndFingerprint(scanned.source(), scanned.fingerprint())
+                    .map(existing -> merge(existing, scanned))
+                    .orElse(scanned);
+            repository.upsert(merged);
         }
+        List<String> dockerFingerprints = scannedServices.stream()
+                .filter(service -> HostModels.ObservedServiceSource.DOCKER.equals(service.source()))
+                .map(ObservedService::fingerprint)
+                .filter(fingerprint -> fingerprint != null && !fingerprint.isBlank())
+                .distinct()
+                .toList();
+        repository.deleteDockerServicesNotIn(dockerFingerprints);
     }
 
     public List<ObservedService> observedServices() {
@@ -75,19 +48,18 @@ public class ObservedServiceService {
                 .toList();
     }
 
-    public List<ObservedService> matchingCatalogServices(String appId) {
-        String normalized = normalizeToken(appId);
+    public List<ObservedService> servicesForCatalogApp(String appId) {
         return observedServices().stream()
-                .filter(service -> appId.equals(service.catalogAppId()) || (service.catalogAppId() == null && matchesNameOrUrl(service, normalized)))
+                .filter(service -> appId.equals(service.catalogAppId()))
+                .filter(ObservedService::catalogIdentityExplicit)
                 .toList();
     }
 
-    public void recordFailedInstall(ApplicationManifest manifest, String accessUrl, String runtimePath, String composeProject, String message, List<String> logs) {
-        if (repository == null || manifest == null) {
+    public void recordFailedInstall(ApplicationManifest manifest, String accessUrl, String runtimePath, String composeProject, String message, List<String> logs, String instanceId) {
+        if (manifest == null) {
             return;
         }
         Instant now = Instant.now();
-        AutarkOsIdentity identity = currentIdentity.get();
         repository.upsert(new ObservedService(
                 "autark-os-install:" + manifest.id(),
                 HostModels.ObservedServiceSource.AUTARK_OS_INSTALL,
@@ -99,14 +71,14 @@ public class ObservedServiceService {
                 "autark_os_failed_install",
                 "failed_install",
                 "failed",
-                identity.instanceId(),
+                cleanToNull(instanceId),
                 now,
                 now,
                 failedInstallMetadata(runtimePath, composeProject, message, logs)));
     }
 
     public void clearFailedInstall(String catalogAppId) {
-        if (repository == null || catalogAppId == null || catalogAppId.isBlank()) {
+        if (catalogAppId == null || catalogAppId.isBlank()) {
             return;
         }
         repository.deleteFailedInstall(catalogAppId);
@@ -146,18 +118,6 @@ public class ObservedServiceService {
         } catch (java.io.IOException exception) {
             return "{}";
         }
-    }
-
-    private boolean matchesNameOrUrl(ObservedService service, String normalizedAppId) {
-        if (normalizedAppId.isBlank()) {
-            return false;
-        }
-        return normalizeToken(service.displayName()).contains(normalizedAppId)
-                || normalizeToken(service.url()).contains(normalizedAppId);
-    }
-
-    private static String normalizeToken(String value) {
-        return value == null ? "" : value.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "");
     }
 
     private static String cleanToNull(String value) {

@@ -48,7 +48,5 @@ function runtimeActionLabel(action: ApplicationRuntimeAction) {
   if (action === 'stop') return 'Pausing';
   if (action === 'backup') return 'Backing up';
   if (action === 'repair') return 'Repairing';
-  if (action === 'update') return 'Updating';
-  if (action === 'rollback') return 'Rolling back';
   return 'Restarting';
 }

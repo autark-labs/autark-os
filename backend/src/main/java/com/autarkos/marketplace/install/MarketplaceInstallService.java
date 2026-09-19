@@ -107,6 +107,11 @@ public class MarketplaceInstallService {
         InstallPlan plan = installPlanService.generatePlan(manifest, options);
         RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
         List<ObservedService> duplicates = matchingObservedDuplicates(manifest);
+        if (duplicates.stream().anyMatch(service -> "owned_managed".equals(service.ownershipState()))) {
+            String message = manifest.name() + " has current-instance runtime resources but no complete managed registration. Review recovery in My Apps before installing it again.";
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
+        }
         List<ObservedService> previousAutarkOsDuplicates = previousAutarkOsDuplicates(duplicates);
         if (!previousAutarkOsDuplicates.isEmpty()) {
             String message = previousAutarkOsDuplicateMessage(manifest);
@@ -157,7 +162,6 @@ public class MarketplaceInstallService {
             RuntimeModels.AppRuntimeMetadata runtimeMetadata = writeRuntimeMetadata(manifest, appRoot, appInstanceId, composeProject);
             recordStep(steps, sink, InstallModels.InstallStep.completed("Configuring private access", "Rendered Compose file with Autark-OS labels and local access at " + runtimeConfiguration.accessUrl() + "."));
 
-            dockerInventory.requireFresh().requireMutationOwnership(manifest.id());
             RuntimeModels.DockerComposeResult composeResult = dockerComposeExecutor.up(composeFile, composeProject);
             logs.addAll(composeResult.output());
             if (!composeResult.successful()) {
@@ -245,8 +249,7 @@ public class MarketplaceInstallService {
 
     private List<ObservedService> matchingObservedDuplicates(ApplicationManifest manifest) {
         observedServiceService.refresh(dockerInventory.requireFresh());
-        return observedServiceService.matchingCatalogServices(manifest.id()).stream()
-                .filter(service -> !"owned_managed".equals(service.ownershipState()))
+        return observedServiceService.servicesForCatalogApp(manifest.id()).stream()
                 .filter(service -> !"failed_install".equals(service.ownershipState()))
                 .toList();
     }
@@ -282,7 +285,8 @@ public class MarketplaceInstallService {
                     appRoot.toString(),
                     composeProject,
                     message,
-                    logs);
+                    logs,
+                    dockerOwnershipService.currentIdentity().instanceId());
         } catch (RuntimeException ignored) {
             // Preserve the original install failure for the API response.
         }

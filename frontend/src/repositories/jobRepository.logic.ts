@@ -10,7 +10,7 @@ export const ACTIVE_JOB_LIST_REFETCH_INTERVAL_MS = 1_200;
 export const IDLE_JOB_LIST_REFETCH_INTERVAL_MS = 15_000;
 
 export const JOB_FAMILIES = {
-  appLifecycle: ['install_app', 'recover_app', 'repair_app', 'save_app_settings', 'update_app', 'rollback_app', 'uninstall_app', 'start_app', 'stop_app', 'restart_app'],
+  appLifecycle: ['install_app', 'recover_app', 'repair_app', 'save_app_settings', 'uninstall_app', 'start_app', 'stop_app', 'restart_app'],
   backup: ['backup', 'backup_verify', 'backup_restore', 'restore'],
   discover: ['install_app', 'backup'],
   install: ['install_app'],
@@ -106,10 +106,6 @@ export function jobTypeLabel(type?: string | null) {
     case 'backup_restore':
     case 'restore':
       return 'Restore';
-    case 'update_app':
-      return 'Update';
-    case 'rollback_app':
-      return 'Rollback';
     case 'start_app':
       return 'Start';
     case 'stop_app':

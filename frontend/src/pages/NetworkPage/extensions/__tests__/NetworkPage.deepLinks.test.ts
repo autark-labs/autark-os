@@ -23,12 +23,14 @@ test('access deep links default to the matrix tab and parse service focus', () =
     tab: 'matrix',
   });
 
-  assert.deepEqual(parseAccessDeepLink('?tab=issues&focus=app:vaultwarden'), {
+  assert.deepEqual(parseAccessDeepLink('?tab=issues&focus=managed:vaultwarden'), {
     id: 'vaultwarden',
     key: 'managed:vaultwarden:issues',
     kind: 'managed',
     tab: 'issues',
   });
+  assert.equal(parseAccessDeepLink('?focus=app:vaultwarden').kind, null);
+  assert.equal(parseAccessDeepLink('?app=vaultwarden').kind, null);
 });
 
 test('access deep links generate stable managed-app routes', () => {

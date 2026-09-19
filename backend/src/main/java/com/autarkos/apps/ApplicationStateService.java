@@ -236,9 +236,7 @@ public class ApplicationStateService {
                 AutarkOsStates.JobType.BACKUP,
                 AutarkOsStates.JobType.BACKUP_VERIFY,
                 AutarkOsStates.JobType.BACKUP_RESTORE,
-                AutarkOsStates.JobType.UNINSTALL_APP,
-                AutarkOsStates.JobType.UPDATE_APP,
-                AutarkOsStates.JobType.ROLLBACK_APP).contains(job.type());
+                AutarkOsStates.JobType.UNINSTALL_APP).contains(job.type());
     }
 
     private boolean jobTargetsApp(AutarkOsJob job, String appId) {
@@ -307,8 +305,6 @@ public class ApplicationStateService {
             case AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY -> AutarkOsStates.OperationKind.BACKING_UP;
             case AutarkOsStates.JobType.BACKUP_RESTORE -> AutarkOsStates.OperationKind.RESTORING;
             case AutarkOsStates.JobType.UNINSTALL_APP -> AutarkOsStates.OperationKind.UNINSTALLING;
-            case AutarkOsStates.JobType.UPDATE_APP -> AutarkOsStates.OperationKind.UPDATING;
-            case AutarkOsStates.JobType.ROLLBACK_APP -> AutarkOsStates.OperationKind.ROLLING_BACK;
             default -> AutarkOsStates.OperationKind.IDLE;
         };
     }
@@ -323,8 +319,6 @@ public class ApplicationStateService {
             case AutarkOsStates.JobType.BACKUP, AutarkOsStates.JobType.BACKUP_VERIFY -> "Creating backup";
             case AutarkOsStates.JobType.BACKUP_RESTORE -> "Restoring";
             case AutarkOsStates.JobType.UNINSTALL_APP -> "Uninstalling safely";
-            case AutarkOsStates.JobType.UPDATE_APP -> "Updating safely";
-            case AutarkOsStates.JobType.ROLLBACK_APP -> "Restoring previous release";
             default -> "Working";
         };
     }
@@ -340,8 +334,6 @@ public class ApplicationStateService {
             case AutarkOsStates.JobType.BACKUP_VERIFY -> "Backup verification failed";
             case AutarkOsStates.JobType.BACKUP_RESTORE -> "Restore failed";
             case AutarkOsStates.JobType.UNINSTALL_APP -> "Uninstall failed";
-            case AutarkOsStates.JobType.UPDATE_APP -> "Update failed";
-            case AutarkOsStates.JobType.ROLLBACK_APP -> "Rollback failed";
             default -> "Action failed";
         };
     }

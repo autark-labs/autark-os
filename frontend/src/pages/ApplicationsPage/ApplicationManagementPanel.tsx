@@ -19,7 +19,6 @@ import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
 import { ApplicationRecoveryTab } from './managementTabs/ApplicationRecoveryTab';
 import { ApplicationSettingsTab } from './managementTabs/ApplicationSettingsTab';
 import { ApplicationTelemetryTab } from './managementTabs/ApplicationTelemetryTab';
-import { ApplicationUpdateSection } from './managementTabs/ApplicationUpdateSection';
 import type { ApplicationActionHandlers, ApplicationSettingsAction, ApplicationSurfaceItem } from './extensions/ApplicationsPage.types';
 
 type ApplicationManagementPanelProps = {
@@ -27,13 +26,9 @@ type ApplicationManagementPanelProps = {
     ApplicationActionHandlers,
     | 'onDirtyChange'
     | 'onLoadUninstallPlan'
-    | 'onLoadUpdatePlan'
-    | 'onLoadRollbackPlan'
     | 'onRepair'
     | 'onRestart'
     | 'onRunUninstall'
-    | 'onRunUpdate'
-    | 'onRunRollback'
     | 'onSaveSettings'
     | 'onSettingsPlanRequest'
     | 'onSetPrivateNetworkAccess'
@@ -102,8 +97,6 @@ export function ApplicationManagementPanel({
               <Detail label="Container" value={item.settings.containerStatus || item.runtime.health?.dockerStatus || 'Not reported'} />
               <Detail label="Policy" value="Plan before apply" />
             </section>
-
-            <ApplicationUpdateSection actions={actions} item={item} />
 
             <DangerZone actions={actions} item={item} />
           </TabsContent>

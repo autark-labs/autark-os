@@ -200,6 +200,21 @@ class ApplicationInventoryServiceTests {
     }
 
     @Test
+    void inferredCatalogHintDoesNotBlockInstall() {
+        ObservedServiceRepository observedRepository = observedRepository();
+        Instant seenAt = Instant.parse("2026-06-21T12:00:00Z");
+        observedRepository.upsert(new ObservedService(
+                "docker:vaultwarden-helper", "docker", "vaultwarden-helper", "vaultwarden-helper",
+                "http://localhost:8081", "LAN", "vaultwarden", "inferred", "external_docker", "running", "",
+                seenAt, seenAt, "{}"));
+
+        ApplicationView view = app(service(installedRepository(), observedRepository), observedRepository, "vaultwarden");
+
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE);
+        assertThat(view.evidence()).isNull();
+    }
+
+    @Test
     void externalDockerEvidenceBlocksInstall() {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));

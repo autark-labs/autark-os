@@ -55,50 +55,14 @@ public class AppGuardianService {
             Map<String, AppRuntimeView> runtimeByAppId = ApplicationViews.managedRuntimes(applicationStateService.snapshot()).stream()
                     .collect(Collectors.toMap(AppRuntimeView::appId, view -> view, (left, right) -> left));
             for (InstalledApp app : managedInstalledAppsFromSnapshot(runtimeByAppId.keySet())) {
-                inspectCachedApp(app, runtimeByAppId.get(app.appId()));
+                inspectApp(app, runtimeByAppId.get(app.appId()));
             }
         } finally {
             running.set(false);
         }
     }
 
-    public void inspectApp(InstalledApp app) {
-        if (!automationService.recipeEnabled(AutomationService.RESTART_UNHEALTHY_APP)) {
-            return;
-        }
-        InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-        if (!settings.autoRepairEnabled()) {
-            return;
-        }
-
-        AppHealthSnapshot snapshot = appLifecycleService.healthSnapshot(app.appId());
-        if (!shouldRepair(snapshot)) {
-            return;
-        }
-        if (recentlyAttempted(settings)) {
-            return;
-        }
-
-        repository.recordEvent(app.appId(), "guardian_issue_detected", "Autark-OS noticed " + app.appName() + " needs attention: " + snapshot.message() + ".");
-        activityLogService.warning("stability", "guardian_issue_detected", app.appName() + " needs attention", snapshot.message(), app.appId());
-        Instant attemptAt = Instant.now();
-        saveGuardianState(app, settings, "guardian_repair_queued", attemptAt);
-        try {
-            appLifecycleService.repair(app.appId(), true);
-        } catch (RecoveryOperationConflictException exception) {
-            saveGuardianState(app, settings, "guardian_repair_deferred", attemptAt);
-            repository.recordEvent(app.appId(), "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
-            activityLogService.info("stability", "guardian_repair_deferred", "Automatic repair deferred for " + app.appName(), exception.getMessage(), app.appId());
-        } catch (RuntimeException exception) {
-            saveGuardianState(app, settings, blockedByOwnership(exception) ? "guardian_repair_blocked" : "guardian_repair_failed", attemptAt);
-            if (!hasRecentGuardianFailure(app.appId())) {
-                repository.recordEvent(app.appId(), "guardian_repair_failed", "Autark-OS could not repair " + app.appName() + ". Reason: " + failureReason(exception));
-                activityLogService.error("stability", "guardian_repair_failed", "Automatic repair failed for " + app.appName(), failureReason(exception), app.appId(), exception);
-            }
-        }
-    }
-
-    private void inspectCachedApp(InstalledApp app, AppRuntimeView runtimeView) {
+    private void inspectApp(InstalledApp app, AppRuntimeView runtimeView) {
         if (runtimeView == null || runtimeView.healthSnapshot() == null) {
             return;
         }

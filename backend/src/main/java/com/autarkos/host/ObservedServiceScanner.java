@@ -27,10 +27,10 @@ public class ObservedServiceScanner {
     private ObservedService observed(DockerInventorySnapshot.Container inventoryContainer, String currentInstanceId, Instant now) {
         HostModels.HostDockerContainer container = inventoryContainer.observed();
         RuntimeModels.DockerResourceClassification classification = inventoryContainer.classification();
-        String appId = firstPresent(
+        String explicitAppId = firstPresent(
                 classification.appId(),
-                container.labels().get(DockerOwnershipService.APP_ID),
-                inferCatalogAppId(container.name(), container.image()));
+                container.labels().get(DockerOwnershipService.APP_ID));
+        String appId = firstPresent(explicitAppId, inferCatalogAppId(container.name(), container.image()));
         String ownershipState = ownershipState(classification.ownership());
         String instanceId = clean(container.labels().get(DockerOwnershipService.INSTANCE_ID));
         String url = accessUrl(container.ports());
@@ -42,7 +42,7 @@ public class ObservedServiceScanner {
                 url,
                 "LAN",
                 cleanToNull(appId),
-                appId == null || appId.isBlank() ? "unknown" : "inferred",
+                explicitAppId != null ? "label" : appId == null ? "unknown" : "inferred",
                 ownershipState,
                 runtimeState(container.status()),
                 instanceId.isBlank() ? null : instanceId,

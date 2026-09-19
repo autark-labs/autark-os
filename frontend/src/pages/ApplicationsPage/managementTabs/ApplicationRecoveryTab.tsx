@@ -131,10 +131,6 @@ function recoveryForOperation(jobType?: string) {
     title: 'Review the settings result', destination: 'settings',
     description: 'Review the error before retrying. If Autark-OS could not confirm recovery of the previous settings, use Repair in My Apps; do not uninstall the app.',
   };
-  if (jobType === 'update_app' || jobType === 'rollback_app') return {
-    title: 'Review the installed release', destination: 'overview',
-    description: 'Review the release error and the current app state in app management before requesting another update or rollback.',
-  };
   return null;
 }
 

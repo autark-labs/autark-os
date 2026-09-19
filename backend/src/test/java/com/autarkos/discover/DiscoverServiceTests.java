@@ -230,7 +230,7 @@ class DiscoverServiceTests {
         AutarkOsJobService jobs = jobService();
         DiscoverService service = new DiscoverService(
                 catalogService(),
-                List::of,
+                applicationStateService(List::of),
                 setupService,
                 new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService),
                 new RecordingMarketplaceInstallService(),
@@ -282,9 +282,11 @@ class DiscoverServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
                 catalogService(),
-                () -> applicationViews(installedAppRepository, observedRepository),
+                applicationStateService(() -> applicationViews(installedAppRepository, observedRepository)),
                 setupService,
-                new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService));
+                new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService),
+                mock(MarketplaceInstallService.class),
+                mock(AutarkOsJobService.class));
     }
 
     private DiscoverService discoverService(ObservedServiceRepository observedRepository, MarketplaceInstallService installService, AutarkOsJobService jobService) {
@@ -295,11 +297,19 @@ class DiscoverServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
                 catalogService(),
-                () -> applicationViews(installedAppRepository, observedRepository),
+                applicationStateService(() -> applicationViews(installedAppRepository, observedRepository)),
                 setupService,
                 new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService),
                 installService,
                 jobService);
+    }
+
+    private ApplicationStateService applicationStateService(
+            java.util.function.Supplier<List<com.autarkos.apps.ApplicationView>> applications) {
+        ApplicationStateService service = mock(ApplicationStateService.class);
+        when(service.snapshot()).thenAnswer(ignored -> new ApplicationState(
+                applications.get(), Instant.parse("2026-06-21T12:00:00Z")));
+        return service;
     }
 
     private List<com.autarkos.apps.ApplicationView> applicationViews(InstalledAppRepository installedAppRepository, ObservedServiceRepository observedRepository) {

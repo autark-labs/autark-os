@@ -81,9 +81,7 @@ public class RecoveryOperationCoordinator {
         APP_LIFECYCLE("an app lifecycle action", "changing an app's running state"),
         APP_INSTALL("an app install", "installing an app"),
         APP_RECOVERY("an app recovery", "recovering an app"),
-        UNINSTALL_CHECKPOINT("an app uninstall", "creating an uninstall safety checkpoint"),
-        APP_UPDATE("an app update", "updating an app safely"),
-        APP_ROLLBACK("an app rollback", "rolling an app back safely");
+        UNINSTALL_CHECKPOINT("an app uninstall", "creating an uninstall safety checkpoint");
 
         private final String actionLabel;
         private final String inProgressLabel;

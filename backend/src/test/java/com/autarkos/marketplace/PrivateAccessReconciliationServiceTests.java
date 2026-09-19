@@ -3,6 +3,7 @@ package com.autarkos.marketplace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +42,8 @@ import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.fileops.LocalAutarkOsFileOperations;
+import com.autarkos.apps.ApplicationState;
+import com.autarkos.apps.ApplicationStateService;
 
 class PrivateAccessReconciliationServiceTests {
 
@@ -82,7 +85,14 @@ class PrivateAccessReconciliationServiceTests {
                         com.autarkos.testsupport.DockerInventoryTestData.fromRuntime(
                                 "vaultwarden", "appinst_vaultwarden", "autark-os-vaultwarden",
                                 composeExecutor.containers(Path.of("compose.yaml"), "autark-os-vaultwarden"))));
-        reconciliationService = new PrivateAccessReconciliationService(appLifecycleService, catalogService, tailscaleService);
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        when(applicationStateService.snapshot()).thenAnswer(ignored -> new ApplicationState(
+                appLifecycleService.listApps().stream()
+                        .map(com.autarkos.testsupport.ApplicationViewTestRecords::managed)
+                        .toList(),
+                Instant.now()));
+        reconciliationService = new PrivateAccessReconciliationService(
+                applicationStateService, catalogService, tailscaleService, repository);
 
         Path appRoot = runtimeRoot.resolve("apps/vaultwarden");
         Files.createDirectories(appRoot);

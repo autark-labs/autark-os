@@ -1,17 +1,9 @@
-import axios from 'axios';
 import { httpClient } from './httpClient';
-import type { AppActionResult, AppReliabilitySummary, AppSettingsChangePlan, AppTelemetry, AppUpdatePlan, InstallSettings, UninstallPlan } from '@/types/app';
+import type { AppActionResult, AppReliabilitySummary, AppSettingsChangePlan, AppTelemetry, InstallSettings, UninstallPlan } from '@/types/app';
 import type { AutarkOsJob } from '@/types/jobs';
 
 export type InstalledAppLifecycleAction = 'start' | 'stop' | 'restart';
 export type InstalledAppAction = InstalledAppLifecycleAction | 'repair';
-
-export class AppUpdatePlanChangedError extends Error {
-  constructor(readonly plan: AppUpdatePlan) {
-    super(plan.summary || 'The app release plan changed.');
-    this.name = 'AppUpdatePlanChangedError';
-  }
-}
 
 export const InstalledAppsAPIClient = {
   async reliabilitySummary() {
@@ -27,34 +19,6 @@ export const InstalledAppsAPIClient = {
   async uninstallPlan(appId: string) {
     const response = await httpClient.get<UninstallPlan>(`/api/apps/${appId}/uninstall-plan`);
     return response.data;
-  },
-
-  async updatePlan(appId: string) {
-    const response = await httpClient.get<AppUpdatePlan>(`/api/apps/${appId}/update-plan`);
-    return response.data;
-  },
-
-  async rollbackPlan(appId: string) {
-    const response = await httpClient.get<AppUpdatePlan>(`/api/apps/${appId}/rollback-plan`);
-    return response.data;
-  },
-
-  async update(appId: string, planId: string) {
-    try {
-      const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/update`, { planId });
-      return response.data;
-    } catch (error) {
-      throwUpdatePlanConflict(error);
-    }
-  },
-
-  async rollback(appId: string, planId: string) {
-    try {
-      const response = await httpClient.post<AutarkOsJob>(`/api/apps/${appId}/rollback`, { planId });
-      return response.data;
-    } catch (error) {
-      throwUpdatePlanConflict(error);
-    }
   },
 
   async runAction(appId: string, action: InstalledAppLifecycleAction) {
@@ -92,25 +56,3 @@ export const InstalledAppsAPIClient = {
     return response.data;
   },
 };
-
-function throwUpdatePlanConflict(error: unknown): never {
-  if (axios.isAxiosError(error) && error.response?.status === 409 && isAppUpdatePlan(error.response.data)) {
-    throw new AppUpdatePlanChangedError(error.response.data);
-  }
-  throw error;
-}
-
-function isAppUpdatePlan(value: unknown): value is AppUpdatePlan {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return false;
-  }
-  const plan = value as Partial<AppUpdatePlan>;
-  return typeof plan.appId === 'string'
-    && (plan.operation === 'update' || plan.operation === 'rollback')
-    && typeof plan.canApply === 'boolean'
-    && typeof plan.headline === 'string'
-    && typeof plan.summary === 'string'
-    && Array.isArray(plan.blockedReasons)
-    && typeof plan.guardianAdvice === 'object'
-    && plan.guardianAdvice !== null;
-}

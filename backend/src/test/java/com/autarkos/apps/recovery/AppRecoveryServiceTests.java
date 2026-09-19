@@ -389,7 +389,7 @@ class AppRecoveryServiceTests {
     }
 
     private void stubEvidence(ObservedService evidence) {
-        when(observedServices.matchingCatalogServices("vaultwarden")).thenReturn(List.of(evidence));
+        when(observedServices.servicesForCatalogApp("vaultwarden")).thenReturn(List.of(evidence));
         when(observedServices.observedServices()).thenReturn(List.of(evidence));
     }
 }

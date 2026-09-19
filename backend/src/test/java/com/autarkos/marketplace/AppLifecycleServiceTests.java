@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.apps.ApplicationRuntimeState;
+import com.autarkos.apps.ApplicationState;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationConflictException;
@@ -419,7 +420,7 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         AppGuardianService guardian = guardian();
 
-        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
+        guardian.inspectAndRepair();
 
         assertThat(composeExecutor.restartCalled).isTrue();
         assertThat(repository.settingsFor("vaultwarden").orElseThrow().lastRepairStatus()).isEqualTo("guardian_repair_completed");
@@ -454,7 +455,7 @@ class AppLifecycleServiceTests {
                 "0.0.0.0:8090->80/tcp"));
         AppGuardianService guardian = guardian();
 
-        guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow());
+        guardian.inspectAndRepair();
 
         assertThat(composeExecutor.restartCalled).isFalse();
     }
@@ -493,11 +494,10 @@ class AppLifecycleServiceTests {
                 "unhealthy",
                 "Up 1 minute (unhealthy)",
                 "0.0.0.0:8090->80/tcp"));
-        AppGuardianService guardian = guardian();
+        AppGuardianService guardian = guardianWithoutManagedApps();
 
-        assertThatThrownBy(() -> guardian.inspectApp(repository.findAppById("vaultwarden").orElseThrow()))
-                .isInstanceOf(InstallationException.class)
-                .hasMessageContaining("not fully managed");
+        guardian.inspectAndRepair();
+
         assertThat(composeExecutor.restartCalled).isFalse();
     }
 
@@ -1420,6 +1420,20 @@ class AppLifecycleServiceTests {
     }
 
     private AppGuardianService guardian() {
+        AppRuntimeView app = service.getApp("vaultwarden");
+        com.autarkos.apps.ApplicationStateService applicationState = mock(com.autarkos.apps.ApplicationStateService.class);
+        when(applicationState.snapshot()).thenReturn(new ApplicationState(
+                List.of(com.autarkos.testsupport.ApplicationViewTestRecords.managed(app)), Instant.now()));
+        return guardian(applicationState);
+    }
+
+    private AppGuardianService guardianWithoutManagedApps() {
+        com.autarkos.apps.ApplicationStateService applicationState = mock(com.autarkos.apps.ApplicationStateService.class);
+        when(applicationState.snapshot()).thenReturn(new ApplicationState(List.of(), Instant.now()));
+        return guardian(applicationState);
+    }
+
+    private AppGuardianService guardian(com.autarkos.apps.ApplicationStateService applicationState) {
         com.autarkos.automation.AutomationService automation = mock(com.autarkos.automation.AutomationService.class);
         when(automation.recipeEnabled(com.autarkos.automation.AutomationService.RESTART_UNHEALTHY_APP)).thenReturn(true);
         return new AppGuardianService(
@@ -1428,7 +1442,7 @@ class AppLifecycleServiceTests {
                 true,
                 mock(com.autarkos.activity.ActivityLogService.class),
                 automation,
-                mock(com.autarkos.apps.ApplicationStateService.class));
+                applicationState);
     }
 
     private void registerManagedRuntime(String appId) {

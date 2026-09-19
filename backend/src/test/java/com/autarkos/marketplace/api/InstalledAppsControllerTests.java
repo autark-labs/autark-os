@@ -1,8 +1,6 @@
 package com.autarkos.marketplace.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -14,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -30,10 +27,8 @@ import com.autarkos.jobs.AutarkOsJobStep;
 import com.autarkos.marketplace.install.AppActionResult;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
-import com.autarkos.marketplace.install.AppUpdateService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
-import com.autarkos.marketplace.install.models.UpdateModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.monitoring.MonitoringMetricsService;
@@ -42,121 +37,14 @@ import com.autarkos.testsupport.JpaTestRepositories;
 class InstalledAppsControllerTests {
 
     @Test
-    void deferredUpdateRoutesRemainBlockedAndDoNotReachLifecycleServices() throws Exception {
-        AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
-        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
-        when(updateService.rollbackPlan("vaultwarden")).thenReturn(UpdateModels.AppUpdatePlan.blocked(
-                "vaultwarden", "Vaultwarden", "rollback", "Rollback unavailable", "No rollback is available.", List.of("No rollback is available.")));
-        InstalledAppsController controller = new InstalledAppsController(
-                lifecycleService,
-                mock(MonitoringMetricsService.class),
-                updateService,
-                applicationStateService,
-                jobService());
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
-
-        mvc.perform(MockMvcRequestBuilders.get("/api/apps/updates"))
-                .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
-                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"available\":false", "\"status\":\"unavailable\"", "\"reasonCode\":\"beta_scope_deferred\""));
-        mvc.perform(MockMvcRequestBuilders.get("/api/apps/vaultwarden/update-plan"))
-                .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200))
-                .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"status\":\"blocked\""));
-        for (String path : List.of("/api/apps/vaultwarden/update", "/api/apps/vaultwarden/rollback")) {
-            mvc.perform(MockMvcRequestBuilders.post(path).contentType(MediaType.APPLICATION_JSON))
-                    .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(409))
-                    .andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("\"status\":\"blocked\""));
-        }
-
-        verifyNoUpdateWork(lifecycleService, applicationStateService);
-    }
-
-    @Test
-    void betaScopeRejectsEvenAStaleUpdatePlanWithoutStartingWork() {
-        AppUpdateService updateService = mock(AppUpdateService.class);
-        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
-        AutarkOsJobService jobService = jobService();
-        InstalledAppsController controller = new InstalledAppsController(
-                mock(AppLifecycleService.class),
-                mock(MonitoringMetricsService.class),
-                updateService,
-                applicationStateService,
-                jobService);
-        UpdateModels.AppUpdatePlan plan = applicableUpdatePlan();
-        when(updateService.updatePlan("vaultwarden")).thenReturn(plan);
-        when(updateService.reviewedPlanMatches(plan, "sha256:" + "b".repeat(64))).thenReturn(false);
-
-        var response = controller.update(
-                "vaultwarden",
-                new UpdateModels.AppUpdateApplyRequest("sha256:" + "b".repeat(64)));
-
-        assertThat(response.getStatusCode().value()).isEqualTo(409);
-        assertThat(response.getBody()).isInstanceOf(UpdateModels.AppUpdatePlan.class);
-        assertThat(((UpdateModels.AppUpdatePlan) response.getBody()).status()).isEqualTo("blocked");
-        assertThat(jobService.list()).isEmpty();
-        verify(updateService, never()).update(eq("vaultwarden"), any(), any());
-    }
-
-    @Test
-    void betaScopeRejectsEvenAnApplicableReviewedPlanWithoutStartingWork() {
-        AppUpdateService updateService = mock(AppUpdateService.class);
-        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
-        AutarkOsJobService jobService = jobService();
-        InstalledAppsController controller = new InstalledAppsController(
-                mock(AppLifecycleService.class),
-                mock(MonitoringMetricsService.class),
-                updateService,
-                applicationStateService,
-                jobService);
-        UpdateModels.AppUpdatePlan plan = applicableUpdatePlan();
-        when(updateService.updatePlan("vaultwarden")).thenReturn(plan);
-        when(updateService.reviewedPlanMatches(plan, plan.planId())).thenReturn(true);
-
-        var response = controller.update(
-                "vaultwarden",
-                new UpdateModels.AppUpdateApplyRequest(plan.planId()));
-
-        assertThat(response.getStatusCode().value()).isEqualTo(409);
-        assertThat(jobService.list()).isEmpty();
-        jobService.runQueuedJobsNow();
-        verify(updateService, never()).update(eq("vaultwarden"), any(), any());
-    }
-
-    @Test
-    void betaScopeDoesNotDeleteExistingUpdateJobs() {
-        AppUpdateService updateService = mock(AppUpdateService.class);
-        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
-        AutarkOsJobService jobService = jobService();
-        AutarkOsJob existing = jobService.start(
-                "update_app",
-                "vaultwarden",
-                List.of(AutarkOsJobStep.pending("create_safety_checkpoint", "Create safety checkpoint")),
-                () -> AutarkOsJobOutcome.succeeded("Updated."));
-        InstalledAppsController controller = new InstalledAppsController(
-                mock(AppLifecycleService.class),
-                mock(MonitoringMetricsService.class),
-                updateService,
-                applicationStateService,
-                jobService);
-
-        var response = controller.update("vaultwarden", null);
-
-        assertThat(response.getStatusCode().value()).isEqualTo(409);
-        assertThat(jobService.list()).extracting(AutarkOsJob::jobId).contains(existing.jobId());
-        verify(updateService, never()).updatePlan("vaultwarden");
-    }
-
-    @Test
     void lifecycleMutationReturnsDurableJobWithoutImplyingReadiness() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService);
         AppActionResult result = new AppActionResult("vaultwarden", "start", "completed", "Started.", null, List.of(), Instant.parse("2026-06-21T12:00:00Z"));
@@ -181,7 +69,6 @@ class InstalledAppsControllerTests {
     void lifecycleMutationRejectsADifferentActiveActionWithAnActionableHttpConflict() throws Exception {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         AutarkOsJob existing = jobService.start(
@@ -192,7 +79,6 @@ class InstalledAppsControllerTests {
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService);
 
@@ -213,7 +99,7 @@ class InstalledAppsControllerTests {
         var lifecycle = mock(AppLifecycleService.class);
         var backups = mock(com.autarkos.backups.BackupService.class);
         var state = mock(ApplicationStateService.class);
-        var controller = new InstalledAppsController(lifecycle, mock(MonitoringMetricsService.class), mock(AppUpdateService.class), state, jobs);
+        var controller = new InstalledAppsController(lifecycle, mock(MonitoringMetricsService.class), state, jobs);
         var first = controller.restart("vaultwarden");
         assertThat(controller.restart("vaultwarden").jobId()).isEqualTo(first.jobId());
         var mvc = MockMvcBuilders.standaloneSetup(controller, new com.autarkos.backups.BackupController(backups, jobs, state))
@@ -231,13 +117,11 @@ class InstalledAppsControllerTests {
     void repairMutationReturnsDurableJobAndRunsRepairLater() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService);
         AppActionResult result = new AppActionResult("vaultwarden", "repair", "completed", "Repair completed.", null, List.of(), Instant.parse("2026-06-21T12:00:00Z"));
@@ -266,13 +150,11 @@ class InstalledAppsControllerTests {
     void repairJobFailureKeepsRepairMessageActionable() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService);
         AppActionResult result = new AppActionResult(
@@ -302,14 +184,12 @@ class InstalledAppsControllerTests {
     void appListReadUsesCachedApplicationState() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AppRuntimeView app = appRuntimeView("vaultwarden");
         when(applicationStateService.snapshot()).thenReturn(applicationStateWith(app));
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService());
 
@@ -323,14 +203,12 @@ class InstalledAppsControllerTests {
     void telemetryReadUsesCachedRuntimeViews() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AppRuntimeView app = appRuntimeView("vaultwarden");
         when(applicationStateService.snapshot()).thenReturn(applicationStateWith(app));
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService());
 
@@ -344,12 +222,10 @@ class InstalledAppsControllerTests {
     void privateAccessMutationInvalidatesCanonicalAppStateImmediately() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService());
         AppRuntimeView app = appRuntimeView("vaultwarden");
@@ -378,12 +254,10 @@ class InstalledAppsControllerTests {
         AutarkOsJobService jobs = jobService();
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobs);
         AppRuntimeView app = appRuntimeView("gitea");
@@ -404,13 +278,11 @@ class InstalledAppsControllerTests {
     void uninstallEndpointReturnsDurableJobWithoutRemovingAppSynchronously() {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
-        AppUpdateService updateService = mock(AppUpdateService.class);
         ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
         AutarkOsJobService jobService = jobService();
         InstalledAppsController controller = new InstalledAppsController(
                 lifecycleService,
                 metricsService,
-                updateService,
                 applicationStateService,
                 jobService);
         AppActionResult result = new AppActionResult("vaultwarden", "uninstall", "removed", "Removed.", null, List.of(), Instant.parse("2026-06-21T12:00:00Z"));
@@ -441,32 +313,6 @@ class InstalledAppsControllerTests {
         return new ApplicationState(
                 List.of(com.autarkos.testsupport.ApplicationViewTestRecords.managed(app)),
                 Instant.parse("2026-06-21T12:00:00Z"));
-    }
-
-    private UpdateModels.AppUpdatePlan applicableUpdatePlan() {
-        return new UpdateModels.AppUpdatePlan(
-                "vaultwarden",
-                "Vaultwarden",
-                "update",
-                "sha256:" + "a".repeat(64),
-                "available",
-                "Update ready to review",
-                "A verified checkpoint will be created.",
-                "1.0.0",
-                "1.1.0",
-                true,
-                true,
-                false,
-                "",
-                List.of("Create verified safety checkpoint"),
-                List.of(),
-                UpdateModels.ChangeSafetyAdvice.unavailable(),
-                Instant.parse("2026-06-21T12:00:00Z"));
-    }
-
-    private void verifyNoUpdateWork(AppLifecycleService lifecycleService, ApplicationStateService applicationStateService) {
-        verify(lifecycleService, never()).getApp("vaultwarden");
-        verify(applicationStateService, never()).invalidate();
     }
 
     private AppRuntimeView appRuntimeView(String appId) {

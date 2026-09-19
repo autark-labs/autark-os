@@ -69,15 +69,17 @@ class AppGuardianServiceTests {
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         InstalledApp app = new InstalledApp(
                 "vaultwarden", "Vaultwarden", "Ready", "/runtime/apps/vaultwarden", "autark-os-vaultwarden", "http://localhost:8090", Instant.now());
+        when(repository.findAllApps()).thenReturn(List.of(app));
         when(repository.settingsFor("vaultwarden")).thenReturn(Optional.of(settings()));
-        when(lifecycleService.healthSnapshot("vaultwarden")).thenReturn(health("Needs attention"));
         doThrow(new RecoveryOperationConflictException(
                 RecoveryOperationCoordinator.Operation.APP_BACKUP,
                 RecoveryOperationCoordinator.Operation.APP_LIFECYCLE))
                 .when(lifecycleService).repair("vaultwarden", true);
-        AppGuardianService guardian = guardian(repository, lifecycleService, mock(ApplicationStateService.class));
+        ApplicationStateService applicationStateService = mock(ApplicationStateService.class);
+        when(applicationStateService.snapshot()).thenReturn(applicationStateWith(runtimeView("vaultwarden", health("Needs attention"))));
+        AppGuardianService guardian = guardian(repository, lifecycleService, applicationStateService);
 
-        guardian.inspectApp(app);
+        guardian.inspectAndRepair();
 
         verify(repository).recordEvent("vaultwarden", "guardian_repair_deferred", "Autark-OS will retry repair after the active recovery operation finishes.");
     }
