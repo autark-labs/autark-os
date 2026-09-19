@@ -40,7 +40,7 @@ test('cleanup refreshes storage, application state, and activity surfaces after 
 
   assert.match(page, /Safety checkpoint saved/);
   assert.match(page, /invalidateApplicationState\(queryClient\)/);
-  assert.match(page, /homeQueryKeys\.all/);
+  assert.match(page, /systemQueryKeys\.summary/);
   assert.match(page, /queryKey: \['monitoring'\]/);
   assert.match(page, /Type `\{target\.name\}` to confirm/);
 });

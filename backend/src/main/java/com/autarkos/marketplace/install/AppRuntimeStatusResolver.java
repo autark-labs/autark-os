@@ -1,5 +1,7 @@
 package com.autarkos.marketplace.install;
 
+import static com.autarkos.marketplace.install.AppPrivateAccessPorts.portFromUrl;
+
 import java.net.URI;
 import java.util.List;
 
@@ -74,27 +76,6 @@ class AppRuntimeStatusResolver {
             matches.add(matcher.group(1));
         }
         return matches;
-    }
-
-    Integer portFromUrl(String accessUrl) {
-        if (accessUrl == null || accessUrl.isBlank()) {
-            return null;
-        }
-        try {
-            URI uri = URI.create(accessUrl);
-            if (uri.getPort() > 0) {
-                return uri.getPort();
-            }
-            if ("http".equalsIgnoreCase(uri.getScheme())) {
-                return 80;
-            }
-            if ("https".equalsIgnoreCase(uri.getScheme())) {
-                return 443;
-            }
-            return null;
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
     }
 
     String protocolFromUrl(String accessUrl) {

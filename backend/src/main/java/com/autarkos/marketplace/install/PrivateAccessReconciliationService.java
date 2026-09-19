@@ -1,5 +1,7 @@
 package com.autarkos.marketplace.install;
 
+import static com.autarkos.marketplace.install.AppPrivateAccessPorts.portFromUrl;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -182,7 +184,7 @@ public class PrivateAccessReconciliationService {
                 .collect(java.util.stream.Collectors.toSet());
         apps.stream()
                 .map(this::storedPrivateUrl)
-                .map(this::portFromUrl)
+                .map(AppPrivateAccessPorts::portFromUrl)
                 .filter(Objects::nonNull)
                 .forEach(ports::add);
         catalogService.findAll().stream()
@@ -196,27 +198,6 @@ public class PrivateAccessReconciliationService {
             }
         });
         return ports;
-    }
-
-    private Integer portFromUrl(String url) {
-        if (url == null || url.isBlank()) {
-            return null;
-        }
-        try {
-            java.net.URI uri = java.net.URI.create(url);
-            if (uri.getPort() > 0) {
-                return uri.getPort();
-            }
-            if ("http".equalsIgnoreCase(uri.getScheme())) {
-                return 80;
-            }
-            if ("https".equalsIgnoreCase(uri.getScheme())) {
-                return 443;
-            }
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-        return null;
     }
 
     private List<AppRuntimeView> runtimeApps() {

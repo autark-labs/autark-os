@@ -1,6 +1,33 @@
 import { expect, test } from 'playwright/test';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage } from './support/mockApi';
 
+test('checkpointed cleanup refreshes the cached Home summary before its polling interval', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.goto('/home');
+  await expect(page.getByRole('region', { name: 'Your Apps' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: /Fixture/ })).toBeVisible();
+  const summary = await page.evaluate(async () => (await fetch('/api/system-summary')).json());
+  await page.route('**/api/system-summary', (route) => route.fulfill({ json: { ...summary, deviceName: 'Cleaned' } }));
+  let cleaned = false;
+  await page.route('**/api/system/storage/orphans/*/cleanup', (route) => {
+    expect(route.request().method()).toBe('POST');
+    expect(new URL(route.request().url()).pathname).toBe('/api/system/storage/orphans/old-paperless-import/cleanup');
+    cleaned = true;
+    return route.fulfill({ json: { message: 'Cleanup complete.', safetyCheckpointPath: '/fixture/checkpoint.tar' } });
+  });
+  await page.locator('a[href="/storage"]').first().click();
+  await page.getByRole('tab', { name: /^Cleanup$/ }).click();
+  await page.getByRole('button', { name: /^Review$/ }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Type `old-paperless-import` to confirm').fill('old-paperless-import');
+  await dialog.getByRole('button', { name: 'Create checkpoint and remove' }).click();
+  await expect(dialog).toBeHidden();
+  expect(cleaned).toBe(true);
+  await page.locator('a[href="/home"]').first().click();
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByRole('heading', { level: 1, name: /Cleaned/ })).toBeVisible();
+});
+
 test('Storage keeps details in the in-page workspace and retains cleanup confirmation', async ({ page }) => {
   await installMockApi(page, 'ready');
   await page.setViewportSize({ width: 1440, height: 960 });

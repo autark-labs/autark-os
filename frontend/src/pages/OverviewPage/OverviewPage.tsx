@@ -1,20 +1,23 @@
 import { useMemo } from 'react';
+import { apiErrorMessage } from '@/api/httpClient';
 import { HomeHero } from './components/HomeHero';
 import { DashboardSummaryGrid, InstalledAppsLauncher } from './components/HomeDashboardPanels';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
-import { useHomeRepository } from '@/repositories/homeRepository';
+import { useSystemSummaryQuery } from '@/repositories/systemRepository';
 import { homeSummaryAvailability, homeSystemMetrics } from './extensions/OverviewPage.systemStatus';
 
 function OverviewPage() {
   const appState = useApplicationStateRepository();
-  const home = useHomeRepository();
+  const summaryQuery = useSystemSummaryQuery();
+  const summary = summaryQuery.data ?? null;
+  const summaryError = summaryQuery.error ? apiErrorMessage(summaryQuery.error, 'Home status could not be loaded.') : null;
 
   const apps = useMemo(() => appState.applications.filter((application) => application.relationship === 'managed'), [appState.applications]);
-  const deviceName = home.summary?.deviceName || 'Autark-OS';
-  const summaryAvailability = homeSummaryAvailability(home.summary, home.summaryError);
-  const systemMetrics = homeSystemMetrics(home.summary, summaryAvailability);
+  const deviceName = summary?.deviceName || 'Autark-OS';
+  const summaryAvailability = homeSummaryAvailability(summary, summaryError);
+  const systemMetrics = homeSystemMetrics(summary, summaryAvailability);
 
   return (
     <PageShell>
@@ -22,7 +25,7 @@ function OverviewPage() {
         <HomeHero
           deviceName={deviceName}
           summaryAvailability={summaryAvailability}
-          summary={home.summary}
+          summary={summary}
         >
           {appState.freshness.hasUsableData && <InstalledAppsLauncher apps={apps} />}
         </HomeHero>
@@ -30,9 +33,9 @@ function OverviewPage() {
 
       <DashboardSummaryGrid metrics={systemMetrics} />
 
-      {home.error && (
+      {summaryError && (
         <div className="rounded-lg border border-amber-300/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-100/80" role="status">
-          Some live Home information is unavailable: {home.error}
+          Some live Home information is unavailable: {summaryError}
         </div>
       )}
     </PageShell>

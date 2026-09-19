@@ -39,7 +39,7 @@ export const discoverQueryKeys = {
   apps: ['discover', 'apps'] as const,
   jobs: ['discover', 'jobs'] as const,
   job: (jobId: string | null) => ['discover', 'job', jobId] as const,
-  preview: (appId: string | null, answers: Record<string, unknown>) => ['discover', 'preview', appId, stableValueKey(answers)] as const,
+  preview: (appId: string | null, answers: Record<string, unknown>) => ['discover', 'preview', appId, answers] as const,
   readiness: ['discover', 'readiness'] as const,
 };
 
@@ -141,22 +141,4 @@ export function useDiscoverJobsQuery() {
 
 export function invalidateDiscoverQueries(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: discoverQueryKeys.all });
-}
-
-function stableValueKey(value: unknown): string {
-  return JSON.stringify(sortValue(value));
-}
-
-function sortValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortValue);
-  }
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, child]) => [key, sortValue(child)]),
-  );
 }

@@ -29,6 +29,9 @@ type NotificationCenterValue = {
   currentRecommendation: RecommendedAction | null;
   dismissCurrentRecommendation: () => void;
   history: SessionNotification[];
+  recommendationStatus: 'pending' | 'error' | 'success';
+  refreshingRecommendations: boolean;
+  refreshRecommendations: () => void;
   runAction: (action: AutarkOsAction) => Promise<void>;
   runningActionId: string | null;
 };
@@ -39,6 +42,7 @@ export function AppNotificationsProvider({ children }: { children: ReactNode }) 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const recommendationQuery = useRecommendedActionQuery();
+  const { status: recommendationStatus, isFetching: refreshingRecommendations, refetch: refreshRecommendations } = recommendationQuery;
   const [dismissedIds, setDismissedIds] = useState<string[]>(readDismissedRecommendationIds);
   const [history, setHistory] = useState<SessionNotification[]>([]);
   const [runningActionId, setRunningActionId] = useState<string | null>(null);
@@ -117,9 +121,12 @@ export function AppNotificationsProvider({ children }: { children: ReactNode }) 
     currentRecommendation,
     dismissCurrentRecommendation,
     history,
+    recommendationStatus,
+    refreshingRecommendations,
+    refreshRecommendations,
     runAction,
     runningActionId,
-  }), [currentRecommendation, dismissCurrentRecommendation, history, runAction, runningActionId]);
+  }), [currentRecommendation, dismissCurrentRecommendation, history, recommendationStatus, refreshingRecommendations, refreshRecommendations, runAction, runningActionId]);
 
   return <NotificationCenterContext.Provider value={value}>{children}</NotificationCenterContext.Provider>;
 }
@@ -136,6 +143,9 @@ export function NotificationCenterPopover({ className }: { className?: string })
     currentRecommendation,
     dismissCurrentRecommendation,
     history,
+    recommendationStatus,
+    refreshingRecommendations,
+    refreshRecommendations,
     runAction,
     runningActionId,
   } = useAppNotifications();
@@ -160,6 +170,13 @@ export function NotificationCenterPopover({ className }: { className?: string })
           </div>
         </PopoverHeader>
 
+        {recommendationStatus === 'error' && (
+          <div className="space-y-2 rounded-lg border border-border bg-muted p-3 text-sm text-foreground" role="alert">
+            <p>Recommendations are unavailable. {currentRecommendation ? 'Showing the last known recommendation.' : 'Try again to check what needs attention.'}</p>
+            <Button disabled={refreshingRecommendations} onClick={() => refreshRecommendations()} size="sm" variant="outline">Retry recommendations</Button>
+          </div>
+        )}
+
         {currentRecommendation && (
           <section className={cn('rounded-lg border p-3', recommendationTone(currentRecommendation.severity))} aria-label="Action needed">
             <div className="flex items-start gap-3">
@@ -181,7 +198,7 @@ export function NotificationCenterPopover({ className }: { className?: string })
 
         <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
           {history.map((item) => <HistoryItem item={item} key={item.id} />)}
-          {!currentRecommendation && history.length === 0 && <p className="rounded-lg border border-sky-400/20 bg-slate-900 p-3 text-xs text-slate-400">Nothing needs your attention right now.</p>}
+          {!currentRecommendation && history.length === 0 && recommendationStatus !== 'error' && <p className="rounded-lg border border-sky-400/20 bg-slate-900 p-3 text-xs text-slate-400">{recommendationStatus === 'pending' ? 'Checking recommendations…' : 'Nothing needs your attention right now.'}</p>}
         </div>
       </PopoverContent>
     </Popover>

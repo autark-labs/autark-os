@@ -509,7 +509,7 @@ public class AppLifecycleService {
             }
             if (checkpoint.privateChange()) {
                 Integer previousPort = checkpoint.settings().expectedLocalPort() != null ? checkpoint.settings().expectedLocalPort()
-                        : runtimeStatusResolver.portFromUrl(firstPresent(checkpoint.settings().accessUrl(), app.accessUrl()));
+                        : AppPrivateAccessPorts.portFromUrl(firstPresent(checkpoint.settings().accessUrl(), app.accessUrl()));
                 if (checkpoint.settings().tailscaleEnabled() && previousPort == null) throw new InstallationException("The previous private link target is unknown.");
                 var result = checkpoint.settings().tailscaleEnabled()
                         ? tailscaleService.serveHttps(previousPort, checkpoint.privatePort())
@@ -606,7 +606,7 @@ public class AppLifecycleService {
         assertNoPendingSettingsRecovery(app);
         AppRuntimeView view = refresh(app);
         String accessUrl = firstPresent(view.accessUrl(), view.settings() == null ? null : view.settings().accessUrl(), app.accessUrl());
-        Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
+        Integer localPort = AppPrivateAccessPorts.portFromUrl(accessUrl);
         if (localPort == null) {
             throw new InstallationException("Autark-OS could not find a local browser port for " + app.appName() + ".");
         }

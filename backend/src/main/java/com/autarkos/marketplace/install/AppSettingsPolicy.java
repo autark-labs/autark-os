@@ -40,8 +40,8 @@ class AppSettingsPolicy {
         boolean restartRequired = false;
         boolean dataMigrationRequired = false;
 
-        Integer currentPort = current.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(firstPresent(current.accessUrl(), app.accessUrl())) : current.expectedLocalPort();
-        Integer requestedPort = requested.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(requested.accessUrl()) : requested.expectedLocalPort();
+        Integer currentPort = current.expectedLocalPort() == null ? AppPrivateAccessPorts.portFromUrl(firstPresent(current.accessUrl(), app.accessUrl())) : current.expectedLocalPort();
+        Integer requestedPort = requested.expectedLocalPort() == null ? AppPrivateAccessPorts.portFromUrl(requested.accessUrl()) : requested.expectedLocalPort();
         boolean wantsLan = "network".equals(requested.desiredAccessMode()) || "local-and-private".equals(requested.desiredAccessMode());
         boolean hasLan = !com.autarkos.network.HostAddress.isLoopbackUrl(current.accessUrl());
         if (wantsLan != hasLan) {
@@ -132,7 +132,7 @@ class AppSettingsPolicy {
         Map<String, String> storage = sanitizeStorage(settings.storageSubfolders());
         String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : null);
         String privateAccessRequirement = sanitizePrivateAccessRequirement(settings.privateAccessRequirement(), false);
-        Integer expectedLocalPort = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(accessUrl) : settings.expectedLocalPort();
+        Integer expectedLocalPort = settings.expectedLocalPort() == null ? AppPrivateAccessPorts.portFromUrl(accessUrl) : settings.expectedLocalPort();
         String expectedProtocol = sanitizeProtocol(settings.expectedProtocol(), accessUrl);
         return new InstallModels.InstallSettings(
                 accessUrl,
@@ -157,7 +157,7 @@ class AppSettingsPolicy {
         AccessManifest accessManifest = manifest == null ? AccessManifest.defaults() : manifest.access();
         String desiredMode = sanitizeAccessMode(settings.desiredAccessMode(), settings.tailscaleEnabled() ? "private" : accessManifest.defaultMode());
         String requirement = privateAccessRequirement(settings.privateAccessRequirement(), manifest);
-        Integer expectedPort = settings.expectedLocalPort() == null ? runtimeStatusResolver.portFromUrl(accessUrl) : settings.expectedLocalPort();
+        Integer expectedPort = settings.expectedLocalPort() == null ? AppPrivateAccessPorts.portFromUrl(accessUrl) : settings.expectedLocalPort();
         String expectedProtocol = sanitizeProtocol(settings.expectedProtocol(), accessUrl);
         InstallModels.InstallSettings normalized = new InstallModels.InstallSettings(
                 accessUrl == null ? settings.accessUrl() : accessUrl,
@@ -203,7 +203,7 @@ class AppSettingsPolicy {
         return new AccessModels.AccessObservedState(
                 accessUrl,
                 privateAccess != null && privateAccess.verified() ? privateAccess.verifiedPrivateUrl() : null,
-                runtimeStatusResolver.portFromUrl(accessUrl),
+                AppPrivateAccessPorts.portFromUrl(accessUrl),
                 runtimeStatusResolver.protocolFromUrl(accessUrl),
                 privateStatus,
                 settings.lastAccessCheckAt(),
@@ -213,7 +213,7 @@ class AppSettingsPolicy {
     }
 
     AccessModels.AppAccessRoute accessRoute(InstallModels.InstallSettings settings, String accessUrl, AccessModels.AccessObservedState observedAccess, PrivateAccessState privateAccess) {
-        Integer localPort = runtimeStatusResolver.portFromUrl(accessUrl);
+        Integer localPort = AppPrivateAccessPorts.portFromUrl(accessUrl);
         String verifiedPrivateUrl = privateAccess != null && privateAccess.verified() ? privateAccess.verifiedPrivateUrl() : null;
         Integer privatePort = privateAccess == null ? null : privateAccess.expectedHttpsPort();
         String privateStatus = observedAccess == null ? "not_enabled" : observedAccess.privateLinkStatus();

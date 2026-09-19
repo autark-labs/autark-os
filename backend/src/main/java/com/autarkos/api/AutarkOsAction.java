@@ -17,10 +17,6 @@ public record AutarkOsAction(
         return new AutarkOsAction(id, label, Optional.of("POST"), Optional.of(href), Optional.empty(), confirmationRequired, danger, false, Optional.empty());
     }
 
-    public static AutarkOsAction disabledPost(String id, String label, String href, String reason) {
-        return new AutarkOsAction(id, label, Optional.of("POST"), Optional.of(href), Optional.empty(), false, false, true, Optional.ofNullable(reason));
-    }
-
     public static AutarkOsAction get(String id, String label, String href) {
         return new AutarkOsAction(id, label, Optional.of("GET"), Optional.of(href), Optional.empty(), false, false, false, Optional.empty());
     }

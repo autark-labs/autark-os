@@ -38,6 +38,57 @@ Each page should have one obvious primary action. Do not add multiple competing 
 
 ## 2. Development Workflow
 
+### Route work through a small skill set
+
+Select applicable skills automatically; the user need not name them. Read each
+selected `SKILL.md` before using it and briefly announce the workflow. Load only
+the skills needed for the current task, not the entire set on every turn.
+
+| Trigger | Skill | Expected result |
+| --- | --- | --- |
+| Drafting stories or resolving materially unclear scope | `story-scope` | Small complete outcome, exclusions, reuse/deletion targets, and validation |
+| Reported failure or unexplained runtime/UI behavior | `evidence-first-debugging` | Reproduction evidence and a demonstrated cause before behavior changes |
+| User-facing actions, navigation, status, or disclosure changes, including backend changes to their behavior | `user-centered-flow-review` | Pre-implementation and pre-handoff review of the complete UI-to-backend-to-user journey |
+| Authorized story implementation or scoped refactor | `lean-story-implementation` | Framework-first implementation with superseded paths removed |
+| Story code changes ready for handoff, or a requested simplification review | `lean-change-review` | Diff-scoped check for unnecessary complexity, leftovers, and validation gaps |
+
+A clear story normally goes directly to implementation, validation, and review.
+A bug starts with diagnosis; a planning-only or diagnosis-only request stops at
+findings. Small fixes need only a proportionate local review, not a new planning
+document. Existing validation and visual-prototype requirements still apply.
+
+For user-facing changes, apply `user-centered-flow-review` before implementation
+to catch contradictions early and again during validation. Trace affected actions
+through their actual backend behavior and resulting UI state across all affected
+surfaces. Keep essential consequences visible and disclose technical detail only
+when useful. A confirmed dead action, misleading outcome, or unresolved flow
+contradiction blocks a completion claim; missing runtime evidence must be reported
+as unverified. Reuse this evidence in the final lean review rather than creating
+another report or test framework.
+
+Resolve these skills from the session catalog. The current local installation is
+under `${CODEX_HOME:-$HOME/.codex}/skills/<skill-name>/SKILL.md`; do not copy skill
+bodies into this repository. If a skill is unavailable, say so and follow this
+file's equivalent scope, diagnosis, reuse, deletion, and validation rules. Do not
+silently install tools or create a substitute workflow framework.
+
+Keep routing here and detailed reusable procedures in the skills. Do not add a
+new skill for every page, framework, or story. Add one only for a demonstrated
+recurring workflow not covered by this set.
+
+### Use agents for bounded parallel work
+
+When supported by the session, a focused subagent may trace an independent
+affected consumer or review a nontrivial cross-surface/state-model refactor while
+the main agent implements or validates. Default to one read-only helper; use
+more only when independent work clearly warrants it. Do not delegate trivial
+edits or spawn agents merely to run every skill.
+
+Give the helper a concrete question, scope, applicable skill, and evidence to
+return. Avoid overlapping edits. The main agent owns integration, checks the
+findings, and runs relevant validation. Skill selection and delegation do not
+authorize deployment, service changes, data deletion, or new product scope.
+
 ### Work in lean slices
 
 Each change should be small enough to validate both behavior and look/feel before moving on.
@@ -134,9 +185,12 @@ Required behavior:
 - Do not report a behavior as implemented if only the primary page, happy path, or newest component reflects it.
 - Prefer shared components and contract tests for cross-surface behaviors so future changes cannot quietly drift back into partial implementations.
 
-### Prefer additive refactors over broad rewrites
+### Prefer in-place refactors over parallel implementations
 
-Refactor behind stable APIs/components when possible. Do not churn unrelated files. Preserve working behavior while simplifying the implementation.
+Refactor behind stable APIs/components when possible. Reuse existing framework
+capabilities and modules before adding files or layers. Move affected consumers
+and delete the superseded path in the same scoped change; do not treat additive
+code as inherently safer. Preserve working behavior and avoid unrelated churn.
 
 ### No dead controls
 

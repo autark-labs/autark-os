@@ -1,11 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
-import type { SystemDoctorStatus } from '@/types/system';
+import type { SystemDoctorStatus, SystemSummary } from '@/types/system';
 
 export const systemQueryKeys = {
   all: ['system'] as const,
   doctor: ['system', 'doctor'] as const,
+  summary: ['system', 'summary'] as const,
 };
+
+export function useSystemSummaryQuery() {
+  return useQuery<SystemSummary>({
+    queryKey: systemQueryKeys.summary,
+    queryFn: () => SystemAPIClient.summary(),
+    refetchInterval: 30_000,
+    staleTime: 30_000,
+  });
+}
 
 export function useSystemDoctorQuery() {
   return useQuery<SystemDoctorStatus>({

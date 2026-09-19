@@ -344,7 +344,7 @@ public class MarketplaceInstallService {
         if (!privateAccessRequested(manifest, runtimeConfiguration)) {
             return new TailscaleServeResult(false, null, "Private HTTPS access was not requested.", List.of());
         }
-        Integer hostPort = portFromAccessUrl(runtimeConfiguration.accessUrl());
+        Integer hostPort = AppPrivateAccessPorts.portFromUrl(runtimeConfiguration.accessUrl());
         if (hostPort == null) {
             return new TailscaleServeResult(false, null, "This app does not expose a local HTTP port for Tailscale Serve.", List.of());
         }
@@ -366,7 +366,7 @@ public class MarketplaceInstallService {
                 runtimeConfiguration.backup(),
                 runtimeConfiguration.accessMode(),
                 manifest.usage().privateHttpsRequired() ? "recommended" : "optional",
-                portFromAccessUrl(accessUrl),
+                AppPrivateAccessPorts.portFromUrl(accessUrl),
                 protocolFromAccessUrl(accessUrl),
                 null,
                 null,
@@ -377,10 +377,6 @@ public class MarketplaceInstallService {
 
     private boolean privateAccessRequested(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration) {
         return runtimeConfiguration.tailscaleEnabled() || manifest.usage().privateHttpsRequired();
-    }
-
-    private Integer portFromAccessUrl(String accessUrl) {
-        return AppPrivateAccessPorts.portFromUrl(accessUrl);
     }
 
     private String protocolFromAccessUrl(String accessUrl) {

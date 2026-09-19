@@ -17,7 +17,7 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import { copyText } from '@/lib/copyText';
 import { invalidateApplicationState, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
-import { homeQueryKeys } from '@/repositories/homeRepository';
+import { systemQueryKeys } from '@/repositories/systemRepository';
 import { useCleanupOrphanMutation, useStorageReportRepository } from '@/repositories/storageRepository';
 import type { AppStorageUsage, OrphanedStorage } from '@/types/system';
 import { StorageCapacityRibbonWorkspace } from './StorageCapacityRibbonWorkspace';
@@ -82,7 +82,7 @@ function StoragePage() {
       await Promise.all([
         storage.refresh(),
         invalidateApplicationState(queryClient),
-        queryClient.invalidateQueries({ queryKey: homeQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: systemQueryKeys.summary }),
         queryClient.invalidateQueries({ queryKey: ['monitoring'] }),
       ]);
     } catch (cleanupError) {

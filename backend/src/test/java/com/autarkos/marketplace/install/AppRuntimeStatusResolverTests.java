@@ -5,12 +5,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.autarkos.marketplace.install.models.RuntimeModels;
 
 class AppRuntimeStatusResolverTests {
 
     private final AppRuntimeStatusResolver resolver = new AppRuntimeStatusResolver();
+
+    @ParameterizedTest
+    @CsvSource({
+            "http://localhost, 80", "https://localhost, 443", "HTTPS://localhost, 443",
+            "http://localhost:8080/path, 8080", "https://localhost:12443/path, 12443",
+            "http://[::1]:8090/, 8090", "http://localhost:0, 80"
+    })
+    void sharesPortInterpretationAcrossRuntimeAndPrivateAccess(String url, int port) {
+        assertThat(AppPrivateAccessPorts.portFromUrl(url)).isEqualTo(port);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = { " ", "not a url", "http://[", "/relative", "ftp://localhost" })
+    void leavesMissingOrUnparseablePortsUnknown(String url) {
+        assertThat(AppPrivateAccessPorts.portFromUrl(url)).isNull();
+    }
 
     @Test
     void classifiesContainerRuntimeStatusWithoutLifecycleServiceState() {

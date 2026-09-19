@@ -2,12 +2,30 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'vitest';
+import { QueryClient } from '@tanstack/react-query';
+import { discoverQueryKeys } from '../discoverRepository';
 
 const root = process.cwd();
 
 function source(relativePath) {
   return readFileSync(resolve(root, relativePath), 'utf8');
 }
+
+test('install preview cache shares reordered answers but separates changed choices and apps', () => {
+  const client = new QueryClient();
+  const answers = { port: 8080, storage: { data: 'apps', cache: 'temp' }, choices: ['a', 'b'] };
+  const key = discoverQueryKeys.preview('syncthing', answers);
+  client.setQueryData(key, { valid: true });
+
+  assert.deepEqual(client.getQueryData(discoverQueryKeys.preview('syncthing', {
+    choices: ['a', 'b'], storage: { cache: 'temp', data: 'apps' }, port: 8080,
+  })), { valid: true });
+  assert.equal(client.getQueryData(discoverQueryKeys.preview('freshrss', answers)), undefined);
+  assert.equal(client.getQueryData(discoverQueryKeys.preview('syncthing', { ...answers, port: 9090 })), undefined);
+  assert.equal(client.getQueryData(discoverQueryKeys.preview('syncthing', { ...answers, storage: { ...answers.storage, data: 'other' } })), undefined);
+  assert.equal(client.getQueryData(discoverQueryKeys.preview('syncthing', { ...answers, choices: ['b', 'a'] })), undefined);
+  client.clear();
+});
 
 test('operational pages use repository hooks instead of page-local polling', () => {
   const pages = [
