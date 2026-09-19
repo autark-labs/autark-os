@@ -79,7 +79,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   const planning = loadingAction === 'planning';
   const saving = loadingAction === 'saving' || isSubmitting;
   const accessChanging = loadingAction === 'private_access';
-  const operationBusy = operationBlocksManagement(item.operationState);
+  const operationBusy = operationBlocksManagement(item.operation);
   const busy = planning || saving || accessChanging || operationBusy;
   const privateNetwork = privateNetworkStatus(item, accessChanging);
 

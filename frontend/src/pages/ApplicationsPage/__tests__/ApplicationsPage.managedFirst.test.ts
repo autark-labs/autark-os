@@ -10,7 +10,7 @@ const header = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/c
 const stateBadges = readFileSync(resolve(process.cwd(), 'src/pages/ApplicationsPage/components/AppStateBadges.tsx'), 'utf8');
 
 test('My Apps renders only canonical managed applications', () => {
-  assert.match(page, /const managedItems = useMemo\(\(\) => items\.filter\(\(item\) => item\.managementState === 'managed'\)/);
+  assert.match(page, /const managedItems = items/);
   assert.match(page, /<ApplicationCollectionFilterDropdown filters=\{collectionFilters\}/);
   assert.doesNotMatch(page, /Linked services|linkedItems|pinned_external/);
   assert.match(page, /<BasicApplicationsView[\s\S]*items=\{visibleItems\}/);
@@ -28,7 +28,7 @@ test('My Apps renders only canonical managed applications', () => {
   assert.doesNotMatch(advancedView, /min-w-\[74rem\]/);
   assert.match(page, /lg:grid-cols-\[minmax\(0,1fr\)_19rem\]/);
   assert.doesNotMatch(advancedView, /Recent activity/);
-  assert.match(advancedView, /<ManagementBadge item=\{item\} \/>/);
+  assert.match(advancedView, /<RelationshipBadge \/>/);
   assert.match(header, /title="My Apps"/);
   assert.match(header, /<AppWindow aria-hidden="true" className="size-5" \/>/);
 });
@@ -36,7 +36,7 @@ test('My Apps renders only canonical managed applications', () => {
 test('My Apps uses quiet status dots and compact action affordances on dark app cards', () => {
   assert.match(stateBadges, /<StatusBadge\s+appearance="solid"/);
   assert.match(stateBadges, /<MetadataBadge appearance="solid" tone="neutral">/);
-  assert.match(card, /labelForManagementState\(item\.managementState\)/);
+  assert.match(card, /labelForRelationship\(item\.relationship\)/);
   assert.match(card, /statusLabel\(item\)/);
   assert.match(card, /DropdownMenuContent/);
   assert.match(card, /aria-label=\{`Open \$\{item\.name\}`\}/);

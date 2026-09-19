@@ -110,7 +110,7 @@ public class UpdateInventoryService {
                 value(identity.instanceId()),
                 runtime == null ? "" : value(runtime.runtimePath()),
                 runtime == null ? "" : value(runtime.composeProject()),
-                value(application.ownershipState()),
+                "owned",
                 application.relationship().value());
     }
 

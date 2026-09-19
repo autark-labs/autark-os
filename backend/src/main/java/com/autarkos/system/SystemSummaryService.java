@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.apps.ApplicationStateService;
+import com.autarkos.apps.ApplicationRuntimeState;
 import com.autarkos.apps.ApplicationView;
 import com.autarkos.apps.ApplicationViews;
 import com.autarkos.backups.BackupDestinationService;
@@ -122,8 +123,10 @@ public class SystemSummaryService implements SystemSummaryProvider {
     }
 
     private SystemSummaryModels.AccessSummary access(List<ApplicationView> apps) {
-        boolean privateReady = apps.stream().anyMatch(app -> "private_ready".equals(app.accessState()));
-        boolean localReady = apps.stream().anyMatch(app -> List.of("local_ready", "private_waiting", "private_needs_setup").contains(app.accessState()));
+        boolean privateReady = apps.stream().anyMatch(app -> app.runtime() != null && app.runtime().accessRoute() != null
+                && "verified".equals(app.runtime().accessRoute().privateLinkStatus()));
+        boolean localReady = apps.stream().anyMatch(app -> app.runtime() != null && app.runtime().accessRoute() != null
+                && app.runtime().accessRoute().localUrl() != null && !app.runtime().accessRoute().localUrl().isBlank());
         if (privateReady) {
             return new SystemSummaryModels.AccessSummary("private_ready", "Private access is ready for at least one app.");
         }
@@ -135,14 +138,14 @@ public class SystemSummaryService implements SystemSummaryProvider {
 
     private SystemSummaryModels.AppsSummary apps(List<ApplicationView> apps) {
         List<SystemSummaryModels.ReadyAppSummary> readyToOpen = apps.stream()
-                .filter(app -> app.runtime() != null && "Ready".equals(app.runtime().friendlyStatus()))
+                .filter(app -> app.runtime() != null && app.runtime().state() == ApplicationRuntimeState.READY)
                 .filter(app -> app.runtime().accessUrl() != null && !app.runtime().accessUrl().isBlank())
                 .map(app -> new SystemSummaryModels.ReadyAppSummary(app.appInstanceId(), app.name(), app.runtime().accessUrl()))
                 .toList();
         return new SystemSummaryModels.AppsSummary(
                 apps.size(),
-                (int) apps.stream().filter(app -> app.runtime() != null && AutarkOsStates.AppStatus.READY.equals(app.runtime().friendlyStatus())).count(),
-                (int) apps.stream().filter(app -> app.runtime() != null && List.of(AutarkOsStates.AppStatus.MISSING, AutarkOsStates.AppStatus.NEEDS_ATTENTION).contains(app.runtime().friendlyStatus())).count(),
+                (int) apps.stream().filter(app -> app.runtime() != null && app.runtime().state() == ApplicationRuntimeState.READY).count(),
+                (int) apps.stream().filter(app -> app.runtime() != null && List.of(ApplicationRuntimeState.MISSING, ApplicationRuntimeState.DEGRADED).contains(app.runtime().state())).count(),
                 readyToOpen);
     }
 
@@ -151,8 +154,8 @@ public class SystemSummaryService implements SystemSummaryProvider {
         if (destination != null && !destination.ready()) {
             return new SystemSummaryModels.BackupSummary("destination_unavailable", destination.message());
         }
-        boolean needsFirstRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(app.backupState()));
-        boolean protectedByRestorePoint = apps.stream().anyMatch(app -> AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(app.backupState()));
+        boolean needsFirstRestorePoint = apps.stream().anyMatch(app -> app.runtime() != null && AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(app.runtime().backupProtection()));
+        boolean protectedByRestorePoint = apps.stream().anyMatch(app -> app.runtime() != null && AutarkOsStates.BackupState.PROTECTED_BY_RESTORE_POINT.equals(app.runtime().backupProtection()));
         return needsFirstRestorePoint
                 ? new SystemSummaryModels.BackupSummary("needs_restore_point", "At least one app has backups enabled but no restore point yet.")
                 : protectedByRestorePoint

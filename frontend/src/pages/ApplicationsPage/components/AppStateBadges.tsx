@@ -4,99 +4,68 @@ import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/Status
 import { cn } from '@/lib/utils';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
-export function ReadinessBadge({ item, overlay = false }: { item: ApplicationSurfaceItem; overlay?: boolean }) {
-  if (item.operationState.kind !== 'idle') {
-    return <OperationBadge item={item} overlay={overlay} />;
-  }
-
-  const Icon = readinessIcon(item.readinessState);
-
+export function RuntimeBadge({ item, overlay = false }: { item: ApplicationSurfaceItem; overlay?: boolean }) {
+  if (item.operation.kind !== 'idle') return <OperationBadge item={item} overlay={overlay} />;
+  const Icon = runtimeIcon(item.state);
   return (
-    <StatusBadge
-      appearance="solid"
-      className={cn(overlay && 'absolute right-3 top-3')}
-      icon={Icon}
-      iconClassName={item.readinessState === 'starting' ? 'animate-spin' : undefined}
-      tone={readinessTone(item.readinessState)}
-    >
-      {labelForReadiness(item.readinessState)}
+    <StatusBadge appearance="solid" className={cn(overlay && 'absolute right-3 top-3')} icon={Icon}
+      iconClassName={item.state === 'starting' ? 'animate-spin' : undefined} tone={runtimeTone(item.state)}>
+      {labelForRuntimeState(item.state)}
     </StatusBadge>
   );
 }
 
-export function ManagementBadge({ item }: { item: ApplicationSurfaceItem }) {
-  return (
-    <MetadataBadge appearance="solid" tone="neutral">
-      <Server data-icon="inline-start" />
-      {labelForManagementState(item.managementState)}
-    </MetadataBadge>
-  );
+export function RelationshipBadge() {
+  return <MetadataBadge appearance="solid" tone="neutral"><Server data-icon="inline-start" />Managed app</MetadataBadge>;
 }
 
-export function AttentionIndicator({ item, className }: { item: ApplicationSurfaceItem; className?: string }) {
-  if (item.attentionState === 'none') {
-    return null;
-  }
-
+export function IssueIndicator({ item, className }: { item: ApplicationSurfaceItem; className?: string }) {
+  const issue = item.issues[0];
+  if (!issue) return null;
+  const danger = issue.severity === 'critical';
   return (
-    <StatusBadge appearance="solid" className={className} icon={AlertTriangle} tone={item.attentionState === 'needs_review' ? 'warning' : 'danger'}>
-      {labelForAttention(item.attentionState)}
+    <StatusBadge appearance="solid" className={className} icon={AlertTriangle} tone={danger ? 'danger' : 'warning'}>
+      {danger ? 'Blocked' : 'Needs review'}
     </StatusBadge>
   );
 }
 
 export function OperationBadge({ item, overlay = false }: { item: ApplicationSurfaceItem; overlay?: boolean }) {
-  if (item.operationState.kind === 'idle') {
-    return null;
-  }
-
-  const failed = item.operationState.kind === 'failed';
+  if (item.operation.kind === 'idle') return null;
+  const failed = item.operation.kind === 'failed';
   const Icon = failed ? AlertTriangle : Loader2;
-
   return (
-    <StatusBadge
-      appearance="solid"
-      className={cn(overlay && 'absolute right-3 top-3')}
-      icon={Icon}
-      iconClassName={failed ? undefined : 'animate-spin'}
-      tone={failed ? 'danger' : 'info'}
-    >
-      {item.operationState.label}
+    <StatusBadge appearance="solid" className={cn(overlay && 'absolute right-3 top-3')} icon={Icon}
+      iconClassName={failed ? undefined : 'animate-spin'} tone={failed ? 'danger' : 'info'}>
+      {item.operation.label}
     </StatusBadge>
   );
 }
 
-export function labelForManagementState(_state: ApplicationSurfaceItem['managementState'], length: 'short' | 'long' = 'long') {
+export function labelForRelationship(_state: ApplicationSurfaceItem['relationship'], length: 'short' | 'long' = 'long') {
   return length === 'short' ? 'Managed' : 'Managed app';
 }
 
-export function labelForReadiness(state: ApplicationSurfaceItem['readinessState']) {
+export function labelForRuntimeState(state: ApplicationSurfaceItem['state']) {
   if (state === 'ready') return 'Ready';
   if (state === 'starting') return 'Starting';
-  if (state === 'paused') return 'Paused';
   if (state === 'stopped') return 'Stopped';
-  if (state === 'unreachable') return 'Unreachable';
+  if (state === 'degraded') return 'Needs attention';
+  if (state === 'missing') return 'Missing';
   return 'Unknown';
 }
 
-export function labelForAttention(state: ApplicationSurfaceItem['attentionState']) {
-  if (state === 'needs_review') return 'Needs review';
-  if (state === 'conflict') return 'Conflict';
-  if (state === 'blocked') return 'Blocked';
-  return 'No attention needed';
-}
-
-function readinessIcon(state: ApplicationSurfaceItem['readinessState']) {
+function runtimeIcon(state: ApplicationSurfaceItem['state']) {
   if (state === 'ready') return CheckCircle2;
   if (state === 'starting') return Loader2;
-  if (state === 'paused') return Pause;
-  if (state === 'stopped' || state === 'unreachable') return XCircle;
+  if (state === 'stopped') return Pause;
+  if (state === 'degraded' || state === 'missing') return XCircle;
   return CircleHelp;
 }
 
-export function readinessTone(state: ApplicationSurfaceItem['readinessState']): StatusBadgeTone {
+export function runtimeTone(state: ApplicationSurfaceItem['state']): StatusBadgeTone {
   if (state === 'ready') return 'success';
   if (state === 'starting') return 'info';
-  if (state === 'unreachable') return 'warning';
+  if (state === 'degraded' || state === 'missing') return 'warning';
   return 'neutral';
 }

@@ -19,11 +19,14 @@ import org.springframework.stereotype.Service;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.BackupModels;
+import com.autarkos.backups.BackupProtectionPolicy;
+import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RecoveryOperationCoordinator;
-import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.marketplace.install.AppInstanceViewProvider;
+import com.autarkos.backups.RestorePoints;
+import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 
@@ -40,7 +43,9 @@ public class StorageService {
     private final InstalledAppRepository installedAppRepository;
     private final ActivityLogService activityLogService;
     private final StorageSampleRepository storageSampleRepository;
-    private final AppInstanceViewProvider appInstanceViewProvider;
+    private final ManagedAppAttestationService managedApps;
+    private final BackupRepository backupRepository;
+    private final MarketplaceCatalogService catalogService;
     private final RuntimeFileOperations fileOperations;
     private final BackupDestinationService backupDestinationService;
     private final RecoveryOperationCoordinator recoveryOperations;
@@ -48,12 +53,14 @@ public class StorageService {
     private Instant lastStorageSampleAt = Instant.EPOCH;
     private String lastWarningStatus = "";
 
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
+    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, ManagedAppAttestationService managedApps, BackupRepository backupRepository, MarketplaceCatalogService catalogService, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.activityLogService = activityLogService;
         this.storageSampleRepository = storageSampleRepository;
-        this.appInstanceViewProvider = appInstanceViewProvider;
+        this.managedApps = managedApps;
+        this.backupRepository = backupRepository;
+        this.catalogService = catalogService;
         this.fileOperations = fileOperations;
         this.backupDestinationService = backupDestinationService;
         this.recoveryOperations = recoveryOperations;
@@ -68,10 +75,7 @@ public class StorageService {
                 : runtimeRoot.resolve("backups").normalize();
         ensure(runtimeRoot);
 
-        var appViews = appInstanceViewProvider.list().stream().collect(java.util.stream.Collectors.toMap(
-                AppInstanceView::catalogAppId, java.util.function.Function.identity(), (first, second) -> first));
-        List<InstalledApp> installedApps = installedAppRepository.findAllApps().stream()
-                .filter(app -> appViews.containsKey(app.appId())).toList();
+        List<InstalledApp> installedApps = managedApps.managedApps();
         Set<String> installedIds = installedApps.stream().map(InstalledApp::appId).collect(HashSet::new, Set::add, Set::addAll);
         StorageModels.StorageUsage hostDisk = diskUsage("Host disk", runtimeRoot);
         StorageModels.StorageUsage runtimeDisk = directoryUsage("Autark-OS data", runtimeRoot, hostDisk.totalBytes(), hostDisk.usableBytes());
@@ -79,7 +83,7 @@ public class StorageService {
                 ? new StorageModels.StorageUsage("Backup destination unavailable", backupDestination.configuredPath(), -1, -1, -1, -1)
                 : backupDirectoryUsage(backupsRoot);
         List<StorageModels.AppStorageUsage> apps = installedApps.stream()
-                .map(app -> appStorage(app, appViews.get(app.appId()).backupState()))
+                .map(app -> appStorage(app, backupState(app.appId())))
                 .sorted(Comparator.comparingLong(StorageModels.AppStorageUsage::usedBytes).reversed())
                 .toList();
         recordStorageSamples(apps);
@@ -207,13 +211,14 @@ public class StorageService {
     }
 
     private List<InstalledApp> managedInstalledApps() {
-        Set<String> managedIds = appInstanceViewProvider.list().stream()
-                .map(AppInstanceView::catalogAppId)
-                .filter(id -> id != null && !id.isBlank())
-                .collect(HashSet::new, Set::add, Set::addAll);
-        return installedAppRepository.findAllApps().stream()
-                .filter(app -> managedIds.contains(app.appId()))
-                .toList();
+        return managedApps.managedApps();
+    }
+
+    private String backupState(String appId) {
+        InstallModels.InstallSettings settings = installedAppRepository.settingsFor(appId).orElse(null);
+        return BackupProtectionPolicy.state(settings != null && settings.backup() != null && settings.backup().enabled(),
+                catalogService.findById(appId).orElse(null),
+                backupRepository.containingApp(appId).stream().map(RestorePoints::toDomain).toList());
     }
 
     private StorageModels.StorageUsage diskUsage(String label, Path path) {

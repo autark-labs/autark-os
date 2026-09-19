@@ -17,8 +17,7 @@ test('app mutation results are synchronized through one canonical app-state help
   assert.match(helper, /syncCanonicalAppMutationResult/);
   assert.match(helper, /setApplicationStateFromActionResultCache\(queryClient, result\)/);
   assert.match(helper, /setAutarkOsJobCache\(queryClient, result\)/);
-  assert.match(helper, /setAutarkOsJobInApplicationStateCache\(queryClient, result\)/);
-  assert.match(helper, /setRuntimeAppInApplicationStateCache\(queryClient, result\.app\)/);
+  assert.doesNotMatch(helper, /setAutarkOsJobInApplicationStateCache|setRuntimeAppInApplicationStateCache/);
   assert.match(helper, /invalidateAutarkOsJobs\(queryClient\)/);
   assert.match(helper, /invalidateApplicationState\(queryClient\)/);
 });

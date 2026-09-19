@@ -167,7 +167,7 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
 }
 
 function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfigureBackupDestination, onUpdate }: PanelProps & { apps: AppRuntimeView[]; backupDestination: BackupDestination | null; backupSchedule: BackupSettingsSummary | null; onConfigureBackupDestination: (path: string) => Promise<void> }) {
-  const protectedApps = apps.filter((app) => app.canonicalBackupState === 'protected_by_restore_point').length;
+  const protectedApps = apps.filter((app) => app.backupProtection === 'protected_by_restore_point').length;
   const [destinationPath, setDestinationPath] = useState(backupDestination?.configuredPath || '');
   const [externalDestinationOpen, setExternalDestinationOpen] = useState(backupDestination?.kind === 'external');
   const [updatingDestination, setUpdatingDestination] = useState(false);

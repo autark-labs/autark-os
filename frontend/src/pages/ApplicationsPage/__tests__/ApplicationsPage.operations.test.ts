@@ -3,254 +3,33 @@ import { test } from 'vitest';
 import {
   applicationActionRestriction,
   operationBlocksManagement,
-  operationStateForItem,
   runtimeActionDisabled,
   runtimeActionDisabledReason,
   runtimeControlsDisabled,
 } from '../extensions/ApplicationsPage.operations';
 
-test('operationStateForItem maps local runtime actions before idle state', () => {
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), 'start', null, []), {
-    kind: 'starting',
-    label: 'Starting',
-  });
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), 'stop', null, []), {
-    kind: 'stopping',
-    label: 'Pausing',
-  });
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), 'restart', null, []), {
-    kind: 'restarting',
-    label: 'Restarting',
-  });
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), 'backup', null, []), {
-    kind: 'backing_up',
-    label: 'Creating backup',
-  });
-});
-
-test('operationStateForItem maps settings save but not settings planning', () => {
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, 'saving', []), {
-    kind: 'saving_settings',
-    label: 'Saving settings',
-  });
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, 'planning', []), {
-    kind: 'idle',
-  });
-});
-
-test('operationStateForItem maps durable jobs by app subject and current step', () => {
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    job('restart-1', 'restart_app', 'vaultwarden', 'running', 'wait'),
-  ]), {
-    kind: 'restarting',
-    label: 'Restarting',
-    jobId: 'restart-1',
-    currentStep: 'Waiting for app readiness',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    job('start-1', 'start_app', 'vaultwarden', 'queued', 'run'),
-  ]), {
-    kind: 'starting',
-    label: 'Starting',
-    jobId: 'start-1',
-    currentStep: 'Running app command',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    job('backup-1', 'backup', 'vaultwarden', 'running', 'archive'),
-  ]), {
-    kind: 'backing_up',
-    label: 'Creating backup',
-    jobId: 'backup-1',
-    currentStep: 'Writing backup archive',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    job('restore-1', 'backup_restore', '42:vaultwarden', 'running', 'restore_data'),
-  ]), {
-    kind: 'restoring',
-    label: 'Restoring',
-    jobId: 'restore-1',
-    currentStep: 'Restoring app data',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    job('restore-2', 'backup_restore', '42:all', 'running', 'restore_data'),
-  ]), {
-    kind: 'restoring',
-    label: 'Restoring',
-    jobId: 'restore-2',
-    currentStep: 'Restoring app data',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    job('repair-1', 'repair_app', 'vaultwarden', 'running', 'repair'),
-  ]), {
-    kind: 'repairing',
-    label: 'Repairing',
-    jobId: 'repair-1',
-    currentStep: 'Repairing app',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), 'restart', null, [
-    job('uninstall-1', 'uninstall_app', 'vaultwarden', 'running', 'remove'),
-  ]), {
-    kind: 'uninstalling',
-    label: 'Uninstalling safely',
-    jobId: 'uninstall-1',
-    currentStep: 'Removing containers',
-  });
-});
-
-test('operationStateForItem maps relevant failed durable jobs and ignores jobs for other apps', () => {
-  assert.deepEqual(operationStateForItem(item('vaultwarden', { readinessState: 'unreachable', attentionState: 'needs_review' }), null, null, [
-    {
-      ...job('failed-1', 'uninstall_app', 'vaultwarden', 'failed', 'remove'),
-      error: { message: 'Docker could not remove the app safely.' },
-    },
-  ]), {
-    kind: 'failed',
-    label: 'Uninstall failed',
-    jobType: 'uninstall_app',
-    message: 'Docker could not remove the app safely.',
-    jobId: 'failed-1',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    job('backup-2', 'backup', 'jellyfin', 'running', 'archive'),
-  ]), {
-    kind: 'idle',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    {
-      ...job('restore-failed', 'backup_restore', '42:all', 'failed', 'restore_data'),
-      error: { message: 'Restore failed for Home Assistant.' },
-    },
-  ]), {
-    kind: 'idle',
-  });
-
-  assert.deepEqual(operationStateForItem(item('vaultwarden'), null, null, [
-    {
-      ...job('restore-failed', 'backup_restore', '42:vaultwarden', 'failed', 'restore_data'),
-      error: { message: 'Restore failed for Vaultwarden.' },
-    },
-  ]), {
-    kind: 'failed',
-    label: 'Restore failed',
-    jobType: 'backup_restore',
-    message: 'Restore failed for Vaultwarden.',
-    jobId: 'restore-failed',
-  });
-});
-
-test('operationStateForItem does not resurrect stale failed lifecycle jobs after recovery', () => {
-  assert.deepEqual(operationStateForItem(item('syncthing', { readinessState: 'ready', attentionState: 'none' }), null, null, [
-    {
-      ...job('failed-1', 'restart_app', 'syncthing', 'failed', 'wait'),
-      error: { message: 'Port 8385 is already in use.' },
-    },
-  ]), {
-    kind: 'idle',
-  });
-
-  assert.deepEqual(operationStateForItem(item('syncthing', { readinessState: 'starting', attentionState: 'none' }), null, null, [
-    {
-      ...job('failed-1', 'start_app', 'syncthing', 'failed', 'wait'),
-      error: { message: 'Port 8385 is already in use.' },
-    },
-  ]), {
-    kind: 'idle',
-  });
-
-  assert.deepEqual(operationStateForItem(item('syncthing', { readinessState: 'ready', attentionState: 'none' }), null, null, [
-    {
-      ...job('success-1', 'restart_app', 'syncthing', 'succeeded', 'wait', '2026-06-29T12:01:00Z'),
-    },
-    {
-      ...job('failed-1', 'restart_app', 'syncthing', 'failed', 'wait', '2026-06-29T12:00:00Z'),
-      error: { message: 'Port 8385 is already in use.' },
-    },
-  ]), {
-    kind: 'idle',
-  });
-});
-
-test('runtime controls remain available after a failed operation', () => {
+test('runtime controls follow the canonical operation state', () => {
   assert.equal(runtimeControlsDisabled({ kind: 'idle' }, null), false);
-  assert.equal(runtimeControlsDisabled({ kind: 'failed' }, null), false);
-  assert.equal(runtimeControlsDisabled({ kind: 'starting' }, null), true);
+  assert.equal(runtimeControlsDisabled({ kind: 'failed', label: 'Failed', message: 'Failed' }, null), false);
+  assert.equal(runtimeControlsDisabled({ kind: 'starting', label: 'Starting' }, null), true);
   assert.equal(runtimeControlsDisabled({ kind: 'idle' }, 'start'), true);
 });
 
-test('canonical action restrictions disable missing-runtime controls with an explanation', () => {
-  const missingRuntime = {
+test('backend action restrictions provide disabled reasons', () => {
+  const item = {
     name: 'Vaultwarden',
-    operationState: { kind: 'idle' },
-    availableActions: [
-      {
-        id: 'start',
-        label: 'Start',
-        disabled: true,
-        reason: 'The original Compose file is missing.',
-      },
-    ],
+    operation: { kind: 'idle' as const },
+    availableActions: [{ id: 'start', label: 'Start', disabled: true, reason: 'The original Compose file is missing.' }],
   };
-
-  assert.deepEqual(applicationActionRestriction(missingRuntime, 'start'), {
-    disabled: true,
-    reason: 'The original Compose file is missing.',
-  });
-  assert.equal(runtimeActionDisabled(missingRuntime, 'start', null), true);
-  assert.equal(runtimeActionDisabledReason(missingRuntime, 'start', null), 'The original Compose file is missing.');
-  assert.equal(runtimeActionDisabled(missingRuntime, 'stop', null), false);
+  assert.deepEqual(applicationActionRestriction(item, 'start'), { disabled: true, reason: 'The original Compose file is missing.' });
+  assert.equal(runtimeActionDisabled(item, 'start', null), true);
+  assert.equal(runtimeActionDisabledReason(item, 'start', null), 'The original Compose file is missing.');
+  assert.equal(runtimeActionDisabled(item, 'stop', null), false);
 });
 
-test('failed operations do not block settings or uninstall recovery actions', () => {
+test('failed operations leave recovery controls available', () => {
   assert.equal(operationBlocksManagement({ kind: 'idle' }), false);
-  assert.equal(operationBlocksManagement({ kind: 'failed' }), false);
-  assert.equal(operationBlocksManagement({ kind: 'starting' }), true);
-  assert.equal(operationBlocksManagement({ kind: 'uninstalling' }), true);
+  assert.equal(operationBlocksManagement({ kind: 'failed', label: 'Failed', message: 'Failed' }), false);
+  assert.equal(operationBlocksManagement({ kind: 'starting', label: 'Starting' }), true);
+  assert.equal(operationBlocksManagement({ kind: 'uninstalling', label: 'Uninstalling' }), true);
 });
-
-function item(id, overrides = {}) {
-  return {
-    id,
-    sourceId: id,
-    name: id,
-    ...overrides,
-  };
-}
-
-test('successful retry clears a cached failure but unrelated success does not', () => {
-  const failed = job('restore-failed', 'backup_restore', '42:homepage', 'failed', 'restore_data');
-  const cached = item('homepage', { readinessState: 'ready', attentionState: 'none', operationState: {
-    kind: 'failed', label: 'Restore failed', jobId: failed.jobId, jobType: failed.type, message: 'Restore failed',
-  } });
-  const unrelated = job('backup-ok', 'backup', 'homepage', 'succeeded', 'archive', '2026-06-29T12:01:00Z');
-  assert.equal(operationStateForItem(cached, null, null, [unrelated, failed]).kind, 'failed');
-  const retry = job('restore-ok', 'backup_restore', '42:homepage', 'succeeded', 'restore_data', '2026-06-29T12:02:00Z');
-  assert.deepEqual(operationStateForItem(cached, null, null, [retry, unrelated, failed]), { kind: 'idle' });
-});
-
-function job(jobId, type, subjectId, status, currentStep, updatedAt = '2026-06-29T12:00:00Z') {
-  return {
-    jobId,
-    type,
-    subjectId,
-    status,
-    currentStep,
-    steps: [
-      { id: 'run', label: 'Run command', message: 'Running app command', status: currentStep === 'run' ? 'running' : 'pending' },
-      { id: 'wait', label: 'Wait for readiness', message: 'Waiting for app readiness', status: currentStep === 'wait' ? 'running' : 'pending' },
-      { id: 'archive', label: 'Create archive', message: 'Writing backup archive', status: currentStep === 'archive' ? 'running' : 'pending' },
-      { id: 'restore_data', label: 'Restore data', message: 'Restoring app data', status: currentStep === 'restore_data' ? 'running' : 'pending' },
-      { id: 'remove', label: 'Remove app', message: 'Removing containers', status: currentStep === 'remove' ? 'running' : 'pending' },
-      { id: 'repair', label: 'Run repair', message: 'Repairing app', status: currentStep === 'repair' ? 'running' : 'pending' },
-    ],
-    createdAt: '2026-06-29T12:00:00Z',
-    updatedAt,
-  };
-}

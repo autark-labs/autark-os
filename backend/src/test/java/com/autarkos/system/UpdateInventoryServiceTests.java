@@ -200,7 +200,6 @@ class UpdateInventoryServiceTests {
         when(runtime.composeProject()).thenReturn(composeProject);
         ApplicationView application = application(appId, ApplicationRelationship.MANAGED, runtime, null);
         when(application.appInstanceId()).thenReturn(appInstanceId);
-        when(application.ownershipState()).thenReturn(AutarkOsStates.OwnershipState.OWNED_MANAGED);
         return application;
     }
 

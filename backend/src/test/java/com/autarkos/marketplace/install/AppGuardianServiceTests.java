@@ -14,6 +14,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import com.autarkos.apps.ApplicationState;
+import com.autarkos.apps.ApplicationRuntimeState;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.automation.AutomationService;
@@ -116,9 +117,7 @@ class AppGuardianServiceTests {
                 "Passwords",
                 "1.0.0",
                 "",
-                health.status(),
-                "running",
-                "healthy",
+                ApplicationRuntimeState.fromStatus(health.status()),
                 "/runtime/apps/" + appId,
                 "autark-os-" + appId,
                 "http://localhost:8090",
@@ -127,12 +126,14 @@ class AppGuardianServiceTests {
                 null,
                 Instant.parse("2026-06-21T12:00:00Z"),
                 "Backups disabled",
+                "backup_disabled",
                 null,
                 RuntimeModels.AppTelemetry.unavailable(),
                 health,
                 null,
                 null,
                 List.of(),
+                null,
                 List.of());
     }
 

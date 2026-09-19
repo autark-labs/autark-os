@@ -49,7 +49,7 @@ function InstalledAppCard({ app, index }: { app: ApplicationView; index: number 
   const openUrl = app.runtime?.accessRoute?.privateUrl || app.runtime?.accessUrl;
   const detailRoute = applicationDeepLinkForManagedApp(app.id, { panel: 'manage' });
   const iconUrl = managedAppIconUrl(app.runtime) || app.image;
-  const status = appStatus(app.runtime?.friendlyStatus || 'Unknown');
+  const status = appStatus(app.runtime?.state || 'unknown');
   return (
     <article className="group/app-card relative h-56 min-w-0 overflow-hidden rounded-xl border border-sky-200/20 bg-app-card-harbor text-slate-50 shadow-lg shadow-slate-950/20 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-app-card-harbor-hover hover:shadow-xl hover:shadow-cyan-950/30" role="listitem">
       <AppBrowserLink
@@ -201,9 +201,11 @@ function QuickLinkItem({ description, icon: Icon, label, to }: { description: st
 }
 
 function appStatus(status: string) {
-  if (status === 'Ready') return { label: 'Running', tone: 'success' as const };
-  if (status === 'Needs attention' || status === 'Missing') return { label: status, tone: 'warning' as const };
-  if (status === 'Starting') return { label: 'Starting', tone: 'info' as const };
+  if (status === 'ready') return { label: 'Running', tone: 'success' as const };
+  if (status === 'degraded') return { label: 'Needs attention', tone: 'warning' as const };
+  if (status === 'missing') return { label: 'Missing', tone: 'warning' as const };
+  if (status === 'starting') return { label: 'Starting', tone: 'info' as const };
+  if (status === 'stopped') return { label: 'Stopped', tone: 'neutral' as const };
   return { label: status || 'Unavailable', tone: 'neutral' as const };
 }
 

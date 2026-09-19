@@ -463,12 +463,12 @@ public class InstalledAppsController {
         if (app == null) {
             return true;
         }
-        String readiness = app.readinessState() == null ? "" : app.readinessState();
+        String readiness = app.state() == null ? "" : app.state().value();
         if ("repair".equals(action)) {
-            return "ready".equals(readiness) || "paused".equals(readiness);
+            return "ready".equals(readiness) || "stopped".equals(readiness);
         }
         if ("stop".equals(action)) {
-            return "paused".equals(readiness) || "stopped".equals(readiness);
+            return "stopped".equals(readiness);
         }
         return "ready".equals(readiness);
     }

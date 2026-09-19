@@ -7,12 +7,14 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.autarkos.api.AppOperationView;
+import com.autarkos.api.AutarkOsAction;
+import com.autarkos.api.AutarkOsIssue;
+import com.autarkos.api.AutarkOsIssueFactory;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.host.ObservedService;
-import com.autarkos.host.ObservedServiceService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.marketplace.install.AppInstanceViewProvider;
+import com.autarkos.marketplace.install.AppRuntimeFiles;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
@@ -25,72 +27,39 @@ public class ApplicationInventoryService {
 
     private final MarketplaceCatalogService catalogService;
     private final InstalledAppRepository installedAppRepository;
-    private final ObservedServiceService observedServiceService;
     private final ManagedAppAttestationService managedApps;
-    private final AppInstanceViewProvider appViews;
 
     public ApplicationInventoryService(
             MarketplaceCatalogService catalogService,
             InstalledAppRepository installedAppRepository,
-            ObservedServiceService observedServiceService,
-            ManagedAppAttestationService managedApps,
-            AppInstanceViewProvider appViews) {
+            ManagedAppAttestationService managedApps) {
         this.catalogService = catalogService;
         this.installedAppRepository = installedAppRepository;
-        this.observedServiceService = observedServiceService;
         this.managedApps = managedApps;
-        this.appViews = appViews;
-    }
-
-    public List<ApplicationView> apps() {
-        return apps(cachedObservedServices(), appViews.list(), List.of());
-    }
-
-    public List<ApplicationView> apps(List<ObservedService> evidence) {
-        return apps(evidence, appViews.list(), List.of());
     }
 
     public List<ApplicationView> apps(
             List<ObservedService> evidence,
-            List<com.autarkos.marketplace.install.AppInstanceView> managedViews,
-            List<AppRuntimeView> runtimes) {
-        var links = browserLinks(managedViews);
-        Map<String, AppInstanceView> managedByAppId = managedViews.stream()
-                .collect(java.util.stream.Collectors.toMap(AppInstanceView::catalogAppId, view -> view, (left, right) -> left));
+            List<AppRuntimeView> runtimes,
+            Map<String, AppOperationView> operations) {
         Map<String, AppRuntimeView> runtimeByAppId = runtimes.stream()
                 .collect(java.util.stream.Collectors.toMap(AppRuntimeView::appId, view -> view, (left, right) -> left));
         return catalogService.findAll().stream()
-                .map(manifest -> appView(manifest, evidence, links, managedByAppId.get(manifest.id()), runtimeByAppId.get(manifest.id())))
+                .map(manifest -> appView(manifest, evidence, runtimeByAppId.get(manifest.id()),
+                        operations.getOrDefault(manifest.id(), AppOperationView.idle())))
                 .sorted(Comparator.comparing(ApplicationView::name, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-    }
-
-    public Optional<ApplicationView> app(String appId) {
-        return apps().stream().filter(application -> application.id().equals(appId)).findFirst();
-    }
-
-    private java.util.Map<String, String> browserLinks(List<com.autarkos.marketplace.install.AppInstanceView> apps) {
-        return apps.stream().collect(java.util.stream.Collectors.toMap(
-                com.autarkos.marketplace.install.AppInstanceView::catalogAppId,
-                app -> app.privateUrl() != null && !app.privateUrl().isBlank() ? app.privateUrl() : app.localUrl() == null ? "" : app.localUrl(),
-                (first, second) -> first));
-    }
-
-    private List<ObservedService> cachedObservedServices() {
-        return observedServiceService.observedServices();
     }
 
     private ApplicationView appView(
             ApplicationManifest manifest,
             List<ObservedService> evidence,
-            java.util.Map<String, String> links,
-            AppInstanceView managed,
-            AppRuntimeView runtime) {
+            AppRuntimeView runtime,
+            AppOperationView operation) {
         InstalledApp registered = installedAppRepository.findAppById(manifest.id()).orElse(null);
         ManagedAppAttestationService.Result attestation = managedApps.attest(registered);
         InstalledApp storedRegistration = !attestation.managed() ? null
-                : new InstalledApp(registered.appId(), registered.appName(), registered.status(), registered.runtimePath(),
-                        registered.composeProject(), links.getOrDefault(registered.appId(), registered.accessUrl()), registered.installedAt());
+                : registered;
         ObservedService registrationLost = matchingObserved(manifest.id(), evidence,
                 service -> AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
         ObservedService recoverable = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);
@@ -117,17 +86,14 @@ public class ApplicationInventoryService {
                 relationship,
                 BetaScope.allowsInstall(manifest.id()) ? "installable" : "unavailable_in_beta",
                 attestation.managed() ? attestation.ownership().appInstanceId() : "",
-                managed == null ? observedService == null ? "unknown" : observedService.runtimeState() : managed.runtimeState(),
-                managed == null ? observedService == null ? "unowned" : observedService.ownershipState() : managed.ownershipState(),
-                managed == null ? "not_ready" : managed.accessState(),
-                managed == null ? AutarkOsStates.BackupState.DISABLED : managed.backupState(),
-                managed == null ? List.of() : managed.issues(),
+                operation,
+                relationship == ApplicationRelationship.MANAGED ? issues(runtime) : List.of(),
                 relationshipLabel(relationship),
                 relationshipDescription(relationship, applicationEvidence),
                 statusTone(relationship),
                 cardTone(relationship),
                 primaryAction,
-                availableActions(manifest.id(), relationship, installed, observedService, reviewExistingHref),
+                availableActions(manifest.id(), relationship, installed, runtime, operation, observedService, reviewExistingHref),
                 relationship == ApplicationRelationship.MANAGED ? runtime : null,
                 applicationEvidence);
     }
@@ -185,21 +151,98 @@ public class ApplicationInventoryService {
             String appId,
             ApplicationRelationship relationship,
             InstalledApp installed,
+            AppRuntimeView runtime,
+            AppOperationView operation,
             ObservedService observedService,
             String reviewExistingHref) {
         return switch (relationship) {
-            case MANAGED -> installedActions(installed);
+            case MANAGED -> managedActions(installed, runtime, operation);
             case RECOVERY_REQUIRED -> existingServiceActions(observedService, reviewExistingHref, false, appId);
             case BLOCKED -> existingServiceActions(observedService, reviewExistingHref, true, appId);
             case AVAILABLE -> List.of(reviewSetup(appId));
         };
     }
 
-    private List<ApplicationAction> installedActions(InstalledApp installed) {
-        if (installed.accessUrl() == null || installed.accessUrl().isBlank()) {
+    private List<ApplicationAction> managedActions(InstalledApp installed, AppRuntimeView runtime, AppOperationView operation) {
+        if (runtime == null) {
             return List.of(manage(installed.appId()));
         }
-        return List.of(manage(installed.appId()), open(installed.accessUrl()));
+        if (operation != null && !AutarkOsStates.OperationKind.IDLE.equals(operation.kind())
+                && !AutarkOsStates.OperationKind.FAILED.equals(operation.kind())) {
+            return List.of();
+        }
+        List<ApplicationAction> actions = new java.util.ArrayList<>();
+        String openUrl = runtime.accessRoute() == null ? runtime.accessUrl() : firstPresent(
+                runtime.accessRoute().privateUrl(), runtime.accessRoute().localUrl(), runtime.accessUrl());
+        if (runtime.state() == ApplicationRuntimeState.READY && !openUrl.isBlank()) {
+            actions.add(open(openUrl));
+        }
+        boolean stopped = runtime.state() == ApplicationRuntimeState.STOPPED;
+        actions.add(post(stopped ? "start" : "stop", stopped ? "Start" : "Pause",
+                "/api/apps/" + runtime.appId() + "/" + (stopped ? "start" : "stop"), false, ""));
+        actions.add(post("restart", "Restart", "/api/apps/" + runtime.appId() + "/restart", false, ""));
+        boolean composeAvailable = AppRuntimeFiles.hasComposeFile(runtime.runtimePath());
+        String missingCompose = "The original Compose file is missing. This action needs the Compose configuration.";
+        if (!composeAvailable) {
+            actions.replaceAll(action -> List.of("start", "restart").contains(action.id())
+                    ? post(action.id(), action.label(), action.href(), true, missingCompose)
+                    : action);
+            actions.add(post("settings", "Settings", "/api/apps/" + runtime.appId() + "/settings", true, missingCompose));
+            actions.add(post("backup", "Backup", "/api/backups/apps/" + runtime.appId() + "/run", true,
+                    "A normal app backup is unavailable because its runtime folder is missing. Use archive-first uninstall to preserve the container writable layer."));
+        }
+        if (runtime.state() == ApplicationRuntimeState.DEGRADED || runtime.state() == ApplicationRuntimeState.MISSING) {
+            actions.add(post("repair", "Repair", "/api/apps/" + runtime.appId() + "/repair", !composeAvailable, composeAvailable ? "" : missingCompose));
+        }
+        return List.copyOf(actions);
+    }
+
+    private ApplicationAction post(String id, String label, String href, boolean disabled, String reason) {
+        return new ApplicationAction(id, label, "action", href, "POST", disabled, reason);
+    }
+
+    private List<AutarkOsIssue> issues(AppRuntimeView runtime) {
+        if (runtime == null) {
+            return List.of();
+        }
+        List<AutarkOsIssue> issues = new java.util.ArrayList<>();
+        if (runtime.state() == ApplicationRuntimeState.MISSING) {
+            issues.add(AutarkOsIssueFactory.appIssue(
+                    "app-missing-" + runtime.appId(), runtime.appId(), "critical", "app_missing_container",
+                    runtime.appName() + " is missing", "Autark-OS cannot find the container for this app.",
+                    AutarkOsAction.post("repair-" + runtime.appId(), "Repair", "/api/apps/" + runtime.appId() + "/repair", false, false)));
+        } else if (runtime.state() == ApplicationRuntimeState.DEGRADED) {
+            issues.add(AutarkOsIssueFactory.appIssue(
+                    "app-needs-attention-" + runtime.appId(), runtime.appId(), "warning", "app_needs_attention",
+                    runtime.appName() + " needs attention", healthDetail(runtime),
+                    AutarkOsAction.post("repair-" + runtime.appId(), "Repair", "/api/apps/" + runtime.appId() + "/repair", false, false)));
+        }
+        if (AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT.equals(runtime.backupProtection())) {
+            issues.add(AutarkOsIssueFactory.backupIssue(
+                    "backup-not-protected-" + runtime.appId(), runtime.appId(), "info",
+                    AutarkOsStates.BackupState.ENABLED_NO_RESTORE_POINT,
+                    runtime.appName() + " is not backed up yet",
+                    "Backup protection is enabled, but Autark-OS has not created a successful restore point for this app.",
+                    AutarkOsAction.route("open-backups-" + runtime.appId(), "Open backups", "/backups")));
+        }
+        if (runtime.observedAccess() != null && runtime.desiredAccess() != null
+                && runtime.desiredAccess().privateAccessRequired()
+                && !"verified".equals(runtime.observedAccess().privateLinkStatus())) {
+            String status = runtime.observedAccess().privateLinkStatus();
+            issues.add(AutarkOsIssueFactory.accessIssue(
+                    "private-access-" + runtime.appId(), runtime.appId(), "waiting".equals(status) ? "info" : "warning",
+                    "private_access_" + status, runtime.appName() + " private link needs setup",
+                    healthDetail(runtime),
+                    AutarkOsAction.post("repair-private-" + runtime.appId(), "Repair private link", "/api/apps/" + runtime.appId() + "/private-access/repair", false, false)));
+        }
+        return List.copyOf(issues);
+    }
+
+    private String healthDetail(AppRuntimeView runtime) {
+        if (runtime.healthSnapshot() != null) {
+            return firstPresent(runtime.healthSnapshot().detail(), runtime.healthSnapshot().message());
+        }
+        return "Review Diagnostics for the latest runtime evidence.";
     }
 
     private List<ApplicationAction> existingServiceActions(ObservedService observedService, String reviewExistingHref, boolean allowSeparateCopy, String appId) {

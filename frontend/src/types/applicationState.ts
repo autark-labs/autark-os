@@ -1,4 +1,4 @@
-import type { AppRuntimeView, AutarkOsIssue } from './app';
+import type { AppRuntimeView, AutarkOsIssue, BackendAppOperationState } from './app';
 
 export type ApplicationRelationship = 'managed' | 'recovery_required' | 'blocked' | 'available';
 export type CatalogAvailability = 'installable' | 'unavailable_in_beta' | string;
@@ -39,10 +39,7 @@ export type ApplicationView = {
   relationship: ApplicationRelationship;
   catalogAvailability: CatalogAvailability;
   appInstanceId: string;
-  runtimeState: string;
-  ownershipState: string;
-  accessState: string;
-  backupState: string;
+  operation: BackendAppOperationState;
   issues: AutarkOsIssue[];
   relationshipLabel: string;
   relationshipDescription: string;

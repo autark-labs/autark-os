@@ -461,7 +461,7 @@ function JobStepList({ job }: { job: AutarkOsJob }) {
 }
 
 function shouldOfferFirstBackup(app: ApplicationView) {
-  return app.backupState === 'backup_enabled_no_restore_point';
+  return app.runtime?.backupProtection === 'backup_enabled_no_restore_point';
 }
 
 function requiresInstallCaution(app: MarketplaceApp) {

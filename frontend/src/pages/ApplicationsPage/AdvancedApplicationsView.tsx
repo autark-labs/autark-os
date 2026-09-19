@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { CompactOperationStatus } from './components/AppOperationStatus';
-import { AttentionIndicator, ManagementBadge, ReadinessBadge } from './components/AppStateBadges';
+import { IssueIndicator, RelationshipBadge, RuntimeBadge } from './components/AppStateBadges';
 import { ApplicationDarkControlButton, ApplicationOpenButton } from './components/ApplicationButtons';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { runtimeActionDisabled, runtimeActionDisabledReason } from './extensions/ApplicationsPage.operations';
@@ -136,11 +136,11 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
           </div>
         </div>
       </TableCell>
-      <TableCell className="h-16 px-3 py-0"><ManagementBadge item={item} /></TableCell>
+      <TableCell className="h-16 px-3 py-0"><RelationshipBadge /></TableCell>
       <TableCell className="h-16 px-3 py-0">
-        {item.operationState.kind !== 'idle' ? (
+        {item.operation.kind !== 'idle' ? (
           <CompactOperationStatus compact item={item} />
-        ) : item.attentionState !== 'none' ? <AttentionIndicator item={item} /> : <ReadinessBadge item={item} />}
+        ) : item.issues.length > 0 ? <IssueIndicator item={item} /> : <RuntimeBadge item={item} />}
       </TableCell>
       <TableCell className="h-16 px-3 py-0"><TableMetadata icon={<Network aria-hidden="true" className="size-3.5" />} value={item.access} /></TableCell>
       <TableCell className="h-16 px-3 py-0"><BackupMetadata item={item} /></TableCell>
@@ -153,14 +153,14 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
               </AppBrowserLink>
             </ApplicationOpenButton>
           )}
-          {item.managementState === 'managed' && (
+          {item.relationship === 'managed' && (
             primaryRuntimeActionLoading ? (
               <DisabledAction disabled reason={disabledReason(loadingAction)}>
                 <ApplicationDarkControlButton aria-label={runtimeActionLabel(loadingAction)} disabled className="my-auto size-8 px-0" size="icon-sm" title={runtimeActionLabel(loadingAction)} type="button">
                   <Loader2 className="animate-spin" />
                 </ApplicationDarkControlButton>
               </DisabledAction>
-            ) : item.readinessState === 'paused' || item.readinessState === 'stopped' ? (
+            ) : item.state === 'stopped' ? (
               <DisabledAction disabled={actionDisabled('start')} reason={disabledReason('start')}>
                 <ApplicationDarkControlButton aria-label={`Start ${item.name}`} disabled={actionDisabled('start')} className="my-auto size-8 px-0" onClick={(event) => {
                   event.stopPropagation();
@@ -180,7 +180,7 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
               </DisabledAction>
             )
           )}
-          {item.managementState === 'managed' && (
+          {item.relationship === 'managed' && (
             <DisabledAction disabled={actionDisabled('restart')} reason={disabledReason('restart')}>
               <ApplicationDarkControlButton aria-label={`${loadingAction === 'restart' ? 'Restarting' : 'Restart'} ${item.name}`} disabled={actionDisabled('restart')} className="my-auto size-8 px-0" onClick={(event) => {
                 event.stopPropagation();
@@ -190,7 +190,7 @@ function AdvancedApplicationRow({ actions, item, loadingAction, managementOpen, 
               </ApplicationDarkControlButton>
             </DisabledAction>
           )}
-          {item.managementState === 'managed' && (
+          {item.relationship === 'managed' && (
             <DisabledAction disabled={actionDisabled('backup')} reason={disabledReason('backup')}>
               <ApplicationDarkControlButton aria-label={`${loadingAction === 'backup' ? 'Backing up' : 'Back up'} ${item.name}`} disabled={actionDisabled('backup')} className="my-auto size-8 px-0" onClick={(event) => {
                 event.stopPropagation();

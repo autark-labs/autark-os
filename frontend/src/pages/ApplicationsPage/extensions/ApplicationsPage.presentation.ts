@@ -45,8 +45,8 @@ export function settingsImpactFromPlan(plan: AppSettingsChangePlan): Application
 export function matchesCollectionFilters(item: ApplicationSurfaceItem, filters: ApplicationCollectionFilter[]) {
   if (!filters.length) return true;
   return filters.some((filter) => (
-    (filter === 'managed' && item.managementState === 'managed')
-    || (filter === 'attention' && item.attentionState !== 'none')
+    (filter === 'managed' && item.relationship === 'managed')
+    || (filter === 'attention' && item.issues.length > 0)
   ));
 }
 

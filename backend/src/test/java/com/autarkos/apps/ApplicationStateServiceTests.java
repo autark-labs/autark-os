@@ -20,7 +20,6 @@ import com.autarkos.host.ObservedServiceService;
 import com.autarkos.host.ObservedService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobStep;
-import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
@@ -35,12 +34,7 @@ class ApplicationStateServiceTests {
         var inventoryCalls = new AtomicInteger();
         var currentInventory = new AtomicReference<>(com.autarkos.testsupport.DockerInventoryTestData.empty());
         var runtimeGeneration = new AtomicReference<com.autarkos.host.DockerInventorySnapshot>();
-        var managedGeneration = new AtomicReference<com.autarkos.host.DockerInventorySnapshot>();
         ApplicationStateService service = new ApplicationStateService(
-                inventory -> {
-                    managedGeneration.set(inventory);
-                    return List.of(appInstance());
-                },
                 inventory -> {
                     runtimeGeneration.set(inventory);
                     return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
@@ -60,7 +54,6 @@ class ApplicationStateServiceTests {
 
         assertThat(inventoryCalls).hasValue(1);
         assertThat(runtimeGeneration.get()).isSameAs(currentInventory.get());
-        assertThat(managedGeneration.get()).isSameAs(currentInventory.get());
         currentInventory.set(com.autarkos.testsupport.DockerInventoryTestData.unavailable("daemon unavailable"));
 
         ApplicationState failed = service.refreshNow();
@@ -74,17 +67,17 @@ class ApplicationStateServiceTests {
     void failedUninstallRemainsVisibleUntilSuccessfulUninstallWithoutRewritingRuntimeReadiness() {
         var failure = lifecycleJob("uninstall-failed", "uninstall_app", "homepage", "failed", "checkpoint", "2026-06-21T12:00:00Z");
         var jobs = new AtomicReference<>(List.of(failure));
-        var service = createService(List::of, () -> List.of(runtimeApp("homepage", "Homepage")),
+        var service = createService(() -> List.of(runtimeApp("homepage", "Homepage")),
                 new ObservedServiceService(repository(), noScan()), inventory(),
                 () -> Instant.parse("2026-06-21T12:05:00Z"), jobs::get);
-        var app = runtimeApps(service.refreshNow()).getFirst();
-        assertThat(app.readinessState()).isEqualTo("ready");
-        assertThat(app.operationState().label()).isEqualTo("Uninstall failed");
-        assertThat(app.operationState().jobType()).isEqualTo("uninstall_app");
+        var app = applications(service.refreshNow()).getFirst();
+        assertThat(app.runtime().state()).isEqualTo(ApplicationRuntimeState.READY);
+        assertThat(app.operation().label()).isEqualTo("Uninstall failed");
+        assertThat(app.operation().jobType()).isEqualTo("uninstall_app");
         jobs.set(List.of(lifecycleJob("backup-ok", "backup", "homepage", "succeeded", "archive", "2026-06-21T12:01:00Z"), failure));
-        assertThat(runtimeApps(service.refreshNow()).getFirst().operationState().kind()).isEqualTo("failed");
+        assertThat(applications(service.refreshNow()).getFirst().operation().kind()).isEqualTo("failed");
         jobs.set(List.of(lifecycleJob("uninstall-ok", "uninstall_app", "homepage", "succeeded", "remove", "2026-06-21T12:02:00Z"), failure));
-        assertThat(runtimeApps(service.refreshNow()).getFirst().operationState().kind()).isEqualTo("idle");
+        assertThat(applications(service.refreshNow()).getFirst().operation().kind()).isEqualTo("idle");
         assertThat(jobs.get()).contains(failure);
     }
 
@@ -100,7 +93,6 @@ class ApplicationStateServiceTests {
         ObservedServiceService observedServiceService = new ObservedServiceService(repository, null);
         ApplicationStateService service = createService(
                 List::of,
-                List::of,
                 observedServiceService,
                 inventory(),
                 Instant::now);
@@ -114,13 +106,12 @@ class ApplicationStateServiceTests {
 
     @Test
     void snapshotDoesNotRunLiveSuppliers() {
-        AtomicInteger managedCalls = new AtomicInteger();
+        AtomicInteger runtimeCalls = new AtomicInteger();
         ApplicationStateService service = createService(
                 () -> {
-                    managedCalls.incrementAndGet();
-                    return List.of(appInstance());
+                    runtimeCalls.incrementAndGet();
+                    return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
                 },
-                List::of,
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"));
@@ -128,7 +119,7 @@ class ApplicationStateServiceTests {
         service.snapshot();
         service.snapshot();
 
-        assertThat(managedCalls).hasValue(0);
+        assertThat(runtimeCalls).hasValue(0);
         assertThat(service.snapshot().refreshStatus()).isEqualTo("stale");
         assertThat(service.snapshot().updatedAt()).isNull();
         assertThat(service.snapshot().stale()).isTrue();
@@ -136,13 +127,12 @@ class ApplicationStateServiceTests {
 
     @Test
     void explicitRefreshBuildsAndCachesProjection() {
-        AtomicInteger managedCalls = new AtomicInteger();
+        AtomicInteger runtimeCalls = new AtomicInteger();
         ApplicationStateService service = createService(
                 () -> {
-                    managedCalls.incrementAndGet();
-                    return List.of(appInstance());
+                    runtimeCalls.incrementAndGet();
+                    return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
                 },
-                List::of,
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"));
@@ -150,7 +140,7 @@ class ApplicationStateServiceTests {
         ApplicationState refreshed = service.refreshNow();
         ApplicationState cached = service.snapshot();
 
-        assertThat(managedCalls).hasValue(1);
+        assertThat(runtimeCalls).hasValue(1);
         assertThat(applications(refreshed)).hasSize(1);
         assertThat(cached).isSameAs(refreshed);
         assertThat(cached.refreshStatus()).isEqualTo("idle");
@@ -163,7 +153,6 @@ class ApplicationStateServiceTests {
                 () -> {
                     throw new IllegalStateException("Docker inventory unavailable");
                 },
-                List::of,
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"));
@@ -185,9 +174,8 @@ class ApplicationStateServiceTests {
                     if (failure.get() != null) {
                         throw failure.get();
                     }
-                    return List.of(appInstance());
+                    return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
                 },
-                List::of,
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"));
@@ -210,7 +198,6 @@ class ApplicationStateServiceTests {
         CountingObservedServiceService observedServiceService = new CountingObservedServiceService(repository);
         ApplicationStateService service = createService(
                 List::of,
-                List::of,
                 observedServiceService,
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"));
@@ -226,15 +213,15 @@ class ApplicationStateServiceTests {
     void snapshotDuringRefreshReturnsPreviousProjectionWithoutWaiting() throws Exception {
         CountDownLatch refreshStarted = new CountDownLatch(1);
         CountDownLatch releaseRefresh = new CountDownLatch(1);
-        AtomicReference<List<AppInstanceView>> managed = new AtomicReference<>(List.of(appInstance()));
+        AtomicReference<java.util.function.Supplier<List<AppRuntimeView>>> runtime = new AtomicReference<>(
+                () -> List.of(runtimeApp("vaultwarden", "Vaultwarden")));
         ApplicationStateService service = createService(
-                () -> managed.get(),
-                List::of,
+                () -> runtime.get().get(),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"));
         ApplicationState previous = service.refreshNow();
-        managed.set(List.of(blockingAppInstance(refreshStarted, releaseRefresh)));
+        runtime.set(() -> blockingRuntimeApp(refreshStarted, releaseRefresh));
 
         Thread refreshThread = new Thread(service::refreshNow);
         refreshThread.start();
@@ -254,15 +241,15 @@ class ApplicationStateServiceTests {
     void exclusiveRefreshWaitsAndBuildsFreshStateDuringAnotherRefresh() throws Exception {
         CountDownLatch refreshStarted = new CountDownLatch(1);
         CountDownLatch releaseRefresh = new CountDownLatch(1);
-        AtomicReference<List<AppInstanceView>> managed = new AtomicReference<>(List.of(appInstance()));
+        AtomicReference<java.util.function.Supplier<List<AppRuntimeView>>> runtime = new AtomicReference<>(
+                () -> List.of(runtimeApp("vaultwarden", "Vaultwarden")));
         ApplicationStateService service = createService(
-                managed::get,
-                List::of,
+                () -> runtime.get().get(),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"));
         ApplicationState previous = service.refreshNow();
-        managed.set(List.of(blockingAppInstance(refreshStarted, releaseRefresh)));
+        runtime.set(() -> blockingRuntimeApp(refreshStarted, releaseRefresh));
 
         Thread refreshThread = new Thread(service::refreshNow);
         refreshThread.start();
@@ -280,14 +267,13 @@ class ApplicationStateServiceTests {
 
     @Test
     void backgroundRefreshUsesProvidedExecutorInsteadOfRunningInline() {
-        AtomicInteger managedCalls = new AtomicInteger();
+        AtomicInteger runtimeCalls = new AtomicInteger();
         RecordingExecutor executor = new RecordingExecutor();
         ApplicationStateService service = createService(
                 () -> {
-                    managedCalls.incrementAndGet();
-                    return List.of(appInstance());
+                    runtimeCalls.incrementAndGet();
+                    return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
                 },
-                List::of,
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"),
@@ -296,24 +282,23 @@ class ApplicationStateServiceTests {
         service.refreshInBackground();
 
         assertThat(executor.tasks).hasSize(1);
-        assertThat(managedCalls).hasValue(0);
+        assertThat(runtimeCalls).hasValue(0);
 
         executor.runNext();
 
-        assertThat(managedCalls).hasValue(1);
+        assertThat(runtimeCalls).hasValue(1);
         assertThat(service.snapshot().refreshStatus()).isEqualTo("idle");
     }
 
     @Test
     void backgroundRefreshRequestsCoalesceWhileQueued() {
-        AtomicInteger managedCalls = new AtomicInteger();
+        AtomicInteger runtimeCalls = new AtomicInteger();
         RecordingExecutor executor = new RecordingExecutor();
         ApplicationStateService service = createService(
                 () -> {
-                    managedCalls.incrementAndGet();
-                    return List.of(appInstance());
+                    runtimeCalls.incrementAndGet();
+                    return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
                 },
-                List::of,
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"),
@@ -327,15 +312,14 @@ class ApplicationStateServiceTests {
 
         executor.runNext();
 
-        assertThat(managedCalls).hasValue(1);
+        assertThat(runtimeCalls).hasValue(1);
     }
 
     @Test
     void backgroundRefreshMarksCachedProjectionAsRunningWhileQueued() {
         RecordingExecutor executor = new RecordingExecutor();
         ApplicationStateService service = createService(
-                () -> List.of(appInstance()),
-                List::of,
+                () -> List.of(runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"),
@@ -359,7 +343,6 @@ class ApplicationStateServiceTests {
     @Test
     void snapshotOverlaysLifecycleOperationOnTargetAppAndPreservesOrder() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("syncthing", "Syncthing")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -371,21 +354,14 @@ class ApplicationStateServiceTests {
         assertThat(runtimeApps(state))
                 .extracting(AppRuntimeView::appId)
                 .containsExactly("homepage", "syncthing");
-        assertThat(runtimeApps(state))
-                .extracting(AppRuntimeView::sortKey)
-                .containsExactly("managed:homepage", "managed:syncthing");
-        assertThat(runtimeApps(state))
-                .extracting(AppRuntimeView::displayOrder)
-                .containsExactly(0, 1);
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("idle");
-        assertThat(runtimeApps(state).get(1).operationState().kind()).isEqualTo("restarting");
-        assertThat(runtimeApps(state).get(1).readinessState()).isEqualTo("starting");
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(applications(state).get(1).operation().kind()).isEqualTo("restarting");
+        assertThat(runtimeApps(state).get(1).state()).isEqualTo(ApplicationRuntimeState.READY);
     }
 
     @Test
     void snapshotOverlaysRepairJobOnTargetApp() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing", "Unavailable")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -394,15 +370,14 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("repairing");
-        assertThat(runtimeApps(state).getFirst().operationState().label()).isEqualTo("Repairing");
-        assertThat(runtimeApps(state).getFirst().availableActions()).isEmpty();
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("repairing");
+        assertThat(applications(state).getFirst().operation().label()).isEqualTo("Repairing");
+        assertThat(applications(state).getFirst().availableActions()).isEmpty();
     }
 
     @Test
     void snapshotOverlaysBackupJobOnTargetApp() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -411,16 +386,15 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("idle");
-        assertThat(runtimeApps(state).get(1).operationState().kind()).isEqualTo("backing_up");
-        assertThat(runtimeApps(state).get(1).operationState().label()).isEqualTo("Creating backup");
-        assertThat(runtimeApps(state).get(1).availableActions()).isEmpty();
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(applications(state).get(1).operation().kind()).isEqualTo("backing_up");
+        assertThat(applications(state).get(1).operation().label()).isEqualTo("Creating backup");
+        assertThat(applications(state).get(1).availableActions()).isEmpty();
     }
 
     @Test
     void snapshotOverlaysRestoreJobOnTargetApp() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -429,16 +403,15 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("idle");
-        assertThat(runtimeApps(state).get(1).operationState().kind()).isEqualTo("restoring");
-        assertThat(runtimeApps(state).get(1).operationState().label()).isEqualTo("Restoring");
-        assertThat(runtimeApps(state).get(1).availableActions()).isEmpty();
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(applications(state).get(1).operation().kind()).isEqualTo("restoring");
+        assertThat(applications(state).get(1).operation().label()).isEqualTo("Restoring");
+        assertThat(applications(state).get(1).availableActions()).isEmpty();
     }
 
     @Test
     void snapshotOverlaysFullRestoreJobOnEveryManagedApp() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -447,18 +420,17 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state))
-                .extracting(app -> app.operationState().kind())
+        assertThat(applications(state))
+                .extracting(app -> app.operation().kind())
                 .containsExactly("restoring", "restoring");
-        assertThat(runtimeApps(state))
-                .extracting(app -> app.operationState().label())
+        assertThat(applications(state))
+                .extracting(app -> app.operation().label())
                 .containsExactly("Restoring", "Restoring");
     }
 
     @Test
     void snapshotDoesNotPinFailedFullRestoreOnEveryManagedApp() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -467,13 +439,13 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state))
-                .extracting(app -> app.operationState().kind())
+        assertThat(applications(state))
+                .extracting(app -> app.operation().kind())
                 .containsExactly("idle", "idle");
-        assertThat(runtimeApps(state).getFirst().availableActions())
+        assertThat(applications(state).getFirst().availableActions())
                 .extracting(action -> action.id())
                 .contains("stop", "restart");
-        assertThat(runtimeApps(state).get(1).availableActions())
+        assertThat(applications(state).get(1).availableActions())
                 .extracting(action -> action.id())
                 .contains("stop", "restart");
     }
@@ -481,7 +453,6 @@ class ApplicationStateServiceTests {
     @Test
     void snapshotKeepsFailedTargetedRestoreVisibleOnTargetApp() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("homepage", "Homepage"), runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -490,15 +461,14 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("idle");
-        assertThat(runtimeApps(state).get(1).operationState().kind()).isEqualTo("failed");
-        assertThat(runtimeApps(state).get(1).operationState().label()).isEqualTo("Restore failed");
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(applications(state).get(1).operation().kind()).isEqualTo("failed");
+        assertThat(applications(state).get(1).operation().label()).isEqualTo("Restore failed");
     }
 
     @Test
     void snapshotKeepsFailedBackupVisibleOnReadyApp() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("vaultwarden", "Vaultwarden")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -507,14 +477,13 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("failed");
-        assertThat(runtimeApps(state).getFirst().operationState().label()).isEqualTo("Backup failed");
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("failed");
+        assertThat(applications(state).getFirst().operation().label()).isEqualTo("Backup failed");
     }
 
     @Test
     void snapshotOnlyIncludesRepairActionWhenCanonicalStateNeedsRemediation() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(
                         runtimeApp("homepage", "Homepage"),
                         runtimeApp("syncthing", "Syncthing", "Unavailable")),
@@ -525,10 +494,10 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().availableActions())
+        assertThat(applications(state).getFirst().availableActions())
                 .extracting(action -> action.id())
                 .doesNotContain("repair");
-        assertThat(runtimeApps(state).get(1).availableActions())
+        assertThat(applications(state).get(1).availableActions())
                 .extracting(action -> action.id())
                 .contains("repair");
     }
@@ -536,7 +505,6 @@ class ApplicationStateServiceTests {
     @Test
     void snapshotIgnoresOlderFailedLifecycleJobAfterNewerSuccess() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -547,36 +515,33 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("idle");
-        assertThat(runtimeApps(state).getFirst().readinessState()).isEqualTo("ready");
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(runtimeApps(state).getFirst().state()).isEqualTo(ApplicationRuntimeState.READY);
     }
 
     @Test
     void snapshotDoesNotSurfaceFailedLifecycleJobWhenRuntimeIsHealthyOrStarting() {
         ApplicationStateService healthyService = createService(
-                List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"),
                 () -> List.of(lifecycleJob("start-failed", "start_app", "syncthing", "failed", "wait_until_ready")));
         ApplicationState startingState = createService(
-                List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing", "Starting")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
                 () -> Instant.parse("2026-06-21T12:00:00Z"),
                 () -> List.of(lifecycleJob("start-failed", "start_app", "syncthing", "failed", "wait_until_ready"))).refreshNow();
 
-        assertThat(runtimeApps(healthyService.refreshNow()).getFirst().operationState().kind()).isEqualTo("idle");
-        assertThat(runtimeApps(startingState).getFirst().operationState().kind()).isEqualTo("idle");
-        assertThat(runtimeApps(startingState).getFirst().readinessState()).isEqualTo("starting");
+        assertThat(applications(healthyService.refreshNow()).getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(applications(startingState).getFirst().operation().kind()).isEqualTo("idle");
+        assertThat(runtimeApps(startingState).getFirst().state()).isEqualTo(ApplicationRuntimeState.STARTING);
     }
 
     @Test
     void snapshotSurfacesFailedLifecycleJobWhenRuntimeStillNeedsAttention() {
         ApplicationStateService service = createService(
-                List::of,
                 () -> List.of(runtimeApp("syncthing", "Syncthing", "Unavailable")),
                 new ObservedServiceService(repository(), noScan()),
                 inventory(),
@@ -585,41 +550,38 @@ class ApplicationStateServiceTests {
 
         ApplicationState state = service.refreshNow();
 
-        assertThat(runtimeApps(state).getFirst().operationState().kind()).isEqualTo("failed");
+        assertThat(applications(state).getFirst().operation().kind()).isEqualTo("failed");
     }
 
     private ApplicationStateService createService(
-            java.util.function.Supplier<List<AppInstanceView>> managed,
             java.util.function.Supplier<List<AppRuntimeView>> runtime,
             ObservedServiceService observed,
             ApplicationInventoryService inventory,
             java.util.function.Supplier<Instant> clock) {
-        return createService(managed, runtime, observed, inventory, clock,
+        return createService(runtime, observed, inventory, clock,
                 (java.util.function.Supplier<List<AutarkOsJob>>) List::of);
     }
 
     private ApplicationStateService createService(
-            java.util.function.Supplier<List<AppInstanceView>> managed,
             java.util.function.Supplier<List<AppRuntimeView>> runtime,
             ObservedServiceService observed,
             ApplicationInventoryService inventory,
             java.util.function.Supplier<Instant> clock,
             java.util.function.Supplier<List<AutarkOsJob>> jobs) {
         return new ApplicationStateService(
-                ignored -> managed.get(), ignored -> runtime.get(),
+                ignored -> runtime.get(),
                 com.autarkos.testsupport.DockerInventoryTestData::empty,
                 observed, inventory, clock, jobs, Runnable::run, false);
     }
 
     private ApplicationStateService createService(
-            java.util.function.Supplier<List<AppInstanceView>> managed,
             java.util.function.Supplier<List<AppRuntimeView>> runtime,
             ObservedServiceService observed,
             ApplicationInventoryService inventory,
             java.util.function.Supplier<Instant> clock,
             java.util.concurrent.Executor executor) {
         return new ApplicationStateService(
-                ignored -> managed.get(), ignored -> runtime.get(),
+                ignored -> runtime.get(),
                 com.autarkos.testsupport.DockerInventoryTestData::empty,
                 observed, inventory, clock, List::of, executor, false);
     }
@@ -629,23 +591,18 @@ class ApplicationStateServiceTests {
     }
 
     private ApplicationInventoryService inventory() {
-        return new ApplicationInventoryService(null, null, mock(ObservedServiceService.class), null, List::of) {
+        return new ApplicationInventoryService(null, null, null) {
             @Override
-            public List<ApplicationView> apps(List<ObservedService> observed, List<AppInstanceView> managed, List<AppRuntimeView> runtime) {
+            public List<ApplicationView> apps(List<ObservedService> observed, List<AppRuntimeView> runtime, java.util.Map<String, com.autarkos.api.AppOperationView> operations) {
                 List<ApplicationView> applications = new ArrayList<>();
                 for (AppRuntimeView app : runtime) {
-                    applications.add(application(app.appId(), app.appName(), "", app, null));
-                }
-                for (AppInstanceView app : managed) {
-                    if (applications.stream().noneMatch(candidate -> candidate.id().equals(app.catalogAppId()))) {
-                        applications.add(application(app.catalogAppId(), app.name(), app.appInstanceId(), null, null));
-                    }
+                    applications.add(application(app.appId(), app.appName(), "", app, null,
+                            operations.getOrDefault(app.appId(), com.autarkos.api.AppOperationView.idle())));
                 }
                 for (ObservedService service : observed) {
                     applications.add(new ApplicationView(
                             service.id(), service.displayName(), "Apps", "", "", "",
-                            ApplicationRelationship.BLOCKED, "unavailable", "", service.runtimeState(),
-                            service.ownershipState(), "not_ready", "backup_disabled", List.of(),
+                            ApplicationRelationship.BLOCKED, "unavailable", "", com.autarkos.api.AppOperationView.idle(), List.of(),
                             "Found on server", "Detected host resource", "neutral", "observed",
                             new ApplicationAction("review_existing", "Review existing service", "route", "/apps", null, false, ""),
                             List.of(), null, evidence(service)));
@@ -655,13 +612,26 @@ class ApplicationStateServiceTests {
         };
     }
 
-    private ApplicationView application(String id, String name, String appInstanceId, AppRuntimeView runtime, ApplicationEvidence evidence) {
+    private ApplicationView application(String id, String name, String appInstanceId, AppRuntimeView runtime, ApplicationEvidence evidence,
+            com.autarkos.api.AppOperationView operation) {
         return new ApplicationView(
                 id, name, "Apps", "", "", "", ApplicationRelationship.MANAGED, "installable",
-                appInstanceId, runtime == null ? "unknown" : runtime.technicalStatus(), "owned", "local_ready",
-                "backup_disabled", List.of(), "Installed", "Managed by Autark-OS", "success", "success",
+                appInstanceId, operation, List.of(), "Installed", "Managed by Autark-OS", "success", "success",
                 new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""),
-                List.of(), runtime, evidence);
+                testActions(runtime, operation), runtime, evidence);
+    }
+
+    private List<ApplicationAction> testActions(AppRuntimeView runtime, com.autarkos.api.AppOperationView operation) {
+        if (!"idle".equals(operation.kind()) && !"failed".equals(operation.kind())) {
+            return List.of();
+        }
+        List<ApplicationAction> actions = new ArrayList<>();
+        actions.add(new ApplicationAction("stop", "Pause", "action", "/stop", "POST", false, ""));
+        actions.add(new ApplicationAction("restart", "Restart", "action", "/restart", "POST", false, ""));
+        if (runtime.state() == ApplicationRuntimeState.DEGRADED || runtime.state() == ApplicationRuntimeState.MISSING) {
+            actions.add(new ApplicationAction("repair", "Repair", "action", "/repair", "POST", false, ""));
+        }
+        return List.copyOf(actions);
     }
 
     private List<ApplicationView> applications(ApplicationState state) {
@@ -707,50 +677,14 @@ class ApplicationStateServiceTests {
                 service.ownershipState(), service.runtimeState(), "Conflict", "Detected host resource", "", "", "", "");
     }
 
-    private AppInstanceView appInstance() {
-        return new AppInstanceView(
-                "appinst_homepage",
-                "homepage",
-                "Homepage",
-                "Dashboards",
-                "",
-                "Ready",
-                "ready",
-                "running",
-                "owned",
-                "local_ready",
-                "backup_disabled",
-                "http://localhost:3005",
-                null,
-                List.of(),
-                List.of(),
-                Instant.parse("2026-06-21T12:00:00Z"));
-    }
-
-    private AppInstanceView blockingAppInstance(CountDownLatch started, CountDownLatch release) {
+    private List<AppRuntimeView> blockingRuntimeApp(CountDownLatch started, CountDownLatch release) {
         started.countDown();
         try {
             release.await(2, TimeUnit.SECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
         }
-        return new AppInstanceView(
-                "appinst_vaultwarden",
-                "vaultwarden",
-                "Vaultwarden",
-                "Security",
-                "",
-                "Ready",
-                "ready",
-                "running",
-                "owned",
-                "local_ready",
-                "backup_disabled",
-                "http://localhost:3006",
-                null,
-                List.of(),
-                List.of(),
-                Instant.parse("2026-06-21T12:00:00Z"));
+        return List.of(runtimeApp("vaultwarden", "Vaultwarden"));
     }
 
     private AppRuntimeView runtimeApp(String appId, String name) {
@@ -765,9 +699,7 @@ class ApplicationStateServiceTests {
                 name + " app",
                 "1.0.0",
                 "",
-                friendlyStatus,
-                "running",
-                "healthy",
+                ApplicationRuntimeState.fromStatus(friendlyStatus),
                 "/runtime/apps/" + appId,
                 "autark-os-" + appId,
                 "http://localhost:3000",
@@ -776,12 +708,14 @@ class ApplicationStateServiceTests {
                 null,
                 Instant.parse("2026-06-21T12:00:00Z"),
                 "Backups disabled",
+                "backup_disabled",
                 null,
                 null,
                 null,
                 null,
                 null,
                 List.of(),
+                null,
                 List.of());
     }
 

@@ -8,19 +8,16 @@ test('unknown managed runtime state does not render as ready', () => {
     appId: 'vaultwarden',
     appName: 'Vaultwarden',
     category: 'Security',
-    friendlyStatus: undefined,
+    state: 'unknown',
+    backupProtection: 'backup_disabled',
   } as AppRuntimeView;
 
   const [item] = buildApplicationSurfaceItems({
-    accessByAppId: {},
     applications: [application(app)],
-    healthByAppId: {},
-    telemetryByAppId: {},
   });
 
-  assert.equal(item.status, 'Needs review');
-  assert.equal(item.readinessState, 'unknown');
-  assert.equal(item.attentionState, 'needs_review');
+  assert.equal(item.state, 'unknown');
+  assert.equal(item.nextAction?.id, 'review_issue');
 });
 
 test('managed cards use the catalog icon when a runtime image is a Docker reference', () => {
@@ -28,15 +25,13 @@ test('managed cards use the catalog icon when a runtime image is a Docker refere
     appId: 'vaultwarden',
     appName: 'Vaultwarden',
     category: 'Security',
-    friendlyStatus: 'Ready',
+    state: 'ready',
+    backupProtection: 'backup_disabled',
     image: 'vaultwarden/server:1.36.0',
   } as AppRuntimeView;
 
   const [item] = buildApplicationSurfaceItems({
-    accessByAppId: {},
     applications: [application(app)],
-    healthByAppId: {},
-    telemetryByAppId: {},
   });
 
   assert.equal(item.iconUrl, '/app-images/vaultwarden.svg');
@@ -46,7 +41,7 @@ function application(runtime: AppRuntimeView) {
   return {
     id: runtime.appId, name: runtime.appName, category: runtime.category, image: '/app-images/vaultwarden.svg',
     summary: '', description: '', relationship: 'managed' as const, catalogAvailability: 'installable', appInstanceId: runtime.appId,
-    runtimeState: runtime.technicalStatus ?? 'unknown', ownershipState: 'owned', accessState: 'local_ready', backupState: 'backup_disabled', issues: [],
+    operation: { kind: 'idle' as const }, issues: [],
     relationshipLabel: 'Installed', relationshipDescription: '', statusTone: 'success', cardTone: 'success',
     primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps', method: null, disabled: false, reason: '' },
     availableActions: [], runtime, evidence: null,

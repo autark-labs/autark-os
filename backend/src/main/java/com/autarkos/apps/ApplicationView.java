@@ -2,6 +2,7 @@ package com.autarkos.apps;
 
 import java.util.List;
 
+import com.autarkos.api.AppOperationView;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.marketplace.install.AppRuntimeView;
 
@@ -15,10 +16,7 @@ public record ApplicationView(
         ApplicationRelationship relationship,
         String catalogAvailability,
         String appInstanceId,
-        String runtimeState,
-        String ownershipState,
-        String accessState,
-        String backupState,
+        AppOperationView operation,
         List<AutarkOsIssue> issues,
         String relationshipLabel,
         String relationshipDescription,

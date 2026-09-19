@@ -318,7 +318,7 @@ public class SystemSetupService {
     private SystemSetupModels.SystemSetupExistingInstallReport existingInstallReport(AutarkOsIdentity identity) {
         List<SystemSetupModels.SystemSetupExistingInstallResource> resources = observedServices.get().stream()
                 .filter(this::isExistingAutarkOsResource)
-                .map(service -> existingResource(service, identity))
+                .map(this::existingResource)
                 .toList();
         if (resources.isEmpty()) {
             return new SystemSetupModels.SystemSetupExistingInstallReport(
@@ -358,18 +358,12 @@ public class SystemSetupService {
                 || "unknown_conflict".equals(service.ownershipState());
     }
 
-    private SystemSetupModels.SystemSetupExistingInstallResource existingResource(ObservedService service, AutarkOsIdentity identity) {
+    private SystemSetupModels.SystemSetupExistingInstallResource existingResource(ObservedService service) {
         String kind = "legacy_autark_os".equals(service.ownershipState()) ? "recoverable_app" : "autark_os_resource";
-        String owner = service.autarkOsInstanceId();
-        if (owner == null || owner.isBlank()) {
-            owner = identity.instanceId();
-        }
         return new SystemSetupModels.SystemSetupExistingInstallResource(
                 service.id(),
                 service.displayName(),
                 kind,
-                service.ownershipState(),
-                owner,
                 existingResourceSummary(service),
                 "/apps");
     }

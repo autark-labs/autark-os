@@ -7,7 +7,13 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.autarkos.marketplace.install.AppInstanceView;
+import com.autarkos.api.AppOperationView;
+import com.autarkos.apps.ApplicationAction;
+import com.autarkos.apps.ApplicationRelationship;
+import com.autarkos.apps.ApplicationRuntimeState;
+import com.autarkos.apps.ApplicationView;
+import com.autarkos.marketplace.install.AppRuntimeView;
+import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
 class AccessStatusServiceTests {
@@ -99,27 +105,27 @@ class AccessStatusServiceTests {
         assertThat(status.issues()).isEmpty();
     }
 
-    private AccessStatusService service(TailscaleStatus tailscaleStatus, List<AppInstanceView> apps) {
+    private AccessStatusService service(TailscaleStatus tailscaleStatus, List<ApplicationView> apps) {
         return new AccessStatusService(() -> apps, () -> tailscaleStatus, () -> "http://host:8082", () -> Instant.parse("2026-06-20T12:00:00Z"));
     }
 
-    private AppInstanceView app(String appInstanceId, String name, String accessState, String localUrl, String privateUrl) {
-        return new AppInstanceView(
-                appInstanceId,
-                appInstanceId.replace("appinst_", ""),
-                name,
-                "Security",
-                "",
-                "Ready",
-                "ready",
-                "running",
-                "owned",
-                accessState,
-                "backup_disabled",
-                localUrl,
-                privateUrl,
-                List.of(),
-                List.of(),
-                Instant.parse("2026-06-20T12:00:00Z"));
+    private ApplicationView app(String appInstanceId, String name, String accessState, String localUrl, String privateUrl) {
+        String appId = appInstanceId.replace("appinst_", "");
+        boolean privateRequested = accessState.startsWith("private_");
+        String linkStatus = "private_ready".equals(accessState) ? "verified"
+                : "private_waiting".equals(accessState) ? "waiting" : privateRequested ? "missing" : "not_enabled";
+        AppRuntimeView runtime = new AppRuntimeView(
+                appId, name, "Security", "", "1.0.0", "", ApplicationRuntimeState.READY,
+                "/runtime/apps/" + appId, "autark-os-" + appId, localUrl,
+                new AccessModels.AppAccessRoute(privateUrl.isBlank() ? localUrl : privateUrl, localUrl,
+                        privateUrl.isBlank() ? null : privateUrl, null, "http", null, null, linkStatus, "network"),
+                new AccessModels.AccessDesiredState(privateRequested ? "private" : "local", "", localUrl,
+                        privateUrl, null, "http", privateRequested ? "required" : "optional", privateRequested, false),
+                null, Instant.parse("2026-06-20T12:00:00Z"), "", "backup_disabled",
+                null, null, null, null, null, List.of(), null, List.of());
+        return new ApplicationView(
+                appId, name, "Security", "", "", "", ApplicationRelationship.MANAGED, "installable",
+                appInstanceId, AppOperationView.idle(), List.of(), "Installed", "Managed", "success", "success",
+                new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""), List.of(), runtime, null);
     }
 }

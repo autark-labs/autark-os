@@ -22,7 +22,7 @@ export function zoneAppChip(item: ZoneAppSource) {
       ? item.accessRoute.privateUrl
       : item.accessRoute?.localUrl || item.observedAccess?.localUrl || item.accessUrl || item.settings?.accessUrl || '',
     external: false,
-    status: item.friendlyStatus || item.canonicalUserStatus || 'Unknown',
+    status: item.state,
   };
 }
 

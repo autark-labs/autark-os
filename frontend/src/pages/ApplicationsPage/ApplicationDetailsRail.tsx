@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { ApplicationDarkControlButton, ApplicationPrimaryButton } from './components/ApplicationButtons';
 import { ExpandedOperationStatus } from './components/AppOperationStatus';
-import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
+import { labelForRelationship, labelForRuntimeState } from './components/AppStateBadges';
 import { ApplicationIcon } from './extensions/ApplicationVisuals';
 import { ApplicationManagementPanel } from './ApplicationManagementPanel';
 import { runtimeActionDisabled, runtimeActionDisabledReason, runtimeControlsDisabled } from './extensions/ApplicationsPage.operations';
@@ -41,9 +41,9 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
   const managementDrawerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    setManagementTab(item?.operationState.kind === 'failed' ? 'recovery' : 'overview');
+    setManagementTab(item?.operation.kind === 'failed' ? 'recovery' : 'overview');
     setRailView('overview');
-  }, [item?.id, item?.operationState.kind]);
+  }, [item?.id, item?.operation.kind]);
 
   useEffect(() => {
     const drawer = managementDrawerRef.current;
@@ -182,7 +182,7 @@ function CompactRailView({
   const issues = buildAttentionIssues({ actions, item, loadingAction, onOpenRecovery });
 
   return (
-    <div className="flex min-h-0 flex-col gap-3" data-management-state={labelForManagementState(item.managementState)}>
+    <div className="flex min-h-0 flex-col gap-3" data-management-state={labelForRelationship(item.relationship)}>
       <ExpandedOperationStatus item={item} />
       <StatusLegend />
       <Tabs onValueChange={(value) => setRailView(value as RailView)} value={railView}>
@@ -196,7 +196,7 @@ function CompactRailView({
 
         <TabsContent className="grid gap-3" value="overview">
           <div className="grid gap-2">
-            <RailStatusRow label="State" tone={readinessTone(item)} value={labelForReadiness(item.readinessState)} />
+            <RailStatusRow label="State" tone={runtimeTone(item)} value={labelForRuntimeState(item.state)} />
             <RailStatusRow label="Access" tone={accessTone(item)} value={item.access} />
             <RailStatusRow label="Backup" tone={backupTone(item)} value={item.backup} />
           </div>
@@ -301,29 +301,29 @@ function buildAttentionIssues({ actions, item, loadingAction, onOpenRecovery }: 
   const actionDisabled = (action: ApplicationRuntimeAction) => runtimeActionDisabled(item, action, loadingAction);
   const disabledReason = (action: ApplicationRuntimeAction) => runtimeActionDisabledReason(item, action, loadingAction);
 
-  if (item.operationState.kind === 'failed') {
+  if (item.operation.kind === 'failed') {
     issues.push({
       action: { disabled: false, label: 'Open recovery', onClick: onOpenRecovery, reason: '' },
-      description: item.operationState.message || 'Autark-OS could not finish the last operation.',
+      description: item.operation.message || 'Autark-OS could not finish the last operation.',
       id: 'operation-failed',
-      title: item.operationState.label,
+      title: item.operation.label,
       tone: 'error',
     });
-  } else if (item.operationState.kind !== 'idle') {
+  } else if (item.operation.kind !== 'idle') {
     issues.push({
-      description: item.operationState.currentStep || 'Autark-OS is still working on this app.',
+      description: item.operation.currentStep || 'Autark-OS is still working on this app.',
       id: 'operation-running',
-      title: item.operationState.label,
+      title: item.operation.label,
       tone: 'info',
     });
   }
 
-  if (item.attentionState !== 'none') {
+  if (item.issues.length > 0) {
     issues.push({
       description: item.userStatusDescription || 'Review this app before taking another action.',
       id: 'attention-state',
-      title: labelForAttention(item.attentionState),
-      tone: item.attentionState === 'conflict' || item.attentionState === 'blocked' ? 'error' : 'warning',
+      title: item.issues[0]?.title || 'Needs attention',
+      tone: item.issues.some((issue) => issue.severity === 'critical') ? 'error' : 'warning',
     });
   }
 
@@ -331,7 +331,7 @@ function buildAttentionIssues({ actions, item, loadingAction, onOpenRecovery }: 
     const nextRuntimeAction: ApplicationRuntimeAction | null = item.nextAction.id === 'start_app'
       ? 'start'
       : item.nextAction.id === 'create_backup' ? 'backup' : null;
-    const nextActionDisabled = nextRuntimeAction ? actionDisabled(nextRuntimeAction) : runtimeControlsDisabled(item.operationState, loadingAction);
+    const nextActionDisabled = nextRuntimeAction ? actionDisabled(nextRuntimeAction) : runtimeControlsDisabled(item.operation, loadingAction);
     issues.push({
       action: {
         disabled: nextActionDisabled,
@@ -344,7 +344,7 @@ function buildAttentionIssues({ actions, item, loadingAction, onOpenRecovery }: 
       title: item.nextAction.label,
       tone: 'warning',
     });
-  } else if (item.backup === 'Needs backup' && item.managementState === 'managed') {
+  } else if (item.backup === 'Needs backup' && item.relationship === 'managed') {
     issues.push({
       action: { disabled: actionDisabled('backup'), label: 'Create backup', onClick: () => actions.onCreateBackup(item.id), reason: disabledReason('backup') },
       description: 'Create a verified restore point before relying on this app.',
@@ -357,10 +357,10 @@ function buildAttentionIssues({ actions, item, loadingAction, onOpenRecovery }: 
   return issues;
 }
 
-function readinessTone(item: ApplicationSurfaceItem): RailStatusTone {
-  if (item.readinessState === 'ready') return 'healthy';
-  if (item.readinessState === 'starting') return 'info';
-  if (item.readinessState === 'unreachable') return 'error';
+function runtimeTone(item: ApplicationSurfaceItem): RailStatusTone {
+  if (item.state === 'ready') return 'healthy';
+  if (item.state === 'starting') return 'info';
+  if (item.state === 'degraded' || item.state === 'missing') return 'error';
   return 'warning';
 }
 
@@ -377,12 +377,12 @@ function backupTone(item: ApplicationSurfaceItem): RailStatusTone {
 }
 
 function RailControls({ actions, item, loadingAction }: { actions: ApplicationActionHandlers; item: ApplicationSurfaceItem; loadingAction: ApplicationRuntimeAction | null }) {
-  const primaryAction: ApplicationRuntimeAction = item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'start' : 'stop';
+  const primaryAction: ApplicationRuntimeAction = item.state === 'stopped' ? 'start' : 'stop';
   const actionDisabled = (action: ApplicationRuntimeAction) => runtimeActionDisabled(item, action, loadingAction);
   const disabledReason = (action: ApplicationRuntimeAction) => runtimeActionDisabledReason(item, action, loadingAction);
   const repairAction = item.availableActions.find((action) => action.id === 'repair');
 
-  if (item.managementState !== 'managed') {
+  if (item.relationship !== 'managed') {
     return null;
   }
 
@@ -394,8 +394,8 @@ function RailControls({ actions, item, loadingAction }: { actions: ApplicationAc
           <ApplicationDarkControlButton className="w-full min-w-0" disabled={actionDisabled(primaryAction)} onClick={() => primaryAction === 'start' ? actions.onStart(item.id) : actions.onStop(item.id)} size="sm" type="button">
             {loadingAction === 'start' || loadingAction === 'stop'
               ? <Loader2 className="animate-spin" data-icon="inline-start" />
-              : item.readinessState === 'paused' || item.readinessState === 'stopped' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
-            {loadingAction === 'start' ? 'Starting' : loadingAction === 'stop' ? 'Pausing' : item.readinessState === 'paused' || item.readinessState === 'stopped' ? 'Start' : 'Pause'}
+              : item.state === 'stopped' ? <Play data-icon="inline-start" /> : <Pause data-icon="inline-start" />}
+            {loadingAction === 'start' ? 'Starting' : loadingAction === 'stop' ? 'Pausing' : item.state === 'stopped' ? 'Start' : 'Pause'}
           </ApplicationDarkControlButton>
         </DisabledAction>
         <DisabledAction className="min-w-0" disabled={actionDisabled('restart')} reason={disabledReason('restart')}>
@@ -438,7 +438,7 @@ function nextActionButtonLabel(id: ApplicationNextAction['id']) {
 }
 
 function RecentActivitySummary({ item }: { item: ApplicationSurfaceItem }) {
-  const lastAction = item.lastEvent || operationStateText(item.operationState) || 'No recent app action reported.';
+  const lastAction = item.lastEvent || operationText(item.operation) || 'No recent app action reported.';
   const timestamp = item.runtime.recentEvents[0]?.createdAt || item.runtime.checkedAt;
 
   return (
@@ -452,14 +452,14 @@ function RecentActivitySummary({ item }: { item: ApplicationSurfaceItem }) {
   );
 }
 
-function operationStateText(operationState: ApplicationSurfaceItem['operationState']) {
-  if (operationState.kind === 'idle') {
+function operationText(operation: ApplicationSurfaceItem['operation']) {
+  if (operation.kind === 'idle') {
     return '';
   }
-  if (operationState.kind === 'failed') {
-    return operationState.message || operationState.label;
+  if (operation.kind === 'failed') {
+    return operation.message || operation.label;
   }
-  return operationState.currentStep || operationState.label;
+  return operation.currentStep || operation.label;
 }
 
 function formatRuntimeTimestamp(value?: string) {

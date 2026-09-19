@@ -628,11 +628,11 @@ function ResourceLine({ application, technical = false }: { application: Applica
           <p className="font-bold text-white">{application.name}</p>
           <p className="mt-1 text-sm text-slate-400">{application.relationshipDescription}</p>
         </div>
-        <MetadataBadge>{evidence?.statusLabel || labelForOwnership(application.ownershipState)}</MetadataBadge>
+        <MetadataBadge>{evidence?.statusLabel || application.relationshipLabel}</MetadataBadge>
       </div>
       {technical && (
         <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
-          <span>State: {application.runtimeState || 'unknown'}</span>
+          <span>State: {application.runtime?.state || evidence?.runtimeState || 'unknown'}</span>
           <span>Catalog: {application.id}</span>
           <span>Source: {evidence?.source || 'Unknown'}</span>
           <span>Relationship: {application.relationshipLabel}</span>
@@ -652,11 +652,11 @@ function RepairLine({ app }: { app: AppRuntimeView }) {
           <p className="mt-1 text-sm text-slate-400">{app.remediation?.summary || app.healthSnapshot?.detail || 'Autark-OS has not recorded repair detail for this app.'}</p>
         </div>
         <StatusBadge tone={repairTone(app.remediation?.tone)}>
-          {app.remediation?.label || app.friendlyStatus}
+          {app.remediation?.label || app.state}
         </StatusBadge>
       </div>
       <div className="mt-3 grid gap-2 text-xs text-slate-500 md:grid-cols-2">
-        <span>Health: {app.healthSnapshot?.status || app.friendlyStatus}</span>
+        <span>Health: {app.healthSnapshot?.status || app.state}</span>
         <span>Last repair: {app.settings?.lastRepairStatus ? humanize(app.settings.lastRepairStatus) : 'No repair recorded'}</span>
         <span>Attempted: {formatDate(app.settings?.lastRepairAttemptAt || undefined)}</span>
         <span>Next action: {app.remediation?.nextActionLabel || 'No action needed'}</span>
@@ -687,14 +687,6 @@ function hasRepairDetail(app: AppRuntimeView) {
   return Boolean(state && !['healthy', 'watching'].includes(state))
     || Boolean(app.settings?.lastRepairStatus)
     || (app.recentEvents || []).some((event) => event.type.includes('repair') || event.type.includes('health') || event.type.includes('private_access'));
-}
-
-function labelForOwnership(value: string) {
-  if (value === 'owned_managed') return 'Installed';
-  if (value === 'foreign_autark_os') return 'Found on this server';
-  if (value === 'legacy_autark_os') return 'Recoverable Autark-OS app';
-  if (value === 'external_docker') return 'Existing Docker app';
-  return humanize(value || 'unknown');
 }
 
 function repairTone(tone?: string): StatusBadgeTone {

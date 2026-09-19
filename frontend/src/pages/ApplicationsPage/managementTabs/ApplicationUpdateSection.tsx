@@ -18,7 +18,7 @@ export function ApplicationUpdateSection({ actions, item }: ApplicationUpdateSec
   const [loading, setLoading] = useState<'update' | 'rollback' | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const blockedByOperation = operationBlocksManagement(item.operationState);
+  const blockedByOperation = operationBlocksManagement(item.operation);
   const planLines = plan?.canApply
     ? plan.changes
     : plan?.blockedReasons.length

@@ -24,7 +24,6 @@ import {
 import { terminalJob } from '@/repositories/jobRepository';
 import {
   invalidateApplicationState,
-  setAutarkOsJobInApplicationStateCache,
   useApplicationStateRepository,
 } from '@/repositories/applicationStateRepository';
 import type { AppBackupStatus, RestorePoint } from '@/types/backup';
@@ -116,7 +115,7 @@ function BackupsPage() {
 
   useEffect(() => {
     if (activeJobQuery.data) {
-      setAutarkOsJobInApplicationStateCache(queryClient, activeJobQuery.data);
+      void invalidateApplicationState(queryClient);
       setActiveJob(activeJobQuery.data);
       if (terminalJob(activeJobQuery.data)) {
         if (activeJobQuery.data.status === 'failed') {

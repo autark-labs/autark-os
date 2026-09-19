@@ -69,6 +69,6 @@ test('applications page uninstall uses real plan and job-backed action wiring', 
   assert.match(panel, /loadPlan=\{\(\) => actions\.onLoadUninstallPlan\(item\.id\)\}/);
   assert.match(panel, /runAction=\{\(\) => actions\.onRunUninstall\(item\.id\)\}/);
   assert.match(panel, /disabledReason=\{uninstallDisabledReason\}/);
-  assert.match(panel, /operationBlocksManagement\(item\.operationState\)/);
+  assert.match(panel, /operationBlocksManagement\(item\.operation\)/);
   assert.doesNotMatch(panel, /A safety plan is required before uninstall can run/);
 });

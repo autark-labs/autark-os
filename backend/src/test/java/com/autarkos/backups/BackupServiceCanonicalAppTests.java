@@ -22,7 +22,6 @@ import com.autarkos.fileops.LocalAutarkOsFileOperations;
 import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppTelemetryService;
@@ -76,13 +75,8 @@ class BackupServiceCanonicalAppTests {
         assertThat(report.protectedApps()).isEqualTo(1);
         assertThat(report.apps().getFirst().latestBackup().verificationStatus()).isNotEqualTo("verified");
         assertThat(report.apps().getFirst().restorePoints()).extracting(RestorePoint::id).contains(full.id());
-        var views = new com.autarkos.marketplace.install.AppInstanceViewService(installed,
-                managedApps(installed, layout),
-                catalog, backups, new TailscaleService(),
-                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
-        assertThat(views.list().getFirst().backupState()).isEqualTo("protected_by_restore_point");
         assertThat(appLifecycleService(layout, installed, catalog, backups, new NoopDockerComposeExecutor())
-                .getApp(appId).canonicalBackupState()).isEqualTo("protected_by_restore_point");
+                .getApp(appId).backupProtection()).isEqualTo("protected_by_restore_point");
         Files.writeString(data, "title: changed\n");
         Files.writeString(syncedData, "changed document");
         assertThat(service.restorePlan(full.id(), appId).executable()).isTrue();
@@ -121,7 +115,7 @@ class BackupServiceCanonicalAppTests {
                 projectSettingsService(runtimeLayout, installedRepository),
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository),
                 catalogService,
-                () -> List.of(appInstance("homepage", "Homepage")),
+                managedApps(List.of(homepage)),
                 new RuntimeFileOperations(),
                 fileOps,
                 backupDestination(runtimeLayout, fileOps),
@@ -496,7 +490,8 @@ class BackupServiceCanonicalAppTests {
                 projectSettingsService(runtimeLayout, installedRepository),
                 appLifecycleService(runtimeLayout, installedRepository, catalogService, backupRepository, composeExecutor),
                 catalogService,
-                () -> List.of(appInstance(managedAppId, managedAppId.equals("homepage") ? "Homepage" : managedAppId)),
+                managedApps(installedRepository.findAllApps().stream()
+                        .filter(app -> app.appId().equals(managedAppId)).toList()),
                 new RuntimeFileOperations(),
                 fileOpsService,
                 backupDestination(runtimeLayout, fileOpsService),
@@ -552,24 +547,10 @@ class BackupServiceCanonicalAppTests {
         }
     }
 
-    private AppInstanceView appInstance(String appId, String name) {
-        return new AppInstanceView(
-                "appinst_" + appId,
-                appId,
-                name,
-                "General",
-                "",
-                "Ready",
-                "ready",
-                "running",
-                "owned",
-                "local_ready",
-                "backup_enabled_no_restore_point",
-                "http://localhost:8090",
-                null,
-                List.of(),
-                List.of(),
-                Instant.parse("2026-06-20T12:00:00Z"));
+    private com.autarkos.marketplace.install.ManagedAppAttestationService managedApps(List<InstalledApp> apps) {
+        var service = mock(com.autarkos.marketplace.install.ManagedAppAttestationService.class);
+        when(service.managedApps()).thenReturn(apps);
+        return service;
     }
 
     private InstalledApp installed(String appId, String name, RuntimeLayout runtimeLayout) throws Exception {

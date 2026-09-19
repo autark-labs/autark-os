@@ -3,6 +3,7 @@ package com.autarkos.apps;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Comparator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -22,7 +23,6 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.api.AppOperationView;
-import com.autarkos.api.AutarkOsAction;
 import com.autarkos.host.DockerInventoryService;
 import com.autarkos.host.DockerInventorySnapshot;
 import com.autarkos.host.ObservedService;
@@ -30,8 +30,6 @@ import com.autarkos.host.ObservedServiceService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobService;
 import com.autarkos.jobs.AutarkOsJobStep;
-import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.marketplace.install.AppInstanceViewService;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 
@@ -40,7 +38,6 @@ public class ApplicationStateService {
 
     private static final Duration SNAPSHOT_REFRESH_INTERVAL = Duration.ofSeconds(10);
 
-    private final Function<DockerInventorySnapshot, List<AppInstanceView>> managedAppViews;
     private final Function<DockerInventorySnapshot, List<AppRuntimeView>> runtimeAppViews;
     private final Supplier<DockerInventorySnapshot> dockerInventory;
     private final ObservedServiceService observedServiceService;
@@ -55,14 +52,12 @@ public class ApplicationStateService {
 
     @Autowired
     public ApplicationStateService(
-            AppInstanceViewService appInstanceViewService,
             AppLifecycleService appLifecycleService,
             DockerInventoryService dockerInventoryService,
             ObservedServiceService observedServiceService,
             ApplicationInventoryService applicationInventoryService,
             AutarkOsJobService jobService) {
         this(
-                appInstanceViewService::list,
                 appLifecycleService::listApps,
                 dockerInventoryService::requireFresh,
                 observedServiceService,
@@ -74,7 +69,6 @@ public class ApplicationStateService {
     }
 
     ApplicationStateService(
-            Function<DockerInventorySnapshot, List<AppInstanceView>> managedAppViews,
             Function<DockerInventorySnapshot, List<AppRuntimeView>> runtimeAppViews,
             Supplier<DockerInventorySnapshot> dockerInventory,
             ObservedServiceService observedServiceService,
@@ -83,7 +77,6 @@ public class ApplicationStateService {
             Supplier<List<AutarkOsJob>> jobs,
             Executor backgroundRefreshExecutor,
             boolean ownsBackgroundRefreshExecutor) {
-        this.managedAppViews = managedAppViews;
         this.runtimeAppViews = runtimeAppViews;
         this.dockerInventory = dockerInventory;
         this.observedServiceService = observedServiceService;
@@ -181,11 +174,13 @@ public class ApplicationStateService {
         DockerInventorySnapshot inventory = dockerInventory.get();
         inventory.requireUsable();
         observedServiceService.refresh(inventory);
-        List<AppRuntimeView> runtime = decorateRuntimeApps(runtimeAppViews.apply(inventory));
-        // Runtime observation writes the freshly derived status; build management views only afterwards.
-        List<AppInstanceView> managed = managedAppViews.apply(inventory);
+        List<AppRuntimeView> runtime = runtimeAppViews.apply(inventory).stream()
+                .sorted(Comparator.comparing(this::managedSortName).thenComparing(AppRuntimeView::appId))
+                .toList();
+        Map<String, AppOperationView> operations = runtime.stream().collect(java.util.stream.Collectors.toMap(
+                AppRuntimeView::appId, this::operationFor));
         List<ObservedService> observed = observedServiceService.observedServices();
-        List<ApplicationView> applications = applicationInventoryService.apps(observed, managed, runtime);
+        List<ApplicationView> applications = applicationInventoryService.apps(observed, runtime, operations);
         Instant completedAt = clock.get();
         return new ApplicationState(
                 applications,
@@ -198,18 +193,8 @@ public class ApplicationStateService {
                 completedAt.plus(SNAPSHOT_REFRESH_INTERVAL));
     }
 
-    private List<AppRuntimeView> decorateRuntimeApps(List<AppRuntimeView> apps) {
-        List<AutarkOsJob> operationJobs = lifecycleOperationJobs();
-        List<AppRuntimeView> sorted = apps.stream()
-                .sorted(Comparator.comparing(this::managedSortName).thenComparing(AppRuntimeView::appId))
-                .toList();
-        return java.util.stream.IntStream.range(0, sorted.size())
-                .mapToObj(index -> runtimeApp(sorted.get(index), index, operationJobs))
-                .toList();
-    }
-
-    private AppRuntimeView runtimeApp(AppRuntimeView app, int displayOrder, List<AutarkOsJob> operationJobs) {
-        List<AutarkOsJob> matchingJobs = operationJobs.stream()
+    private AppOperationView operationFor(AppRuntimeView app) {
+        List<AutarkOsJob> matchingJobs = lifecycleOperationJobs().stream()
                 .filter(candidate -> jobTargetsApp(candidate, app.appId()))
                 .toList();
         AutarkOsJob job = matchingJobs.stream().filter(candidate ->
@@ -222,12 +207,7 @@ public class ApplicationStateService {
                                         && later.type().equals(candidate.type())
                                         && later.updatedAt().isAfter(candidate.updatedAt())))
                         .findFirst().orElse(null));
-        AppOperationView operation = operationState(job, app);
-        return app.withSurfaceState(
-                operation,
-                "managed:" + app.appId(),
-                displayOrder,
-                availableActions(app, operation));
+        return operationState(job, app);
     }
 
     private List<AutarkOsJob> lifecycleOperationJobs() {
@@ -307,12 +287,7 @@ public class ApplicationStateService {
                 AutarkOsStates.JobType.RESTART_APP, AutarkOsStates.JobType.REPAIR_APP).contains(job.type())) {
             return true;
         }
-        String readinessState = app.readinessState() == null ? "" : app.readinessState();
-        if (List.of(AutarkOsStates.ReadinessState.READY, AutarkOsStates.ReadinessState.STARTING, AutarkOsStates.ReadinessState.PAUSED).contains(readinessState)) {
-            return false;
-        }
-        String friendlyStatus = app.friendlyStatus() == null ? "" : app.friendlyStatus();
-        return !List.of(AutarkOsStates.AppStatus.READY, AutarkOsStates.AppStatus.STARTING, AutarkOsStates.AppStatus.PAUSED).contains(friendlyStatus);
+        return !List.of(ApplicationRuntimeState.READY, ApplicationRuntimeState.STARTING, ApplicationRuntimeState.STOPPED).contains(app.state());
     }
 
     private boolean isFailedFullRestore(AutarkOsJob job) {
@@ -386,26 +361,6 @@ public class ApplicationStateService {
             return "";
         }
         return step.message() == null || step.message().isBlank() ? step.label() : step.message();
-    }
-
-    private List<AutarkOsAction> availableActions(AppRuntimeView app, AppOperationView operation) {
-        if (operation != null && !AutarkOsStates.OperationKind.IDLE.equals(operation.kind()) && !AutarkOsStates.OperationKind.FAILED.equals(operation.kind())) {
-            return List.of();
-        }
-        return AppRuntimeView.defaultAvailableActions(app.appId(), app.friendlyStatus(), app.runtimePath(), repairRecommended(app));
-    }
-
-    private boolean repairRecommended(AppRuntimeView app) {
-        String attentionState = app.attentionState() == null ? "" : app.attentionState();
-        if (List.of("needs_review", "conflict", "blocked").contains(attentionState)) {
-            return true;
-        }
-        String readinessState = app.readinessState() == null ? "" : app.readinessState();
-        if (List.of("unreachable", "unknown").contains(readinessState)) {
-            return true;
-        }
-        String friendlyStatus = app.friendlyStatus() == null ? "" : app.friendlyStatus();
-        return List.of("Needs review", AutarkOsStates.AppStatus.UNAVAILABLE).contains(friendlyStatus);
     }
 
     private String managedSortName(AppRuntimeView app) {

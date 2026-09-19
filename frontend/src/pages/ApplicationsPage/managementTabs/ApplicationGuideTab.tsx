@@ -35,7 +35,7 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
               {usageGuide?.summary || item.description}
             </p>
           </div>
-          <MetadataBadge className="w-fit">{setupGuide?.automation || usageGuide?.kind || item.managementState}</MetadataBadge>
+          <MetadataBadge className="w-fit">{setupGuide?.automation || usageGuide?.kind || item.relationship}</MetadataBadge>
         </div>
 
         {item.href && (

@@ -2,11 +2,8 @@ import type { AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/ap
 import type { ApplicationView } from '@/types/applicationState';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import type {
-  AppAttentionState,
   AppOperationState,
-  AppReadinessState,
   ApplicationNextAction,
-  ApplicationRuntimeState,
   ApplicationSurfaceItem,
 } from './ApplicationsPage.types';
 
@@ -26,26 +23,16 @@ function managedAppSurfaceItem(application: ApplicationView & { runtime: AppRunt
   const app = application.runtime;
   const health = app.healthSnapshot;
   const telemetry = app.telemetry;
-  const displayStatus = app.friendlyStatus || 'Unknown';
   const backup = backupLabel(application);
-  const managementState = 'managed';
-  const readinessState = backendReadinessState(app.readinessState ?? application.runtimeState);
-  const attentionState = backendAttentionState(app.attentionState ?? (
-    application.issues.length > 0 || readinessState === 'unknown' || readinessState === 'unreachable'
-      ? 'needs_review'
-      : 'none'
-  ));
-  const status = managedStatus(displayStatus, app);
 
   return {
     access: accessLabel(application, app),
-    attentionState,
-    availableActions: (app.availableActions ?? []).map((action) => ({
+    availableActions: application.availableActions.map((action) => ({
       id: action.id,
       label: action.label,
-      href: action.href ?? action.route ?? null,
-      disabled: action.disabled ?? false,
-      reason: action.reason ?? null,
+      href: action.href,
+      disabled: action.disabled,
+      reason: action.reason,
     })),
     backup,
     category: app.category || 'App',
@@ -53,21 +40,18 @@ function managedAppSurfaceItem(application: ApplicationView & { runtime: AppRunt
     href: primaryOpenUrl(app),
     iconUrl: preferredAppImageUrl(app.image, catalogAppImageUrl(app.appId)) || undefined,
     id: app.appId,
-    kind: 'managed',
+    relationship: 'managed',
+    issues: application.issues,
     lastEvent: app.recentEvents?.[0]?.message || health?.message || app.remediation?.summary || undefined,
     links: appLinks(app),
-    managementState,
     name: app.appName,
-    nextAction: managedNextAction(application, app, readinessState, attentionState),
-    operationState: backendOperationState(app.operationState),
-    readinessState,
+    nextAction: managedNextAction(application, app),
+    operation: backendOperationState(application.operation),
     runtime: appRuntimeDetails(app, health, telemetry),
-    runtimeState: managedRuntimeState(status, app),
+    state: app.state,
     settings: appSettings(app),
-    sortKey: app.sortKey || `managed:${app.appName.toLowerCase()}:${app.appId}`,
-    displayOrder: app.displayOrder,
+    sortKey: `managed:${app.appName.toLowerCase()}:${app.appId}`,
     sourceId: app.appId,
-    status,
   };
 }
 
@@ -77,43 +61,16 @@ function compareSurfaceItems(left: ApplicationSurfaceItem, right: ApplicationSur
   if (leftOrder !== rightOrder) {
     return leftOrder - rightOrder;
   }
-  const leftSort = left.sortKey || `${left.managementState}:${left.name.toLowerCase()}:${left.id}`;
-  const rightSort = right.sortKey || `${right.managementState}:${right.name.toLowerCase()}:${right.id}`;
+  const leftSort = left.sortKey || `${left.relationship}:${left.name.toLowerCase()}:${left.id}`;
+  const rightSort = right.sortKey || `${right.relationship}:${right.name.toLowerCase()}:${right.id}`;
   return leftSort.localeCompare(rightSort);
-}
-
-function managedStatus(displayStatus: string, app: AppRuntimeView): ApplicationSurfaceItem['status'] {
-  if (displayStatus === 'Starting') {
-    return 'Starting';
-  }
-  if (displayStatus === 'Paused' || displayStatus === 'Stopped' || app.friendlyStatus === 'Stopped') {
-    return 'Paused';
-  }
-  if (['Needs attention', 'Unavailable', 'Missing', 'Unknown'].includes(displayStatus)) {
-    return 'Needs review';
-  }
-  return 'Ready';
-}
-
-function backendReadinessState(value: string): AppReadinessState {
-  if (value === 'ready' || value === 'starting' || value === 'paused' || value === 'stopped' || value === 'unreachable' || value === 'unknown') {
-    return value;
-  }
-  return 'unknown';
-}
-
-function backendAttentionState(value: string): AppAttentionState {
-  if (value === 'none' || value === 'needs_review' || value === 'conflict' || value === 'blocked') {
-    return value;
-  }
-  return 'needs_review';
 }
 
 function idleOperationState(): AppOperationState {
   return { kind: 'idle' };
 }
 
-function backendOperationState(value: AppRuntimeView['operationState']): AppOperationState {
+function backendOperationState(value: ApplicationView['operation']): AppOperationState {
   if (!value || value.kind === 'idle') {
     return idleOperationState();
   }
@@ -151,29 +108,11 @@ function operationLabel(kind: string) {
   return 'Working';
 }
 
-function managedRuntimeState(status: ApplicationSurfaceItem['status'], app: AppRuntimeView): ApplicationRuntimeState {
-  if (status === 'Paused') {
-    return 'paused';
-  }
-  if (status === 'Starting') {
-    return 'starting';
-  }
-  if (status === 'Needs review') {
-    return 'needs_attention';
-  }
-  if (app.canonicalRuntimeState === 'stopped') {
-    return 'paused';
-  }
-  return 'running';
-}
-
 function managedNextAction(
   application: ApplicationView,
   app: AppRuntimeView,
-  readinessState: AppReadinessState,
-  attentionState: AppAttentionState,
 ): ApplicationNextAction | undefined {
-  if (readinessState === 'paused' || readinessState === 'stopped') {
+  if (app.state === 'stopped') {
     return {
       description: 'Start the app so it can be opened again.',
       id: 'start_app',
@@ -181,7 +120,7 @@ function managedNextAction(
     };
   }
 
-  if (attentionState !== 'none' || readinessState === 'unreachable' || readinessState === 'unknown') {
+  if (application.issues.length > 0 || app.state === 'degraded' || app.state === 'missing' || app.state === 'unknown') {
     return {
     description: app.remediation?.summary || application.issues[0]?.summary || 'Review the app state before making changes.',
       id: 'review_issue',
@@ -189,7 +128,7 @@ function managedNextAction(
     };
   }
 
-  if (application.backupState === 'backup_enabled_no_restore_point') {
+  if (app.backupProtection === 'backup_enabled_no_restore_point') {
     return {
       description: 'Create the first backup snapshot before making larger changes.',
       id: 'create_backup',
@@ -201,20 +140,20 @@ function managedNextAction(
 }
 
 function accessLabel(application: ApplicationView, app: AppRuntimeView): ApplicationSurfaceItem['access'] {
-  if (application.accessState === 'private_ready') {
+  if (app.accessRoute?.privateLinkStatus === 'verified' && app.accessRoute.privateUrl) {
     return 'Private';
   }
-  if (application.accessState === 'local_ready' || application.accessState === 'private_waiting' || application.accessState === 'private_needs_setup') {
+  if (app.accessRoute?.localUrl || app.accessUrl) {
     return 'Open';
   }
   return 'No link';
 }
 
 function backupLabel(application: ApplicationView): ApplicationSurfaceItem['backup'] {
-  if (application.backupState === 'protected_by_restore_point') {
+  if (application.runtime?.backupProtection === 'protected_by_restore_point') {
     return 'Protected';
   }
-  if (application.backupState === 'backup_disabled') {
+  if (application.runtime?.backupProtection === 'backup_disabled') {
     return 'Not managed';
   }
   return 'Needs backup';
@@ -254,8 +193,8 @@ function appSettings(app: AppRuntimeView): ApplicationSurfaceItem['settings'] {
     backupFrequency: app.settings?.backup?.frequency ?? 'daily',
     backupRetention: app.settings?.backup?.retention ?? 7,
     canEdit: true,
-    containerDetail: app.healthSnapshot?.detail || app.healthSnapshot?.message || app.technicalStatus || app.healthCheck || 'No container detail reported.',
-    containerStatus: app.technicalStatus || app.healthSnapshot?.dockerStatus || app.friendlyStatus,
+    containerDetail: app.healthSnapshot?.detail || app.healthSnapshot?.message || 'No container detail reported.',
+    containerStatus: app.healthSnapshot?.dockerStatus || app.state,
     desiredAccessMode: app.settings?.desiredAccessMode || app.desiredAccess?.mode || 'local',
     expectedLocalPort: app.settings?.expectedLocalPort ?? app.desiredAccess?.expectedLocalPort ?? app.observedAccess?.localPort ?? portFromUrl(primaryOpenUrl(app)),
     expectedProtocol: app.settings?.expectedProtocol ?? app.desiredAccess?.expectedProtocol ?? app.observedAccess?.protocol ?? protocolFromUrl(primaryOpenUrl(app)),

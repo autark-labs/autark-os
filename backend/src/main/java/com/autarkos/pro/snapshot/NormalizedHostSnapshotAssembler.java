@@ -1218,22 +1218,20 @@ public final class NormalizedHostSnapshotAssembler {
     }
 
     private String lifecycle(ApplicationView app) {
-        return switch (cleanToken(app.runtime() == null ? null : app.runtime().friendlyStatus())) {
-            case "ready", "installed" -> "running";
+        return switch (cleanToken(app.runtime() == null || app.runtime().state() == null ? null : app.runtime().state().value())) {
+            case "ready" -> "running";
             case "starting" -> "starting";
-            case "paused" -> "paused";
             case "stopped" -> "stopped";
-            case "missing", "needs_attention", "unavailable" -> "failed";
+            case "missing", "degraded" -> "failed";
             default -> "unknown";
         };
     }
 
     private String readiness(ApplicationView app) {
-        return switch (cleanToken(app.runtime() == null ? null : app.runtime().readinessState())) {
-            case "ready", "reachable" -> "available";
+        return switch (cleanToken(app.runtime() == null || app.runtime().state() == null ? null : app.runtime().state().value())) {
+            case "ready" -> "available";
             case "starting", "degraded" -> "degraded";
-            case "paused", "stopped", "unreachable", "missing" ->
-                "unavailable";
+            case "stopped", "missing" -> "unavailable";
             default -> "unknown";
         };
     }

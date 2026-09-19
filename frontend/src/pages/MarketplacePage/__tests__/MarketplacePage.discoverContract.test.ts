@@ -80,7 +80,7 @@ test('marketplace first-backup prompt uses canonical installed backup protection
   const discoverTypes = projectSource('types/discover.ts');
 
   assert.doesNotMatch(discoverTypes, /DiscoverInstalledAppSummary/);
-  assert.match(detail, /app\.backupState === 'backup_enabled_no_restore_point'/);
+  assert.match(detail, /app\.runtime\?\.backupProtection === 'backup_enabled_no_restore_point'/);
   assert.doesNotMatch(detail, /function shouldOfferFirstBackup\([^)]*\) \{\s*return true;\s*\}/s);
 });
 

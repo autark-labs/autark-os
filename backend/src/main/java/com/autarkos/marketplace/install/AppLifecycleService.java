@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.apps.ApplicationRuntimeState;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.BackupProtectionPolicy;
 import com.autarkos.backups.BackupDestinationService;
@@ -825,9 +826,7 @@ public class AppLifecycleService {
                 description,
                 version,
                 image,
-                healthSnapshot.status(),
-                status.technicalStatus(),
-                status.healthCheck(),
+                ApplicationRuntimeState.fromStatus(healthSnapshot.status()),
                 app.runtimePath(),
                 app.composeProject(),
                 accessUrl,

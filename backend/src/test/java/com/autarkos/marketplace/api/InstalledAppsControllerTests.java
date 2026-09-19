@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.autarkos.apps.ApplicationState;
+import com.autarkos.apps.ApplicationRuntimeState;
 import com.autarkos.apps.ApplicationStateService;
 import com.autarkos.jobs.AutarkOsJob;
 import com.autarkos.jobs.AutarkOsJobOutcome;
@@ -476,9 +477,7 @@ class InstalledAppsControllerTests {
                 "Passwords",
                 "1.0.0",
                 "",
-                "Ready",
-                "running",
-                "healthy",
+                ApplicationRuntimeState.READY,
                 "/runtime/apps/" + appId,
                 "autark-os-" + appId,
                 "http://localhost:8090",
@@ -487,12 +486,14 @@ class InstalledAppsControllerTests {
                 null,
                 Instant.parse("2026-06-21T12:00:00Z"),
                 "Backups disabled",
+                "backup_disabled",
                 null,
                 RuntimeModels.AppTelemetry.unavailable(),
                 null,
                 null,
                 null,
                 List.of(),
+                null,
                 List.of());
     }
 

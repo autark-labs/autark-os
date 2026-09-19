@@ -11,8 +11,8 @@ import org.springframework.stereotype.Service;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
+import com.autarkos.apps.ApplicationView;
 import com.autarkos.apps.ApplicationStateService;
-import com.autarkos.marketplace.install.AppInstanceView;
 import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.network.tailscale.TailscaleStatus;
 
@@ -36,7 +36,7 @@ public class AccessStatusService {
                                         ? "" : application.runtime().accessRoute().localUrl(),
                                 application.runtime() == null || application.runtime().accessRoute() == null
                                         ? "" : application.runtime().accessRoute().privateUrl(),
-                                application.accessState(),
+                                accessState(application),
                                 application.issues()))
                         .toList();
         this.tailscaleStatus = tailscaleService::status;
@@ -45,15 +45,32 @@ public class AccessStatusService {
     }
 
     public AccessStatusService(
-            Supplier<List<AppInstanceView>> appViews,
+            Supplier<List<ApplicationView>> appViews,
             Supplier<TailscaleStatus> tailscaleStatus,
             Supplier<String> serverLanUrl,
             Supplier<Instant> clock) {
         this.appViews = () -> appViews.get().stream().map(app -> new ManagedAccessApp(
-                app.appInstanceId(), app.name(), app.localUrl(), app.privateUrl(), app.accessState(), app.issues())).toList();
+                app.appInstanceId(), app.name(),
+                app.runtime() == null || app.runtime().accessRoute() == null ? "" : app.runtime().accessRoute().localUrl(),
+                app.runtime() == null || app.runtime().accessRoute() == null ? "" : app.runtime().accessRoute().privateUrl(),
+                accessState(app), app.issues())).toList();
         this.tailscaleStatus = tailscaleStatus;
         this.serverLanUrl = serverLanUrl;
         this.clock = clock;
+    }
+
+    private static String accessState(ApplicationView application) {
+        if (application.runtime() == null || application.runtime().accessRoute() == null) {
+            return "not_ready";
+        }
+        var route = application.runtime().accessRoute();
+        if ("verified".equals(route.privateLinkStatus()) && hasText(route.privateUrl())) {
+            return "private_ready";
+        }
+        if (application.runtime().desiredAccess() != null && application.runtime().desiredAccess().privateAccessRequired()) {
+            return "waiting".equals(route.privateLinkStatus()) ? "private_waiting" : "private_needs_setup";
+        }
+        return hasText(route.localUrl()) ? "local_ready" : "not_ready";
     }
 
     public AccessStatus status() {
@@ -193,7 +210,7 @@ public class AccessStatusService {
         return value == null ? "" : value;
     }
 
-    private boolean hasText(String value) {
+    private static boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
 

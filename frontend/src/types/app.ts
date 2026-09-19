@@ -29,9 +29,7 @@ export type AutarkOsIssue = {
   advancedDetails: Record<string, unknown>;
 };
 
-export type BackendAppManagementState = 'managed';
-export type BackendAppReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown' | string;
-export type BackendAppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked' | string;
+export type ApplicationRuntimeState = 'ready' | 'starting' | 'stopped' | 'degraded' | 'missing' | 'unknown';
 
 export type BackendAppOperationState = {
   jobType?: string | null;
@@ -199,16 +197,7 @@ export type AppRuntimeView = {
   description: string;
   version: string;
   image: string | null;
-  friendlyStatus: 'Ready' | 'Starting' | 'Stopped' | 'Needs attention' | string;
-  managementState?: BackendAppManagementState;
-  readinessState?: BackendAppReadinessState;
-  attentionState?: BackendAppAttentionState;
-  operationState?: BackendAppOperationState | null;
-  sortKey?: string;
-  displayOrder?: number;
-  availableActions?: AutarkOsAction[];
-  technicalStatus: string;
-  healthCheck: string;
+  state: ApplicationRuntimeState;
   runtimePath: string;
   composeProject: string;
   accessUrl: string | null;
@@ -224,13 +213,7 @@ export type AppRuntimeView = {
   setupGuide: AppSetupGuide | null;
   appConfiguration: AppConfigurationItem[];
   recentEvents: AppEvent[];
-  canonicalUserStatus?: string;
-  canonicalRuntimeState?: string;
-  canonicalOwnershipState?: string;
-  canonicalAccessState?: string;
-  canonicalBackupState?: string;
-  canonicalIssues?: AutarkOsIssue[];
-  canonicalActions?: AutarkOsAction[];
+  backupProtection: string;
   remediation?: AppRemediationView | null;
 };
 

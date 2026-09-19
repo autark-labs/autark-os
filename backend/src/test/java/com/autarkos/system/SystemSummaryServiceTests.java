@@ -10,9 +10,14 @@ import org.junit.jupiter.api.Test;
 import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
+import com.autarkos.api.AppOperationView;
+import com.autarkos.apps.ApplicationAction;
+import com.autarkos.apps.ApplicationRelationship;
+import com.autarkos.apps.ApplicationRuntimeState;
+import com.autarkos.apps.ApplicationView;
 import com.autarkos.backups.BackupModels;
-import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.testsupport.ApplicationViewTestRecords;
+import com.autarkos.marketplace.install.AppRuntimeView;
+import com.autarkos.marketplace.install.models.AccessModels;
 
 class SystemSummaryServiceTests {
 
@@ -26,10 +31,10 @@ class SystemSummaryServiceTests {
                 "Vaultwarden is missing",
                 "Autark-OS cannot find the container for this app.",
                 AutarkOsAction.post("repair-vaultwarden", "Repair", "/api/apps/vaultwarden/repair", false, false));
-        AppInstanceView ready = app("appinst_homepage", "homepage", "Homepage", "Ready", "http://localhost:3000", List.of());
-        AppInstanceView missing = app("appinst_vaultwarden", "vaultwarden", "Vaultwarden", "Missing", "", List.of(missingIssue));
+        ApplicationView ready = app("appinst_homepage", "homepage", "Homepage", ApplicationRuntimeState.READY, "http://localhost:3000", List.of());
+        ApplicationView missing = app("appinst_vaultwarden", "vaultwarden", "Vaultwarden", ApplicationRuntimeState.MISSING, "", List.of(missingIssue));
         SystemSummaryService service = new SystemSummaryService(
-                () -> List.of(ApplicationViewTestRecords.managed(ready), ApplicationViewTestRecords.managed(missing)),
+                () -> List.of(ready, missing),
                 () -> ProjectSettings.defaults("autark-os-test"),
                 () -> new AutarkOsIdentity("pos_test", "autark-os-test", "/runtime", "sha256:test", Instant.parse("2026-06-20T12:00:00Z"), 1),
                 () -> setupStatus("ready", "Docker 29.6.0"),
@@ -75,16 +80,16 @@ class SystemSummaryServiceTests {
 
     @Test
     void reportsBackupProtectionOnlyWhenAManagedAppHasARestorePoint() {
-        AppInstanceView protectedApp = app(
+        ApplicationView protectedApp = app(
                 "appinst_vaultwarden",
                 "vaultwarden",
                 "Vaultwarden",
-                "Ready",
+                ApplicationRuntimeState.READY,
                 "http://localhost:8090",
                 List.of(),
                 "protected_by_restore_point");
         SystemSummaryService service = new SystemSummaryService(
-                () -> List.of(ApplicationViewTestRecords.managed(protectedApp)),
+                () -> List.of(protectedApp),
                 () -> ProjectSettings.defaults("autark-os-test"),
                 () -> new AutarkOsIdentity("pos_test", "autark-os-test", "/runtime", "sha256:test", Instant.parse("2026-06-20T12:00:00Z"), 1),
                 () -> setupStatus("ready", "Docker 29.6.0"),
@@ -132,28 +137,21 @@ class SystemSummaryServiceTests {
         assertThat(summary.setup().nextStep()).isEqualTo("host_check");
     }
 
-    private AppInstanceView app(String appInstanceId, String catalogAppId, String name, String status, String url, List<AutarkOsIssue> issues) {
+    private ApplicationView app(String appInstanceId, String catalogAppId, String name, ApplicationRuntimeState status, String url, List<AutarkOsIssue> issues) {
         return app(appInstanceId, catalogAppId, name, status, url, issues, "backup_disabled");
     }
 
-    private AppInstanceView app(String appInstanceId, String catalogAppId, String name, String status, String url, List<AutarkOsIssue> issues, String backupState) {
-        return new AppInstanceView(
-                appInstanceId,
-                catalogAppId,
-                name,
-                "General",
-                "",
-                status,
-                status.toLowerCase(),
-                status.toLowerCase(),
-                "owned",
-                url.isBlank() ? "not_ready" : "local_ready",
-                backupState,
-                url,
-                null,
-                issues,
-                List.of(),
-                Instant.parse("2026-06-20T12:30:00Z"));
+    private ApplicationView app(String appInstanceId, String catalogAppId, String name, ApplicationRuntimeState status, String url, List<AutarkOsIssue> issues, String backupState) {
+        AppRuntimeView runtime = new AppRuntimeView(
+                catalogAppId, name, "General", "", "1.0.0", "", status,
+                "/runtime/apps/" + catalogAppId, "autark-os-" + catalogAppId, url,
+                new AccessModels.AppAccessRoute(url, url, null, null, "http", null, null, "not_enabled", "local"),
+                null, null, Instant.parse("2026-06-20T12:30:00Z"), "", backupState,
+                null, null, null, null, null, List.of(), null, List.of());
+        return new ApplicationView(
+                catalogAppId, name, "General", "", "", "", ApplicationRelationship.MANAGED, "installable",
+                appInstanceId, AppOperationView.idle(), issues, "Installed", "Managed", "success", "success",
+                new ApplicationAction("manage", "Manage", "route", "/apps", null, false, ""), List.of(), runtime, null);
     }
 
     private SystemSetupModels.SystemSetupStatus setupStatus(String status, String dockerVersion) {

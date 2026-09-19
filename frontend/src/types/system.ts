@@ -145,8 +145,6 @@ export type SystemSetupExistingInstallResource = {
   id: string;
   label: string;
   kind: string;
-  ownershipState: string;
-  ownerInstanceId: string;
   summary: string;
   route: string;
 };

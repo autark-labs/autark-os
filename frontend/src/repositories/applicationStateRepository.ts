@@ -3,33 +3,24 @@ import { ApplicationStateAPIClient } from '@/api/ApplicationStateAPIClient';
 import type { ApplicationState, ApplicationStateFreshness, ApplicationView } from '@/types/applicationState';
 import {
   accessByAppId,
-  appNeedsAttentionFromCanonicalState,
   applications,
   applicationStateFreshness,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
   catalogAppIsManaged,
-  displayStatusFromCanonicalState,
   healthByAppId,
-  setAutarkOsJobInState,
-  setRuntimeAppInState,
   telemetryByAppId,
 } from './applicationStateRepository.logic';
-import type { AppAccessCheck, AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
-import type { AutarkOsJob } from '@/types/jobs';
+import type { AppAccessCheck, AppHealthSnapshot, AppTelemetry } from '@/types/app';
 
 export {
   accessByAppId,
-  appNeedsAttentionFromCanonicalState,
   applications,
   applicationStateFreshness,
   applicationStateQueryKey,
   applicationStateUpdatedAt,
   catalogAppIsManaged,
-  displayStatusFromCanonicalState,
   healthByAppId,
-  setAutarkOsJobInState,
-  setRuntimeAppInState,
   telemetryByAppId,
 };
 
@@ -111,15 +102,4 @@ export function setApplicationStateFromActionResultCache(queryClient: QueryClien
 
 export function invalidateApplicationState(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: applicationStateQueryKey });
-}
-
-export function setAutarkOsJobInApplicationStateCache(queryClient: QueryClient, job?: AutarkOsJob | null) {
-  if (!job) {
-    return;
-  }
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setAutarkOsJobInState(current, job));
-}
-
-export function setRuntimeAppInApplicationStateCache(queryClient: QueryClient, app: AppRuntimeView) {
-  queryClient.setQueryData<ApplicationState | undefined>(applicationStateQueryKey, (current) => setRuntimeAppInState(current, app));
 }

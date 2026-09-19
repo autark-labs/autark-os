@@ -220,8 +220,8 @@ function RailPrimaryAction({ appView, installLocked, installing, onReviewInstall
   const actionDisabled = application.primaryAction.disabled || installLocked || installing;
   const actionReason = application.primaryAction.reason || (installing ? `${application.name} is already installing.` : installLocked ? 'Another app is installing right now.' : 'This app action is not available right now.');
   const actionLabel = railActionLabel(appView, installing, installLocked);
-  const attentionState = application.statusTone === 'warning' || application.statusTone === 'observed' || application.statusTone === 'danger';
-  const ButtonComponent = attentionState ? ProjectWarningButton : ProjectPrimaryButton;
+  const needsAttention = application.statusTone === 'warning' || application.statusTone === 'observed' || application.statusTone === 'danger';
+  const ButtonComponent = needsAttention ? ProjectWarningButton : ProjectPrimaryButton;
 
   if (actionRoute && !application.primaryAction.disabled) {
     return (

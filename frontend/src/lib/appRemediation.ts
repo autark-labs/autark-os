@@ -55,7 +55,7 @@ type BuildAppRemediationInput = {
  * @returns {AppRemediation | null}
  */
 export function buildAppRemediation({ access, app, health, reconciliation, telemetry }: BuildAppRemediationInput): AppRemediation | null {
-  const status = health?.status || app?.friendlyStatus;
+  const status = health?.status || app?.state;
   const privateAccessIssue = reconciliation && !['healthy', 'waiting'].includes(reconciliation.status ?? '');
   const linkIssue = access?.status === 'unreachable';
   const resourceIssue = resourceWarning(telemetry);

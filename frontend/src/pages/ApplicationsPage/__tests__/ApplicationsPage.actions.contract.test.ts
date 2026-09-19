@@ -19,20 +19,14 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, data\)/);
   assert.match(page, /actionLoadingByAppId/);
   assert.match(page, /useAutarkOsJobsQuery\(\)/);
-  assert.match(page, /operationStateForItem\(/);
-  assert.match(page, /settingsLoadingByAppId\[itemId\]/);
+  assert.doesNotMatch(page, /operationStateForItem|operationForItem/);
   assert.match(page, /showActionNotification\(\{[\s\S]*App action started/);
   assert.match(page, /showActionErrorNotification\(err, 'App action failed'\)/);
   assert.doesNotMatch(page, /setRuntimeAppStatusInApplicationStateCache/);
   assert.doesNotMatch(page, /setRuntimeAppInApplicationStateCache\(queryClient, data\.app\)/);
   assert.doesNotMatch(page, /Start requested just now|Pause requested just now|Restart requested just now/);
-  assert.match(operations, /start_app/);
-  assert.match(operations, /stop_app/);
-  assert.match(operations, /restart_app/);
-  assert.match(operations, /kind: 'uninstalling'/);
-  assert.match(operations, /kind: 'backing_up'/);
-  assert.match(operations, /kind: 'saving_settings'/);
-  assert.match(operations, /kind: 'failed'/);
+  assert.match(operations, /item\.operation/);
+  assert.doesNotMatch(operations, /AutarkOsJob|operationFromJob/);
   assert.match(advanced, /actionLoadingByItemId/);
   assert.match(advanced, /runtimeActionDisabled\(item, action, loadingAction\)/);
   assert.match(rail, /actionLoadingByItemId/);
@@ -57,7 +51,7 @@ test('applications page exposes a red recovery tab for failed app operations', (
   const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
   const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
 
-  assert.match(panel, /const recoveryNeeded = item\.operationState\.kind === 'failed'/);
+  assert.match(panel, /const recoveryNeeded = item\.operation\.kind === 'failed'/);
   assert.match(panel, /ApplicationRecoveryTab/);
   assert.match(panel, /value="recovery"/);
   assert.doesNotMatch(panel, /ExpandedOperationStatus/);
@@ -66,12 +60,12 @@ test('applications page exposes a red recovery tab for failed app operations', (
   assert.match(recovery, /Edit settings/);
   assert.match(recovery, /Stop app/);
   assert.match(recovery, /Review recent activity/);
-  assert.match(recovery, /item\.operationState\.message/);
+  assert.match(recovery, /item\.operation\.message/);
   assert.match(recovery, /item\.runtime\.recentEvents/);
 
   assert.match(rail, /Open recovery/);
   assert.match(rail, /onManagementOpenChange\(true\)/);
-  assert.match(settings, /operationBlocksManagement\(item\.operationState\)/);
+  assert.match(settings, /operationBlocksManagement\(item\.operation\)/);
 });
 
 test('applications page runs repair only from canonical available actions', () => {
@@ -121,10 +115,10 @@ test('applications page only exposes concrete next actions from the rail', () =>
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
   const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
 
-  assert.match(page, /item\.nextAction\?\.id === 'start_app'/);
-  assert.match(page, /item\.nextAction\?\.id === 'create_backup'/);
+  assert.match(page, /item\?\.nextAction\?\.id === 'start_app'/);
+  assert.match(page, /item\?\.nextAction\?\.id === 'create_backup'/);
   assert.match(page, /void runBackup\(item\.sourceId \|\| item\.id\)/);
-  assert.match(page, /setManagementOpen\(true\)/);
+  assert.match(page, /focusApplicationItem\(item, true\)/);
 
   assert.match(rail, /nextActionButtonLabel\(item\.nextAction\.id\)/);
   assert.match(rail, /Create backup/);

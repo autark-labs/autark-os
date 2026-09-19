@@ -45,15 +45,12 @@ class ApplicationInventoryServiceTests {
         repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
                 "syncthing", "instance", "syncthing", "current-instance", runtimeRoot.resolve("apps/syncthing").toString(),
                 "installed", "owned", Instant.now(), Instant.now()));
-        var managed = new com.autarkos.marketplace.install.AppInstanceView("instance", "syncthing", "Syncthing", "Productivity", "",
-                "Ready", "ready", "running", "owned", "private_ready", "backup_disabled", "http://localhost:18384",
-                "https://server.example.ts.net:14384", List.of(), List.of(), Instant.now());
-        var service = new ApplicationInventoryService(catalogService(), repository, observedService(observedRepository()), managedApps(repository),
-                () -> List.of(managed));
-        var view = service.apps(List.of(), List.of(managed), List.of(runtime("syncthing", "Syncthing", managed.privateUrl())))
+        String privateUrl = "https://server.example.ts.net:14384";
+        var service = new ApplicationInventoryService(catalogService(), repository, managedApps(repository));
+        var view = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", privateUrl)), Map.of())
                 .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
-        assertThat(view.accessState()).isEqualTo("private_ready");
-        assertThat(view.availableActions()).anySatisfy(action -> assertThat(action.href()).isEqualTo(managed.privateUrl()));
+        assertThat(view.runtime().accessRoute().privateLinkStatus()).isEqualTo("verified");
+        assertThat(view.availableActions()).anySatisfy(action -> assertThat(action.href()).isEqualTo(privateUrl));
         assertThat(repository.findAppById("syncthing").orElseThrow().accessUrl()).isEqualTo("http://localhost:18384");
     }
 
@@ -104,8 +101,8 @@ class ApplicationInventoryServiceTests {
         observedRepository.upsert(observed("docker:found_actual-budget", "actual-budget", "unknown_conflict", "observed"));
 
         List<ApplicationView> views = service(installedRepository, observedRepository).apps(
-                observedService(observedRepository).observedServices(), List.of(),
-                List.of(runtime("vaultwarden", "Family Passwords", "http://localhost:8090")));
+                observedService(observedRepository).observedServices(),
+                List.of(runtime("vaultwarden", "Family Passwords", "http://localhost:8090")), Map.of());
 
         assertThat(views).isSortedAccordingTo((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.name(), right.name()));
         assertThat(views).filteredOn(view -> view.id().equals("vaultwarden"))
@@ -155,7 +152,7 @@ class ApplicationInventoryServiceTests {
         observedRepository.upsert(pinned);
         observedRepository.upsert(observed("docker:jellyfin", "jellyfin", "external_docker", "observed"));
 
-        ApplicationView view = service(installedRepository(), observedRepository).app("jellyfin").orElseThrow();
+        ApplicationView view = app(service(installedRepository(), observedRepository), observedRepository, "jellyfin");
 
         assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(view.relationshipLabel()).isEqualTo("Blocked");
@@ -187,7 +184,7 @@ class ApplicationInventoryServiceTests {
                 Instant.parse("2026-06-21T12:00:00Z"),
                 "{}"));
 
-        ApplicationView view = service(installedRepository(), observedRepository).app("vaultwarden").orElseThrow();
+        ApplicationView view = app(service(installedRepository(), observedRepository), observedRepository, "vaultwarden");
 
         assertThat(view.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE);
         assertThat(view.managed()).isFalse();
@@ -199,7 +196,7 @@ class ApplicationInventoryServiceTests {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("docker:vaultwarden", "vaultwarden", "external_docker", "observed"));
 
-        ApplicationView view = service(installedRepository(), observedRepository).app("vaultwarden").orElseThrow();
+        ApplicationView view = app(service(installedRepository(), observedRepository), observedRepository, "vaultwarden");
 
         assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(view.relationshipLabel()).isEqualTo("Blocked");
@@ -212,7 +209,7 @@ class ApplicationInventoryServiceTests {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("autark-os-install:vaultwarden", "vaultwarden", "failed_install", "observed"));
 
-        ApplicationView view = service(installedRepository(), observedRepository).app("vaultwarden").orElseThrow();
+        ApplicationView view = app(service(installedRepository(), observedRepository), observedRepository, "vaultwarden");
 
         assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(view.relationshipLabel()).isEqualTo("Blocked");
@@ -222,28 +219,6 @@ class ApplicationInventoryServiceTests {
         assertThat(view.evidence()).isNotNull();
         assertThat(view.evidence().ownershipState()).isEqualTo("failed_install");
         assertThat(view.evidence().statusLabel()).isEqualTo("Install failed");
-    }
-
-    @Test
-    void ownershipProjectionReadsCachedObservedServicesWithoutScanningHost() {
-        ObservedServiceRepository observedRepository = observedRepository();
-        observedRepository.upsert(observed("manual:vaultwarden", "vaultwarden", "external", "pinned"));
-        CountingObservedServiceService observedServiceService = new CountingObservedServiceService(observedRepository);
-        ApplicationInventoryService service = new ApplicationInventoryService(
-                catalogService(),
-                installedRepository(),
-                observedServiceService,
-                managedApps(installedRepository()),
-                List::of);
-
-        ApplicationView view = service.app("vaultwarden").orElseThrow();
-        List<ApplicationView> views = service.apps();
-
-        assertThat(observedServiceService.refreshCalls).hasValue(0);
-        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE);
-        assertThat(views).filteredOn(item -> item.id().equals("vaultwarden"))
-                .singleElement()
-                .satisfies(item -> assertThat(item.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE));
     }
 
     @Test
@@ -268,7 +243,8 @@ class ApplicationInventoryServiceTests {
                 Instant.parse("2026-06-21T12:00:00Z"),
                 Instant.parse("2026-06-21T12:00:00Z")));
 
-        ApplicationView view = service(repository, observedRepository()).app("homepage").orElseThrow();
+        ObservedServiceRepository observed = observedRepository();
+        ApplicationView view = app(service(repository, observed), observed, "homepage");
 
         assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
         assertThat(view.managed()).isFalse();
@@ -288,9 +264,10 @@ class ApplicationInventoryServiceTests {
         ManagedAppAttestationService managedApps = managedApps(repository);
         Files.delete(runtimeRoot.resolve("apps/vaultwarden/manifest.yaml"));
         ApplicationInventoryService inventory = new ApplicationInventoryService(
-                catalogService(), repository, observedService(observedRepository()), managedApps, List::of);
+                catalogService(), repository, managedApps);
 
-        assertThat(inventory.app("vaultwarden").orElseThrow().relationship())
+        assertThat(inventory.apps(List.of(), List.of(), Map.of()).stream()
+                .filter(view -> view.id().equals("vaultwarden")).findFirst().orElseThrow().relationship())
                 .isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
         assertThat(org.assertj.core.api.Assertions.catchThrowable(
                 () -> managedApps.requireManaged("vaultwarden", "start")))
@@ -302,9 +279,12 @@ class ApplicationInventoryServiceTests {
         return new ApplicationInventoryService(
                 catalogService(),
                 installedRepository,
-                observedService(observedRepository),
-                managedApps(installedRepository),
-                List::of);
+                managedApps(installedRepository));
+    }
+
+    private ApplicationView app(ApplicationInventoryService service, ObservedServiceRepository observed, String appId) {
+        return service.apps(observedService(observed).observedServices(), List.of(), Map.of()).stream()
+                .filter(view -> view.id().equals(appId)).findFirst().orElseThrow();
     }
 
     private MarketplaceCatalogService catalogService() {
@@ -344,10 +324,13 @@ class ApplicationInventoryServiceTests {
 
     private AppRuntimeView runtime(String appId, String name, String accessUrl) {
         return new AppRuntimeView(
-                appId, name, "Apps", name + " app", "1.0.0", "", "Ready", "running", "healthy",
+                appId, name, "Apps", name + " app", "1.0.0", "", ApplicationRuntimeState.READY,
                 runtimeRoot.resolve("apps").resolve(appId).toString(), "autark-os-" + appId, accessUrl,
-                null, null, null, Instant.parse("2026-06-21T12:00:00Z"), "Backups disabled",
-                null, null, null, null, null, List.of(), List.of());
+                new com.autarkos.marketplace.install.models.AccessModels.AppAccessRoute(
+                        accessUrl, "http://localhost:18384", accessUrl.startsWith("https") ? accessUrl : null,
+                        null, "http", null, null, accessUrl.startsWith("https") ? "verified" : "not_enabled", "network"),
+                null, null, Instant.parse("2026-06-21T12:00:00Z"), "Backups disabled", "backup_disabled",
+                null, null, null, null, null, List.of(), null, List.of());
     }
 
     private ObservedService observed(String id, String catalogAppId, String ownershipState, String visibility) {
@@ -369,17 +352,4 @@ class ApplicationInventoryServiceTests {
                 "{}");
     }
 
-    private static final class CountingObservedServiceService extends ObservedServiceService {
-        private final AtomicInteger refreshCalls = new AtomicInteger();
-
-        private CountingObservedServiceService(ObservedServiceRepository repository) {
-            super(repository, null);
-        }
-
-        @Override
-        public void refresh(com.autarkos.host.DockerInventorySnapshot inventory) {
-            refreshCalls.incrementAndGet();
-            super.refresh(inventory);
-        }
-    }
 }

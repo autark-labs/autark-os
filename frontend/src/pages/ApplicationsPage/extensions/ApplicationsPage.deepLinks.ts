@@ -29,7 +29,7 @@ export function applicationDeepLinkForSurfaceItem(item: ApplicationSurfaceItem |
   }
 
   const itemId = item.sourceId || item.id;
-  if (item.managementState === 'managed' && itemId) {
+  if (item.relationship === 'managed' && itemId) {
     return applicationDeepLink('managed', itemId, options);
   }
   return APPLICATIONS_PATH;
@@ -98,7 +98,7 @@ export function findApplicationDeepLinkTarget(items: ApplicationSurfaceItem[], t
 }
 
 export function filterForApplicationDeepLinkTarget(item: ApplicationSurfaceItem | null | undefined) {
-  if (item?.managementState === 'managed') {
+  if (item?.relationship === 'managed') {
     return 'managed';
   }
   return 'all';
@@ -141,7 +141,7 @@ function normalizeKind(kind: string): ApplicationDeepLinkKind | null {
 function matchesApplicationDeepLinkTarget(item: ApplicationSurfaceItem, target: ApplicationDeepLinkTarget) {
   const itemIds = new Set([item.id, item.sourceId].filter((id): id is string => Boolean(id)));
   if (target.kind === 'managed') {
-    return target.id !== null && item.managementState === 'managed' && itemIds.has(target.id);
+    return target.id !== null && item.relationship === 'managed' && itemIds.has(target.id);
   }
   return false;
 }

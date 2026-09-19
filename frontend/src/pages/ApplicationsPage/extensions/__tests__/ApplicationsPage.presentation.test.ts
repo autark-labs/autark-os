@@ -9,13 +9,13 @@ import type { ApplicationSurfaceItem } from '../ApplicationsPage.types';
 import { buildApplicationSurfaceItems } from '../ApplicationsPage.liveModel';
 
 const managedItem = {
-  managementState: 'managed',
-  attentionState: 'none',
+  relationship: 'managed',
+  issues: [],
 } as ApplicationSurfaceItem;
 
 const attentionItem = {
-  managementState: 'managed',
-  attentionState: 'needs_review',
+  relationship: 'managed',
+  issues: [{ title: 'Needs review' }],
 } as ApplicationSurfaceItem;
 
 describe('My Apps presentation helpers', () => {
@@ -61,8 +61,8 @@ describe('My Apps presentation helpers', () => {
       appId: 'vaultwarden',
       appName: 'Vaultwarden',
       accessUrl: 'http://localhost:8090',
-      friendlyStatus: 'Ready',
-      canonicalAccessState: 'private_needs_setup',
+      state: 'ready',
+      backupProtection: 'backup_disabled',
       accessRoute: {
         localUrl: 'http://localhost:8090',
         primaryOpenUrl: 'https://autark-os.tailnet.test:14743',
@@ -84,8 +84,8 @@ describe('My Apps presentation helpers', () => {
     const [item] = buildApplicationSurfaceItems({
       applications: [{
         id: app.appId, name: app.appName, category: 'Security', image: '', summary: '', description: '', relationship: 'managed',
-        catalogAvailability: 'installable', appInstanceId: app.appId, runtimeState: 'running', ownershipState: 'owned', accessState: 'private_needs_setup',
-        backupState: 'backup_disabled', issues: [], relationshipLabel: 'Installed', relationshipDescription: '', statusTone: 'success', cardTone: 'success',
+        catalogAvailability: 'installable', appInstanceId: app.appId, operation: { kind: 'idle' },
+        issues: [], relationshipLabel: 'Installed', relationshipDescription: '', statusTone: 'success', cardTone: 'success',
         primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps', method: null, disabled: false, reason: '' },
         availableActions: [], runtime: app, evidence: null,
       }],

@@ -193,7 +193,7 @@ function managedAppIconUrl(app: AppRuntimeView) {
 }
 
 function reachabilityIssue(app: AppRuntimeView, reconciliationItem: PrivateAccessReconciliationItem | null) {
-  if (app.attentionState && app.attentionState !== 'none') {
+  if (app.state === 'degraded' || app.state === 'missing' || app.state === 'unknown') {
     return app.remediation?.summary || app.healthSnapshot?.message || 'This app needs review.';
   }
   if (reconciliationItem && !['healthy', 'waiting'].includes(reconciliationItem.status)) {

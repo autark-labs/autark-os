@@ -15,7 +15,7 @@ test('builds managed-app focus links', () => {
     '/apps?focus=managed%3Asyncthing&panel=manage&tab=settings',
   );
   assert.equal(
-    applicationDeepLinkForSurfaceItem({ id: 'vaultwarden', sourceId: 'vaultwarden', managementState: 'managed' } as never),
+    applicationDeepLinkForSurfaceItem({ id: 'vaultwarden', sourceId: 'vaultwarden', relationship: 'managed' } as never),
     '/apps?focus=managed%3Avaultwarden',
   );
 });
@@ -45,7 +45,7 @@ test('opens the management panel only for managed-app focus routes', () => {
 });
 
 test('matches managed targets without falling back to another app', () => {
-  const item = { id: 'syncthing', sourceId: 'syncthing', managementState: 'managed' as const };
+  const item = { id: 'syncthing', sourceId: 'syncthing', relationship: 'managed' as const };
 
   assert.equal(findApplicationDeepLinkTarget([item] as never, parseApplicationsDeepLink('?focus=managed:syncthing'))?.id, 'syncthing');
   assert.equal(findApplicationDeepLinkTarget([item] as never, parseApplicationsDeepLink('?focus=managed:missing')), null);

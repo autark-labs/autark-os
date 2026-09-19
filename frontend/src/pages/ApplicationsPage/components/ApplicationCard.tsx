@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { AppArtwork } from '@/components/autark-os/AppArtwork';
 import { AppCardName } from '@/components/autark-os/AppCardName';
-import { labelForManagementState, labelForReadiness } from './AppStateBadges';
+import { labelForRelationship, labelForRuntimeState } from './AppStateBadges';
 import { applicationDeepLinkForSurfaceItem } from '../extensions/ApplicationsPage.deepLinks';
 import { runtimeActionDisabled, runtimeActionDisabledReason } from '../extensions/ApplicationsPage.operations';
 import type { ApplicationRuntimeAction, ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
@@ -80,7 +80,7 @@ export function ApplicationCard({
           overlay={(
             <>
               <span className="absolute left-2 top-2 z-20 rounded-full border border-slate-950/35 bg-slate-950/55 px-1.5 py-0.5 text-[0.65rem] font-medium text-slate-100 backdrop-blur-sm">
-                {labelForManagementState(item.managementState)}
+                {labelForRelationship(item.relationship)}
               </span>
               <DropdownMenu>
                 <div className="pointer-events-auto absolute right-1.5 top-1.5 z-20 flex items-center gap-0.5">
@@ -144,10 +144,10 @@ export function ApplicationCard({
           <p className="m-0 truncate text-xs text-slate-400">{item.category || 'App'}</p>
           <div className="mt-auto flex items-center justify-between gap-2 border-t border-sky-300/10 pt-2 text-[0.7rem] font-medium">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className={cn('size-1.5 shrink-0 rounded-full', readinessTone(item))} />
+              <span className={cn('size-1.5 shrink-0 rounded-full', runtimeTone(item))} />
               <span className={cn(readinessTextTone(item))}>{statusLabel(item)}</span>
             </span>
-            <span className="truncate text-slate-200/65">{item.managementState === 'managed' ? `${item.access}` : item.access}</span>
+            <span className="truncate text-slate-200/65">{item.relationship === 'managed' ? `${item.access}` : item.access}</span>
           </div>
         </div>
       </div>
@@ -159,8 +159,8 @@ function cardActions(item: ApplicationSurfaceItem, actionLoading: ApplicationRun
   const known = new Map(item.availableActions.map((action) => [action.id, action]));
   const actions: CardAction[] = [];
 
-  if (item.managementState === 'managed') {
-    const lifecycleActions: ApplicationRuntimeAction[] = item.readinessState === 'paused' || item.readinessState === 'stopped'
+  if (item.relationship === 'managed') {
+    const lifecycleActions: ApplicationRuntimeAction[] = item.state === 'stopped'
       ? ['start', 'restart', 'backup', 'repair']
       : ['stop', 'restart', 'backup', 'repair'];
     lifecycleActions.forEach((id) => {
@@ -198,21 +198,21 @@ function lifecycleLabel(action: ApplicationRuntimeAction) {
 }
 
 function statusLabel(item: ApplicationSurfaceItem) {
-  if (item.operationState.kind !== 'idle') return item.operationState.label;
-  if (item.attentionState !== 'none') return 'Needs attention';
-  return labelForReadiness(item.readinessState);
+  if (item.operation.kind !== 'idle') return item.operation.label;
+  if (item.issues.length > 0) return 'Needs attention';
+  return labelForRuntimeState(item.state);
 }
 
-function readinessTone(item: ApplicationSurfaceItem) {
-  if (item.operationState.kind === 'failed' || item.attentionState !== 'none') return 'bg-amber-400';
-  if (item.operationState.kind !== 'idle' || item.readinessState === 'starting') return 'bg-cyan-300';
-  if (item.readinessState === 'ready') return 'bg-emerald-400';
+function runtimeTone(item: ApplicationSurfaceItem) {
+  if (item.operation.kind === 'failed' || item.issues.length > 0) return 'bg-amber-400';
+  if (item.operation.kind !== 'idle' || item.state === 'starting') return 'bg-cyan-300';
+  if (item.state === 'ready') return 'bg-emerald-400';
   return 'bg-slate-400';
 }
 
 function readinessTextTone(item: ApplicationSurfaceItem) {
-  if (item.operationState.kind === 'failed' || item.attentionState !== 'none') return 'text-amber-200';
-  if (item.operationState.kind !== 'idle' || item.readinessState === 'starting') return 'text-cyan-200';
-  if (item.readinessState === 'ready') return 'text-emerald-300';
+  if (item.operation.kind === 'failed' || item.issues.length > 0) return 'text-amber-200';
+  if (item.operation.kind !== 'idle' || item.state === 'starting') return 'text-cyan-200';
+  if (item.state === 'ready') return 'text-emerald-300';
   return 'text-slate-300';
 }

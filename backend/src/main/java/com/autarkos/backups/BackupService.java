@@ -17,13 +17,12 @@ import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.install.AppInstanceView;
-import com.autarkos.marketplace.install.AppInstanceViewProvider;
 import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.AppRuntimeFiles;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettings;
@@ -42,7 +41,7 @@ public class BackupService {
     private final ActivityLogService activityLogService;
     private final ProjectSettingsRepository settingsRepository;
     private final ProjectSettingsService projectSettingsService;
-    private final AppInstanceViewProvider appInstanceViewProvider;
+    private final ManagedAppAttestationService managedApps;
     private final BackupVerificationService backupVerificationService;
     private final BackupReportService backupReportService;
     private final BackupArchiveService backupArchiveService;
@@ -55,14 +54,14 @@ public class BackupService {
     private final RecoveryOperationCoordinator recoveryOperations;
     private final BackupArchiveManifestService archiveManifestService = new BackupArchiveManifestService();
 
-    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, AppInstanceViewProvider appInstanceViewProvider, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
+    public BackupService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, BackupRepository backupRepository, ActivityLogService activityLogService, ProjectSettingsRepository settingsRepository, ProjectSettingsService projectSettingsService, AppLifecycleService appLifecycleService, MarketplaceCatalogService catalogService, ManagedAppAttestationService managedApps, RuntimeFileOperations fileOperations, AutarkOsFileOpsService fileOpsService, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.backupRepository = backupRepository;
         this.activityLogService = activityLogService;
         this.settingsRepository = settingsRepository;
         this.projectSettingsService = projectSettingsService;
-        this.appInstanceViewProvider = appInstanceViewProvider;
+        this.managedApps = managedApps;
         this.backupDestinationService = backupDestinationService;
         this.appLifecycleService = appLifecycleService;
         this.catalogService = catalogService;
@@ -511,15 +510,7 @@ public class BackupService {
     }
 
     private List<InstalledApp> managedInstalledApps() {
-        List<String> managedAppIds = appInstanceViewProvider.list().stream()
-                .map(AppInstanceView::catalogAppId)
-                .filter(id -> id != null && !id.isBlank())
-                .distinct()
-                .toList();
-        return managedAppIds.stream()
-                .map(installedAppRepository::findAppById)
-                .flatMap(Optional::stream)
-                .toList();
+        return managedApps.managedApps();
     }
 
     private Path backupRoot() {

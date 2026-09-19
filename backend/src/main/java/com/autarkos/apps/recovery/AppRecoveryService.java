@@ -165,9 +165,7 @@ public class AppRecoveryService {
     }
 
     public List<AppRecoveryModels.RecoveryCandidate> list() {
-        List<com.autarkos.apps.ApplicationView> applications = applicationState == null
-                ? applicationInventory.apps()
-                : applicationState.snapshot().applications();
+        List<com.autarkos.apps.ApplicationView> applications = applicationState.snapshot().applications();
         return applications.stream()
                 .filter(app -> app.relationship() == ApplicationRelationship.RECOVERY_REQUIRED)
                 .map(app -> new AppRecoveryModels.RecoveryCandidate(

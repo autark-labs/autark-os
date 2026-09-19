@@ -280,7 +280,7 @@ class DiscoverServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
                 catalogService(),
-                () -> applicationInventoryService(installedAppRepository, observedRepository).apps(),
+                () -> applicationViews(installedAppRepository, observedRepository),
                 setupService,
                 new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService));
     }
@@ -293,14 +293,14 @@ class DiscoverServiceTests {
         InstallCustomizationResolver customizationResolver = new InstallCustomizationResolver(new PortAllocator());
         return new DiscoverService(
                 catalogService(),
-                () -> applicationInventoryService(installedAppRepository, observedRepository).apps(),
+                () -> applicationViews(installedAppRepository, observedRepository),
                 setupService,
                 new DiscoverInstallPreviewService(new InstallPlanService(layout, customizationResolver), setupService),
                 installService,
                 jobService);
     }
 
-    private com.autarkos.apps.ApplicationInventoryService applicationInventoryService(InstalledAppRepository installedAppRepository, ObservedServiceRepository observedRepository) {
+    private List<com.autarkos.apps.ApplicationView> applicationViews(InstalledAppRepository installedAppRepository, ObservedServiceRepository observedRepository) {
         com.autarkos.system.AutarkOsIdentity identity = new com.autarkos.system.AutarkOsIdentity(
                 "current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash",
                 Instant.parse("2026-06-20T12:00:00Z"), 1);
@@ -308,29 +308,20 @@ class DiscoverServiceTests {
                 new ObservedServiceScanner());
         var managedApps = com.autarkos.testsupport.ManagedAppTestContract.service(
                 installedAppRepository, runtimeLayout(), identity);
-        return new com.autarkos.apps.ApplicationInventoryService(
-                catalogService(),
-                installedAppRepository,
-                observedServices,
-                managedApps,
-                List::of) {
-            @Override
-            public List<com.autarkos.apps.ApplicationView> apps() {
-                com.autarkos.testsupport.ManagedAppTestContract.writeAll(installedAppRepository, runtimeLayout(), identity);
-                var runtimes = installedAppRepository.findAllApps().stream()
-                        .filter(app -> managedApps.attest(app).managed())
-                        .map(DiscoverServiceTests.this::runtime)
-                        .toList();
-                return apps(observedServices.observedServices(), List.of(), runtimes);
-            }
-        };
+        com.autarkos.testsupport.ManagedAppTestContract.writeAll(installedAppRepository, runtimeLayout(), identity);
+        var runtimes = installedAppRepository.findAllApps().stream()
+                .filter(app -> managedApps.attest(app).managed())
+                .map(this::runtime)
+                .toList();
+        return new com.autarkos.apps.ApplicationInventoryService(catalogService(), installedAppRepository, managedApps)
+                .apps(observedServices.observedServices(), runtimes, Map.of());
     }
 
     private com.autarkos.marketplace.install.AppRuntimeView runtime(InstalledApp app) {
         return new com.autarkos.marketplace.install.AppRuntimeView(
-                app.appId(), app.appName(), "Apps", app.appName() + " app", "1.0.0", "", "Ready",
-                "running", "healthy", app.runtimePath(), app.composeProject(), app.accessUrl(), null, null, null,
-                app.installedAt(), "Backups disabled", null, null, null, null, null, List.of(), List.of());
+                app.appId(), app.appName(), "Apps", app.appName() + " app", "1.0.0", "", com.autarkos.apps.ApplicationRuntimeState.READY,
+                app.runtimePath(), app.composeProject(), app.accessUrl(), null, null, null,
+                app.installedAt(), "Backups disabled", "backup_disabled", null, null, null, null, null, List.of(), null, List.of());
     }
 
     private MarketplaceCatalogService catalogService() {

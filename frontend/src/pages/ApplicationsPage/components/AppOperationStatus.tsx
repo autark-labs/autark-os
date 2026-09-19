@@ -3,21 +3,21 @@ import { cn } from '@/lib/utils';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function CompactOperationStatus({ className, compact = false, item }: { className?: string; compact?: boolean; item: ApplicationSurfaceItem }) {
-  if (item.operationState.kind === 'idle') {
+  if (item.operation.kind === 'idle') {
     return null;
   }
 
-  const failed = item.operationState.kind === 'failed';
+  const failed = item.operation.kind === 'failed';
 
   if (compact) {
-    const detail = item.operationState.kind === 'failed'
-      ? item.operationState.message || 'Open details to review this app operation.'
-      : item.operationState.currentStep || 'Autark-OS is working on this app.';
+    const detail = item.operation.kind === 'failed'
+      ? item.operation.message || 'Open details to review this app operation.'
+      : item.operation.currentStep || 'Autark-OS is working on this app.';
 
     return (
       <div className={cn('flex min-w-0 items-center gap-1.5 text-xs font-semibold', failed ? 'text-red-200' : 'text-cyan-100', className)} title={detail}>
         {failed ? <AlertTriangle aria-hidden="true" className="size-3.5 shrink-0" /> : <Loader2 aria-hidden="true" className="size-3.5 shrink-0 animate-spin" />}
-        <span className="truncate">{item.operationState.label}</span>
+        <span className="truncate">{item.operation.label}</span>
       </div>
     );
   }
@@ -34,10 +34,10 @@ export function CompactOperationStatus({ className, compact = false, item }: { c
     >
       <div className="flex min-w-0 items-center gap-1.5 font-semibold">
         {failed ? <AlertTriangle className="size-3.5 shrink-0" /> : <Loader2 className="size-3.5 shrink-0 animate-spin" />}
-        <span className="truncate">{item.operationState.label}</span>
+        <span className="truncate">{item.operation.label}</span>
       </div>
-      {item.operationState.kind !== 'failed' && item.operationState.currentStep && (
-        <p className="mt-1 truncate opacity-75">{item.operationState.currentStep}</p>
+      {item.operation.kind !== 'failed' && item.operation.currentStep && (
+        <p className="mt-1 truncate opacity-75">{item.operation.currentStep}</p>
       )}
       {failed && (
         <p className="mt-1 truncate opacity-80">Open details to review.</p>
@@ -47,11 +47,11 @@ export function CompactOperationStatus({ className, compact = false, item }: { c
 }
 
 export function ExpandedOperationStatus({ className, item }: { className?: string; item: ApplicationSurfaceItem }) {
-  if (item.operationState.kind === 'idle') {
+  if (item.operation.kind === 'idle') {
     return null;
   }
 
-  const failed = item.operationState.kind === 'failed';
+  const failed = item.operation.kind === 'failed';
 
   return (
     <section
@@ -66,14 +66,14 @@ export function ExpandedOperationStatus({ className, item }: { className?: strin
       <div className="flex items-start gap-2">
         {failed ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />}
         <div className="min-w-0">
-          <p className="text-sm font-semibold">{item.operationState.label}</p>
-      {item.operationState.kind === 'failed' ? (
+          <p className="text-sm font-semibold">{item.operation.label}</p>
+      {item.operation.kind === 'failed' ? (
         <p className="mt-1 text-xs leading-5 opacity-80">
-          {item.operationState.message || 'Autark-OS could not finish this action. The app remains visible so you can review its state before trying again.'}
+          {item.operation.message || 'Autark-OS could not finish this action. The app remains visible so you can review its state before trying again.'}
         </p>
       ) : (
             <p className="mt-1 text-xs leading-5 opacity-80">
-              {item.operationState.currentStep || 'Autark-OS is working on this app. Conflicting controls are paused until it finishes.'}
+              {item.operation.currentStep || 'Autark-OS is working on this app. Conflicting controls are paused until it finishes.'}
             </p>
           )}
         </div>

@@ -33,7 +33,6 @@ import {
   parseApplicationsDeepLink,
 } from './extensions/ApplicationsPage.deepLinks';
 import { buildApplicationSurfaceItems } from './extensions/ApplicationsPage.liveModel';
-import { operationStateForItem } from './extensions/ApplicationsPage.operations';
 import type {
   ApplicationRuntimeAction,
   ApplicationSettingsAction,
@@ -85,33 +84,13 @@ export const ApplicationsPage = () => {
   const railRef = useRef<HTMLDivElement | null>(null);
   const deepLinkTarget = useMemo(() => parseApplicationsDeepLink(location.search), [location.search]);
 
-  const items = useMemo(() => {
-    const liveItems = buildApplicationSurfaceItems({
+  const items = useMemo(() => (
+    buildApplicationSurfaceItems({
       applications: appState.applications,
-    });
+    })
+  ), [appState.applications]);
 
-    return liveItems.map((item) => {
-      const itemId = item.sourceId || item.id;
-      const operationState = operationStateForItem(
-        item,
-        actionLoadingByAppId[itemId] ?? null,
-        settingsLoadingByAppId[itemId] ?? null,
-        jobsQuery.data ?? [],
-      );
-
-      return {
-        ...item,
-        operationState,
-      };
-    });
-  }, [
-    actionLoadingByAppId,
-    appState.applications,
-    jobsQuery.data,
-    settingsLoadingByAppId,
-  ]);
-
-  const managedItems = useMemo(() => items.filter((item) => item.managementState === 'managed'), [items]);
+  const managedItems = items;
   const reviewApplications = useMemo(
     () => appState.applications
       .filter((application) => application.relationship === 'recovery_required' || application.relationship === 'blocked')
@@ -136,7 +115,7 @@ export const ApplicationsPage = () => {
         return true;
       }
 
-      return [item.name, item.managementState, item.readinessState, item.attentionState, item.access, item.backup, item.nextAction?.label ?? '', item.description]
+      return [item.name, item.relationship, item.state, item.issues.map((issue) => issue.title).join(' '), item.access, item.backup, item.nextAction?.label ?? '', item.description]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
     });
   }, [collectionFilters, items, query]);
@@ -144,7 +123,7 @@ export const ApplicationsPage = () => {
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
   const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
   const managedCount = managedItems.length;
-  const attentionCount = items.filter((item) => item.attentionState !== 'none').length;
+  const attentionCount = items.filter((item) => item.issues.length > 0 || ['degraded', 'missing', 'unknown'].includes(item.state)).length;
   const emptyState = emptyStateForApplicationCollection(collectionFilters, query);
   const managedAppById = useMemo(() => new Map(appState.applications.flatMap((application) => (
     application.relationship === 'managed' && application.runtime ? [[application.id, application.runtime] as const] : []
@@ -540,11 +519,11 @@ export const ApplicationsPage = () => {
 
   const handleRunNextAction = (id: string) => {
     const item = items.find((candidate) => candidate.id === id);
-    if (item?.managementState === 'managed' && item.nextAction?.id === 'start_app') {
+    if (item?.nextAction?.id === 'start_app') {
       void runManagedAction(item.sourceId || item.id, 'start');
       return;
     }
-    if (item?.managementState === 'managed' && item.nextAction?.id === 'create_backup') {
+    if (item?.nextAction?.id === 'create_backup') {
       void runBackup(item.sourceId || item.id);
       return;
     }

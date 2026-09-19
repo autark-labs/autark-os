@@ -2,6 +2,7 @@ package com.autarkos.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,13 +13,14 @@ import org.junit.jupiter.api.io.TempDir;
 import com.autarkos.activity.ActivityLogRepository;
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.backups.BackupDestinationService;
+import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.fileops.LocalAutarkOsFileOperations;
-import com.autarkos.marketplace.install.AppInstanceViewProvider;
-import com.autarkos.marketplace.install.AppInstanceView;
+import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
@@ -53,7 +55,7 @@ class StorageServiceTests {
         InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(layout);
         repository.save(installed(layout, "homepage", "Homepage"));
         repository.save(installed(layout, "vaultwarden", "Vaultwarden"));
-        StorageService service = storageService(layout, repository, () -> List.of(appInstance("homepage")));
+        StorageService service = storageService(layout, repository, List.of(installed(layout, "homepage", "Homepage")));
 
         StorageModels.StorageReport report = service.report();
 
@@ -62,20 +64,24 @@ class StorageServiceTests {
     }
 
     private StorageService storageService(RuntimeLayout layout) {
-        return storageService(layout, JpaTestRepositories.installedAppRepository(layout), List::of);
+        return storageService(layout, JpaTestRepositories.installedAppRepository(layout), List.of());
     }
 
     private StorageService storageService(
             RuntimeLayout layout,
             InstalledAppRepository repository,
-            AppInstanceViewProvider apps) {
+            List<InstalledApp> apps) {
         AutarkOsFileOpsService fileOps = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations());
+        ManagedAppAttestationService managedApps = mock(ManagedAppAttestationService.class);
+        when(managedApps.managedApps()).thenReturn(apps);
         return new StorageService(
                 layout,
                 repository,
                 new ActivityLogService(mock(ActivityLogRepository.class)),
                 mock(StorageSampleRepository.class),
-                apps,
+                managedApps,
+                mock(BackupRepository.class),
+                mock(MarketplaceCatalogService.class),
                 new RuntimeFileOperations(),
                 new BackupDestinationService(
                         layout,
@@ -86,26 +92,6 @@ class StorageServiceTests {
 
     private InstalledApp installed(RuntimeLayout layout, String appId, String name) {
         return new InstalledApp(appId, name, "Ready", layout.appRoot(appId).toString(), "autark-os-" + appId, "http://localhost:8090", Instant.parse("2026-06-20T12:00:00Z"));
-    }
-
-    private AppInstanceView appInstance(String appId) {
-        return new AppInstanceView(
-                "appinst_" + appId,
-                appId,
-                appId,
-                "General",
-                "",
-                "Ready",
-                "ready",
-                "running",
-                "owned",
-                "local_ready",
-                "backup_disabled",
-                "http://localhost:8090",
-                null,
-                List.of(),
-                List.of(),
-                Instant.parse("2026-06-20T12:00:00Z"));
     }
 
     private RuntimeLayout runtimeLayout(Path runtimeRoot) {

@@ -12,7 +12,7 @@ import { copyText } from '@/lib/copyText';
 import { cn } from '@/lib/utils';
 import { ApplicationDarkControlButton } from './components/ApplicationButtons';
 import { DestructiveActionDialog } from './components/DestructiveActionDialog';
-import { labelForAttention, labelForManagementState, labelForReadiness } from './components/AppStateBadges';
+import { labelForRelationship, labelForRuntimeState } from './components/AppStateBadges';
 import { operationBlocksManagement } from './extensions/ApplicationsPage.operations';
 import { ApplicationGuideTab } from './managementTabs/ApplicationGuideTab';
 import { ApplicationLinksTab } from './managementTabs/ApplicationLinksTab';
@@ -57,7 +57,7 @@ export function ApplicationManagementPanel({
 }: ApplicationManagementPanelProps) {
   const rail = variant === 'rail';
   const recentEvents = item.runtime.recentEvents.slice(0, 5);
-  const recoveryNeeded = item.operationState.kind === 'failed';
+  const recoveryNeeded = item.operation.kind === 'failed';
 
   return (
     <section
@@ -97,8 +97,8 @@ export function ApplicationManagementPanel({
 
           <TabsContent className="grid gap-4" value="overview">
             <section className="grid gap-2 sm:grid-cols-2">
-              <Detail label="State" value={labelForReadiness(item.readinessState)} />
-              <Detail label="Attention" value={labelForAttention(item.attentionState)} />
+              <Detail label="State" value={labelForRuntimeState(item.state)} />
+              <Detail label="Issue" value={item.issues[0]?.title || 'None'} />
               <Detail label="Container" value={item.settings.containerStatus || item.runtime.health?.dockerStatus || 'Not reported'} />
               <Detail label="Policy" value="Plan before apply" />
             </section>
@@ -144,7 +144,7 @@ export function ApplicationManagementPanel({
                 <AccordionTrigger className="text-sky-50">Template values</AccordionTrigger>
                 <AccordionContent className="grid gap-2 sm:grid-cols-2">
                   <Detail label="Image" value={item.runtime.image || 'Not reported'} />
-                  <Detail label="Category" value={labelForManagementState(item.managementState)} />
+                  <Detail label="Category" value={labelForRelationship(item.relationship)} />
                   <Detail label="Port" value={formatPort(item.settings.expectedLocalPort)} />
                   <Detail label="Policy" value="Plan before apply" />
                 </AccordionContent>
@@ -191,7 +191,7 @@ function DangerZone({
   actions: Pick<ApplicationActionHandlers, 'onLoadUninstallPlan' | 'onRunUninstall'>;
   item: ApplicationSurfaceItem;
 }) {
-  const uninstallBlockedByOperation = operationBlocksManagement(item.operationState);
+  const uninstallBlockedByOperation = operationBlocksManagement(item.operation);
   const uninstallDisabledReason = uninstallBlockedByOperation
     ? 'Wait for the current app action to finish before uninstalling.'
     : null;
@@ -288,10 +288,10 @@ function supportDetailsText(item: ApplicationSurfaceItem) {
   return [
     `App ID: ${item.sourceId || item.id}`,
     `Name: ${item.name}`,
-    `Type: ${labelForManagementState(item.managementState)}`,
-    `Readiness: ${labelForReadiness(item.readinessState)}`,
-    `Attention: ${labelForAttention(item.attentionState)}`,
-    `Operation: ${operationStateText(item)}`,
+    `Type: ${labelForRelationship(item.relationship)}`,
+    `Readiness: ${labelForRuntimeState(item.state)}`,
+    `Issue: ${item.issues[0]?.title || 'None'}`,
+    `Operation: ${operationText(item)}`,
     `Access: ${item.access}`,
     `Backup: ${item.backup}`,
     `Primary URL: ${item.links.primaryUrl || 'Not configured'}`,
@@ -304,12 +304,12 @@ function supportDetailsText(item: ApplicationSurfaceItem) {
   ].join('\n');
 }
 
-function operationStateText(item: ApplicationSurfaceItem) {
-  if (item.operationState.kind === 'idle') {
+function operationText(item: ApplicationSurfaceItem) {
+  if (item.operation.kind === 'idle') {
     return 'Idle';
   }
-  if (item.operationState.kind === 'failed') {
-    return item.operationState.message || item.operationState.label;
+  if (item.operation.kind === 'failed') {
+    return item.operation.message || item.operation.label;
   }
-  return item.operationState.currentStep || item.operationState.label;
+  return item.operation.currentStep || item.operation.label;
 }

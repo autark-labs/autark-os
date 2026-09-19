@@ -1,12 +1,8 @@
 import type { DestructiveActionPlan } from './ApplicationsPage.destructiveActions';
-import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUpdatePlan, AppUsageGuide } from '@/types/app';
+import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUpdatePlan, AppUsageGuide, ApplicationRuntimeState, AutarkOsIssue } from '@/types/app';
 
-export type ApplicationRuntimeState = 'running' | 'starting' | 'paused' | 'needs_attention';
 export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup' | 'update' | 'rollback';
 export type ApplicationSettingsAction = 'planning' | 'saving' | 'private_access';
-export type AppManagementState = 'managed';
-export type AppReadinessState = 'ready' | 'starting' | 'paused' | 'stopped' | 'unreachable' | 'unknown';
-export type AppAttentionState = 'none' | 'needs_review' | 'conflict' | 'blocked';
 export type AppOperationState =
   | { kind: 'idle' }
   | {
@@ -49,13 +45,10 @@ export type ApplicationSurfaceItem = {
   displayOrder?: number;
   category?: string;
   name: string;
-  kind: 'managed';
-  managementState: AppManagementState;
-  readinessState: AppReadinessState;
-  attentionState: AppAttentionState;
-  operationState: AppOperationState;
-  status: 'Ready' | 'Starting' | 'Paused' | 'Needs review';
-  runtimeState: ApplicationRuntimeState;
+  relationship: 'managed';
+  state: ApplicationRuntimeState;
+  operation: AppOperationState;
+  issues: AutarkOsIssue[];
   access: 'Open' | 'Private' | 'Local only' | 'No link';
   backup: 'Protected' | 'Needs backup' | 'Not managed';
   availableActions: ApplicationAvailableAction[];

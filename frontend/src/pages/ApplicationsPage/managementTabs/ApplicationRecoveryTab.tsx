@@ -14,7 +14,7 @@ type ApplicationRecoveryTabProps = {
 };
 
 export function ApplicationRecoveryTab({ actions, item, onEditSettings, onReviewManagement }: ApplicationRecoveryTabProps) {
-  if (item.operationState.kind !== 'failed') {
+  if (item.operation.kind !== 'failed') {
     return null;
   }
 
@@ -22,8 +22,8 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings, onReview
   const start = applicationActionRestriction(item, 'start');
   const stop = applicationActionRestriction(item, 'stop');
   const settings = applicationActionRestriction(item, 'settings');
-  const operationRecovery = recoveryForOperation(item.operationState.jobType);
-  const recovery = operationRecovery ?? explainFailure(item.operationState.message);
+  const operationRecovery = recoveryForOperation(item.operation.jobType);
+  const recovery = operationRecovery ?? explainFailure(item.operation.message);
   const recentEvents = item.runtime.recentEvents.slice(0, 4);
   const backupWarning = backupSafetyMessage(item);
 
@@ -31,7 +31,7 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings, onReview
     <section className="grid gap-4 rounded-xl border border-red-300/40 bg-red-950 p-4 text-red-50 shadow-inner shadow-red-950/40">
       <Alert className="border-red-300/40 bg-red-900 text-red-50">
         <AlertTriangle />
-        <AlertTitle>{item.operationState.label}</AlertTitle>
+        <AlertTitle>{item.operation.label}</AlertTitle>
         <AlertDescription className="text-red-50/80">
           {operationRecovery?.description ?? 'Autark-OS could not finish the last app action. Review the cause and current app state before trying again.'}
         </AlertDescription>
@@ -39,7 +39,7 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings, onReview
 
       <div className="grid gap-2 rounded-lg border border-red-300/30 bg-red-900/70 p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-red-100/70">Error</p>
-        <p className="text-sm leading-6 text-white">{item.operationState.message}</p>
+        <p className="text-sm leading-6 text-white">{item.operation.message}</p>
       </div>
 
       <div className="grid gap-2 rounded-lg border border-red-300/30 bg-red-900/70 p-3">

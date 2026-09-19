@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.autarkos.apps.ApplicationRuntimeState;
 import com.autarkos.backups.BackupRepository;
 import com.autarkos.backups.BackupDestinationService;
 import com.autarkos.backups.RecoveryOperationConflictException;
@@ -131,11 +132,8 @@ class AppLifecycleServiceTests {
     void returnsFriendlyRuntimeStatusAndRecentEvents() {
         AppRuntimeView app = service.getApp("vaultwarden");
 
-        assertThat(app.friendlyStatus()).isEqualTo("Ready");
-        assertThat(app.managementState()).isEqualTo("managed");
-        assertThat(app.readinessState()).isEqualTo("ready");
-        assertThat(app.attentionState()).isEqualTo("none");
-        assertThat(app.healthCheck()).isEqualTo("passing");
+        assertThat(app.state()).isEqualTo(ApplicationRuntimeState.READY);
+        assertThat(app.healthSnapshot().status()).isEqualTo("Ready");
         assertThat(app.healthSnapshot()).isNotNull();
         assertThat(repository.healthFor("vaultwarden")).isPresent();
         assertThat(app.category()).isEqualTo("Security");
@@ -299,8 +297,7 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView paused = service.getApp("vaultwarden");
 
-        assertThat(paused.readinessState()).isEqualTo("paused");
-        assertThat(paused.attentionState()).isEqualTo("none");
+        assertThat(paused.state()).isEqualTo(ApplicationRuntimeState.STOPPED);
 
         composeExecutor.containers = List.of(new RuntimeModels.DockerContainerStatus(
                 "autark-os-vaultwarden",
@@ -312,8 +309,7 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView unreachable = service.getApp("vaultwarden");
 
-        assertThat(unreachable.readinessState()).isEqualTo("unreachable");
-        assertThat(unreachable.attentionState()).isEqualTo("needs_review");
+        assertThat(unreachable.state()).isEqualTo(ApplicationRuntimeState.DEGRADED);
     }
 
     @Test
@@ -328,9 +324,8 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView app = service.getApp("vaultwarden");
 
-        assertThat(app.friendlyStatus()).isEqualTo("Unavailable");
+        assertThat(app.state()).isEqualTo(ApplicationRuntimeState.DEGRADED);
         assertThat(app.healthSnapshot().detail()).contains("local app link did not answer");
-        assertThat(app.readinessState()).isEqualTo("unreachable");
     }
 
     @Test
@@ -364,7 +359,7 @@ class AppLifecycleServiceTests {
         assertThat(result.title()).isEqualTo("App restarted");
         assertThat(result.nextAction()).isEqualTo("refresh_apps");
         assertThat(result.status()).isEqualTo("completed");
-        assertThat(result.app().friendlyStatus()).isEqualTo("Ready");
+        assertThat(result.app().state()).isEqualTo(ApplicationRuntimeState.READY);
         assertThat(repository.eventsFor("vaultwarden", 5))
                 .extracting(event -> event.type())
                 .contains("restart");
@@ -623,9 +618,8 @@ class AppLifecycleServiceTests {
 
         AppRuntimeView app = service.getApp("vaultwarden");
 
-        assertThat(app.friendlyStatus()).isEqualTo("Ready");
-        assertThat(app.healthCheck()).isEqualTo("passing");
-        assertThat(app.technicalStatus()).contains("running");
+        assertThat(app.state()).isEqualTo(ApplicationRuntimeState.READY);
+        assertThat(app.healthSnapshot().status()).isEqualTo("Ready");
     }
 
     @Test
@@ -1169,7 +1163,7 @@ class AppLifecycleServiceTests {
         assertThatThrownBy(() -> service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090")))
                 .isInstanceOf(AssertionError.class);
         assertThat(repository.settingsRecoveryFor("vaultwarden")).isPresent();
-        assertThat(service.getApp("vaultwarden").friendlyStatus()).isEqualTo("Needs attention");
+        assertThat(service.getApp("vaultwarden").state()).isEqualTo(ApplicationRuntimeState.DEGRADED);
         assertThatThrownBy(() -> service.start("vaultwarden")).hasMessageContaining("Use Repair");
         composeExecutor.upBehavior = null;
         service.recoverInterruptedSettings();
@@ -1305,7 +1299,7 @@ class AppLifecycleServiceTests {
                 "autark-os-vaultwarden", "vaultwarden", "exited", "", "Exited", "0.0.0.0:8090->80/tcp"));
         var updated = service.updateSettings("vaultwarden", InstallModels.InstallSettings.defaults("http://localhost:19090"));
         assertThat(composeExecutor.upCalled).isFalse();
-        assertThat(updated.friendlyStatus()).isEqualTo("Paused");
+        assertThat(updated.state()).isEqualTo(ApplicationRuntimeState.STOPPED);
         assertThat(updated.accessUrl()).isEqualTo("http://localhost:19090");
         assertThat(Files.readString(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"))).contains("19090:80");
     }
