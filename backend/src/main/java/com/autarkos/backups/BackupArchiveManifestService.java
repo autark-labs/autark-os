@@ -18,7 +18,7 @@ import com.autarkos.marketplace.install.InstallationException;
  */
 final class BackupArchiveManifestService {
 
-    private static final int SCHEMA_VERSION = 1;
+    private static final int SCHEMA_VERSION = 2;
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     Path manifestPath(Path archive) {

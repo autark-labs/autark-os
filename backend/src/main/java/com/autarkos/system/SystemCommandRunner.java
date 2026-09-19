@@ -19,7 +19,6 @@ public class SystemCommandRunner {
     public static final Duration PROBE_TIMEOUT = Duration.ofSeconds(30);
     public static final Duration COMPOSE_TIMEOUT = Duration.ofMinutes(5);
     public static final Duration IMAGE_PULL_TIMEOUT = Duration.ofMinutes(20);
-    public static final Duration ARCHIVE_TIMEOUT = Duration.ofMinutes(10);
     private static final Duration TERMINATION_GRACE = Duration.ofSeconds(2);
     private static final Duration DRAIN_GRACE = Duration.ofSeconds(2);
     private static final int MAX_OUTPUT_CHARACTERS = 64 * 1024;

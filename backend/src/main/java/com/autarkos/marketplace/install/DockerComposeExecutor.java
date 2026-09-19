@@ -27,10 +27,6 @@ public interface DockerComposeExecutor {
 
     RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName);
 
-    default RuntimeModels.DockerComposeResult stopManagedProject(Path composeFile, String projectName, String appId) {
-        return stop(composeFile, projectName);
-    }
-
     RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName);
 
     RuntimeModels.DockerComposeResult down(Path composeFile, String projectName);
@@ -38,10 +34,6 @@ public interface DockerComposeExecutor {
     RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName);
 
     List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName);
-
-    default RuntimeModels.DockerComposeResult archiveAndRemoveManagedProject(String projectName, String appId, Path archiveDirectory) {
-        return new RuntimeModels.DockerComposeResult(1, List.of("This Docker executor cannot safely archive containers without a Compose file."));
-    }
 
     List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames);
 }

@@ -5,6 +5,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.stereotype.Component;
 
@@ -41,10 +43,25 @@ public class AppRuntimeMetadataReader {
                     instanceId,
                     composeProject,
                     manifestVersion,
-                    instant(text(root, "createdAt"))));
+                    instant(text(root, "createdAt")),
+                    mounts(root.path("mountContract"))));
         } catch (IOException | RuntimeException exception) {
             return Optional.empty();
         }
+    }
+
+    private List<RuntimeModels.ManagedMount> mounts(JsonNode node) {
+        if (!node.isArray()) {
+            return List.of();
+        }
+        List<RuntimeModels.ManagedMount> mounts = new ArrayList<>();
+        node.forEach(value -> mounts.add(new RuntimeModels.ManagedMount(
+                text(value, "service"),
+                text(value, "type"),
+                text(value, "source"),
+                text(value, "destination"),
+                value.path("readOnly").asBoolean(false))));
+        return List.copyOf(mounts);
     }
 
     private String text(JsonNode root, String field) {

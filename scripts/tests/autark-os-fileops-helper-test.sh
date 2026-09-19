@@ -43,7 +43,7 @@ PY
   --archive "${archive}" \
   --scope full >/dev/null
 
-[[ ! -e "${app_root}/old/file.txt" ]]
+grep -q 'old' "${app_root}/old/file.txt"
 grep -q 'default_config' "${app_root}/config/configuration.yaml"
 [[ ! -e "${app_root}/grafana/config.ini" ]]
 [[ "$(stat -c '%a' "${app_root}/config/configuration.yaml")" == "640" ]]
@@ -51,10 +51,10 @@ grep -q 'default_config' "${app_root}/config/configuration.yaml"
 mkdir -p "${app_root}/empty-state"
 chmod 700 "${app_root}/empty-state"
 
-"${repo_root}/scripts/autark-os-fileops" create-safety-archive \
+"${repo_root}/scripts/autark-os-fileops" create-managed-archive \
   --runtime-root "${runtime_root}" \
   --backup-root "${backup_root}" \
-  --app home-assistant \
+  --entries home-assistant:config,home-assistant:empty-state \
   --destination "${safety}" >/dev/null
 
 unzip -l "${safety}" | grep -q 'config/configuration.yaml'
@@ -62,25 +62,25 @@ unzip -l "${safety}" | grep -q 'empty-state/'
 unzip -l "${safety}" | grep -q '.autark-os-filesystem.json'
 [[ "$(stat -c '%a' "${safety}")" == "644" ]]
 
-mkdir -p "${runtime_root}/apps/grafana"
-printf 'grafana\n' >"${runtime_root}/apps/grafana/config.ini"
-"${repo_root}/scripts/autark-os-fileops" create-full-archive \
+mkdir -p "${runtime_root}/apps/grafana/data"
+printf 'grafana\n' >"${runtime_root}/apps/grafana/data/config.ini"
+"${repo_root}/scripts/autark-os-fileops" create-managed-archive \
   --runtime-root "${runtime_root}" \
   --backup-root "${backup_root}" \
-  --apps home-assistant,grafana \
+  --entries home-assistant:config,grafana:data \
   --destination "${full_archive}" >/dev/null
 
 unzip -l "${full_archive}" | grep -q 'home-assistant/config/configuration.yaml'
-unzip -l "${full_archive}" | grep -q 'grafana/config.ini'
+unzip -l "${full_archive}" | grep -q 'grafana/data/config.ini'
 
-mkdir -p "${runtime_root}/apps/broken"
-printf 'included before failure\n' >"${runtime_root}/apps/broken/content.txt"
-ln -s "${tmp_dir}/outside.txt" "${runtime_root}/apps/broken/linked.txt"
+mkdir -p "${runtime_root}/apps/broken/data"
+printf 'included before failure\n' >"${runtime_root}/apps/broken/data/content.txt"
+ln -s "${tmp_dir}/outside.txt" "${runtime_root}/apps/broken/data/linked.txt"
 broken_archive="${backup_root}/broken.zip"
-if "${repo_root}/scripts/autark-os-fileops" create-safety-archive \
+if "${repo_root}/scripts/autark-os-fileops" create-managed-archive \
   --runtime-root "${runtime_root}" \
   --backup-root "${backup_root}" \
-  --app broken \
+  --entries broken:data \
   --destination "${broken_archive}" >/dev/null 2>&1; then
   echo "expected archive containing a symbolic link to fail" >&2
   exit 1

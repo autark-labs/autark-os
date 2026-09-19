@@ -287,6 +287,8 @@ export type OrphanedStorage = {
   name: string;
   path: string;
   usedBytes: number;
+  cleanupAllowed: boolean;
+  cleanupBlockedReason: string | null;
 };
 
 export type StorageRecommendation = {

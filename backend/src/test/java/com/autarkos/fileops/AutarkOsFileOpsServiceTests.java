@@ -142,20 +142,23 @@ class AutarkOsFileOpsServiceTests {
                     return new AutarkOsFileOpsService.CommandResult(0, List.of("archived"), false);
                 });
 
-        service.createFullArchive(List.of("grafana", "home-assistant"), archive);
+        service.createManagedFullArchive(java.util.Map.of(
+                "grafana", java.util.Map.of("data", layout.appRoot("grafana").resolve("data")),
+                "home-assistant", java.util.Map.of("config", layout.appRoot("home-assistant").resolve("config"))),
+                archive, layout.runtimeRoot().resolve("backups"));
 
         assertThat(commands).singleElement().satisfies(command -> {
             assertThat(command).containsExactly(
                     "sudo",
                     "-n",
                     "/opt/autark-os/bin/autark-os-fileops",
-                    "create-full-archive",
+                    "create-managed-archive",
                     "--runtime-root",
                     layout.runtimeRoot().toString(),
                     "--backup-root",
                     layout.runtimeRoot().resolve("backups").toString(),
-                    "--apps",
-                    "grafana,home-assistant",
+                    "--entries",
+                    "grafana:data,home-assistant:config",
                     "--destination",
                     archive.toAbsolutePath().normalize().toString());
         });
@@ -194,7 +197,9 @@ class AutarkOsFileOpsServiceTests {
                 command -> new AutarkOsFileOpsService.CommandResult(1, List.of("sudo: a password is required"), false),
                 helper.toString());
 
-        assertThatThrownBy(() -> service.createFullArchive(List.of("grafana"), archive))
+        assertThatThrownBy(() -> service.createManagedFullArchive(
+                java.util.Map.of("grafana", java.util.Map.of("data", layout.appRoot("grafana").resolve("data"))),
+                archive, layout.runtimeRoot().resolve("backups")))
                 .isInstanceOf(java.io.IOException.class)
                 .hasMessageContaining("could not create the backup archive")
                 .hasMessageContaining("does not have permission")
@@ -214,7 +219,9 @@ class AutarkOsFileOpsServiceTests {
                 command -> new AutarkOsFileOpsService.CommandResult(1, List.of("sudo: a password is required"), false),
                 missingHelper.toString());
 
-        assertThatThrownBy(() -> service.createFullArchive(List.of("grafana"), archive))
+        assertThatThrownBy(() -> service.createManagedFullArchive(
+                java.util.Map.of("grafana", java.util.Map.of("data", layout.appRoot("grafana").resolve("data"))),
+                archive, layout.runtimeRoot().resolve("backups")))
                 .isInstanceOf(java.io.IOException.class)
                 .hasMessageContaining("could not create the backup archive")
                 .hasMessageContaining("required file helper is not installed")
@@ -236,7 +243,7 @@ class AutarkOsFileOpsServiceTests {
         Path destination = tempDir.resolve("restored");
 
         LocalAutarkOsFileOperations operations = new LocalAutarkOsFileOperations();
-        operations.createArchive(source, archive);
+        operations.createPrefixedArchive(java.util.Map.of("data", source.resolve("data")), archive);
         operations.restoreAppData(archive, "app", "vaultwarden", destination);
 
         assertThat(Files.readString(destination.resolve("data/settings.db"))).isEqualTo("secret settings");
@@ -276,7 +283,7 @@ class AutarkOsFileOpsServiceTests {
         Files.createSymbolicLink(source.resolve("linked.txt"), tempDir.resolve("outside.txt"));
         Path archive = tempDir.resolve("backup.zip");
 
-        assertThatThrownBy(() -> new LocalAutarkOsFileOperations().createArchive(source, archive))
+        assertThatThrownBy(() -> new LocalAutarkOsFileOperations().createPrefixedArchive(java.util.Map.of("data", source), archive))
                 .isInstanceOf(java.io.IOException.class)
                 .hasMessageContaining("symbolic links");
         assertThat(archive).doesNotExist();

@@ -73,7 +73,7 @@ public class BackupService {
         this.backupArchiveService = new BackupArchiveService(fileOperations, fileOpsService, this::backupRoot, backupDestinationService::approvedRootForArchive);
         RestoreSimulationService restoreSimulationService = new RestoreSimulationService(backupContractService, this::backupRoot);
         this.restorePlanner = new RestorePlanner(backupRepository, backupContractService, backupVerificationService, restoreSimulationService, this::managedInstalledApps, backupDestinationService::archiveAvailable);
-        this.restoreExecutor = new RestoreExecutor(backupRepository, installedAppRepository, activityLogService, appLifecycleService, fileOperations, backupArchiveService, backupVerificationService, restorePlanner, this::backupRoot);
+        this.restoreExecutor = new RestoreExecutor(backupRepository, installedAppRepository, activityLogService, appLifecycleService, fileOperations, backupArchiveService, backupVerificationService, restorePlanner, this::backupRoot, managedApps);
     }
 
     public BackupModels.BackupReport report() {
@@ -187,12 +187,15 @@ public class BackupService {
         List<InstalledApp> runningApps = new java.util.ArrayList<>();
         BackupModels.BackupRunResult result;
         try {
+            List<com.autarkos.marketplace.install.ManagedStorageContractService.Contract> storage = protectedApps.stream()
+                    .map(app -> managedApps.durableStorage(app, true))
+                    .toList();
             // Validate every source and the destination before pausing the first app.
-            backupArchiveService.validateFullBackup(protectedApps);
+            backupArchiveService.validateFullBackup(storage);
             stopRunningAppsForBackup(protectedApps, runningApps);
             Files.createDirectories(backupRoot().resolve("full"));
             Path destination = backupRoot().resolve("full").resolve("autark-os-full-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
-            long size = backupArchiveService.createFullArchive(protectedApps, destination);
+            long size = backupArchiveService.createFullArchive(storage, destination);
             String included = protectedApps.stream().map(InstalledApp::appId).collect(java.util.stream.Collectors.joining(","));
             BackupModels.BackupContract contract = new BackupModels.BackupContract("cold_file", 1, "Stopped app file backup", "standard", false, "All included apps were stopped before archiving.", List.of());
             RestorePoint point = recordVerifiedArchive("__full__", "All apps", "full", cleanSource(source), included, destination, size, "Full backup completed for " + protectedApps.size() + " app(s).", contract);
@@ -253,14 +256,6 @@ public class BackupService {
 
     private BackupModels.BackupRunResult runAppBackup(String appId, String backupSource) {
         InstalledApp app = appLifecycleService.requireManagedApp(appId, "create a backup for");
-        Path source = runtimeLayout.appRoot(app.appId())
-                .toAbsolutePath()
-                .normalize();
-        if (!AppRuntimeFiles.hasComposeFile(source.toString())) {
-            String message = app.appName() + " cannot use normal backups because its original Compose file is missing. Review it in My Apps and use archive-first cleanup if you no longer need the container.";
-            RestorePoint point = recordRestorePoint(app.appId(), app.appName(), "", AutarkOsStates.RestorePointStatus.FAILED, 0, message);
-            return new BackupModels.BackupRunResult(app.appId(), app.appName(), AutarkOsStates.RestorePointStatus.FAILED, point.message(), point, Instant.now());
-        }
         InstallModels.BackupPolicy policy = installedAppRepository.settingsFor(appId)
                 .map(InstallModels.InstallSettings::backup)
                 .orElse(InstallModels.BackupPolicy.defaults());
@@ -282,11 +277,12 @@ public class BackupService {
         boolean wasRunning = false;
         BackupModels.BackupRunResult result;
         try {
+            java.util.Map<String, Path> protectedPaths = managedApps.durableStorage(app, true).protectedPaths();
             wasRunning = stopAppForBackupIfRunning(app);
-            backupArchiveService.validateAppBackup(source);
+            backupArchiveService.validateAppBackup(protectedPaths);
             Files.createDirectories(backupRoot().resolve(app.appId()));
             Path destination = backupRoot().resolve(app.appId()).resolve(app.appId() + "-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
-            long size = backupArchiveService.createAppArchive(app.appId(), destination);
+            long size = backupArchiveService.createArchive(app.appId(), protectedPaths, destination);
             RestorePoint point = recordVerifiedArchive(app.appId(), app.appName(), "app", cleanSource(backupSource), app.appId(), destination, size, "Backup completed.", contract);
             point = backupVerificationService.verifyRestorePoint(point).restorePoint();
             if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {

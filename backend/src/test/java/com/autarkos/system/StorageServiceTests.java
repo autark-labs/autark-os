@@ -1,6 +1,7 @@
 package com.autarkos.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -21,6 +22,7 @@ import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.ManagedAppAttestationService;
+import com.autarkos.marketplace.install.ManagedStorageContractService;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.testsupport.JpaTestRepositories;
@@ -63,6 +65,19 @@ class StorageServiceTests {
         assertThat(report.orphanedData()).extracting(StorageModels.OrphanedStorage::name).contains("vaultwarden");
     }
 
+    @Test
+    void cleanupIsBlockedWhenDurableDataPlacementCannotBeProven() throws Exception {
+        RuntimeLayout layout = runtimeLayout(tempDir.resolve("blocked-cleanup-runtime"));
+        Path orphan = layout.appRoot("legacy-app");
+        Files.createDirectories(orphan);
+        Files.writeString(orphan.resolve("unknown.db"), "keep me");
+        StorageService service = storageService(layout);
+
+        assertThatThrownBy(() -> service.cleanupOrphan("legacy-app"))
+                .hasMessageContaining("durable data placement cannot be proven");
+        assertThat(orphan.resolve("unknown.db")).exists();
+    }
+
     private StorageService storageService(RuntimeLayout layout) {
         return storageService(layout, JpaTestRepositories.installedAppRepository(layout), List.of());
     }
@@ -74,6 +89,17 @@ class StorageServiceTests {
         AutarkOsFileOpsService fileOps = new AutarkOsFileOpsService(layout, new LocalAutarkOsFileOperations());
         ManagedAppAttestationService managedApps = mock(ManagedAppAttestationService.class);
         when(managedApps.managedApps()).thenReturn(apps);
+        ManagedStorageContractService storageContracts = mock(ManagedStorageContractService.class);
+        when(storageContracts.assessOrphan(org.mockito.ArgumentMatchers.any(Path.class)))
+                .thenReturn(new ManagedStorageContractService.CleanupAssessment(false, "Storage proof is unavailable.", java.util.Map.of()));
+        when(storageContracts.assessOrphans(org.mockito.ArgumentMatchers.anyList()))
+                .thenAnswer(invocation -> {
+                    java.util.Map<Path, ManagedStorageContractService.CleanupAssessment> assessments = new java.util.LinkedHashMap<>();
+                    for (Path path : invocation.<List<Path>>getArgument(0)) {
+                        assessments.put(path, new ManagedStorageContractService.CleanupAssessment(false, "Storage proof is unavailable.", java.util.Map.of()));
+                    }
+                    return assessments;
+                });
         return new StorageService(
                 layout,
                 repository,
@@ -87,7 +113,9 @@ class StorageServiceTests {
                         layout,
                         JpaTestRepositories.projectSettingsRepository(layout),
                         fileOps),
-                new RecoveryOperationCoordinator());
+                new RecoveryOperationCoordinator(),
+                storageContracts,
+                fileOps);
     }
 
     private InstalledApp installed(RuntimeLayout layout, String appId, String name) {

@@ -21,7 +21,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -35,11 +34,10 @@ import com.autarkos.host.DockerInventoryService;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
-import com.autarkos.marketplace.catalog.ManifestValidator;
-import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.AppRuntimeMetadataReader;
 import com.autarkos.marketplace.install.AppRuntimeMetadataWriter;
+import com.autarkos.marketplace.install.ManagedStorageContractService;
 import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
@@ -47,7 +45,6 @@ import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
-import com.autarkos.marketplace.model.RuntimeServiceManifest;
 import com.autarkos.system.AutarkOsIdentity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,7 +54,6 @@ public class AppRecoveryService {
 
     static final String CURRENT_INSTANCE_REGISTRATION_LOST = "current_instance_registration_lost";
     static final String INSUFFICIENT_EVIDENCE = "insufficient_evidence";
-
     private static final Pattern PUBLISHED_PORT = Pattern.compile("(?:^|:)(\\d+):\\d+(?:/(?:tcp|udp))?$");
 
     private final ObservedServiceService observedServices;
@@ -69,6 +65,8 @@ public class AppRecoveryService {
     private final RecoveryOperationCoordinator recoveryOperations;
     private final AppAccessChecker accessChecker;
     private final DockerInventoryService dockerInventory;
+    private final AppRuntimeMetadataWriter runtimeMetadataWriter;
+    private final ManagedStorageContractService storageContracts;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AppRecoveryService(
@@ -80,7 +78,9 @@ public class AppRecoveryService {
             ActivityLogService activityLog,
             RecoveryOperationCoordinator recoveryOperations,
             AppAccessChecker accessChecker,
-            DockerInventoryService dockerInventory) {
+            DockerInventoryService dockerInventory,
+            AppRuntimeMetadataWriter runtimeMetadataWriter,
+            ManagedStorageContractService storageContracts) {
         this.observedServices = observedServices;
         this.installedApps = installedApps;
         this.catalog = catalog;
@@ -90,6 +90,8 @@ public class AppRecoveryService {
         this.recoveryOperations = recoveryOperations;
         this.accessChecker = accessChecker;
         this.dockerInventory = dockerInventory;
+        this.runtimeMetadataWriter = runtimeMetadataWriter;
+        this.storageContracts = storageContracts;
     }
 
     public AppRecoveryModels.RecoveryPlan plan(String appId) {
@@ -119,9 +121,9 @@ public class AppRecoveryService {
         Path runtimePath = runtimePath(appId, evidence, identity);
         Optional<RuntimeModels.AppRuntimeMetadata> metadata = runtimeMetadataReader.read(runtimePath);
         String reason = reasonFor(appId, evidence, metadata.orElse(null), identity);
-        Optional<ApplicationManifest> savedManifest = readSavedManifest(runtimePath);
+        Optional<ApplicationManifest> savedManifest = storageContracts.findManifest(runtimePath);
         ApplicationManifest deployedManifest = savedManifest.orElse(manifest);
-        ComposeInspection compose = inspectCompose(runtimePath.resolve("compose.yaml"), deployedManifest, runtimePath);
+        ComposeEvidence compose = inspectCompose(runtimePath, deployedManifest);
         List<AppRecoveryModels.RecoveryCheck> checks = new ArrayList<>();
 
         boolean catalogIdentity = (evidence == null || appId.equals(evidence.catalogAppId()))
@@ -156,7 +158,20 @@ public class AppRecoveryService {
                         : "The runtime folder is missing or outside managed Autark-OS storage.", runtimePath.toString()));
 
         checks.add(check("compose", "Compose configuration", compose.valid(), compose.message(), runtimePath.resolve("compose.yaml").toString()));
-        checks.add(check("mounts", "Saved data layout", compose.mountsValid(), compose.mountMessage(), String.join(", ", compose.mounts())));
+        checks.add(check("mounts", "Saved data layout", compose.storageValid(), compose.storageMessage(), String.join(", ", compose.mountLabels())));
+
+        List<RuntimeModels.ManagedMount> composeContract = compose.mounts();
+        boolean mountContractReady = metadata.map(value -> value.mountContract().isEmpty()
+                        ? compose.storageValid() && !composeContract.isEmpty()
+                        : ManagedStorageContractService.sameMounts(value.mountContract(), composeContract))
+                .orElse(false);
+        checks.add(check("mount_contract", "Durable storage contract", mountContractReady,
+                mountContractReady
+                        ? metadata.map(value -> value.mountContract().isEmpty()
+                                ? "The verified saved layout will be recorded during recovery."
+                                : "Runtime metadata and Compose agree on every managed mount.").orElse("")
+                        : "Runtime metadata and Compose do not prove the same durable storage layout.",
+                composeContract.size() + " managed mount(s)"));
 
         LiveRuntimeInspection liveRuntime = inspectLiveRuntime(containers, compose, deployedManifest);
         checks.add(check("live_runtime", "Running containers", liveRuntime.valid(), liveRuntime.message(), liveRuntime.detail()));
@@ -209,7 +224,7 @@ public class AppRecoveryService {
         return new AppRecoveryModels.RecoveryPlan(
                 appId, manifest.name(), reason, applicable, summary, planId,
                 runtimePath.toString(), composeProject, appInstanceId,
-                containers.stream().map(ObservedService::fingerprint).toList(), compose.mounts(),
+                containers.stream().map(ObservedService::fingerprint).toList(), compose.mountLabels(),
                 compose.ports().stream().map(String::valueOf).toList(), List.copyOf(checks),
                 List.of("Re-read current-instance evidence", "Restore the missing managed registration",
                         "Refresh canonical application state"),
@@ -252,14 +267,16 @@ public class AppRecoveryService {
             throw new InstallationException("The app changed after this recovery plan was reviewed. Review a fresh plan before continuing.");
         }
         Path runtimePath = Path.of(plan.runtimePath()).toAbsolutePath().normalize();
-        Path composePath = runtimePath.resolve("compose.yaml");
-        ApplicationManifest manifest = readSavedManifest(runtimePath)
+        ApplicationManifest manifest = storageContracts.findManifest(runtimePath)
                 .orElseThrow(() -> new InstallationException("The app's saved release manifest is no longer available."));
         InstallModels.InstallSettings settings = recoverySettings(appId, manifest, evidence.stream().findFirst().orElse(null),
-                inspectCompose(composePath, manifest, runtimePath), runtimePath)
+                inspectCompose(runtimePath, manifest), runtimePath)
                 .orElseThrow(() -> new InstallationException("The verified app settings are no longer available."));
 
         progress.accept("verify_recovery");
+        RuntimeModels.AppRuntimeMetadata metadata = runtimeMetadataReader.read(runtimePath)
+                .orElseThrow(() -> new InstallationException("The app runtime metadata is no longer available."));
+        runtimeMetadataWriter.writeRecovered(manifest, runtimePath, metadata);
         progress.accept("commit_management");
         boolean running = evidence.stream().anyMatch(this::running);
         commitManagedRecords(plan, manifest, settings, Instant.now(),
@@ -287,13 +304,13 @@ public class AppRecoveryService {
             String appId,
             ApplicationManifest manifest,
             ObservedService evidence,
-            ComposeInspection compose,
+            ComposeEvidence compose,
             Path runtimePath) {
         Optional<InstallModels.InstallSettings> stored = installedApps.settingsFor(appId);
         if (stored.isPresent()) return stored;
-        if (!compose.valid() || !compose.mountsValid()) return Optional.empty();
-        Map<String, String> storage = storageSettings(manifest, compose.mounts(), runtimePath);
-        if (storage == null) return Optional.empty();
+        if (!compose.valid() || !compose.storageValid()) return Optional.empty();
+        Optional<Map<String, String>> storage = storageContracts.recoverySettings(manifest, compose.mounts(), runtimePath);
+        if (storage.isEmpty()) return Optional.empty();
         Integer localPort = compose.ports().stream().findFirst().orElse(null);
         String observedUrl = evidence == null ? "" : blank(evidence.url(), "");
         String accessUrl = accessUrl(observedUrl, localPort);
@@ -304,46 +321,10 @@ public class AppRecoveryService {
                 || (evidence != null && blank(evidence.accessScope(), "").toLowerCase(Locale.ROOT).contains("private"));
         String mode = privateAccess ? "private" : loopback(accessUrl) ? "local" : "network";
         return Optional.of(new InstallModels.InstallSettings(
-                accessUrl.isBlank() ? null : accessUrl, null, privateAccess, storage,
+                accessUrl.isBlank() ? null : accessUrl, null, privateAccess, storage.orElseThrow(),
                 InstallModels.BackupPolicy.defaults(), mode,
                 manifest.usage().privateHttpsRequired() ? "required" : "optional", localPort,
                 protocol(accessUrl), null, null, null, null, true));
-    }
-
-    private Map<String, String> storageSettings(
-            ApplicationManifest manifest,
-            List<String> observedMounts,
-            Path runtimePath) {
-        Map<String, String> actualByTarget = new LinkedHashMap<>();
-        for (String mapping : observedMounts) {
-            Mount mount = mount(mapping);
-            if (mount == null || actualByTarget.put(mount.target(), mount.source()) != null) return null;
-        }
-        List<Mount> expectedMounts = declaredVolumes(manifest).stream().map(this::mount).toList();
-        if (expectedMounts.stream().anyMatch(java.util.Objects::isNull)
-                || actualByTarget.size() != expectedMounts.size()) return null;
-        Map<String, String> settings = new LinkedHashMap<>();
-        for (Mount expected : expectedMounts) {
-            String actual = actualByTarget.get(expected.target());
-            if (actual == null) return null;
-            if (!expected.source().startsWith(manifest.runtime().runtimeRoot())) {
-                if (!actual.equals(expected.source())) return null;
-                continue;
-            }
-            String key = expected.source().substring(manifest.runtime().runtimeRoot().length()).replaceFirst("^/+", "");
-            if (key.isBlank() || actual == null || !actual.startsWith("/")) return null;
-            Path actualPath = Path.of(actual).toAbsolutePath().normalize();
-            if (!actualPath.startsWith(runtimePath)) return null;
-            Path relative = runtimePath.relativize(actualPath);
-            if (relative.getNameCount() != 1 || !relative.toString().matches("[A-Za-z0-9][A-Za-z0-9._-]{0,63}")) return null;
-            settings.put(key, relative.toString());
-        }
-        return Map.copyOf(settings);
-    }
-
-    private List<String> declaredVolumes(ApplicationManifest manifest) {
-        if (!manifest.runtime().multiService()) return manifest.runtime().volumes();
-        return manifest.runtime().services().stream().flatMap(service -> service.volumes().stream()).distinct().toList();
     }
 
     private List<ObservedService> strictDockerEvidence(String appId, List<ObservedService> evidence) {
@@ -414,113 +395,50 @@ public class AppRecoveryService {
         }
     }
 
-    private ComposeInspection inspectCompose(Path composePath, ApplicationManifest manifest, Path runtimePath) {
-        if (!Files.isRegularFile(composePath)) return ComposeInspection.invalid("The original Compose file is missing.");
+    private ComposeEvidence inspectCompose(Path appRoot, ApplicationManifest manifest) {
+        Path composePath = appRoot.resolve("compose.yaml");
+        if (!Files.isRegularFile(composePath)) return ComposeEvidence.invalid("The original Compose file is missing.");
         try {
             Object document = new Yaml(new SafeConstructor(new LoaderOptions())).load(Files.readString(composePath));
             if (!(document instanceof Map<?, ?> root) || !(root.get("services") instanceof Map<?, ?> services) || services.isEmpty()) {
-                return ComposeInspection.invalid("The Compose file has no readable services.");
+                return ComposeEvidence.invalid("The Compose file has no readable services.");
             }
-            Set<String> expectedServices = expectedServices(manifest);
-            Set<String> actualServices = services.keySet().stream().map(String::valueOf)
-                    .collect(java.util.stream.Collectors.toSet());
-            if (!actualServices.equals(expectedServices)) {
-                return ComposeInspection.invalid("The Compose file does not exactly match the saved app release's services.");
+            Map<String, String> images = new LinkedHashMap<>();
+            if (manifest.runtime().multiService()) manifest.runtime().services().forEach(service -> images.put(service.name(), service.image()));
+            else images.put(manifest.runtime().containerName(), manifest.runtime().image());
+            if (!services.keySet().stream().map(String::valueOf).collect(java.util.stream.Collectors.toSet()).equals(images.keySet())) {
+                return ComposeEvidence.invalid("The Compose file does not exactly match the saved app release's services.");
             }
-            Map<String, String> expectedImages = expectedImages(manifest);
-            List<String> mounts = new ArrayList<>();
             Set<Integer> ports = new LinkedHashSet<>();
-            boolean mountsValid = true;
-            for (var entry : services.entrySet()) {
-                Object serviceValue = entry.getValue();
-                if (!(serviceValue instanceof Map<?, ?> service)) return ComposeInspection.invalid("The Compose file contains an invalid service definition.");
-                String serviceName = String.valueOf(entry.getKey());
-                if (!expectedImages.get(serviceName).equals(String.valueOf(service.get("image")))) {
-                    return ComposeInspection.invalid("A Compose image does not match the saved app release.");
+            for (Map.Entry<?, ?> entry : services.entrySet()) {
+                if (!(entry.getValue() instanceof Map<?, ?> service)) return ComposeEvidence.invalid("The Compose file contains an invalid service definition.");
+                if (!images.get(String.valueOf(entry.getKey())).equals(String.valueOf(service.get("image")))) {
+                    return ComposeEvidence.invalid("A Compose image does not match the saved app release.");
                 }
-                Object volumesValue = service.get("volumes");
-                if (volumesValue != null && !(volumesValue instanceof List<?>)) mountsValid = false;
-                if (volumesValue instanceof List<?> volumes) {
-                    for (Object volume : volumes) {
-                        if (!(volume instanceof String mapping) || !validMount(mapping)) mountsValid = false;
-                        else mounts.add(mapping);
-                    }
-                }
-                Object portsValue = service.get("ports");
-                if (portsValue != null && !(portsValue instanceof List<?>)) return ComposeInspection.invalid("The Compose file contains an unsupported port definition.");
-                if (portsValue instanceof List<?> mappings) {
-                    for (Object value : mappings) {
-                        Integer published = publishedPort(String.valueOf(value));
-                        if (published == null) return ComposeInspection.invalid("The Compose file contains an unsupported port mapping.");
-                        ports.add(published);
-                    }
+                Object rawPorts = service.get("ports");
+                if (rawPorts != null && !(rawPorts instanceof List<?>)) return ComposeEvidence.invalid("The Compose file contains an unsupported port definition.");
+                if (rawPorts instanceof List<?> mappings) for (Object mapping : mappings) {
+                    Integer port = publishedPort(String.valueOf(mapping));
+                    if (port == null) return ComposeEvidence.invalid("The Compose file contains an unsupported port mapping.");
+                    ports.add(port);
                 }
             }
-            if (mountsValid && storageSettings(manifest, mounts, runtimePath) == null) mountsValid = false;
-            return new ComposeInspection(true, "The Compose file matches the catalog app.", mountsValid,
-                    mountsValid ? "Mounted data can be preserved as managed storage."
+            List<RuntimeModels.ManagedMount> mounts = ManagedStorageContractService.readComposeMounts(composePath);
+            boolean storageValid = storageContracts.recoverySettings(manifest, mounts, appRoot).isPresent();
+            return new ComposeEvidence(true, "The Compose file matches the catalog app.", storageValid,
+                    storageValid ? "Mounted data can be preserved as managed storage."
                             : "A mounted data path cannot be represented safely by managed app settings.",
-                    List.copyOf(mounts), Set.copyOf(ports));
+                    mounts, Map.copyOf(images), Set.copyOf(ports));
         } catch (IOException | RuntimeException exception) {
-            return ComposeInspection.invalid("The Compose file could not be parsed safely.");
+            return ComposeEvidence.invalid("The Compose file could not be parsed safely.");
         }
-    }
-
-    private Optional<ApplicationManifest> readSavedManifest(Path runtimePath) {
-        Path path = runtimePath.resolve("manifest.yaml");
-        if (!Files.isRegularFile(path)) return Optional.empty();
-        try {
-            ApplicationManifest manifest = new ManifestYamlReader().read(new FileSystemResource(path));
-            new ManifestValidator().validate(manifest);
-            return Optional.of(manifest);
-        } catch (RuntimeException exception) {
-            return Optional.empty();
-        }
-    }
-
-    private Set<String> expectedServices(ApplicationManifest manifest) {
-        if (manifest.runtime().multiService()) {
-            return manifest.runtime().services().stream().map(RuntimeServiceManifest::name).collect(java.util.stream.Collectors.toSet());
-        }
-        return Set.of(manifest.runtime().containerName());
-    }
-
-    private Map<String, String> expectedImages(ApplicationManifest manifest) {
-        Map<String, String> images = new LinkedHashMap<>();
-        if (manifest.runtime().multiService()) {
-            manifest.runtime().services().forEach(service -> images.put(service.name(), service.image()));
-        } else {
-            images.put(manifest.runtime().containerName(), manifest.runtime().image());
-        }
-        return Map.copyOf(images);
-    }
-
-    private boolean validMount(String mapping) {
-        Mount mount = mount(mapping);
-        if (mount == null || !mount.target().startsWith("/")) return false;
-        return !mount.source().startsWith(".") && (!mount.source().startsWith("/") || Path.of(mount.source()).isAbsolute());
-    }
-
-    private Mount mount(String mapping) {
-        if (mapping == null) return null;
-        String[] parts = mapping.split(":");
-        if (parts.length < 2) return null;
-        int targetIndex = parts.length > 2 && Set.of("ro", "rw").contains(parts[parts.length - 1]) ? parts.length - 2 : parts.length - 1;
-        if (targetIndex != 1) return null;
-        boolean readOnly = parts.length > 2 && "ro".equals(parts[parts.length - 1]);
-        return new Mount(parts[0], parts[targetIndex], readOnly);
     }
 
     private Integer publishedPort(String mapping) {
-        String normalized = mapping.replace("0.0.0.0:", "").replace("127.0.0.1:", "");
-        Matcher matcher = PUBLISHED_PORT.matcher(normalized);
+        Matcher matcher = PUBLISHED_PORT.matcher(mapping.replace("0.0.0.0:", "").replace("127.0.0.1:", ""));
         if (!matcher.find()) return null;
-        try {
-            int port = Integer.parseInt(matcher.group(1));
-            return port > 0 && port <= 65535 ? port : null;
-        } catch (NumberFormatException exception) {
-            return null;
-        }
+        int port = Integer.parseInt(matcher.group(1));
+        return port > 0 && port <= 65535 ? port : null;
     }
 
     private Set<Integer> portConflicts(String appId, Set<Integer> plannedPorts) {
@@ -556,8 +474,7 @@ public class AppRecoveryService {
         List<String> evidence = containers.stream().map(service -> String.join(":",
                         blank(service.fingerprint(), ""), blank(service.ownershipState(), ""),
                         blank(service.autarkOsInstanceId(), ""), blank(service.runtimeState(), ""),
-                        metadataValue(service, "appInstanceId"), metadataValue(service, "image"),
-                        metadataValue(service, "composeService"), liveMountMaterial(service)))
+                        metadataValue(service, "appInstanceId"), blank(service.metadataJson(), "")))
                 .sorted().toList();
         String material = String.join("|", appId, reason, runtimePath.toString(), composeProject,
                 appInstanceId, fileHash(runtimePath.resolve("compose.yaml")),
@@ -568,7 +485,7 @@ public class AppRecoveryService {
 
     private LiveRuntimeInspection inspectLiveRuntime(
             List<ObservedService> containers,
-            ComposeInspection compose,
+            ComposeEvidence compose,
             ApplicationManifest manifest) {
         if (!compose.valid()) {
             return LiveRuntimeInspection.invalid("Running container configuration cannot be verified until Compose evidence is complete.");
@@ -579,35 +496,29 @@ public class AppRecoveryService {
                     "No app containers are present; the restored registration will keep the app stopped.",
                     "Runtime files and stored current-instance ownership are complete.");
         }
-        List<String> expectedServices = expectedServices(manifest).stream().sorted().toList();
+        List<String> expectedServices = compose.images().keySet().stream().sorted().toList();
         List<String> actualServices = containers.stream()
                 .map(service -> metadataValue(service, "composeService"))
                 .sorted().toList();
         if (!actualServices.equals(expectedServices)) {
             return LiveRuntimeInspection.invalid("The running containers do not exactly match the saved app services.");
         }
-        List<String> expectedImages = expectedImages(manifest).values().stream().sorted().toList();
+        List<String> expectedImages = compose.images().values().stream().sorted().toList();
         List<String> actualImages = containers.stream()
                 .map(service -> metadataValue(service, "image"))
                 .sorted().toList();
         if (!actualImages.equals(expectedImages)) {
             return LiveRuntimeInspection.invalid("A running container image does not match the saved app release.");
         }
-        List<String> expectedMounts = compose.mounts().stream()
-                .map(this::mount)
-                .filter(java.util.Objects::nonNull)
-                .map(this::mountSignature)
-                .sorted().toList();
-        List<String> actualMounts = new ArrayList<>();
+        List<RuntimeModels.ManagedMount> actualMounts = new ArrayList<>();
         for (ObservedService container : containers) {
-            Optional<List<Mount>> mounts = liveMounts(container);
+            Optional<List<RuntimeModels.ManagedMount>> mounts = liveMounts(container);
             if (mounts.isEmpty()) {
                 return LiveRuntimeInspection.invalid("Docker did not provide complete live mount details for every app container.");
             }
-            mounts.orElseThrow().stream().map(this::mountSignature).forEach(actualMounts::add);
+            actualMounts.addAll(mounts.orElseThrow());
         }
-        actualMounts.sort(String::compareTo);
-        if (!actualMounts.equals(expectedMounts)) {
+        if (!ManagedStorageContractService.sameMounts(compose.mounts(), actualMounts)) {
             return LiveRuntimeInspection.invalid("The running container mounts differ from the saved app configuration. Existing data will not be changed.");
         }
         return new LiveRuntimeInspection(
@@ -616,43 +527,33 @@ public class AppRecoveryService {
                 containers.size() + " container(s), " + actualMounts.size() + " mounted data path(s)");
     }
 
-    private Optional<List<Mount>> liveMounts(ObservedService service) {
+    private Optional<List<RuntimeModels.ManagedMount>> liveMounts(ObservedService service) {
         try {
             JsonNode metadata = objectMapper.readTree(service.metadataJson());
             JsonNode mounts = metadata == null ? null : metadata.get("liveMounts");
             if (mounts == null || !mounts.isArray()) return Optional.empty();
-            List<Mount> values = new ArrayList<>();
+            String serviceName = metadataValue(service, "composeService");
+            List<RuntimeModels.ManagedMount> values = new ArrayList<>();
             for (JsonNode mount : mounts) {
+                String type = mount.path("type").asText("");
                 String source = mount.path("source").asText("");
                 String target = mount.path("target").asText("");
-                if (!"bind".equals(mount.path("type").asText(""))
-                        || source.isBlank() || !source.startsWith("/")
+                if (serviceName.isBlank() || !("bind".equals(type) || "volume".equals(type))
+                        || source.isBlank() || ("bind".equals(type) && !source.startsWith("/"))
                         || target.isBlank() || !target.startsWith("/")) {
                     return Optional.empty();
                 }
-                values.add(new Mount(source, target, mount.path("readOnly").asBoolean(false)));
+                values.add(new RuntimeModels.ManagedMount(
+                        serviceName,
+                        type,
+                        "bind".equals(type) ? Path.of(source).toAbsolutePath().normalize().toString() : source,
+                        target,
+                        mount.path("readOnly").asBoolean(false)));
             }
             return Optional.of(List.copyOf(values));
         } catch (IOException | RuntimeException exception) {
             return Optional.empty();
         }
-    }
-
-    private String liveMountMaterial(ObservedService service) {
-        return liveMounts(service)
-                .map(mounts -> mounts.stream().map(this::mountSignature).sorted()
-                        .collect(java.util.stream.Collectors.joining(",")))
-                .orElse("unavailable");
-    }
-
-    private String mountSignature(Mount mount) {
-        String source;
-        try {
-            source = Path.of(mount.source()).toAbsolutePath().normalize().toString();
-        } catch (RuntimeException exception) {
-            source = mount.source();
-        }
-        return source + "|" + mount.target() + "|" + (mount.readOnly() ? "ro" : "rw");
     }
 
     private String fileHash(Path path) {
@@ -738,20 +639,6 @@ public class AppRecoveryService {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    private record ComposeInspection(
-            boolean valid,
-            String message,
-            boolean mountsValid,
-            String mountMessage,
-            List<String> mounts,
-            Set<Integer> ports) {
-
-        private static ComposeInspection invalid(String message) {
-            return new ComposeInspection(false, message, false,
-                    "Mount mappings cannot be verified until Compose is valid.", List.of(), Set.of());
-        }
-    }
-
     private record LiveRuntimeInspection(boolean valid, String message, String detail) {
 
         private static LiveRuntimeInspection invalid(String message) {
@@ -759,7 +646,23 @@ public class AppRecoveryService {
         }
     }
 
-    private record Mount(String source, String target, boolean readOnly) {
+    private record ComposeEvidence(
+            boolean valid,
+            String message,
+            boolean storageValid,
+            String storageMessage,
+            List<RuntimeModels.ManagedMount> mounts,
+            Map<String, String> images,
+            Set<Integer> ports) {
+
+        private List<String> mountLabels() {
+            return mounts.stream().map(mount -> mount.source() + ":" + mount.destination()).toList();
+        }
+
+        private static ComposeEvidence invalid(String message) {
+            return new ComposeEvidence(false, message, false,
+                    "Mount mappings cannot be verified until Compose is valid.", List.of(), Map.of(), Set.of());
+        }
     }
 
 }

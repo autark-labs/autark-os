@@ -26,7 +26,9 @@ public final class StorageModels {
     public record OrphanedStorage(
             String name,
             String path,
-            long usedBytes) {
+            long usedBytes,
+            boolean cleanupAllowed,
+            String cleanupBlockedReason) {
     }
 
     public record StorageCleanupResult(

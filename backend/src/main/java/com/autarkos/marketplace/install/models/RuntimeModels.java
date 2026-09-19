@@ -17,7 +17,20 @@ public final class RuntimeModels {
             String instanceId,
             String composeProject,
             String manifestVersion,
-            Instant createdAt) {
+            Instant createdAt,
+            List<ManagedMount> mountContract) {
+
+        public AppRuntimeMetadata {
+            mountContract = List.copyOf(mountContract == null ? List.of() : mountContract);
+        }
+    }
+
+    public record ManagedMount(
+            String service,
+            String type,
+            String source,
+            String destination,
+            boolean readOnly) {
     }
 
     public record AppTelemetry(

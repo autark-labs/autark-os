@@ -220,7 +220,7 @@ class BackupReportService {
     }
 
     private String missingRuntimeReason(String appName) {
-        return appName + " cannot use normal backups because its original Compose file is missing. Review it in My Apps and use archive-first cleanup if you no longer need the container.";
+        return appName + " cannot use backups because its original Compose file is missing. Review recovery in My Apps before changing or removing its data.";
     }
 
     private String nextRunLabel(ProjectSettings settings) {

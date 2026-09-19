@@ -36,6 +36,7 @@ import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.marketplace.install.ManagedStorageContractService;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.system.AutarkOsIdentity;
 
@@ -63,16 +64,24 @@ class AppRecoveryServiceTests {
                 "current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.EPOCH, 1));
         when(dockerOwnership.composeProject("vaultwarden")).thenReturn("autarkos_current_vaultwarden");
         manifest = catalog.findById("vaultwarden").orElseThrow();
+        com.autarkos.host.DockerInventoryService dockerInventory =
+                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty());
+        AppRuntimeMetadataReader metadataReader = new AppRuntimeMetadataReader();
         service = new AppRecoveryService(
                 observedServices,
                 installedApps,
                 catalog,
-                new AppRuntimeMetadataReader(),
+                metadataReader,
                 dockerOwnership,
                 activityLog,
                 new RecoveryOperationCoordinator(),
                 new AppAccessChecker(),
-                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
+                dockerInventory,
+                new com.autarkos.marketplace.install.AppRuntimeMetadataWriter(
+                        dockerOwnership::currentIdentity,
+                        () -> Instant.parse("2026-06-20T12:00:00Z")),
+                new ManagedStorageContractService(
+                        new ManifestYamlReader(), new ManifestValidator(), dockerInventory, metadataReader));
     }
 
     @Test

@@ -35,6 +35,22 @@ public class AppRuntimeMetadataWriter {
     }
 
     public RuntimeModels.AppRuntimeMetadata write(ApplicationManifest manifest, Path appRoot, String appInstanceId, String composeProject) {
+        return write(manifest, appRoot, appInstanceId, composeProject, clock.get());
+    }
+
+    public RuntimeModels.AppRuntimeMetadata writeRecovered(
+            ApplicationManifest manifest,
+            Path appRoot,
+            RuntimeModels.AppRuntimeMetadata existing) {
+        return write(manifest, appRoot, existing.appInstanceId(), existing.composeProject(), existing.createdAt());
+    }
+
+    private RuntimeModels.AppRuntimeMetadata write(
+            ApplicationManifest manifest,
+            Path appRoot,
+            String appInstanceId,
+            String composeProject,
+            Instant createdAt) {
         AutarkOsIdentity identity = identitySupplier.get();
         RuntimeModels.AppRuntimeMetadata metadata = new RuntimeModels.AppRuntimeMetadata(
                 appInstanceId,
@@ -42,7 +58,8 @@ public class AppRuntimeMetadataWriter {
                 identity.instanceId(),
                 composeProject,
                 manifest.version(),
-                clock.get());
+                createdAt,
+                ManagedStorageContractService.readComposeMounts(appRoot.resolve("compose.yaml")));
         try {
             Files.createDirectories(appRoot);
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(appRoot.resolve(METADATA_FILE).toFile(), StoredMetadata.from(metadata));
@@ -58,7 +75,8 @@ public class AppRuntimeMetadataWriter {
             String instanceId,
             String composeProject,
             String manifestVersion,
-            String createdAt) {
+            String createdAt,
+            java.util.List<RuntimeModels.ManagedMount> mountContract) {
 
         private static StoredMetadata from(RuntimeModels.AppRuntimeMetadata metadata) {
             return new StoredMetadata(
@@ -67,7 +85,8 @@ public class AppRuntimeMetadataWriter {
                     metadata.instanceId(),
                     metadata.composeProject(),
                     metadata.manifestVersion(),
-                    metadata.createdAt().toString());
+                    metadata.createdAt().toString(),
+                    metadata.mountContract());
         }
     }
 }

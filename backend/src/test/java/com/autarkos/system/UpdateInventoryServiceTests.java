@@ -290,7 +290,8 @@ class UpdateInventoryServiceTests {
                 identity.instanceId(),
                 composeProject,
                 "1.0.0",
-                NOW);
+                NOW,
+                List.of());
         return new ManagedAppAttestationService.Result(
                 true,
                 "managed",

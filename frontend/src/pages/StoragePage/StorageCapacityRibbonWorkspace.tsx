@@ -21,6 +21,7 @@ import type { LucideIcon } from 'lucide-react';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ProjectDarkControlButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, Surface } from '@/components/primitives/Surface';
 import { semanticStatusVariants, type SemanticStatusTone } from '@/components/primitives/SemanticVariants';
@@ -548,7 +549,7 @@ function RecommendationRow({ recommendation }: { recommendation: StorageReport['
 function DetailedOrphanRow({ onReview, orphan, showAdvancedMetrics }: { onReview: () => void; orphan: OrphanedStorage; showAdvancedMetrics: boolean }) {
   return (
     <div className="rounded-xl border border-amber-300/25 bg-amber-400/5 p-3 text-amber-100">
-      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-white">{orphan.name}</p><p className="mt-1 text-xs text-amber-100/75">Not tied to an installed app · {formatStorageBytes(orphan.usedBytes)}</p>{showAdvancedMetrics && <p className="mt-2 select-text break-all font-mono text-xs text-amber-100/85">{orphan.path}</p>}</div><ProjectWarningButton className="shrink-0" onClick={onReview} size="sm" type="button">Review</ProjectWarningButton></div>
+      <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-white">{orphan.name}</p><p className="mt-1 text-xs text-amber-100/75">Not tied to an installed app · {formatStorageBytes(orphan.usedBytes)}</p>{!orphan.cleanupAllowed && <p className="mt-2 text-xs leading-5 text-amber-100">Cleanup blocked: {orphan.cleanupBlockedReason}</p>}{showAdvancedMetrics && <p className="mt-2 select-text break-all font-mono text-xs text-amber-100/85">{orphan.path}</p>}</div><DisabledAction disabled={!orphan.cleanupAllowed} reason={orphan.cleanupBlockedReason || 'Autark-OS cannot prove this folder is safe to clean up.'}><ProjectWarningButton className="shrink-0" disabled={!orphan.cleanupAllowed} onClick={onReview} size="sm" type="button">Review</ProjectWarningButton></DisabledAction></div>
     </div>
   );
 }

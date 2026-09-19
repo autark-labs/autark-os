@@ -36,12 +36,17 @@ public record DockerInventorySnapshot(
     }
 
     public List<RuntimeModels.DockerContainerStatus> ownedContainersFor(String appId, String composeProject) {
+        return ownedContainerEvidenceFor(appId, composeProject).stream()
+                .map(Container::runtimeStatus)
+                .toList();
+    }
+
+    public List<Container> ownedContainerEvidenceFor(String appId, String composeProject) {
         return containers.stream()
                 .filter(container -> container.classification().ownership() == DockerResourceOwnership.OWNED)
                 .filter(container -> clean(appId).equals(clean(container.classification().appId())))
                 .filter(container -> clean(composeProject).isBlank()
                         || clean(composeProject).equals(clean(container.classification().composeProject())))
-                .map(Container::runtimeStatus)
                 .toList();
     }
 

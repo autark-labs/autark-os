@@ -287,6 +287,9 @@ def archive_tree(archive: zipfile.ZipFile, source: Path, prefix: str = "") -> li
     if source.is_symlink() or not source.is_dir():
         die("backup source must be a real directory")
     entries: list[dict[str, int | str]] = []
+    if prefix:
+        archive.writestr(prefix + "/", b"")
+        entries.append(archive_entry(source, prefix, "directory"))
     for path in sorted(source.rglob("*")):
         relative = path.relative_to(source).as_posix()
         name = f"{prefix}/{relative}" if prefix else relative
@@ -364,8 +367,9 @@ def restore_app_data(args: argparse.Namespace) -> None:
     scope = args.scope or "app"
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=".autark-os-restore-", dir=destination.parent))
-    previous = destination.parent / f".{destination.name}.pre-restore-{os.getpid()}"
-    moved_previous = False
+    previous = Path(tempfile.mkdtemp(prefix=".autark-os-previous-", dir=destination.parent))
+    applied: list[Path] = []
+    preserved: list[Path] = []
     try:
         with zipfile.ZipFile(archive) as restore_zip:
             metadata = restore_metadata(restore_zip, scope, args.app)
@@ -400,25 +404,30 @@ def restore_app_data(args: argparse.Namespace) -> None:
                 target = require_inside(staging / str(entry["path"]), staging, "restore target")
                 os.chown(target, int(entry["uid"]), int(entry["gid"]))
                 os.chmod(target, int(entry["mode"]))
-        # The outer app directory belongs to the runtime manager, not to the
-        # root helper that created staging. Container-owned entries retain
-        # their archived metadata. Leaving staging root:root 0700 makes the
-        # restored compose file inaccessible to the unprivileged service.
-        runtime_owner = destination.parent.stat()
-        os.chown(staging, runtime_owner.st_uid, runtime_owner.st_gid)
-        if destination.exists():
-            os.replace(destination, previous)
-            moved_previous = True
-        os.replace(staging, destination)
-        if moved_previous:
-            shutil.rmtree(previous)
+        destination.mkdir(parents=True, exist_ok=True)
+        for child in list(staging.iterdir()):
+            target = destination / child.name
+            if target.exists():
+                os.replace(target, previous / child.name)
+                preserved.append(target)
+            os.replace(child, target)
+            applied.append(target)
     except Exception:
-        if moved_previous and not destination.exists() and previous.exists():
-            os.replace(previous, destination)
+        for target in reversed(applied):
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target)
+            else:
+                target.unlink(missing_ok=True)
+        for target in reversed(preserved):
+            saved = previous / target.name
+            if saved.exists():
+                os.replace(saved, target)
         raise
     finally:
         if staging.exists():
             shutil.rmtree(staging)
+        if previous.exists():
+            shutil.rmtree(previous)
     print(f"restored {args.app}")
 
 
@@ -427,40 +436,40 @@ def clear_runtime(args: argparse.Namespace) -> None:
     print(f"cleared {args.app}")
 
 
-def create_safety_archive(args: argparse.Namespace) -> None:
-    source = app_root(args)
+def create_managed_archive(args: argparse.Namespace) -> None:
     destination = backup_path(args, args.destination, "archive destination")
     if destination.suffix != ".zip":
         die("archive destination must be a .zip file")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-
-    def write_contents(archive: zipfile.ZipFile) -> None:
-        write_filesystem_metadata(archive, archive_tree(archive, source))
-
-    publish_archive(destination, write_contents)
-    print(f"archived {args.app}")
-
-
-def create_full_archive(args: argparse.Namespace) -> None:
-    destination = backup_path(args, args.destination, "archive destination")
-    if destination.suffix != ".zip":
-        die("archive destination must be a .zip file")
-    app_ids = [require_app_id(app.strip()) for app in (args.apps or "").split(",") if app.strip()]
-    if not app_ids:
-        die("--apps must include at least one app id")
+    specifications = managed_entries(args.entries)
+    if not specifications:
+        die("--entries must identify protected app data")
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     def write_contents(archive: zipfile.ZipFile) -> None:
         entries: list[dict[str, int | str]] = []
-        for app_id in app_ids:
-            source = app_root(argparse.Namespace(runtime_root=args.runtime_root, app=app_id))
-            if not source.exists():
-                continue
-            entries.extend(archive_tree(archive, source, app_id))
+        for app_id, relative in specifications:
+            root = app_root(argparse.Namespace(runtime_root=args.runtime_root, app=app_id))
+            source = require_inside(resolved(root / relative), root, "protected app-data path")
+            entries.extend(archive_tree(archive, source, f"{app_id}/{relative}"))
         write_filesystem_metadata(archive, entries)
 
     publish_archive(destination, write_contents)
-    print(f"archived {','.join(app_ids)}")
+    print(f"archived {','.join(sorted({app for app, _ in specifications}))}")
+
+
+def managed_entries(value: str | None) -> list[tuple[str, str]]:
+    entries: list[tuple[str, str]] = []
+    for item in (value or "").split(","):
+        if not item.strip():
+            continue
+        app_id, separator, path = item.partition(":")
+        if not separator:
+            die("invalid full-backup app-data entry")
+        path = path.strip()
+        if not safe_archive_name(path) or path.endswith("/"):
+            die("invalid full-backup app-data entry")
+        entries.append((require_app_id(app_id), path))
+    return entries
 
 
 def delete_backup(args: argparse.Namespace) -> None:
@@ -511,8 +520,7 @@ def parser() -> argparse.ArgumentParser:
     parser.add_argument("operation", choices=[
         "clear-runtime",
         "restore-app-data",
-        "create-safety-archive",
-        "create-full-archive",
+        "create-managed-archive",
         "delete-backup",
         "repair-runtime-ownership",
         "configure-tailscale-operator",
@@ -524,7 +532,7 @@ def parser() -> argparse.ArgumentParser:
     parser.add_argument("--archive")
     parser.add_argument("--scope", choices=["app", "full"], default="app")
     parser.add_argument("--destination")
-    parser.add_argument("--apps")
+    parser.add_argument("--entries")
     parser.add_argument("--path")
     parser.add_argument("--user")
     parser.add_argument("--group")
@@ -550,14 +558,12 @@ def main(argv: list[str]) -> int:
         configure_backup_destination(args)
         return 0
     args.backup_root = approved_backup_root(args)
-    if args.operation in {"clear-runtime", "restore-app-data", "create-safety-archive", "repair-runtime-ownership"} and not args.app:
+    if args.operation in {"clear-runtime", "restore-app-data", "repair-runtime-ownership"} and not args.app:
         die("--app is required")
     if args.operation == "restore-app-data" and not args.archive:
         die("--archive is required")
-    if args.operation == "create-safety-archive" and not args.destination:
-        die("--destination is required")
-    if args.operation == "create-full-archive" and (not args.apps or not args.destination):
-        die("--apps and --destination are required")
+    if args.operation == "create-managed-archive" and (not args.entries or not args.destination):
+        die("--entries and --destination are required")
     if args.operation == "delete-backup" and not args.path:
         die("--path is required")
     if args.operation == "repair-runtime-ownership" and (not args.user or not args.group):
@@ -566,8 +572,7 @@ def main(argv: list[str]) -> int:
     operations = {
         "clear-runtime": clear_runtime,
         "restore-app-data": restore_app_data,
-        "create-safety-archive": create_safety_archive,
-        "create-full-archive": create_full_archive,
+        "create-managed-archive": create_managed_archive,
         "delete-backup": delete_backup,
         "repair-runtime-ownership": repair_runtime_ownership,
     }

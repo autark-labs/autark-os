@@ -27,6 +27,8 @@ import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.ManagedAppAttestationService;
+import com.autarkos.marketplace.install.ManagedStorageContractService;
+import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 
@@ -49,11 +51,13 @@ public class StorageService {
     private final RuntimeFileOperations fileOperations;
     private final BackupDestinationService backupDestinationService;
     private final RecoveryOperationCoordinator recoveryOperations;
+    private final ManagedStorageContractService storageContracts;
+    private final AutarkOsFileOpsService fileOpsService;
     private Instant lastWarningLoggedAt = Instant.EPOCH;
     private Instant lastStorageSampleAt = Instant.EPOCH;
     private String lastWarningStatus = "";
 
-    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, ManagedAppAttestationService managedApps, BackupRepository backupRepository, MarketplaceCatalogService catalogService, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations) {
+    public StorageService(RuntimeLayout runtimeLayout, InstalledAppRepository installedAppRepository, ActivityLogService activityLogService, StorageSampleRepository storageSampleRepository, ManagedAppAttestationService managedApps, BackupRepository backupRepository, MarketplaceCatalogService catalogService, RuntimeFileOperations fileOperations, BackupDestinationService backupDestinationService, RecoveryOperationCoordinator recoveryOperations, ManagedStorageContractService storageContracts, AutarkOsFileOpsService fileOpsService) {
         this.runtimeLayout = runtimeLayout;
         this.installedAppRepository = installedAppRepository;
         this.activityLogService = activityLogService;
@@ -64,6 +68,8 @@ public class StorageService {
         this.fileOperations = fileOperations;
         this.backupDestinationService = backupDestinationService;
         this.recoveryOperations = recoveryOperations;
+        this.storageContracts = storageContracts;
+        this.fileOpsService = fileOpsService;
     }
 
     public StorageModels.StorageReport report() {
@@ -125,6 +131,11 @@ public class StorageService {
         if (installedIds.contains(safeName)) {
             throw new com.autarkos.marketplace.install.InstallationException("Autark-OS will not remove data for an installed app.");
         }
+        ManagedStorageContractService.CleanupAssessment assessment = storageContracts.assessOrphan(orphanPath);
+        if (!assessment.allowed()) {
+            throw new com.autarkos.marketplace.install.InstallationException(
+                    "Autark-OS will not remove this folder because its durable data placement cannot be proven. " + assessment.reason());
+        }
         try {
             long removedBytes = fileOperations.directorySize(orphanPath);
             Path checkpoint = activeBackupRoot()
@@ -133,7 +144,7 @@ public class StorageService {
                     .toAbsolutePath()
                     .normalize();
             Files.createDirectories(checkpoint.getParent());
-            fileOperations.zipDirectory(orphanPath, checkpoint);
+            fileOpsService.createManagedArchive(safeName, assessment.protectedPaths(), checkpoint, activeBackupRoot());
             fileOperations.deleteRecursively(orphanPath);
             activityLogService.success(
                     "system",
@@ -199,10 +210,21 @@ public class StorageService {
             return List.of();
         }
         try (Stream<Path> stream = Files.list(appsRoot)) {
-            return stream
+            List<Path> orphanPaths = stream
                     .filter(Files::isDirectory)
                     .filter(path -> !installedIds.contains(path.getFileName().toString()))
-                    .map(path -> new StorageModels.OrphanedStorage(path.getFileName().toString(), path.toAbsolutePath().normalize().toString(), fileOperations.directorySize(path)))
+                    .toList();
+            java.util.Map<Path, ManagedStorageContractService.CleanupAssessment> assessments = storageContracts.assessOrphans(orphanPaths);
+            return orphanPaths.stream()
+                    .map(path -> {
+                        ManagedStorageContractService.CleanupAssessment assessment = assessments.get(path);
+                        return new StorageModels.OrphanedStorage(
+                                path.getFileName().toString(),
+                                path.toAbsolutePath().normalize().toString(),
+                                fileOperations.directorySize(path),
+                                assessment.allowed(),
+                                assessment.allowed() ? null : assessment.reason());
+                    })
                     .sorted(Comparator.comparingLong(StorageModels.OrphanedStorage::usedBytes).reversed())
                     .toList();
         } catch (IOException exception) {

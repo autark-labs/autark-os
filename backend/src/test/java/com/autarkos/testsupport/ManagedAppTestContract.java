@@ -12,6 +12,7 @@ import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.ManagedAppAttestationService;
+import com.autarkos.marketplace.install.ManagedStorageContractService;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.AutarkOsIdentity;
@@ -29,7 +30,19 @@ public final class ManagedAppTestContract {
             RuntimeLayout runtimeLayout,
             AutarkOsIdentity identity) {
         DockerOwnershipService ownership = new DockerOwnershipService(() -> identity, () -> "test", false);
-        return new ManagedAppAttestationService(repository, runtimeLayout, ownership, new AppRuntimeMetadataReader());
+        ManagedStorageContractService storageContracts = org.mockito.Mockito.mock(ManagedStorageContractService.class);
+        org.mockito.Mockito.when(storageContracts.require(
+                        org.mockito.ArgumentMatchers.any(InstalledApp.class),
+                        org.mockito.ArgumentMatchers.any(RuntimeModels.AppRuntimeMetadata.class),
+                        org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenAnswer(invocation -> contract(invocation.getArgument(0)));
+        return new ManagedAppAttestationService(repository, runtimeLayout, ownership, new AppRuntimeMetadataReader(), storageContracts);
+    }
+
+    private static ManagedStorageContractService.Contract contract(InstalledApp app) {
+        return new ManagedStorageContractService.Contract(
+                app,
+                Map.of("data", Path.of(app.runtimePath()).toAbsolutePath().normalize()));
     }
 
     public static void writeAll(

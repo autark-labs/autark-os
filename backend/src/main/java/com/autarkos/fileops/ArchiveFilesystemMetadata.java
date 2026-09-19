@@ -34,6 +34,9 @@ public final class ArchiveFilesystemMetadata {
             throw new IOException("Backup source is not a directory: " + source);
         }
         List<Entry> entries = new ArrayList<>();
+        if (prefix != null && !prefix.isBlank()) {
+            entries.add(entry(source, prefix, "directory"));
+        }
         try (var paths = Files.walk(source)) {
             for (Path path : paths.sorted(Comparator.naturalOrder()).toList()) {
                 if (path.equals(source)) {

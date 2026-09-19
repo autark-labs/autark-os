@@ -39,16 +39,19 @@ public class ManagedAppAttestationService {
     private final RuntimeLayout runtimeLayout;
     private final DockerOwnershipService dockerOwnership;
     private final AppRuntimeMetadataReader runtimeMetadataReader;
+    private final ManagedStorageContractService storageContracts;
 
     public ManagedAppAttestationService(
             InstalledAppRepository repository,
             RuntimeLayout runtimeLayout,
             DockerOwnershipService dockerOwnership,
-            AppRuntimeMetadataReader runtimeMetadataReader) {
+            AppRuntimeMetadataReader runtimeMetadataReader,
+            ManagedStorageContractService storageContracts) {
         this.repository = repository;
         this.runtimeLayout = runtimeLayout;
         this.dockerOwnership = dockerOwnership;
         this.runtimeMetadataReader = runtimeMetadataReader;
+        this.storageContracts = storageContracts;
     }
 
     public Result attest(String appId) {
@@ -108,6 +111,11 @@ public class ManagedAppAttestationService {
                 || !app.composeProject().equals(runtimeMetadata.composeProject())) {
             return failed("runtime_identity_mismatch", "The app runtime metadata does not match its managed identity.", app);
         }
+        try {
+            storageContracts.require(app, runtimeMetadata, false);
+        } catch (InstallationException exception) {
+            return failed("durable_storage_unproven", exception.getMessage(), app);
+        }
         return Result.managed(app, ownership, runtimeMetadata);
     }
 
@@ -130,6 +138,19 @@ public class ManagedAppAttestationService {
                     + " it. " + attestation.message());
         }
         return attestation.app();
+    }
+
+    public ManagedStorageContractService.Contract durableStorage(InstalledApp app, boolean verifyLive) {
+        Result attestation = requireAttestation(app);
+        return storageContracts.require(attestation.app(), attestation.runtimeMetadata(), verifyLive);
+    }
+
+    private Result requireAttestation(InstalledApp app) {
+        Result attestation = attest(app);
+        if (!attestation.managed()) {
+            throw new InstallationException(attestation.message());
+        }
+        return attestation;
     }
 
     private Result failed(String code, String message, InstalledApp app) {

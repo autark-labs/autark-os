@@ -6,8 +6,6 @@ import java.util.Map;
 
 public interface AutarkOsFileOperations {
 
-    long createArchive(Path source, Path destination) throws IOException;
-
     long createPrefixedArchive(Map<String, Path> sources, Path destination) throws IOException;
 
     void clearDirectoryContents(Path directory) throws IOException;

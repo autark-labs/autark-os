@@ -209,7 +209,9 @@ class RecoveryOperationCoordinatorTests {
                 mock(MarketplaceCatalogService.class),
                 mock(RuntimeFileOperations.class),
                 mock(BackupDestinationService.class),
-                coordinator);
+                coordinator,
+                mock(com.autarkos.marketplace.install.ManagedStorageContractService.class),
+                mock(AutarkOsFileOpsService.class));
     }
 
     private void assertRecoveryConflict(Runnable action) {

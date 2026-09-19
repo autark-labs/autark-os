@@ -161,6 +161,7 @@ public class AppLifecycleService {
 
     private AppActionResult startUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "start");
+        managedApps.durableStorage(app, true);
         requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.start(app, composeFile(app));
@@ -208,6 +209,7 @@ public class AppLifecycleService {
 
     private AppActionResult restartUnlocked(String appId) {
         InstalledApp app = requireManagedApp(appId, "restart");
+        managedApps.durableStorage(app, true);
         requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         return containerLifecycleService.restart(app, composeFile(app));
@@ -223,6 +225,7 @@ public class AppLifecycleService {
 
     private AppActionResult repairUnlocked(String appId, boolean automatic) {
         InstalledApp app = requireManagedApp(appId, "repair");
+        managedApps.durableStorage(app, true);
         DockerInventorySnapshot inventory = requireFreshMutationInventory(app);
         var pendingSettings = repository.settingsRecoveryFor(appId);
         if (pendingSettings.isPresent()) {
@@ -306,6 +309,7 @@ public class AppLifecycleService {
 
     private AppRuntimeView updateSettingsUnlocked(String appId, InstallModels.InstallSettings settings) {
         InstalledApp app = requireManagedApp(appId, "update settings for");
+        managedApps.durableStorage(app, true);
         DockerInventorySnapshot inventory = requireFreshMutationInventory(app);
         assertNoPendingSettingsRecovery(app);
         String defaultAccessUrl = app.accessUrl();
@@ -743,16 +747,18 @@ public class AppLifecycleService {
 
     public InstallModels.UninstallPlan uninstallPlan(String appId) {
         InstalledApp app = requireManagedApp(appId, "plan removal for");
+        managedApps.durableStorage(app, true);
         return uninstallService.uninstallPlan(app);
     }
 
     public AppActionResult uninstall(String appId) {
         return recoveryOperations.runExclusive(RecoveryOperationCoordinator.Operation.UNINSTALL_CHECKPOINT, () -> {
             InstalledApp app = requireManagedApp(appId, "uninstall");
+            ManagedStorageContractService.Contract storage = managedApps.durableStorage(app, true);
             requireFreshMutationInventory(app);
             assertNoPendingSettingsRecovery(app);
             InstallModels.InstallSettings settings = repository.settingsFor(app.appId()).orElseGet(() -> InstallModels.InstallSettings.defaults(app.accessUrl()));
-            return uninstallService.uninstall(app, settings, composeFile(app));
+            return uninstallService.uninstall(app, settings, composeFile(app), storage.protectedPaths());
         });
     }
 

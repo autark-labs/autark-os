@@ -18,6 +18,7 @@ import com.autarkos.marketplace.install.AppLifecycleService;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
+import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.system.RuntimeFileOperations;
 
 class RestoreExecutor {
@@ -33,6 +34,7 @@ class RestoreExecutor {
     private final BackupVerificationService backupVerificationService;
     private final RestorePlanner restorePlanner;
     private final Supplier<Path> backupRoot;
+    private final ManagedAppAttestationService managedApps;
 
     RestoreExecutor(
             BackupRepository backupRepository,
@@ -43,7 +45,8 @@ class RestoreExecutor {
             BackupArchiveService backupArchiveService,
             BackupVerificationService backupVerificationService,
             RestorePlanner restorePlanner,
-            Supplier<Path> backupRoot) {
+            Supplier<Path> backupRoot,
+            ManagedAppAttestationService managedApps) {
         this.backupRepository = backupRepository;
         this.installedAppRepository = installedAppRepository;
         this.activityLogService = activityLogService;
@@ -53,6 +56,7 @@ class RestoreExecutor {
         this.backupVerificationService = backupVerificationService;
         this.restorePlanner = restorePlanner;
         this.backupRoot = backupRoot;
+        this.managedApps = managedApps;
     }
 
     RestoreModels.RestoreResult restore(long restorePointId, String targetAppId) {
@@ -86,6 +90,7 @@ class RestoreExecutor {
 
     private RestoreAppResult restoreApp(RestorePoint point, InstalledApp app, List<String> logs) {
         Path destination = Path.of(app.runtimePath()).toAbsolutePath().normalize();
+        java.util.Map<String, Path> protectedPaths = managedApps.durableStorage(app, true).protectedPaths();
         try {
             logs.add("Stopping " + app.appName() + ".");
             AppActionResult stop = appLifecycleService.stopAndConfirm(app.appId());
@@ -102,7 +107,7 @@ class RestoreExecutor {
             if (Files.exists(destination) && fileOperations.directorySize(destination) > 0) {
                 Files.createDirectories(backupRoot.get().resolve("pre-restore"));
                 safetyArchive = backupRoot.get().resolve("pre-restore").resolve(app.appId() + "-pre-restore-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
-                long size = backupArchiveService.createSafetyArchive(app.appId(), safetyArchive);
+                long size = backupArchiveService.createArchive(app.appId(), protectedPaths, safetyArchive);
                 BackupModels.BackupContract safetyContract = new BackupModels.BackupContract(
                         "cold_file", 1, "Stopped app file backup", "standard", false,
                         "Safety checkpoint created before restore.", List.of());

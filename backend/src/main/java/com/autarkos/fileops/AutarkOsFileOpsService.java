@@ -59,45 +59,64 @@ public class AutarkOsFileOpsService {
         }
     }
 
-    public long createSafetyArchive(String appId, Path destination) throws IOException {
-        return createSafetyArchive(appId, destination, backupRoot());
-    }
-
-    public long createSafetyArchive(String appId, Path destination, Path approvedBackupRoot) throws IOException {
-        Path appRoot = appRoot(appId);
-        Path backupPath = requireBackupPath(destination, approvedBackupRoot);
-        try {
-            return localOperations.createArchive(appRoot, backupPath);
-        } catch (IOException exception) {
-            if (!isPermissionFailure(exception)) {
-                throw exception;
-            }
-            runPrivileged("create-safety-archive", approvedBackupRoot, "--app", appId, "--destination", backupPath.toString());
-            return Files.isRegularFile(backupPath) ? Files.size(backupPath) : 0;
+    public long createManagedArchive(
+            String appId,
+            Map<String, Path> protectedPaths,
+            Path destination,
+            Path approvedBackupRoot) throws IOException {
+        requireSafeAppId(appId);
+        if (protectedPaths == null || protectedPaths.isEmpty()) {
+            throw new IllegalArgumentException("At least one protected app-data path is required.");
         }
-    }
-
-    public long createFullArchive(List<String> appIds, Path destination) throws IOException {
-        return createFullArchive(appIds, destination, backupRoot());
-    }
-
-    public long createFullArchive(List<String> appIds, Path destination, Path approvedBackupRoot) throws IOException {
-        if (appIds == null || appIds.isEmpty()) {
-            throw new IllegalArgumentException("At least one app id is required for a full archive.");
-        }
-        Path backupPath = requireBackupPath(destination, approvedBackupRoot);
+        Path root = appRoot(appId);
         Map<String, Path> sources = new LinkedHashMap<>();
-        for (String appId : appIds) {
-            sources.put(appId, appRoot(appId));
+        protectedPaths.forEach((relative, source) -> sources.put(
+                requireManagedRelativePath(relative),
+                requireInsideAppRoot(source, root)));
+        List<String> entries = sources.keySet().stream().map(path -> appId + ":" + path).toList();
+        return writeArchive(sources, entries, destination, approvedBackupRoot);
+    }
+
+    public long createManagedFullArchive(
+            Map<String, Map<String, Path>> appPaths,
+            Path destination,
+            Path approvedBackupRoot) throws IOException {
+        if (appPaths == null || appPaths.isEmpty()) {
+            throw new IllegalArgumentException("At least one app is required for a full archive.");
         }
-        String joinedAppIds = String.join(",", sources.keySet());
+        Map<String, Path> sources = new LinkedHashMap<>();
+        List<String> specifications = new ArrayList<>();
+        appPaths.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(appEntry -> {
+            String appId = appEntry.getKey();
+            Map<String, Path> paths = appEntry.getValue();
+            requireSafeAppId(appId);
+            Path root = appRoot(appId);
+            paths.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(pathEntry -> {
+                String relative = pathEntry.getKey();
+                Path source = pathEntry.getValue();
+                String safeRelative = requireManagedRelativePath(relative);
+                sources.put(appId + "/" + safeRelative, requireInsideAppRoot(source, root));
+                specifications.add(appId + ":" + safeRelative);
+            });
+        });
+        return writeArchive(sources, specifications, destination, approvedBackupRoot);
+    }
+
+    private long writeArchive(
+            Map<String, Path> sources,
+            List<String> entries,
+            Path destination,
+            Path approvedBackupRoot) throws IOException {
+        Path backupPath = requireBackupPath(destination, approvedBackupRoot);
         try {
             return localOperations.createPrefixedArchive(sources, backupPath);
         } catch (IOException exception) {
             if (!isPermissionFailure(exception)) {
                 throw exception;
             }
-            runPrivileged("create-full-archive", approvedBackupRoot, "--apps", joinedAppIds, "--destination", backupPath.toString());
+            runPrivileged("create-managed-archive", approvedBackupRoot,
+                    "--entries", String.join(",", entries),
+                    "--destination", backupPath.toString());
             return Files.isRegularFile(backupPath) ? Files.size(backupPath) : 0;
         }
     }
@@ -150,6 +169,21 @@ public class AutarkOsFileOpsService {
         if (appId == null || !APP_ID_PATTERN.matcher(appId).matches()) {
             throw new IllegalArgumentException("Invalid app id for Autark-OS file operation.");
         }
+    }
+
+    private String requireManagedRelativePath(String value) {
+        if (value == null || !value.matches("[A-Za-z0-9][A-Za-z0-9._/-]*") || value.contains("..") || value.startsWith("/")) {
+            throw new IllegalArgumentException("Invalid managed app-data path.");
+        }
+        return value;
+    }
+
+    private Path requireInsideAppRoot(Path value, Path appRoot) {
+        Path source = value.toAbsolutePath().normalize();
+        if (!source.startsWith(appRoot)) {
+            throw new IllegalArgumentException("Protected app data must stay under its managed runtime folder.");
+        }
+        return source;
     }
 
     /** Writes the root-owned allow-list only after the destination has passed the canonical probe. */
@@ -252,7 +286,7 @@ public class AutarkOsFileOpsService {
 
     private String operationFailureMessage(String operation) {
         return switch (operation) {
-            case "create-safety-archive", "create-full-archive" -> "Autark-OS could not create the backup archive.";
+            case "create-managed-archive" -> "Autark-OS could not create the backup archive.";
             case "restore-app-data" -> "Autark-OS could not restore the app data.";
             case "delete-backup" -> "Autark-OS could not delete the backup.";
             case "clear-runtime" -> "Autark-OS could not clear the app data.";

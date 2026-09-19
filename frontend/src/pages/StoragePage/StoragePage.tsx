@@ -114,7 +114,7 @@ function StoragePage() {
             appIconUrlById={appIconUrlById}
             onCopyPath={(value, id) => void copyPath(value, id)}
             onRefresh={refreshStorage}
-            onReviewOrphan={setCleanupTarget}
+            onReviewOrphan={(orphan) => orphan.cleanupAllowed && setCleanupTarget(orphan)}
             refreshing={storage.isFetching}
             report={report}
             showAdvancedMetrics={showAdvancedMetrics}

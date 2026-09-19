@@ -85,7 +85,7 @@ class BackupServiceCanonicalAppTests {
         }
         assertThat(service.restore(full.id(), appId).status()).isEqualTo("completed");
         assertThat(Files.readString(data)).isEqualTo("title: original\n");
-        assertThat(Files.readString(syncedData)).isEqualTo("original document");
+        assertThat(Files.readString(syncedData)).isEqualTo(appId.equals("syncthing") ? "original document" : "changed document");
         assertThat(service.restorePlan(full.id(), "vaultwarden").executable()).isFalse();
     }
 
@@ -167,7 +167,7 @@ class BackupServiceCanonicalAppTests {
         assertThat(report.apps()).singleElement().satisfies(app -> {
             assertThat(app.status()).isEqualTo("recovery_limited");
             assertThat(app.backupAvailable()).isFalse();
-            assertThat(app.backupUnavailableReason()).contains("original Compose file is missing").contains("archive-first cleanup");
+            assertThat(app.backupUnavailableReason()).contains("original Compose file is missing").contains("Review recovery");
         });
         assertThatThrownBy(() -> service.run("homepage"))
                 .isInstanceOf(com.autarkos.marketplace.install.InstallationException.class)
@@ -550,6 +550,19 @@ class BackupServiceCanonicalAppTests {
     private com.autarkos.marketplace.install.ManagedAppAttestationService managedApps(List<InstalledApp> apps) {
         var service = mock(com.autarkos.marketplace.install.ManagedAppAttestationService.class);
         when(service.managedApps()).thenReturn(apps);
+        when(service.durableStorage(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenAnswer(invocation -> {
+                    InstalledApp app = invocation.getArgument(0);
+                    var manifest = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator())
+                            .findById(app.appId()).orElseThrow();
+                    java.util.Map<String, Path> paths = new java.util.LinkedHashMap<>();
+                    for (String path : manifest.runtime().backupPaths()) {
+                        Path source = Path.of(app.runtimePath()).resolve(path);
+                        Files.createDirectories(source);
+                        paths.put(path, source);
+                    }
+                    return new com.autarkos.marketplace.install.ManagedStorageContractService.Contract(app, paths);
+                });
         return service;
     }
 
@@ -684,8 +697,8 @@ class BackupServiceCanonicalAppTests {
         }
 
         @Override
-        public long createSafetyArchive(String appId, Path destination, Path approvedBackupRoot) throws java.io.IOException {
-            long size = super.createSafetyArchive(appId, destination, approvedBackupRoot);
+        public long createManagedArchive(String appId, java.util.Map<String, Path> paths, Path destination, Path approvedBackupRoot) throws java.io.IOException {
+            long size = super.createManagedArchive(appId, paths, destination, approvedBackupRoot);
             if (archiveToTamper != null) {
                 Files.writeString(archiveToTamper, "tampered", java.nio.file.StandardOpenOption.APPEND);
                 archiveToTamper = null;

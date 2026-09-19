@@ -36,6 +36,14 @@ class AppRuntimeMetadataWriterTests {
         AppRuntimeMetadataWriter writer = new AppRuntimeMetadataWriter(
                 () -> identity,
                 () -> Instant.parse("2026-06-20T13:00:00Z"));
+        Files.createDirectories(appRoot.resolve("data"));
+        Files.writeString(appRoot.resolve("compose.yaml"), """
+                services:
+                  vaultwarden:
+                    image: vaultwarden/server:1.36.0
+                    volumes:
+                      - "%s:/data"
+                """.formatted(appRoot.resolve("data")));
 
         RuntimeModels.AppRuntimeMetadata metadata = writer.write(manifest, appRoot, "appinst_vaultwarden", "autarkos_homelab-box_vaultwarden");
 
@@ -45,9 +53,15 @@ class AppRuntimeMetadataWriterTests {
         assertThat(metadata.composeProject()).isEqualTo("autarkos_homelab-box_vaultwarden");
         assertThat(metadata.manifestVersion()).isEqualTo("1.36.0");
         assertThat(metadata.createdAt()).isEqualTo(Instant.parse("2026-06-20T13:00:00Z"));
+        assertThat(metadata.mountContract()).singleElement().satisfies(mount -> {
+            assertThat(mount.service()).isEqualTo("vaultwarden");
+            assertThat(mount.source()).isEqualTo(appRoot.resolve("data").toString());
+            assertThat(mount.destination()).isEqualTo("/data");
+        });
         assertThat(Files.readString(appRoot.resolve("autark-os-app.json")))
                 .contains("\"appInstanceId\" : \"appinst_vaultwarden\"")
                 .contains("\"catalogAppId\" : \"vaultwarden\"")
-                .contains("\"instanceId\" : \"pos_abcdef1234567890\"");
+                .contains("\"instanceId\" : \"pos_abcdef1234567890\"")
+                .contains("\"mountContract\"");
     }
 }

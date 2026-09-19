@@ -871,7 +871,7 @@ class AppLifecycleServiceTests {
     @Test
     void uninstallDoesNotRemoveContainersWhenItsPlannedSafetyCheckpointCannotBeCreated() throws Exception {
         AutarkOsFileOpsService fileOpsService = mock(AutarkOsFileOpsService.class);
-        when(fileOpsService.createSafetyArchive(eq("vaultwarden"), any(Path.class), any(Path.class)))
+        when(fileOpsService.createManagedArchive(eq("vaultwarden"), any(java.util.Map.class), any(Path.class), any(Path.class)))
                 .thenThrow(new java.io.IOException("Autark-OS cannot read app-data.sqlite"));
         AppLifecycleService checkpointFailureService = new AppLifecycleService(
                 repository,
@@ -924,19 +924,6 @@ class AppLifecycleServiceTests {
         assertThatThrownBy(() -> service.uninstall("vaultwarden"))
                 .isInstanceOf(InstallationException.class)
                 .hasMessageContaining("original Compose configuration is missing");
-        assertThat(composeExecutor.archiveCalled).isFalse();
-        assertThat(repository.findAppById("vaultwarden")).isPresent();
-    }
-
-    @Test
-    void missingComposeUninstallKeepsContainerAndAppRecordWhenArchiveFails() throws Exception {
-        Files.delete(runtimeRoot.resolve("apps/vaultwarden/compose.yaml"));
-        composeExecutor.failArchive = true;
-
-        assertThatThrownBy(() -> service.uninstall("vaultwarden"))
-                .hasMessageContaining("original Compose configuration is missing");
-
-        assertThat(composeExecutor.archiveCalled).isFalse();
         assertThat(repository.findAppById("vaultwarden")).isPresent();
     }
 
@@ -960,7 +947,6 @@ class AppLifecycleServiceTests {
                 .isInstanceOf(InstallationException.class)
                 .hasMessageContaining("original Compose configuration is missing");
 
-        assertThat(composeExecutor.stopManagedCalled).isFalse();
     }
 
     @Test
@@ -1559,9 +1545,6 @@ class AppLifecycleServiceTests {
         List<String> failUpOutput = List.of();
         boolean failDown;
         boolean downCalled;
-        boolean archiveCalled;
-        boolean failArchive;
-        boolean stopManagedCalled;
         boolean transitionToStarting;
         boolean observationFails;
         String requiredProjectName;
@@ -1586,12 +1569,6 @@ class AppLifecycleServiceTests {
         }
 
         @Override
-        public RuntimeModels.DockerComposeResult stopManagedProject(Path composeFile, String projectName, String appId) {
-            stopManagedCalled = true;
-            return stop(composeFile, projectName);
-        }
-
-        @Override
         public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
             restartCalled = true;
             if (transitionToStarting) {
@@ -1607,14 +1584,6 @@ class AppLifecycleServiceTests {
                 return new RuntimeModels.DockerComposeResult(1, List.of("failed to remove " + projectName));
             }
             return new RuntimeModels.DockerComposeResult(0, List.of("removed " + projectName));
-        }
-
-        @Override
-        public RuntimeModels.DockerComposeResult archiveAndRemoveManagedProject(String projectName, String appId, Path archiveDirectory) {
-            archiveCalled = true;
-            return failArchive
-                    ? new RuntimeModels.DockerComposeResult(1, List.of("archive failed; no containers removed"))
-                    : new RuntimeModels.DockerComposeResult(0, List.of("Saved container writable-filesystem recovery archive: " + archiveDirectory));
         }
 
         @Override

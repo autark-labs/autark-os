@@ -26,11 +26,6 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
     }
 
     @Override
-    public long createArchive(Path source, Path destination) throws IOException {
-        return zipStrict(Map.of("", source), destination);
-    }
-
-    @Override
     public long createPrefixedArchive(Map<String, Path> sources, Path destination) throws IOException {
         return zipStrict(sources, destination);
     }
@@ -63,8 +58,9 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
         }
         Files.createDirectories(parent);
         Path staging = Files.createTempDirectory(parent, ".autark-os-restore-");
-        Path previous = parent.resolve("." + destination.getFileName() + ".pre-restore-" + java.util.UUID.randomUUID());
-        boolean previousMoved = false;
+        Path previous = Files.createTempDirectory(parent, ".autark-os-previous-");
+        List<Path> applied = new java.util.ArrayList<>();
+        List<Path> preserved = new java.util.ArrayList<>();
         try {
             List<ArchiveFilesystemMetadata.Entry> metadata = ArchiveFilesystemMetadata.forRestore(
                     ArchiveFilesystemMetadata.read(archive), scope, appId);
@@ -73,22 +69,37 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
                 throw new IOException("Restore point does not contain restorable app data.");
             }
             applyFilesystemMetadata(staging, metadata);
-            if (Files.exists(destination)) {
-                move(destination, previous);
-                previousMoved = true;
-            }
-            move(staging, destination);
-            if (previousMoved) {
-                deleteRecursively(previous);
+            Files.createDirectories(destination);
+            try (Stream<Path> children = Files.list(staging)) {
+                for (Path child : children.toList()) {
+                    Path target = destination.resolve(child.getFileName().toString());
+                    if (Files.exists(target)) {
+                        move(target, previous.resolve(child.getFileName().toString()));
+                        preserved.add(target);
+                    }
+                    move(child, target);
+                    applied.add(target);
+                }
             }
         } catch (IOException exception) {
-            if (previousMoved && !Files.exists(destination) && Files.exists(previous)) {
-                move(previous, destination);
+            for (Path target : applied.reversed()) {
+                if (Files.exists(target)) {
+                    deleteRecursively(target);
+                }
+            }
+            for (Path target : preserved.reversed()) {
+                Path saved = previous.resolve(target.getFileName().toString());
+                if (Files.exists(saved)) {
+                    move(saved, target);
+                }
             }
             throw exception;
         } finally {
             if (Files.exists(staging)) {
                 deleteRecursively(staging);
+            }
+            if (Files.exists(previous)) {
+                deleteRecursively(previous);
             }
         }
     }
@@ -213,6 +224,10 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
     }
 
     private void writeDirectoryStrict(ZipOutputStream zip, Path source, String prefix, AtomicLong writtenBytes) throws IOException {
+        if (prefix != null && !prefix.isBlank()) {
+            zip.putNextEntry(new ZipEntry(prefix.replace(source.getFileSystem().getSeparator(), "/") + "/"));
+            zip.closeEntry();
+        }
         Files.walkFileTree(source, new SimpleFileVisitor<>() {
             @Override
             public java.nio.file.FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) throws IOException {

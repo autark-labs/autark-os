@@ -128,8 +128,16 @@ public class ManifestValidator {
         validateServices(errors, manifest);
 
         for (String backupPath : manifest.runtime().backupPaths()) {
-            if (backupPath == null || backupPath.isBlank() || backupPath.startsWith("/") || backupPath.contains("..")) {
-                errors.add("runtime.backupPaths entries must be relative managed paths: " + backupPath);
+            if (backupPath == null || !backupPath.matches("[A-Za-z0-9][A-Za-z0-9._-]*")) {
+                errors.add("runtime.backupPaths entries must name one managed data folder: " + backupPath);
+                continue;
+            }
+            String durableSource = manifest.runtime().runtimeRoot() + "/" + backupPath;
+            boolean mounted = declaredVolumes(manifest).stream()
+                    .map(volume -> volume.split(":", 2)[0])
+                    .anyMatch(durableSource::equals);
+            if (!mounted) {
+                errors.add("runtime.backupPaths entry must have its own managed storage mapping: " + backupPath);
             }
         }
 

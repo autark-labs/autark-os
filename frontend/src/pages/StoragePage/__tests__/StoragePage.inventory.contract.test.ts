@@ -13,12 +13,14 @@ test('storage details stay in the workspace while cleanup keeps its selected tar
   const page = source('src/pages/StoragePage/StoragePage.tsx');
   const workspace = source('src/pages/StoragePage/StorageCapacityRibbonWorkspace.tsx');
 
-  assert.match(page, /onReviewOrphan=\{setCleanupTarget\}/);
+  assert.match(page, /onReviewOrphan=\{\(orphan\) => orphan\.cleanupAllowed && setCleanupTarget\(orphan\)\}/);
   assert.match(workspace, /<Tabs className="min-h-0 flex-1 gap-0"/);
   assert.doesNotMatch(workspace, /StorageDetailsSheet/);
   assert.match(workspace, /value="cleanup"/);
   assert.match(workspace, /orphans\.map/);
   assert.match(workspace, /onReview=\{\(\) => onReviewOrphan\(orphan\)\}/);
+  assert.match(workspace, /disabled=\{!orphan\.cleanupAllowed\}/);
+  assert.match(workspace, /Cleanup blocked:/);
   assert.match(page, /setCleanupTarget\(null\)/);
 });
 

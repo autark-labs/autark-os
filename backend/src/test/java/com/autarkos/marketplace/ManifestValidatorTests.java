@@ -123,6 +123,29 @@ class ManifestValidatorTests {
                 .hasMessageContaining("safe path under config/");
     }
 
+    @Test
+    void rejectsBackupPathsWithoutAnExactManagedMount() {
+        ApplicationManifest base = manifest("missing-data-mount", "8090:80");
+        RuntimeManifest runtime = base.runtime();
+        ApplicationManifest invalid = withRuntime(base, new RuntimeManifest(
+                runtime.containerName(), runtime.composeProject(), runtime.image(), runtime.network(), runtime.runtimeRoot(), runtime.ports(),
+                runtime.volumes(), runtime.environment(), runtime.labels(), List.of("unmounted"), runtime.backupStrategy(), runtime.backupContractVersion(),
+                runtime.privileged(), runtime.provisionedFiles(), runtime.services()));
+
+        assertThatThrownBy(() -> validator.validate(invalid))
+                .isInstanceOf(ManifestValidationException.class)
+                .hasMessageContaining("must have its own managed storage mapping");
+    }
+
+    private ApplicationManifest withRuntime(ApplicationManifest base, RuntimeManifest runtime) {
+        return new ApplicationManifest(
+                base.id(), base.name(), base.category(), base.description(), base.shortValue(), base.badge(), base.downloads(), base.rating(),
+                base.image(), base.version(), base.lastUpdated(), base.size(), base.maintainer(), base.source(), base.sourceUrl(), base.documentationUrl(),
+                base.installTime(), base.difficulty(), base.supportLevel(), base.supportSummary(), base.accessUrl(), base.tags(), base.bestFor(),
+                base.highlights(), base.plainLanguage(), base.technicalSummary(), base.requirements(), base.includes(), base.configuration(),
+                base.access(), base.usage(), base.setup(), base.health(), base.smokeTests(), runtime);
+    }
+
     private ApplicationManifest manifest(String id, String port) {
         return manifest(id, port, "http://localhost:8090");
     }
