@@ -37,8 +37,11 @@ class AutarkOsJobServiceTests {
         var parameters = new java.util.LinkedHashMap<String, Object>();
         parameters.put("port", 8080);
         parameters.put("mode", "local");
+        parameters.put("checkedAt", Instant.parse("2026-09-19T23:34:06.123456789Z"));
         var first = service.startWithJob("install_app", "freshrss", steps, parameters, job -> AutarkOsJobOutcome.succeeded("Installed."));
-        var same = service.startWithJob("install_app", "freshrss", steps, java.util.Map.of("mode", "local", "port", 8080), job -> { throw new AssertionError("Duplicate ran"); });
+        var same = service.startWithJob("install_app", "freshrss", steps, java.util.Map.of(
+                "mode", "local", "port", 8080, "checkedAt", Instant.parse("2026-09-19T23:34:06.123456789Z")),
+                job -> { throw new AssertionError("Duplicate ran"); });
         assertThat(same.jobId()).isEqualTo(first.jobId());
         parameters.put("port", 9090);
         assertThatThrownBy(() -> service.startWithJob("install_app", "freshrss", steps, parameters, job -> AutarkOsJobOutcome.succeeded("Wrong install")))

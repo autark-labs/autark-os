@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import com.autarkos.api.AutarkOsStates;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 @Service
 public class AutarkOsJobService {
@@ -32,7 +33,7 @@ public class AutarkOsJobService {
     private final boolean autoRun;
     private final boolean reconcileOnStartup;
     private final Supplier<Instant> clock;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private final ConcurrentHashMap<String, Runnable> queuedTasks = new ConcurrentHashMap<>();
     // Only live workers can accept retries. After a restart, interrupted jobs
     // are reconciled rather than guessed equivalent or automatically replayed.

@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -249,8 +251,9 @@ class InstalledAppsControllerTests {
         verify(applicationStateService, never()).refreshInBackground();
     }
 
-    @Test
-    void settingsMutationInvalidatesCanonicalAppStateImmediately() {
+    @ParameterizedTest
+    @ValueSource(strings = {"local", "network"})
+    void accessSettingsWithObservedTimestampsQueueAndInvalidateCanonicalState(String mode) throws Exception {
         AutarkOsJobService jobs = jobService();
         AppLifecycleService lifecycleService = mock(AppLifecycleService.class);
         MonitoringMetricsService metricsService = mock(MonitoringMetricsService.class);
@@ -261,14 +264,33 @@ class InstalledAppsControllerTests {
                 applicationStateService,
                 jobs);
         AppRuntimeView app = appRuntimeView("gitea");
-        InstallModels.InstallSettings settings = InstallModels.InstallSettings.defaults("http://localhost:3000");
+        Instant checkedAt = Instant.parse("2026-09-19T23:34:06.123456789Z");
+        InstallModels.InstallSettings settings = new InstallModels.InstallSettings(
+                "http://localhost:3000", null, false, Map.of(), InstallModels.BackupPolicy.defaults(),
+                mode, "disabled", 3000, "http", checkedAt, checkedAt, checkedAt, "ready", true);
         when(lifecycleService.updateSettings("gitea", settings)).thenReturn(app);
 
-        AutarkOsJob returned = controller.updateSettings("gitea", settings);
+        var mvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(MockMvcRequestBuilders.put("/api/apps/gitea/settings")
+                .contentType("application/json")
+                .content("""
+                        {"accessUrl":"http://localhost:3000","tailscaleEnabled":false,"storageSubfolders":{},
+                         "backup":{"enabled":true,"frequency":"daily","retention":7},
+                         "desiredAccessMode":"%s","privateAccessRequirement":"disabled",
+                         "expectedLocalPort":3000,"expectedProtocol":"http","autoRepairEnabled":true,
+                         "lastAccessCheckAt":"2026-09-19T23:34:06.123456789Z",
+                         "lastSuccessfulAccessAt":"2026-09-19T23:34:06.123456789Z",
+                         "lastRepairAttemptAt":"2026-09-19T23:34:06.123456789Z","lastRepairStatus":"ready"}
+                        """.formatted(mode)))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(200));
 
+        AutarkOsJob returned = jobs.list().getFirst();
         assertThat(returned.type()).isEqualTo("save_app_settings");
+        assertThat(returned.status()).isEqualTo("queued");
+        assertThat(controller.updateSettings("gitea", settings).jobId()).isEqualTo(returned.jobId());
         verify(lifecycleService, never()).updateSettings("gitea", settings);
         jobs.runQueuedJobsNow();
+        verify(lifecycleService).updateSettings("gitea", settings);
         assertThat(jobs.findById(returned.jobId()).orElseThrow().status()).isEqualTo("succeeded");
         verify(applicationStateService).invalidate();
         verify(applicationStateService, never()).refreshInBackground();
