@@ -50,9 +50,8 @@ class BackupDestinationServiceTests {
     @Test
     void configuresAnExternalDestinationAndPersistsItsMountIdentity() throws Exception {
         Map<String, String> settings = new HashMap<>();
-        RecordingConfigurator configurator = new RecordingConfigurator();
         Path external = Files.createDirectories(externalRoot().resolve("backups"));
-        BackupDestinationService service = service(settings, configurator, external);
+        BackupDestinationService service = service(settings, external);
 
         BackupModels.BackupDestination destination = service.configure(external.toString());
 
@@ -61,7 +60,6 @@ class BackupDestinationServiceTests {
         assertThat(destination.protectsAgainstRuntimeDriveFailure()).isTrue();
         assertThat(settings).containsEntry(BackupDestinationService.DESTINATION_PATH, external.toString());
         assertThat(settings).containsEntry(BackupDestinationService.DESTINATION_IDENTITY, "external-drive");
-        assertThat(configurator.configured).isEqualTo(destination);
     }
 
     @Test
@@ -70,7 +68,7 @@ class BackupDestinationServiceTests {
         Path missing = externalRoot().resolve("backups");
         settings.put(BackupDestinationService.DESTINATION_PATH, missing.toString());
         settings.put(BackupDestinationService.DESTINATION_IDENTITY, "external-drive");
-        BackupDestinationService service = service(settings, new RecordingConfigurator(), externalRoot());
+        BackupDestinationService service = service(settings, externalRoot());
 
         BackupModels.BackupDestination destination = service.current();
 
@@ -84,14 +82,14 @@ class BackupDestinationServiceTests {
 
     @Test
     void rejectsRelativePathsBeforeTheyCanBecomeAnApprovedDestination() {
-        BackupDestinationService service = service(new HashMap<>(), new RecordingConfigurator(), externalRoot());
+        BackupDestinationService service = service(new HashMap<>(), externalRoot());
 
         assertThatThrownBy(() -> service.preview("relative/backups"))
                 .isInstanceOf(InstallationException.class)
                 .hasMessageContaining("absolute path");
     }
 
-    private BackupDestinationService service(Map<String, String> settings, RecordingConfigurator configurator, Path externalRoot) {
+    private BackupDestinationService service(Map<String, String> settings, Path externalRoot) {
         ProjectSettingsRepository repository = mock(ProjectSettingsRepository.class);
         when(repository.readAll()).thenAnswer(invocation -> new HashMap<>(settings));
         doAnswer(invocation -> {
@@ -104,7 +102,7 @@ class BackupDestinationServiceTests {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(tempDir.resolve("runtime").toString());
         RuntimeLayout runtimeLayout = new RuntimeLayout(properties);
-        return new BackupDestinationService(runtimeLayout, repository, configurator, new TestInspector(runtimeLayout.runtimeRoot(), externalRoot));
+        return new BackupDestinationService(runtimeLayout, repository, new TestInspector(runtimeLayout.runtimeRoot(), externalRoot));
     }
 
     private Path externalRoot() {
@@ -112,15 +110,6 @@ class BackupDestinationServiceTests {
             externalTestRoot = Path.of(System.getProperty("user.home"), ".autark-os-destination-test-" + UUID.randomUUID()).toAbsolutePath().normalize();
         }
         return externalTestRoot;
-    }
-
-    private static final class RecordingConfigurator implements BackupDestinationService.DestinationConfigurator {
-        private BackupModels.BackupDestination configured;
-
-        @Override
-        public void configure(BackupModels.BackupDestination destination, List<Path> history) {
-            configured = destination;
-        }
     }
 
     private static final class TestInspector implements BackupDestinationService.DestinationInspector {

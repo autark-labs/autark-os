@@ -31,17 +31,22 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
                 "ps",
                 "-a",
                 "--format",
-                "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Labels}}\t{{.Ports}}");
+                "{{json .}}");
         if (!result.successful()) {
             return DockerInventory.failed(result.output());
         }
-        List<HostModels.HostDockerContainer> containers = result.outputLines().stream()
+        List<HostModels.HostDockerContainer> containers;
+        try {
+            containers = result.outputLines().stream()
                 .map(this::container)
                 .filter(container -> !container.name().isBlank())
                 .filter(container -> !"true".equals(
                         container.labels().get(
                                 PRO_MANAGED_LABEL)))
                 .toList();
+        } catch (IllegalArgumentException exception) {
+            return DockerInventory.failed("Docker returned unreadable container details.");
+        }
         if (containers.isEmpty()) {
             return DockerInventory.successful(List.of());
         }
@@ -105,13 +110,18 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
     }
 
     private HostModels.HostDockerContainer container(String line) {
-        String[] fields = line.split("\t", -1);
-        return new HostModels.HostDockerContainer(
-                field(fields, 0),
-                field(fields, 1),
-                field(fields, 2),
-                labels(field(fields, 3)),
-                field(fields, 4));
+        try {
+            JsonNode row = objectMapper.readTree(line);
+            if (row == null || row.path("Names").asText().isBlank()) {
+                throw new IllegalArgumentException("Container name is missing.");
+            }
+            return new HostModels.HostDockerContainer(
+                    row.path("Names").asText(), row.path("Image").asText(),
+                    row.path("Status").asText(), labels(row.path("Labels").asText()),
+                    row.path("Ports").asText());
+        } catch (java.io.IOException exception) {
+            throw new IllegalArgumentException("Invalid container details.", exception);
+        }
     }
 
     private Map<String, String> labels(String labels) {
@@ -128,7 +138,4 @@ public class ProcessHostDockerContainerDiscovery implements HostDockerContainerD
         return parsed;
     }
 
-    private String field(String[] fields, int index) {
-        return fields.length > index ? fields[index].trim() : "";
-    }
 }

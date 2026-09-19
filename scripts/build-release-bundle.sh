@@ -70,7 +70,6 @@ The bundle layout is:
   scripts/install-autark-os.sh
   scripts/autark-os-gui-installer.sh
   scripts/autark-os
-  scripts/autark-os-fileops
   docs/GETTING_STARTED.md
   docs/RELEASE_NOTES.md
   docs/LICENSE.md
@@ -577,7 +576,6 @@ write_release_json() {
     "scripts/install-autark-os.sh",
     "scripts/autark-os-gui-installer.sh",
     "scripts/autark-os",
-    "scripts/autark-os-fileops",
     "docs/GETTING_STARTED.md",
     "docs/RELEASE_NOTES.md",
     "docs/LICENSE.md",
@@ -757,8 +755,7 @@ sign_checksum_manifest() {
 
 normalize_release_permissions() {
   # CI materializes signing inputs with a restrictive umask. A release bundle is
-  # not secret, and the installed service runs as an unprivileged account, so
-  # every runtime directory must be traversable and every shared runtime file
+  # not secret, so every runtime directory must be traversable and every shared runtime file
   # readable after extraction. Keep the small, known executable surface
   # explicit instead of inheriting build-host file modes.
   run_cmd find "${OUTPUT_DIR}" -type d -exec chmod 0755 {} +
@@ -773,8 +770,7 @@ normalize_release_permissions() {
     "${OUTPUT_DIR}/scripts/install-autark-os-service.sh" \
     "${OUTPUT_DIR}/scripts/install-autark-os.sh" \
     "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh" \
-    "${OUTPUT_DIR}/scripts/autark-os" \
-    "${OUTPUT_DIR}/scripts/autark-os-fileops"
+    "${OUTPUT_DIR}/scripts/autark-os"
 }
 
 create_bundle() {
@@ -799,7 +795,6 @@ create_bundle() {
   run_cmd cp "${SCRIPT_DIR}/install-autark-os.sh" "${OUTPUT_DIR}/scripts/install-autark-os.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os-gui-installer.sh" "${OUTPUT_DIR}/scripts/autark-os-gui-installer.sh"
   run_cmd cp "${SCRIPT_DIR}/autark-os" "${OUTPUT_DIR}/scripts/autark-os"
-  run_cmd cp "${SCRIPT_DIR}/autark-os-fileops" "${OUTPUT_DIR}/scripts/autark-os-fileops"
   copy_release_docs "${jar}"
   prepare_release_signing_key
   write_metadata

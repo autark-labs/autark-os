@@ -1,5 +1,5 @@
 autark-os:
-  dev-mode: true
+  dev-mode: false
   guardian:
     enabled: true
     initial-delay-ms: 10000

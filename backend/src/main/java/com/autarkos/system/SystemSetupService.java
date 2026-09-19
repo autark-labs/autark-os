@@ -3,7 +3,6 @@ package com.autarkos.system;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,10 +24,8 @@ import com.autarkos.network.tailscale.TailscaleStatus;
 @Service
 public class SystemSetupService {
 
-    private static final String EXPECTED_USER = "autarkos";
-    private static final String DEFAULT_FILEOPS_HELPER = "/opt/autark-os/bin/autark-os-fileops";
+    private static final String EXPECTED_USER = "root";
     private static final String INSTALL_COMMAND_OVERRIDE = "AUTARK_OS_SETUP_COMMAND";
-    private static final Duration FILEOPS_CHECK_TTL = Duration.ofMinutes(5);
 
     private final RuntimeLayout runtimeLayout;
     private final TailscaleService tailscaleService;
@@ -37,7 +34,6 @@ public class SystemSetupService {
     private final Environment environment;
     private final Supplier<AutarkOsIdentity> identitySupplier;
     private final Supplier<List<ObservedService>> observedServices;
-    private volatile CachedSetupCheck cachedFileOpsCheck;
 
     @Autowired
     public SystemSetupService(RuntimeLayout runtimeLayout, TailscaleService tailscaleService, @Value("${autark-os.dev-mode:false}") boolean devMode, Environment environment, InstanceIdentityService identityService, ObservedServiceService observedServiceService) {
@@ -83,12 +79,10 @@ public class SystemSetupService {
         } else if (!existingInstall.resources().isEmpty()) {
             checks.add(neutral("existing-install", "Development instance", existingInstall.headline(), existingInstall.summary(), null, null));
         }
-        checks.add(serviceUserCheck(runAsUser));
+        checks.add(runtimePrivilegeCheck(runAsUser));
         checks.add(runtimeCheck());
         checks.add(dockerCheck());
-        checks.add(fileOpsCheck());
         checks.add(tailscaleCheck());
-        checks.add(tailscaleOperatorCheck(runAsUser));
         checks.add(systemdCheck());
 
         String overall = overall(checks);
@@ -112,14 +106,10 @@ public class SystemSetupService {
                 Instant.now());
     }
 
-    private SystemSetupModels.SystemSetupCheck serviceUserCheck(String runAsUser) {
-        if (devMode) {
-            return neutral(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Dev mode is running as your local user.", "Current user: " + runAsUser, null, null);
-        }
-        if (EXPECTED_USER.equals(runAsUser)) {
-            return ok(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Autark-OS is running as autarkos.", "This is the recommended durable host identity.", null, null);
-        }
-        return warn(SystemCapabilityCatalog.SERVICE_USER, "Service user", "Autark-OS is not running as the autarkos service user.", "Current user: " + runAsUser, "Run service setup", installCommand());
+    private SystemSetupModels.SystemSetupCheck runtimePrivilegeCheck(String runAsUser) {
+        return EXPECTED_USER.equals(runAsUser)
+                ? ok(SystemCapabilityCatalog.RUNTIME_PRIVILEGES, "Runtime privileges", "Autark-OS can manage this appliance.", "Running as root.", null, null)
+                : warn(SystemCapabilityCatalog.RUNTIME_PRIVILEGES, "Runtime privileges", "Start Autark-OS through the root runtime launcher.", "Current user: " + runAsUser, "Run service setup", installCommand());
     }
 
     private SystemSetupModels.SystemSetupCheck runtimeCheck() {
@@ -146,28 +136,6 @@ public class SystemSetupService {
         return warn(SystemCapabilityCatalog.DOCKER, "Docker", "Docker is installed but Autark-OS cannot access it.", firstLine(docker), "Run service setup", installCommand());
     }
 
-    private synchronized SystemSetupModels.SystemSetupCheck fileOpsCheck() {
-        Instant now = Instant.now();
-        if (cachedFileOpsCheck != null && cachedFileOpsCheck.checkedAt().plus(FILEOPS_CHECK_TTL).isAfter(now)) {
-            return cachedFileOpsCheck.check();
-        }
-        String helper = fileOpsHelperCommand();
-        CommandResult result = run("sudo", "-n", helper, "--help");
-        SystemSetupModels.SystemSetupCheck check;
-        if (result.successful()) {
-            String message = devMode
-                    ? "Dev mode can use bounded privileged file operations."
-                    : "Autark-OS can repair root-owned app data.";
-            check = ok(SystemCapabilityCatalog.FILEOPS, "File operations", message, "Backups, restores, app cleanup, and delayed Tailscale setup can use the bounded helper.", null, null);
-        } else if (devMode) {
-            check = warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Dev mode cannot use privileged file operations.", "Local operations may work, but backups, restores, and cleanup for root-owned app data can fail: " + firstLine(result), "Run service setup", installCommand());
-        } else {
-            check = warn(SystemCapabilityCatalog.FILEOPS, "File operations", "Autark-OS cannot run bounded file operations yet.", firstLine(result), "Run service setup", installCommand());
-        }
-        cachedFileOpsCheck = new CachedSetupCheck(check, now);
-        return check;
-    }
-
     private SystemSetupModels.SystemSetupCheck tailscaleCheck() {
         TailscaleStatus status = tailscaleService.status();
         if (!status.installed()) {
@@ -182,30 +150,9 @@ public class SystemSetupService {
         return ok(SystemCapabilityCatalog.TAILSCALE, "Tailscale", "Tailscale is connected.", status.dnsName(), null, null);
     }
 
-    private SystemSetupModels.SystemSetupCheck tailscaleOperatorCheck(String runAsUser) {
-        if (devMode) {
-            return ok(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Dev mode is using mock Tailscale Serve access.", "No real Tailscale Serve command will be run.", null, null);
-        }
-        if (!tailscaleService.status().connected()) {
-            return neutral(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Waiting for Tailscale connection.", "Connect Tailscale first.", null, null);
-        }
-        String operator = tailscaleService.operatorUser();
-        if (runAsUser.equals(operator) || "root".equals(operator)) {
-            return ok(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Autark-OS can manage Tailscale Serve.", "Tailscale operator: " + operator, null, null);
-        }
-        String detail = operator == null || operator.isBlank()
-                ? "Tailscale has not assigned a Serve operator to the Autark-OS service user."
-                : "Tailscale Serve is currently assigned to " + operator + ".";
-        String command = "sudo tailscale set --operator=" + runAsUser;
-        if (!EXPECTED_USER.equals(runAsUser)) {
-            command = "sudo tailscale set --operator=" + EXPECTED_USER;
-        }
-        return warn(SystemCapabilityCatalog.TAILSCALE_OPERATOR, "Tailscale Serve permission", "Autark-OS cannot manage Tailscale Serve yet.", detail, "Grant Serve permission", command);
-    }
-
     private SystemSetupModels.SystemSetupCheck systemdCheck() {
-        if (devMode) {
-            return neutral(SystemCapabilityCatalog.SYSTEMD, "System service", "Dev mode is using a local backend process.", "Production should still run through autark-os.service.", null, null);
+        if (devMode || (environment != null && environment.acceptsProfiles(org.springframework.core.env.Profiles.of("local")))) {
+            return neutral(SystemCapabilityCatalog.SYSTEMD, "System service", "Running a local backend process.", "Installed appliances run through autark-os.service.", null, null);
         }
         CommandResult systemctl = run("systemctl", "is-active", "autark-os");
         if (systemctl.exitCode() == 127) {
@@ -239,7 +186,7 @@ public class SystemSetupService {
         return switch (status) {
             case "ready" -> "This host can manage apps, Docker, and private Tailscale links.";
             case "ready_with_notes" -> "Core setup is working, with a few environment-specific notes.";
-            default -> "Run the service-user setup so Autark-OS can manage Docker and private HTTPS links without manual fixes.";
+            default -> "Run service setup so Autark-OS can manage Docker and private HTTPS links without manual fixes.";
         };
     }
 
@@ -305,14 +252,6 @@ public class SystemSetupService {
             return "not available";
         }
         return firstLine(result);
-    }
-
-    private String fileOpsHelperCommand() {
-        String helper = System.getenv("AUTARK_OS_FILEOPS_HELPER");
-        return helper == null || helper.isBlank() ? DEFAULT_FILEOPS_HELPER : helper;
-    }
-
-    private record CachedSetupCheck(SystemSetupModels.SystemSetupCheck check, Instant checkedAt) {
     }
 
     private SystemSetupModels.SystemSetupExistingInstallReport existingInstallReport(AutarkOsIdentity identity) {

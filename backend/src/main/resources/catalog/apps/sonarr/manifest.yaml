@@ -145,8 +145,6 @@ runtime:
     - /var/lib/autark-os/apps/sonarr/tv:/tv
     - /var/lib/autark-os/apps/sonarr/downloads:/downloads
   environment:
-    - PUID=1000
-    - PGID=1000
     - TZ=UTC
   labels:
     - autark-os.managed=true

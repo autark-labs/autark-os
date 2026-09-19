@@ -18,7 +18,6 @@ fake_bin="${tmp_dir}/fake-bin"
 mkdir -p "${install_dir}/backend" "${install_dir}/bin" "${runtime_dir}/config" "${config_dir}" "${log_dir}" "${bundle_dir}/backend" "${bundle_dir}/runtime/bin" "${bundle_dir}/scripts" "${fake_bin}"
 printf 'old backend jar\n' >"${current_jar}"
 printf 'old autark-os helper\n' >"${install_dir}/bin/autark-os"
-printf 'old fileops helper\n' >"${install_dir}/bin/autark-os-fileops"
 printf 'old bootstrap\n' >"${install_dir}/bin/bootstrap-autark-os.sh"
 printf 'local-update-secret\n' >"${runtime_dir}/config/admin-local-secret"
 cat >"${fake_bin}/systemctl" <<'SH'
@@ -47,7 +46,6 @@ ENV
 
 printf 'new backend jar\n' >"${bundle_dir}/backend/autark-os-backend.jar"
 printf 'new autark-os helper\n' >"${bundle_dir}/scripts/autark-os"
-printf 'new fileops helper\n' >"${bundle_dir}/scripts/autark-os-fileops"
 printf 'new bootstrap\n' >"${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cp "${repo_root}/scripts/install-autark-os-service.sh" "${bundle_dir}/scripts/install-autark-os-service.sh"
 cp "$(command -v java)" "${bundle_dir}/runtime/bin/java"
@@ -67,7 +65,7 @@ cat >"${bundle_dir}/autark-os-release.json" <<JSON
   "bundleUrl": "file://${bundle_dir}"
 }
 JSON
-(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json > SHA256SUMS)
+(cd "${bundle_dir}" && sha256sum backend/autark-os-backend.jar runtime/bin/java scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh autark-os-release.json > SHA256SUMS)
 
 check_json="$(AUTARK_OS_CONFIG_FILE="${config_file}" "${repo_root}/scripts/autark-os" update --check --metadata-url "file://${bundle_dir}/autark-os-release.json" --json)"
 AUTARK_OS_UPDATE_JSON="${check_json}" BUNDLE_DIR="${bundle_dir}" python3 - <<'PY'
@@ -99,7 +97,6 @@ grep -q 'service restart and managed-app verification were skipped' /tmp/autark-
 
 grep -q 'new backend jar' "${current_jar}"
 grep -q 'new autark-os helper' "${install_dir}/bin/autark-os"
-grep -q 'new fileops helper' "${install_dir}/bin/autark-os-fileops"
 grep -q 'new bootstrap' "${install_dir}/bin/bootstrap-autark-os.sh"
 [[ -x "${cli_link}" ]]
 grep -q 'AUTARK_OS_VERSION=1.1.0' "${config_file}"

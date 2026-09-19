@@ -70,70 +70,6 @@ class TailscaleServiceTests {
     }
 
     @Test
-    void serveHttpsSetsOperatorWhenTailscaleDeniesServeConfig() {
-        List<List<String>> commands = new ArrayList<>();
-        int[] serveAttempts = { 0 };
-        TailscaleService service = new TailscaleService(command -> {
-            commands.add(Arrays.asList(command));
-            String joined = String.join(" ", command);
-            if (joined.equals("tailscale status --json")) {
-                return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
-            }
-            if (joined.equals("tailscale serve --bg --https=5984 http://127.0.0.1:5984")) {
-                serveAttempts[0]++;
-                if (serveAttempts[0] == 1) {
-                    return new TailscaleService.CommandResult(1, List.of(
-                            "changing settings via 'tailscale serve' requires operator permissions",
-                            "Use 'sudo tailscale serve --bg --https=5984 http://127.0.0.1:5984'.",
-                            "To not require root, use 'sudo tailscale set --operator=$USER' once."), false);
-                }
-                return new TailscaleService.CommandResult(0, List.of("available at https://autark-os.tail123.ts.net:5984"), false);
-            }
-            if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator")) {
-                return new TailscaleService.CommandResult(0, List.of("operator set"), false);
-            }
-            if (joined.equals("tailscale serve status --json")) {
-                return new TailscaleService.CommandResult(0, List.of(nodeServeStatusJson(5984, 5984)), false);
-            }
-            if (joined.equals("tailscale serve get-config --all")) {
-                return new TailscaleService.CommandResult(0, List.of("{\"version\":\"0.0.1\"}"), false);
-            }
-            return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
-        }, "autarkos");
-
-        TailscaleServeResult result = service.serveHttps(5984);
-
-        assertThat(result.configured()).isTrue();
-        assertThat(result.privateUrl()).isEqualTo("https://autark-os.tail123.ts.net:5984");
-        assertThat(commands)
-                .anySatisfy(command -> assertThat(String.join(" ", command))
-                        .isEqualTo("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator"));
-    }
-
-    @Test
-    void serveHttpsReturnsOneTimeOperatorFixWhenElevationIsUnavailable() {
-        TailscaleService service = new TailscaleService(command -> {
-            String joined = String.join(" ", command);
-            if (joined.equals("tailscale status --json")) {
-                return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
-            }
-            if (joined.equals("tailscale serve --bg --https=5984 http://127.0.0.1:5984")) {
-                return new TailscaleService.CommandResult(1, List.of("Access denied: serve config denied. To not require root, use 'sudo tailscale set --operator=$USER' once."), false);
-            }
-            if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator")) {
-                return new TailscaleService.CommandResult(1, List.of("sudo: a password is required"), false);
-            }
-            return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
-        }, "autarkos");
-
-        TailscaleServeResult result = service.serveHttps(5984);
-
-        assertThat(result.configured()).isFalse();
-        assertThat(result.message()).contains("cannot manage Serve yet");
-        assertThat(result.privateUrl()).isNull();
-    }
-
-    @Test
     void serveConfigParsesGetConfigEndpoints() {
         TailscaleService service = new TailscaleService(command -> {
             String joined = String.join(" ", command);
@@ -282,45 +218,6 @@ class TailscaleServiceTests {
         assertThat(result.message()).contains("removed");
         assertThat(commands)
                 .anySatisfy(command -> assertThat(String.join(" ", command)).isEqualTo("tailscale serve --https=5984 off"));
-    }
-
-    @Test
-    void disableHttpsConfiguresOperatorThenRetriesWithoutRunningArbitraryServeAsRoot() {
-        int[] removeAttempts = { 0 };
-        boolean[] removed = { false };
-        List<String> commands = new ArrayList<>();
-        TailscaleService service = new TailscaleService(command -> {
-            String joined = String.join(" ", command);
-            commands.add(joined);
-            if (joined.equals("tailscale status --json")) {
-                return new TailscaleService.CommandResult(0, List.of(connectedStatusJson()), false);
-            }
-            if (joined.equals("tailscale serve status --json")) {
-                return new TailscaleService.CommandResult(0, List.of(removed[0] ? "{}" : nodeServeStatusJson(5984, 5984)), false);
-            }
-            if (joined.equals("tailscale serve get-config --all")) {
-                return new TailscaleService.CommandResult(0, List.of("{}"), false);
-            }
-            if (joined.equals("tailscale serve --https=5984 off")) {
-                removeAttempts[0]++;
-                if (removeAttempts[0] == 1) {
-                    return new TailscaleService.CommandResult(1, List.of("Access denied: serve config denied. Use sudo tailscale serve."), false);
-                }
-                removed[0] = true;
-                return new TailscaleService.CommandResult(0, List.of("removed"), false);
-            }
-            if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator")) {
-                return new TailscaleService.CommandResult(0, List.of("operator configured"), false);
-            }
-            return new TailscaleService.CommandResult(1, List.of("unexpected command " + joined), false);
-        }, "autarkos");
-
-        TailscaleServeResult result = service.disableHttps(5984);
-
-        assertThat(result.configured()).isTrue();
-        assertThat(result.message()).contains("removed");
-        assertThat(commands).contains("sudo -n /opt/autark-os/bin/autark-os-fileops configure-tailscale-operator");
-        assertThat(commands).noneMatch(command -> command.startsWith("sudo -n tailscale serve"));
     }
 
     @Test

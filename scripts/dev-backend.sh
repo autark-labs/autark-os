@@ -8,7 +8,6 @@ SERVICE_NAMES=("${SERVICE_NAME}")
 if [[ -z "${AUTARK_OS_SERVICE_NAME:-}" && "${SERVICE_NAME}" != "project-os" ]]; then
   SERVICE_NAMES+=("project-os")
 fi
-FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-/opt/autark-os/bin/autark-os-fileops}"
 AUTO_PORT=0
 STOP_SERVICE=0
 STATUS_ONLY=0
@@ -25,10 +24,10 @@ Options:
   -h, --help        Show this help.
 
 Environment:
+  AUTARK_OS_RUNTIME_ROOT      Absolute runtime directory (default: .autark-os-dev/runtime).
   AUTARK_OS_BACKEND_PORT      Default backend port for dev mode. Defaults to 8082.
   AUTARK_OS_SERVICE_NAME      Production systemd service name. Defaults to autark-os;
                               the legacy project-os service is also checked by default.
-  AUTARK_OS_FILEOPS_HELPER    Bounded privileged file helper. Defaults to /opt/autark-os/bin/autark-os-fileops.
 
 Examples:
   ./scripts/dev-backend.sh
@@ -132,11 +131,7 @@ show_status() {
   else
     log "systemd: unavailable"
   fi
-  if sudo -n "${FILEOPS_HELPER}" --help >/dev/null 2>&1; then
-    log "Privileged file operations: available via ${FILEOPS_HELPER}"
-  else
-    log "Privileged file operations: unavailable for $(id -un); root-owned app backups/restores may fail in dev mode"
-  fi
+  log "Runtime: root Java process; builds remain owned by your login user."
 }
 
 stop_service_if_requested() {
@@ -178,10 +173,6 @@ fi
 
 stop_service_if_requested
 
-if ! sudo -n "${FILEOPS_HELPER}" --help >/dev/null 2>&1; then
-  log "Warning: $(id -un) cannot run ${FILEOPS_HELPER} without a sudo prompt."
-  log "Backups/restores for root-owned app data require the installed ${SERVICE_NAME}.service or repaired fileops sudo setup."
-fi
 
 if port_busy "${PORT}"; then
   if [[ "${AUTO_PORT}" -eq 1 ]]; then
@@ -194,10 +185,15 @@ if port_busy "${PORT}"; then
   fi
 fi
 
-log "Starting backend with SPRING_PROFILES_ACTIVE=dev on port ${PORT}."
-log "Frontend proxy for this backend: AUTARK_OS_BACKEND_URL=http://localhost:${PORT} yarn dev"
-
-export SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-dev}"
-export SERVER_PORT="${PORT}"
-
-exec "${ROOT_DIR}/backend/gradlew" -p "${ROOT_DIR}/backend" bootRun
+[[ "$(id -u)" -ne 0 ]] || die "Run this launcher as your normal user. It elevates Java after building."
+JAVA_BIN="$(command -v java)"
+RUNTIME_DIR="${AUTARK_OS_RUNTIME_ROOT:-${ROOT_DIR}/.autark-os-dev/runtime}"
+[[ "${RUNTIME_DIR}" = /* && "${RUNTIME_DIR}" != / && "${RUNTIME_DIR}" != "${ROOT_DIR}" ]] || die "Choose an absolute, dedicated runtime directory."
+log "Building as $(id -un)."
+"${ROOT_DIR}/backend/gradlew" -p "${ROOT_DIR}/backend" bootJar
+BACKEND_JAR="${ROOT_DIR}/backend/build/libs/autark-os-backend-${AUTARK_OS_BUILD_VERSION:-0.0.1-SNAPSHOT}.jar"
+[[ -f "${BACKEND_JAR}" ]] || die "Backend build did not produce ${BACKEND_JAR}."
+log "Starting root backend on 127.0.0.1:${PORT}; runtime: ${RUNTIME_DIR}"
+log "Frontend: AUTARK_OS_BACKEND_URL=http://127.0.0.1:${PORT} yarn dev"
+log "First-run claim code: sudo cat ${RUNTIME_DIR}/config/admin-setup-code"
+exec sudo env AUTARK_OS_RUNTIME_ROOT="${RUNTIME_DIR}" "${JAVA_BIN}" -jar "${BACKEND_JAR}" --spring.profiles.active=local --autark-os.dev-mode=false --server.address=127.0.0.1 --server.port="${PORT}"

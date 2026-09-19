@@ -218,9 +218,9 @@ request_administrator_privileges() {
   )
   local name
   for name in \
-    AUTARK_OS_USER AUTARK_OS_GROUP AUTARK_OS_JAVA_BIN AUTARK_OS_RUNTIME_IMAGE \
+    AUTARK_OS_JAVA_BIN AUTARK_OS_RUNTIME_IMAGE \
     AUTARK_OS_SERVICE_NAME AUTARK_OS_SERVICE_FILE AUTARK_OS_CLI_LINK \
-    AUTARK_OS_FILEOPS_HELPER AUTARK_OS_SUDOERS_FILE AUTARK_OS_ALLOW_INSTALL_COLLISION \
+    AUTARK_OS_ALLOW_INSTALL_COLLISION \
     HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy; do
     [[ -z "${!name:-}" ]] || admin_env+=("${name}=${!name}")
   done
@@ -1580,7 +1580,7 @@ preflight() {
     local docker_output=""
     if ! docker_output="$(docker version 2>&1 >/dev/null)"; then
       if grep -qiE 'permission denied|denied while trying to connect|Got permission denied' <<<"${docker_output}"; then
-        log "Docker is installed, but this shell cannot access the Docker socket yet. Autark-OS will use service-user docker-group access after install."
+        log "Docker is installed, but this shell cannot access the Docker socket yet. The installed appliance runs as root."
       else
         log "Docker is installed, but the daemon is not reachable yet. Discover installs need Docker running."
       fi
@@ -1645,7 +1645,7 @@ build_project() {
 }
 
 install_service() {
-  local args=(--skip-tailscale)
+  local args=()
   local env_args=()
   local passthrough_name
   if [[ "${NO_START}" -eq 1 ]]; then
@@ -1657,9 +1657,9 @@ install_service() {
   [[ -n "${LOG_DIR_OVERRIDE}" ]] && args+=(--log-dir "${LOG_DIR_OVERRIDE}") && env_args+=("AUTARK_OS_LOG_DIR=${LOG_DIR_OVERRIDE}")
   [[ -n "${SERVER_PORT_OVERRIDE}" ]] && args+=(--port "${SERVER_PORT_OVERRIDE}") && env_args+=("AUTARK_OS_SERVER_PORT=${SERVER_PORT_OVERRIDE}")
   for passthrough_name in \
-    AUTARK_OS_USER AUTARK_OS_GROUP AUTARK_OS_SERVICE_NAME AUTARK_OS_SERVICE_FILE \
+    AUTARK_OS_SERVICE_NAME AUTARK_OS_SERVICE_FILE \
     AUTARK_OS_CLI_LINK AUTARK_OS_JAVA_BIN AUTARK_OS_RUNTIME_IMAGE \
-    AUTARK_OS_FILEOPS_HELPER AUTARK_OS_SUDOERS_FILE AUTARK_OS_ALLOW_INSTALL_COLLISION \
+    AUTARK_OS_ALLOW_INSTALL_COLLISION \
     AUTARK_OS_UPDATE_CHANNEL AUTARK_OS_INSTALL_METHOD AUTARK_OS_UPDATE_REPOSITORY \
     AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED; do
     if [[ -n "${!passthrough_name:-}" ]]; then
@@ -1698,18 +1698,6 @@ install_service() {
   fi
 }
 
-verify_service_user_docker_access() {
-  [[ "${DRY_RUN}" -eq 0 ]] || return 0
-  local service_user="${AUTARK_OS_USER:-autarkos}"
-  has_command docker || die "Docker disappeared after service installation. Reinstall Docker, then rerun this installer."
-  id "${service_user}" >/dev/null 2>&1 || die "The Autark-OS service user was not created. Rerun the installer and review the service-install stage."
-  if has_command runuser; then
-    runuser -u "${service_user}" -- docker info >/dev/null 2>&1 || die "Docker is running, but the Autark-OS service user cannot access it. Check the docker group and socket permissions, then retry."
-  else
-    su -s /bin/sh "${service_user}" -c 'docker info >/dev/null 2>&1' || die "Docker is running, but the Autark-OS service user cannot access it. Check the docker group and socket permissions, then retry."
-  fi
-  log "Verified Docker access for the ${service_user} service user."
-}
 
 print_next_steps() {
   local port="${SERVER_PORT_OVERRIDE:-8082}"
@@ -1876,7 +1864,6 @@ main() {
 
   begin_install_stage "service-install"
   install_service
-  verify_service_user_docker_access
   complete_install_stage "service-install"
   begin_install_stage "service-health"
   verify_service_health

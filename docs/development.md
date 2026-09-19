@@ -26,7 +26,13 @@ cd ..
 ./scripts/dev-backend.sh --auto-port
 ```
 
-The backend starts with the `dev` Spring profile and chooses an available port
+The launcher builds the runnable JAR as your login user, then asks sudo to run
+only Java as root, bound to loopback. It uses the `local` profile, real Docker
+and Tailscale, and normal administrator authentication. Runtime data lives in
+`.autark-os-dev/runtime` (override with an absolute `AUTARK_OS_RUNTIME_ROOT`).
+Do not run Gradle or VSCode as root. Ctrl+C stops the backend; rerun the launcher
+after backend changes. Use this launcher instead of `./gradlew bootRun` / `bR`;
+the application now rejects an unprivileged startup. It chooses an available port
 when requested. In a second terminal, point Vite at the port printed by the
 backend script:
 
@@ -44,8 +50,25 @@ The stop option recognizes both `autark-os.service` and the legacy
 ./scripts/dev-backend.sh --stop-service
 ```
 
-The development profile enables its development-only authentication mode. It
-must never be used as production configuration.
+Claim the fresh installation through the normal browser flow. Read the setup code
+in another terminal (do not paste it into logs or support reports):
+
+```bash
+sudo cat .autark-os-dev/runtime/config/admin-setup-code
+```
+
+For a local lifecycle smoke test: install FreshRSS and Syncthing, open them,
+pause/resume, create a restore point, restore it, then uninstall. Confirm each job
+completes and containers are gone; uninstall deliberately preserves app data.
+Use Storage cleanup to review and delete the leftover data. Test private
+links only with a connected real Tailscale client. Keep existing unrelated Docker
+projects untouched. Installer/systemd and Pi qualification are separate checks.
+
+For a deterministic manual backup test, turn off automatic backups in Settings
+before installing the test apps, then enable backups in each install plan. This
+allows explicit backup/restore without a routine cold backup stopping the app
+during a lifecycle action. An operation-in-progress refusal is not a permissions
+failure: wait for the active backup to finish before retrying.
 
 ## Validate A Change
 
@@ -79,7 +102,7 @@ git diff --check
   page.
 - Model install, recovery, cleanup, backup, restore, and update work as durable
   jobs when it can outlive an HTTP request.
-- Keep Docker, filesystem, Tailscale, and privileged helper details behind
+- Keep Docker, filesystem, and Tailscale details behind
   backend boundaries. User-facing UI should state the next safe action.
 - Add a regression test when a state can disagree across surfaces or after a
   failed operation.

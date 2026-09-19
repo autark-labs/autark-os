@@ -15,15 +15,12 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.autarkos.fileops.AutarkOsFileOpsService;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.ProjectSettingsRepository;
 
 /**
  * The single authority for where Autark-OS can create and read backup archives.
- * Paths in the database are useful product state, but the root helper maintains
- * its own approved-root record before it accepts privileged archive work.
  */
 @Service
 public class BackupDestinationService {
@@ -42,22 +39,19 @@ public class BackupDestinationService {
 
     private final RuntimeLayout runtimeLayout;
     private final ProjectSettingsRepository settingsRepository;
-    private final DestinationConfigurator destinationConfigurator;
     private final DestinationInspector inspector;
 
     @Autowired
-    public BackupDestinationService(RuntimeLayout runtimeLayout, ProjectSettingsRepository settingsRepository, AutarkOsFileOpsService fileOpsService) {
-        this(runtimeLayout, settingsRepository, fileOpsService::configureBackupDestination, new NioDestinationInspector());
+    public BackupDestinationService(RuntimeLayout runtimeLayout, ProjectSettingsRepository settingsRepository) {
+        this(runtimeLayout, settingsRepository, new NioDestinationInspector());
     }
 
     BackupDestinationService(
             RuntimeLayout runtimeLayout,
             ProjectSettingsRepository settingsRepository,
-            DestinationConfigurator destinationConfigurator,
             DestinationInspector inspector) {
         this.runtimeLayout = runtimeLayout;
         this.settingsRepository = settingsRepository;
-        this.destinationConfigurator = destinationConfigurator;
         this.inspector = inspector;
     }
 
@@ -79,7 +73,7 @@ public class BackupDestinationService {
         return inspectExternal(requested, null, false);
     }
 
-    /** Validates, probes, root-authorizes, then persists the new destination. */
+    /** Validates, probes, then persists the new destination. */
     public synchronized BackupModels.BackupDestination configure(String requestedPath) {
         Path requested = parseRequestedPath(requestedPath);
         Path internal = internalRoot();
@@ -92,18 +86,8 @@ public class BackupDestinationService {
 
         Map<String, String> previousValues = settingsRepository.readAll();
         Path previousPath = configuredRoot(previousValues);
-        try {
-            if (!samePath(previousPath, Path.of(candidate.configuredPath())) || !"internal".equals(candidate.kind())) {
-                destinationConfigurator.configure(candidate, approvedHistory(previousValues));
-            }
-            Map<String, String> updates = destinationValues(candidate, previousPath, internal, previousValues);
-            settingsRepository.saveValues(updates);
-            return candidate;
-        } catch (IOException exception) {
-            throw new InstallationException("Autark-OS could not authorize this backup destination. " + concise(exception), exception);
-        } catch (RuntimeException exception) {
-            throw exception;
-        }
+        settingsRepository.saveValues(destinationValues(candidate, previousPath, internal, previousValues));
+        return candidate;
     }
 
     public Path activeRoot() {
@@ -197,7 +181,7 @@ public class BackupDestinationService {
             Inspection inspection = inspector.inspect(requested);
             if (!inspection.writable()) {
                 return destination("external", "read_only", requested, inspection, false,
-                        "The mounted backup drive is read-only for the Autark-OS service user.", "Fix drive permissions");
+                        "The mounted backup drive is read-only for Autark-OS.", "Fix drive permissions");
             }
             if (inspection.usableBytes() < MINIMUM_USABLE_SPACE_BYTES) {
                 return destination("external", "insufficient_space", requested, inspection, false,
@@ -364,11 +348,6 @@ public class BackupDestinationService {
     private String concise(Exception exception) {
         String message = exception.getMessage();
         return message == null || message.isBlank() ? "No detailed filesystem error was returned." : message;
-    }
-
-    @FunctionalInterface
-    interface DestinationConfigurator {
-        void configure(BackupModels.BackupDestination destination, List<Path> history) throws IOException;
     }
 
     interface DestinationInspector {

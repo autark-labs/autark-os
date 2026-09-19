@@ -105,7 +105,7 @@ function SettingsPage({
   const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false);
 
   const requiredChecks = useMemo(
-    () => state.setup?.checks?.filter((check) => ['service-user', 'runtime-root', 'docker', 'fileops', 'tailscale', 'tailscale-operator'].includes(check.id)) ?? [],
+    () => state.setup?.checks?.filter((check) => ['runtime-privileges', 'runtime-root', 'docker', 'tailscale'].includes(check.id)) ?? [],
     [state.setup],
   );
   const advancedChecks = useMemo(

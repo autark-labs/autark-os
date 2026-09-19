@@ -141,8 +141,6 @@ runtime:
   volumes:
     - /var/lib/autark-os/apps/prowlarr/config:/config
   environment:
-    - PUID=1000
-    - PGID=1000
     - TZ=UTC
   labels:
     - autark-os.managed=true

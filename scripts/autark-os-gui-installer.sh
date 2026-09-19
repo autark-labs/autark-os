@@ -390,7 +390,7 @@ contract = {
                 "willInstallOrConfigure": [
                     "Docker engine when it is missing on supported hosts",
                     "Docker Compose v2 when it is missing",
-                    "Docker group access for the Autark-OS service user",
+                    "Root appliance access to Docker",
                 ],
             },
             {
@@ -454,7 +454,7 @@ contract = {
             stage("download-release", 1, "Download release", "release-download", "Getting the selected Autark-OS release."),
             stage("verify-release", 2, "Verify release", "release-verify", "Checking release files before anything is installed."),
             stage("prepare-dependencies", 3, "Prepare dependencies", "dependency-install", "Preparing the local app runtime. Private access stays optional for later."),
-            stage("create-service-user", 4, "Create service user", "service-install", "Creating the Autark-OS background service account when needed."),
+            stage("install-runtime", 4, "Install appliance runtime", "service-install", "Installing the root-run Autark-OS backend."),
             stage("install-autark-os", 5, "Install Autark-OS", "service-install", "Installing Autark-OS files and helper commands."),
             stage("start-autark-os", 6, "Start Autark-OS", "service-install", "Starting the Autark-OS background service."),
             stage("check-readiness", 7, "Check readiness", "post-install-doctor", "Checking that Autark-OS is ready to open."),

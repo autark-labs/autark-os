@@ -71,21 +71,16 @@ before using a recovery action.
 
 Open **Access** and check the app's private-link state. **Verified** means Autark-OS found a live Tailscale Serve HTTPS endpoint that points to the app's expected local port. **Needs repair** means the private-link preference is saved, but Autark-OS will keep using the working local link until the live route is fixed.
 
-Choose **Repair private link** first. Autark-OS will grant its service user the limited Tailscale permission when possible, recreate the route, and verify it before offering the private URL again. Removing a link that is already absent is safe and is reported as complete.
+Choose **Repair private link** first. Autark-OS will recreate the route directly as root and verify it before offering the private URL again. Removing a link that is already absent is safe and is reported as complete.
 
 Test a private link from another device that is signed into the same tailnet. If support asks for technical details, run:
 
 ```bash
 sudo tailscale status
 sudo tailscale serve status --json
-sudo -u autarkos tailscale serve status --json
 ```
 
-Both Serve status commands should show the same mapping. If the service user receives a permission error, run this recovery command once and then choose **Repair private link** again:
-
-```bash
-sudo tailscale set --operator=autarkos
-```
+The appliance backend runs as root; no service-user operator grant is needed.
 
 Local access can continue to work while Tailscale is signed out, disconnected, or waiting for repair.
 

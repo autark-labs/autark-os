@@ -140,4 +140,4 @@ Use these only when you need the technical details:
 
 - [Technical installation](./technical-installation.md): supported hosts, release artifacts, preflight checks, storage locations, and installed paths.
 - [Portable and offline installation](./offline-install.md): install copied release files without downloading during setup.
-- [Service and storage reference](./service-user-installation.md): system user, systemd service, Docker access, and Tailscale operator setup.
+- [Service and storage reference](./runtime-and-storage.md): root appliance runtime, systemd service, Docker access, and storage.

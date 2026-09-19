@@ -25,13 +25,8 @@ class ProcessHostDockerContainerDiscoveryTests {
                 return new CommandExecutionResult(
                         0,
                         List.of(
-                                "vaultwarden\tvaultwarden/server:latest\tUp\tapp=user\t443/tcp",
-                                "autark-pro-agent\tprivate@sha256:"
-                                        + "d".repeat(64)
-                                        + "\tUp\t"
-                                        + ProcessHostDockerContainerDiscovery
-                                                .PRO_MANAGED_LABEL
-                                        + "=true\t"),
+                                "{\"Names\":\"vaultwarden\",\"Image\":\"vaultwarden/server:latest\",\"Status\":\"Up\",\"Labels\":\"app=user\",\"Ports\":\"443/tcp\"}",
+                                "{\"Names\":\"autark-pro-agent\",\"Labels\":\"com.autarkos.pro.managed=true\"}"),
                         false);
             }
         };
@@ -77,7 +72,7 @@ class ProcessHostDockerContainerDiscoveryTests {
                 }
                 return new CommandExecutionResult(
                         0,
-                        List.of("vaultwarden\tvaultwarden/server:latest\tUp\tapp=user\t443/tcp"),
+                        List.of("{\"Names\":\"vaultwarden\",\"Image\":\"vaultwarden/server:latest\",\"Status\":\"Up\",\"Labels\":\"app=user\",\"Ports\":\"443/tcp\"}"),
                         false);
             }
         };
@@ -86,5 +81,27 @@ class ProcessHostDockerContainerDiscoveryTests {
 
         assertThat(inventory.successful()).isFalse();
         assertThat(inventory.diagnostic()).contains("container disappeared");
+    }
+
+    @Test
+    void multilineImageLabelsDoNotBecomeContainerNames() {
+        SystemCommandRunner runner = new SystemCommandRunner() {
+            @Override
+            public CommandExecutionResult run(String... command) {
+                if ("inspect".equals(command[1])) {
+                    assertThat(command).hasSize(5).endsWith("example");
+                    return new CommandExecutionResult(0, List.of("/example\t[]"), false);
+                }
+                assertThat(command).contains("{{json .}}");
+                return new CommandExecutionResult(0,
+                        List.of("{\"Names\":\"example\",\"Labels\":\"description=first line\\nsecond\\tline,app=test\"}"), false);
+            }
+        };
+        var inventory = new ProcessHostDockerContainerDiscovery(runner).observeContainers();
+        assertThat(inventory.successful()).isTrue();
+        assertThat(inventory.containers()).singleElement().satisfies(container -> {
+            assertThat(container.name()).isEqualTo("example");
+            assertThat(container.labels()).containsEntry("description", "first line\nsecond\tline");
+        });
     }
 }

@@ -14,7 +14,7 @@ server:
   port: 8082
 
 autark-os:
-  runtime-root: ../runtime/autark-os
+  runtime-root: /var/lib/autark-os
   guardian:
     enabled: true
     initial-delay-ms: 10000

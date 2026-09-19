@@ -13,7 +13,6 @@ bundle_dir="${tmp_dir}/bundle"
 fake_bin="${tmp_dir}/bin"
 service_file="${tmp_dir}/autark-os.service"
 cli_link="${tmp_dir}/autark-os"
-sudoers_file="${tmp_dir}/autark-os-fileops.sudoers"
 config_file="${config_dir}/autark-os.env"
 service_state="${tmp_dir}/service-state"
 service_enabled_state="${tmp_dir}/service-enabled-state"
@@ -37,7 +36,6 @@ printf 'local-update-secret\n' >"${runtime_dir}/config/admin-local-secret"
 printf 'stable installation identity\n' >"${runtime_dir}/config/identity.json"
 printf 'managed app data\n' >"${runtime_dir}/apps/vaultwarden/data/preserved.txt"
 printf 'old unit\n' >"${service_file}"
-printf 'old sudoers\n' >"${sudoers_file}"
 printf 'active\n' >"${service_state}"
 printf 'disabled\n' >"${service_enabled_state}"
 printf 'old backend\n' >"${health_expected}"
@@ -138,7 +136,6 @@ chmod +x "${fake_bin}"/*
 printf 'new backend\n' >"${bundle_dir}/backend/autark-os-backend.jar"
 printf 'new runtime\n' >"${bundle_dir}/runtime/bin/java"
 printf 'new cli\n' >"${bundle_dir}/scripts/autark-os"
-printf 'new fileops\n' >"${bundle_dir}/scripts/autark-os-fileops"
 printf 'new bootstrap\n' >"${bundle_dir}/scripts/bootstrap-autark-os.sh"
 cat >"${bundle_dir}/scripts/install-autark-os-service.sh" <<'SH'
 #!/usr/bin/env bash
@@ -154,7 +151,6 @@ cp -a "${AUTARK_OS_RUNTIME_IMAGE}" "${AUTARK_OS_INSTALL_DIR}/runtime"
 cp "$(dirname "${AUTARK_OS_BACKEND_JAR}")/../scripts/autark-os" "${AUTARK_OS_INSTALL_DIR}/bin/autark-os"
 chmod +x "${AUTARK_OS_INSTALL_DIR}/bin/autark-os"
 printf 'new unit\n' >"${AUTARK_OS_SERVICE_FILE}"
-printf 'new sudoers\n' >"${AUTARK_OS_SUDOERS_FILE}"
 SH
 chmod +x "${bundle_dir}/scripts/install-autark-os-service.sh"
 
@@ -175,7 +171,7 @@ cat >"${bundle_dir}/autark-os-release.json" <<JSON
 JSON
 (cd "${bundle_dir}" && sha256sum \
   backend/autark-os-backend.jar runtime/bin/java \
-  scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
+  scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
   autark-os-release.json >SHA256SUMS)
 
 rollback_output="${tmp_dir}/rollback.out"
@@ -190,7 +186,6 @@ if PATH="${fake_bin}:/usr/bin:/bin" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
   AUTARK_OS_CLI_LINK="${cli_link}" \
-  AUTARK_OS_SUDOERS_FILE="${sudoers_file}" \
   AUTARK_OS_UPDATE_HEALTH_TIMEOUT=1 \
   "${repo_root}/scripts/autark-os" update --release-bundle "${bundle_dir}" --yes >"${rollback_output}" 2>&1; then
   printf 'Expected the unhealthy update to fail after rolling back.\n' >&2
@@ -203,7 +198,6 @@ grep -q '^old database$' "${runtime_dir}/autark-os.db"
 grep -q '^stable installation identity$' "${runtime_dir}/config/identity.json"
 grep -q '^managed app data$' "${runtime_dir}/apps/vaultwarden/data/preserved.txt"
 grep -q '^old unit$' "${service_file}"
-grep -q '^old sudoers$' "${sudoers_file}"
 grep -q 'AUTARK_OS_VERSION=1.0.0' "${config_file}"
 grep -q '"status":"rolled_back"' "${runtime_dir}/updates/update-state.json"
 grep -q 'previous release and its managed apps were restored successfully' "${rollback_output}"
@@ -362,7 +356,6 @@ PATH="${fake_bin}:/usr/bin:/bin" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
   AUTARK_OS_CLI_LINK="${cli_link}" \
-  AUTARK_OS_SUDOERS_FILE="${sudoers_file}" \
   AUTARK_OS_UPDATE_HEALTH_TIMEOUT=1 \
   "${repo_root}/scripts/autark-os" update --release-bundle "${bundle_dir}" --yes >"${success_output}"
 
@@ -392,7 +385,7 @@ printf 'regressed backend\n' >"${health_expected}"
 printf 'regressed backend\n' >"${inventory_regressed_backend}"
 (cd "${bundle_dir}" && sha256sum \
   backend/autark-os-backend.jar runtime/bin/java \
-  scripts/autark-os scripts/autark-os-fileops scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
+  scripts/autark-os scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh \
   autark-os-release.json >SHA256SUMS)
 inventory_failure_output="${tmp_dir}/inventory-failure.out"
 if PATH="${fake_bin}:/usr/bin:/bin" \
@@ -406,7 +399,6 @@ if PATH="${fake_bin}:/usr/bin:/bin" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
   AUTARK_OS_CLI_LINK="${cli_link}" \
-  AUTARK_OS_SUDOERS_FILE="${sudoers_file}" \
   AUTARK_OS_UPDATE_HEALTH_TIMEOUT=1 \
   "${repo_root}/scripts/autark-os" update --release-bundle "${bundle_dir}" --yes --force >"${inventory_failure_output}" 2>&1; then
   printf 'Expected a managed-app inventory regression to fail and roll back.\n' >&2

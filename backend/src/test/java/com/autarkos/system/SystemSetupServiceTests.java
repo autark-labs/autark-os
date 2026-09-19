@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -23,7 +22,7 @@ class SystemSetupServiceTests {
     Path runtimeRoot;
 
     @Test
-    void reportsNeedsSetupWhenDockerAndServePermissionAreMissing() {
+    void reportsNeedsSetupWhenDockerAndTailscaleAreUnavailable() {
         SystemSetupService service = new SystemSetupService(
                 runtimeLayout(),
                 new FakeTailscaleService(TailscaleStatus.notConnected("Tailscale is waiting for sign in.")),
@@ -49,124 +48,6 @@ class SystemSetupServiceTests {
                 .anySatisfy(check -> {
                     assertThat(check.id()).isEqualTo("tailscale");
                     assertThat(check.status()).isEqualTo("warning");
-                });
-    }
-
-    @Test
-    void reportsServePermissionGrantCommandWhenOperatorIsMissing() {
-        SystemSetupService service = new SystemSetupService(
-                runtimeLayout(),
-                new FakeTailscaleService(new TailscaleStatus(true, true, "connected", "Connected", "autark-os", "autark-os.tail.ts.net.", List.of("100.64.0.1"), "tail.ts.net", "owner@example.com")),
-                command -> {
-                    String joined = String.join(" ", command);
-                    if (joined.startsWith("docker ")) {
-                        return new SystemSetupService.CommandResult(0, "27.0.0");
-                    }
-                    if (joined.equals("tailscale serve status --json")) {
-                        return new SystemSetupService.CommandResult(1, "Access denied: serve config denied");
-                    }
-                    if (joined.equals("systemctl is-active autark-os")) {
-                        return new SystemSetupService.CommandResult(3, "inactive");
-                    }
-                    return new SystemSetupService.CommandResult(0, "{}");
-                });
-
-        SystemSetupModels.SystemSetupStatus status = service.status();
-
-        assertThat(status.checks())
-                .filteredOn(check -> check.id().equals("tailscale-operator"))
-                .singleElement()
-                .satisfies(check -> {
-                    assertThat(check.status()).isEqualTo("warning");
-                    assertThat(check.actionCommand()).contains("sudo tailscale set --operator=");
-                });
-    }
-
-    @Test
-    void reportsFileOpsSetupCommandWhenHelperPermissionIsMissing() {
-        SystemSetupService service = new SystemSetupService(
-                runtimeLayout(),
-                new FakeTailscaleService(TailscaleStatus.notInstalled()),
-                command -> {
-                    String joined = String.join(" ", command);
-                    if (joined.startsWith("docker ")) {
-                        return new SystemSetupService.CommandResult(0, "27.0.0");
-                    }
-                    if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops --help")) {
-                        return new SystemSetupService.CommandResult(1, "sudo: a password is required");
-                    }
-                    if (joined.equals("systemctl is-active autark-os")) {
-                        return new SystemSetupService.CommandResult(3, "inactive");
-                    }
-                    return new SystemSetupService.CommandResult(0, "{}");
-                });
-
-        SystemSetupModels.SystemSetupStatus status = service.status();
-
-        assertThat(status.checks())
-                .filteredOn(check -> check.id().equals("fileops"))
-                .singleElement()
-                .satisfies(check -> {
-                    assertThat(check.status()).isEqualTo("warning");
-                    assertThat(check.message()).contains("file operations");
-                    assertThat(check.actionCommand()).contains("install-autark-os-service.sh");
-                });
-    }
-
-    @Test
-    void cachesPrivilegedHelperReadinessInsteadOfPollingSudoOnEveryStatusRefresh() {
-        AtomicInteger helperChecks = new AtomicInteger();
-        SystemSetupService service = new SystemSetupService(
-                runtimeLayout(),
-                new FakeTailscaleService(TailscaleStatus.notInstalled()),
-                command -> {
-                    String joined = String.join(" ", command);
-                    if (joined.equals("sudo -n /opt/autark-os/bin/autark-os-fileops --help")) {
-                        helperChecks.incrementAndGet();
-                    }
-                    if (joined.equals("systemctl is-active autark-os")) {
-                        return new SystemSetupService.CommandResult(3, "inactive");
-                    }
-                    return new SystemSetupService.CommandResult(0, "ready");
-                });
-
-        service.status();
-        service.status();
-
-        assertThat(helperChecks).hasValue(1);
-    }
-
-
-    @Test
-    void devModeReportsLocalProcessNotesAndPrivilegedFileOpsWarning() {
-        SystemSetupService service = new SystemSetupService(
-                runtimeLayout(),
-                new FakeTailscaleService(new TailscaleStatus(true, true, "dev", "Dev mode", "autark-os-dev", "autark-os-dev.tailnet.local", List.of("100.64.0.1"), "tail.ts.net", "owner@example.com")),
-                command -> new SystemSetupService.CommandResult(1, "not available"),
-                true);
-
-        SystemSetupModels.SystemSetupStatus status = service.status();
-
-        assertThat(status.checks())
-                .anySatisfy(check -> {
-                    assertThat(check.id()).isEqualTo("service-user");
-                    assertThat(check.status()).isEqualTo("neutral");
-                    assertThat(check.message()).contains("Dev mode");
-                })
-                .anySatisfy(check -> {
-                    assertThat(check.id()).isEqualTo("tailscale-operator");
-                    assertThat(check.status()).isEqualTo("ok");
-                    assertThat(check.message()).contains("mock Tailscale");
-                })
-                .anySatisfy(check -> {
-                    assertThat(check.id()).isEqualTo("fileops");
-                    assertThat(check.status()).isEqualTo("warning");
-                    assertThat(check.message()).contains("privileged file operations");
-                })
-                .anySatisfy(check -> {
-                    assertThat(check.id()).isEqualTo("systemd");
-                    assertThat(check.status()).isEqualTo("neutral");
-                    assertThat(check.message()).contains("local backend");
                 });
     }
 
@@ -217,6 +98,20 @@ class SystemSetupServiceTests {
         assertThat(status.existingInstall().summary()).contains("development");
     }
 
+    @Test
+    void localProfileDoesNotRequestSystemdSetup() {
+        var environment = new org.springframework.mock.env.MockEnvironment();
+        environment.setActiveProfiles("local");
+        var service = new SystemSetupService(runtimeLayout(), new FakeTailscaleService(TailscaleStatus.notInstalled()),
+                command -> new SystemSetupService.CommandResult(3, "inactive"), false, environment);
+
+        assertThat(service.status().checks()).anySatisfy(check -> {
+            assertThat(check.id()).isEqualTo("systemd");
+            assertThat(check.status()).isEqualTo("neutral");
+            assertThat(check.message()).isEqualTo("Running a local backend process.");
+        });
+    }
+
     private RuntimeLayout runtimeLayout() {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
@@ -253,9 +148,5 @@ class SystemSetupServiceTests {
             return status;
         }
 
-        @Override
-        public String operatorUser() {
-            return "";
-        }
     }
 }

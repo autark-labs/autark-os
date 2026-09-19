@@ -5,12 +5,10 @@ import java.util.List;
 
 public final class SystemCapabilityCatalog {
 
-    public static final String SERVICE_USER = "service-user";
+    public static final String RUNTIME_PRIVILEGES = "runtime-privileges";
     public static final String RUNTIME_ROOT = "runtime-root";
     public static final String DOCKER = "docker";
-    public static final String FILEOPS = "fileops";
     public static final String TAILSCALE = "tailscale";
-    public static final String TAILSCALE_OPERATOR = "tailscale-operator";
     public static final String SYSTEMD = "systemd";
     public static final String INTERNET = "internet";
     public static final String BACKUP_DESTINATION = "backup-destination";
@@ -20,8 +18,8 @@ public final class SystemCapabilityCatalog {
     public static final String NEUTRAL = "neutral";
 
     public static final List<String> CORE_CHECKS = List.of(RUNTIME_ROOT);
-    public static final List<String> APP_INSTALL_CHECKS = List.of(DOCKER, SERVICE_USER, FILEOPS);
-    public static final List<String> PRIVATE_ACCESS_CHECKS = List.of(TAILSCALE, TAILSCALE_OPERATOR);
+    public static final List<String> APP_INSTALL_CHECKS = List.of(DOCKER, RUNTIME_PRIVILEGES);
+    public static final List<String> PRIVATE_ACCESS_CHECKS = List.of(TAILSCALE);
     public static final List<String> STORAGE_CHECKS = List.of(BACKUP_DESTINATION);
     public static final List<String> WARNING_CHECKS = List.of(INTERNET, SYSTEMD);
 
@@ -30,9 +28,9 @@ public final class SystemCapabilityCatalog {
 
     public static String supportRoute(String id) {
         return switch (id) {
-            case TAILSCALE, TAILSCALE_OPERATOR -> "/network";
+            case TAILSCALE -> "/network";
             case BACKUP_DESTINATION -> "/backups";
-            case DOCKER, FILEOPS, SYSTEMD, SERVICE_USER, RUNTIME_ROOT -> "/settings";
+            case DOCKER, SYSTEMD, RUNTIME_PRIVILEGES, RUNTIME_ROOT -> "/settings";
             default -> "/settings";
         };
     }

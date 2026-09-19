@@ -32,7 +32,6 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=contract-build-sha "${re
 [[ -f "${bundle_dir}/SHA256SUMS" ]]
 [[ -x "${bundle_dir}/scripts/install-autark-os.sh" ]]
 [[ -x "${bundle_dir}/scripts/autark-os-gui-installer.sh" ]]
-[[ -x "${bundle_dir}/scripts/autark-os-fileops" ]]
 [[ ! -e "${bundle_dir}/scripts/autark-os-update-helper" ]]
 [[ -x "${bundle_dir}/runtime/bin/java" ]]
 [[ -x "${bundle_dir}/tools/cosign" ]]
@@ -85,7 +84,6 @@ grep -q 'autark-os-release.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'autark-os-provenance.json' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/install-autark-os.sh' "${bundle_dir}/SHA256SUMS"
 grep -q 'scripts/autark-os-gui-installer.sh' "${bundle_dir}/SHA256SUMS"
-grep -q 'scripts/autark-os-fileops' "${bundle_dir}/SHA256SUMS"
 ! grep -q 'scripts/autark-os-update-helper' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/GETTING_STARTED.md' "${bundle_dir}/SHA256SUMS"
 grep -q 'docs/RELEASE_NOTES.md' "${bundle_dir}/SHA256SUMS"
@@ -121,7 +119,6 @@ assert "runtime/bin/java" in release["artifacts"]
 assert "tools/cosign" in release["artifacts"]
 assert "tools/cosign-LICENSE" in release["artifacts"]
 assert "scripts/autark-os-gui-installer.sh" in release["artifacts"]
-assert "scripts/autark-os-fileops" in release["artifacts"]
 assert "scripts/autark-os-update-helper" not in release["artifacts"]
 assert "docs/GETTING_STARTED.md" in release["artifacts"]
 assert "docs/RELEASE_NOTES.md" in release["artifacts"]

@@ -123,10 +123,6 @@ parse_args() {
   done
 }
 
-smoke_user() {
-  printf '%s\n' "${SMOKE_NAME//-/_}" | cut -c1-28 | tr '_' '-'
-}
-
 prepare_bundle() {
   if [[ -n "${BUNDLE_DIR}" ]]; then
     [[ -d "${BUNDLE_DIR}" ]] || die "--bundle-dir must be a directory: ${BUNDLE_DIR}"
@@ -153,12 +149,6 @@ cleanup_smoke_install() {
       --remove-data \
       --confirm-delete-data DELETE-AUTARK-OS-DATA \
       --yes || true
-  if id "$(smoke_user)" >/dev/null 2>&1; then
-    sudo userdel "$(smoke_user)" >/dev/null 2>&1 || true
-  fi
-  if getent group "$(smoke_user)" >/dev/null 2>&1; then
-    sudo groupdel "$(smoke_user)" >/dev/null 2>&1 || true
-  fi
 }
 
 cleanup_on_exit() {
@@ -187,14 +177,12 @@ main() {
   local cli_link="/usr/local/bin/${SMOKE_NAME}"
   local state_dir="${WORK_DIR}/installer-state"
   local support_file="${WORK_DIR}/${SMOKE_NAME}-support.tar.gz"
-  local user_name
-  user_name="$(smoke_user)"
   ACTIVE_CONFIG_FILE="${config_file}"
   trap cleanup_on_exit EXIT
 
   log "Smoke mode: $([[ "${RUN_INSTALL}" -eq 1 ]] && printf run || printf dry-run)"
   log "Smoke service: ${SMOKE_NAME}.service"
-  log "Smoke user/group: ${user_name}"
+  log "Runtime user: root"
   log "Smoke port: ${PORT}"
   log "Smoke work dir: ${WORK_DIR}"
 
@@ -217,8 +205,6 @@ main() {
     INSTALL_ACTIVE=1
   fi
   AUTARK_OS_SERVICE_NAME="${SMOKE_NAME}" \
-  AUTARK_OS_USER="${user_name}" \
-  AUTARK_OS_GROUP="${user_name}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
   AUTARK_OS_CLI_LINK="${cli_link}" \
     "${REPO_ROOT}/scripts/bootstrap-autark-os.sh" "${install_args[@]}"

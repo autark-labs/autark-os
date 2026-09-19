@@ -152,7 +152,7 @@ docs/          Installation, operation, recovery, and technical-admin guides
 - [Technical installation](docs/technical-installation.md)
 - [Architecture](docs/architecture.md)
 - [Development](docs/development.md)
-- [Service and storage reference](docs/service-user-installation.md)
+- [Service and storage reference](docs/runtime-and-storage.md)
 - [Support policy](SUPPORT.md)
 - [Security reporting](SECURITY.md)
 - [License](LICENSE.md) and [commercial licensing](COMMERCIAL-LICENSE.md)

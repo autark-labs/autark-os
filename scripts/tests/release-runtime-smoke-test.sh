@@ -10,13 +10,18 @@ health_response="${tmp_dir}/health.json"
 version_response="${tmp_dir}/version.json"
 backend_pid=""
 port="${AUTARK_OS_RUNTIME_SMOKE_PORT:-19099}"
+root_command=()
+if [[ "$(id -u)" -ne 0 ]]; then
+  sudo -n true || { printf 'Runtime smoke requires sudo credentials; builds stay unprivileged.\n' >&2; exit 1; }
+  root_command=(sudo -n)
+fi
 
 cleanup() {
   if [[ -n "${backend_pid}" ]] && kill -0 "${backend_pid}" 2>/dev/null; then
-    kill "${backend_pid}" 2>/dev/null || true
+    "${root_command[@]}" kill "${backend_pid}" 2>/dev/null || true
     wait "${backend_pid}" 2>/dev/null || true
   fi
-  rm -rf "${tmp_dir}"
+  "${root_command[@]}" rm -rf "${tmp_dir}"
 }
 trap cleanup EXIT
 
@@ -47,11 +52,11 @@ AUTARK_OS_BACKEND_JAR="${real_jar}" AUTARK_OS_BUILD_SHA="${jar_sha}" "${repo_roo
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.crypto.ec@'
 "${bundle_dir}/runtime/bin/java" --list-modules | grep -q '^jdk.management@'
 
-AUTARK_OS_RUNTIME_ROOT="${tmp_dir}/runtime-data" \
+"${root_command[@]}" env AUTARK_OS_RUNTIME_ROOT="${tmp_dir}/runtime-data" \
 SERVER_PORT="${port}" \
 LOGGING_FILE_NAME="${application_log}" \
   "${bundle_dir}/runtime/bin/java" \
-  -jar "${bundle_dir}/backend/autark-os-backend.jar" >"${backend_log}" 2>&1 &
+  -jar "${bundle_dir}/backend/autark-os-backend.jar" --server.address=127.0.0.1 >"${backend_log}" 2>&1 &
 backend_pid=$!
 
 ready=0

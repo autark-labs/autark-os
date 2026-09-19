@@ -13,7 +13,6 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_PATH}")" && pwd)"
 SERVICE_FILE="${AUTARK_OS_SERVICE_FILE:-/etc/systemd/system/${SERVICE_NAME}.service}"
 CLI_LINK="${AUTARK_OS_CLI_LINK:-/usr/local/bin/autark-os}"
-SUDOERS_FILE="${AUTARK_OS_SUDOERS_FILE:-/etc/sudoers.d/autark-os-fileops}"
 UPDATE_REPOSITORY="${AUTARK_OS_UPDATE_REPOSITORY:-autark-labs/autark-os}"
 UPDATE_API_VERSION="${AUTARK_OS_GITHUB_API_VERSION:-2022-11-28}"
 UPDATE_HEALTH_TIMEOUT="${AUTARK_OS_UPDATE_HEALTH_TIMEOUT:-120}"
@@ -1078,7 +1077,7 @@ verify_release_bundle() {
   for required_file in \
     autark-os-release.json SHA256SUMS \
     backend/autark-os-backend.jar runtime/bin/java \
-    scripts/autark-os scripts/autark-os-fileops \
+    scripts/autark-os \
     scripts/bootstrap-autark-os.sh scripts/install-autark-os-service.sh; do
     [[ -r "${bundle_dir}/${required_file}" ]] || die "Release bundle is incomplete: ${bundle_dir}/${required_file}"
   done
@@ -1413,7 +1412,6 @@ create_update_snapshot() {
   [[ -d "${UPDATE_CONFIG_DIR}" ]] && cp -a "${UPDATE_CONFIG_DIR}" "${incomplete_dir}/config"
   [[ -f "${SERVICE_FILE}" ]] && cp -a "${SERVICE_FILE}" "${incomplete_dir}/service-file"
   [[ -e "${CLI_LINK}" || -L "${CLI_LINK}" ]] && cp -a "${CLI_LINK}" "${incomplete_dir}/cli-link"
-  [[ -f "${SUDOERS_FILE}" ]] && cp -a "${SUDOERS_FILE}" "${incomplete_dir}/sudoers-file"
   mkdir -p "${incomplete_dir}/database"
   local database_file
   for database_file in "${UPDATE_RUNTIME_DIR}"/autark-os.db "${UPDATE_RUNTIME_DIR}"/autark-os.db-shm "${UPDATE_RUNTIME_DIR}"/autark-os.db-wal; do
@@ -1469,11 +1467,6 @@ restore_update_snapshot() {
   fi
   rm -f "${CLI_LINK}"
   [[ -e "${snapshot_dir}/cli-link" || -L "${snapshot_dir}/cli-link" ]] && cp -a "${snapshot_dir}/cli-link" "${CLI_LINK}"
-  if [[ -f "${snapshot_dir}/sudoers-file" ]]; then
-    cp -a "${snapshot_dir}/sudoers-file" "${SUDOERS_FILE}"
-  else
-    rm -f "${SUDOERS_FILE}"
-  fi
   rm -f "${UPDATE_RUNTIME_DIR}/autark-os.db" "${UPDATE_RUNTIME_DIR}/autark-os.db-shm" "${UPDATE_RUNTIME_DIR}/autark-os.db-wal"
   if compgen -G "${snapshot_dir}/database/autark-os.db*" >/dev/null; then
     cp -a "${snapshot_dir}"/database/autark-os.db* "${UPDATE_RUNTIME_DIR}/"
@@ -1623,13 +1616,12 @@ install_release_bundle() {
     AUTARK_OS_SERVICE_NAME="${SERVICE_NAME}" \
     AUTARK_OS_SERVICE_FILE="${SERVICE_FILE}" \
     AUTARK_OS_CLI_LINK="${CLI_LINK}" \
-    AUTARK_OS_SUDOERS_FILE="${SUDOERS_FILE}" \
     AUTARK_OS_VERSION="${version}" \
     AUTARK_OS_BUILD_SHA="${build_sha}" \
     AUTARK_OS_BUILD_DATE="${build_date}" \
     AUTARK_OS_UPDATE_CHANNEL="${channel}" \
     AUTARK_OS_INSTALL_METHOD="${method}" \
-    "${setup_script}" --skip-tailscale --no-start || return 1
+    "${setup_script}" --no-start || return 1
   [[ "${skip_service_restart}" -eq 0 ]] || return 0
   if [[ "${service_was_enabled}" -eq 1 ]]; then
     systemctl enable "${SERVICE_NAME}.service" >/dev/null 2>&1 || true
@@ -1646,7 +1638,7 @@ install_release_bundle_files_only() {
   rm -rf "${UPDATE_INSTALL_DIR}/runtime"
   cp -a "${bundle_dir}/runtime" "${UPDATE_INSTALL_DIR}/runtime" || return 1
   local script_name
-  for script_name in autark-os autark-os-fileops bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh supported-host-matrix.env; do
+  for script_name in autark-os bootstrap-autark-os.sh install-autark-os-service.sh install-autark-os.sh autark-os-gui-installer.sh supported-host-matrix.env; do
     [[ -f "${bundle_dir}/scripts/${script_name}" ]] || continue
     cp "${bundle_dir}/scripts/${script_name}" "${UPDATE_INSTALL_DIR}/bin/${script_name}" || return 1
     if [[ "${script_name}" == "supported-host-matrix.env" ]]; then
@@ -2523,7 +2515,7 @@ UNINSTALL_USAGE
   [[ "${remove_config}" -eq 1 || "${remove_logs}" -eq 1 ]] && mode="remove-config-and-logs"
   [[ "${remove_data}" -eq 1 ]] && mode="remove-all-data"
 
-  local remove_paths=("${SERVICE_FILE}" "${CLI_LINK}" "${SUDOERS_FILE}" "${install_dir}")
+  local remove_paths=("${SERVICE_FILE}" "${CLI_LINK}" "${install_dir}")
   local preserve_paths=()
   if [[ "${remove_config}" -eq 1 ]]; then
     remove_paths+=("${config_dir}")
@@ -2666,17 +2658,6 @@ UNINSTALL_USAGE
   done
   if has_command systemctl; then
     systemctl daemon-reload
-  fi
-  if [[ "${remove_data}" -eq 1 ]]; then
-    if has_command tailscale; then
-      tailscale set --operator=root >/dev/null 2>&1 || log "Tailscale is preserved, but its operator setting could not be returned to root."
-    fi
-    if has_command userdel && id autarkos >/dev/null 2>&1; then
-      userdel autarkos >/dev/null 2>&1 || log "The autarkos service user is still in use and was preserved."
-    fi
-    if has_command groupdel && getent group autarkos >/dev/null 2>&1; then
-      groupdel autarkos >/dev/null 2>&1 || log "The autarkos service group is still in use and was preserved."
-    fi
   fi
 }
 

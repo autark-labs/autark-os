@@ -146,8 +146,6 @@ runtime:
     - /var/lib/autark-os/apps/qbittorrent/config:/config
     - /var/lib/autark-os/apps/qbittorrent/downloads:/downloads
   environment:
-    - PUID=1000
-    - PGID=1000
     - TZ=UTC
     - WEBUI_PORT=8080
   labels:

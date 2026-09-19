@@ -243,9 +243,7 @@ Trusted package source:
   - Existing container runtimes are never removed or replaced automatically.
 
 Services and permissions that may change:
-  - autarkos system user and group may be created.
-  - autark-os.service may be installed and enabled.
-  - The autarkos user may be added to the docker group.
+  - autark-os.service runs the appliance backend as root.
   - Tailscale is not installed, signed in, or reconfigured by the base installer.
   - Private access can be configured later from the Autark-OS Access page.
 

@@ -170,7 +170,6 @@ function SupportPage() {
     .filter((application) => application.evidence?.source === 'docker'), [evidencedApplications]);
   const repairResources = useMemo(() => managedApps.filter((app) => hasRepairDetail(app)), [managedApps]);
   const tailscaleCheck = state.setup?.checks?.find((check) => check.id === 'tailscale');
-  const operatorCheck = state.setup?.checks?.find((check) => check.id === 'tailscale-operator');
 
   if (loading || appState.isLoading) {
     return <DiagnosticsLoadingState />;
@@ -216,7 +215,6 @@ function SupportPage() {
           setActiveSection('logs');
           void viewLogs();
         }}
-        operatorCheck={operatorCheck?.message || 'Waiting for Tailscale status.'}
         ownershipResources={ownershipResources}
         redactionRules={redactionRules}
         refreshing={refreshing}
@@ -255,7 +253,6 @@ type DiagnosticsNotebookProps = {
   onRetry: () => void;
   onSectionChange: (section: DiagnosticsNotebookSection) => void;
   onViewLogs: () => void;
-  operatorCheck: string;
   ownershipResources: ApplicationView[];
   redactionRules: SupportRedactionRule[];
   refreshing: boolean;
@@ -290,7 +287,6 @@ function DiagnosticsNotebook({
   onRetry,
   onSectionChange,
   onViewLogs,
-  operatorCheck,
   ownershipResources,
   redactionRules,
   refreshing,
@@ -350,7 +346,6 @@ function DiagnosticsNotebook({
             <SystemDetailsWorkspace
               dockerResources={dockerResources}
               onOpenSettings={onOpenSettings}
-              operatorCheck={operatorCheck}
               ownershipResources={ownershipResources}
               repairResources={repairResources}
               setup={setup}
@@ -511,7 +506,7 @@ function RedactionRulesWorkspace({ rules }: { rules: SupportRedactionRule[] }) {
   );
 }
 
-function SystemDetailsWorkspace({ dockerResources, onOpenSettings, operatorCheck, ownershipResources, repairResources, setup, showAdvancedMetrics, summary, tailscaleCheck }: { dockerResources: ApplicationView[]; onOpenSettings: () => void; operatorCheck: string; ownershipResources: ApplicationView[]; repairResources: AppRuntimeView[]; setup: SystemSetupStatus | null; showAdvancedMetrics: boolean; summary: SupportSummary | null; tailscaleCheck: string }) {
+function SystemDetailsWorkspace({ dockerResources, onOpenSettings, ownershipResources, repairResources, setup, showAdvancedMetrics, summary, tailscaleCheck }: { dockerResources: ApplicationView[]; onOpenSettings: () => void; ownershipResources: ApplicationView[]; repairResources: AppRuntimeView[]; setup: SystemSetupStatus | null; showAdvancedMetrics: boolean; summary: SupportSummary | null; tailscaleCheck: string }) {
   return (
     <div className="grid min-h-full content-start gap-3">
       <WorkspaceHeading description="Technical context stays available without competing with everyday health checks." title="System details" />
@@ -522,8 +517,8 @@ function SystemDetailsWorkspace({ dockerResources, onOpenSettings, operatorCheck
       <AdvancedSection defaultOpen={false} icon={Server} title="App ownership details">{ownershipResources.length ? ownershipResources.map((application) => <ResourceLine application={application} key={application.id} />) : <p className="text-sm text-slate-400">No apps require ownership review.</p>}</AdvancedSection>
       <AdvancedSection defaultOpen={repairResources.length > 0} icon={ShieldCheck} title="App repair details">{repairResources.length ? repairResources.map((app) => <RepairLine app={app} key={app.appId} />) : <p className="text-sm text-slate-400">No app repair attempts or remediation states are currently visible.</p>}</AdvancedSection>
       <AdvancedSection defaultOpen={false} icon={FileText} title="Docker resources">{dockerResources.length ? dockerResources.map((application) => <ResourceLine application={application} key={application.id} technical />) : <p className="text-sm text-slate-400">No matching Docker evidence is present in the app inventory.</p>}</AdvancedSection>
-      <AdvancedSection defaultOpen={false} icon={LockKeyhole} title="Tailscale details"><div className="grid gap-3 md:grid-cols-2"><InfoLine label="Tailscale" value={tailscaleCheck} /><InfoLine label="Private access permission" value={operatorCheck} /><InfoLine label="Version" value={setup?.tailscaleVersion || 'Unknown'} /><InfoLine label="Instance" value={setup?.instanceSlug || 'Unknown'} /></div></AdvancedSection>
-      <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3"><SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." /><div className="mt-3 grid gap-2 sm:grid-cols-2"><RelatedLink onClick={onOpenSettings} title="Settings" detail="Host setup checks and service-user guidance." /><RelatedLink to="/apps" title="My Apps" detail="Review apps that need recovery or conflict resolution." /><RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />{showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}</div></section>
+      <AdvancedSection defaultOpen={false} icon={LockKeyhole} title="Tailscale details"><div className="grid gap-3 md:grid-cols-2"><InfoLine label="Tailscale" value={tailscaleCheck} /><InfoLine label="Version" value={setup?.tailscaleVersion || 'Unknown'} /><InfoLine label="Instance" value={setup?.instanceSlug || 'Unknown'} /></div></AdvancedSection>
+      <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3"><SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." /><div className="mt-3 grid gap-2 sm:grid-cols-2"><RelatedLink onClick={onOpenSettings} title="Settings" detail="Host setup checks and appliance runtime checks." /><RelatedLink to="/apps" title="My Apps" detail="Review apps that need recovery or conflict resolution." /><RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />{showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}</div></section>
     </div>
   );
 }

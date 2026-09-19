@@ -20,17 +20,12 @@ import java.util.zip.ZipOutputStream;
 import org.springframework.stereotype.Component;
 
 @Component
-public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
+public class LocalAutarkOsFileOperations {
 
-    public LocalAutarkOsFileOperations() {
-    }
-
-    @Override
     public long createPrefixedArchive(Map<String, Path> sources, Path destination) throws IOException {
         return zipStrict(sources, destination);
     }
 
-    @Override
     public void clearDirectoryContents(Path directory) throws IOException {
         if (!Files.exists(directory)) {
             return;
@@ -45,12 +40,10 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
         }
     }
 
-    @Override
     public void deleteBackup(Path backupPath) throws IOException {
         Files.deleteIfExists(backupPath);
     }
 
-    @Override
     public void restoreAppData(Path archive, String scope, String appId, Path destination) throws IOException {
         Path parent = destination.toAbsolutePath().normalize().getParent();
         if (parent == null) {
@@ -166,13 +159,15 @@ public class LocalAutarkOsFileOperations implements AutarkOsFileOperations {
     }
 
     private void applyFilesystemMetadata(Path path, ArchiveFilesystemMetadata.Entry entry) throws IOException {
-        Files.setPosixFilePermissions(path, ArchiveFilesystemMetadata.permissions(entry.mode()));
         long currentUid = ((Number) Files.getAttribute(path, "unix:uid")).longValue();
         long currentGid = ((Number) Files.getAttribute(path, "unix:gid")).longValue();
-        if (currentUid != entry.uid() || currentGid != entry.gid()) {
-            throw new java.nio.file.AccessDeniedException(path.toString(), null,
-                    "Restoring this app requires the bounded Autark-OS file helper to preserve ownership.");
+        if (currentUid != entry.uid()) {
+            Files.setAttribute(path, "unix:uid", (int) entry.uid());
         }
+        if (currentGid != entry.gid()) {
+            Files.setAttribute(path, "unix:gid", (int) entry.gid());
+        }
+        Files.setPosixFilePermissions(path, ArchiveFilesystemMetadata.permissions(entry.mode()));
     }
 
     private void move(Path source, Path destination) throws IOException {

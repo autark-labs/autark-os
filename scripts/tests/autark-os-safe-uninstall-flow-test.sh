@@ -36,7 +36,6 @@ assert plan["dockerResources"]["appCount"] == 1
 assert os.environ["SERVICE_FILE"] in plan["removePaths"]
 assert os.environ["CLI_LINK"] in plan["removePaths"]
 assert os.environ["INSTALL_DIR"] in plan["removePaths"]
-assert "/etc/sudoers.d/autark-os-fileops" in plan["removePaths"]
 assert os.environ["RUNTIME_DIR"] in plan["preservePaths"]
 assert os.environ["CONFIG_DIR"] in plan["preservePaths"]
 assert os.environ["LOG_DIR"] in plan["preservePaths"]
@@ -85,20 +84,15 @@ grep -q "Would preserve: ${runtime_dir}" <<<"${dry_run_output}"
 fake_bin="${tmp_dir}/fake-bin"
 api_calls="${tmp_dir}/api-calls"
 tailscale_calls="${tmp_dir}/tailscale-calls"
-sudoers_file="${tmp_dir}/autark-os-fileops.sudoers"
 mkdir -p "${fake_bin}"
 printf 'service unit\n' >"${service_file}"
 printf 'cli link\n' >"${cli_link}"
-printf 'sudoers rule\n' >"${sudoers_file}"
 
 cat >"${fake_bin}/id" <<'SH'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-u" ]]; then
   printf '0\n'
   exit 0
-fi
-if [[ "${1:-}" == "autarkos" ]]; then
-  exit 1
 fi
 exec /usr/bin/id "$@"
 SH
@@ -137,12 +131,11 @@ TEST_TAILSCALE_CALLS="${tailscale_calls}" \
 AUTARK_OS_CONFIG_FILE="${config_file}" \
 AUTARK_OS_SERVICE_FILE="${service_file}" \
 AUTARK_OS_CLI_LINK="${cli_link}" \
-AUTARK_OS_SUDOERS_FILE="${sudoers_file}" \
 AUTARK_OS_BASE_URL="http://127.0.0.1:18082" \
   "${repo_root}/scripts/autark-os" uninstall --yes --remove-data --confirm-delete-data DELETE-AUTARK-OS-DATA >/dev/null
 
 grep -q 'GET http://127.0.0.1:18082/api/apps' "${api_calls}"
 grep -q 'DELETE http://127.0.0.1:18082/api/apps/vaultwarden' "${api_calls}"
-grep -q '^set --operator=root$' "${tailscale_calls}"
+[[ ! -e "${tailscale_calls}" ]]
 [[ ! -e "${install_dir}" && ! -e "${runtime_dir}" && ! -e "${config_dir}" && ! -e "${log_dir}" ]]
-[[ ! -e "${service_file}" && ! -e "${cli_link}" && ! -e "${sudoers_file}" ]]
+[[ ! -e "${service_file}" && ! -e "${cli_link}" ]]

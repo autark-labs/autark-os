@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "autark-os")
 public class AutarkOsRuntimeProperties {
 
-    private String runtimeRoot = "../runtime/autark-os";
+    private String runtimeRoot = "/var/lib/autark-os";
 
     public String getRuntimeRoot() {
         return runtimeRoot;

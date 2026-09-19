@@ -25,7 +25,7 @@ The repository README is the public overview. These guides focus on installing, 
   and targeted validation.
 - [Technical installation](./technical-installation.md): release artifacts, supported hosts, preflight checks, runtime storage, and installed paths.
 - [Portable and offline installation](./offline-install.md): verify and install copied release artifacts without downloading during setup.
-- [Service and storage reference](./service-user-installation.md): the installed service, durable data paths, systemd, Docker access, and Tailscale operator setup.
+- [Service and storage reference](./runtime-and-storage.md): the installed service, durable data paths, systemd, Docker access, and direct Tailscale access.
 - [Autark Pro CE invariants](./pro/ce-invariants.md): release-blocking rules that keep Community Edition complete when Pro is absent or unhealthy.
 - [Autark Pro device identity](./pro/device-identity.md): local Ed25519 identity storage, permissions, and root-only recovery commands.
 - [Autark Pro repository inventory](./pro/repository-inventory.md): public/private ownership, current integration seams, and prototype boundaries.

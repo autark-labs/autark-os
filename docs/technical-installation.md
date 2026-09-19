@@ -104,7 +104,7 @@ The normal installation keeps application data separate from program files:
 | `/var/log/autark-os` | Service logs. |
 | `/etc/systemd/system/autark-os.service` | The systemd service unit. |
 
-For long-running installations, place the runtime directory on a stable SSD mount. Avoid desktop auto-mount paths that may disappear after a reboot. Review the proposed storage location during guided installation; see [Service and storage reference](./service-user-installation.md) for the service model.
+For long-running installations, place the runtime directory on a stable SSD mount. Avoid desktop auto-mount paths that may disappear after a reboot. Review the proposed storage location during guided installation; see [Service and storage reference](./runtime-and-storage.md) for the service model.
 
 ## Verify And Operate
 
@@ -132,4 +132,4 @@ autark-os repair --apply
 
 For Autark-OS updates, managed-app image updates and rollbacks, safe uninstall,
 and recovery guidance, see [Maintenance](./maintenance.md). For service or
-storage details, see [Service and storage reference](./service-user-installation.md).
+storage details, see [Service and storage reference](./runtime-and-storage.md).

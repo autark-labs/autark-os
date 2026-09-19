@@ -1,62 +1,30 @@
 package com.autarkos.fileops;
 
 import java.io.IOException;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.FileSystemException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.autarkos.marketplace.runtime.RuntimeLayout;
-import com.autarkos.backups.BackupModels;
-import com.autarkos.system.SystemCommandRunner;
 
 @Service
 public class AutarkOsFileOpsService {
 
-    private static final Duration COMMAND_TIMEOUT = Duration.ofMinutes(10);
-    private static final String DEFAULT_HELPER_COMMAND = "/opt/autark-os/bin/autark-os-fileops";
     private static final Pattern APP_ID_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
     private final RuntimeLayout runtimeLayout;
-    private final AutarkOsFileOperations localOperations;
-    private final CommandRunner commandRunner;
-    private final String helperCommand;
+    private final LocalAutarkOsFileOperations localOperations;
 
-    @Autowired
-    public AutarkOsFileOpsService(RuntimeLayout runtimeLayout, AutarkOsFileOperations localOperations) {
-        this(runtimeLayout, localOperations, new ProcessCommandRunner(new SystemCommandRunner()), defaultHelperCommand());
-    }
-
-    AutarkOsFileOpsService(RuntimeLayout runtimeLayout, AutarkOsFileOperations localOperations, CommandRunner commandRunner) {
-        this(runtimeLayout, localOperations, commandRunner, defaultHelperCommand());
-    }
-
-    AutarkOsFileOpsService(RuntimeLayout runtimeLayout, AutarkOsFileOperations localOperations, CommandRunner commandRunner, String helperCommand) {
+    public AutarkOsFileOpsService(RuntimeLayout runtimeLayout, LocalAutarkOsFileOperations localOperations) {
         this.runtimeLayout = runtimeLayout;
         this.localOperations = localOperations;
-        this.commandRunner = commandRunner;
-        this.helperCommand = helperCommand == null || helperCommand.isBlank() ? DEFAULT_HELPER_COMMAND : helperCommand;
     }
 
     public void clearAppRuntime(String appId) throws IOException {
-        Path appRoot = appRoot(appId);
-        try {
-            localOperations.clearDirectoryContents(appRoot);
-        } catch (IOException exception) {
-            if (!isPermissionFailure(exception)) {
-                throw exception;
-            }
-            runPrivileged("clear-runtime", "--app", appId);
-        }
+        localOperations.clearDirectoryContents(appRoot(appId));
     }
 
     public long createManagedArchive(
@@ -73,8 +41,7 @@ public class AutarkOsFileOpsService {
         protectedPaths.forEach((relative, source) -> sources.put(
                 requireManagedRelativePath(relative),
                 requireInsideAppRoot(source, root)));
-        List<String> entries = sources.keySet().stream().map(path -> appId + ":" + path).toList();
-        return writeArchive(sources, entries, destination, approvedBackupRoot);
+        return localOperations.createPrefixedArchive(sources, requireBackupPath(destination, approvedBackupRoot));
     }
 
     public long createManagedFullArchive(
@@ -85,7 +52,6 @@ public class AutarkOsFileOpsService {
             throw new IllegalArgumentException("At least one app is required for a full archive.");
         }
         Map<String, Path> sources = new LinkedHashMap<>();
-        List<String> specifications = new ArrayList<>();
         appPaths.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(appEntry -> {
             String appId = appEntry.getKey();
             Map<String, Path> paths = appEntry.getValue();
@@ -96,29 +62,9 @@ public class AutarkOsFileOpsService {
                 Path source = pathEntry.getValue();
                 String safeRelative = requireManagedRelativePath(relative);
                 sources.put(appId + "/" + safeRelative, requireInsideAppRoot(source, root));
-                specifications.add(appId + ":" + safeRelative);
             });
         });
-        return writeArchive(sources, specifications, destination, approvedBackupRoot);
-    }
-
-    private long writeArchive(
-            Map<String, Path> sources,
-            List<String> entries,
-            Path destination,
-            Path approvedBackupRoot) throws IOException {
-        Path backupPath = requireBackupPath(destination, approvedBackupRoot);
-        try {
-            return localOperations.createPrefixedArchive(sources, backupPath);
-        } catch (IOException exception) {
-            if (!isPermissionFailure(exception)) {
-                throw exception;
-            }
-            runPrivileged("create-managed-archive", approvedBackupRoot,
-                    "--entries", String.join(",", entries),
-                    "--destination", backupPath.toString());
-            return Files.isRegularFile(backupPath) ? Files.size(backupPath) : 0;
-        }
+        return localOperations.createPrefixedArchive(sources, requireBackupPath(destination, approvedBackupRoot));
     }
 
     public void restoreAppData(Path archive, String scope, String appId) throws IOException {
@@ -129,14 +75,7 @@ public class AutarkOsFileOpsService {
         Path backupPath = requireBackupPath(archive, approvedBackupRoot);
         Path appRoot = appRoot(appId);
         String restoreScope = scope == null || scope.isBlank() ? "app" : scope;
-        try {
-            localOperations.restoreAppData(backupPath, restoreScope, appId, appRoot);
-        } catch (IOException exception) {
-            if (!isPermissionFailure(exception)) {
-                throw exception;
-            }
-            runPrivileged("restore-app-data", approvedBackupRoot, "--app", appId, "--archive", backupPath.toString(), "--scope", restoreScope);
-        }
+        localOperations.restoreAppData(backupPath, restoreScope, appId, appRoot);
     }
 
     public void deleteBackup(Path backupPath) throws IOException {
@@ -145,14 +84,7 @@ public class AutarkOsFileOpsService {
 
     public void deleteBackup(Path backupPath, Path approvedBackupRoot) throws IOException {
         Path path = requireBackupPath(backupPath, approvedBackupRoot);
-        try {
-            localOperations.deleteBackup(path);
-        } catch (IOException exception) {
-            if (!isPermissionFailure(exception)) {
-                throw exception;
-            }
-            runPrivileged("delete-backup", approvedBackupRoot, "--path", path.toString());
-        }
+        localOperations.deleteBackup(path);
     }
 
     private Path appRoot(String appId) {
@@ -186,25 +118,6 @@ public class AutarkOsFileOpsService {
         return source;
     }
 
-    /** Writes the root-owned allow-list only after the destination has passed the canonical probe. */
-    public void configureBackupDestination(BackupModels.BackupDestination destination, List<Path> history) throws IOException {
-        Path root = Path.of(destination.configuredPath()).toAbsolutePath().normalize();
-        List<String> args = new ArrayList<>();
-        args.add("--destination");
-        args.add(root.toString());
-        args.add("--destination-identity");
-        args.add(destination.deviceIdentity());
-        args.add("--destination-filesystem");
-        args.add(destination.filesystemType());
-        args.add("--destination-mount-point");
-        args.add(destination.mountPoint());
-        for (Path previous : history == null ? List.<Path>of() : history) {
-            args.add("--history-root");
-            args.add(previous.toAbsolutePath().normalize().toString());
-        }
-        runPrivileged("configure-backup-destination", root, args.toArray(String[]::new));
-    }
-
     private Path requireBackupPath(Path path, Path approvedBackupRoot) {
         Path normalized = path.toAbsolutePath().normalize();
         Path root = approvedBackupRoot.toAbsolutePath().normalize();
@@ -222,104 +135,4 @@ public class AutarkOsFileOpsService {
         return runtimeLayout.runtimeRoot().resolve("backups").toAbsolutePath().normalize();
     }
 
-    private void runPrivileged(String operation, String... args) throws IOException {
-        runPrivileged(operation, backupRoot(), args);
-    }
-
-    private void runPrivileged(String operation, Path approvedBackupRoot, String... args) throws IOException {
-        List<String> command = new ArrayList<>();
-        command.add("sudo");
-        command.add("-n");
-        command.add(helperCommand);
-        command.add(operation);
-        command.add("--runtime-root");
-        command.add(runtimeLayout.runtimeRoot().toString());
-        command.add("--backup-root");
-        command.add(approvedBackupRoot.toAbsolutePath().normalize().toString());
-        command.addAll(List.of(args));
-        CommandResult result = commandRunner.run(command.toArray(String[]::new));
-        if (!result.successful()) {
-            throw new IOException(operationFailureMessage(operation) + " " + conciseOutput(result));
-        }
-    }
-
-    private static String defaultHelperCommand() {
-        String configured = System.getenv("AUTARK_OS_FILEOPS_HELPER");
-        return configured == null || configured.isBlank() ? DEFAULT_HELPER_COMMAND : configured;
-    }
-
-    private boolean isPermissionFailure(IOException exception) {
-        if (exception instanceof AccessDeniedException) {
-            return true;
-        }
-        if (exception instanceof FileSystemException fileSystemException) {
-            String reason = fileSystemException.getReason();
-            if (reason != null && reason.toLowerCase().contains("permission")) {
-                return true;
-            }
-        }
-        String message = exception.getMessage();
-        return message != null && message.toLowerCase().contains("permission denied");
-    }
-
-    private String conciseOutput(CommandResult result) {
-        Path helperPath = Path.of(helperCommand);
-        if (!Files.isRegularFile(helperPath)) {
-            return "The required file helper is not installed. Reinstall the Autark-OS system service, then try again.";
-        }
-        if (!Files.isExecutable(helperPath)) {
-            return "The required file helper is installed but cannot be run. Reinstall the Autark-OS system service to repair it, then try again.";
-        }
-        if (result.missingCommand()) {
-            return "The system could not start the privileged file operation. Check that sudo is installed and available to the Autark-OS service.";
-        }
-        String firstLine = result.output().isEmpty() ? "" : result.output().get(0);
-        String normalized = String.join("\n", result.output()).toLowerCase();
-        if (normalized.contains("sudo") && normalized.contains("password")) {
-            return "Autark-OS does not have permission to run its file helper. Reinstall the Autark-OS system service to repair this permission, then try again.";
-        }
-        if (normalized.contains("not allowed") || normalized.contains("not in the sudoers")) {
-            return "Autark-OS does not have permission to run its file helper. Reinstall the Autark-OS system service to repair this permission, then try again.";
-        }
-        return firstLine.isBlank() ? "No details were returned." : firstLine;
-    }
-
-    private String operationFailureMessage(String operation) {
-        return switch (operation) {
-            case "create-managed-archive" -> "Autark-OS could not create the backup archive.";
-            case "restore-app-data" -> "Autark-OS could not restore the app data.";
-            case "delete-backup" -> "Autark-OS could not delete the backup.";
-            case "clear-runtime" -> "Autark-OS could not clear the app data.";
-            case "configure-backup-destination" -> "Autark-OS could not configure the backup destination.";
-            default -> "Autark-OS could not complete the privileged file operation.";
-        };
-    }
-
-    interface CommandRunner {
-        CommandResult run(String... command);
-    }
-
-    private static class ProcessCommandRunner implements CommandRunner {
-        private final SystemCommandRunner systemCommandRunner;
-
-        private ProcessCommandRunner(SystemCommandRunner systemCommandRunner) {
-            this.systemCommandRunner = systemCommandRunner;
-        }
-
-        @Override
-        public CommandResult run(String... command) {
-            SystemCommandRunner.CommandExecutionResult result = systemCommandRunner.run(
-                    List.of(command),
-                    COMMAND_TIMEOUT,
-                    "Autark-OS file operation timed out.",
-                    "Autark-OS file operation was interrupted.");
-            return new CommandResult(result.exitCode(), result.outputLines(), result.missingCommand());
-        }
-    }
-
-    record CommandResult(int exitCode, List<String> output, boolean missingCommand) {
-        boolean successful() {
-            return exitCode == 0;
-        }
-    }
 }

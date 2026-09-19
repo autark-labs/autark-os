@@ -21,8 +21,6 @@ AUTARK_OS_BACKEND_JAR="${fake_jar}" AUTARK_OS_BUILD_SHA=smoke-contract-sha "${re
   --output-dir "${bundle_dir}" >/dev/null
 
 bootstrap_output="$(AUTARK_OS_SERVICE_NAME=autark-os-smoke-test \
-  AUTARK_OS_USER=autarkos-smoke-test \
-  AUTARK_OS_GROUP=autarkos-smoke-test \
   AUTARK_OS_SERVICE_FILE=/etc/systemd/system/autark-os-smoke-test.service \
   AUTARK_OS_CLI_LINK=/usr/local/bin/autark-os-smoke-test \
   "${repo_root}/scripts/bootstrap-autark-os.sh" \
@@ -35,7 +33,6 @@ bootstrap_output="$(AUTARK_OS_SERVICE_NAME=autark-os-smoke-test \
     --port 18083)"
 
 grep -q 'autark-os-smoke-test.service' <<<"${bootstrap_output}"
-grep -q 'autarkos-smoke-test' <<<"${bootstrap_output}"
 grep -q '/usr/local/bin/autark-os-smoke-test' <<<"${bootstrap_output}"
 grep -q '/var/lib/autark-os-smoke-test' <<<"${bootstrap_output}"
 grep -q '/opt/autark-os-smoke-test' <<<"${bootstrap_output}"

@@ -339,7 +339,7 @@ if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system
     echo "Autark-OS: this update will establish the complete managed-app continuity baseline used by newer releases." >&2
   fi
   checkpoint_paths=()
-  for path in "${install_dir}" "${config_dir}" /etc/systemd/system/autark-os.service /etc/sudoers.d/autark-os-fileops "${runtime_dir}/config/identity.json" "${runtime_dir}/autark-os.db" "${runtime_dir}/autark-os.db-shm" "${runtime_dir}/autark-os.db-wal"; do
+  for path in "${install_dir}" "${config_dir}" /etc/systemd/system/autark-os.service "${runtime_dir}/config/identity.json" "${runtime_dir}/autark-os.db" "${runtime_dir}/autark-os.db-shm" "${runtime_dir}/autark-os.db-wal"; do
     [[ -e "${path}" || -L "${path}" ]] && checkpoint_paths+=("${path}")
   done
   service_was_active=0
@@ -422,7 +422,7 @@ if [[ "\${1:-configure}" == "configure" ]]; then
   AUTARK_OS_INSTALL_METHOD=package \\
   AUTARK_OS_UPDATE_REPOSITORY=autark-labs/autark-os \\
   AUTARK_OS_JAVA_BIN=/usr/lib/autark-os/release/runtime/bin/java \\
-    /usr/lib/autark-os/release/scripts/install-autark-os-service.sh --skip-tailscale
+    /usr/lib/autark-os/release/scripts/install-autark-os-service.sh
   ready=0
   for _attempt in \$(seq 1 60); do
     if curl --fail --silent "http://127.0.0.1:\${server_port}/api/health" >/dev/null 2>&1; then
@@ -469,7 +469,7 @@ if [[ "\${1:-configure}" == "configure" ]]; then
       if [[ -f "\${checkpoint}" ]]; then
         systemctl stop autark-os.service >/dev/null 2>&1 || true
         rm -rf "\${install_dir}" "\${config_dir}"
-        rm -f /etc/systemd/system/autark-os.service /etc/sudoers.d/autark-os-fileops
+        rm -f /etc/systemd/system/autark-os.service
         rm -f "\${runtime_dir}/autark-os.db" "\${runtime_dir}/autark-os.db-shm" "\${runtime_dir}/autark-os.db-wal"
         tar -xzf "\${checkpoint}" -C /
         systemctl daemon-reload
@@ -540,7 +540,7 @@ if [[ "${1:-}" == "remove" || "${1:-}" == "purge" ]]; then
   if command -v systemctl >/dev/null 2>&1; then
     systemctl disable --now autark-os.service >/dev/null 2>&1 || true
   fi
-  rm -f /etc/systemd/system/autark-os.service /usr/local/bin/autark-os /etc/sudoers.d/autark-os-fileops
+  rm -f /etc/systemd/system/autark-os.service /usr/local/bin/autark-os
   rm -rf /opt/autark-os
   if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload >/dev/null 2>&1 || true
@@ -568,10 +568,10 @@ package_deb() {
   cp -a "${BUNDLE_DIR}/docs/." "${documentation_dir}/"
   # A release workflow uses a restrictive umask while materializing signing
   # inputs. Debian requires a readable control directory, and the installed
-  # /usr hierarchy must remain traversable by the service account.
+  # /usr hierarchy must remain traversable by host users.
   chmod 0755 "${deb_root}" "${deb_root}/DEBIAN"
   find "${deb_root}/usr" -type d -exec chmod 0755 {} +
-  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os" "${payload_dir}/scripts/autark-os-fileops"
+  chmod +x "${payload_dir}/scripts/"*.sh "${payload_dir}/scripts/autark-os"
   size_kb="$(installed_size_kb "${deb_root}/usr")"
   write_deb_control "${deb_root}" "${size_kb}"
   write_deb_scripts "${deb_root}"

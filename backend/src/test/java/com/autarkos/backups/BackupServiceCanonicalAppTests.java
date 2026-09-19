@@ -56,7 +56,7 @@ class BackupServiceCanonicalAppTests {
         saveOwned(installed, app);
         installed.saveSettings(app.appId(), new InstallModels.InstallSettings(app.accessUrl(), null, false,
                 java.util.Map.of(), new InstallModels.BackupPolicy(true, "daily", 7)));
-        Path data = layout.appRoot(appId).resolve("config/settings.yaml");
+        Path data = layout.appRoot(appId).resolve(appId.equals("syncthing") ? "data/config/settings.yaml" : "config/settings.yaml");
         Files.createDirectories(data.getParent());
         Files.writeString(data, "title: original\n");
         Path syncedData = layout.appRoot(appId).resolve("data/document.txt");
@@ -81,7 +81,7 @@ class BackupServiceCanonicalAppTests {
         Files.writeString(syncedData, "changed document");
         assertThat(service.restorePlan(full.id(), appId).executable()).isTrue();
         if (appId.equals("syncthing")) {
-            assertThat(service.restorePlan(full.id(), appId).dryRunDetails()).contains("Declared paths: config, data");
+            assertThat(service.restorePlan(full.id(), appId).dryRunDetails()).contains("Declared paths: data");
         }
         assertThat(service.restore(full.id(), appId).status()).isEqualTo("completed");
         assertThat(Files.readString(data)).isEqualTo("title: original\n");
@@ -501,8 +501,7 @@ class BackupServiceCanonicalAppTests {
     private BackupDestinationService backupDestination(RuntimeLayout layout, AutarkOsFileOpsService fileOps) {
         return new BackupDestinationService(
                 layout,
-                JpaTestRepositories.projectSettingsRepository(layout),
-                fileOps);
+                JpaTestRepositories.projectSettingsRepository(layout));
     }
 
     private AppLifecycleService appLifecycleService(RuntimeLayout runtimeLayout, InstalledAppRepository repository, MarketplaceCatalogService catalogService, BackupRepository backupRepository, DockerComposeExecutor composeExecutor) {

@@ -41,7 +41,7 @@ expected_stages = [
     "download-release",
     "verify-release",
     "prepare-dependencies",
-    "create-service-user",
+    "install-runtime",
     "install-autark-os",
     "start-autark-os",
     "check-readiness",

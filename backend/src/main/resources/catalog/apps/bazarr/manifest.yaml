@@ -133,8 +133,6 @@ runtime:
     - /var/lib/autark-os/apps/bazarr/movies:/movies
     - /var/lib/autark-os/apps/bazarr/tv:/tv
   environment:
-    - PUID=1000
-    - PGID=1000
     - TZ=UTC
   labels:
     - autark-os.managed=true

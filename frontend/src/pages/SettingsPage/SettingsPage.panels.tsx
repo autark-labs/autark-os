@@ -250,7 +250,7 @@ function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRu
 function SecurityPanel({ setup }: { setup: SystemSetupStatus | null }) {
   return (
     <SettingsGroup description="Configure security and access options." title="Security">
-      <ReadOnlyRow label="Service user" note="Recommended production user for backend operations." value={setup?.expectedUser || 'autarkos'} />
+      <ReadOnlyRow label="Runtime user" note="The appliance backend runs as root." value={setup?.expectedUser || 'root'} />
       <ReadOnlyRow label="Docker socket access" note="Required for Autark-OS to manage containers." value={setup?.dockerVersion ? 'Available' : 'Not detected'} />
       <ReadOnlyRow label="Administrator sessions" note="Browser sessions expire after inactivity and end whenever the backend restarts." value="Protected cookie" />
       <ReadOnlyRow label="Lost password" note="Run this command on the Autark-OS server. It preserves apps, settings, and backups." value="sudo autark-os admin reset-password" />

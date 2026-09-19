@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-AUTARK_OS_USER="${AUTARK_OS_USER:-autarkos}"
-AUTARK_OS_GROUP="${AUTARK_OS_GROUP:-autarkos}"
 RUNTIME_DIR="${AUTARK_OS_RUNTIME_DIR:-/var/lib/autark-os}"
 CONFIG_DIR="${AUTARK_OS_CONFIG_DIR:-/etc/autark-os}"
 LOG_DIR="${AUTARK_OS_LOG_DIR:-/var/log/autark-os}"
@@ -13,7 +11,6 @@ JAVA_BIN="${AUTARK_OS_JAVA_BIN:-${INSTALL_DIR}/runtime/bin/java}"
 SERVER_PORT="${AUTARK_OS_SERVER_PORT:-8082}"
 BACKEND_JAR="${AUTARK_OS_BACKEND_JAR:-}"
 CLI_LINK="${AUTARK_OS_CLI_LINK:-/usr/local/bin/autark-os}"
-SUDOERS_FILE="${AUTARK_OS_SUDOERS_FILE:-/etc/sudoers.d/autark-os-fileops}"
 DOCUMENTATION_DIR="${AUTARK_OS_DOCUMENTATION_DIR:-/usr/share/doc/autark-os}"
 AUTARK_OS_VERSION="${AUTARK_OS_VERSION:-0.0.1-SNAPSHOT}"
 AUTARK_OS_BUILD_SHA="${AUTARK_OS_BUILD_SHA:-}"
@@ -26,8 +23,6 @@ COSIGN_EXECUTABLE="${AUTARK_OS_COSIGN_EXECUTABLE:-${INSTALL_DIR}/bin/cosign}"
 DRY_RUN=0
 CHECK_ONLY=0
 NO_START=0
-SKIP_TAILSCALE=1
-SKIP_DOCKER=0
 BACKEND_JAR_READY=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,7 +35,6 @@ INSTALLED_SETUP_SCRIPT="${INSTALL_DIR}/bin/install-autark-os-service.sh"
 INSTALLED_CLI="${INSTALL_DIR}/bin/autark-os"
 INSTALLED_BOOTSTRAP="${INSTALL_DIR}/bin/bootstrap-autark-os.sh"
 INSTALLED_HOST_MATRIX="${INSTALL_DIR}/bin/supported-host-matrix.env"
-INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
 INSTALLED_RELEASE_METADATA_DIR="${INSTALL_DIR}/release-metadata"
 COSIGN_SOURCE="${REPO_ROOT}/tools/cosign"
 
@@ -50,24 +44,21 @@ Usage: $0 [options]
 
 Options:
   --dry-run          Print actions without changing the host.
-  --check           Report current service-user setup state.
+  --check           Report current appliance setup state.
   --no-start        Install files and unit, but do not enable/start systemd service.
   --runtime-dir DIR  Store Autark-OS runtime data, database, apps, and backups in DIR.
   --install-dir DIR  Install Autark-OS binaries into DIR.
   --config-dir DIR   Store Autark-OS host config in DIR.
   --log-dir DIR      Store Autark-OS logs in DIR.
   --port PORT        Run the production backend on PORT.
-  --configure-tailscale Configure the autarkos Tailscale operator when Tailscale is already installed.
-  --skip-tailscale  Keep private-access configuration deferred (default).
-  --skip-docker     Do not add the autark-os user to the docker group.
   -h, --help        Show this help.
 
 Environment overrides:
-  AUTARK_OS_USER, AUTARK_OS_GROUP, AUTARK_OS_RUNTIME_DIR,
+  AUTARK_OS_RUNTIME_DIR,
   AUTARK_OS_CONFIG_DIR, AUTARK_OS_LOG_DIR, AUTARK_OS_INSTALL_DIR,
   AUTARK_OS_BACKEND_JAR, AUTARK_OS_JAVA_BIN, AUTARK_OS_SERVER_PORT,
   AUTARK_OS_SERVICE_NAME, AUTARK_OS_SERVICE_FILE, AUTARK_OS_CLI_LINK,
-  AUTARK_OS_FILEOPS_HELPER, AUTARK_OS_SUDOERS_FILE, AUTARK_OS_VERSION,
+  AUTARK_OS_VERSION,
   AUTARK_OS_BUILD_SHA, AUTARK_OS_BUILD_DATE, AUTARK_OS_UPDATE_CHANNEL,
   AUTARK_OS_INSTALL_METHOD, AUTARK_OS_UPDATE_REPOSITORY,
   AUTARK_OS_DOCUMENTATION_DIR, AUTARK_OS_COSIGN_EXECUTABLE
@@ -120,7 +111,6 @@ refresh_derived_paths() {
   INSTALLED_CLI="${INSTALL_DIR}/bin/autark-os"
   INSTALLED_BOOTSTRAP="${INSTALL_DIR}/bin/bootstrap-autark-os.sh"
   INSTALLED_HOST_MATRIX="${INSTALL_DIR}/bin/supported-host-matrix.env"
-  INSTALLED_FILEOPS_HELPER="${AUTARK_OS_FILEOPS_HELPER:-${INSTALL_DIR}/bin/autark-os-fileops}"
   INSTALLED_RELEASE_METADATA_DIR="${INSTALL_DIR}/release-metadata"
   COSIGN_EXECUTABLE="${AUTARK_OS_COSIGN_EXECUTABLE:-${INSTALL_DIR}/bin/cosign}"
   COSIGN_SOURCE="${REPO_ROOT}/tools/cosign"
@@ -151,8 +141,7 @@ jar_manifest_value() {
   if command_exists unzip; then
     unzip -p "${jar}" META-INF/MANIFEST.MF 2>/dev/null | tr -d '\r' | awk -F': ' -v key="${key}" '$1 == key {print $2; exit}'
   else
-    # Python is already used by the installed file helper. Minimal Debian
-    # hosts need not install another archive tool just to inspect JAR identity.
+    # Minimal Debian hosts need not install another archive tool to inspect JAR identity.
     python3 - "${jar}" "${key}" <<'PY'
 import sys
 import zipfile
@@ -240,15 +229,6 @@ parse_args() {
         SERVER_PORT="${1#*=}"
         require_port "${SERVER_PORT}"
         ;;
-      --skip-tailscale)
-        SKIP_TAILSCALE=1
-        ;;
-      --configure-tailscale)
-        SKIP_TAILSCALE=0
-        ;;
-      --skip-docker)
-        SKIP_DOCKER=1
-        ;;
       -h|--help)
         usage
         exit 0
@@ -272,7 +252,7 @@ require_root_or_reexec() {
   fi
   command_exists sudo || die "This installer needs root privileges. Install sudo or rerun as root."
   log "Requesting administrator privileges."
-  exec sudo --preserve-env=AUTARK_OS_USER,AUTARK_OS_GROUP,AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_FILEOPS_HELPER,AUTARK_OS_SUDOERS_FILE,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_DOCUMENTATION_DIR,AUTARK_OS_COSIGN_EXECUTABLE,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
+  exec sudo --preserve-env=AUTARK_OS_RUNTIME_DIR,AUTARK_OS_CONFIG_DIR,AUTARK_OS_LOG_DIR,AUTARK_OS_INSTALL_DIR,AUTARK_OS_BACKEND_JAR,AUTARK_OS_JAVA_BIN,AUTARK_OS_SERVER_PORT,AUTARK_OS_SERVICE_NAME,AUTARK_OS_SERVICE_FILE,AUTARK_OS_CLI_LINK,AUTARK_OS_VERSION,AUTARK_OS_BUILD_SHA,AUTARK_OS_BUILD_DATE,AUTARK_OS_UPDATE_CHANNEL,AUTARK_OS_INSTALL_METHOD,AUTARK_OS_UPDATE_REPOSITORY,AUTARK_OS_DOCUMENTATION_DIR,AUTARK_OS_COSIGN_EXECUTABLE,AUTARK_OS_ASSUME_DEPENDENCIES_INSTALLED bash "${SCRIPT_PATH}" "$@"
 }
 
 status_line() {
@@ -295,22 +275,17 @@ path_mount_summary() {
 }
 
 check_state() {
-  log "Checking Autark-OS service-user setup."
+  log "Checking Autark-OS appliance setup."
   local installed_env="${CONFIG_DIR}/autark-os.env"
-  local installed_version installed_sha installed_date installed_helper_sha actual_helper_sha
+  local installed_version installed_sha installed_date
   local jar_version="" jar_sha="" jar_date="" identity_ok=0 security_ok=0
   installed_version="$(env_file_value "${installed_env}" AUTARK_OS_VERSION)"
   installed_sha="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_SHA)"
   installed_date="$(env_file_value "${installed_env}" AUTARK_OS_BUILD_DATE)"
-  installed_helper_sha="$(env_file_value "${installed_env}" AUTARK_OS_FILEOPS_HELPER_SHA256)"
   [[ -n "${installed_version}" ]] || installed_version="${AUTARK_OS_VERSION}"
   [[ -n "${installed_sha}" ]] || installed_sha="$(build_sha)"
   [[ -n "${installed_date}" ]] || installed_date="$(build_date)"
-  if id "${AUTARK_OS_USER}" >/dev/null 2>&1; then
-    status_line "User" "present (${AUTARK_OS_USER})"
-  else
-    status_line "User" "missing (${AUTARK_OS_USER})"
-  fi
+  status_line "Runtime user" "root"
 
   for dir in "${RUNTIME_DIR}" "${CONFIG_DIR}" "${LOG_DIR}" "${INSTALL_DIR}"; do
     if [[ -d "${dir}" ]]; then
@@ -424,7 +399,7 @@ check_state() {
 
   # Only enforce ownership checks for real system locations. Custom paths are
   # deliberately supported for isolated tests and development installations.
-  if [[ "${AUTARK_OS_ENFORCE_SERVICE_HARDENING_CHECK:-0}" == 1 || "${INSTALL_DIR}" == /opt/* || "${CONFIG_DIR}" == /etc/* || "${SERVICE_FILE}" == /etc/* || "${SUDOERS_FILE}" == /etc/* ]]; then
+  if [[ "${AUTARK_OS_ENFORCE_SERVICE_HARDENING_CHECK:-0}" == 1 || "${INSTALL_DIR}" == /opt/* || "${CONFIG_DIR}" == /etc/* || "${SERVICE_FILE}" == /etc/* ]]; then
     local security_paths_ok=1
     check_root_owned_path() {
       local label="$1"
@@ -445,7 +420,6 @@ check_state() {
       fi
       status_line "${label}" "protected (${owner}:${mode})"
     }
-    check_root_owned_path "Installed helper" "${INSTALLED_FILEOPS_HELPER}" "required"
     check_root_owned_path "Autark-OS command" "${INSTALLED_CLI}" "required"
     check_root_owned_path "Bootstrap helper" "${INSTALLED_BOOTSTRAP}" "required"
     check_root_owned_path "Host support matrix" "${INSTALLED_HOST_MATRIX}" "required"
@@ -455,36 +429,20 @@ check_state() {
     check_root_owned_path "Installed backend" "${TARGET_BACKEND_JAR}" "required"
     check_root_owned_path "Program directory" "${INSTALL_DIR}" "required"
     check_root_owned_path "Service unit" "${SERVICE_FILE}" "required"
-    check_root_owned_path "Sudoers rule" "${SUDOERS_FILE}" "required"
     check_root_owned_path "Service environment" "${installed_env}" "required"
-    if [[ -e "${CONFIG_DIR}/backup-destination.env" ]]; then
-      check_root_owned_path "Backup destination policy" "${CONFIG_DIR}/backup-destination.env" "optional"
-    fi
-    if [[ -x "${INSTALLED_FILEOPS_HELPER}" && -n "${installed_helper_sha}" ]] && command_exists sha256sum; then
-      actual_helper_sha="$(sha256sum "${INSTALLED_FILEOPS_HELPER}" | awk '{print $1}')"
-      if [[ "${actual_helper_sha}" != "${installed_helper_sha}" ]]; then
-        status_line "Installed helper identity" "needs repair (checksum differs)"
-        security_paths_ok=0
-      else
-        status_line "Installed helper identity" "verified"
-      fi
-    elif [[ -x "${INSTALLED_FILEOPS_HELPER}" ]]; then
-      status_line "Installed helper identity" "needs repair (checksum is missing)"
-      security_paths_ok=0
-    fi
     if [[ -f "${SERVICE_FILE}" ]]; then
       local required_directives=(
         "RequiresMountsFor=${RUNTIME_DIR}"
-        'NoNewPrivileges=false'
+        'User=root'
+        'Group=root'
+        'NoNewPrivileges=true'
         'PrivateTmp=true'
-        'ProtectSystem=strict'
+        'ProtectSystem=full'
         'ProtectHome=true'
         'ProtectControlGroups=true'
-        'ReadOnlyPaths=/proc/sys /proc/sysrq-trigger /proc/irq /proc/bus /sys'
-        'InaccessiblePaths=-/proc/kmsg -/dev/kmsg -/usr/lib/modules -/lib/modules'
-        'DevicePolicy=closed'
-        'CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID'
-        'AmbientCapabilities='
+        'ProtectKernelTunables=true'
+        'ProtectKernelModules=true'
+        'UMask=0022'
       )
       local directive
       for directive in "${required_directives[@]}"; do
@@ -494,49 +452,13 @@ check_state() {
           break
         fi
       done
-      if ! grep -Fxq "ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}" "${SERVICE_FILE}"; then
+      if ! grep -Fxq "ReadWritePaths=${CONFIG_DIR}" "${SERVICE_FILE}"; then
         status_line "Service hardening" "needs repair (missing explicit writable paths)"
         security_paths_ok=0
       fi
     fi
-    if [[ -f "${SUDOERS_FILE}" ]] && ! grep -Fqx "${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_FILEOPS_HELPER} *" "${SUDOERS_FILE}"; then
-      status_line "Sudoers rule" "needs repair (helper allow-list differs)"
-      security_paths_ok=0
-    fi
-    if id "${AUTARK_OS_USER}" >/dev/null 2>&1; then
-      local service_groups unexpected_group=""
-      service_groups="$(id -nG "${AUTARK_OS_USER}")"
-      local group_name
-      for group_name in ${service_groups}; do
-        if [[ "${group_name}" != "${AUTARK_OS_GROUP}" && "${group_name}" != docker ]]; then
-          unexpected_group="${group_name}"
-          break
-        fi
-      done
-      if [[ -n "${unexpected_group}" ]]; then
-        status_line "Service user groups" "needs review (unexpected ${unexpected_group})"
-        security_paths_ok=0
-      else
-        status_line "Service user groups" "expected (${service_groups})"
-      fi
-    else
-      status_line "Service user groups" "needs repair (service user is missing)"
-      security_paths_ok=0
-    fi
-    local service_main_pid=""
-    if command_exists systemctl; then
-      service_main_pid="$(systemctl show "${SERVICE_NAME}.service" --property=MainPID --value 2>/dev/null || true)"
-    fi
-    if [[ "${service_main_pid}" =~ ^[1-9][0-9]*$ && -r "/proc/${service_main_pid}/status" ]]; then
-      if grep -Eq '^NoNewPrivs:[[:space:]]*1$' "/proc/${service_main_pid}/status"; then
-        status_line "Helper elevation" "blocked (running process has no-new-privileges set)"
-        security_paths_ok=0
-      else
-        status_line "Helper elevation" "permitted by running process profile"
-      fi
-    fi
     if [[ "${security_paths_ok}" -eq 1 ]]; then
-      status_line "Service hardening" "protected (privileged helper exception documented)"
+      status_line "Service hardening" "protected"
     else
       security_ok=1
     fi
@@ -645,38 +567,10 @@ build_date() {
   date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
-ensure_group() {
-  if getent group "${AUTARK_OS_GROUP}" >/dev/null; then
-    log "Group ${AUTARK_OS_GROUP} already exists."
-    return 0
-  fi
-  run groupadd --system "${AUTARK_OS_GROUP}"
-}
-
-ensure_user() {
-  if id "${AUTARK_OS_USER}" >/dev/null 2>&1; then
-    log "User ${AUTARK_OS_USER} already exists."
-    local current_home
-    current_home="$(getent passwd "${AUTARK_OS_USER}" | cut -d: -f6)"
-    if [[ "${current_home}" != "${RUNTIME_DIR}" ]]; then
-      run usermod --home "${RUNTIME_DIR}" "${AUTARK_OS_USER}"
-      log "Updated ${AUTARK_OS_USER} home directory to ${RUNTIME_DIR}."
-    fi
-    return 0
-  fi
-  run useradd \
-    --system \
-    --gid "${AUTARK_OS_GROUP}" \
-    --home-dir "${RUNTIME_DIR}" \
-    --shell /usr/sbin/nologin \
-    --comment "Autark-OS service user" \
-    "${AUTARK_OS_USER}"
-}
-
 ensure_directories() {
-  run install -d -o "${AUTARK_OS_USER}" -g "${AUTARK_OS_GROUP}" -m 0750 "${RUNTIME_DIR}"
-  run install -d -o root -g "${AUTARK_OS_GROUP}" -m 0750 "${CONFIG_DIR}"
-  run install -d -o "${AUTARK_OS_USER}" -g "${AUTARK_OS_GROUP}" -m 0750 "${LOG_DIR}"
+  run install -d -o root -g root -m 0750 "${RUNTIME_DIR}"
+  run install -d -o root -g root -m 0750 "${CONFIG_DIR}"
+  run install -d -o root -g root -m 0750 "${LOG_DIR}"
   run install -d -o root -g root -m 0755 "${INSTALL_DIR}"
   run install -d -o root -g root -m 0755 "${INSTALL_DIR}/backend"
   # The installed command is intentionally available to the interactive host
@@ -712,16 +606,6 @@ install_cli() {
   fi
 }
 
-install_fileops_helper() {
-  local helper_source="${REPO_ROOT}/scripts/autark-os-fileops"
-  if [[ ! -f "${helper_source}" ]]; then
-    warn "Autark-OS file operations helper is missing from ${helper_source}."
-    return 0
-  fi
-  run install -o root -g root -m 0755 "${helper_source}" "${INSTALLED_FILEOPS_HELPER}"
-  log "Installed Autark-OS file operations helper to ${INSTALLED_FILEOPS_HELPER}."
-}
-
 install_cosign() {
   if [[ ! -f "${COSIGN_SOURCE}" ]]; then
     warn "Pinned Cosign verifier is missing from ${COSIGN_SOURCE}. Community Edition remains available, but Autark Pro image activation will fail closed."
@@ -731,81 +615,6 @@ install_cosign() {
     die "Pinned Cosign verifier is not executable: ${COSIGN_SOURCE}"
   run install -D -o root -g root -m 0755 "${COSIGN_SOURCE}" "${COSIGN_EXECUTABLE}"
   log "Installed the Autark Pro image verifier to ${COSIGN_EXECUTABLE}."
-}
-
-configure_fileops_privilege() {
-  local sudoers_dir
-  sudoers_dir="$(dirname "${SUDOERS_FILE}")"
-  local rule="${AUTARK_OS_USER} ALL=(root) NOPASSWD: ${INSTALLED_FILEOPS_HELPER} *"
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
-    run install -d -o root -g root -m 0755 "${sudoers_dir}"
-    log "Would allow ${AUTARK_OS_USER} to run bounded file operations through sudo without a password."
-    return 0
-  fi
-
-  install -d -o root -g root -m 0755 "${sudoers_dir}"
-  local tmp_file
-  tmp_file="$(mktemp)"
-  {
-    printf '# Autark-OS bounded app-data file operations.\n'
-    printf '%s\n' "${rule}"
-  } >"${tmp_file}"
-  if command_exists visudo; then
-    visudo -cf "${tmp_file}" >/dev/null
-  fi
-  install -o root -g root -m 0440 "${tmp_file}" "${SUDOERS_FILE}"
-  rm -f "${tmp_file}"
-  log "Configured bounded sudo access for Autark-OS file operations at ${SUDOERS_FILE}."
-}
-
-configure_docker_access() {
-  if [[ "${SKIP_DOCKER}" -eq 1 ]]; then
-    log "Skipping Docker group setup."
-    return 0
-  fi
-  if ! command_exists docker; then
-    warn "Docker was not found. Install Docker before using Discover app installs."
-    return 0
-  fi
-  if ! getent group docker >/dev/null; then
-    warn "Docker is installed, but the docker group does not exist. Configure Docker access for ${AUTARK_OS_USER} manually."
-    return 0
-  fi
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
-    run usermod -aG docker "${AUTARK_OS_USER}"
-    log "Would add ${AUTARK_OS_USER} to the docker group."
-    return 0
-  fi
-  if id -nG "${AUTARK_OS_USER}" | tr ' ' '\n' | grep -qx docker; then
-    log "User ${AUTARK_OS_USER} is already in the docker group."
-    return 0
-  fi
-  run usermod -aG docker "${AUTARK_OS_USER}"
-  log "Added ${AUTARK_OS_USER} to the docker group."
-}
-
-configure_tailscale_operator() {
-  if [[ "${SKIP_TAILSCALE}" -eq 1 ]]; then
-    log "Skipping Tailscale operator setup."
-    return 0
-  fi
-  if ! command_exists tailscale; then
-    warn "Tailscale was not found. Private HTTPS app links will be enabled after Tailscale is installed and connected."
-    return 0
-  fi
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
-    run tailscale set "--operator=${AUTARK_OS_USER}"
-    log "Would configure ${AUTARK_OS_USER} as the Tailscale operator."
-    return 0
-  fi
-  if run tailscale set "--operator=${AUTARK_OS_USER}"; then
-    log "Configured ${AUTARK_OS_USER} as the Tailscale operator."
-    if ! tailscale status >/dev/null 2>&1; then
-      log "Tailscale is installed but not connected. Run 'sudo tailscale up' to enable private access."
-    fi
-  else
-    warn "Could not set Tailscale operator. Connect Tailscale first, then rerun this script or run: sudo tailscale set --operator=${AUTARK_OS_USER}"
-  fi
 }
 
 find_backend_jar() {
@@ -898,8 +707,7 @@ install_runtime_image() {
     rm -rf "${TARGET_RUNTIME_DIR}"
     cp -a "${RUNTIME_IMAGE_SOURCE}" "${TARGET_RUNTIME_DIR}"
     chown -R root:root "${TARGET_RUNTIME_DIR}"
-    # Do not preserve a restrictive builder umask into the runtime. The service
-    # account needs traversal/read access, while only the known Java launch
+    # Do not preserve a restrictive builder umask into the runtime. The bundled runtime needs traversal/read access, while only the known Java launch
     # helpers need execute permissions.
     find "${TARGET_RUNTIME_DIR}" -type d -exec chmod 0755 {} +
     find "${TARGET_RUNTIME_DIR}" -type f -exec chmod 0644 {} +
@@ -915,7 +723,6 @@ install_runtime_image() {
 write_env_file() {
   local env_file="${CONFIG_DIR}/autark-os.env"
   local setup_command="sudo ${INSTALLED_SETUP_SCRIPT}"
-  local fileops_helper_sha=""
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     log "Would write ${env_file} with runtime root ${RUNTIME_DIR} and port ${SERVER_PORT}."
     return 0
@@ -924,12 +731,7 @@ write_env_file() {
   local tmp_file
   tmp_file="$(mktemp)"
   if [[ -f "${env_file}" ]]; then
-    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_FILEOPS_HELPER|AUTARK_OS_FILEOPS_HELPER_SHA256|AUTARK_OS_COSIGN_EXECUTABLE|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
-  fi
-  if command_exists sha256sum; then
-    fileops_helper_sha="$(sha256sum "${INSTALLED_FILEOPS_HELPER}" | awk '{print $1}')"
-  else
-    die "sha256sum is required to record the installed privileged helper identity."
+    grep -v -E '^(AUTARK_OS_RUNTIME_ROOT|AUTARK_OS_INSTALL_DIR|AUTARK_OS_CONFIG_DIR|AUTARK_OS_LOG_DIR|AUTARK_OS_BACKEND_JAR|AUTARK_OS_COSIGN_EXECUTABLE|AUTARK_OS_VERSION|AUTARK_OS_BUILD_SHA|AUTARK_OS_BUILD_DATE|AUTARK_OS_UPDATE_CHANNEL|AUTARK_OS_INSTALL_METHOD|AUTARK_OS_UPDATE_REPOSITORY|SERVER_PORT|LOGGING_FILE_NAME|AUTARK_OS_SETUP_COMMAND)=' "${env_file}" >"${tmp_file}" || true
   fi
   cat >>"${tmp_file}" <<EOF
 AUTARK_OS_RUNTIME_ROOT=${RUNTIME_DIR}
@@ -937,8 +739,6 @@ AUTARK_OS_INSTALL_DIR=${INSTALL_DIR}
 AUTARK_OS_CONFIG_DIR=${CONFIG_DIR}
 AUTARK_OS_LOG_DIR=${LOG_DIR}
 AUTARK_OS_BACKEND_JAR=${TARGET_BACKEND_JAR}
-AUTARK_OS_FILEOPS_HELPER=${INSTALLED_FILEOPS_HELPER}
-AUTARK_OS_FILEOPS_HELPER_SHA256=${fileops_helper_sha}
 AUTARK_OS_COSIGN_EXECUTABLE=${COSIGN_EXECUTABLE}
 AUTARK_OS_VERSION=${AUTARK_OS_VERSION}
 AUTARK_OS_BUILD_SHA=$(build_sha)
@@ -950,19 +750,14 @@ SERVER_PORT=${SERVER_PORT}
 LOGGING_FILE_NAME=${LOG_DIR}/autark-os.log
 AUTARK_OS_SETUP_COMMAND=${setup_command}
 EOF
-  install -o root -g "${AUTARK_OS_GROUP}" -m 0640 "${tmp_file}" "${env_file}"
+  install -o root -g root -m 0640 "${tmp_file}" "${env_file}"
   rm -f "${tmp_file}"
-  chown root:"${AUTARK_OS_GROUP}" "${env_file}"
+  chown root:root "${env_file}"
   chmod 0640 "${env_file}"
   log "Updated ${env_file}."
 }
 
 write_systemd_unit() {
-  local supplementary_groups=""
-  if getent group docker >/dev/null 2>&1; then
-    supplementary_groups="SupplementaryGroups=docker"
-  fi
-
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     log "Would write systemd unit to ${SERVICE_FILE}."
     return 0
@@ -977,9 +772,8 @@ RequiresMountsFor=${RUNTIME_DIR}
 
 [Service]
 Type=simple
-User=${AUTARK_OS_USER}
-Group=${AUTARK_OS_GROUP}
-${supplementary_groups}
+User=root
+Group=root
 WorkingDirectory=${RUNTIME_DIR}
 Environment=AUTARK_OS_RUNTIME_ROOT=${RUNTIME_DIR}
 EnvironmentFile=-${CONFIG_DIR}/autark-os.env
@@ -987,29 +781,16 @@ ExecStart=${JAVA_BIN} -jar ${TARGET_BACKEND_JAR}
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=5
-# The bounded root helper is invoked through sudo for restore, cleanup, core
-# updates, and Tailscale operator repair. sudo needs its setuid/setgid and audit
-# transition, while the resulting root helper needs DAC override to cross the
-# service-owned runtime directory. CHOWN and FOWNER restore container-owned
-# files and modes from validated backup metadata. Retain only those six capabilities in the
-# bounding set and do not enable NoNewPrivileges until the helper becomes a
-# dedicated root service.
-# Seccomp-based systemd restrictions imply NoNewPrivileges for this non-root
-# service, even when it is explicitly false. Use mount and device restrictions
-# here; the capability bound already excludes kernel/module/clock/raw-IO powers.
-NoNewPrivileges=false
+# Root owns the appliance runtime. Containers keep their image-native users.
+NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
 ProtectControlGroups=true
-ReadOnlyPaths=/proc/sys /proc/sysrq-trigger /proc/irq /proc/bus /sys
-InaccessiblePaths=-/proc/kmsg -/dev/kmsg -/usr/lib/modules -/lib/modules
-DevicePolicy=closed
-CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID
-AmbientCapabilities=
-UMask=0077
-# The root helper also writes the root-owned approved-backup destination file.
-ReadWritePaths=${RUNTIME_DIR} ${LOG_DIR} ${CONFIG_DIR}
+ProtectKernelTunables=true
+ProtectKernelModules=true
+UMask=0022
+ReadWritePaths=${CONFIG_DIR}
 
 [Install]
 WantedBy=multi-user.target
@@ -1050,19 +831,13 @@ main() {
     exit 0
   fi
 
-  log "Installing Autark-OS service-user architecture."
+  log "Installing Autark-OS root appliance runtime."
   preflight_host
   preflight_install_collision
-  ensure_group
-  ensure_user
   ensure_directories
   install_setup_script
   install_cli
-  install_fileops_helper
   install_cosign
-  configure_fileops_privilege
-  configure_docker_access
-  configure_tailscale_operator
   install_runtime_image
   install_backend_jar || true
   install_release_metadata

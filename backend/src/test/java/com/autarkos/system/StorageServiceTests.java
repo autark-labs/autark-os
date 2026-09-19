@@ -111,8 +111,7 @@ class StorageServiceTests {
                 new RuntimeFileOperations(),
                 new BackupDestinationService(
                         layout,
-                        JpaTestRepositories.projectSettingsRepository(layout),
-                        fileOps),
+                        JpaTestRepositories.projectSettingsRepository(layout)),
                 new RecoveryOperationCoordinator(),
                 storageContracts,
                 fileOps);

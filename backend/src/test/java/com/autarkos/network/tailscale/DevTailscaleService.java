@@ -3,11 +3,7 @@ package com.autarkos.network.tailscale;
 import java.time.Instant;
 import java.util.List;
 
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Service;
 
-@Service
-@Profile("dev")
 public class DevTailscaleService extends TailscaleService {
 
     private static final String DEV_DNS = "autark-os-dev.tailnet.local";
@@ -56,10 +52,6 @@ public class DevTailscaleService extends TailscaleService {
                 Instant.now());
     }
 
-    @Override
-    public String operatorUser() {
-        return "autarkos";
-    }
 
     @Override
     public TailscaleServeResult disableHttps(int httpsPort) {

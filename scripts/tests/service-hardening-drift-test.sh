@@ -11,13 +11,9 @@ config_dir="${tmp_dir}/config"
 install_dir="${tmp_dir}/install"
 log_dir="${tmp_dir}/logs"
 service_file="${tmp_dir}/autark-os.service"
-sudoers_file="${tmp_dir}/autark-os-fileops"
 fake_bin="${tmp_dir}/bin"
-service_user="autarkos-test"
-helper="${install_dir}/bin/autark-os-fileops"
 
 mkdir -p "${runtime_dir}" "${config_dir}" "${install_dir}/backend" "${install_dir}/bin" "${log_dir}" "${fake_bin}"
-printf '#!/usr/bin/env bash\nexit 0\n' >"${helper}"
 printf '#!/usr/bin/env bash\nexit 0\n' >"${install_dir}/bin/autark-os"
 printf '#!/usr/bin/env bash\nexit 0\n' >"${install_dir}/bin/bootstrap-autark-os.sh"
 printf 'host matrix\n' >"${install_dir}/bin/supported-host-matrix.env"
@@ -26,48 +22,34 @@ python3 "${repo_root}/scripts/tests/create-release-test-jar.py" \
   --version 0.0.1-SNAPSHOT \
   --build-sha development \
   --build-date unknown
-chmod 0755 "${helper}" "${install_dir}/bin/autark-os" "${install_dir}/bin/bootstrap-autark-os.sh"
+chmod 0755 "${install_dir}/bin/autark-os" "${install_dir}/bin/bootstrap-autark-os.sh"
 chmod 0644 "${install_dir}/bin/supported-host-matrix.env" "${install_dir}/backend/autark-os-backend.jar"
 
-helper_sha="$(sha256sum "${helper}" | awk '{print $1}')"
 cat >"${config_dir}/autark-os.env" <<ENV
 AUTARK_OS_VERSION=0.0.1-SNAPSHOT
 AUTARK_OS_BUILD_SHA=development
 AUTARK_OS_BUILD_DATE=unknown
-AUTARK_OS_FILEOPS_HELPER_SHA256=${helper_sha}
-ENV
-cat >"${sudoers_file}" <<ENV
-${service_user} ALL=(root) NOPASSWD: ${helper} *
 ENV
 cat >"${service_file}" <<ENV
 [Unit]
 RequiresMountsFor=${runtime_dir}
 [Service]
-NoNewPrivileges=false
+User=root
+Group=root
+NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
 ProtectControlGroups=true
-ReadOnlyPaths=/proc/sys /proc/sysrq-trigger /proc/irq /proc/bus /sys
-InaccessiblePaths=-/proc/kmsg -/dev/kmsg -/usr/lib/modules -/lib/modules
-DevicePolicy=closed
-CapabilityBoundingSet=CAP_AUDIT_WRITE CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_SETGID CAP_SETUID
-AmbientCapabilities=
-ReadWritePaths=${runtime_dir} ${log_dir} ${config_dir}
+ProtectKernelTunables=true
+ProtectKernelModules=true
+UMask=0022
+ReadWritePaths=${config_dir}
 ENV
 chmod 0755 "${install_dir}"
 chmod 0640 "${config_dir}/autark-os.env"
 chmod 0644 "${service_file}"
-chmod 0640 "${sudoers_file}"
 
-cat >"${fake_bin}/id" <<'SH'
-#!/usr/bin/env bash
-if [[ "${1:-}" == "-nG" ]]; then
-  printf '%s\n' "${AUTARK_OS_TEST_GROUPS:-autarkos-test docker}"
-  exit 0
-fi
-exit 0
-SH
 cat >"${fake_bin}/stat" <<'SH'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-c" && "${2:-}" == "%U" ]]; then
@@ -85,27 +67,24 @@ chmod 0755 "${fake_bin}"/*
 check_service() {
   PATH="${fake_bin}:/usr/bin:/bin" \
     AUTARK_OS_ENFORCE_SERVICE_HARDENING_CHECK=1 \
-    AUTARK_OS_USER="${service_user}" \
-    AUTARK_OS_GROUP="${service_user}" \
     AUTARK_OS_RUNTIME_DIR="${runtime_dir}" \
     AUTARK_OS_CONFIG_DIR="${config_dir}" \
     AUTARK_OS_INSTALL_DIR="${install_dir}" \
     AUTARK_OS_LOG_DIR="${log_dir}" \
     AUTARK_OS_SERVICE_FILE="${service_file}" \
-    AUTARK_OS_SUDOERS_FILE="${sudoers_file}" \
     "${installer}" --check
 }
 
 check_service >"${tmp_dir}/clean.out"
 grep -q 'Service hardening.*protected' "${tmp_dir}/clean.out"
 
-chmod g+w "${helper}"
-if check_service >"${tmp_dir}/writable-helper.out" 2>&1; then
-  echo "expected a group-writable helper to fail the service check" >&2
+chmod g+w "${install_dir}/bin/autark-os"
+if check_service >"${tmp_dir}/writable-command.out" 2>&1; then
+  echo "expected a group-writable command to fail the service check" >&2
   exit 1
 fi
-grep -q 'Installed helper.*needs repair' "${tmp_dir}/writable-helper.out"
-chmod 0755 "${helper}"
+grep -q 'Autark-OS command.*needs repair' "${tmp_dir}/writable-command.out"
+chmod 0755 "${install_dir}/bin/autark-os"
 
 sed -i '/PrivateTmp=true/d' "${service_file}"
 if check_service >"${tmp_dir}/unit-drift.out" 2>&1; then
@@ -122,25 +101,3 @@ if check_service >"${tmp_dir}/mount-dependency-drift.out" 2>&1; then
 fi
 grep -q 'missing RequiresMountsFor=' "${tmp_dir}/mount-dependency-drift.out"
 sed -i '/\[Unit\]/a RequiresMountsFor='"${runtime_dir}" "${service_file}"
-
-printf '%s\n' "${service_user} ALL=(root) NOPASSWD: /usr/bin/false" >"${sudoers_file}"
-if check_service >"${tmp_dir}/sudoers-drift.out" 2>&1; then
-  echo "expected sudoers drift to fail the service check" >&2
-  exit 1
-fi
-grep -q 'helper allow-list differs' "${tmp_dir}/sudoers-drift.out"
-printf '%s\n' "${service_user} ALL=(root) NOPASSWD: ${helper} *" >"${sudoers_file}"
-
-if AUTARK_OS_TEST_GROUPS="${service_user} docker wheel" check_service >"${tmp_dir}/group-drift.out" 2>&1; then
-  echo "expected an unexpected service-user group to fail the service check" >&2
-  exit 1
-fi
-grep -q 'Service user groups.*unexpected wheel' "${tmp_dir}/group-drift.out"
-
-printf '# tampered\n' >>"${helper}"
-if check_service >"${tmp_dir}/checksum-drift.out" 2>&1; then
-  echo "expected privileged helper checksum drift to fail the service check" >&2
-  exit 1
-fi
-grep -q 'checksum differs' "${tmp_dir}/checksum-drift.out"
-sed -i '$d' "${helper}"
