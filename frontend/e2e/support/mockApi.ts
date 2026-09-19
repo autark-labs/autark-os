@@ -88,6 +88,7 @@ const appSettings = {
 };
 
 const runtimeApp = {
+  state: 'ready',
   appId: 'vaultwarden',
   appName: 'Vaultwarden with a deliberately long self-hosted service name',
   category: 'Security',
@@ -182,6 +183,7 @@ const managedApp = {
 };
 
 const managedApplication = {
+  operation: { kind: 'idle' },
   id: 'vaultwarden', name: runtimeApp.appName, category: 'Security', image: '', summary: 'Private password vault', description: 'Private password vault',
   relationship: 'managed', catalogAvailability: 'installable', appInstanceId: runtimeApp.appInstanceId, runtimeState: 'running', ownershipState: 'owned_managed', accessState: 'private_ready', backupState: 'protected_by_restore_point', issues: [],
   relationshipLabel: 'Installed', relationshipDescription: 'Managed by this Autark-OS installation.', statusTone: 'success', cardTone: 'success',
@@ -189,6 +191,7 @@ const managedApplication = {
 };
 
 const immichApplication = {
+  operation: { kind: 'idle' },
   id: 'immich', name: 'Immich', category: 'Photos', image: '', summary: 'Private photo library', description: 'Keep photos on your own server.',
   relationship: 'recovery_required', catalogAvailability: 'installable', appInstanceId: '', runtimeState: 'running', ownershipState: 'foreign_autark_os', accessState: 'not_ready', backupState: 'backup_disabled', issues: [],
   relationshipLabel: 'Recovery required', relationshipDescription: 'This app belongs to another Autark-OS installation.', statusTone: 'warning', cardTone: 'warning',

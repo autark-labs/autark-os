@@ -1,92 +1,97 @@
 package com.autarkos.marketplace.install;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
 import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.marketplace.catalog.ManifestValidator;
+import com.autarkos.marketplace.catalog.ManifestYamlReader;
+import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
+import com.autarkos.marketplace.install.models.AccessModels.AppAccessCheck;
+import com.autarkos.marketplace.install.models.RuntimeModels.DockerContainerStatus;
+import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.HealthManifest;
 
 class InstallStartupCheckerTests {
-
-    private static final HealthManifest HEALTH = new HealthManifest(
-            "http", "/", 180, "Ready to open", "Starting up", "Needs attention", "Checks the local app link.");
+    private final DockerComposeExecutor docker = mock(DockerComposeExecutor.class);
+    private final AppAccessChecker access = spy(new AppAccessChecker());
+    private final InstallStartupChecker checker = new InstallStartupChecker(docker, access);
 
     @Test
-    void reportsReadyWhenDockerHasAStableRunningContainer() {
-        InstallStartupChecker.StartupCheck check = new InstallStartupChecker(new FixedContainerExecutor(List.of(
-                container("running", "healthy", "Up 2 minutes (healthy)"))))
-                .waitForStartup(Path.of("compose.yaml"), "autarkos-vaultwarden", HEALTH);
-
-        assertThat(check.ready()).isTrue();
-        assertThat(check.failed()).isFalse();
-        assertThat(check.warmingUp()).isFalse();
-        assertThat(check.detail()).isEqualTo("The app container is running. Autark-OS will keep checking the app link from Applications.");
+    void healthyDockerWithUnreachableWebLinkIsNotSuccessful() {
+        containers("running", "healthy");
+        doReturn(AppAccessCheck.unreachable("homepage", "http://localhost:3003"))
+                .when(access).localHealthCheck(anyString(), any(), anyString());
+        var result = check(manifest("homepage", 0));
+        assertThat(result.ready()).isFalse();
+        assertThat(result.detail()).contains("local app link did not respond", "timed out");
     }
 
     @Test
-    void reportsTheDockerStateWhenAContainerFailsDuringStartup() {
-        InstallStartupChecker.StartupCheck check = new InstallStartupChecker(new FixedContainerExecutor(List.of(
-                container("exited", "", "Exited 1 second ago"))))
-                .waitForStartup(Path.of("compose.yaml"), "autarkos-vaultwarden", HEALTH);
-
-        assertThat(check.ready()).isFalse();
-        assertThat(check.failed()).isTrue();
-        assertThat(check.detail()).contains("stopped or reported unhealthy").contains("state=exited");
+    void waitsForWebReadinessWithinTheManifestStartupWindow() {
+        containers("running", "healthy");
+        doReturn(AppAccessCheck.unreachable("homepage", "http://localhost:3003"),
+                AppAccessCheck.reachable("homepage", "http://localhost:3003"))
+                .when(access).localHealthCheck(anyString(), any(), anyString());
+        assertThat(check(manifest("homepage", 5)).ready()).isTrue();
+        verify(access, times(2)).localHealthCheck(anyString(), any(), anyString());
     }
 
     @Test
-    void doesNotDeclareStartupReadyWhenARequiredServiceIsMissing() {
-        InstallStartupChecker.StartupCheck check = new InstallStartupChecker(new FixedContainerExecutor(List.of(
-                container("running", "healthy", "Up 2 minutes (healthy)"))))
-                .waitForStartup(Path.of("compose.yaml"), "autarkos-vaultwarden", HEALTH, List.of("vaultwarden", "database"));
-
-        assertThat(check.ready()).isFalse();
-        assertThat(check.failed()).isTrue();
-        assertThat(check.detail()).contains("required service(s): database");
+    void startingContainerIsNotDeclaredSuccessfulWhenItsWindowExpires() {
+        containers("running", "starting");
+        var result = check(manifest("homepage", 0));
+        assertThat(result.ready()).isFalse();
+        assertThat(result.detail()).contains("did not finish starting", "timed out");
+        verify(access, never()).localHealthCheck(anyString(), any(), anyString());
     }
 
-    private static RuntimeModels.DockerContainerStatus container(String state, String health, String status) {
-        return new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", state, health, status, "0.0.0.0:8090->80/tcp");
+    @Test
+    void stoppedContainerFailsWithoutWaitingForTheStartupWindow() {
+        containers("exited", "");
+        var result = check(manifest("homepage", 180));
+        assertThat(result.ready()).isFalse();
+        assertThat(result.detail()).contains("could not start", "exited");
     }
 
-    private record FixedContainerExecutor(List<RuntimeModels.DockerContainerStatus> containers) implements DockerComposeExecutor {
-        @Override
-        public RuntimeModels.DockerComposeResult up(Path composeFile, String projectName) {
-            return new RuntimeModels.DockerComposeResult(0, List.of());
-        }
+    @Test
+    void missingRequiredServiceUsesTheSameFailureAsMonitoring() {
+        containers("running", "healthy");
+        var result = check(manifest("paperless-ngx", 180));
+        assertThat(result.ready()).isFalse();
+        assertThat(result.detail()).contains("missing required service");
+    }
 
-        @Override
-        public RuntimeModels.DockerComposeResult stop(Path composeFile, String projectName) {
-            return new RuntimeModels.DockerComposeResult(0, List.of());
-        }
+    @Test
+    void containerOnlyAppsDoNotRequireAWebEndpoint() {
+        containers("running", "healthy");
+        var manifest = manifest("homepage", 0);
+        doReturn(new HealthManifest("container", "", 0, "Ready", "Starting", "Failed", "Container is running."))
+                .when(manifest).health();
+        assertThat(check(manifest).ready()).isTrue();
+        verify(access, never()).localHealthCheck(anyString(), any(), anyString());
+    }
 
-        @Override
-        public RuntimeModels.DockerComposeResult restart(Path composeFile, String projectName) {
-            return new RuntimeModels.DockerComposeResult(0, List.of());
-        }
+    private void containers(String state, String health) {
+        when(docker.containers(any(), anyString())).thenReturn(List.of(
+                new DockerContainerStatus("homepage", "homepage", state, health, state, "0.0.0.0:3003->3000/tcp")));
+    }
 
-        @Override
-        public RuntimeModels.DockerComposeResult down(Path composeFile, String projectName) {
-            return new RuntimeModels.DockerComposeResult(0, List.of());
-        }
+    private InstallStartupChecker.StartupCheck check(ApplicationManifest manifest) {
+        return checker.waitForStartup(Path.of("compose.yaml"), "autarkos-app", manifest, "http://localhost:3003");
+    }
 
-        @Override
-        public RuntimeModels.DockerComposeResult ps(Path composeFile, String projectName) {
-            return new RuntimeModels.DockerComposeResult(0, List.of());
-        }
-
-        @Override
-        public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
-            return containers;
-        }
-
-        @Override
-        public List<RuntimeModels.ContainerTelemetry> stats(List<String> containerNames) {
-            return List.of();
-        }
+    private ApplicationManifest manifest(String id, int seconds) {
+        var manifest = spy(new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator()).findById(id).orElseThrow());
+        var health = manifest.health();
+        doReturn(new HealthManifest(health.type(), health.path(), seconds, health.successLabel(), health.startingLabel(), health.failureLabel(), health.description()))
+                .when(manifest).health();
+        return manifest;
     }
 }

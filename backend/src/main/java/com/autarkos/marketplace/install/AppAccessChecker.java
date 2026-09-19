@@ -23,6 +23,8 @@ public class AppAccessChecker {
     static final Duration ACCESS_CHECK_TIMEOUT = Duration.ofMillis(850);
 
     private final HttpClient httpClient = HttpClient.newBuilder()
+            // Local app servers need not support cleartext HTTP/2 upgrades (h2c).
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(ACCESS_CHECK_TIMEOUT)
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();

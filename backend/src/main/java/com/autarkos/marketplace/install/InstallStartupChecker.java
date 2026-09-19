@@ -1,128 +1,55 @@
 package com.autarkos.marketplace.install;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 
-import com.autarkos.marketplace.install.models.RuntimeModels;
-import com.autarkos.marketplace.model.HealthManifest;
+import com.autarkos.api.AutarkOsStates;
+import com.autarkos.marketplace.model.ApplicationManifest;
 
-/** Waits for Docker startup states and turns them into the install job contract. */
+/** Install and ongoing monitoring share Docker status and local-access checks. */
 public final class InstallStartupChecker {
 
     private final DockerComposeExecutor dockerComposeExecutor;
+    private final AppAccessChecker accessChecker;
+    private final AppRuntimeStatusResolver runtimeStatusResolver = new AppRuntimeStatusResolver();
 
-    public InstallStartupChecker(DockerComposeExecutor dockerComposeExecutor) {
+    public InstallStartupChecker(DockerComposeExecutor dockerComposeExecutor, AppAccessChecker accessChecker) {
         this.dockerComposeExecutor = dockerComposeExecutor;
+        this.accessChecker = accessChecker;
     }
 
-    StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health) {
-        return waitForStartup(composeFile, composeProject, health, List.of());
-    }
-
-    public StartupCheck waitForStartup(Path composeFile, String composeProject, HealthManifest health, List<String> requiredServices) {
-        List<String> lastStatus = List.of();
-        List<RuntimeModels.DockerContainerStatus> lastContainers = List.of();
-        for (int attempt = 1; attempt <= 20; attempt++) {
-            List<RuntimeModels.DockerContainerStatus> containers = dockerComposeExecutor.containers(composeFile, composeProject);
-            lastContainers = containers;
-            StartupCheck check = evaluateStartup(containers, health, requiredServices);
-            lastStatus = check.logs();
-            if (check.ready() || check.failed()) return check;
-            sleep();
-        }
-        if (lastContainers.stream().anyMatch(this::running) && lastContainers.stream().noneMatch(this::failed)) {
-            return StartupCheck.warmingUp(
-                    "The service is running and still finishing startup checks. Autark-OS will keep watching it from Applications.",
-                    lastStatus);
-        }
-        return StartupCheck.failed(
-                "The app did not report ready within 20 seconds. Last container state: " + String.join("; ", lastStatus),
-                lastStatus);
-    }
-
-    private StartupCheck evaluateStartup(List<RuntimeModels.DockerContainerStatus> containers, HealthManifest health, List<String> requiredServices) {
-        if (containers.isEmpty()) {
-            return StartupCheck.pending("Waiting for Docker to report the app container.", List.of("No containers reported yet."));
-        }
-        List<String> statusLines = containers.stream().map(this::statusLine).toList();
-        List<String> failedContainers = containers.stream().filter(this::failed).map(this::statusLine).toList();
-        if (!failedContainers.isEmpty()) {
-            return StartupCheck.failed("The app container stopped or reported unhealthy: " + String.join("; ", failedContainers), statusLines);
-        }
-        List<String> missingServices = (requiredServices == null ? List.<String>of() : requiredServices).stream()
-                .filter(required -> required != null && !required.isBlank())
-                .filter(required -> containers.stream().noneMatch(container -> required.equals(container.service())))
-                .toList();
-        if (!missingServices.isEmpty()) {
-            return StartupCheck.failed("Docker did not report required service(s): " + String.join(", ", missingServices), statusLines);
-        }
-        boolean starting = containers.stream().anyMatch(this::starting);
-        boolean running = containers.stream().anyMatch(this::running);
-        if (running && !starting) return StartupCheck.ready(readinessDetail(health), statusLines);
-        return StartupCheck.pending(health.startingLabel(), statusLines);
-    }
-
-    private String readinessDetail(HealthManifest health) {
-        if (health == null) return "The app container is running.";
-        if (List.of("container", "no-web-ui", "none").contains(health.type())) return health.description();
-        if ("tcp".equals(health.type())) {
-            return "The service container is running. Autark-OS will keep checking the service port from Applications.";
-        }
-        return "The app container is running. Autark-OS will keep checking the app link from Applications.";
-    }
-
-    private boolean running(RuntimeModels.DockerContainerStatus container) {
-        return lower(container.state()).equals("running") || lower(container.status()).startsWith("up ");
-    }
-
-    private boolean starting(RuntimeModels.DockerContainerStatus container) {
-        return lower(container.state()).equals("created")
-                || lower(container.state()).equals("restarting")
-                || lower(container.health()).equals("starting")
-                || lower(container.status()).contains("starting");
-    }
-
-    private boolean failed(RuntimeModels.DockerContainerStatus container) {
-        return lower(container.state()).equals("exited")
-                || lower(container.state()).equals("dead")
-                || lower(container.health()).equals("unhealthy")
-                || lower(container.status()).contains("exited")
-                || lower(container.status()).contains("unhealthy");
-    }
-
-    private String statusLine(RuntimeModels.DockerContainerStatus container) {
-        return "%s state=%s health=%s status=%s".formatted(
-                container.name(), container.state(), container.health(), container.status());
-    }
-
-    private String lower(String value) {
-        return value == null ? "" : value.toLowerCase();
-    }
-
-    private void sleep() {
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new InstallationException("Interrupted while waiting for the app to start.", exception);
+    public StartupCheck waitForStartup(Path composeFile, String composeProject, ApplicationManifest manifest, String accessUrl) {
+        var health = manifest.health();
+        long deadline = System.nanoTime() + Duration.ofSeconds(health.startupGraceSeconds()).toNanos();
+        while (true) {
+            var containers = dockerComposeExecutor.containers(composeFile, composeProject);
+            var runtime = runtimeStatusResolver.normalize(containers, manifest);
+            List<String> logs = List.of(runtime.technicalStatus());
+            if (!containers.isEmpty() && (AutarkOsStates.AppStatus.STOPPED.equals(runtime.friendlyStatus())
+                    || AutarkOsStates.AppStatus.NEEDS_ATTENTION.equals(runtime.friendlyStatus()))) {
+                return new StartupCheck(false, "The app could not start: " + runtime.technicalStatus(), logs);
+            }
+            boolean running = AutarkOsStates.AppStatus.READY.equals(runtime.friendlyStatus());
+            boolean checkAccess = accessChecker.shouldCheckLocalAccess(manifest, accessUrl);
+            if (running && (!checkAccess || "reachable".equals(accessChecker.localHealthCheck(manifest.id(), manifest, accessUrl).status()))) {
+                return new StartupCheck(true, checkAccess
+                        ? "Docker is running and the local app link is responding."
+                        : health.description(), logs);
+            }
+            if (System.nanoTime() >= deadline) {
+                String detail = running && checkAccess ? health.failureLabel() + ": the local app link did not respond."
+                        : "The app did not finish starting. " + runtime.technicalStatus();
+                return new StartupCheck(false, detail + " Startup checks timed out after " + health.startupGraceSeconds() + " seconds.", logs);
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                throw new InstallationException("Interrupted while waiting for the app to start.", exception);
+            }
         }
     }
 
-    public record StartupCheck(boolean ready, boolean failed, boolean warmingUp, String detail, List<String> logs) {
-        private static StartupCheck ready(String detail, List<String> logs) {
-            return new StartupCheck(true, false, false, detail, logs);
-        }
-
-        private static StartupCheck warmingUp(String detail, List<String> logs) {
-            return new StartupCheck(true, false, true, detail, logs);
-        }
-
-        private static StartupCheck pending(String detail, List<String> logs) {
-            return new StartupCheck(false, false, false, detail, logs);
-        }
-
-        private static StartupCheck failed(String detail, List<String> logs) {
-            return new StartupCheck(false, true, false, detail, logs);
-        }
-    }
+    public record StartupCheck(boolean ready, String detail, List<String> logs) { }
 }

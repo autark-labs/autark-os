@@ -70,6 +70,12 @@ second install. Completion should leave one managed app with working controls;
 repeating an install request must not recreate it or report its own container as
 a conflict. Recovery is for incomplete installations after their job has ended.
 
+Also install Homepage: installation must verify its local web link before
+announcing readiness. Startup uses the same Docker-status and HTTP/TCP checks as
+ongoing monitoring, within the catalog app's startup window. Local HTTP probes
+use HTTP/1.1, without cleartext HTTP/2 upgrades. Pause and resume an installed app
+and confirm its tile stays on Home as well as My Apps, with its current status.
+
 For a deterministic manual backup test, turn off automatic backups in Settings
 before installing the test apps, then enable backups in each install plan. This
 allows explicit backup/restore without a routine cold backup stopping the app

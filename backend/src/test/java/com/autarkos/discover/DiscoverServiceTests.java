@@ -383,7 +383,7 @@ class DiscoverServiceTests {
         private InstallOptionsRequest lastOptions;
 
         private RecordingMarketplaceInstallService() {
-            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

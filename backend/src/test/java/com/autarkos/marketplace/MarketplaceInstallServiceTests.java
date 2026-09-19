@@ -25,6 +25,7 @@ import com.autarkos.marketplace.catalog.ManifestValidator;
 import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppRuntimeMetadataWriter;
+import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.CatalogPackageCopier;
 import com.autarkos.marketplace.install.ComposeRenderer;
 import com.autarkos.marketplace.install.DockerComposeExecutor;
@@ -54,6 +55,16 @@ import com.autarkos.testsupport.JpaTestRepositories;
 import com.autarkos.testsupport.ManagedAppTestContract;
 
 class MarketplaceInstallServiceTests {
+
+    private boolean appLinkReachable = true;
+    private final AppAccessChecker accessChecker = new AppAccessChecker() {
+        @Override
+        protected com.autarkos.marketplace.install.models.AccessModels.AppAccessCheck accessCheck(String appId, String url) {
+            return appLinkReachable
+                    ? com.autarkos.marketplace.install.models.AccessModels.AppAccessCheck.reachable(appId, url)
+                    : com.autarkos.marketplace.install.models.AccessModels.AppAccessCheck.unreachable(appId, url);
+        }
+    };
 
     @TempDir
     Path runtimeRoot;
@@ -103,7 +114,7 @@ class MarketplaceInstallServiceTests {
                 tailscaleService, activityLogService, ownership, metadataWriter, observedServices,
                 ManagedAppTestContract.service(repository, runtimeLayout, ownership.currentIdentity()),
                 com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()),
-                new RecoveryOperationCoordinator());
+                new RecoveryOperationCoordinator(), accessChecker);
     }
 
     @Test
@@ -380,7 +391,7 @@ class MarketplaceInstallServiceTests {
         InstallModels.InstallResult result = installService.install(manifest);
 
         assertThat(result.status()).isEqualTo("failed");
-        assertThat(result.message()).contains("stopped or reported unhealthy");
+        assertThat(result.message()).contains("could not start");
         assertThat(repository.findAllApps()).isEmpty();
     }
 
@@ -409,7 +420,7 @@ class MarketplaceInstallServiceTests {
                     assertThat(service.ownershipState()).isEqualTo("failed_install");
                     assertThat(service.runtimeState()).isEqualTo("failed");
                     assertThat(service.displayName()).isEqualTo("Vaultwarden");
-                    assertThat(service.metadataJson()).contains("stopped or reported unhealthy");
+                    assertThat(service.metadataJson()).contains("could not start");
                 });
 
         MarketplaceInstallService successfulInstallService = installService(
@@ -427,7 +438,27 @@ class MarketplaceInstallServiceTests {
     }
 
     @Test
-    void installsWhenContainerIsRunningButHealthCheckIsStillStarting() throws Exception {
+    void healthyContainerWithBrokenWebLinkDoesNotCompleteInstallation() {
+        RuntimeLayout layout = runtimeLayout();
+        var repository = JpaTestRepositories.installedAppRepository(layout);
+        var manifest = org.mockito.Mockito.spy(new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator())
+                .findById("homepage").orElseThrow());
+        var health = manifest.health();
+        org.mockito.Mockito.doReturn(new com.autarkos.marketplace.model.HealthManifest(
+                health.type(), health.path(), 0, health.successLabel(), health.startingLabel(), health.failureLabel(), health.description()))
+                .when(manifest).health();
+        appLinkReachable = false;
+
+        var result = installService(layout, repository, observedRepository(layout), null).install(manifest);
+
+        assertThat(result.status()).isEqualTo("failed");
+        assertThat(result.message()).contains("local app link did not respond");
+        assertThat(result.steps()).noneSatisfy(step -> assertThat(step.label()).isEqualTo(health.successLabel()));
+        assertThat(repository.findAppById("homepage")).isEmpty();
+    }
+
+    @Test
+    void waitsForContainerHealthBeforeCompletingInstall() throws Exception {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());
         RuntimeLayout runtimeLayout = new RuntimeLayout(properties);
@@ -440,7 +471,15 @@ class MarketplaceInstallServiceTests {
                 new RuntimeDirectoryManager(runtimeLayout),
                 new CatalogPackageCopier(),
                 new ComposeRenderer(runtimeLayout),
-                new FakeDockerComposeExecutor(List.of(new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "running", "starting", "Up 20 seconds (health: starting)", "0.0.0.0:8090->80/tcp"))),
+                new FakeDockerComposeExecutor() {
+                    private boolean starting = true;
+                    @Override
+                    public List<RuntimeModels.DockerContainerStatus> containers(Path composeFile, String projectName) {
+                        if (!starting) return super.containers(composeFile, projectName);
+                        starting = false;
+                        return List.of(new RuntimeModels.DockerContainerStatus("autark-os-vaultwarden", "vaultwarden", "running", "starting", "Up (health: starting)", "0.0.0.0:8090->80/tcp"));
+                    }
+                },
                 repository,
                 customizationResolver,
                 new FakePostInstallProvisioner(),
@@ -453,9 +492,9 @@ class MarketplaceInstallServiceTests {
         assertThat(result.steps())
                 .anySatisfy(step -> {
                     assertThat(step.label()).isEqualTo("Checking app health");
-                    assertThat(step.detail()).contains("still finishing startup checks");
+                    assertThat(step.detail()).contains("local app link is responding");
                 });
-        assertThat(repository.findAppById("vaultwarden").orElseThrow().status()).isEqualTo("Starting");
+        assertThat(repository.findAppById("vaultwarden").orElseThrow().status()).isEqualTo("Ready");
     }
 
     @Test
@@ -727,7 +766,7 @@ class MarketplaceInstallServiceTests {
                 observedService,
                 ManagedAppTestContract.service(repository, runtimeLayout, identity(runtimeLayout)),
                 com.autarkos.testsupport.DockerInventoryTestData.service(() -> observedInventory(observedRepository)),
-                new RecoveryOperationCoordinator());
+                new RecoveryOperationCoordinator(), accessChecker);
     }
 
     private com.autarkos.host.DockerInventorySnapshot observedInventory(ObservedServiceRepository repository) {

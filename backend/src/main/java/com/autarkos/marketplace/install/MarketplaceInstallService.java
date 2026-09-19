@@ -64,7 +64,8 @@ public class MarketplaceInstallService {
             ObservedServiceService observedServiceService,
             ManagedAppAttestationService managedApps,
             DockerInventoryService dockerInventory,
-            RecoveryOperationCoordinator recoveryOperations) {
+            RecoveryOperationCoordinator recoveryOperations,
+            AppAccessChecker accessChecker) {
         this.installPlanService = installPlanService;
         this.directoryManager = directoryManager;
         this.packageCopier = packageCopier;
@@ -82,7 +83,7 @@ public class MarketplaceInstallService {
         this.managedApps = managedApps;
         this.dockerInventory = dockerInventory;
         this.recoveryOperations = recoveryOperations;
-        this.startupChecker = new InstallStartupChecker(dockerComposeExecutor);
+        this.startupChecker = new InstallStartupChecker(dockerComposeExecutor, accessChecker);
     }
 
     public InstallModels.InstallResult install(ApplicationManifest manifest) {
@@ -177,10 +178,8 @@ public class MarketplaceInstallService {
             InstallStartupChecker.StartupCheck startupCheck = startupChecker.waitForStartup(
                     composeFile,
                     composeProject,
-                    manifest.health(),
-                    manifest.runtime() == null || manifest.runtime().services() == null
-                            ? List.of()
-                            : manifest.runtime().services().stream().map(com.autarkos.marketplace.model.RuntimeServiceManifest::name).toList());
+                    manifest,
+                    runtimeConfiguration.accessUrl());
             logs.addAll(startupCheck.logs());
             if (!startupCheck.ready()) {
                 recordStep(steps, sink, InstallModels.InstallStep.failed("Checking app health", startupCheck.detail()));
@@ -209,12 +208,12 @@ public class MarketplaceInstallService {
             installedAppRepository.save(new InstalledApp(
                     manifest.id(),
                     manifest.name(),
-                    startupCheck.warmingUp() ? AutarkOsStates.AppStatus.STARTING : AutarkOsStates.AppStatus.READY,
+                    AutarkOsStates.AppStatus.READY,
                     appRoot.toString(),
                     composeProject,
                     runtimeConfiguration.accessUrl(),
                     Instant.now()));
-            saveOwnershipMetadata(manifest, appRoot, runtimeMetadata, startupCheck.warmingUp() ? "starting" : "ready");
+            saveOwnershipMetadata(manifest, appRoot, runtimeMetadata, "ready");
             ManagedAppAttestationService.Result attestation = managedApps.attest(manifest.id());
             if (!attestation.managed()) {
                 installedAppRepository.deleteApp(manifest.id());

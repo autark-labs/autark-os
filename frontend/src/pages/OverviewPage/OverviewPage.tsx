@@ -12,7 +12,6 @@ function OverviewPage() {
   const home = useHomeRepository();
 
   const apps = useMemo(() => appState.applications.filter((application) => application.relationship === 'managed'), [appState.applications]);
-  const readyApps = useMemo(() => apps.filter((application) => application.runtime?.state === 'ready'), [apps]);
   const deviceName = home.summary?.deviceName || 'Autark-OS';
   const summaryAvailability = homeSummaryAvailability(home.summary, home.summaryError);
   const systemMetrics = homeSystemMetrics(home.summary, summaryAvailability);
@@ -25,7 +24,7 @@ function OverviewPage() {
           summaryAvailability={summaryAvailability}
           summary={home.summary}
         >
-          {appState.freshness.hasUsableData && <InstalledAppsLauncher apps={readyApps} />}
+          {appState.freshness.hasUsableData && <InstalledAppsLauncher apps={apps} />}
         </HomeHero>
       </ExtensionActionTarget>
 
