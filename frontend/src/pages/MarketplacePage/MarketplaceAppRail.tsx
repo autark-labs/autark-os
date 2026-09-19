@@ -135,7 +135,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
   const [tab, setTab] = useState('overview');
   const [duplicateWarningOpen, setDuplicateWarningOpen] = useState(false);
   const application = appView.application;
-  const reviewExistingHref = application.primaryAction.id === 'review_existing' ? application.primaryAction.href : null;
+  const reviewExistingHref = marketplacePrimaryRoute(appView);
 
   useEffect(() => {
     setTab('overview');
@@ -185,7 +185,7 @@ function MarketplaceAppDetailsPopover({ appView, onClose, onInstallSecondCopy, o
               <AppFactList items={appView.app.highlights} title="Key features" />
               <AppFactList items={appView.app.bestFor} title="Best for" />
             </div>
-            {application.relationship === 'blocked' && (
+            {application.availableActions.some((action) => action.id === 'install_copy' && !action.disabled) && (
               <ProjectDarkControlButton className="w-fit" onClick={() => setDuplicateWarningOpen(true)} type="button">
                 Install second copy
               </ProjectDarkControlButton>

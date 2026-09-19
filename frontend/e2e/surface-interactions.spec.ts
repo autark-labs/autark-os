@@ -97,7 +97,7 @@ test('narrow view keeps sheets and the backup dialog within the viewport', async
 
   await openReadyRoute(page, '/discover?detail=immich', { width: 390, height: 844 });
   await expect(page.getByRole('dialog')).toContainText(/Immich/i);
-  await page.getByRole('dialog').getByRole('link', { name: /Review existing service/i }).first().click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Recover app', exact: true }).first().click();
   await expect(page).toHaveURL(/\/apps\?review=immich/);
   await expect(page.getByRole('dialog')).toContainText(/Recover Immich/i);
   await expectNoHorizontalOverflow(page);

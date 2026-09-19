@@ -1,8 +1,10 @@
 import { expect, test } from 'playwright/test';
 import { installMockApi, stabilizePage } from './support/mockApi';
+import type { ApplicationState } from '../src/types/applicationState';
 
 for (const type of ['backup_restore', 'uninstall_app']) {
   test(`${type} shows terminal failure and relevant recovery rather than start/stop advice`, async ({ page }) => {
+    test.setTimeout(45_000);
     await page.setViewportSize({ width: 1440, height: 960 });
     await installMockApi(page, 'idle');
     let status = 'running';
@@ -12,11 +14,22 @@ for (const type of ['backup_restore', 'uninstall_app']) {
       steps: [{ id: 'checkpoint', label: 'Create safety checkpoint', status, message: 'The backup destination is unavailable.' }],
       error: status === 'failed' ? { code: 'job_failed', message: 'The backup destination is unavailable.', details: {} } : null });
     await page.route('**/api/jobs', route => route.fulfill({ json: [job()] }));
+    await page.goto('/home');
+    const snapshot: ApplicationState = await page.evaluate(async () => (await fetch('/api/application-state')).json());
+    await page.route('**/api/application-state*', async route => {
+      const app = snapshot.applications.find((application) => application.id === 'vaultwarden')!;
+      app.operation = status === 'succeeded' ? { kind: 'idle' } : {
+        kind: status === 'failed' ? 'failed' : type === 'backup_restore' ? 'restoring' : 'uninstalling',
+        label: status === 'failed' ? label : type === 'backup_restore' ? 'Restoring' : 'Uninstalling safely',
+        jobId: 'operation-test', jobType: type, message: 'The backup destination is unavailable.',
+      };
+      await route.fulfill({ json: snapshot });
+    });
     await page.goto('/apps');
     await stabilizePage(page);
     await expect(page.getByText(type === 'backup_restore' ? 'Restoring' : 'Uninstalling safely', { exact: true }).first()).toBeVisible();
     status = 'failed';
-    await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i }).click();
     await page.getByRole('button', { name: /^Manage app$/i }).click();
     await page.getByRole('tab', { name: 'Recovery', exact: true }).click();

@@ -83,6 +83,11 @@ test('marketplaceVisibleAppViews filters canonical availability and installs', (
 });
 
 test('marketplacePrimaryRoute follows My Apps management and existing-service actions', () => {
+  for (const disabled of [false, true]) {
+    assert.equal(marketplacePrimaryRoute({
+      application: application('homepage', 'recovery_required', { id: 'recover', kind: 'route', href: '/apps?review=homepage', disabled }),
+    }), disabled ? null : '/apps?review=homepage');
+  }
   assert.equal(marketplacePrimaryRoute({
     application: application('vaultwarden', 'managed', { id: 'manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden', disabled: false }),
   }), '/apps?focus=managed%3Avaultwarden&panel=manage');

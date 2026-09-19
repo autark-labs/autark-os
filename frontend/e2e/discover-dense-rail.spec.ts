@@ -43,18 +43,9 @@ test('wide Discover keeps a selected app in the dense launcher detail rail', asy
   await page.screenshot({ path: 'test-results/discover-app-drawer.png', fullPage: false });
 
   await detailDrawer.getByRole('tab', { name: 'Overview' }).click();
-  await detailDrawer.getByRole('button', { name: 'Install second copy' }).click();
-  const duplicateDialog = page.getByRole('dialog').filter({ hasText: 'Install a second copy?' });
-  await expect(duplicateDialog).toBeVisible();
-  await duplicateDialog.getByRole('button', { name: 'Install second copy anyway' }).click();
-  const installDialog = page.getByRole('dialog').filter({ hasText: 'Install Immich' });
-  await expect(installDialog).toBeVisible();
-  await expect(installDialog).toContainText('Install plan');
-  await expect(installDialog).toContainText('Create the app');
-  await expect(installDialog.getByRole('button', { name: 'Install app' })).toBeDisabled();
-  await installDialog.getByLabel('Confirm install plan').click();
-  await expect(installDialog.getByRole('button', { name: 'Install app' })).toBeEnabled();
-  await page.screenshot({ path: 'test-results/discover-install-review.png', fullPage: false });
+  await expect(detailDrawer.getByRole('button', { name: 'Install second copy' })).toHaveCount(0);
+  await rail.getByRole('link', { name: 'Recover app' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Recover Immich');
 });
 
 test('narrow Discover opens the selected app in the full review sheet', async ({ page }) => {

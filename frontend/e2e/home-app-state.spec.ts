@@ -15,6 +15,9 @@ test('Home and My Apps keep the same managed app visible across runtime states',
     ['starting', 'Starting'], ['degraded', 'Needs attention'], ['stopped', 'Stopped'], ['ready', 'Running'],
   ] as const) {
     application.runtime.state = state;
+    application.availableActions = state === 'ready'
+      ? [{ id: 'open', label: 'Open', kind: 'external', href: application.runtime.accessUrl, method: null, disabled: false, reason: '' }]
+      : [];
     await page.goto('/apps');
     await expect(page.getByText(application.name, { exact: true }).first()).toBeVisible();
     await page.locator('a[href="/home"]').first().click();
@@ -22,6 +25,15 @@ test('Home and My Apps keep the same managed app visible across runtime states',
     await expect(launcher.getByText(application.name, { exact: true })).toBeVisible();
     await expect(launcher.getByText(label, { exact: true })).toBeVisible();
     await expect(page.getByText('No apps installed yet', { exact: true })).toBeHidden();
+    if (state === 'ready') {
+      await expect(launcher.getByRole('link', { name: `Open ${application.name}`, exact: true }).first()).toHaveAttribute('href', application.runtime.accessUrl!);
+    } else {
+      await expect(launcher.getByRole('link', { name: `Open ${application.name}`, exact: true })).toHaveCount(0);
+      const manage = launcher.getByRole('link', { name: `Manage ${application.name}`, exact: true }).first();
+      await expect(manage).toHaveAttribute('href', '/apps?focus=managed%3Avaultwarden&panel=manage');
+      await manage.click();
+      await expect(page.getByRole('tab', { name: 'Guide', exact: true })).toBeVisible();
+    }
   }
 
   await page.setViewportSize({ width: 390, height: 844 });

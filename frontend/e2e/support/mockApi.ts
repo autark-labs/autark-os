@@ -88,6 +88,7 @@ const appSettings = {
 };
 
 const runtimeApp = {
+  appInstanceId: 'appinst_fixture_vaultwarden',
   state: 'ready',
   appId: 'vaultwarden',
   appName: 'Vaultwarden with a deliberately long self-hosted service name',
@@ -187,7 +188,7 @@ const managedApplication = {
   id: 'vaultwarden', name: runtimeApp.appName, category: 'Security', image: '', summary: 'Private password vault', description: 'Private password vault',
   relationship: 'managed', catalogAvailability: 'installable', appInstanceId: runtimeApp.appInstanceId, runtimeState: 'running', ownershipState: 'owned_managed', accessState: 'private_ready', backupState: 'protected_by_restore_point', issues: [],
   relationshipLabel: 'Installed', relationshipDescription: 'Managed by this Autark-OS installation.', statusTone: 'success', cardTone: 'success',
-  primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden&panel=manage', method: null, disabled: false, reason: '' }, availableActions: [], runtime: runtimeApp, evidence: null,
+  primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden&panel=manage', method: null, disabled: false, reason: '' }, availableActions: [{ id: 'open', label: 'Open', kind: 'external', href: runtimeApp.accessRoute.privateUrl, method: null, disabled: false, reason: '' }], runtime: runtimeApp, evidence: null,
 };
 
 const immichApplication = {
@@ -195,7 +196,7 @@ const immichApplication = {
   id: 'immich', name: 'Immich', category: 'Photos', image: '', summary: 'Private photo library', description: 'Keep photos on your own server.',
   relationship: 'recovery_required', catalogAvailability: 'installable', appInstanceId: '', runtimeState: 'running', ownershipState: 'foreign_autark_os', accessState: 'not_ready', backupState: 'backup_disabled', issues: [],
   relationshipLabel: 'Recovery required', relationshipDescription: 'This app belongs to another Autark-OS installation.', statusTone: 'warning', cardTone: 'warning',
-  primaryAction: { id: 'review_existing', label: 'Review existing service', kind: 'route', href: '/apps?review=immich', method: null, disabled: false, reason: '' }, availableActions: [{ id: 'review_existing', label: 'Review existing service', kind: 'route', href: '/apps?review=immich', method: null, disabled: false, reason: '' }], runtime: null,
+  primaryAction: { id: 'recover', label: 'Recover app', kind: 'route', href: '/apps?review=immich', method: null, disabled: false, reason: '' }, availableActions: [{ id: 'recover', label: 'Recover app', kind: 'route', href: '/apps?review=immich', method: null, disabled: false, reason: '' }], runtime: null,
   evidence: { resourceId: 'foreign-immich', source: 'docker', url: 'http://immich.local:2283', accessScope: 'Home network', ownershipState: 'foreign_autark_os', runtimeState: 'running', statusLabel: 'Owned elsewhere', summary: 'This app belongs to another Autark-OS installation.', appInstanceId: 'appinst_immich', ownerInstanceId: 'other-instance', runtimePath: '/var/lib/autark-os/apps/immich', composeProject: 'legacy-immich' },
 };
 
@@ -303,7 +304,7 @@ const storageReport = {
   runtimeDisk: { label: 'Autark-OS data', path: '/var/lib/autark-os', totalBytes: 1_000_000_000_000, usableBytes: 430_000_000_000, usedBytes: 90_000_000_000, usedPercent: 9 },
   backupStorage: { label: 'Backups', path: '/var/lib/autark-os/backups', totalBytes: 1_000_000_000_000, usableBytes: 430_000_000_000, usedBytes: 28_800_000, usedPercent: 1 },
   apps: [{ appId: 'vaultwarden', appName: runtimeApp.appName, status: 'healthy', path: runtimeApp.runtimePath, usedBytes: 19_000_000, sevenDayGrowthBytes: 1_000_000, trend: [{ usedBytes: 18_000_000, sampledAt: '2025-01-08T12:00:00.000Z' }, { usedBytes: 19_000_000, sampledAt: fixedAt }], backupEnabled: true, backupFrequency: 'daily', backupState: 'protected_by_restore_point' }],
-  orphanedData: [{ name: 'old-paperless-import', path: '/var/lib/autark-os/orphans/old-paperless-import', usedBytes: 8_400_000 }],
+  orphanedData: [{ name: 'old-paperless-import', path: '/var/lib/autark-os/orphans/old-paperless-import', usedBytes: 8_400_000, cleanupAllowed: true, cleanupBlockedReason: '' }],
   recommendations: [{ id: 'review-orphan', tone: 'warning', title: 'Review unused data', message: 'An old import folder can be removed after review.', actionLabel: 'Review folder' }],
   installSafety: { status: 'ready', message: 'Enough disk space is available for a typical verified app.', minimumRecommendedFreeBytes: 50_000_000_000, currentFreeBytes: 430_000_000_000, installAllowed: true },
   checkedAt: fixedAt,

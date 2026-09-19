@@ -25,6 +25,7 @@ import { InstallWizard } from './MarketplaceInstallWizard';
 import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
 import { AppImage, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
 import { DuplicateInstallWarningDialog } from './DuplicateInstallWarningDialog';
+import { marketplacePrimaryRoute } from './extensions/MarketplacePage.logic';
 
 type AppDetailProps = {
   app: MarketplaceApp;
@@ -60,10 +61,10 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
   const needsExistingServiceReview = !isInstalled && (
     application.relationship === 'recovery_required' || application.relationship === 'blocked'
   );
-  const canInstallSecondCopy = application.relationship === 'blocked';
-  const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appInstanceId) : '/apps';
-  const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.appInstanceId, { panel: 'manage' }) : '/apps';
-  const reviewExistingHref = application.primaryAction.id === 'review_existing' ? application.primaryAction.href : null;
+  const canInstallSecondCopy = application.availableActions.some((action) => action.id === 'install_copy' && !action.disabled);
+  const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.id) : '/apps';
+  const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.id, { panel: 'manage' }) : '/apps';
+  const reviewExistingHref = needsExistingServiceReview ? marketplacePrimaryRoute(appView) : null;
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
     ? `${app.name} is already installing.`
@@ -113,7 +114,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
                 <ProjectWarningButton asChild>
                   <Link to={reviewExistingHref}>
                     <TriangleAlert className="size-4" />
-                    Review existing service
+                    {application.primaryAction.label}
                   </Link>
                 </ProjectWarningButton>
               )}
@@ -278,7 +279,7 @@ function ExistingServiceNotice({ appView, reviewHref }: { appView: DiscoverAppVi
           <p className="mt-2 leading-6 text-current/80">Review recovery for the existing service before creating another copy.</p>
           {reviewHref && (
             <Button asChild className="mt-3" size="sm" variant="outline">
-              <Link to={reviewHref}>Review existing service</Link>
+              <Link to={reviewHref}>{appView.application.primaryAction.label}</Link>
             </Button>
           )}
         </div>
@@ -398,14 +399,14 @@ function InlineInstallStatus({
                 )}
                 {installedApp && shouldOfferFirstBackup(installedApp) && (
                   <DisabledAction disabled={backupJob ? !terminalJob(backupJob) : false} reason="Autark-OS is already creating the first backup for this app.">
-                    <ProjectDarkControlButton disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.appInstanceId)} size="sm" type="button">
+                    <ProjectDarkControlButton disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.id)} size="sm" type="button">
                       {backupJob && !terminalJob(backupJob) ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
                       {backupJob?.status === 'succeeded' ? 'Backup created' : backupJob && !terminalJob(backupJob) ? 'Creating backup' : 'Create first backup'}
                     </ProjectDarkControlButton>
                   </DisabledAction>
                 )}
                 <ProjectDarkControlButton asChild size="sm">
-                  <Link to={applicationDeepLinkForManagedApp(installedApp?.appInstanceId || app.id)}>View in My Apps</Link>
+                  <Link to={applicationDeepLinkForManagedApp(installedApp?.id || app.id)}>View in My Apps</Link>
                 </ProjectDarkControlButton>
               </div>
             )}

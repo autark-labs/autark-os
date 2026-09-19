@@ -75,6 +75,10 @@ announcing readiness. Startup uses the same Docker-status and HTTP/TCP checks as
 ongoing monitoring, within the catalog app's startup window. Local HTTP probes
 use HTTP/1.1, without cleartext HTTP/2 upgrades. Pause and resume an installed app
 and confirm its tile stays on Home as well as My Apps, with its current status.
+While paused, its Home launch control should open management rather than the
+stopped service. On desktop and mobile, check Discover's management and recovery
+links; second-copy installation must only appear when the canonical app actions
+allow it. After install, the first-backup action should target that same app.
 
 For a deterministic manual backup test, turn off automatic backups in Settings
 before installing the test apps, then enable backups in each install plan. This

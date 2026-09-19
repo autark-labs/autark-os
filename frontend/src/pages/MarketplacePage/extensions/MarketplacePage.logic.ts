@@ -102,7 +102,7 @@ export function marketplacePrimaryRoute(view: Pick<DiscoverAppView, 'application
   if (action.id === 'manage') {
     return applicationRouteWithManagementPanel(action.href) ?? null;
   }
-  if (action.id === 'review_existing') {
+  if (action.id === 'review_existing' || action.id === 'recover') {
     return action.href;
   }
   return null;
