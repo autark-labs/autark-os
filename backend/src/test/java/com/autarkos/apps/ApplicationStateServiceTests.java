@@ -30,6 +30,27 @@ import java.nio.file.Path;
 class ApplicationStateServiceTests {
 
     @Test
+    void queuedAndRunningInstallJobsReachInventoryBeforeAnyRuntimeExists() {
+        var inventory = mock(ApplicationInventoryService.class);
+        var active = new AtomicReference<>(List.of(lifecycleJob("install", "install_app", "syncthing", "queued", "start", "2026-06-21T12:00:00Z")));
+        org.mockito.Mockito.when(inventory.apps(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyMap()))
+                .thenAnswer(invocation -> {
+                    java.util.Map<String, com.autarkos.api.AppOperationView> operations = invocation.getArgument(2);
+                    assertThat(operations).containsKey("syncthing");
+                    assertThat(operations.get("syncthing").kind()).isEqualTo("installing");
+                    assertThat(operations.get("syncthing").jobId()).isEqualTo("install");
+                    return List.of();
+                });
+        var service = createService(List::of, new ObservedServiceService(repository(), noScan()), inventory,
+                Instant::now, active::get);
+        service.refreshNow();
+        active.set(List.of(lifecycleJob("install", "install_app", "syncthing", "running", "start", "2026-06-21T12:00:01Z")));
+        service.refreshNow();
+        org.mockito.Mockito.verify(inventory, org.mockito.Mockito.times(2)).apps(
+                org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
     void oneDockerGenerationFeedsEveryCanonicalConsumerAndFailurePreservesIt() {
         var inventoryCalls = new AtomicInteger();
         var currentInventory = new AtomicReference<>(com.autarkos.testsupport.DockerInventoryTestData.empty());

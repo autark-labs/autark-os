@@ -302,6 +302,25 @@ class MarketplaceInstallServiceTests {
     }
 
     @Test
+    void repeatInstallRecognizesManagedAppWithLiveOwnedContainer() throws Exception {
+        RuntimeLayout layout = runtimeLayout();
+        InstalledAppRepository repository = JpaTestRepositories.installedAppRepository(layout);
+        ObservedServiceRepository observed = observedRepository(layout);
+        InstalledApp existing = new InstalledApp("syncthing", "Syncthing", "Starting",
+                layout.appRoot("syncthing").toString(), "autark-os-syncthing", "http://localhost:8384", Instant.now());
+        repository.save(existing);
+        writeManagedContract(repository, layout, existing);
+        observed.upsert(observed("docker:syncthing", "syncthing", "owned_managed", "observed"));
+        var executor = new FakeDockerComposeExecutor();
+        var service = installService(layout, repository, observed, null, executor);
+        var manifest = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator())
+                .findById("syncthing").orElseThrow();
+
+        assertThat(service.install(manifest).status()).isEqualTo("already_installed");
+        assertThat(repository.findAppById("syncthing").orElseThrow().installedAt()).isEqualTo(existing.installedAt());
+    }
+
+    @Test
     void explicitlyReinstallsExistingApp() throws Exception {
         AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
         properties.setRuntimeRoot(runtimeRoot.toString());

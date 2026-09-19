@@ -61,11 +61,12 @@ public class ApplicationInventoryService {
             List<ObservedService> evidence,
             AppRuntimeView runtime,
             AppOperationView operation) {
+        boolean installing = AutarkOsStates.OperationKind.INSTALLING.equals(operation.kind());
         InstalledApp registered = installedAppRepository.findAppById(manifest.id()).orElse(null);
         ManagedAppAttestationService.Result attestation = managedApps.attest(registered);
         InstalledApp storedRegistration = !attestation.managed() ? null
                 : registered;
-        AppRecoveryModels.RecoveryPlan recoveryPlan = attestation.managed()
+        AppRecoveryModels.RecoveryPlan recoveryPlan = installing || attestation.managed()
                 ? null
                 : recovery.applicablePlan(manifest.id(), evidence).orElse(null);
         ObservedService registrationLost = matchingObserved(manifest.id(), evidence,
@@ -77,15 +78,17 @@ public class ApplicationInventoryService {
         ObservedService blocked = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.UNKNOWN_CONFLICT.equals(service.ownershipState())).orElse(null);
         ObservedService found = matchingObserved(manifest.id(), evidence, service -> !AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
 
-        ApplicationRelationship relationship = relationship(
+        ApplicationRelationship relationship = installing && installed == null ? ApplicationRelationship.AVAILABLE : relationship(
                 installed, recoveryPlan, registered, registrationLost, legacy, managedElsewhere, failedInstall, blocked, found);
         ObservedService observedService = firstPresent(registrationLost, legacy, managedElsewhere, failedInstall, blocked, found);
         ManagedAppAttestationService.Result failedRegistration = registered != null && !attestation.managed()
                 ? attestation
                 : null;
-        ApplicationEvidence applicationEvidence = evidence(observedService, failedRegistration);
+        ApplicationEvidence applicationEvidence = installing ? null : evidence(observedService, failedRegistration);
         String reviewExistingHref = reviewExistingHref(manifest.id());
-        ApplicationAction primaryAction = primaryAction(manifest.id(), relationship, installed, observedService, reviewExistingHref);
+        ApplicationAction primaryAction = installing
+                ? new ApplicationAction("installing", "Installing", "disabled", null, null, true, "Installation is in progress.")
+                : primaryAction(manifest.id(), relationship, installed, observedService, reviewExistingHref);
         return new ApplicationView(
                 manifest.id(),
                 manifest.name(),
@@ -98,12 +101,12 @@ public class ApplicationInventoryService {
                 attestation.managed() ? attestation.ownership().appInstanceId() : "",
                 operation,
                 relationship == ApplicationRelationship.MANAGED ? issues(runtime) : List.of(),
-                relationshipLabel(relationship),
-                relationshipDescription(relationship, applicationEvidence, failedRegistration),
+                installing ? operation.label() : relationshipLabel(relationship),
+                installing ? operation.currentStep() : relationshipDescription(relationship, applicationEvidence, failedRegistration),
                 statusTone(relationship),
                 cardTone(relationship),
                 primaryAction,
-                availableActions(manifest.id(), relationship, installed, runtime, operation, observedService, reviewExistingHref),
+                installing ? List.of(primaryAction) : availableActions(manifest.id(), relationship, installed, runtime, operation, observedService, reviewExistingHref),
                 relationship == ApplicationRelationship.MANAGED ? runtime : null,
                 applicationEvidence);
     }

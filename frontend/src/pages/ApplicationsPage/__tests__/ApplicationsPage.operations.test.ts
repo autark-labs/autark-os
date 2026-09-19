@@ -12,6 +12,7 @@ test('runtime controls follow the canonical operation state', () => {
   assert.equal(runtimeControlsDisabled({ kind: 'idle' }, null), false);
   assert.equal(runtimeControlsDisabled({ kind: 'failed', label: 'Failed', message: 'Failed' }, null), false);
   assert.equal(runtimeControlsDisabled({ kind: 'starting', label: 'Starting' }, null), true);
+  assert.equal(runtimeControlsDisabled({ kind: 'installing', label: 'Installing' }, null), true);
   assert.equal(runtimeControlsDisabled({ kind: 'idle' }, 'start'), true);
 });
 

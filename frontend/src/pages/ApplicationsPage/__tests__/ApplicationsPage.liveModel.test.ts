@@ -47,3 +47,11 @@ function application(runtime: AppRuntimeView) {
     availableActions: [], runtime, evidence: null,
   };
 }
+
+test('registration appearing during install retains its busy operation', () => {
+  const runtime = { appId: 'syncthing', appName: 'Syncthing', state: 'starting', backupProtection: 'backup_disabled' } as AppRuntimeView;
+  const view = { ...application(runtime), operation: { kind: 'installing', label: 'Installing', jobId: 'install-1', currentStep: 'Finishing install' } };
+  const [item] = buildApplicationSurfaceItems({ applications: [view] });
+  assert.equal(item.operation.kind, 'installing');
+  assert.equal(item.state, 'starting');
+});

@@ -40,6 +40,32 @@ import com.autarkos.testsupport.ManagedAppTestContract;
 
 class ApplicationInventoryServiceTests {
 
+    @Test
+    void activeInstallIsNotOfferedAsRecoveryBeforeRegistrationExists() {
+        var repository = installedRepository();
+        var recovery = recovery();
+        var inventory = new ApplicationInventoryService(catalogService(), repository, managedApps(repository), recovery);
+        var evidence = List.of(observed("docker:syncthing", "syncthing", "owned_managed", "observed"));
+        var operation = com.autarkos.api.AppOperationView.running("installing", "Installing", "install-1", "Starting services", "Starting services");
+
+        var view = inventory.apps(evidence, List.of(), Map.of("syncthing", operation)).stream()
+                .filter(app -> app.id().equals("syncthing")).findFirst().orElseThrow();
+
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.AVAILABLE);
+        assertThat(view.relationshipLabel()).isEqualTo("Installing");
+        assertThat(view.operation()).isEqualTo(operation);
+        assertThat(view.primaryAction().disabled()).isTrue();
+        assertThat(view.availableActions()).extracting(ApplicationAction::id).doesNotContain("recover", "review_setup");
+        assertThat(view.evidence()).isNull();
+        org.mockito.Mockito.verify(recovery, org.mockito.Mockito.never()).applicablePlan(eq("syncthing"), anyList());
+
+        // Once the job ends, genuine incomplete registrations must still be reviewed.
+        var finished = inventory.apps(evidence, List.of(), Map.of()).stream()
+                .filter(app -> app.id().equals("syncthing")).findFirst().orElseThrow();
+        assertThat(finished.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
+        org.mockito.Mockito.verify(recovery).applicablePlan(eq("syncthing"), anyList());
+    }
+
     @TempDir
     Path runtimeRoot;
 

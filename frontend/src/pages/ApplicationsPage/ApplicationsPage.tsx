@@ -5,6 +5,7 @@ import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ApplicationReviewPrompt } from '@/components/autark-os/ApplicationReviewPrompt';
+import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
@@ -504,6 +505,11 @@ export const ApplicationsPage = () => {
       <ExtensionActionTarget actionId="review-app" routeId="apps">
         <AppsPageHeader attentionCount={attentionCount} managedCount={managedCount} />
       </ExtensionActionTarget>
+
+      {appState.applications.filter((application) => application.operation.kind === 'installing' && !application.runtime).map((application) => {
+        const job = jobsQuery.data?.find((candidate) => candidate.jobId === application.operation.jobId);
+        return job ? <JobProgress compact job={job} key={application.id} subjectLabel={application.name} /> : null;
+      })}
 
       {showApplicationReviewPrompt && (
         <ApplicationReviewPrompt

@@ -179,6 +179,11 @@ public class ApplicationStateService {
                 .toList();
         Map<String, AppOperationView> operations = runtime.stream().collect(java.util.stream.Collectors.toMap(
                 AppRuntimeView::appId, this::operationFor));
+        jobs.get().stream()
+                .filter(job -> AutarkOsStates.JobType.INSTALL_APP.equals(job.type()))
+                .filter(job -> AutarkOsStates.JobStatus.QUEUED.equals(job.status()) || AutarkOsStates.JobStatus.RUNNING.equals(job.status()))
+                .forEach(job -> operations.put(job.subjectId(), AppOperationView.running(
+                        AutarkOsStates.OperationKind.INSTALLING, "Installing", job.jobId(), currentStepText(job), currentStepText(job))));
         List<ObservedService> observed = observedServiceService.observedServices();
         List<ApplicationView> applications = applicationInventoryService.apps(observed, runtime, operations);
         Instant completedAt = clock.get();

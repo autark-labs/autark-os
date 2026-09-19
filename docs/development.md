@@ -64,6 +64,12 @@ Use Storage cleanup to review and delete the leftover data. Test private
 links only with a connected real Tailscale client. Keep existing unrelated Docker
 projects untouched. Installer/systemd and Pi qualification are separate checks.
 
+During Syncthing installation, navigate between Discover and My Apps and refresh
+the browser. Both should show the active installation, not offer recovery or a
+second install. Completion should leave one managed app with working controls;
+repeating an install request must not recreate it or report its own container as
+a conflict. Recovery is for incomplete installations after their job has ended.
+
 For a deterministic manual backup test, turn off automatic backups in Settings
 before installing the test apps, then enable backups in each install plan. This
 allows explicit backup/restore without a routine cold backup stopping the app

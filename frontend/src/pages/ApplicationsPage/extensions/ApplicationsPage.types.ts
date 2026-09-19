@@ -6,7 +6,7 @@ export type ApplicationSettingsAction = 'planning' | 'saving' | 'private_access'
 export type AppOperationState =
   | { kind: 'idle' }
   | {
-    kind: 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'restoring' | 'uninstalling';
+    kind: 'installing' | 'starting' | 'stopping' | 'restarting' | 'repairing' | 'saving_settings' | 'backing_up' | 'restoring' | 'uninstalling';
     label: string;
     jobId?: string;
     currentStep?: string;

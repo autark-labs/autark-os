@@ -106,23 +106,6 @@ public class MarketplaceInstallService {
         Consumer<InstallModels.InstallStep> sink = progressSink == null ? ignored -> { } : progressSink;
         InstallPlan plan = installPlanService.generatePlan(manifest, options);
         RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
-        List<ObservedService> duplicates = matchingObservedDuplicates(manifest);
-        if (duplicates.stream().anyMatch(service -> "owned_managed".equals(service.ownershipState()))) {
-            String message = manifest.name() + " has current-instance runtime resources but no complete managed registration. Review recovery in My Apps before installing it again.";
-            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
-            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
-        }
-        List<ObservedService> previousAutarkOsDuplicates = previousAutarkOsDuplicates(duplicates);
-        if (!previousAutarkOsDuplicates.isEmpty()) {
-            String message = previousAutarkOsDuplicateMessage(manifest);
-            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
-            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
-        }
-        if (!duplicates.isEmpty() && (options == null || !options.duplicateAcknowledgedRequested())) {
-            String message = duplicateWarningMessage(manifest);
-            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
-            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
-        }
         InstalledApp existingApp = installedAppRepository.findAppById(manifest.id()).orElse(null);
         if (existingApp != null && !managedApps.attest(existingApp).managed()) {
             String message = manifest.name() + " has an incomplete managed registration. Review recovery in My Apps before installing or replacing it.";
@@ -144,6 +127,25 @@ public class MarketplaceInstallService {
                     logs,
                     null,
                     setupGuide(manifest, existingApp.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
+        }
+        List<ObservedService> duplicates = matchingObservedDuplicates(manifest).stream()
+                .filter(service -> existingApp == null || !"owned_managed".equals(service.ownershipState()))
+                .toList();
+        if (duplicates.stream().anyMatch(service -> "owned_managed".equals(service.ownershipState()))) {
+            String message = manifest.name() + " has current-instance runtime resources but no complete managed registration. Review recovery in My Apps before installing it again.";
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
+        }
+        List<ObservedService> previousAutarkOsDuplicates = previousAutarkOsDuplicates(duplicates);
+        if (!previousAutarkOsDuplicates.isEmpty()) {
+            String message = previousAutarkOsDuplicateMessage(manifest);
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
+        }
+        if (!duplicates.isEmpty() && (options == null || !options.duplicateAcknowledgedRequested())) {
+            String message = duplicateWarningMessage(manifest);
+            recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
+            return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
         }
         Path appRoot = null;
         String composeProject = "";

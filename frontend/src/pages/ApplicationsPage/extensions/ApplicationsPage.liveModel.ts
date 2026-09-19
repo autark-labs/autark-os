@@ -83,7 +83,7 @@ function backendOperationState(value: ApplicationView['operation']): AppOperatio
       jobId: value.jobId || undefined,
     };
   }
-  if (value.kind === 'starting' || value.kind === 'stopping' || value.kind === 'restarting' || value.kind === 'repairing' || value.kind === 'saving_settings' || value.kind === 'backing_up' || value.kind === 'restoring' || value.kind === 'uninstalling') {
+  if (value.kind === 'installing' || value.kind === 'starting' || value.kind === 'stopping' || value.kind === 'restarting' || value.kind === 'repairing' || value.kind === 'saving_settings' || value.kind === 'backing_up' || value.kind === 'restoring' || value.kind === 'uninstalling') {
     return {
       kind: value.kind,
       label: value.label || operationLabel(value.kind),
@@ -95,6 +95,7 @@ function backendOperationState(value: ApplicationView['operation']): AppOperatio
 }
 
 function operationLabel(kind: string) {
+  if (kind === 'installing') return 'Installing';
   if (kind === 'starting') return 'Starting';
   if (kind === 'stopping') return 'Pausing';
   if (kind === 'restarting') return 'Restarting';

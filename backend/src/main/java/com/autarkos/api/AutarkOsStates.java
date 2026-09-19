@@ -66,6 +66,7 @@ public final class AutarkOsStates {
         public static final String REPAIRING = "repairing";
         public static final String BACKING_UP = "backing_up";
         public static final String RESTORING = "restoring";
+        public static final String INSTALLING = "installing";
         public static final String UNINSTALLING = "uninstalling";
         public static final String FAILED = "failed";
 
