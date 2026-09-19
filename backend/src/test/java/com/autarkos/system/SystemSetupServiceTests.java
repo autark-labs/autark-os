@@ -186,8 +186,10 @@ class SystemSetupServiceTests {
         assertThat(status.existingInstall().conflict()).isTrue();
         assertThat(status.existingInstall().severity()).isEqualTo("warning");
         assertThat(status.existingInstall().resources()).hasSize(2);
+        assertThat(status.existingInstall().resources()).extracting("kind")
+                .containsOnly("previous_installation_resource");
         assertThat(status.existingInstall().actions()).extracting("id")
-                .containsExactly("recover_existing_apps", "abort");
+                .containsExactly("review_existing_apps", "abort");
         assertThat(status.checks()).anySatisfy(check -> {
             assertThat(check.id()).isEqualTo("existing-install");
             assertThat(check.status()).isEqualTo("warning");

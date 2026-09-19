@@ -9,14 +9,12 @@ export type AppRecoveryCheck = {
 export type AppRecoveryPlan = {
   appId: string;
   appName: string;
-  reason: 'current_instance_registration_lost' | 'previous_instance' | 'legacy_autark' | 'insufficient_evidence' | string;
+  reason: 'current_instance_registration_lost' | string;
   applicable: boolean;
   summary: string;
   planId: string;
-  ownershipTransferRequired: boolean;
   runtimePath: string;
-  sourceComposeProject: string;
-  targetComposeProject: string;
+  composeProject: string;
   appInstanceId: string;
   containers: string[];
   mounts: string[];

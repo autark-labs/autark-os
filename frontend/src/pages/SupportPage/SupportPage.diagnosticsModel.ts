@@ -78,13 +78,15 @@ function appRow(applications: ApplicationView[], unavailable = false): Diagnosti
   if (unavailable) {
     return { label: 'Apps', value: 'Status unavailable', tone: 'warning' };
   }
-  const issues = applications.filter((application) => application.relationship !== 'managed' && application.relationship !== 'available');
+  const recoveryAvailable = applications.filter((application) => application.relationship === 'recovery_required').length;
+  const found = applications.filter((application) => application.relationship === 'blocked').length;
   const managedRuntimes = applications.flatMap((application) => application.relationship === 'managed' && application.runtime ? [application.runtime] : []);
   const repairing = managedRuntimes.filter((app) => app.remediation?.state === 'auto_repairing').length;
   const failed = managedRuntimes.filter((app) => ['repair_failed', 'restore_recommended'].includes(app.remediation?.state ?? '')).length;
   const needsReview = managedRuntimes.filter((app) => app.remediation?.state === 'needs_user_action').length;
   const parts: string[] = [];
-  if (issues.length) parts.push(`${issues.length} found on this server`);
+  if (recoveryAvailable) parts.push(`${recoveryAvailable} recovery available`);
+  if (found) parts.push(`${found} found on this server`);
   if (repairing) parts.push(`${repairing} repairing`);
   if (failed) parts.push(`${failed} repair failed`);
   if (needsReview) parts.push(`${needsReview} need review`);

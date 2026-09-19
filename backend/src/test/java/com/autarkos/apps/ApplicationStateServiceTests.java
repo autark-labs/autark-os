@@ -591,7 +591,7 @@ class ApplicationStateServiceTests {
     }
 
     private ApplicationInventoryService inventory() {
-        return new ApplicationInventoryService(null, null, null) {
+        return new ApplicationInventoryService(null, null, null, null) {
             @Override
             public List<ApplicationView> apps(List<ObservedService> observed, List<AppRuntimeView> runtime, java.util.Map<String, com.autarkos.api.AppOperationView> operations) {
                 List<ApplicationView> applications = new ArrayList<>();

@@ -1,12 +1,17 @@
 package com.autarkos.apps;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
@@ -25,6 +30,8 @@ import com.autarkos.marketplace.install.ManagedAppAttestationService;
 import com.autarkos.marketplace.install.AppRuntimeView;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
+import com.autarkos.apps.recovery.AppRecoveryService;
+import com.autarkos.apps.recovery.AppRecoveryModels;
 import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
 import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.AutarkOsIdentity;
@@ -46,7 +53,7 @@ class ApplicationInventoryServiceTests {
                 "syncthing", "instance", "syncthing", "current-instance", runtimeRoot.resolve("apps/syncthing").toString(),
                 "installed", "owned", Instant.now(), Instant.now()));
         String privateUrl = "https://server.example.ts.net:14384";
-        var service = new ApplicationInventoryService(catalogService(), repository, managedApps(repository));
+        var service = new ApplicationInventoryService(catalogService(), repository, managedApps(repository), recovery());
         var view = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", privateUrl)), Map.of())
                 .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
         assertThat(view.runtime().accessRoute().privateLinkStatus()).isEqualTo("verified");
@@ -121,7 +128,7 @@ class ApplicationInventoryServiceTests {
         assertThat(views).filteredOn(view -> view.id().equals("jellyfin"))
                 .singleElement()
                 .satisfies(view -> {
-                    assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
+                    assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
                     assertThat(view.managed()).isFalse();
                     assertThat(view.primaryAction().href()).isEqualTo("/apps?review=jellyfin");
                     assertThat(view.primaryAction().id()).isEqualTo("review_existing");
@@ -132,9 +139,10 @@ class ApplicationInventoryServiceTests {
         assertThat(views).filteredOn(view -> view.id().equals("homepage"))
                 .singleElement()
                 .satisfies(view -> {
-                    assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
-                    assertThat(view.relationshipLabel()).isEqualTo("Recovery required");
+                    assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
+                    assertThat(view.relationshipLabel()).isEqualTo("Blocked");
                     assertThat(view.primaryAction().id()).isEqualTo("review_existing");
+                    assertThat(view.availableActions()).extracting(ApplicationAction::id).containsExactly("review_existing");
                 });
         assertThat(views).filteredOn(view -> view.id().equals("actual-budget"))
                 .singleElement()
@@ -205,6 +213,27 @@ class ApplicationInventoryServiceTests {
     }
 
     @Test
+    void recoveryRelationshipRequiresAnApplicablePreflightPlan() {
+        InstalledAppRepository repository = installedRepository();
+        ObservedServiceRepository observed = observedRepository();
+        observed.upsert(observed("docker:vaultwarden", "vaultwarden", "owned_managed", "observed"));
+        AppRecoveryService recovery = recovery();
+        when(recovery.applicablePlan(eq("vaultwarden"), anyList())).thenReturn(Optional.of(new AppRecoveryModels.RecoveryPlan(
+                "vaultwarden", "Vaultwarden", "current_instance_registration_lost", true,
+                "Registration can be restored.", "recovery-plan", runtimeRoot.resolve("apps/vaultwarden").toString(),
+                "autarkos_autark-os_vaultwarden", "appinst_vaultwarden", List.of("vaultwarden"), List.of(), List.of(),
+                List.of(), List.of("Restore registration"), List.of())));
+        ApplicationInventoryService inventory = new ApplicationInventoryService(
+                catalogService(), repository, managedApps(repository), recovery);
+
+        ApplicationView view = app(inventory, observed, "vaultwarden");
+
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
+        assertThat(view.primaryAction().id()).isEqualTo("recover");
+        assertThat(view.availableActions()).extracting(ApplicationAction::id).contains("recover");
+    }
+
+    @Test
     void failedInstallEvidenceBlocksInstallWithoutBecomingManaged() {
         ObservedServiceRepository observedRepository = observedRepository();
         observedRepository.upsert(observed("autark-os-install:vaultwarden", "vaultwarden", "failed_install", "observed"));
@@ -246,7 +275,7 @@ class ApplicationInventoryServiceTests {
         ObservedServiceRepository observed = observedRepository();
         ApplicationView view = app(service(repository, observed), observed, "homepage");
 
-        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(view.managed()).isFalse();
         assertThat(view.runtime()).isNull();
     }
@@ -264,11 +293,11 @@ class ApplicationInventoryServiceTests {
         ManagedAppAttestationService managedApps = managedApps(repository);
         Files.delete(runtimeRoot.resolve("apps/vaultwarden/manifest.yaml"));
         ApplicationInventoryService inventory = new ApplicationInventoryService(
-                catalogService(), repository, managedApps);
+                catalogService(), repository, managedApps, recovery());
 
         assertThat(inventory.apps(List.of(), List.of(), Map.of()).stream()
                 .filter(view -> view.id().equals("vaultwarden")).findFirst().orElseThrow().relationship())
-                .isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
+                .isEqualTo(ApplicationRelationship.BLOCKED);
         assertThat(org.assertj.core.api.Assertions.catchThrowable(
                 () -> managedApps.requireManaged("vaultwarden", "start")))
                 .isInstanceOf(com.autarkos.marketplace.install.InstallationException.class)
@@ -279,7 +308,12 @@ class ApplicationInventoryServiceTests {
         return new ApplicationInventoryService(
                 catalogService(),
                 installedRepository,
-                managedApps(installedRepository));
+                managedApps(installedRepository),
+                recovery());
+    }
+
+    private AppRecoveryService recovery() {
+        return mock(AppRecoveryService.class);
     }
 
     private ApplicationView app(ApplicationInventoryService service, ObservedServiceRepository observed, String appId) {

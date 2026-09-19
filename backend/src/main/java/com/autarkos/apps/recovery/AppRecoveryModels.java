@@ -2,19 +2,9 @@ package com.autarkos.apps.recovery;
 
 import java.util.List;
 
-import com.autarkos.apps.ApplicationState;
-
 public final class AppRecoveryModels {
 
     private AppRecoveryModels() {
-    }
-
-    public record RecoveryCandidate(
-            String appId,
-            String appName,
-            String reason,
-            String summary,
-            String planHref) {
     }
 
     public record RecoveryCheck(
@@ -32,10 +22,8 @@ public final class AppRecoveryModels {
             boolean applicable,
             String summary,
             String planId,
-            boolean ownershipTransferRequired,
             String runtimePath,
-            String sourceComposeProject,
-            String targetComposeProject,
+            String composeProject,
             String appInstanceId,
             List<String> containers,
             List<String> mounts,
@@ -45,18 +33,6 @@ public final class AppRecoveryModels {
             List<String> blockedReasons) {
     }
 
-    public record RecoveryApplyRequest(
-            String planId,
-            boolean ownershipTransferConfirmed) {
-    }
-
-    public record RecoveryResult(
-            boolean ok,
-            String severity,
-            String title,
-            String message,
-            String resourceId,
-            String nextAction,
-            ApplicationState applicationState) {
+    public record RecoveryApplyRequest(String planId) {
     }
 }

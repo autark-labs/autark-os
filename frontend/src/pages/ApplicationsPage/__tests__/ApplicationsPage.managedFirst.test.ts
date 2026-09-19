@@ -42,8 +42,9 @@ test('My Apps uses quiet status dots and compact action affordances on dark app 
   assert.match(card, /aria-label=\{`Open \$\{item\.name\}`\}/);
 });
 
-test('My Apps reviews non-managed applications in place', () => {
-  assert.match(page, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
+test('My Apps prompts only for preflighted recovery while retaining direct conflict review', () => {
+  assert.match(page, /reviewApplications = useMemo\([\s\S]*application\.relationship === 'recovery_required'/);
+  assert.match(page, /reviewedApplication = appState\.applications\.find[\s\S]*application\.relationship === 'blocked'/);
   assert.match(page, /ApplicationReviewPrompt/);
   assert.match(page, /reviewApplications\[0\]\?\.primaryAction\.href/);
   assert.match(page, /<ApplicationReviewDialog/);

@@ -35,7 +35,7 @@ test('Diagnostics summary includes apps found on the server without treating own
   assert.deepEqual(rows.find((row) => row.id === 'apps'), {
     id: 'apps',
     label: 'Apps',
-    value: '2 found on this server',
+    value: '1 recovery available, 1 found on this server',
     tone: 'warning',
   });
 });

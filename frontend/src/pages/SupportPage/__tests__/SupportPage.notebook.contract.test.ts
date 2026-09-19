@@ -20,7 +20,7 @@ test('Diagnostics keeps every support workflow inside the notebook workspace', (
 test('Diagnostics notebook preserves report, recovery, logs, and advanced detail access', () => {
   assert.match(page, /Copy report/);
   assert.match(page, /Download report/);
-  assert.match(page, /Recover existing apps/);
+  assert.match(page, /Review existing apps/);
   assert.match(page, /open=\{logsOpen\}/);
   assert.match(page, /onOpenChange=\{setLogsOpen\}/);
   assert.match(page, /title="App ownership details"/);

@@ -3,7 +3,6 @@ package com.autarkos.marketplace.install;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -77,72 +76,6 @@ public class ComposeRenderer {
         } catch (IOException exception) {
             throw new InstallationException("Unable to render Compose file for " + manifest.name(), exception);
         }
-    }
-
-    /**
-     * Rehomes a previously generated Autark-OS Compose file without
-     * regenerating ports, mounts, environment, or image configuration.
-     */
-    public Path transferOwnership(
-            Path composePath,
-            ApplicationManifest manifest,
-            String appInstanceId,
-            String composeProject) {
-        var yaml = new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()));
-        try {
-            Object document = yaml.load(Files.readString(composePath));
-            if (!(document instanceof Map<?, ?> root) || !(root.get("services") instanceof Map<?, ?> services)) {
-                throw new InstallationException("The existing app configuration cannot be read safely.");
-            }
-            Map<Object, Object> updatedServices = new LinkedHashMap<>(services);
-            List<String> expectedServices = manifest.runtime().multiService()
-                    ? manifest.runtime().services().stream().map(RuntimeServiceManifest::name).toList()
-                    : List.of(manifest.runtime().containerName());
-            for (String serviceName : expectedServices) {
-                if (!(services.get(serviceName) instanceof Map<?, ?> service)) {
-                    throw new InstallationException("The app service is missing from its existing Compose configuration.");
-                }
-                Map<Object, Object> updatedService = new LinkedHashMap<>(service);
-                updatedService.put("container_name", manifest.runtime().multiService()
-                        ? composeProject + "_" + serviceName
-                        : containerName(manifest, composeProject));
-                List<String> existingLabels = labelEntries(service.get("labels"));
-                updatedService.put("labels", labels(manifest, existingLabels, appInstanceId, composeProject));
-                updatedServices.put(serviceName, updatedService);
-            }
-            Map<Object, Object> updatedRoot = new LinkedHashMap<>(root);
-            updatedRoot.put("services", updatedServices);
-            Path temporary = Files.createTempFile(composePath.getParent(), ".autark-os-recovery-", ".yaml");
-            try {
-                Files.writeString(temporary, yaml.dump(updatedRoot));
-                Files.move(temporary, composePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (java.nio.file.AtomicMoveNotSupportedException exception) {
-                Files.move(temporary, composePath, StandardCopyOption.REPLACE_EXISTING);
-            } finally {
-                Files.deleteIfExists(temporary);
-            }
-            return composePath;
-        } catch (IOException exception) {
-            throw new InstallationException("Unable to transfer the app's Compose ownership.", exception);
-        }
-    }
-
-    private List<String> labelEntries(Object value) {
-        if (value == null) {
-            return List.of();
-        }
-        if (value instanceof List<?> list) {
-            if (!list.stream().allMatch(String.class::isInstance)) {
-                throw new InstallationException("The app contains unsupported Compose labels.");
-            }
-            return list.stream().map(String.class::cast).toList();
-        }
-        if (value instanceof Map<?, ?> map) {
-            return map.entrySet().stream()
-                    .map(entry -> String.valueOf(entry.getKey()) + "=" + String.valueOf(entry.getValue()))
-                    .toList();
-        }
-        throw new InstallationException("The app contains unsupported Compose labels.");
     }
 
     private String composeYaml(ApplicationManifest manifest, RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration, String appInstanceId, String composeProject) {

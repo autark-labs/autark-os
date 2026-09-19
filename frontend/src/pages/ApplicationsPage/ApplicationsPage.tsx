@@ -93,8 +93,7 @@ export const ApplicationsPage = () => {
   const managedItems = items;
   const reviewApplications = useMemo(
     () => appState.applications
-      .filter((application) => application.relationship === 'recovery_required' || application.relationship === 'blocked')
-      .filter((application) => Boolean(application.evidence)),
+      .filter((application) => application.relationship === 'recovery_required'),
     [appState.applications],
   );
   const reviewApplicationsSignature = useMemo(
@@ -102,7 +101,10 @@ export const ApplicationsPage = () => {
     [reviewApplications],
   );
   const reviewAppId = useMemo(() => new URLSearchParams(location.search).get('review'), [location.search]);
-  const reviewedApplication = reviewApplications.find((application) => application.id === reviewAppId) ?? null;
+  const reviewedApplication = appState.applications.find((application) => (
+    application.id === reviewAppId
+    && (application.relationship === 'recovery_required' || application.relationship === 'blocked')
+  )) ?? null;
   const showApplicationReviewPrompt = Boolean(reviewApplicationsSignature && dismissedReviewSignature !== reviewApplicationsSignature);
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();

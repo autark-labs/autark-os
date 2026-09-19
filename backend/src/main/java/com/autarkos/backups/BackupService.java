@@ -102,46 +102,6 @@ public class BackupService {
     }
 
     /**
-     * Creates the same verified archive used by normal backup flows before an
-     * unresolved app is transferred into this installation. The app is not
-     * registered as managed merely to make the checkpoint possible.
-     */
-    public RestorePoint createRecoveryCheckpoint(String appId, String appName) {
-        return recoveryOperations.runExclusive(
-                RecoveryOperationCoordinator.Operation.APP_RECOVERY,
-                () -> createRecoveryCheckpointUnlocked(appId, appName));
-    }
-
-    private RestorePoint createRecoveryCheckpointUnlocked(String appId, String appName) {
-        Path source = runtimeLayout.appRoot(appId).toAbsolutePath().normalize();
-        BackupModels.BackupDestination destinationState = backupDestinationService.current();
-        if (!destinationState.ready()) {
-            throw new InstallationException(destinationState.message());
-        }
-        try {
-            backupArchiveService.validateAppBackup(source);
-            Path directory = backupRoot().resolve("recovery");
-            Files.createDirectories(directory);
-            Path destination = directory.resolve(appId + "-pre-recovery-" + BACKUP_NAME_FORMAT.format(Instant.now()) + ".zip");
-            long size = backupArchiveService.createAppArchive(appId, destination);
-            InstalledApp provisional = new InstalledApp(appId, appName, AutarkOsStates.AppStatus.NEEDS_ATTENTION,
-                    source.toString(), "", null, Instant.now());
-            BackupModels.BackupContract contract = backupContract(provisional);
-            RestorePoint point = recordVerifiedArchive(appId, appName, "app", "pre_recovery", appId,
-                    destination, size, "Safety checkpoint created before app recovery.", contract);
-            point = backupVerificationService.verifyRestorePoint(point).restorePoint();
-            if (!AutarkOsStates.RestorePointStatus.VERIFIED.equals(point.verificationStatus())) {
-                throw new InstallationException("Autark-OS could not verify the recovery safety checkpoint. " + point.verificationMessage());
-            }
-            activityLogService.success("applications", "recovery_checkpoint_created", "Recovery checkpoint ready",
-                    "Autark-OS verified a safety checkpoint before recovering " + appName + ".", appId);
-            return point;
-        } catch (IOException exception) {
-            throw new InstallationException("Autark-OS could not create a safety checkpoint before recovery. " + userMessage(exception), exception);
-        }
-    }
-
-    /**
      * Runs a verified cold backup and keeps the recovery-operation lease while
      * the caller performs the related update or rollback. This prevents a
      * backup, restore, or storage cleanup from racing a release change.

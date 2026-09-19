@@ -348,7 +348,7 @@ public class SystemSetupService {
                 "Review apps found on this server before creating another production Autark-OS instance.",
                 resources,
                 List.of(
-                        new SystemSetupModels.SystemSetupAction("recover_existing_apps", "Recover existing apps", "/apps", "primary"),
+                        new SystemSetupModels.SystemSetupAction("review_existing_apps", "Review existing apps", "/apps", "primary"),
                         new SystemSetupModels.SystemSetupAction("abort", "Abort setup", "/", "secondary")));
     }
 
@@ -359,20 +359,19 @@ public class SystemSetupService {
     }
 
     private SystemSetupModels.SystemSetupExistingInstallResource existingResource(ObservedService service) {
-        String kind = "legacy_autark_os".equals(service.ownershipState()) ? "recoverable_app" : "autark_os_resource";
         return new SystemSetupModels.SystemSetupExistingInstallResource(
                 service.id(),
                 service.displayName(),
-                kind,
+                "previous_installation_resource",
                 existingResourceSummary(service),
                 "/apps");
     }
 
     private String existingResourceSummary(ObservedService service) {
         return switch (service.ownershipState()) {
-            case "legacy_autark_os" -> "Autark-OS found recoverable app metadata from an earlier installation.";
-            case "foreign_autark_os" -> "This app belongs to another Autark-OS installation.";
-            default -> "This resource needs review before Autark-OS can safely install or recover the app.";
+            case "legacy_autark_os" -> "Autark-OS found app resources from an earlier installation and will leave them unchanged during beta.";
+            case "foreign_autark_os" -> "This app belongs to another Autark-OS installation and will remain unchanged during beta.";
+            default -> "This resource needs review before Autark-OS can safely install an app.";
         };
     }
 

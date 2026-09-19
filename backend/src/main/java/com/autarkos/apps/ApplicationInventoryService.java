@@ -12,6 +12,8 @@ import com.autarkos.api.AutarkOsAction;
 import com.autarkos.api.AutarkOsIssue;
 import com.autarkos.api.AutarkOsIssueFactory;
 import com.autarkos.api.AutarkOsStates;
+import com.autarkos.apps.recovery.AppRecoveryModels;
+import com.autarkos.apps.recovery.AppRecoveryService;
 import com.autarkos.host.ObservedService;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppRuntimeFiles;
@@ -28,14 +30,17 @@ public class ApplicationInventoryService {
     private final MarketplaceCatalogService catalogService;
     private final InstalledAppRepository installedAppRepository;
     private final ManagedAppAttestationService managedApps;
+    private final AppRecoveryService recovery;
 
     public ApplicationInventoryService(
             MarketplaceCatalogService catalogService,
             InstalledAppRepository installedAppRepository,
-            ManagedAppAttestationService managedApps) {
+            ManagedAppAttestationService managedApps,
+            AppRecoveryService recovery) {
         this.catalogService = catalogService;
         this.installedAppRepository = installedAppRepository;
         this.managedApps = managedApps;
+        this.recovery = recovery;
     }
 
     public List<ApplicationView> apps(
@@ -60,19 +65,21 @@ public class ApplicationInventoryService {
         ManagedAppAttestationService.Result attestation = managedApps.attest(registered);
         InstalledApp storedRegistration = !attestation.managed() ? null
                 : registered;
+        AppRecoveryModels.RecoveryPlan recoveryPlan = attestation.managed()
+                ? null
+                : recovery.applicablePlan(manifest.id(), evidence).orElse(null);
         ObservedService registrationLost = matchingObserved(manifest.id(), evidence,
                 service -> AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
-        ObservedService recoverable = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);
+        ObservedService legacy = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(service.ownershipState())).orElse(null);
         ObservedService managedElsewhere = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS.equals(service.ownershipState())).orElse(null);
-        InstalledApp installed = storedRegistration == null || runtime == null || recoverable != null || managedElsewhere != null
-                || !com.autarkos.marketplace.install.AppRuntimeFiles.hasComposeFile(storedRegistration.runtimePath())
-                        ? null : storedRegistration;
+        InstalledApp installed = storedRegistration != null && runtime != null ? storedRegistration : null;
         ObservedService failedInstall = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.FAILED_INSTALL.equals(service.ownershipState())).orElse(null);
         ObservedService blocked = matchingObserved(manifest.id(), evidence, service -> AutarkOsStates.OwnershipState.UNKNOWN_CONFLICT.equals(service.ownershipState())).orElse(null);
         ObservedService found = matchingObserved(manifest.id(), evidence, service -> !AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(service.ownershipState())).orElse(null);
 
-        ApplicationRelationship relationship = relationship(installed, registered, registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
-        ObservedService observedService = firstPresent(registrationLost, recoverable, managedElsewhere, failedInstall, blocked, found);
+        ApplicationRelationship relationship = relationship(
+                installed, recoveryPlan, registered, registrationLost, legacy, managedElsewhere, failedInstall, blocked, found);
+        ObservedService observedService = firstPresent(registrationLost, legacy, managedElsewhere, failedInstall, blocked, found);
         ApplicationEvidence applicationEvidence = evidence(observedService);
         String reviewExistingHref = reviewExistingHref(manifest.id());
         ApplicationAction primaryAction = primaryAction(manifest.id(), relationship, installed, observedService, reviewExistingHref);
@@ -100,9 +107,10 @@ public class ApplicationInventoryService {
 
     private ApplicationRelationship relationship(
             InstalledApp installed,
+            AppRecoveryModels.RecoveryPlan recoveryPlan,
             InstalledApp storedRegistration,
             ObservedService registrationLost,
-            ObservedService recoverable,
+            ObservedService legacy,
             ObservedService managedElsewhere,
             ObservedService failedInstall,
             ObservedService blocked,
@@ -110,10 +118,11 @@ public class ApplicationInventoryService {
         if (installed != null) {
             return ApplicationRelationship.MANAGED;
         }
-        if (storedRegistration != null || registrationLost != null || recoverable != null || managedElsewhere != null) {
+        if (recoveryPlan != null) {
             return ApplicationRelationship.RECOVERY_REQUIRED;
         }
-        if (failedInstall != null || blocked != null || found != null) {
+        if (storedRegistration != null || registrationLost != null || legacy != null
+                || managedElsewhere != null || failedInstall != null || blocked != null || found != null) {
             return ApplicationRelationship.BLOCKED;
         }
         return ApplicationRelationship.AVAILABLE;
@@ -157,8 +166,12 @@ public class ApplicationInventoryService {
             String reviewExistingHref) {
         return switch (relationship) {
             case MANAGED -> managedActions(installed, runtime, operation);
-            case RECOVERY_REQUIRED -> existingServiceActions(observedService, reviewExistingHref, false, appId);
-            case BLOCKED -> existingServiceActions(observedService, reviewExistingHref, true, appId);
+            case RECOVERY_REQUIRED -> recoveryActions(observedService, reviewExistingHref);
+            case BLOCKED -> existingServiceActions(
+                    observedService,
+                    reviewExistingHref,
+                    separateCopyAllowed(observedService),
+                    appId);
             case AVAILABLE -> List.of(reviewSetup(appId));
         };
     }
@@ -257,6 +270,22 @@ public class ApplicationInventoryService {
         return List.copyOf(actions);
     }
 
+    private List<ApplicationAction> recoveryActions(ObservedService observedService, String reviewExistingHref) {
+        java.util.ArrayList<ApplicationAction> actions = new java.util.ArrayList<>();
+        if (observedService != null && observedService.url() != null && !observedService.url().isBlank()) {
+            actions.add(open(observedService.url()));
+        }
+        actions.add(new ApplicationAction("recover", "Recover app", "route", reviewExistingHref, null, false, ""));
+        return List.copyOf(actions);
+    }
+
+    private boolean separateCopyAllowed(ObservedService observedService) {
+        return observedService != null
+                && !AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS.equals(observedService.ownershipState())
+                && !AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS.equals(observedService.ownershipState())
+                && !AutarkOsStates.OwnershipState.OWNED_MANAGED.equals(observedService.ownershipState());
+    }
+
     private ApplicationAction primaryAction(
             String appId,
             ApplicationRelationship relationship,
@@ -265,7 +294,8 @@ public class ApplicationInventoryService {
             String reviewExistingHref) {
         return switch (relationship) {
             case MANAGED -> manage(appId);
-            case RECOVERY_REQUIRED, BLOCKED -> reviewExisting(reviewExistingHref);
+            case RECOVERY_REQUIRED -> new ApplicationAction("recover", "Recover app", "route", reviewExistingHref, null, false, "");
+            case BLOCKED -> reviewExisting(reviewExistingHref);
             case AVAILABLE -> reviewSetup(appId);
         };
     }
@@ -313,7 +343,7 @@ public class ApplicationInventoryService {
     private String relationshipDescription(ApplicationRelationship relationship, ApplicationEvidence evidence) {
         return switch (relationship) {
             case MANAGED -> "Managed by this Autark-OS installation.";
-            case RECOVERY_REQUIRED -> evidence == null ? "Autark-OS found app resources that require recovery." : evidence.summary();
+            case RECOVERY_REQUIRED -> "Autark-OS verified this installation's runtime and can restore its missing management records.";
             case BLOCKED -> evidence == null ? "A server resource blocks installation." : evidence.summary();
             case AVAILABLE -> "Ready to review before install.";
         };
@@ -342,7 +372,7 @@ public class ApplicationInventoryService {
     private String evidenceLabel(ObservedService service) {
         return switch (service.ownershipState()) {
             case AutarkOsStates.OwnershipState.OWNED_MANAGED -> "Registration missing";
-            case AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS -> "Recoverable";
+            case AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS -> "Previous installation";
             case AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS -> "Owned elsewhere";
             case AutarkOsStates.OwnershipState.FAILED_INSTALL -> "Install failed";
             default -> "Conflict";
@@ -352,8 +382,8 @@ public class ApplicationInventoryService {
     private String evidenceSummary(ObservedService service) {
         return switch (service.ownershipState()) {
             case AutarkOsStates.OwnershipState.OWNED_MANAGED -> "Autark-OS found this app's current runtime, but its managed registration is missing.";
-            case AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS -> "Autark-OS found recoverable app metadata from an earlier installation.";
-            case AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS -> "This app belongs to another Autark-OS installation.";
+            case AutarkOsStates.OwnershipState.LEGACY_AUTARK_OS -> "Autark-OS found resources from an earlier installation. They will remain unchanged during beta.";
+            case AutarkOsStates.OwnershipState.FOREIGN_AUTARK_OS -> "This app belongs to another Autark-OS installation and will remain unchanged during beta.";
             case AutarkOsStates.OwnershipState.FAILED_INSTALL -> BetaScope.allowsInstall(service.catalogAppId())
                     ? "Autark-OS started creating this app but did not finish. Review setup or try the install again."
                     : "A previous installation did not finish. Existing resources have not been deleted.";

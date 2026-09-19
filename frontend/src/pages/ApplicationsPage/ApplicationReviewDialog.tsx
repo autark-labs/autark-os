@@ -7,7 +7,6 @@ import {
   HardDrive,
   Info,
   Loader2,
-  LockKeyhole,
   Network,
   RotateCcw,
   ShieldAlert,
@@ -20,7 +19,6 @@ import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { StatusBadge } from '@/components/autark-os/StatusBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -50,16 +48,12 @@ type ApplicationReviewDialogProps = {
   open: boolean;
 };
 
-type RecoveryStage = 'review' | 'confirm';
-
 export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, open }: ApplicationReviewDialogProps) {
   const queryClient = useQueryClient();
   const jobsQuery = useAutarkOsJobsQuery();
   const [reviewedApplication, setReviewedApplication] = useState<ApplicationView | null>(application);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [plan, setPlan] = useState<AppRecoveryPlan | null>(null);
-  const [recoveryStage, setRecoveryStage] = useState<RecoveryStage>('review');
-  const [transferAcknowledged, setTransferAcknowledged] = useState(false);
   const [recoveryJob, setRecoveryJob] = useState<AutarkOsJob | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const preparedAppId = useRef<string | null>(null);
@@ -75,8 +69,6 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
     if (preparedAppId.current === application.id) return;
     preparedAppId.current = application.id;
     setPlan(null);
-    setRecoveryStage('review');
-    setTransferAcknowledged(false);
     setRecoveryJob(null);
     setLocalError(null);
     notifiedJob.current = null;
@@ -85,8 +77,6 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
   const loadPlan = useCallback(async () => {
     const appId = currentApplication?.id;
     if (!appId) return;
-    setRecoveryStage('review');
-    setTransferAcknowledged(false);
     setRecoveryJob(null);
     setPlan(null);
     setBusyAction('recovery_plan');
@@ -131,7 +121,7 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
       title: succeeded ? 'App recovery completed' : 'App recovery needs attention',
       message: succeeded
         ? `${currentApplication?.name || 'The app'} is fully managed. Its lifecycle controls are ready.`
-        : recoveryJob.error?.message || 'Autark-OS restored the previous runtime and left the app recoverable.',
+        : recoveryJob.error?.message || 'Autark-OS left the app runtime unchanged and did not restore the registration.',
     }, succeeded ? 'App recovery completed' : 'App recovery failed');
   }, [currentApplication?.name, recoveryJob]);
 
@@ -141,16 +131,11 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
     setBusyAction('recover');
     setLocalError(null);
     try {
-      const job = await AppRecoveryAPIClient.apply(
-        appId,
-        plan.planId,
-        !plan.ownershipTransferRequired || transferAcknowledged,
-      );
+      const job = await AppRecoveryAPIClient.apply(appId, plan.planId);
       setRecoveryJob(job);
       syncCanonicalAppMutationResult(queryClient, job);
     } catch (error) {
       const message = apiErrorMessage(error, 'App recovery could not be started. Review a fresh plan and try again.');
-      setRecoveryStage('review');
       try {
         setPlan(await AppRecoveryAPIClient.plan(appId));
         setLocalError(message.includes('409')
@@ -179,21 +164,17 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
 
   return (
       <RecoveryDialog
-        acknowledged={transferAcknowledged}
         busy={busyAction === 'recover'}
         error={localError}
         job={recoveryJob}
         loading={busyAction === 'recovery_plan'}
-        onAcknowledged={setTransferAcknowledged}
         onClose={() => onOpenChange(false)}
         onFinish={() => void finishRecovery()}
         onRecover={() => void runRecovery()}
         onReload={() => void loadPlan()}
-        onStageChange={setRecoveryStage}
         open={open}
         plan={plan}
         application={currentApplication}
-        stage={recoveryStage}
       />
   );
 }
@@ -226,37 +207,29 @@ function ConflictReviewDialog({ application, onOpenChange, open }: { application
 }
 
 function RecoveryDialog({
-  acknowledged,
   busy,
   error,
   job,
   loading,
-  onAcknowledged,
   onClose,
   onFinish,
   onRecover,
   onReload,
-  onStageChange,
   open,
   plan,
   application,
-  stage,
 }: {
-  acknowledged: boolean;
   busy: boolean;
   error: string | null;
   job: AutarkOsJob | null;
   loading: boolean;
-  onAcknowledged: (value: boolean) => void;
   onClose: () => void;
   onFinish: () => void;
   onRecover: () => void;
   onReload: () => void;
-  onStageChange: (stage: RecoveryStage) => void;
   open: boolean;
   plan: AppRecoveryPlan | null;
   application: ApplicationView;
-  stage: RecoveryStage;
 }) {
   const running = job && !terminalJob(job);
   const succeeded = job?.status === 'succeeded';
@@ -269,20 +242,12 @@ function RecoveryDialog({
           : running ? <RecoveryRunning job={job} />
             : succeeded ? <RecoveryVerified application={application} onFinish={onFinish} />
               : failed ? <RecoveryFailed job={job} onClose={onClose} onReload={onReload} />
-                : stage === 'confirm' && plan ? (
-                  <RecoveryConfirmation
-                    acknowledged={acknowledged}
-                    onAcknowledged={onAcknowledged}
-                    onBack={() => onStageChange('review')}
-                    onRecover={onRecover}
-                    plan={plan}
-                  />
-                ) : (
+                : (
                   <RecoveryReview
                     busy={busy}
                     error={error}
                     onCancel={onClose}
-                    onContinue={() => plan?.ownershipTransferRequired ? onStageChange('confirm') : onRecover()}
+                    onContinue={onRecover}
                     onReload={onReload}
                     plan={plan}
                   />
@@ -347,8 +312,8 @@ function RecoveryReview({ busy, error, onCancel, onContinue, onReload, plan }: {
                   <RecoverySummary icon={HardDrive} title="Your app data stays in place" detail="Existing files and settings are preserved." />
                   <RecoverySummary
                     icon={RotateCcw}
-                    title={plan.ownershipTransferRequired ? 'Brief interruption' : 'No app restart needed'}
-                    detail={plan.ownershipTransferRequired ? `${plan.appName} will restart during recovery.` : 'Only the missing registration will be restored.'}
+                    title="No app restart needed"
+                    detail="Only this installation's missing registration will be restored."
                   />
                 </div>
                 <div className="rounded-lg border px-3 py-2">
@@ -360,17 +325,17 @@ function RecoveryReview({ busy, error, onCancel, onContinue, onReload, plan }: {
                   </TooltipProvider>
                   <div className="mt-2 rounded-md bg-muted/60 px-3 py-2.5">
                     <p className="text-xs font-medium text-foreground">
-                      Checkpoint <span className="text-muted-foreground">→</span> transfer management <span className="text-muted-foreground">→</span> verify health and access
+                      Verify current ownership <span className="text-muted-foreground">→</span> restore registration <span className="text-muted-foreground">→</span> refresh app controls
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">If verification fails, the previous runtime is restored.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">The running containers and app data are not changed.</p>
                   </div>
                 </div>
               </>
             ) : (
               <Alert className="border-warning/30 bg-warning/10">
                 <ShieldAlert className="size-4 text-warning" />
-                <AlertTitle>Recovery is not safe yet</AlertTitle>
-                <AlertDescription>{plan.blockedReasons.join(' ')}</AlertDescription>
+                <AlertTitle>Recovery is no longer available</AlertTitle>
+                <AlertDescription>{plan.summary}</AlertDescription>
               </Alert>
             )}
           </>
@@ -380,45 +345,8 @@ function RecoveryReview({ busy, error, onCancel, onContinue, onReload, plan }: {
       <DialogFooter>
         <Button onClick={onCancel} variant="outline">Leave unchanged</Button>
         {plan?.applicable
-          ? <Button disabled={busy} onClick={onContinue}>{busy && <Loader2 className="size-4 animate-spin" />}Continue</Button>
-          : <Button disabled={busy} onClick={onReload} variant="outline">Check again</Button>}
-      </DialogFooter>
-    </div>
-  );
-}
-
-function RecoveryConfirmation({ acknowledged, onAcknowledged, onBack, onRecover, plan }: {
-  acknowledged: boolean;
-  onAcknowledged: (value: boolean) => void;
-  onBack: () => void;
-  onRecover: () => void;
-  plan: AppRecoveryPlan;
-}) {
-  return (
-    <div className="flex min-h-0 flex-col gap-4">
-      <DialogHeader>
-        <DialogTitle className="text-lg">Transfer management?</DialogTitle>
-        <DialogDescription>
-          This Autark-OS installation will become {plan.appName}&apos;s owner and provide the same controls as a newly installed app.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="grid min-h-0 flex-1 content-start gap-4">
-        <Alert className="border-warning/30 bg-warning/10">
-          <LockKeyhole className="size-4 text-warning" />
-          <AlertTitle>The previous installation will no longer be the owner</AlertTitle>
-          <AlertDescription>No app data will be deleted or moved.</AlertDescription>
-        </Alert>
-        <label className="flex items-start gap-3 rounded-lg border p-4 text-sm">
-          <Checkbox checked={acknowledged} className="mt-0.5" onCheckedChange={(value) => onAcknowledged(value === true)} />
-          <span>I understand {plan.appName} will briefly restart while management transfers.</span>
-        </label>
-      </div>
-      <DialogFooter>
-        <Button onClick={onBack} variant="outline">Back</Button>
-        <Button disabled={!acknowledged} onClick={onRecover}>
-          <ArchiveRestore className="size-4" />
-          Recover {plan.appName}
-        </Button>
+          ? <Button disabled={busy} onClick={onContinue}>{busy && <Loader2 className="size-4 animate-spin" />}Recover app</Button>
+          : <Button disabled={busy} onClick={onReload} variant="outline">Refresh status</Button>}
       </DialogFooter>
     </div>
   );
@@ -474,7 +402,7 @@ function RecoveryFailed({ job, onClose, onReload }: { job: AutarkOsJob; onClose:
     <div className="flex min-h-0 flex-col gap-4">
       <DialogHeader>
         <DialogTitle className="text-lg">Recovery did not complete</DialogTitle>
-        <DialogDescription>Autark-OS attempted to restore the previous runtime and left the app recoverable.</DialogDescription>
+        <DialogDescription>Autark-OS left the app runtime unchanged and did not restore the registration.</DialogDescription>
       </DialogHeader>
       <div className="min-h-0 flex-1">
         <Alert variant="destructive">
@@ -542,14 +470,14 @@ function RecoveryProgressRow({ step }: { step: AutarkOsJobStep }) {
 }
 
 function compactChecks(checks: AppRecoveryCheck[]) {
-  const preferred = ['catalog_identity', 'live_runtime', 'ports', 'docker_ownership'];
+  const preferred = ['catalog_identity', 'live_runtime', 'ports', 'ownership'];
   return preferred.flatMap((id) => checks.find((check) => check.id === id) || []);
 }
 
 function recoveryCheckIcon(id: string) {
   if (id === 'mounts' || id === 'live_runtime') return HardDrive;
   if (id === 'ports') return Network;
-  if (id === 'docker_ownership') return LockKeyhole;
+  if (id === 'ownership') return ShieldAlert;
   return CheckCircle2;
 }
 

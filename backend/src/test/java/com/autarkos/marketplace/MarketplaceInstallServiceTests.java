@@ -607,7 +607,7 @@ class MarketplaceInstallServiceTests {
     }
 
     @Test
-    void recoverableAutarkOsServiceBlocksDuplicateInstallEvenWithAcknowledgement() {
+    void previousAutarkOsServiceRemainsUntouchedEvenWithDuplicateAcknowledgement() {
         RuntimeLayout runtimeLayout = runtimeLayout();
         MarketplaceCatalogService catalogService = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         ApplicationManifest manifest = catalogService.findById("vaultwarden").orElseThrow();
@@ -619,7 +619,7 @@ class MarketplaceInstallServiceTests {
         InstallModels.InstallResult result = installService.install(manifest, new InstallOptionsRequest(null, null, null, null, false, true));
 
         assertThat(result.status()).isEqualTo("failed");
-        assertThat(result.message()).contains("recover the existing Vaultwarden service");
+        assertThat(result.message()).contains("leave it unchanged");
         assertThat(repository.findAppById("vaultwarden")).isEmpty();
     }
 

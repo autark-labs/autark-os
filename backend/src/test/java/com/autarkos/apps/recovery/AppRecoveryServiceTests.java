@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,16 +15,12 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.autarkos.activity.ActivityLogService;
-import com.autarkos.apps.ApplicationInventoryService;
-import com.autarkos.apps.ApplicationStateService;
-import com.autarkos.backups.BackupService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.host.ObservedService;
 import com.autarkos.host.ObservedServiceService;
@@ -34,19 +29,14 @@ import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.catalog.MarketplaceCatalogService;
 import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.AppRuntimeMetadataReader;
-import com.autarkos.marketplace.install.AppRuntimeMetadataWriter;
 import com.autarkos.marketplace.install.CatalogPackageCopier;
-import com.autarkos.marketplace.install.ComposeRenderer;
-import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.DockerOwnershipService;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.InstallationException;
-import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
-import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.system.AutarkOsIdentity;
 
 class AppRecoveryServiceTests {
@@ -54,38 +44,34 @@ class AppRecoveryServiceTests {
     @TempDir
     Path runtimeRoot;
 
-    private ApplicationInventoryService applicationInventory;
     private ObservedServiceService observedServices;
     private InstalledAppRepository installedApps;
     private MarketplaceCatalogService catalog;
     private DockerOwnershipService dockerOwnership;
     private ActivityLogService activityLog;
-    private ApplicationStateService applicationState;
     private AppRecoveryService service;
     private ApplicationManifest manifest;
 
     @BeforeEach
     void setUp() {
-        applicationInventory = mock(ApplicationInventoryService.class);
         observedServices = mock(ObservedServiceService.class);
         installedApps = mock(InstalledAppRepository.class);
         catalog = new MarketplaceCatalogService(new ManifestYamlReader(), new ManifestValidator());
         dockerOwnership = mock(DockerOwnershipService.class);
         activityLog = mock(ActivityLogService.class);
-        applicationState = mock(ApplicationStateService.class);
         when(dockerOwnership.currentIdentity()).thenReturn(new AutarkOsIdentity(
                 "current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.EPOCH, 1));
         when(dockerOwnership.composeProject("vaultwarden")).thenReturn("autarkos_current_vaultwarden");
         manifest = catalog.findById("vaultwarden").orElseThrow();
         service = new AppRecoveryService(
-                applicationInventory,
                 observedServices,
                 installedApps,
                 catalog,
                 new AppRuntimeMetadataReader(),
                 dockerOwnership,
                 activityLog,
-                applicationState,
+                new RecoveryOperationCoordinator(),
+                new AppAccessChecker(),
                 com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
     }
 
@@ -99,11 +85,10 @@ class AppRecoveryServiceTests {
         when(installedApps.settingsFor("vaultwarden")).thenReturn(Optional.of(settings));
 
         AppRecoveryModels.RecoveryPlan plan = service.plan("vaultwarden");
-        var result = service.apply("vaultwarden", new AppRecoveryModels.RecoveryApplyRequest(plan.planId(), false));
+        service.apply("vaultwarden", new AppRecoveryModels.RecoveryApplyRequest(plan.planId()));
 
         assertThat(plan.reason()).isEqualTo("current_instance_registration_lost");
         assertThat(plan.applicable()).isTrue();
-        assertThat(result.ok()).isTrue();
         verify(installedApps).commitRecoveredApp(any(InstalledApp.class), any(), any());
     }
 
@@ -117,14 +102,14 @@ class AppRecoveryServiceTests {
         when(installedApps.settingsFor("vaultwarden")).thenReturn(Optional.of(settings));
 
         AppRecoveryModels.RecoveryPlan plan = service.plan("vaultwarden");
-        service.apply("vaultwarden", new AppRecoveryModels.RecoveryApplyRequest(plan.planId(), false));
+        service.apply("vaultwarden", new AppRecoveryModels.RecoveryApplyRequest(plan.planId()));
 
         verify(installedApps).commitRecoveredApp(
                 argThat(app -> "Stopped".equals(app.status())), eq(settings), any());
     }
 
     @Test
-    void previousInstancePlanRequiresExplicitOwnershipTransfer() throws Exception {
+    void previousInstanceIsNotEligibleForBetaRecovery() throws Exception {
         Path appRoot = writeRuntime(true);
         ObservedService evidence = evidence("foreign_autark_os", appRoot, "previous-instance");
         stubEvidence(evidence);
@@ -132,13 +117,45 @@ class AppRecoveryServiceTests {
         when(installedApps.settingsFor("vaultwarden")).thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
 
         AppRecoveryModels.RecoveryPlan plan = service.plan("vaultwarden");
-        assertThat(plan.reason()).isEqualTo("previous_instance");
-        assertThat(plan.applicable()).isTrue();
-        assertThat(plan.ownershipTransferRequired()).isTrue();
-        assertThat(service.reviewedPlanMatches(
-                plan,
-                new AppRecoveryModels.RecoveryApplyRequest(plan.planId(), false))).isFalse();
+        assertThat(plan.reason()).isEqualTo("insufficient_evidence");
+        assertThat(plan.applicable()).isFalse();
+        assertThat(plan.summary()).contains("remain unchanged");
         verify(installedApps, never()).save(any(InstalledApp.class));
+    }
+
+    @Test
+    void repairsAnIncompleteSameInstanceRegistrationFromCompleteRuntimeOwnership() throws Exception {
+        Path appRoot = writeRuntime(true);
+        InstalledApp incomplete = new InstalledApp(
+                "vaultwarden", "Vaultwarden", "Ready", appRoot.toString(), "", "http://localhost:8090", Instant.now());
+        when(observedServices.observedServices()).thenReturn(List.of());
+        when(installedApps.findAppById("vaultwarden")).thenReturn(Optional.of(incomplete));
+        when(installedApps.ownershipFor("vaultwarden")).thenReturn(Optional.of(
+                new RuntimeModels.InstalledAppOwnershipMetadata(
+                        "vaultwarden", "appinst_vaultwarden", "vaultwarden", "current-instance",
+                        appRoot.toString(), "ready", "owned", Instant.now(), Instant.now())));
+        when(installedApps.settingsFor("vaultwarden"))
+                .thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
+
+        AppRecoveryModels.RecoveryPlan plan = service.plan("vaultwarden");
+
+        assertThat(plan.reason()).isEqualTo("current_instance_registration_lost");
+        assertThat(plan.applicable()).isTrue();
+        assertThat(plan.composeProject()).isEqualTo("autarkos_current_vaultwarden");
+    }
+
+    @Test
+    void fuzzyNameEvidenceCannotBecomeARecoveryCandidate() throws Exception {
+        Path appRoot = writeRuntime(true);
+        ObservedService exact = evidence("owned_managed", appRoot, "current-instance");
+        ObservedService fuzzy = new ObservedService(
+                exact.id(), exact.source(), exact.fingerprint(), "Old Vaultwarden", exact.url(), exact.accessScope(),
+                null, "name", exact.ownershipState(), exact.runtimeState(), exact.autarkOsInstanceId(),
+                exact.firstSeenAt(), exact.lastSeenAt(), exact.metadataJson());
+        when(installedApps.settingsFor("vaultwarden"))
+                .thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
+
+        assertThat(service.applicablePlan("vaultwarden", List.of(fuzzy))).isEmpty();
     }
 
     @Test
@@ -259,56 +276,8 @@ class AppRecoveryServiceTests {
 
         assertThat(plan.reason()).isEqualTo("insufficient_evidence");
         assertThat(plan.applicable()).isFalse();
-        assertThat(plan.checks()).filteredOn(check -> check.id().equals("docker_ownership"))
+        assertThat(plan.checks()).filteredOn(check -> check.id().equals("ownership"))
                 .singleElement().satisfies(check -> assertThat(check.status()).isEqualTo("blocked"));
-    }
-
-    @Test
-    void transfersPreviousInstanceOnlyAfterCheckpointAndCommitsCurrentOwnershipLast() throws Exception {
-        Path appRoot = writeRuntime(true);
-        markPreviousProject(appRoot);
-        Files.createDirectories(appRoot.resolve("data"));
-        AtomicBoolean transferred = new AtomicBoolean(false);
-        ObservedService previous = evidence("foreign_autark_os", appRoot, "previous-instance");
-        ObservedService current = evidence("owned_managed", appRoot, "current-instance");
-        when(observedServices.matchingCatalogServices("vaultwarden"))
-                .thenAnswer(ignored -> List.of(transferred.get() ? current : previous));
-        when(observedServices.observedServices()).thenAnswer(ignored -> List.of(transferred.get() ? current : previous));
-        when(installedApps.findAppById("vaultwarden")).thenReturn(Optional.empty());
-        when(installedApps.settingsFor("vaultwarden"))
-                .thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
-
-        DockerComposeExecutor compose = mock(DockerComposeExecutor.class);
-        ComposeRenderer renderer = mock(ComposeRenderer.class);
-        AppRuntimeMetadataWriter metadataWriter = mock(AppRuntimeMetadataWriter.class);
-        BackupService backups = mock(BackupService.class);
-        TailscaleService tailscale = mock(TailscaleService.class);
-        AppAccessChecker access = mock(AppAccessChecker.class);
-        when(compose.down(any(), any())).thenReturn(success("stopped previous project"));
-        when(compose.up(any(), any())).thenAnswer(ignored -> {
-            transferred.set(true);
-            return success("started current project");
-        });
-        when(compose.containers(any(), any())).thenReturn(List.of(
-                new RuntimeModels.DockerContainerStatus("vaultwarden", "vaultwarden", "running", "healthy", "Up", "8090:80")));
-        when(access.shouldCheckLocalAccess(any(), any())).thenReturn(true);
-        when(access.localHealthCheck(any(), any(), any()))
-                .thenReturn(AccessModels.AppAccessCheck.reachable("vaultwarden", "http://localhost:8090"));
-
-        AppRecoveryService transactional = completeService(compose, renderer, metadataWriter, backups, tailscale, access);
-        AppRecoveryModels.RecoveryPlan plan = transactional.plan("vaultwarden");
-        var result = transactional.apply("vaultwarden", new AppRecoveryModels.RecoveryApplyRequest(plan.planId(), true));
-
-        assertThat(result.ok()).isTrue();
-        assertThat(plan.ownershipTransferRequired()).isTrue();
-        var order = inOrder(backups, compose, renderer, metadataWriter, installedApps);
-        order.verify(compose).down(eq(appRoot.resolve("compose.yaml")), eq(plan.sourceComposeProject()));
-        order.verify(backups).createRecoveryCheckpoint("vaultwarden", "Vaultwarden");
-        order.verify(renderer).transferOwnership(appRoot.resolve("compose.yaml"), manifest,
-                "appinst_vaultwarden", "autarkos_current_vaultwarden");
-        order.verify(metadataWriter).write(manifest, appRoot, "appinst_vaultwarden", "autarkos_current_vaultwarden");
-        order.verify(compose).up(eq(appRoot.resolve("compose.yaml")), eq("autarkos_current_vaultwarden"));
-        order.verify(installedApps).commitRecoveredApp(any(InstalledApp.class), any(), any());
     }
 
     @Test
@@ -324,7 +293,7 @@ class AppRecoveryServiceTests {
 
         assertThatThrownBy(() -> service.apply(
                 "vaultwarden",
-                new AppRecoveryModels.RecoveryApplyRequest(reviewed.planId(), false)))
+                new AppRecoveryModels.RecoveryApplyRequest(reviewed.planId())))
                 .isInstanceOf(InstallationException.class)
                 .hasMessageContaining("changed after this recovery plan");
         verify(installedApps, never()).commitRecoveredApp(any(), any(), any());
@@ -343,63 +312,10 @@ class AppRecoveryServiceTests {
 
         assertThatThrownBy(() -> service.apply(
                 "vaultwarden",
-                new AppRecoveryModels.RecoveryApplyRequest(reviewed.planId(), false)))
+                new AppRecoveryModels.RecoveryApplyRequest(reviewed.planId())))
                 .isInstanceOf(InstallationException.class)
                 .hasMessageContaining("changed after this recovery plan");
         verify(installedApps, never()).commitRecoveredApp(any(), any(), any());
-    }
-
-    @Test
-    void restoresPreviousRuntimeWhenTransferredContainerFailsHealthVerification() throws Exception {
-        Path appRoot = writeRuntime(true);
-        markPreviousProject(appRoot);
-        Files.createDirectories(appRoot.resolve("data"));
-        ObservedService previous = evidence("foreign_autark_os", appRoot, "previous-instance");
-        stubEvidence(previous);
-        when(installedApps.findAppById("vaultwarden")).thenReturn(Optional.empty());
-        when(installedApps.settingsFor("vaultwarden"))
-                .thenReturn(Optional.of(InstallModels.InstallSettings.defaults("http://localhost:8090")));
-
-        DockerComposeExecutor compose = mock(DockerComposeExecutor.class);
-        ComposeRenderer renderer = mock(ComposeRenderer.class);
-        AppRuntimeMetadataWriter metadataWriter = mock(AppRuntimeMetadataWriter.class);
-        BackupService backups = mock(BackupService.class);
-        TailscaleService tailscale = mock(TailscaleService.class);
-        AppAccessChecker access = mock(AppAccessChecker.class);
-        when(compose.down(any(), any())).thenReturn(success("stopped"));
-        when(compose.up(any(), any())).thenReturn(success("started"));
-        when(compose.containers(any(), any())).thenReturn(List.of(
-                new RuntimeModels.DockerContainerStatus("vaultwarden", "vaultwarden", "exited", "unhealthy", "Exited", "8090:80")));
-
-        AppRecoveryService transactional = completeService(compose, renderer, metadataWriter, backups, tailscale, access);
-        AppRecoveryModels.RecoveryPlan plan = transactional.plan("vaultwarden");
-
-        assertThatThrownBy(() -> transactional.apply(
-                "vaultwarden",
-                new AppRecoveryModels.RecoveryApplyRequest(plan.planId(), true)))
-                .isInstanceOf(InstallationException.class)
-                .hasMessageContaining("previous runtime arrangement");
-        verify(compose).down(appRoot.resolve("compose.yaml"), "autarkos_current_vaultwarden");
-        verify(compose).up(appRoot.resolve("compose.yaml"), plan.sourceComposeProject());
-        verify(installedApps, never()).commitRecoveredApp(any(), any(), any());
-    }
-
-    private AppRecoveryService completeService(
-            DockerComposeExecutor compose,
-            ComposeRenderer renderer,
-            AppRuntimeMetadataWriter metadataWriter,
-            BackupService backups,
-            TailscaleService tailscale,
-            AppAccessChecker access) {
-        return new AppRecoveryService(
-                applicationInventory, observedServices, installedApps, catalog, new AppRuntimeMetadataReader(),
-                dockerOwnership, activityLog, applicationState, compose, renderer, metadataWriter, backups,
-                new RecoveryOperationCoordinator(), tailscale, access,
-                com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty()));
-    }
-
-    private RuntimeModels.DockerComposeResult success(String output) {
-        return new RuntimeModels.DockerComposeResult(0, List.of(output));
     }
 
     private void markPreviousProject(Path appRoot) throws Exception {

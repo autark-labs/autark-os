@@ -107,9 +107,9 @@ public class MarketplaceInstallService {
         InstallPlan plan = installPlanService.generatePlan(manifest, options);
         RuntimeModels.ResolvedRuntimeConfiguration runtimeConfiguration = customizationResolver.resolve(manifest, options);
         List<ObservedService> duplicates = matchingObservedDuplicates(manifest);
-        List<ObservedService> recoverableDuplicates = recoverableAutarkOsDuplicates(duplicates);
-        if (!recoverableDuplicates.isEmpty()) {
-            String message = recoverableDuplicateMessage(manifest);
+        List<ObservedService> previousAutarkOsDuplicates = previousAutarkOsDuplicates(duplicates);
+        if (!previousAutarkOsDuplicates.isEmpty()) {
+            String message = previousAutarkOsDuplicateMessage(manifest);
             recordStep(steps, sink, InstallModels.InstallStep.failed("Checking existing services", message));
             return new InstallModels.InstallResult(manifest.id(), manifest.name(), AutarkOsStates.JobStatus.FAILED, message, runtimeConfiguration.accessUrl(), plan, steps, logs, null, setupGuide(manifest, runtimeConfiguration.accessUrl(), null, GuideModels.PostInstallProvisioningResult.empty()));
         }
@@ -251,18 +251,18 @@ public class MarketplaceInstallService {
                 .toList();
     }
 
-    private List<ObservedService> recoverableAutarkOsDuplicates(List<ObservedService> duplicates) {
+    private List<ObservedService> previousAutarkOsDuplicates(List<ObservedService> duplicates) {
         return duplicates.stream()
                 .filter(service -> "legacy_autark_os".equals(service.ownershipState()) || "foreign_autark_os".equals(service.ownershipState()))
                 .toList();
     }
 
-    private String recoverableDuplicateMessage(ApplicationManifest manifest) {
-        return "Autark-OS found an existing " + manifest.name() + " service with Autark-OS runtime metadata. To avoid weird behavior across your network, recover the existing " + manifest.name() + " service from My Apps instead of installing another copy on top of it.";
+    private String previousAutarkOsDuplicateMessage(ApplicationManifest manifest) {
+        return "Autark-OS found an existing " + manifest.name() + " service from another installation. During beta, Autark-OS will leave it unchanged and will not install over it.";
     }
 
     private String duplicateWarningMessage(ApplicationManifest manifest) {
-        return "Autark-OS already sees " + manifest.name() + " on your system. Installing another copy can cause confusing behavior across your network. Review recovery for the existing service when possible, or acknowledge that you intentionally want a separate copy.";
+        return "Autark-OS already sees " + manifest.name() + " on your system. Installing another copy can cause confusing behavior across your network. Review the existing service, or acknowledge that you intentionally want a separate copy.";
     }
 
     private void recordFailedPartialInstall(

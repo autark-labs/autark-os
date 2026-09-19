@@ -129,7 +129,8 @@ test('applications page only exposes concrete next actions from the rail', () =>
 test('applications page opens canonical app review without a second observed-service route', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
-  assert.match(page, /appState\.applications[\s\S]*application\.relationship === 'recovery_required'/);
+  assert.match(page, /reviewApplications = useMemo\([\s\S]*application\.relationship === 'recovery_required'/);
+  assert.match(page, /reviewedApplication = appState\.applications\.find[\s\S]*application\.relationship === 'blocked'/);
   assert.match(page, /<ApplicationReviewPrompt/);
   assert.match(page, /reviewApplications\[0\]\?\.primaryAction\.href/);
   assert.match(page, /<ApplicationReviewDialog/);

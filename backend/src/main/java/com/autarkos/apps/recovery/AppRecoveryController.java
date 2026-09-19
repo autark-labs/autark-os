@@ -35,11 +35,6 @@ public class AppRecoveryController {
         this.applicationState = applicationState;
     }
 
-    @GetMapping
-    public List<AppRecoveryModels.RecoveryCandidate> list() {
-        return service.list();
-    }
-
     @GetMapping("/{appId}/plan")
     public AppRecoveryModels.RecoveryPlan plan(@PathVariable String appId) {
         return service.plan(appId);
@@ -53,7 +48,7 @@ public class AppRecoveryController {
         if (!plan.applicable() || !service.reviewedPlanMatches(plan, request)) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(plan);
         }
-        List<AutarkOsJobStep> steps = recoverySteps(plan.ownershipTransferRequired());
+        List<AutarkOsJobStep> steps = recoverySteps();
         AutarkOsJob existing = jobs.existingForRequest(
                 AutarkOsStates.JobType.RECOVER_APP, appId, steps, request).orElse(null);
         if (existing != null) {
@@ -79,17 +74,11 @@ public class AppRecoveryController {
         return ResponseEntity.accepted().body(job);
     }
 
-    private List<AutarkOsJobStep> recoverySteps(boolean transfer) {
-        List<AutarkOsJobStep> steps = new java.util.ArrayList<>();
-        steps.add(AutarkOsJobStep.pending("inspect_current_state", "Confirm recovery plan"));
-        if (transfer) {
-            steps.add(AutarkOsJobStep.pending("create_safety_checkpoint", "Create safety checkpoint"));
-            steps.add(AutarkOsJobStep.pending("transfer_runtime", "Transfer app management"));
-            steps.add(AutarkOsJobStep.pending("restore_access", "Restore app access"));
-        }
-        steps.add(AutarkOsJobStep.pending("verify_recovery", "Verify health and ownership"));
-        steps.add(AutarkOsJobStep.pending("commit_management", "Finish recovery"));
-        return List.copyOf(steps);
+    private List<AutarkOsJobStep> recoverySteps() {
+        return List.of(
+                AutarkOsJobStep.pending("inspect_current_state", "Confirm recovery plan"),
+                AutarkOsJobStep.pending("verify_recovery", "Verify current ownership"),
+                AutarkOsJobStep.pending("commit_management", "Restore app registration"));
     }
 
     private void markProgress(String jobId, List<AutarkOsJobStep> steps, String activeStep) {

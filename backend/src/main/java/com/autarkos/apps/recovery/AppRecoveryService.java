@@ -21,7 +21,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -30,10 +29,6 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import com.autarkos.activity.ActivityLogService;
 import com.autarkos.api.AutarkOsStates;
-import com.autarkos.apps.ApplicationInventoryService;
-import com.autarkos.apps.ApplicationRelationship;
-import com.autarkos.apps.ApplicationStateService;
-import com.autarkos.backups.BackupService;
 import com.autarkos.backups.RecoveryOperationCoordinator;
 import com.autarkos.host.HostModels;
 import com.autarkos.host.DockerInventoryService;
@@ -45,22 +40,14 @@ import com.autarkos.marketplace.catalog.ManifestYamlReader;
 import com.autarkos.marketplace.install.AppAccessChecker;
 import com.autarkos.marketplace.install.AppRuntimeMetadataReader;
 import com.autarkos.marketplace.install.AppRuntimeMetadataWriter;
-import com.autarkos.marketplace.install.ComposeRenderer;
-import com.autarkos.marketplace.install.DockerComposeExecutor;
 import com.autarkos.marketplace.install.DockerOwnershipService;
-import com.autarkos.marketplace.install.InstallStartupChecker;
 import com.autarkos.marketplace.install.InstallationException;
 import com.autarkos.marketplace.install.InstalledApp;
 import com.autarkos.marketplace.install.InstalledAppRepository;
-import com.autarkos.marketplace.install.models.AccessModels;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
 import com.autarkos.marketplace.model.RuntimeServiceManifest;
-import com.autarkos.network.tailscale.TailscaleServeResult;
-import com.autarkos.network.tailscale.TailscaleServeConfig;
-import com.autarkos.network.tailscale.TailscaleServeMapping;
-import com.autarkos.network.tailscale.TailscaleService;
 import com.autarkos.system.AutarkOsIdentity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -69,131 +56,75 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class AppRecoveryService {
 
     static final String CURRENT_INSTANCE_REGISTRATION_LOST = "current_instance_registration_lost";
-    static final String PREVIOUS_INSTANCE = "previous_instance";
-    static final String LEGACY_AUTARK = "legacy_autark";
     static final String INSUFFICIENT_EVIDENCE = "insufficient_evidence";
 
     private static final Pattern PUBLISHED_PORT = Pattern.compile("(?:^|:)(\\d+):\\d+(?:/(?:tcp|udp))?$");
 
-    private final ApplicationInventoryService applicationInventory;
     private final ObservedServiceService observedServices;
     private final InstalledAppRepository installedApps;
     private final MarketplaceCatalogService catalog;
     private final AppRuntimeMetadataReader runtimeMetadataReader;
     private final DockerOwnershipService dockerOwnership;
     private final ActivityLogService activityLog;
-    private final ApplicationStateService applicationState;
-    private final DockerComposeExecutor composeExecutor;
-    private final ComposeRenderer composeRenderer;
-    private final AppRuntimeMetadataWriter runtimeMetadataWriter;
-    private final BackupService backupService;
     private final RecoveryOperationCoordinator recoveryOperations;
-    private final TailscaleService tailscaleService;
     private final AppAccessChecker accessChecker;
     private final DockerInventoryService dockerInventory;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Autowired
     public AppRecoveryService(
-            ApplicationInventoryService applicationInventory,
             ObservedServiceService observedServices,
             InstalledAppRepository installedApps,
             MarketplaceCatalogService catalog,
             AppRuntimeMetadataReader runtimeMetadataReader,
             DockerOwnershipService dockerOwnership,
             ActivityLogService activityLog,
-            ApplicationStateService applicationState,
-            DockerComposeExecutor composeExecutor,
-            ComposeRenderer composeRenderer,
-            AppRuntimeMetadataWriter runtimeMetadataWriter,
-            BackupService backupService,
             RecoveryOperationCoordinator recoveryOperations,
-            TailscaleService tailscaleService,
-            DockerInventoryService dockerInventory) {
-        this(applicationInventory, observedServices, installedApps, catalog, runtimeMetadataReader, dockerOwnership,
-                activityLog, applicationState, composeExecutor, composeRenderer, runtimeMetadataWriter, backupService,
-                recoveryOperations, tailscaleService, new AppAccessChecker(), dockerInventory);
-    }
-
-    AppRecoveryService(
-            ApplicationInventoryService applicationInventory,
-            ObservedServiceService observedServices,
-            InstalledAppRepository installedApps,
-            MarketplaceCatalogService catalog,
-            AppRuntimeMetadataReader runtimeMetadataReader,
-            DockerOwnershipService dockerOwnership,
-            ActivityLogService activityLog,
-            ApplicationStateService applicationState,
-            DockerComposeExecutor composeExecutor,
-            ComposeRenderer composeRenderer,
-            AppRuntimeMetadataWriter runtimeMetadataWriter,
-            BackupService backupService,
-            RecoveryOperationCoordinator recoveryOperations,
-            TailscaleService tailscaleService,
             AppAccessChecker accessChecker,
             DockerInventoryService dockerInventory) {
-        this.applicationInventory = applicationInventory;
         this.observedServices = observedServices;
         this.installedApps = installedApps;
         this.catalog = catalog;
         this.runtimeMetadataReader = runtimeMetadataReader;
         this.dockerOwnership = dockerOwnership;
         this.activityLog = activityLog;
-        this.applicationState = applicationState;
-        this.composeExecutor = composeExecutor;
-        this.composeRenderer = composeRenderer;
-        this.runtimeMetadataWriter = runtimeMetadataWriter;
-        this.backupService = backupService;
         this.recoveryOperations = recoveryOperations;
-        this.tailscaleService = tailscaleService;
         this.accessChecker = accessChecker;
         this.dockerInventory = dockerInventory;
     }
 
-    public AppRecoveryService(
-            ApplicationInventoryService applicationInventory,
-            ObservedServiceService observedServices,
-            InstalledAppRepository installedApps,
-            MarketplaceCatalogService catalog,
-            AppRuntimeMetadataReader runtimeMetadataReader,
-            DockerOwnershipService dockerOwnership,
-            ActivityLogService activityLog,
-            ApplicationStateService applicationState,
-            DockerInventoryService dockerInventory) {
-        this(applicationInventory, observedServices, installedApps, catalog, runtimeMetadataReader, dockerOwnership,
-                activityLog, applicationState, null, null, null, null, null, null, null, dockerInventory);
-    }
-
-    public List<AppRecoveryModels.RecoveryCandidate> list() {
-        List<com.autarkos.apps.ApplicationView> applications = applicationState.snapshot().applications();
-        return applications.stream()
-                .filter(app -> app.relationship() == ApplicationRelationship.RECOVERY_REQUIRED)
-                .map(app -> new AppRecoveryModels.RecoveryCandidate(
-                        app.id(), app.name(), reasonFor(bestEvidence(app.id()).orElse(null)),
-                        app.relationshipDescription(), "/api/app-recovery/" + encode(app.id()) + "/plan"))
-                .toList();
-    }
-
     public AppRecoveryModels.RecoveryPlan plan(String appId) {
         observedServices.refresh(dockerInventory.requireFresh());
-        return buildPlan(appId);
+        return buildPlan(appId, strictDockerEvidence(appId, observedServices.observedServices()));
     }
 
-    private AppRecoveryModels.RecoveryPlan buildPlan(String appId) {
+    public Optional<AppRecoveryModels.RecoveryPlan> applicablePlan(
+            String appId,
+            List<ObservedService> evidence) {
+        List<ObservedService> containers = strictDockerEvidence(appId, evidence);
+        boolean currentRuntimeObserved = containers.stream().anyMatch(service ->
+                "owned_managed".equals(service.ownershipState())
+                        && dockerOwnership.currentIdentity().instanceId().equals(service.autarkOsInstanceId()));
+        if (!currentRuntimeObserved && installedApps.findAppById(appId).isEmpty()) {
+            return Optional.empty();
+        }
+        AppRecoveryModels.RecoveryPlan plan = buildPlan(appId, containers);
+        return plan.applicable() ? Optional.of(plan) : Optional.empty();
+    }
+
+    private AppRecoveryModels.RecoveryPlan buildPlan(String appId, List<ObservedService> containers) {
         ApplicationManifest manifest = catalog.findById(appId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown catalog application: " + appId));
-        ObservedService evidence = bestEvidence(appId).orElse(null);
-        String reason = reasonFor(evidence);
+        ObservedService evidence = containers.stream().findFirst().orElse(null);
         AutarkOsIdentity identity = dockerOwnership.currentIdentity();
         Path runtimePath = runtimePath(appId, evidence, identity);
         Optional<RuntimeModels.AppRuntimeMetadata> metadata = runtimeMetadataReader.read(runtimePath);
+        String reason = reasonFor(appId, evidence, metadata.orElse(null), identity);
         Optional<ApplicationManifest> savedManifest = readSavedManifest(runtimePath);
         ApplicationManifest deployedManifest = savedManifest.orElse(manifest);
         ComposeInspection compose = inspectCompose(runtimePath.resolve("compose.yaml"), deployedManifest, runtimePath);
-        List<ObservedService> containers = matchingDockerEvidence(appId);
         List<AppRecoveryModels.RecoveryCheck> checks = new ArrayList<>();
 
-        boolean catalogIdentity = evidence != null && appId.equals(evidence.catalogAppId())
+        boolean catalogIdentity = (evidence == null || appId.equals(evidence.catalogAppId()))
                 && metadata.map(value -> appId.equals(value.catalogAppId())).orElse(false)
                 && savedManifest.map(value -> appId.equals(value.id())).orElse(false);
         checks.add(check("catalog_identity", "App identity", catalogIdentity,
@@ -230,20 +161,16 @@ public class AppRecoveryService {
         LiveRuntimeInspection liveRuntime = inspectLiveRuntime(containers, compose, deployedManifest);
         checks.add(check("live_runtime", "Running containers", liveRuntime.valid(), liveRuntime.message(), liveRuntime.detail()));
 
-        boolean ownershipConsistent = ownershipConsistent(reason, containers, identity);
-        checks.add(check("docker_ownership", "Previous ownership", ownershipConsistent,
-                ownershipConsistent ? ownershipReadyMessage(reason) : ownershipMessage(reason),
+        boolean ownershipConsistent = ownershipConsistent(appId, containers, metadata.orElse(null), identity);
+        checks.add(check("ownership", "Current ownership", ownershipConsistent,
+                ownershipConsistent ? "The saved runtime and current-instance evidence identify this Autark-OS installation."
+                        : "Current-instance ownership could not be proven without using legacy or foreign resources.",
                 containers.stream().map(ObservedService::fingerprint).collect(java.util.stream.Collectors.joining(", "))));
 
         Set<Integer> conflicts = portConflicts(appId, compose.ports());
         checks.add(check("ports", "Published ports", conflicts.isEmpty(),
                 conflicts.isEmpty() ? "The app's published ports have no conflict." : "Another service claims: " + conflicts,
                 compose.ports().isEmpty() ? "No published ports" : compose.ports().toString()));
-
-        boolean noManagedConflict = installedApps.findAppById(appId).isEmpty();
-        checks.add(check("managed_record", "Managed registration", noManagedConflict,
-                noManagedConflict ? "No managed app record will be overwritten."
-                        : "A managed app record already exists and must not be overwritten.", appId));
 
         Optional<InstallModels.InstallSettings> resolvedSettings = recoverySettings(appId, deployedManifest, evidence, compose, runtimePath);
         boolean settingsReady = resolvedSettings.isPresent();
@@ -254,22 +181,18 @@ public class AppRecoveryService {
                         : "Autark-OS cannot reconstruct complete app settings without guessing.",
                 settingsReady ? "Settings are ready for the managed lifecycle." : "Existing resources remain unchanged."));
 
-        boolean supportedReason = Set.of(CURRENT_INSTANCE_REGISTRATION_LOST, PREVIOUS_INSTANCE, LEGACY_AUTARK).contains(reason);
-        boolean transferRequired = PREVIOUS_INSTANCE.equals(reason) || LEGACY_AUTARK.equals(reason);
-        String sourceComposeProject = firstPresent(
+        String composeProject = firstPresent(
                 metadata.map(RuntimeModels.AppRuntimeMetadata::composeProject).orElse(""),
                 metadataValue(evidence, "composeProject"));
-        String targetComposeProject = dockerOwnership.composeProject(appId);
-        boolean composeProjectsReady = !sourceComposeProject.isBlank() && !targetComposeProject.isBlank()
-                && (transferRequired || sourceComposeProject.equals(targetComposeProject));
+        String expectedComposeProject = dockerOwnership.composeProject(appId);
+        boolean composeProjectsReady = !composeProject.isBlank() && composeProject.equals(expectedComposeProject);
         checks.add(check("compose_project", "Compose ownership", composeProjectsReady,
                 composeProjectsReady
-                        ? "The previous and current Compose project identities are available."
-                        : sourceComposeProject.isBlank() || targetComposeProject.isBlank()
-                                ? "Autark-OS cannot safely identify both Compose projects."
-                                : "The current-instance Compose project does not match the recorded runtime.",
-                composeProjectsReady ? sourceComposeProject + " → " + targetComposeProject : "No complete project identity"));
-        boolean lifecycleAvailable = supportedReason && checks.stream().allMatch(item -> "passed".equals(item.status()));
+                        ? "The Compose project belongs to this Autark-OS installation."
+                        : "The recorded Compose project does not match this Autark-OS installation.",
+                composeProjectsReady ? composeProject : "No matching current-instance project identity"));
+        boolean lifecycleAvailable = CURRENT_INSTANCE_REGISTRATION_LOST.equals(reason)
+                && checks.stream().allMatch(item -> "passed".equals(item.status()));
         checks.add(check("managed_lifecycle", "Complete managed lifecycle", lifecycleAvailable,
                 lifecycleAvailable ? "Recovery will enable start, stop, restart, repair, settings, backup, update, and uninstall."
                         : "A complete managed lifecycle cannot be guaranteed from the current evidence.",
@@ -279,155 +202,71 @@ public class AppRecoveryService {
                 .map(AppRecoveryModels.RecoveryCheck::message).distinct().toList();
         boolean applicable = blocked.isEmpty();
         String summary = applicable
-                ? transferRequired
-                        ? "Autark-OS can transfer management while preserving the app's mounted data and verified runtime configuration."
-                        : "Autark-OS can restore the missing registration without changing the running app."
-                : "Autark-OS found recovery evidence, but will not claim this app until every lifecycle check passes.";
-        String planId = planId(appId, reason, runtimePath, sourceComposeProject, targetComposeProject,
+                ? "Autark-OS can restore this installation's missing registration without changing the app runtime or data."
+                : "These resources will remain unchanged because complete current-instance recovery proof is unavailable.";
+        String planId = planId(appId, reason, runtimePath, composeProject,
                 appInstanceId, containers, resolvedSettings.orElse(null));
         return new AppRecoveryModels.RecoveryPlan(
-                appId, manifest.name(), reason, applicable, summary, planId, transferRequired,
-                runtimePath.toString(), sourceComposeProject, targetComposeProject, appInstanceId,
+                appId, manifest.name(), reason, applicable, summary, planId,
+                runtimePath.toString(), composeProject, appInstanceId,
                 containers.stream().map(ObservedService::fingerprint).toList(), compose.mounts(),
                 compose.ports().stream().map(String::valueOf).toList(), List.copyOf(checks),
-                transferRequired
-                        ? List.of("Create and verify a safety checkpoint", "Stop the previous Compose project",
-                                "Transfer runtime ownership", "Restore app access", "Verify health and access",
-                                "Commit managed app records")
-                        : List.of("Re-read current-instance evidence", "Restore the missing managed registration",
-                                "Refresh canonical application state"),
+                List.of("Re-read current-instance evidence", "Restore the missing managed registration",
+                        "Refresh canonical application state"),
                 blocked);
     }
 
     public boolean reviewedPlanMatches(AppRecoveryModels.RecoveryPlan plan, AppRecoveryModels.RecoveryApplyRequest request) {
-        return request != null && request.planId() != null && request.planId().equals(plan.planId())
-                && (!plan.ownershipTransferRequired() || request.ownershipTransferConfirmed());
+        return request != null && request.planId() != null && request.planId().equals(plan.planId());
     }
 
-    public AppRecoveryModels.RecoveryResult apply(String appId, AppRecoveryModels.RecoveryApplyRequest request) {
-        return apply(appId, request, ignored -> { });
+    public void apply(String appId, AppRecoveryModels.RecoveryApplyRequest request) {
+        apply(appId, request, ignored -> { });
     }
 
-    public AppRecoveryModels.RecoveryResult apply(
+    public void apply(
             String appId,
             AppRecoveryModels.RecoveryApplyRequest request,
             Consumer<String> progress) {
         Consumer<String> sink = progress == null ? ignored -> { } : progress;
-        if (recoveryOperations == null) {
-            return applyLocked(appId, request, sink);
-        }
-        return recoveryOperations.runExclusive(
+        recoveryOperations.runExclusive(
                 RecoveryOperationCoordinator.Operation.APP_RECOVERY,
-                () -> applyLocked(appId, request, sink));
+                () -> {
+                    applyLocked(appId, request, sink);
+                    return null;
+                });
     }
 
-    private AppRecoveryModels.RecoveryResult applyLocked(
+    private void applyLocked(
             String appId,
             AppRecoveryModels.RecoveryApplyRequest request,
             Consumer<String> progress) {
         progress.accept("inspect_current_state");
         observedServices.refresh(dockerInventory.requireFresh());
-        AppRecoveryModels.RecoveryPlan plan = buildPlan(appId);
+        List<ObservedService> evidence = strictDockerEvidence(appId, observedServices.observedServices());
+        AppRecoveryModels.RecoveryPlan plan = buildPlan(appId, evidence);
         if (!plan.applicable()) {
             throw new InstallationException("Recovery is not safe yet. " + String.join(" ", plan.blockedReasons()));
         }
         if (request == null || request.planId() == null || !request.planId().equals(plan.planId())) {
             throw new InstallationException("The app changed after this recovery plan was reviewed. Review a fresh plan before continuing.");
         }
-        if (plan.ownershipTransferRequired() && !request.ownershipTransferConfirmed()) {
-            throw new InstallationException("Confirm the ownership transfer before recovering this app.");
-        }
-
         Path runtimePath = Path.of(plan.runtimePath()).toAbsolutePath().normalize();
         Path composePath = runtimePath.resolve("compose.yaml");
         ApplicationManifest manifest = readSavedManifest(runtimePath)
                 .orElseThrow(() -> new InstallationException("The app's saved release manifest is no longer available."));
-        InstallModels.InstallSettings settings = recoverySettings(appId, manifest, bestEvidence(appId).orElse(null),
+        InstallModels.InstallSettings settings = recoverySettings(appId, manifest, evidence.stream().findFirst().orElse(null),
                 inspectCompose(composePath, manifest, runtimePath), runtimePath)
                 .orElseThrow(() -> new InstallationException("The verified app settings are no longer available."));
 
-        if (!plan.ownershipTransferRequired()) {
-            progress.accept("verify_recovery");
-            requireManagedOwnership(appId, plan.appInstanceId());
-            progress.accept("commit_management");
-            boolean running = matchingDockerEvidence(appId).stream().anyMatch(this::running);
-            commitManagedRecords(plan, manifest, settings, Instant.now(),
-                    running ? AutarkOsStates.AppStatus.READY : AutarkOsStates.AppStatus.STOPPED);
-            return completed(plan, manifest, "Autark-OS restored the missing app registration.");
-        }
-
-        requireRuntimeDependencies();
-        RuntimeSnapshot original = snapshot(runtimePath);
-        boolean sourceWasRunning = matchingDockerEvidence(appId).stream().anyMatch(this::running);
-        boolean ownershipFilesChanged = false;
-        AccessRollback accessRollback = null;
-        try {
-            progress.accept("create_safety_checkpoint");
-            dockerInventory.requireFresh();
-            RuntimeModels.DockerComposeResult stopped = composeExecutor.down(composePath, plan.sourceComposeProject());
-            if (!stopped.successful()) {
-                throw new InstallationException("Docker could not stop the previous app project. " + output(stopped));
-            }
-            backupService.createRecoveryCheckpoint(appId, manifest.name());
-            progress.accept("transfer_runtime");
-            composeRenderer.transferOwnership(composePath, manifest, plan.appInstanceId(), plan.targetComposeProject());
-            runtimeMetadataWriter.write(manifest, runtimePath, plan.appInstanceId(), plan.targetComposeProject());
-            ownershipFilesChanged = true;
-            RuntimeModels.DockerComposeResult started = composeExecutor.up(composePath, plan.targetComposeProject());
-            if (!started.successful()) {
-                throw new InstallationException("Docker could not recreate the app under current ownership. " + output(started));
-            }
-
-            InstallStartupChecker.StartupCheck startup = new InstallStartupChecker(composeExecutor).waitForStartup(
-                    composePath, plan.targetComposeProject(), manifest.health(), expectedServices(manifest).stream().toList());
-            if (!startup.ready()) {
-                throw new InstallationException(startup.detail());
-            }
-
-            progress.accept("restore_access");
-            AccessRecovery accessRecovery = restorePrivateAccess(appId, manifest, settings);
-            accessRollback = accessRecovery.rollback();
-            InstallModels.InstallSettings verifiedSettings = accessRecovery.settings();
-            progress.accept("verify_recovery");
-            verifyLocalAccess(appId, manifest, verifiedSettings.accessUrl());
-            requireManagedOwnership(appId, plan.appInstanceId());
-            if (!sourceWasRunning) {
-                RuntimeModels.DockerComposeResult paused = composeExecutor.stopManagedProject(
-                        composePath, plan.targetComposeProject(), appId);
-                if (!paused.successful()) {
-                    throw new InstallationException("Autark-OS could not return the recovered app to its previous stopped state. "
-                            + output(paused));
-                }
-            }
-
-            progress.accept("commit_management");
-            commitManagedRecords(plan, manifest, verifiedSettings, Instant.now(),
-                    sourceWasRunning ? AutarkOsStates.AppStatus.READY : AutarkOsStates.AppStatus.STOPPED);
-            return completed(plan, manifest, "Autark-OS transferred ownership and verified the recovered app.");
-        } catch (RuntimeException exception) {
-            String rollback = ownershipFilesChanged
-                    ? rollbackRuntime(plan, composePath, original, sourceWasRunning)
-                    : restorePreviousRuntime(plan, composePath, sourceWasRunning);
-            rollback = rollback + " " + rollbackPrivateAccess(accessRollback);
-            applicationState.refreshNow();
-            InstallationException failure = new InstallationException(
-                    "Recovery did not complete. " + userMessage(exception) + " " + rollback, exception);
-            activityLog.error("applications", "app_recovery_failed", "App recovery rolled back",
-                    manifest.name() + " remains recoverable. " + rollback, appId, failure);
-            throw failure;
-        }
-    }
-
-    private AppRecoveryModels.RecoveryResult completed(
-            AppRecoveryModels.RecoveryPlan plan,
-            ApplicationManifest manifest,
-            String eventMessage) {
-        installedApps.recordEvent(plan.appId(), "app_recovered", eventMessage);
+        progress.accept("verify_recovery");
+        progress.accept("commit_management");
+        boolean running = evidence.stream().anyMatch(this::running);
+        commitManagedRecords(plan, manifest, settings, Instant.now(),
+                running ? AutarkOsStates.AppStatus.READY : AutarkOsStates.AppStatus.STOPPED);
+        installedApps.recordEvent(plan.appId(), "app_recovered", "Autark-OS restored the missing app registration.");
         activityLog.success("applications", "app_recovered", "App recovery completed",
                 manifest.name() + " is fully managed by this Autark-OS installation.", plan.appId());
-        return new AppRecoveryModels.RecoveryResult(true, "success", "App recovery completed",
-                manifest.name() + " is fully managed by Autark-OS.", plan.appId(), "open_apps",
-                applicationState.refreshNow());
     }
 
     private void commitManagedRecords(
@@ -437,152 +276,11 @@ public class AppRecoveryService {
             Instant now,
             String status) {
         InstalledApp app = new InstalledApp(plan.appId(), manifest.name(), status,
-                plan.runtimePath(), plan.targetComposeProject(), settings.accessUrl(), now);
+                plan.runtimePath(), plan.composeProject(), settings.accessUrl(), now);
         RuntimeModels.InstalledAppOwnershipMetadata ownership = new RuntimeModels.InstalledAppOwnershipMetadata(
                 plan.appId(), plan.appInstanceId(), plan.appId(), dockerOwnership.currentIdentity().instanceId(),
                 plan.runtimePath(), "ready", "owned", now, now);
         installedApps.commitRecoveredApp(app, settings, ownership);
-    }
-
-    private void requireRuntimeDependencies() {
-        if (composeExecutor == null || composeRenderer == null || runtimeMetadataWriter == null
-                || backupService == null || tailscaleService == null || accessChecker == null) {
-            throw new InstallationException("The complete recovery runtime is unavailable.");
-        }
-    }
-
-    private RuntimeSnapshot snapshot(Path runtimePath) {
-        try {
-            Path metadataPath = runtimePath.resolve(AppRuntimeMetadataWriter.METADATA_FILE);
-            return new RuntimeSnapshot(Files.readAllBytes(runtimePath.resolve("compose.yaml")),
-                    Files.isRegularFile(metadataPath) ? Files.readAllBytes(metadataPath) : null);
-        } catch (IOException exception) {
-            throw new InstallationException("Autark-OS could not snapshot the existing runtime configuration.", exception);
-        }
-    }
-
-    private String rollbackRuntime(
-            AppRecoveryModels.RecoveryPlan plan,
-            Path composePath,
-            RuntimeSnapshot original,
-            boolean sourceWasRunning) {
-        List<String> failures = new ArrayList<>();
-        try {
-            RuntimeModels.DockerComposeResult removed = composeExecutor.down(composePath, plan.targetComposeProject());
-            if (!removed.successful()) failures.add(output(removed));
-        } catch (RuntimeException exception) {
-            failures.add(userMessage(exception));
-        }
-        try {
-            Files.write(composePath, original.compose());
-            Path metadataPath = composePath.getParent().resolve(AppRuntimeMetadataWriter.METADATA_FILE);
-            if (original.metadata() == null) Files.deleteIfExists(metadataPath);
-            else Files.write(metadataPath, original.metadata());
-        } catch (IOException exception) {
-            failures.add("The original runtime files could not be restored: " + userMessage(exception));
-        }
-        if (sourceWasRunning) {
-            try {
-                RuntimeModels.DockerComposeResult restored = composeExecutor.up(composePath, plan.sourceComposeProject());
-                if (!restored.successful()) failures.add(output(restored));
-            } catch (RuntimeException exception) {
-                failures.add(userMessage(exception));
-            }
-        }
-        return failures.isEmpty()
-                ? "Autark-OS restored the previous runtime arrangement; the app remains recoverable."
-                : "Autark-OS could not completely restore the previous runtime: " + String.join(" ", failures);
-    }
-
-    private String restorePreviousRuntime(
-            AppRecoveryModels.RecoveryPlan plan,
-            Path composePath,
-            boolean sourceWasRunning) {
-        if (!sourceWasRunning) {
-            return "The previous app was stopped and remains recoverable.";
-        }
-        try {
-            RuntimeModels.DockerComposeResult restored = composeExecutor.up(composePath, plan.sourceComposeProject());
-            return restored.successful()
-                    ? "Autark-OS restored the previous runtime arrangement; the app remains recoverable."
-                    : "Autark-OS could not restart the previous runtime: " + output(restored);
-        } catch (RuntimeException exception) {
-            return "Autark-OS could not restart the previous runtime: " + userMessage(exception);
-        }
-    }
-
-    private AccessRecovery restorePrivateAccess(
-            String appId,
-            ApplicationManifest manifest,
-            InstallModels.InstallSettings settings) {
-        if (!wantsPrivateAccess(settings)) {
-            return new AccessRecovery(settings, null);
-        }
-        Integer localPort = portFromUrl(settings.accessUrl());
-        if (localPort == null) {
-            throw new InstallationException("Autark-OS could not identify the local app port needed for private access.");
-        }
-        Integer storedPrivatePort = portFromUrl(settings.privateAccessUrl());
-        int privatePort = storedPrivatePort == null ? defaultPrivatePort(appId, localPort) : storedPrivatePort;
-        TailscaleServeConfig before = tailscaleService.serveConfig();
-        if (before == null || !before.available()) {
-            throw new InstallationException("Autark-OS could not capture the current private-access configuration for safe rollback.");
-        }
-        TailscaleServeMapping previous = before.mappings().stream()
-                .filter(mapping -> Integer.valueOf(privatePort).equals(mapping.servePort()))
-                .findFirst().orElse(null);
-        AccessRollback rollback = new AccessRollback(privatePort, previous);
-        TailscaleServeResult result = tailscaleService.serveHttps(localPort, privatePort);
-        if (!result.configured()) {
-            throw new InstallationException("Private access could not be restored. " + result.message() + " "
-                    + rollbackPrivateAccess(rollback));
-        }
-        return new AccessRecovery(copySettings(settings, result.privateUrl()), rollback);
-    }
-
-    private String rollbackPrivateAccess(AccessRollback rollback) {
-        if (rollback == null) return "Private access was unchanged.";
-        try {
-            TailscaleServeResult result;
-            if (rollback.previous() == null) {
-                result = tailscaleService.disableHttps(rollback.privatePort());
-            } else if (rollback.previous().targetPort() != null) {
-                result = tailscaleService.serveHttps(rollback.previous().targetPort(), rollback.privatePort());
-            } else {
-                return "Autark-OS could not identify the previous private-access target.";
-            }
-            return result.configured()
-                    ? "Autark-OS restored the previous private-access mapping."
-                    : "Autark-OS could not restore the previous private-access mapping: " + result.message();
-        } catch (RuntimeException exception) {
-            return "Autark-OS could not restore the previous private-access mapping: " + userMessage(exception);
-        }
-    }
-
-    private void verifyLocalAccess(String appId, ApplicationManifest manifest, String accessUrl) {
-        if (!accessChecker.shouldCheckLocalAccess(manifest, accessUrl)) {
-            return;
-        }
-        AccessModels.AppAccessCheck check = null;
-        for (int attempt = 0; attempt < 10; attempt++) {
-            check = accessChecker.localHealthCheck(appId, manifest, accessUrl);
-            if ("reachable".equals(check.status())) return;
-            sleep();
-        }
-        throw new InstallationException(check == null ? "The app link could not be verified." : check.message());
-    }
-
-    private void requireManagedOwnership(String appId, String appInstanceId) {
-        observedServices.refresh(dockerInventory.requireFresh());
-        String currentInstance = dockerOwnership.currentIdentity().instanceId();
-        List<ObservedService> evidence = matchingDockerEvidence(appId);
-        boolean managed = !evidence.isEmpty() && evidence.stream().allMatch(service ->
-                "owned_managed".equals(service.ownershipState())
-                        && currentInstance.equals(service.autarkOsInstanceId())
-                        && appInstanceId.equals(metadataValue(service, "appInstanceId")));
-        if (!managed) {
-            throw new InstallationException("Autark-OS could not verify the new Docker ownership labels.");
-        }
     }
 
     private Optional<InstallModels.InstallSettings> recoverySettings(
@@ -648,64 +346,52 @@ public class AppRecoveryService {
         return manifest.runtime().services().stream().flatMap(service -> service.volumes().stream()).distinct().toList();
     }
 
-    private Optional<ObservedService> bestEvidence(String appId) {
-        return matchingDockerEvidence(appId).stream().sorted(Comparator.comparingInt(this::evidencePriority)).findFirst();
+    private List<ObservedService> strictDockerEvidence(String appId, List<ObservedService> evidence) {
+        return evidence.stream()
+                .filter(service -> HostModels.ObservedServiceSource.DOCKER.equals(service.source()))
+                .filter(service -> appId.equals(service.catalogAppId()))
+                .sorted(Comparator.comparingInt(service -> "owned_managed".equals(service.ownershipState()) ? 0 : 1))
+                .toList();
     }
 
-    private List<ObservedService> matchingDockerEvidence(String appId) {
-        return observedServices.matchingCatalogServices(appId).stream()
-                .filter(service -> HostModels.ObservedServiceSource.DOCKER.equals(service.source())).toList();
-    }
-
-    private int evidencePriority(ObservedService service) {
-        return switch (service.ownershipState()) {
-            case "owned_managed" -> 0;
-            case "foreign_autark_os" -> 1;
-            case "legacy_autark_os" -> 2;
-            default -> 3;
-        };
-    }
-
-    private String reasonFor(ObservedService evidence) {
-        if (evidence == null) return INSUFFICIENT_EVIDENCE;
-        return switch (evidence.ownershipState()) {
-            case "owned_managed" -> installedApps.findAppById(evidence.catalogAppId()).isEmpty()
-                    ? CURRENT_INSTANCE_REGISTRATION_LOST : INSUFFICIENT_EVIDENCE;
-            case "foreign_autark_os" -> PREVIOUS_INSTANCE;
-            case "legacy_autark_os" -> LEGACY_AUTARK;
-            default -> INSUFFICIENT_EVIDENCE;
-        };
-    }
-
-    private boolean ownershipConsistent(String reason, List<ObservedService> containers, AutarkOsIdentity identity) {
-        if (containers.isEmpty()) return false;
-        if (CURRENT_INSTANCE_REGISTRATION_LOST.equals(reason)) {
-            return containers.stream().allMatch(service -> "owned_managed".equals(service.ownershipState())
-                    && identity.instanceId().equals(service.autarkOsInstanceId()));
+    private String reasonFor(
+            String appId,
+            ObservedService evidence,
+            RuntimeModels.AppRuntimeMetadata metadata,
+            AutarkOsIdentity identity) {
+        if (metadata == null || !appId.equals(metadata.catalogAppId())
+                || !identity.instanceId().equals(metadata.instanceId())
+                || metadata.appInstanceId() == null || metadata.appInstanceId().isBlank()) {
+            return INSUFFICIENT_EVIDENCE;
         }
-        if (PREVIOUS_INSTANCE.equals(reason)) {
-            Set<String> owners = containers.stream().map(ObservedService::autarkOsInstanceId)
-                    .filter(value -> value != null && !value.isBlank()).collect(java.util.stream.Collectors.toSet());
-            return owners.size() == 1 && containers.stream().allMatch(service -> "foreign_autark_os".equals(service.ownershipState()));
+        return ownershipConsistent(appId, evidence == null ? List.of() : List.of(evidence), metadata, identity)
+                ? CURRENT_INSTANCE_REGISTRATION_LOST
+                : INSUFFICIENT_EVIDENCE;
+    }
+
+    private boolean ownershipConsistent(
+            String appId,
+            List<ObservedService> containers,
+            RuntimeModels.AppRuntimeMetadata metadata,
+            AutarkOsIdentity identity) {
+        if (metadata == null || !appId.equals(metadata.catalogAppId())
+                || !identity.instanceId().equals(metadata.instanceId())) {
+            return false;
         }
-        return LEGACY_AUTARK.equals(reason)
-                && containers.stream().allMatch(service -> "legacy_autark_os".equals(service.ownershipState()));
-    }
-
-    private String ownershipReadyMessage(String reason) {
-        return switch (reason) {
-            case PREVIOUS_INSTANCE -> "All app containers agree on one previous Autark-OS owner; transfer requires confirmation.";
-            case LEGACY_AUTARK -> "All app containers carry consistent legacy Autark-OS evidence; transfer requires confirmation.";
-            default -> "All app containers belong to this Autark-OS installation.";
-        };
-    }
-
-    private String ownershipMessage(String reason) {
-        return switch (reason) {
-            case PREVIOUS_INSTANCE -> "The app does not have one consistent previous Autark-OS owner.";
-            case LEGACY_AUTARK -> "The legacy containers do not have consistent Autark-OS ownership evidence.";
-            default -> "Docker ownership cannot be proven for the current Autark-OS installation.";
-        };
+        boolean storedOwnership = installedApps.ownershipFor(appId)
+                .filter(ownership -> "owned".equalsIgnoreCase(ownership.ownershipStatus()))
+                .filter(ownership -> appId.equals(ownership.catalogAppId()))
+                .filter(ownership -> identity.instanceId().equals(ownership.autarkOsInstanceId()))
+                .filter(ownership -> metadata.appInstanceId().equals(ownership.appInstanceId()))
+                .isPresent();
+        if (containers.isEmpty()) {
+            return storedOwnership;
+        }
+        boolean liveOwnership = containers.stream().allMatch(service ->
+                "owned_managed".equals(service.ownershipState())
+                        && identity.instanceId().equals(service.autarkOsInstanceId())
+                        && metadata.appInstanceId().equals(metadataValue(service, "appInstanceId")));
+        return storedOwnership || liveOwnership;
     }
 
     private Path runtimePath(String appId, ObservedService evidence, AutarkOsIdentity identity) {
@@ -863,8 +549,7 @@ public class AppRecoveryService {
             String appId,
             String reason,
             Path runtimePath,
-            String sourceProject,
-            String targetProject,
+            String composeProject,
             String appInstanceId,
             List<ObservedService> containers,
             InstallModels.InstallSettings settings) {
@@ -874,7 +559,7 @@ public class AppRecoveryService {
                         metadataValue(service, "appInstanceId"), metadataValue(service, "image"),
                         metadataValue(service, "composeService"), liveMountMaterial(service)))
                 .sorted().toList();
-        String material = String.join("|", appId, reason, runtimePath.toString(), sourceProject, targetProject,
+        String material = String.join("|", appId, reason, runtimePath.toString(), composeProject,
                 appInstanceId, fileHash(runtimePath.resolve("compose.yaml")),
                 fileHash(runtimePath.resolve("manifest.yaml")),
                 fileHash(runtimePath.resolve(AppRuntimeMetadataWriter.METADATA_FILE)), String.join(",", evidence), json(settings));
@@ -885,8 +570,14 @@ public class AppRecoveryService {
             List<ObservedService> containers,
             ComposeInspection compose,
             ApplicationManifest manifest) {
-        if (!compose.valid() || containers.isEmpty()) {
-            return LiveRuntimeInspection.invalid("Running container configuration cannot be verified until Docker and Compose evidence are complete.");
+        if (!compose.valid()) {
+            return LiveRuntimeInspection.invalid("Running container configuration cannot be verified until Compose evidence is complete.");
+        }
+        if (containers.isEmpty()) {
+            return new LiveRuntimeInspection(
+                    true,
+                    "No app containers are present; the restored registration will keep the app stopped.",
+                    "Runtime files and stored current-instance ownership are complete.");
         }
         List<String> expectedServices = expectedServices(manifest).stream().sorted().toList();
         List<String> actualServices = containers.stream()
@@ -1005,39 +696,6 @@ public class AppRecoveryService {
         }
     }
 
-    private InstallModels.InstallSettings copySettings(InstallModels.InstallSettings settings, String privateUrl) {
-        return new InstallModels.InstallSettings(settings.accessUrl(), privateUrl, settings.tailscaleEnabled(),
-                settings.storageSubfolders(), settings.backup(), settings.desiredAccessMode(),
-                settings.privateAccessRequirement(), settings.expectedLocalPort(), settings.expectedProtocol(),
-                settings.lastAccessCheckAt(), settings.lastSuccessfulAccessAt(), settings.lastRepairAttemptAt(),
-                settings.lastRepairStatus(), settings.autoRepairEnabled());
-    }
-
-    private boolean wantsPrivateAccess(InstallModels.InstallSettings settings) {
-        return settings.tailscaleEnabled() || "private".equals(settings.desiredAccessMode())
-                || "local-and-private".equals(settings.desiredAccessMode())
-                || "required".equals(settings.privateAccessRequirement());
-    }
-
-    private int defaultPrivatePort(String appId, int localPort) {
-        int first = 12000;
-        int count = 4000;
-        int offset = Math.floorMod(appId.hashCode(), count);
-        int candidate = first + offset;
-        return candidate == localPort ? first + ((offset + 1) % count) : candidate;
-    }
-
-    private Integer portFromUrl(String value) {
-        if (value == null || value.isBlank()) return null;
-        try {
-            URI uri = URI.create(value);
-            if (uri.getPort() > 0) return uri.getPort();
-            return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : "http".equalsIgnoreCase(uri.getScheme()) ? 80 : null;
-        } catch (IllegalArgumentException exception) {
-            return null;
-        }
-    }
-
     private String accessUrl(String observedUrl, Integer port) {
         if (observedUrl == null || observedUrl.isBlank()) return "";
         try {
@@ -1071,11 +729,6 @@ public class AppRecoveryService {
         return state.equals("running") || state.startsWith("up");
     }
 
-    private String output(RuntimeModels.DockerComposeResult result) {
-        String value = result == null || result.output() == null ? "" : String.join(" ", result.output()).trim();
-        return value.isBlank() ? "Docker did not provide additional details." : value;
-    }
-
     private String firstPresent(String... values) {
         for (String value : values) if (value != null && !value.isBlank()) return value.trim();
         return "";
@@ -1083,24 +736,6 @@ public class AppRecoveryService {
 
     private String blank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
-    }
-
-    private String userMessage(Exception exception) {
-        return exception.getMessage() == null || exception.getMessage().isBlank()
-                ? "Autark-OS could not complete recovery." : exception.getMessage();
-    }
-
-    private void sleep() {
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new InstallationException("Recovery was interrupted while verifying app access.", exception);
-        }
-    }
-
-    private String encode(String value) {
-        return java.net.URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private record ComposeInspection(
@@ -1127,12 +762,4 @@ public class AppRecoveryService {
     private record Mount(String source, String target, boolean readOnly) {
     }
 
-    private record RuntimeSnapshot(byte[] compose, byte[] metadata) {
-    }
-
-    private record AccessRecovery(InstallModels.InstallSettings settings, AccessRollback rollback) {
-    }
-
-    private record AccessRollback(int privatePort, TailscaleServeMapping previous) {
-    }
 }

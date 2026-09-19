@@ -63,7 +63,8 @@ test('existing-app recovery tracks a durable job and refreshes canonical state a
   assert.match(dialog, /useAutarkOsJobQuery\(activeRecoveryJobId\)/);
   assert.match(dialog, /useAutarkOsJobsQuery\(\)/);
   assert.match(dialog, /job\.type === 'recover_app'[\s\S]*job\.subjectId === currentApplication\.id[\s\S]*!terminalJob\(job\)/);
-  assert.match(dialog, /AppRecoveryAPIClient\.apply\([\s\S]*plan\.planId[\s\S]*transferAcknowledged/);
+  assert.match(dialog, /AppRecoveryAPIClient\.apply\(appId, plan\.planId\)/);
+  assert.doesNotMatch(dialog, /transferAcknowledged|ownershipTransferRequired/);
   assert.match(dialog, /await onRefresh\(\)/);
   assert.doesNotMatch(dialog, /ObservedServicesAPIClient|setObservedServicePinnedInApplicationStateCache|setApplicationStateFromActionResultCache/);
 });

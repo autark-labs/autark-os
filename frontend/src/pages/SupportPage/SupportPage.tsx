@@ -439,7 +439,7 @@ function HealthChecksWorkspace({ conflict, findings, healthChecks }: { conflict:
         <div className={cn('rounded-xl border p-3', conflict.tone === 'warning' ? 'border-amber-300/30 bg-amber-400/10' : 'border-cyan-300/25 bg-cyan-400/10')}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><p className="text-sm font-semibold text-white">{conflict.title}</p><p className="mt-1 text-xs leading-5 text-sky-100/70">{conflict.message}</p></div>
-            <ProjectPrimaryButton asChild className="h-8 shrink-0 px-2.5 text-xs"><Link to="/apps">Recover existing apps</Link></ProjectPrimaryButton>
+            <ProjectPrimaryButton asChild className="h-8 shrink-0 px-2.5 text-xs"><Link to="/apps">Review existing apps</Link></ProjectPrimaryButton>
           </div>
         </div>
       )}

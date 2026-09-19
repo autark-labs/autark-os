@@ -83,14 +83,16 @@ class DiscoverServiceTests {
         assertThat(apps).filteredOn(app -> app.application().id().equals("jellyfin"))
                 .singleElement()
                 .satisfies(app -> {
-                    assertThat(app.application().relationship()).isEqualTo(ApplicationRelationship.RECOVERY_REQUIRED);
-                    assertThat(app.application().relationshipLabel()).isEqualTo("Recovery required");
+                    assertThat(app.application().relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
+                    assertThat(app.application().relationshipLabel()).isEqualTo("Blocked");
                     assertThat(app.application().primaryAction().id()).isEqualTo("review_existing");
-                    assertThat(app.application().statusTone()).isEqualTo("warning");
-                    assertThat(app.application().cardTone()).isEqualTo("warning");
+                    assertThat(app.application().statusTone()).isEqualTo("danger");
+                    assertThat(app.application().cardTone()).isEqualTo("danger");
                     assertThat(app.application().availableActions()).extracting(com.autarkos.apps.ApplicationAction::id).contains("review_existing");
+                    assertThat(app.application().availableActions()).extracting(com.autarkos.apps.ApplicationAction::id).doesNotContain("recover", "install_copy");
                     assertThat(app.application().runtime()).isNull();
                     assertThat(app.application().evidence()).isNotNull();
+                    assertThat(app.application().evidence().summary()).contains("remain unchanged during beta");
                 });
     }
 
@@ -313,7 +315,9 @@ class DiscoverServiceTests {
                 .filter(app -> managedApps.attest(app).managed())
                 .map(this::runtime)
                 .toList();
-        return new com.autarkos.apps.ApplicationInventoryService(catalogService(), installedAppRepository, managedApps)
+        return new com.autarkos.apps.ApplicationInventoryService(
+                catalogService(), installedAppRepository, managedApps,
+                mock(com.autarkos.apps.recovery.AppRecoveryService.class))
                 .apps(observedServices.observedServices(), runtimes, Map.of());
     }
 

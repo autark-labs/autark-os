@@ -8,10 +8,9 @@ export const AppRecoveryAPIClient = {
     return response.data;
   },
 
-  async apply(appId: string, planId: string, ownershipTransferConfirmed: boolean) {
+  async apply(appId: string, planId: string) {
     const response = await httpClient.post<AutarkOsJob>(`/api/app-recovery/${encodeURIComponent(appId)}/apply`, {
       planId,
-      ownershipTransferConfirmed,
     });
     return response.data;
   },
