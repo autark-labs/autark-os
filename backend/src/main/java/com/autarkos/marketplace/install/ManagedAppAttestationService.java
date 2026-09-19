@@ -112,7 +112,14 @@ public class ManagedAppAttestationService {
     }
 
     public List<InstalledApp> managedApps() {
-        return repository.findAllApps().stream().filter(app -> attest(app).managed()).toList();
+        return managedAttestations().stream().map(Result::app).toList();
+    }
+
+    public List<Result> managedAttestations() {
+        return repository.findAllApps().stream()
+                .map(this::attest)
+                .filter(Result::managed)
+                .toList();
     }
 
     public InstalledApp requireManaged(String appId, String action) {

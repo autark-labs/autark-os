@@ -322,9 +322,24 @@ if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system
   fi
   rm -f "${header_file}"
   chmod 600 "${inventory}"
-  grep -q '"ownerInstanceId"' "${inventory}" || { rm -f "${inventory}"; echo "Autark-OS: the managed-app inventory response was invalid." >&2; exit 1; }
+  if grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*2([,}[:space:]])' "${inventory}"; then
+    grep -q '"ownerInstanceId"' "${inventory}" \
+      && grep -q '"runtimeRoot"' "${inventory}" \
+      && grep -q '"runtimeRootHash"' "${inventory}" \
+      && grep -q '"identityFileSha256"' "${inventory}" \
+      && grep -q '"managedApps"' "${inventory}" \
+      || { rm -f "${inventory}"; echo "Autark-OS: the managed-app inventory response was invalid." >&2; exit 1; }
+  else
+    grep -Eq '"schemaVersion"[[:space:]]*:[[:space:]]*1([,}[:space:]])' "${inventory}" \
+      && grep -q '"ownerInstanceId"' "${inventory}" \
+      && grep -q '"runtimeRoot"' "${inventory}" \
+      && grep -q '"runtimeRootHash"' "${inventory}" \
+      && grep -q '"managedApps"' "${inventory}" \
+      || { rm -f "${inventory}"; echo "Autark-OS: the managed-app inventory response was invalid." >&2; exit 1; }
+    echo "Autark-OS: this update will establish the complete managed-app continuity baseline used by newer releases." >&2
+  fi
   checkpoint_paths=()
-  for path in "${install_dir}" "${config_dir}" /etc/systemd/system/autark-os.service /etc/sudoers.d/autark-os-fileops "${runtime_dir}/autark-os.db" "${runtime_dir}/autark-os.db-shm" "${runtime_dir}/autark-os.db-wal"; do
+  for path in "${install_dir}" "${config_dir}" /etc/systemd/system/autark-os.service /etc/sudoers.d/autark-os-fileops "${runtime_dir}/config/identity.json" "${runtime_dir}/autark-os.db" "${runtime_dir}/autark-os.db-shm" "${runtime_dir}/autark-os.db-wal"; do
     [[ -e "${path}" || -L "${path}" ]] && checkpoint_paths+=("${path}")
   done
   service_was_active=0
@@ -332,8 +347,12 @@ if [[ "${1:-}" == "upgrade" ]] && [[ -d /etc/autark-os || -f /etc/systemd/system
     service_was_active=1
     systemctl stop autark-os.service >/dev/null 2>&1 || true
   fi
+  rm -f /run/autark-os-package-upgrade-service-enabled
+  if systemctl is-enabled --quiet autark-os.service 2>/dev/null; then
+    : >/run/autark-os-package-upgrade-service-enabled
+  fi
   if ! tar -czf "${checkpoint}" "${checkpoint_paths[@]}"; then
-    rm -f "${inventory}"
+    rm -f "${inventory}" /run/autark-os-package-upgrade-service-enabled
     [[ "${service_was_active}" -eq 0 ]] || systemctl start autark-os.service >/dev/null 2>&1 || true
     exit 1
   fi
@@ -416,6 +435,14 @@ if [[ "\${1:-configure}" == "configure" ]]; then
     ready=0
   fi
   inventory_file=/run/autark-os-package-upgrade-inventory
+  service_enabled_file=/run/autark-os-package-upgrade-service-enabled
+  if [[ -r "\${inventory_file}" ]]; then
+    if [[ -f "\${service_enabled_file}" ]]; then
+      systemctl enable autark-os.service >/dev/null 2>&1 || true
+    else
+      systemctl disable autark-os.service >/dev/null 2>&1 || true
+    fi
+  fi
   inventory_report="\${runtime_dir}/updates/latest-inventory-report.json"
   if [[ "\${ready}" -eq 1 && -r "\${inventory_file}" ]]; then
     inventory="\$(cat "\${inventory_file}")"
@@ -446,6 +473,11 @@ if [[ "\${1:-configure}" == "configure" ]]; then
         rm -f "\${runtime_dir}/autark-os.db" "\${runtime_dir}/autark-os.db-shm" "\${runtime_dir}/autark-os.db-wal"
         tar -xzf "\${checkpoint}" -C /
         systemctl daemon-reload
+        if [[ -f "\${service_enabled_file}" ]]; then
+          systemctl enable autark-os.service >/dev/null 2>&1 || true
+        else
+          systemctl disable autark-os.service >/dev/null 2>&1 || true
+        fi
         systemctl start autark-os.service >/dev/null 2>&1 || true
         rollback_verified=0
         for _attempt in \$(seq 1 60); do
@@ -475,10 +507,10 @@ if [[ "\${1:-configure}" == "configure" ]]; then
         fi
       fi
     fi
-    rm -f "\${checkpoint_file}" "\${inventory_file}"
+    rm -f "\${checkpoint_file}" "\${inventory_file}" "\${service_enabled_file}"
     exit 1
   fi
-  rm -f /run/autark-os-package-upgrade-checkpoint /run/autark-os-package-upgrade-inventory
+  rm -f /run/autark-os-package-upgrade-checkpoint /run/autark-os-package-upgrade-inventory /run/autark-os-package-upgrade-service-enabled
   echo "Autark-OS base service installed."
   echo "Next: open http://localhost:\${server_port} to complete setup."
   echo "Logs: journalctl -u autark-os.service -f"

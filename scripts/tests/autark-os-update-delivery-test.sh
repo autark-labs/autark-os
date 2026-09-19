@@ -30,7 +30,7 @@ esac
 SH
 cat >"${fake_bin}/curl" <<'SH'
 #!/usr/bin/env bash
-printf '{"schemaVersion":1,"ownerInstanceId":"pos_current","runtimeRoot":"%s","runtimeRootHash":"sha256:runtime","managedApps":[]}\n' "${TEST_RUNTIME_DIR}"
+printf '{"schemaVersion":2,"ownerInstanceId":"pos_current","runtimeRoot":"%s","runtimeRootHash":"sha256:runtime","identityFileSha256":"sha256:identity","managedApps":[]}\n' "${TEST_RUNTIME_DIR}"
 SH
 chmod +x "${fake_bin}/systemctl" "${fake_bin}/curl"
 cat >"${config_file}" <<ENV
@@ -113,7 +113,7 @@ previous_jar="$(awk -F= '$1 == "AUTARK_OS_PREVIOUS_BACKEND_JAR" {print $2; exit}
 grep -q 'old backend jar' "${previous_jar}"
 
 snapshot_dir="$(awk -F= '$1 == "AUTARK_OS_PRE_UPDATE_SNAPSHOT_DIR" {print $2; exit}' "${config_file}")"
-[[ -n "${snapshot_dir}" && -f "${snapshot_dir}/autark-os.env" && -f "${snapshot_dir}/autark-os-release.json" ]]
+[[ -n "${snapshot_dir}" && -f "${snapshot_dir}/config/autark-os.env" && -f "${snapshot_dir}/autark-os-release.json" ]]
 
 version_output="$(AUTARK_OS_CONFIG_FILE="${config_file}" AUTARK_OS_BASE_URL="http://127.0.0.1:1" "${repo_root}/scripts/autark-os" version)"
 grep -q 'Version:         1.1.0' <<<"${version_output}"

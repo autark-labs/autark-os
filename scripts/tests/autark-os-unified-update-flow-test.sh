@@ -16,15 +16,17 @@ cli_link="${tmp_dir}/autark-os"
 sudoers_file="${tmp_dir}/autark-os-fileops.sudoers"
 config_file="${config_dir}/autark-os.env"
 service_state="${tmp_dir}/service-state"
+service_enabled_state="${tmp_dir}/service-enabled-state"
 health_expected="${tmp_dir}/health-expected"
 curl_calls="${tmp_dir}/curl-calls"
 inventory_regressed_backend="${tmp_dir}/inventory-regressed-backend"
+legacy_inventory="${tmp_dir}/legacy-inventory"
 
 mkdir -p \
   "${install_dir}/backend" "${install_dir}/runtime/bin" "${install_dir}/bin" \
   "${runtime_dir}" "${config_dir}" "${log_dir}" "${fake_bin}" \
   "${bundle_dir}/backend" "${bundle_dir}/runtime/bin" "${bundle_dir}/scripts"
-mkdir -p "${runtime_dir}/config"
+mkdir -p "${runtime_dir}/config" "${runtime_dir}/apps/vaultwarden/data"
 
 printf 'old backend\n' >"${install_dir}/backend/autark-os-backend.jar"
 printf 'old runtime\n' >"${install_dir}/runtime/bin/java"
@@ -32,9 +34,12 @@ printf 'old cli\n' >"${install_dir}/bin/autark-os"
 chmod +x "${install_dir}/bin/autark-os"
 printf 'old database\n' >"${runtime_dir}/autark-os.db"
 printf 'local-update-secret\n' >"${runtime_dir}/config/admin-local-secret"
+printf 'stable installation identity\n' >"${runtime_dir}/config/identity.json"
+printf 'managed app data\n' >"${runtime_dir}/apps/vaultwarden/data/preserved.txt"
 printf 'old unit\n' >"${service_file}"
 printf 'old sudoers\n' >"${sudoers_file}"
 printf 'active\n' >"${service_state}"
+printf 'disabled\n' >"${service_enabled_state}"
 printf 'old backend\n' >"${health_expected}"
 
 cat >"${config_file}" <<ENV
@@ -68,13 +73,19 @@ case "${1:-}" in
     [[ "$(cat "${TEST_SERVICE_STATE}")" == "active" ]]
     ;;
   is-enabled)
-    exit 0
+    [[ "$(cat "${TEST_SERVICE_ENABLED_STATE}")" == "enabled" ]]
     ;;
-  stop|disable)
+  stop)
     printf 'inactive\n' >"${TEST_SERVICE_STATE}"
     ;;
-  start|restart|enable)
+  start|restart)
     printf 'active\n' >"${TEST_SERVICE_STATE}"
+    ;;
+  enable)
+    printf 'enabled\n' >"${TEST_SERVICE_ENABLED_STATE}"
+    ;;
+  disable)
+    printf 'disabled\n' >"${TEST_SERVICE_ENABLED_STATE}"
     ;;
   daemon-reload|status)
     exit 0
@@ -92,13 +103,17 @@ url="${!#}"
 printf '%s\n' "${url}" >>"${TEST_CURL_CALLS}"
 case "${url}" in
   */api/system/update-inventory)
-    printf '{"schemaVersion":1,"ownerInstanceId":"pos_current","runtimeRoot":"%s","runtimeRootHash":"sha256:runtime","managedApps":[{"catalogAppId":"vaultwarden","appInstanceId":"appinst_vault","ownerInstanceId":"pos_current","runtimePath":"%s/apps/vaultwarden","composeProject":"autarkos_current_vaultwarden","ownershipState":"owned_managed","relationship":"managed"},{"catalogAppId":"homepage","appInstanceId":"appinst_home","ownerInstanceId":"pos_current","runtimePath":"%s/apps/homepage","composeProject":"autarkos_current_homepage","ownershipState":"owned_managed","relationship":"managed"}]}\n' "${TEST_RUNTIME_DIR}" "${TEST_RUNTIME_DIR}" "${TEST_RUNTIME_DIR}"
+    if [[ -n "${TEST_LEGACY_INVENTORY:-}" && -s "${TEST_LEGACY_INVENTORY}" ]]; then
+      printf '{"schemaVersion":1,"ownerInstanceId":"pos_current","runtimeRoot":"%s","runtimeRootHash":"sha256:runtime","managedApps":[{"catalogAppId":"vaultwarden","appInstanceId":"appinst_vault","ownerInstanceId":"pos_current","runtimePath":"%s/apps/vaultwarden","composeProject":"autarkos_current_vaultwarden","ownershipState":"owned","relationship":"managed"},{"catalogAppId":"homepage","appInstanceId":"appinst_home","ownerInstanceId":"pos_current","runtimePath":"%s/apps/homepage","composeProject":"autarkos_current_homepage","ownershipState":"owned","relationship":"managed"}]}\n' "${TEST_RUNTIME_DIR}" "${TEST_RUNTIME_DIR}" "${TEST_RUNTIME_DIR}"
+    else
+      printf '{"schemaVersion":2,"ownerInstanceId":"pos_current","runtimeRoot":"%s","runtimeRootHash":"sha256:runtime","identityFileSha256":"sha256:identity","managedApps":[{"catalogAppId":"vaultwarden","appInstanceId":"appinst_vault","ownerInstanceId":"pos_current","runtimePath":"%s/apps/vaultwarden","composeProject":"autarkos_current_vaultwarden","registrationInstalledAt":"2026-01-01T00:00:00Z","ownershipCreatedAt":"2026-01-01T00:00:00Z","runtimeMetadataCreatedAt":"2026-01-01T00:00:00Z","manifestVersion":"1.0.0","savedManifestSha256":"sha256:manifest-vault","composeSha256":"sha256:compose-vault","containers":[]},{"catalogAppId":"homepage","appInstanceId":"appinst_home","ownerInstanceId":"pos_current","runtimePath":"%s/apps/homepage","composeProject":"autarkos_current_homepage","registrationInstalledAt":"2026-01-01T00:00:00Z","ownershipCreatedAt":"2026-01-01T00:00:00Z","runtimeMetadataCreatedAt":"2026-01-01T00:00:00Z","manifestVersion":"1.0.0","savedManifestSha256":"sha256:manifest-home","composeSha256":"sha256:compose-home","containers":[]}]}\n' "${TEST_RUNTIME_DIR}" "${TEST_RUNTIME_DIR}" "${TEST_RUNTIME_DIR}"
+    fi
     ;;
   */api/system/update-inventory/verify)
     if [[ -s "${TEST_INVENTORY_REGRESSED_BACKEND}" ]] && cmp -s "${TEST_INVENTORY_REGRESSED_BACKEND}" "${TEST_INSTALL_DIR}/backend/autark-os-backend.jar"; then
-      printf '{"schemaVersion":1,"safe":false,"summary":"Update inventory verification found 1 ownership regression(s).","violations":[{"catalogAppId":"vaultwarden","code":"became_available"}]}\n'
+      printf '{"schemaVersion":2,"safe":false,"summary":"Update continuity verification found 1 managed-app identity violation(s).","violations":[{"catalogAppId":"vaultwarden","code":"registration_missing","expected":"managed","actual":"registration_missing"}]}\n'
     else
-      printf '{"schemaVersion":1,"safe":true,"summary":"Verified 2 managed app(s) and 0 explicit recovery case(s) after the update.","violations":[]}\n'
+      printf '{"schemaVersion":2,"safe":true,"summary":"Verified that 2 managed app(s) retained their complete identity after the update.","violations":[]}\n'
     fi
     ;;
   */api/system/doctor) printf '{"status":"ready"}\n' ;;
@@ -131,6 +146,9 @@ set -euo pipefail
 mkdir -p "${AUTARK_OS_INSTALL_DIR}/backend" "${AUTARK_OS_INSTALL_DIR}/runtime" "${AUTARK_OS_INSTALL_DIR}/bin"
 cp "${AUTARK_OS_BACKEND_JAR}" "${AUTARK_OS_INSTALL_DIR}/backend/autark-os-backend.jar"
 printf 'database migrated by candidate\n' >"${AUTARK_OS_RUNTIME_DIR}/autark-os.db"
+if grep -q '^regressed backend$' "${AUTARK_OS_BACKEND_JAR}"; then
+  printf 'candidate replaced identity\n' >"${AUTARK_OS_RUNTIME_DIR}/config/identity.json"
+fi
 rm -rf "${AUTARK_OS_INSTALL_DIR}/runtime"
 cp -a "${AUTARK_OS_RUNTIME_IMAGE}" "${AUTARK_OS_INSTALL_DIR}/runtime"
 cp "$(dirname "${AUTARK_OS_BACKEND_JAR}")/../scripts/autark-os" "${AUTARK_OS_INSTALL_DIR}/bin/autark-os"
@@ -166,6 +184,7 @@ if PATH="${fake_bin}:/usr/bin:/bin" \
   TEST_HEALTH_EXPECTED="${health_expected}" \
   TEST_CURL_CALLS="${curl_calls}" \
   TEST_SERVICE_STATE="${service_state}" \
+  TEST_SERVICE_ENABLED_STATE="${service_enabled_state}" \
   TEST_RUNTIME_DIR="${runtime_dir}" \
   TEST_INVENTORY_REGRESSED_BACKEND="${inventory_regressed_backend}" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
@@ -181,6 +200,8 @@ fi
 grep -q '^old backend$' "${install_dir}/backend/autark-os-backend.jar"
 grep -q '^old runtime$' "${install_dir}/runtime/bin/java"
 grep -q '^old database$' "${runtime_dir}/autark-os.db"
+grep -q '^stable installation identity$' "${runtime_dir}/config/identity.json"
+grep -q '^managed app data$' "${runtime_dir}/apps/vaultwarden/data/preserved.txt"
 grep -q '^old unit$' "${service_file}"
 grep -q '^old sudoers$' "${sudoers_file}"
 grep -q 'AUTARK_OS_VERSION=1.0.0' "${config_file}"
@@ -194,6 +215,7 @@ PATH="${fake_bin}:/usr/bin:/bin" \
   TEST_HEALTH_EXPECTED="${health_expected}" \
   TEST_CURL_CALLS="${curl_calls}" \
   TEST_SERVICE_STATE="${service_state}" \
+  TEST_SERVICE_ENABLED_STATE="${service_enabled_state}" \
   TEST_RUNTIME_DIR="${runtime_dir}" \
   TEST_INVENTORY_REGRESSED_BACKEND="${inventory_regressed_backend}" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
@@ -326,13 +348,16 @@ assert check["artifactSha256"] == "123456"
 PY
 
 printf 'new backend\n' >"${health_expected}"
+printf 'legacy\n' >"${legacy_inventory}"
 success_output="${tmp_dir}/success.out"
 PATH="${fake_bin}:/usr/bin:/bin" \
   TEST_INSTALL_DIR="${install_dir}" \
   TEST_HEALTH_EXPECTED="${health_expected}" \
   TEST_CURL_CALLS="${curl_calls}" \
   TEST_SERVICE_STATE="${service_state}" \
+  TEST_SERVICE_ENABLED_STATE="${service_enabled_state}" \
   TEST_RUNTIME_DIR="${runtime_dir}" \
+  TEST_LEGACY_INVENTORY="${legacy_inventory}" \
   TEST_INVENTORY_REGRESSED_BACKEND="${inventory_regressed_backend}" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
   AUTARK_OS_SERVICE_FILE="${service_file}" \
@@ -344,16 +369,22 @@ PATH="${fake_bin}:/usr/bin:/bin" \
 grep -q '^new backend$' "${install_dir}/backend/autark-os-backend.jar"
 grep -q '^new runtime$' "${install_dir}/runtime/bin/java"
 grep -q '^database migrated by candidate$' "${runtime_dir}/autark-os.db"
+grep -q '^stable installation identity$' "${runtime_dir}/config/identity.json"
+grep -q '^managed app data$' "${runtime_dir}/apps/vaultwarden/data/preserved.txt"
 grep -q 'AUTARK_OS_VERSION=1.1.0' "${config_file}"
 grep -q '"status":"completed"' "${runtime_dir}/updates/update-state.json"
 grep -q 'is installed, healthy, and retained its managed-app inventory' "${success_output}"
-grep -q 'Verified 2 managed app(s)' "${success_output}"
+grep -q 'establish the complete managed-app continuity baseline' "${success_output}"
+grep -q 'Verified that 2 managed app(s)' "${success_output}"
 grep -q '^active$' "${service_state}"
+grep -q '^disabled$' "${service_enabled_state}"
 
 snapshot_dir="$(awk -F= '$1 == "AUTARK_OS_PRE_UPDATE_SNAPSHOT_DIR" {print $2; exit}' "${config_file}")"
 [[ -r "${snapshot_dir}/managed-app-inventory.json" ]]
+[[ -r "${snapshot_dir}/identity.json" ]]
 grep -q '"catalogAppId":"vaultwarden"' "${snapshot_dir}/managed-app-inventory.json"
 grep -q '"safe":true' "${runtime_dir}/updates/latest-inventory-report.json"
+rm -f "${legacy_inventory}"
 
 printf 'database before inventory regression\n' >"${runtime_dir}/autark-os.db"
 printf 'regressed backend\n' >"${bundle_dir}/backend/autark-os-backend.jar"
@@ -369,6 +400,7 @@ if PATH="${fake_bin}:/usr/bin:/bin" \
   TEST_HEALTH_EXPECTED="${health_expected}" \
   TEST_CURL_CALLS="${curl_calls}" \
   TEST_SERVICE_STATE="${service_state}" \
+  TEST_SERVICE_ENABLED_STATE="${service_enabled_state}" \
   TEST_RUNTIME_DIR="${runtime_dir}" \
   TEST_INVENTORY_REGRESSED_BACKEND="${inventory_regressed_backend}" \
   AUTARK_OS_CONFIG_FILE="${config_file}" \
@@ -383,6 +415,10 @@ fi
 
 grep -q '^new backend$' "${install_dir}/backend/autark-os-backend.jar"
 grep -q '^database before inventory regression$' "${runtime_dir}/autark-os.db"
+grep -q '^stable installation identity$' "${runtime_dir}/config/identity.json"
+grep -q '^managed app data$' "${runtime_dir}/apps/vaultwarden/data/preserved.txt"
 grep -q '"status":"rolled_back"' "${runtime_dir}/updates/update-state.json"
 grep -q 'did not preserve the managed-app inventory' "${inventory_failure_output}"
 grep -q '"safe":false' "${runtime_dir}/updates/latest-inventory-report.json"
+grep -q '^active$' "${service_state}"
+grep -q '^disabled$' "${service_enabled_state}"

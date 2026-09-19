@@ -3,6 +3,8 @@ package com.autarkos.system;
 import java.time.Instant;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 public final class UpdateInventoryModels {
 
     private UpdateInventoryModels() {
@@ -14,30 +16,40 @@ public final class UpdateInventoryModels {
             String ownerInstanceId,
             String runtimeRoot,
             String runtimeRootHash,
+            String identityFileSha256,
             List<ManagedApp> managedApps) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record ManagedApp(
             String catalogAppId,
             String appInstanceId,
             String ownerInstanceId,
             String runtimePath,
             String composeProject,
-            String ownershipState,
-            String relationship) {
+            Instant registrationInstalledAt,
+            Instant ownershipCreatedAt,
+            Instant runtimeMetadataCreatedAt,
+            String manifestVersion,
+            String savedManifestSha256,
+            String composeSha256,
+            List<ContainerIdentity> containers) {
     }
 
-    public record AppOutcome(
-            String catalogAppId,
-            String previousRelationship,
-            String currentRelationship,
-            String status,
-            String message) {
+    public record ContainerIdentity(
+            String name,
+            String ownershipState,
+            String appInstanceId,
+            String ownerInstanceId,
+            String runtimeRootHash,
+            String composeProject) {
     }
 
     public record Violation(
             String catalogAppId,
             String code,
+            String expected,
+            String actual,
             String message) {
     }
 
@@ -48,7 +60,6 @@ public final class UpdateInventoryModels {
             String summary,
             Snapshot before,
             Snapshot after,
-            List<AppOutcome> outcomes,
             List<Violation> violations) {
     }
 }
