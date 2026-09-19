@@ -38,6 +38,8 @@ import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.install.ManagedStorageContractService;
 import com.autarkos.marketplace.model.ApplicationManifest;
+import com.autarkos.marketplace.runtime.AutarkOsRuntimeProperties;
+import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.AutarkOsIdentity;
 
 class AppRecoveryServiceTests {
@@ -61,12 +63,16 @@ class AppRecoveryServiceTests {
         dockerOwnership = mock(DockerOwnershipService.class);
         activityLog = mock(ActivityLogService.class);
         when(dockerOwnership.currentIdentity()).thenReturn(new AutarkOsIdentity(
-                "current-instance", "autark-os", runtimeRoot.toString(), "runtime-hash", Instant.EPOCH, 1));
+                "current-instance", "autark-os", runtimeRoot.resolve("retired-workspace").toString(),
+                "runtime-hash", Instant.EPOCH, 1));
         when(dockerOwnership.composeProject("vaultwarden")).thenReturn("autarkos_current_vaultwarden");
         manifest = catalog.findById("vaultwarden").orElseThrow();
         com.autarkos.host.DockerInventoryService dockerInventory =
                 com.autarkos.testsupport.DockerInventoryTestData.service(com.autarkos.testsupport.DockerInventoryTestData.empty());
         AppRuntimeMetadataReader metadataReader = new AppRuntimeMetadataReader();
+        AutarkOsRuntimeProperties runtimeProperties = new AutarkOsRuntimeProperties();
+        runtimeProperties.setRuntimeRoot(runtimeRoot.toString());
+        RuntimeLayout runtimeLayout = new RuntimeLayout(runtimeProperties);
         service = new AppRecoveryService(
                 observedServices,
                 installedApps,
@@ -81,7 +87,8 @@ class AppRecoveryServiceTests {
                         dockerOwnership::currentIdentity,
                         () -> Instant.parse("2026-06-20T12:00:00Z")),
                 new ManagedStorageContractService(
-                        new ManifestYamlReader(), new ManifestValidator(), dockerInventory, metadataReader));
+                        new ManifestYamlReader(), new ManifestValidator(), dockerInventory, metadataReader),
+                runtimeLayout);
     }
 
     @Test
@@ -98,6 +105,7 @@ class AppRecoveryServiceTests {
 
         assertThat(plan.reason()).isEqualTo("current_instance_registration_lost");
         assertThat(plan.applicable()).isTrue();
+        assertThat(plan.runtimePath()).isEqualTo(appRoot.toString());
         verify(installedApps).commitRecoveredApp(any(InstalledApp.class), any(), any());
     }
 

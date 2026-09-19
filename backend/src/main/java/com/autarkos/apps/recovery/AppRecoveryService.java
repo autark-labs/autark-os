@@ -45,6 +45,7 @@ import com.autarkos.marketplace.install.InstalledAppRepository;
 import com.autarkos.marketplace.install.models.InstallModels;
 import com.autarkos.marketplace.install.models.RuntimeModels;
 import com.autarkos.marketplace.model.ApplicationManifest;
+import com.autarkos.marketplace.runtime.RuntimeLayout;
 import com.autarkos.system.AutarkOsIdentity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,6 +68,7 @@ public class AppRecoveryService {
     private final DockerInventoryService dockerInventory;
     private final AppRuntimeMetadataWriter runtimeMetadataWriter;
     private final ManagedStorageContractService storageContracts;
+    private final RuntimeLayout runtimeLayout;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AppRecoveryService(
@@ -80,7 +82,8 @@ public class AppRecoveryService {
             AppAccessChecker accessChecker,
             DockerInventoryService dockerInventory,
             AppRuntimeMetadataWriter runtimeMetadataWriter,
-            ManagedStorageContractService storageContracts) {
+            ManagedStorageContractService storageContracts,
+            RuntimeLayout runtimeLayout) {
         this.observedServices = observedServices;
         this.installedApps = installedApps;
         this.catalog = catalog;
@@ -92,6 +95,7 @@ public class AppRecoveryService {
         this.dockerInventory = dockerInventory;
         this.runtimeMetadataWriter = runtimeMetadataWriter;
         this.storageContracts = storageContracts;
+        this.runtimeLayout = runtimeLayout;
     }
 
     public AppRecoveryModels.RecoveryPlan plan(String appId) {
@@ -118,7 +122,7 @@ public class AppRecoveryService {
                 .orElseThrow(() -> new IllegalArgumentException("Unknown catalog application: " + appId));
         ObservedService evidence = containers.stream().findFirst().orElse(null);
         AutarkOsIdentity identity = dockerOwnership.currentIdentity();
-        Path runtimePath = runtimePath(appId, evidence, identity);
+        Path runtimePath = runtimeLayout.appRoot(appId).toAbsolutePath().normalize();
         Optional<RuntimeModels.AppRuntimeMetadata> metadata = runtimeMetadataReader.read(runtimePath);
         String reason = reasonFor(appId, evidence, metadata.orElse(null), identity);
         Optional<ApplicationManifest> savedManifest = storageContracts.findManifest(runtimePath);
@@ -152,7 +156,7 @@ public class AppRecoveryService {
                 instanceIdentity ? "App-instance identity is consistent." : "App-instance identity is missing or inconsistent.",
                 blank(appInstanceId, "No app-instance ID found")));
 
-        boolean runtimeSafe = safeRuntimePath(runtimePath, identity, appId) && Files.isDirectory(runtimePath);
+        boolean runtimeSafe = safeRuntimePath(runtimePath, appId) && Files.isDirectory(runtimePath);
         checks.add(check("runtime_path", "Runtime storage", runtimeSafe,
                 runtimeSafe ? "The runtime folder is inside managed Autark-OS storage."
                         : "The runtime folder is missing or outside managed Autark-OS storage.", runtimePath.toString()));
@@ -375,20 +379,11 @@ public class AppRecoveryService {
         return storedOwnership || liveOwnership;
     }
 
-    private Path runtimePath(String appId, ObservedService evidence, AutarkOsIdentity identity) {
-        String recorded = firstPresent(metadataValue(evidence, "runtimePath"), metadataValue(evidence, "dataPaths"));
+    private boolean safeRuntimePath(Path path, String appId) {
         try {
-            return Path.of(recorded.isBlank() ? identity.runtimeRoot() + "/apps/" + appId : recorded).toAbsolutePath().normalize();
-        } catch (RuntimeException exception) {
-            return Path.of(identity.runtimeRoot(), "apps", appId).toAbsolutePath().normalize();
-        }
-    }
-
-    private boolean safeRuntimePath(Path path, AutarkOsIdentity identity, String appId) {
-        try {
-            Path apps = Path.of(identity.runtimeRoot()).toAbsolutePath().normalize().resolve("apps");
-            Path expected = apps.resolve(appId).normalize();
-            if (identity.runtimeRoot().isBlank() || !path.equals(expected)) return false;
+            Path apps = runtimeLayout.runtimeRoot().resolve("apps").toAbsolutePath().normalize();
+            Path expected = runtimeLayout.appRoot(appId).toAbsolutePath().normalize();
+            if (!path.equals(expected)) return false;
             return !Files.exists(path) || path.toRealPath().startsWith(apps.toRealPath());
         } catch (IOException | RuntimeException exception) {
             return false;

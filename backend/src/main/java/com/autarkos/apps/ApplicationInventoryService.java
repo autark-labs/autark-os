@@ -80,7 +80,10 @@ public class ApplicationInventoryService {
         ApplicationRelationship relationship = relationship(
                 installed, recoveryPlan, registered, registrationLost, legacy, managedElsewhere, failedInstall, blocked, found);
         ObservedService observedService = firstPresent(registrationLost, legacy, managedElsewhere, failedInstall, blocked, found);
-        ApplicationEvidence applicationEvidence = evidence(observedService);
+        ManagedAppAttestationService.Result failedRegistration = registered != null && !attestation.managed()
+                ? attestation
+                : null;
+        ApplicationEvidence applicationEvidence = evidence(observedService, failedRegistration);
         String reviewExistingHref = reviewExistingHref(manifest.id());
         ApplicationAction primaryAction = primaryAction(manifest.id(), relationship, installed, observedService, reviewExistingHref);
         return new ApplicationView(
@@ -96,7 +99,7 @@ public class ApplicationInventoryService {
                 operation,
                 relationship == ApplicationRelationship.MANAGED ? issues(runtime) : List.of(),
                 relationshipLabel(relationship),
-                relationshipDescription(relationship, applicationEvidence),
+                relationshipDescription(relationship, applicationEvidence, failedRegistration),
                 statusTone(relationship),
                 cardTone(relationship),
                 primaryAction,
@@ -329,16 +332,23 @@ public class ApplicationInventoryService {
         };
     }
 
-    private String relationshipDescription(ApplicationRelationship relationship, ApplicationEvidence evidence) {
+    private String relationshipDescription(
+            ApplicationRelationship relationship,
+            ApplicationEvidence evidence,
+            ManagedAppAttestationService.Result failedRegistration) {
         return switch (relationship) {
             case MANAGED -> "Managed by this Autark-OS installation.";
             case RECOVERY_REQUIRED -> "Autark-OS verified this installation's runtime and can restore its missing management records.";
-            case BLOCKED -> evidence == null ? "A server resource blocks installation." : evidence.summary();
+            case BLOCKED -> failedRegistration != null
+                    ? failedRegistration.message()
+                    : evidence == null ? "A server resource blocks installation." : evidence.summary();
             case AVAILABLE -> "Ready to review before install.";
         };
     }
 
-    private ApplicationEvidence evidence(ObservedService service) {
+    private ApplicationEvidence evidence(
+            ObservedService service,
+            ManagedAppAttestationService.Result failedRegistration) {
         if (service == null) {
             return null;
         }
@@ -350,8 +360,8 @@ public class ApplicationInventoryService {
                 service.accessScope(),
                 service.ownershipState(),
                 service.runtimeState(),
-                evidenceLabel(service),
-                evidenceSummary(service),
+                failedRegistration == null ? evidenceLabel(service) : "Management incomplete",
+                failedRegistration == null ? evidenceSummary(service) : failedRegistration.message(),
                 metadata.getOrDefault("appInstanceId", ""),
                 firstPresent(service.autarkOsInstanceId(), metadata.get("autarkOsInstanceId")),
                 metadata.getOrDefault("runtimePath", ""),

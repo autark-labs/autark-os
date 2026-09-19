@@ -309,10 +309,16 @@ class ApplicationInventoryServiceTests {
         Files.delete(runtimeRoot.resolve("apps/vaultwarden/manifest.yaml"));
         ApplicationInventoryService inventory = new ApplicationInventoryService(
                 catalogService(), repository, managedApps, recovery());
+        ObservedService currentRuntime = observed(
+                "docker:vaultwarden", "vaultwarden", "owned_managed", "observed");
 
-        assertThat(inventory.apps(List.of(), List.of(), Map.of()).stream()
-                .filter(view -> view.id().equals("vaultwarden")).findFirst().orElseThrow().relationship())
-                .isEqualTo(ApplicationRelationship.BLOCKED);
+        ApplicationView view = inventory.apps(List.of(currentRuntime), List.of(), Map.of()).stream()
+                .filter(candidate -> candidate.id().equals("vaultwarden")).findFirst().orElseThrow();
+        assertThat(view.relationship()).isEqualTo(ApplicationRelationship.BLOCKED);
+        assertThat(view.relationshipDescription()).contains("saved app release manifest is missing");
+        assertThat(view.evidence().statusLabel()).isEqualTo("Management incomplete");
+        assertThat(view.evidence().summary()).contains("saved app release manifest is missing");
+        assertThat(view.evidence().summary()).doesNotContain("registration is missing");
         assertThat(org.assertj.core.api.Assertions.catchThrowable(
                 () -> managedApps.requireManaged("vaultwarden", "start")))
                 .isInstanceOf(com.autarkos.marketplace.install.InstallationException.class)
