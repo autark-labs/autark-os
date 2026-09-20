@@ -33,6 +33,63 @@ async function expectActionsWithinDialog(dialog: Locator) {
   }
 }
 
+for (const entry of [
+  { path: '/settings', section: 'General' },
+  { path: '/home?settings=open', section: 'General' },
+  { path: '/backups', button: 'Backup settings', section: 'Backups' },
+  { path: '/diagnostics', button: 'Settings Host setup checks and appliance runtime checks.', section: 'Advanced' },
+]) {
+  test(`Settings opens one workbench at ${entry.section} from ${entry.path}`, async ({ page }) => {
+    await installMockApi(page, 'ready');
+    await page.goto(entry.path);
+    if (entry.path === '/diagnostics') await page.getByRole('tab', { name: 'System details', exact: true }).click();
+    if (entry.button) await page.getByRole('button', { name: entry.button, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
+    await expect(dialog).toHaveCount(1);
+    await expect(dialog.getByRole('region', { name: 'Settings workspace' })).toHaveCount(1);
+    await expect(dialog.getByRole('heading', { name: entry.section, exact: true }).first()).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    if (entry.button) await expect(page.getByRole('button', { name: entry.button, exact: true })).toBeFocused();
+  });
+}
+
+test('Settings guards Escape, preserves failed saves for retry, and returns focus after saving', async ({ page }) => {
+  await openSettings(page);
+  const dialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
+  const name = dialog.getByRole('textbox', { name: /^Device name/ });
+  await name.fill('Retained settings draft');
+  await page.keyboard.press('Escape');
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation).toContainText('Save settings before closing?');
+  await confirmation.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(name).toHaveValue('Retained settings draft');
+  let rejectSave = true;
+  const writes: unknown[] = [];
+  await page.route('**/api/system/settings', async route => {
+    if (route.request().method() !== 'PUT') return route.fallback();
+    const settings = route.request().postDataJSON();
+    writes.push(settings);
+    await route.fulfill(rejectSave
+      ? { status: 500, json: { message: 'Settings could not be saved.' } }
+      : { json: { settings, appDefaults: { message: 'Settings saved.', updatedApps: 0 } } });
+  });
+  await page.keyboard.press('Escape');
+  await confirmation.getByRole('button', { name: 'Save and close', exact: true }).click();
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation.locator('[data-sonner-toast]')).toContainText('Settings could not be saved.');
+  await confirmation.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(dialog.getByText('Save failed', { exact: true })).toBeVisible();
+  await expect(name).toHaveValue('Retained settings draft');
+  rejectSave = false;
+  await page.keyboard.press('Escape');
+  await confirmation.getByRole('button', { name: 'Save and close', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(writes).toHaveLength(2);
+  expect(writes[1]).toEqual(writes[0]);
+  await expect(page.getByRole('button', { name: 'Open settings' })).toBeFocused();
+});
+
 test('Settings workbench keeps a fixed dialog while only its workspace scrolls', async ({ page }) => {
   await openSettings(page);
 
@@ -74,9 +131,11 @@ test('Settings workbench uses the same guarded close flow for backdrop and close
   await expect(page.getByRole('alertdialog')).toContainText('Save settings before closing?');
   await page.getByRole('button', { name: 'Discard changes' }).click();
   await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open settings' })).toBeFocused();
 
-  await openSettings(page);
+  await page.getByRole('button', { name: 'Open settings' }).click();
   const cleanDialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
+  await expect(cleanDialog.getByRole('textbox', { name: 'Device name' })).not.toHaveValue('Fixture Home Server updated');
   const cleanBounds = await cleanDialog.boundingBox();
   expect(cleanBounds, 'settings dialog should reopen').not.toBeNull();
   await page.mouse.click(cleanBounds!.x - 8, cleanBounds!.y + cleanBounds!.height / 2);

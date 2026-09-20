@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AppWindow,
-  CheckCircle2,
   Code2,
   Database,
   Loader2,
@@ -9,7 +8,6 @@ import {
   RefreshCw,
   Save,
   Settings,
-  ShieldCheck,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -22,7 +20,7 @@ import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectDarkControlButton, ProjectPrimaryButton } from '@/components/primitives/ProjectButtons';
-import { ProjectInset, Surface } from '@/components/primitives/Surface';
+import { ProjectInset } from '@/components/primitives/Surface';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,15 +63,13 @@ function SettingsErrorState({ actionLabel = 'Retry', message, onAction, title }:
 
 /** Composes the Settings controller, navigation, and typed section panels. */
 function SettingsPage({
-  embedded = false,
   initialGroup,
   onRequestClose,
   onRequestDismiss,
 }: {
-  embedded?: boolean;
-  initialGroup?: SettingsGroupId;
-  onRequestClose?: () => void;
-  onRequestDismiss?: (requestDismiss: () => void) => void;
+  initialGroup: SettingsGroupId;
+  onRequestClose: () => void;
+  onRequestDismiss: (requestDismiss: () => void) => void;
 }) {
   const {
     activeGroup,
@@ -113,14 +109,12 @@ function SettingsPage({
   );
   const activeGroupId = defaultSettingsGroup(activeGroup);
   const activeGroupMeta = topLevelSettingsGroups.find((group) => group.id === activeGroupId) || topLevelSettingsGroups[0];
-  const ActiveGroupIcon = groupIcons[activeGroupId];
 
   useEffect(() => {
-    if (initialGroup) setActiveGroup(initialGroup);
+    setActiveGroup(initialGroup);
   }, [initialGroup, setActiveGroup]);
 
   const requestClose = useCallback(() => {
-    if (!onRequestClose) return;
     if (dirty) {
       setCloseConfirmationOpen(true);
       return;
@@ -129,13 +123,13 @@ function SettingsPage({
   }, [dirty, onRequestClose]);
 
   useEffect(() => {
-    onRequestDismiss?.(requestClose);
+    onRequestDismiss(requestClose);
   }, [onRequestDismiss, requestClose]);
 
   const saveAndClose = async () => {
     if (await save()) {
       setCloseConfirmationOpen(false);
-      onRequestClose?.();
+      onRequestClose();
     }
   };
 
@@ -172,10 +166,9 @@ function SettingsPage({
   );
 
   return (
-    <PageShell contained={embedded} className={embedded ? 'min-h-0 flex-1 bg-app-panel' : undefined} contentClassName={embedded ? 'min-h-0 !gap-0 !overflow-hidden !p-0' : undefined}>
-      {embedded ? (
-        <ExtensionActionTarget actionId="review-pro" className="flex min-h-0 flex-1" routeId="settings">
-          <SettingsWorkbench
+    <PageShell contained className="min-h-0 flex-1 bg-app-panel" contentClassName="min-h-0 !gap-0 !overflow-hidden !p-0">
+      <ExtensionActionTarget actionId="review-pro" className="flex min-h-0 flex-1" routeId="settings">
+        <SettingsWorkbench
           activeGroupId={activeGroupId}
           activeGroupMeta={activeGroupMeta}
           activePanelContent={activePanelContent}
@@ -188,88 +181,8 @@ function SettingsPage({
           refreshing={refreshing}
           saveError={saveError}
           saving={saving}
-          />
-        </ExtensionActionTarget>
-      ) : (
-        <>
-          <Surface as="header" className="sticky top-0 z-10 shrink-0 overflow-hidden" tone="panel">
-        <div className={cn('flex flex-wrap items-start justify-between gap-4 border-b border-sky-400/20 bg-slate-900', embedded ? 'p-4' : 'p-6 md:p-7')}>
-          <div>
-            <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Settings</p>
-            <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Autark-OS controls</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Save appliance preferences here. Backup location changes use their own Apply location action.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <SettingsFeedback dirty={dirty} loadError={loadError} saveError={saveError} onRefresh={requestRefresh} />
-            <DisabledAction disabled={refreshing || saving} reason={saving ? 'Wait for the current save to finish.' : 'Settings are already refreshing.'}>
-              <ProjectDarkControlButton disabled={refreshing || saving} onClick={requestRefresh} type="button">
-                <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
-                Refresh
-              </ProjectDarkControlButton>
-            </DisabledAction>
-            <DisabledAction disabled={!dirty || saving} reason={saving ? 'Autark-OS is already saving these settings.' : 'Make a change before saving settings.'}>
-              <ProjectPrimaryButton disabled={!dirty || saving} onClick={() => void save()} type="button">
-                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                {saving ? 'Saving' : 'Save changes'}
-              </ProjectPrimaryButton>
-            </DisabledAction>
-            {embedded && (
-              <ProjectDarkControlButton aria-label="Close settings" onClick={requestClose} type="button">
-                <X className="size-4" />
-                Close
-              </ProjectDarkControlButton>
-            )}
-          </div>
-        </div>
-        <div className="grid gap-4 p-5 md:grid-cols-3">
-          <SettingsStatusCard icon={CheckCircle2} label="Save state" tone={dirty ? 'orange' : 'green'} value={dirty ? 'Review changes' : 'No pending changes'} />
-          <SettingsStatusCard icon={ShieldCheck} label="Setup" tone={state.setup?.status === 'ready' ? 'green' : 'orange'} value={state.setup?.headline || 'Setup status unavailable'} />
-          <SettingsStatusCard icon={ActiveGroupIcon} label="Selected" tone={activeGroupId === 'advanced' ? 'cyan' : 'slate'} value={activeGroupMeta.label} />
-        </div>
-          </Surface>
-          <Surface as="nav" className="shrink-0 grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-4" tone="panel">
-        {topLevelSettingsGroups.map((group) => {
-          const groupId = group.id as SettingsGroupId;
-          const Icon = groupIcons[groupId];
-          const active = activeGroupId === group.id;
-          return (
-            <button
-              className={cn(
-                'flex min-w-0 items-start gap-3 rounded-xl border p-3 text-left text-sm transition',
-                active
-                  ? 'border-cyan-300/45 bg-cyan-400/10 text-cyan-100 shadow-sm shadow-cyan-950/20'
-                  : 'border-sky-400/20 bg-slate-800 text-sky-100/80 hover:border-cyan-300/35 hover:bg-slate-700 hover:text-white',
-              )}
-              key={group.id}
-              onClick={() => setActiveGroup(groupId)}
-              type="button"
-            >
-              <Icon className="mt-0.5 size-4 shrink-0" />
-              <span className="min-w-0">
-                <span className="block font-bold">{group.label}</span>
-                <span className="mt-1 block text-xs leading-5 opacity-75">{group.description}</span>
-              </span>
-            </button>
-          );
-        })}
-          </Surface>
-
-          <Surface as="main" className="shrink-0 p-5" tone="panel">
-        <ProjectInset className="mb-5">
-          <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 text-cyan-200">
-              <ActiveGroupIcon className="size-4" />
-            </span>
-            <div>
-              <h2 className="text-lg font-black text-white">{activeGroupMeta.label}</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-400">{activeGroupMeta.description}</p>
-            </div>
-          </div>
-        </ProjectInset>
-            {activePanelContent}
-          </Surface>
-        </>
-      )}
+        />
+      </ExtensionActionTarget>
 
       <AlertDialog open={refreshConfirmationOpen} onOpenChange={setRefreshConfirmationOpen}>
         <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
@@ -304,7 +217,7 @@ function SettingsPage({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <ProjectDarkControlButton onClick={() => { setCloseConfirmationOpen(false); onRequestClose?.(); }} type="button">Discard changes</ProjectDarkControlButton>
+            <ProjectDarkControlButton onClick={() => { setCloseConfirmationOpen(false); onRequestClose(); }} type="button">Discard changes</ProjectDarkControlButton>
             <ProjectPrimaryButton disabled={saving} onClick={() => void saveAndClose()} type="button">{saving ? 'Saving' : 'Save and close'}</ProjectPrimaryButton>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -419,24 +332,6 @@ function SettingsWorkbench({
         </footer>
       </div>
     </section>
-  );
-}
-
-function SettingsStatusCard({ icon: Icon, label, tone, value }: { icon: LucideIcon; label: string; tone: 'green' | 'orange' | 'slate' | 'cyan'; value: string }) {
-  const tones = {
-    cyan: 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100',
-    green: 'border-emerald-300/20 bg-emerald-500/10 text-emerald-100',
-    orange: 'border-orange-300/30 bg-orange-500/10 text-orange-100',
-    slate: 'border-slate-700/60 bg-slate-900/55 text-slate-300',
-  };
-  return (
-    <div className={cn('rounded-lg border p-4', tones[tone])}>
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-bold uppercase text-current/70">{label}</p>
-        <Icon className="size-4" />
-      </div>
-      <p className="mt-3 line-clamp-2 text-sm font-black text-white">{value}</p>
-    </div>
   );
 }
 

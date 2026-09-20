@@ -141,7 +141,7 @@ test('Activity initial partial failure does not claim an empty event history', a
   await installMockApi(page, 'idle');
   await page.route('**/api/activity?**', route => route.fulfill({ status: 503, json: { message: 'Activity offline' } }));
   await page.goto('/activity');
-  await expect(page.getByText('Activity is unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('History is unavailable', { exact: true })).toBeVisible();
   await expect(page.getByText(/No events/)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
 });
@@ -162,11 +162,16 @@ test('failed diagnostics export reports the action failure without displacing Ac
 test('lost Discover job progress is not reported as a failed install and can be retried', async ({ page }) => {
   await installMockApi(page, 'idle');
   const job = { jobId: 'progress-test', type: 'install_app', subjectId: 'immich', status: 'running', steps: [], createdAt: '2025-01-15T12:00:00Z', updatedAt: '2025-01-15T12:00:00Z' };
-  await page.route('**/api/jobs', route => route.fulfill({ json: [job] }));
-  let offline = true;
-  await page.route('**/api/jobs/progress-test', route => offline
-    ? route.fulfill({ status: 503, json: { message: 'Progress offline' } }) : route.fulfill({ json: job }));
+  let offline = false;
+  let loaded = false;
+  await page.route('**/api/jobs', route => {
+    loaded = true;
+    return route.fulfill(offline
+      ? { status: 503, json: { message: 'Progress offline' } } : { json: [job] });
+  });
   await page.goto('/discover');
+  await expect.poll(() => loaded).toBe(true);
+  offline = true;
   const chip = page.getByRole('button', { name: 'Refresh paused', exact: true });
   await chip.click();
   await expect(page.getByRole('dialog', { name: 'Current status', exact: true })).toContainText('This does not mean the operation failed');

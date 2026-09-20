@@ -16,6 +16,7 @@ export function SettingsDialogProvider({ children }: { children: ReactNode }) {
   const [group, setGroup] = useState<SettingsGroupId>('general');
   const closeSettings = useCallback(() => setOpen(false), []);
   const requestDismissRef = useRef<() => void>(closeSettings);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const registerDismissRequest = useCallback((requestDismiss: () => void) => {
     requestDismissRef.current = requestDismiss;
@@ -47,12 +48,17 @@ export function SettingsDialogProvider({ children }: { children: ReactNode }) {
         <DialogContent
           aria-describedby={undefined}
           className="flex h-[calc(100dvh-1rem)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden border-sky-400/30 bg-app-panel p-0 text-slate-50 sm:h-[min(90dvh,48rem)] sm:max-w-5xl"
+          onOpenAutoFocus={() => { returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            returnFocusRef.current?.focus();
+          }}
           onEscapeKeyDown={(event) => { event.preventDefault(); requestDismiss(); }}
           onPointerDownOutside={(event) => { event.preventDefault(); requestDismiss(); }}
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">Autark-OS settings</DialogTitle>
-          <SettingsPage embedded initialGroup={group} key={group} onRequestClose={closeSettings} onRequestDismiss={registerDismissRequest} />
+          <SettingsPage initialGroup={group} key={group} onRequestClose={closeSettings} onRequestDismiss={registerDismissRequest} />
         </DialogContent>
       </Dialog>
     </SettingsDialogContext.Provider>
