@@ -11,22 +11,32 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import com.autarkos.api.AutarkOsAction;
+import com.autarkos.system.SupportDataRedactor;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class ActivityLogService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ActivityLogService.class);
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final ActivityLogRepository repository;
     private final ApplicationEventPublisher events;
 
     public ActivityLog notification(ActivityController.NotificationRequest notification) {
         String key = "notification:" + notification.id();
-        var redactor = new com.autarkos.system.SupportDataRedactor();
+        var redactor = new SupportDataRedactor();
+        var action = notification.nextAction();
+        var safeAction = action == null ? null : new AutarkOsAction(
+                action.id(), redactor.redact(action.label()), action.method(), action.href(), action.route(),
+                action.confirmationRequired(), action.danger(), action.disabled(), action.reason().map(redactor::redact));
         return activityLog(repository.findByEventKey(key).orElseGet(() -> repository.save(new ActivityLogEntity(
                 notification.severity(), "notification", key,
                 redactor.redact(notification.title()), redactor.redact(notification.message()), null,
-                "error".equals(notification.severity()) ? "failed" : "recorded", "", Instant.now().toString(), key))));
+                "error".equals(notification.severity()) ? "failed" : "recorded",
+                safeAction == null ? "" : JSON.writeValueAsString(safeAction),
+                Instant.now().toString(), key))));
     }
 
     public ActivityLogService(ActivityLogRepository repository) {
@@ -174,7 +184,9 @@ public class ActivityLogService {
                 entity.appId(),
                 entity.outcome(),
                 entity.details(),
-                Instant.parse(entity.createdAt()));
+                Instant.parse(entity.createdAt()),
+                "notification".equals(entity.category()) && !entity.details().isBlank()
+                        ? JSON.readValue(entity.details(), AutarkOsAction.class) : null);
     }
 
     private int safeLimit(int limit) {

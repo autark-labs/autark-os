@@ -13,7 +13,7 @@ async function historyServer(page: Page) {
       const receipt = route.request().postDataJSON();
       const saved = records.find((item) => item.action === `notification:${receipt.id}`) ?? {
         id: records.length + 1, action: `notification:${receipt.id}`, category: 'notification',
-        level: receipt.severity, title: receipt.title, message: receipt.message,
+        level: receipt.severity, title: receipt.title, message: receipt.message, nextAction: receipt.nextAction,
         appId: null, outcome: 'recorded', details: '', createdAt: new Date().toISOString(),
       };
       if (!records.includes(saved)) records.unshift(saved);
@@ -216,7 +216,7 @@ test('recommendations can be dismissed without resolving Pro, and changed notice
   let recommendation = {
     id: 'pro-activate', severity: 'info', title: 'Autark Pro is ready to activate',
     body: 'Activate this server when you are ready to use its Pro capabilities.',
-    primaryAction: { id: 'review-pro', label: 'Review Autark Pro', route: '/pro' }, sourceIssueIds: [],
+    primaryAction: { id: 'review-pro', label: 'Review Autark Pro', route: '/pro', confirmationRequired: false, danger: false, disabled: false }, sourceIssueIds: [],
   };
   await page.route('**/api/recommended-action', (route) => route.fulfill({ json: recommendation }));
   const mutations: string[] = [];
@@ -232,13 +232,20 @@ test('recommendations can be dismissed without resolving Pro, and changed notice
   await expect(page.getByText('Nothing needs your attention.', { exact: true })).toBeHidden();
   await expect.poll(() => server.records.length).toBe(1);
   expect(server.records[0].title).toBe(recommendation.title);
+  expect(server.records[0].nextAction).toEqual(recommendation.primaryAction);
   await page.getByRole('tab', { name: 'History', exact: true }).click();
   await expect(page.locator('summary').filter({ hasText: recommendation.title })).toBeVisible();
+  // Existing text-only receipts can still use their matching live recommendation.
+  server.records[0].nextAction = undefined;
   await page.reload();
   await page.getByRole('button', { name: 'Open activity: Activity', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeHidden();
   await page.getByRole('tab', { name: 'History', exact: true }).click();
   await expect(page.locator('summary').filter({ hasText: recommendation.title })).toBeVisible();
+  await page.locator('summary').filter({ hasText: recommendation.title }).click();
+  await page.getByRole('button', { name: 'Review Autark Pro', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/pro$/);
   recommendation = { ...recommendation, severity: 'warning', body: 'Activation now requires your attention.' };
   await page.reload();
   await page.getByRole('button', { name: 'Open activity: Needs review', exact: true }).click();
@@ -246,6 +253,67 @@ test('recommendations can be dismissed without resolving Pro, and changed notice
   await page.getByRole('button', { name: 'Review Autark Pro', exact: true }).click();
   await expect(page).toHaveURL(/\/pro$/);
   expect(mutations).toEqual([]);
+});
+
+test('saved historical actions work without the original recommendation or browser preferences', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installMockApi(page, 'idle');
+  const server = await historyServer(page);
+  server.records.push({
+    id: 1, action: 'notification:saved-pro', category: 'notification', level: 'info',
+    title: 'Autark Pro is ready to activate', message: 'Review Pro capabilities.',
+    appId: null, outcome: 'recorded', details: '', createdAt: new Date().toISOString(),
+    nextAction: { id: 'review-pro', label: 'Review Autark Pro', route: '/pro', confirmationRequired: false, danger: false },
+  });
+  await page.route('**/api/recommended-action', (route) => route.fulfill({ json: { id: 'no-action-needed' } }));
+  await page.goto('/home');
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await page.locator('summary').filter({ hasText: server.records[0].title }).click();
+  await expectNoHorizontalOverflow(page);
+  await page.getByRole('button', { name: 'Review Autark Pro', exact: true }).click();
+  await expect(page).toHaveURL(/\/pro$/);
+  await expect(page.getByRole('dialog', { name: 'Activity', exact: true })).toBeHidden();
+});
+
+test('history uses the same confirmation, failure feedback and disabled explanations as Now', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  const server = await historyServer(page);
+  const action = {
+    id: 'repair-app', label: 'Repair app', href: '/api/apps/syncthing/repair',
+    method: 'POST', confirmationRequired: true, danger: false,
+  };
+  server.records.push({
+    id: 1, action: 'notification:repair', category: 'notification', level: 'warning',
+    title: 'Syncthing needs attention', message: 'Check its configuration.',
+    appId: null, outcome: 'recorded', details: '', createdAt: new Date().toISOString(), nextAction: action,
+  });
+  let writes = 0;
+  await page.route('**/api/apps/syncthing/repair', (route) => {
+    writes++;
+    expect(route.request().method()).toBe('POST');
+    return route.fulfill({ status: 409, json: { message: 'The app is no longer available.' } });
+  });
+  await page.goto('/home');
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Syncthing needs attention' }).click();
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.getByRole('button', { name: 'Repair app', exact: true }).click();
+  expect(writes).toBe(0);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Repair app', exact: true }).click();
+  await expect(page.locator('[data-sonner-toast]')).toContainText('The app is no longer available.');
+  expect(writes).toBe(1);
+  server.records.find((record) => record.action === 'notification:repair')!.nextAction = {
+    ...action, disabled: true, reason: 'App ownership must be reviewed first.',
+  };
+  await page.reload();
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await page.locator('summary').filter({ hasText: 'Syncthing needs attention' }).click();
+  await expect(page.getByRole('button', { name: 'Repair app', exact: true })).toBeDisabled();
+  await expect(page.getByText('App ownership must be reviewed first.', { exact: true })).toBeVisible();
 });
 
 test('dismissal reports unavailable browser storage and keeps failed history saves retryable', async ({ page }) => {

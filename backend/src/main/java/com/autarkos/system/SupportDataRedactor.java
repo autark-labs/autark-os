@@ -58,7 +58,8 @@ public final class SupportDataRedactor {
                         log.appId(),
                         log.outcome(),
                         redact(log.details()),
-                        log.createdAt()))
+                        log.createdAt(),
+                        null))
                 .toList();
     }
 

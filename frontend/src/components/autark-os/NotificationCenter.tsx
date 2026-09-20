@@ -43,7 +43,7 @@ function useNotificationState() {
     setUnsaved((current) => [{ ...receipt, failed: false }, ...current.filter((item) => item.id !== receipt.id)]);
     try {
       await ActivityAPIClient.recordNotification({
-        id: receipt.id, severity: receipt.severity, title: receipt.title.slice(0, 160), message: receipt.message?.slice(0, 2000),
+        id: receipt.id, severity: receipt.severity, title: receipt.title.slice(0, 160), message: receipt.message?.slice(0, 2000), nextAction: receipt.nextAction,
       });
       await queryClient.invalidateQueries({ queryKey: historyQueryKey });
       setUnsaved((current) => current.filter((item) => item.id !== receipt.id));
@@ -79,9 +79,10 @@ function useNotificationState() {
       localStorage.setItem(dismissedRecommendationsKey, JSON.stringify(next));
       setDismissalSessionOnly(false);
     } catch { setDismissalSessionOnly(true); }
-    void saveReceipt(createNotificationReceipt({
-      severity: current.severity, title: current.title, message: current.body, sticky: false,
-    }));
+    void saveReceipt({
+      ...createNotificationReceipt({ severity: current.severity, title: current.title, message: current.body, sticky: false }),
+      nextAction: current.primaryAction,
+    });
   }
 
   return { jobs, recommendation, unsaved, saveReceipt, dismissed, dismissRecommendation, dismissalSessionOnly };
@@ -152,10 +153,20 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
     finally { setRunningAction(false); }
   }
 
+  function actionButton(action: AutarkOsAction) {
+    return <>
+      <Button size="sm" variant="outline" className="text-xs" disabled={action.disabled || runningAction}
+        onClick={() => void runAction(action)}>{runningAction ? 'Starting…' : action.label}</Button>
+      {action.disabled && <p className="text-xs text-muted-foreground">{action.reason || 'This action is currently unavailable.'}</p>}
+    </>;
+  }
+
   const rows = [
-    ...(history.data ?? []).map((item) => ({ id: item.action, title: item.title, message: item.message, severity: item.level, at: item.createdAt, job: undefined as AutarkOsJob | undefined })),
-    ...unsaved.filter((item) => !history.data?.some((saved) => saved.action === `notification:${item.id}`)).map((item) => ({ id: `notification:${item.id}`, title: item.title, message: item.message, severity: item.severity, at: item.occurredAt, job: undefined as AutarkOsJob | undefined })),
-    ...(jobs.data ?? []).filter(terminalJob).map((job) => ({ ...actionNotificationFromJob(job), id: job.jobId, at: job.updatedAt, job })),
+    ...(history.data ?? []).map((item) => ({ id: item.action, title: item.title, message: item.message, severity: item.level, at: item.createdAt,
+      nextAction: item.nextAction ?? (item.title === recommendation.data?.title && item.message === recommendation.data?.body ? recommendation.data.primaryAction : undefined),
+      job: undefined as AutarkOsJob | undefined })),
+    ...unsaved.filter((item) => !history.data?.some((saved) => saved.action === `notification:${item.id}`)).map((item) => ({ id: `notification:${item.id}`, title: item.title, message: item.message, severity: item.severity, at: item.occurredAt, nextAction: item.nextAction, job: undefined as AutarkOsJob | undefined })),
+    ...(jobs.data ?? []).filter(terminalJob).map((job) => ({ ...actionNotificationFromJob(job), id: job.jobId, at: job.updatedAt, job, nextAction: undefined })),
   ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 100);
 
   return <Popover modal open={open} onOpenChange={(next) => { setOpen(next); if (next) dismissActionPopup(); }}>
@@ -188,10 +199,9 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
               <p className="text-xs font-medium">{current.title}</p>
               <details className="mt-1 text-xs text-muted-foreground"><summary className="cursor-pointer">Details</summary><p className="my-2 leading-relaxed">{current.body}</p></details>
               <div className="mt-2 flex flex-wrap gap-2">
-                {current.primaryAction && <Button size="sm" variant="outline" className="text-xs" disabled={current.primaryAction.disabled || runningAction} title={current.primaryAction.reason || undefined} onClick={() => void runAction(current.primaryAction!)}>{runningAction ? 'Starting…' : current.primaryAction.label}</Button>}
+                {current.primaryAction && actionButton(current.primaryAction)}
                 <Button size="sm" variant="ghost" className="text-xs" disabled={runningAction} onClick={dismissRecommendation}>Dismiss</Button>
               </div>
-              {current.primaryAction?.disabled && <p className="mt-1 text-xs text-muted-foreground">{current.primaryAction.reason || 'This action is currently unavailable.'}</p>}
             </div>
           </section>}
           {dismissalSessionOnly && <p role="status" className="py-2 text-xs text-muted-foreground">Browser storage is unavailable. Dismissals last until you reload.</p>}
@@ -202,7 +212,19 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
           {(history.isPending || jobs.isPending) && <p role="status" className="py-3 text-xs text-muted-foreground">Loading history…</p>}
           {(history.isError || jobs.isError) && <div role="alert" className="py-2 text-xs"><p>History is incomplete. Showing available results.</p><Button size="sm" variant="ghost" onClick={() => { void history.refetch(); void jobs.refetch(); }}>Retry history</Button></div>}
           {unsaved.some((item) => item.failed) && <div role="alert" className="py-2 text-xs"><p>Some results are only in this session. Keep this page open until they’re saved.</p><Button size="sm" variant="ghost" onClick={() => unsaved.filter((item) => item.failed).forEach((item) => void saveReceipt(item))}>Retry saving</Button></div>}
-          {rows.map((item) => <details key={item.id} className="group border-b border-border last:border-0"><summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 py-2 text-xs [&::-webkit-details-marker]:hidden"><ResultIcon severity={item.severity} /><span className="min-w-0 flex-1">{item.title}</span><time dateTime={item.at} className="shrink-0 text-[10px] text-muted-foreground">{formatLocalizedDateTime(item.at)}</time><ChevronRight className="size-3 shrink-0 group-open:rotate-90" /></summary><div className="space-y-2 pb-3 pl-5 text-xs text-muted-foreground"><p>{new Date(item.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'long' })}</p><p className="break-words leading-relaxed">{item.message || item.title}</p>{item.job && <><p>{item.job.status}{item.job.subjectId ? ` · ${item.job.subjectId}` : ''}</p><JobSteps job={item.job} /></>}</div></details>)}
+          {rows.map((item) => <details key={item.id} className="group border-b border-border last:border-0">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 py-2 text-xs [&::-webkit-details-marker]:hidden">
+              <ResultIcon severity={item.severity} /><span className="min-w-0 flex-1">{item.title}</span>
+              <time dateTime={item.at} className="shrink-0 text-[10px] text-muted-foreground">{formatLocalizedDateTime(item.at)}</time>
+              <ChevronRight className="size-3 shrink-0 group-open:rotate-90" />
+            </summary>
+            <div className="space-y-2 pb-3 pl-5 text-xs text-muted-foreground">
+              <p>{new Date(item.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'long' })}</p>
+              <p className="break-words leading-relaxed">{item.message || item.title}</p>
+              {item.nextAction && actionButton(item.nextAction)}
+              {item.job && <><p>{item.job.status}{item.job.subjectId ? ` · ${item.job.subjectId}` : ''}</p><JobSteps job={item.job} /></>}
+            </div>
+          </details>)}
           {!history.isPending && !jobs.isPending && !history.isError && !jobs.isError && rows.length === 0 && <p className="py-4 text-xs text-muted-foreground">No history yet.</p>}
         </TabsContent>
       </Tabs>

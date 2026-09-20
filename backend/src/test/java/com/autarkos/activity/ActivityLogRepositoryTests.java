@@ -54,7 +54,8 @@ class ActivityLogRepositoryTests {
     @Test
     void notificationHistoryIsPersistedRedactedFilteredAndRetrySafe() {
         var request = new ActivityController.NotificationRequest("receipt-1", "error", "Access failed",
-                "token=super-secret at http://192.168.1.20:8080/");
+                "token=super-secret at http://192.168.1.20:8080/",
+                com.autarkos.api.AutarkOsAction.route("review-pro", "Review Autark Pro", "/pro"));
         var saved = service.notification(request);
         assertThat(service.notification(request).id()).isEqualTo(saved.id());
         service.info("system", "check", "Unrelated system event", "Checked");
@@ -66,7 +67,22 @@ class ActivityLogRepositoryTests {
             assertThat(log.action()).isEqualTo("notification:receipt-1");
             assertThat(log.level()).isEqualTo("error");
             assertThat(log.message()).doesNotContain("super-secret", "192.168.1.20");
+            assertThat(log.nextAction()).isEqualTo(request.nextAction());
         });
         assertThat(repository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void savedActionsRetainTheirMethodAndConfirmationWithoutLeakingLabelSecrets() {
+        var action = com.autarkos.api.AutarkOsAction.post(
+                "repair-app", "Repair token=secret", "/api/apps/syncthing/repair", true, true);
+        service.notification(new ActivityController.NotificationRequest(
+                "receipt-action", "warning", "Review app", "Needs attention", action));
+        var saved = new ActivityLogService(repository).recent(1).getFirst().nextAction();
+        assertThat(saved.label()).isEqualTo("Repair token=[redacted]");
+        assertThat(saved.method()).contains("POST");
+        assertThat(saved.href()).contains("/api/apps/syncthing/repair");
+        assertThat(saved.confirmationRequired()).isTrue();
+        assertThat(saved.danger()).isTrue();
     }
 }

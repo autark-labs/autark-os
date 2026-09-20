@@ -1,8 +1,9 @@
 import { httpClient } from './httpClient';
 import type { ActivityFilters, ActivityLog } from '@/types/activity';
+import type { AutarkOsAction } from '@/types/app';
 
 export const ActivityAPIClient = {
-  async recordNotification(notification: { id: string; severity: string; title: string; message?: string }) {
+  async recordNotification(notification: { id: string; severity: string; title: string; message?: string; nextAction?: AutarkOsAction | null }) {
     const response = await httpClient.post<ActivityLog>('/api/activity/notifications', notification);
     return response.data;
   },

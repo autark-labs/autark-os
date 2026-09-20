@@ -59,6 +59,9 @@ Recommendations can be dismissed without changing their underlying system state.
 The unchanged notice stays hidden in that browser across reloads, and its text is
 saved through the same History path as action results. Changed recommendations
 appear again. Browser storage holds only dismissal preferences, not History.
+Dismissed recommendations retain their action in the existing activity record;
+expanded History entries reuse the live notice's action handler and confirmation
+checks. Persisted actions are limited to internal pages and API operations.
 
 The single popup viewport follows the active dialog/sheet's focus scope. A stable
 portal target uses the browser's manual-popover top layer to avoid modal clipping

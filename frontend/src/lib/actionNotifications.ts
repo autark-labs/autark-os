@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import type { AutarkOsJob } from '@/types/jobs';
+import type { AutarkOsAction } from '@/types/app';
 import { actionNotificationFromError, actionNotificationFromJob, actionNotificationFromResult, notificationToastMethod } from './actionNotifications.logic';
 import { setAutarkOsJobCache, terminalJob } from '@/repositories/jobRepository';
 import { queryClient } from '@/repositories/queryClient';
@@ -25,7 +26,7 @@ export type ActionNotification = {
   message?: string;
   sticky: boolean;
 };
-export type NotificationReceipt = ActionNotification & { id: string; occurredAt: string; jobId?: string };
+export type NotificationReceipt = ActionNotification & { id: string; occurredAt: string; jobId?: string; nextAction?: AutarkOsAction | null };
 
 export function showActionNotification(result: ActionNotificationResult, fallbackTitle = 'Action finished') {
   if ('jobId' in result && typeof result.jobId === 'string') return showJobNotification(result as AutarkOsJob);

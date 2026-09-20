@@ -1,3 +1,5 @@
+import type { AutarkOsAction } from './app';
+
 export type ActivityLog = {
   id: number;
   level: 'info' | 'success' | 'warning' | 'error' | string;
@@ -9,6 +11,7 @@ export type ActivityLog = {
   outcome: 'completed' | 'failed' | 'needs_attention' | string;
   details: string;
   createdAt: string;
+  nextAction?: AutarkOsAction | null;
 };
 
 export type ActivityFilters = {

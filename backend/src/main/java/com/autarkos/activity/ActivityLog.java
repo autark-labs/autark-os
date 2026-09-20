@@ -1,6 +1,7 @@
 package com.autarkos.activity;
 
 import java.time.Instant;
+import com.autarkos.api.AutarkOsAction;
 
 public record ActivityLog(
         long id,
@@ -12,5 +13,6 @@ public record ActivityLog(
         String appId,
         String outcome,
         String details,
-        Instant createdAt) {
+        Instant createdAt,
+        AutarkOsAction nextAction) {
 }
