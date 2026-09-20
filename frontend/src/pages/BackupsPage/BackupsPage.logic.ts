@@ -1,7 +1,6 @@
 import { activeJobs } from '../../repositories/jobRepository.logic';
-import type { SemanticStatusTone } from '@/components/primitives/SemanticVariants';
 import { formatLocalizedDateTime } from '@/lib/dateTime';
-import type { AppBackupStatus, BackupReport, RestorePoint } from '@/types/backup';
+import type { BackupReport, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
 
 export function reportRestorePoints(report: BackupReport): RestorePoint[] {
@@ -40,14 +39,6 @@ export function formatBackupBytes(value: number) {
 }
 
 /**
- * @param {string} value
- * @returns {string}
- */
-export function capitalizeBackupLabel(value: string) {
-  return value ? value.slice(0, 1).toUpperCase() + value.slice(1) : value;
-}
-
-/**
  * @param {string} status
  * @returns {string}
  */
@@ -59,69 +50,6 @@ export function backupStatusLabel(status: string) {
   if (status === 'unprotected') return 'Backups off';
   if (status === 'protected') return 'Protected by restore point';
   return status.replaceAll('_', ' ');
-}
-
-/**
- * @param {string} status
- * @returns {string}
- */
-export function backupSchedulerLabel(status: string) {
-  if (status === 'off') return 'Off';
-  if (status === 'manual_only') return 'Run-now mode';
-  if (status === 'warning') return 'Needs attention';
-  if (status === 'healthy') return 'Healthy';
-  return backupStatusLabel(status);
-}
-
-/**
- * @param {string} status
- * @returns {string}
- */
-export function backupSchedulerTone(status: string): SemanticStatusTone {
-  if (status === 'healthy') return 'success';
-  if (status === 'warning') return 'danger';
-  if (status === 'off') return 'muted';
-  return 'warning';
-}
-
-/**
- * @param {string} status
- * @returns {string}
- */
-export function backupAppBadgeTone(status: string): SemanticStatusTone {
-  if (status === 'protected') return 'success';
-  if (status === 'failed') return 'danger';
-  return 'warning';
-}
-
-/**
- * @param {{ type?: string } | null | undefined} job
- * @returns {string}
- */
-export function backupJobBannerTitle(job?: Pick<AutarkOsJob, 'type'> | null) {
-  if (job?.type === 'backup_verify') return 'Verification in progress';
-  if (job?.type === 'backup_restore') return 'Restore in progress';
-  return 'Backup in progress';
-}
-
-/**
- * @param {{ type?: string } | null | undefined} job
- * @returns {string}
- */
-export function backupJobStartedMessage(job?: Pick<AutarkOsJob, 'type'> | null) {
-  if (job?.type === 'backup_verify') return 'Verification job started. Autark-OS will update the restore point when it finishes.';
-  if (job?.type === 'backup_restore') return 'Restore job started. Autark-OS will update app and backup state when it finishes.';
-  return 'Backup job started. Autark-OS will update restore points when it finishes.';
-}
-
-/**
- * @param {{ type?: string } | null | undefined} job
- * @returns {string}
- */
-export function backupJobCompletedMessage(job?: Pick<AutarkOsJob, 'type'> | null) {
-  if (job?.type === 'backup_verify') return 'Verification job completed.';
-  if (job?.type === 'backup_restore') return 'Restore job completed.';
-  return 'Backup job completed.';
 }
 
 const BACKUP_JOB_TYPES = ['backup', 'backup_verify', 'backup_restore'];
@@ -209,56 +137,4 @@ export function backupJobRunningId(job?: Pick<AutarkOsJob, 'subjectId' | 'type'>
     return 'routine';
   }
   return subjectId ? `app-${subjectId}` : 'backup';
-}
-
-/**
- * @param {unknown} report
- * @param {unknown} latestRestore
- * @returns {{ summary: string; title: string }}
- */
-export function backupProtectionHero(report: BackupReport | null | undefined, latestRestore: RestorePoint | null | undefined) {
-  if (!report) {
-    return {
-      summary: 'Autark-OS could not read backup status yet. Refresh the page or check Support if this continues.',
-      title: 'Protection status is unknown',
-    };
-  }
-  if (report.status === 'protected') {
-    if (!latestRestore) {
-      return {
-        summary: 'Backups are configured, but Autark-OS has not created a completed restore point yet.',
-        title: 'Create the first restore point',
-      };
-    }
-    return {
-      summary: `Your apps are protected by a restore point. The latest restore point was created ${formatBackupDate(latestRestore.createdAt)}, and the next scheduled backup is ${report.settings.nextRoutineRun ? formatBackupDate(report.settings.nextRoutineRun, report.settings.timeZone) : 'not scheduled'}.`,
-      title: 'Protected by restore point',
-    };
-  }
-  if (report.failedBackups > 0) {
-    return {
-      summary: `${report.failedBackups} backup ${report.failedBackups === 1 ? 'run needs' : 'runs need'} attention. Review the affected apps and create a fresh checkpoint after fixing the issue.`,
-      title: 'Backup protection needs attention',
-    };
-  }
-  return {
-    summary: report.summary || 'Some apps still need a successful backup before Autark-OS can call them protected.',
-    title: 'Finish backup protection',
-  };
-}
-
-/**
- * @param {unknown | null} report
- */
-export function backupPageViewModel(report: BackupReport | null | undefined) {
-  const restorePoints = report ? reportRestorePoints(report).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)) : [];
-  const latestRestore = restorePoints.find((point) => point.status === 'completed') ?? null;
-  return {
-    appRestorePoints: restorePoints.filter((point) => point.scope !== 'full' && point.status === 'completed'),
-    fullRestorePoints: restorePoints.filter((point) => point.scope === 'full' && point.status === 'completed'),
-    latestRestore,
-    needsAttention: report?.apps.filter((app: AppBackupStatus) => app.status !== 'protected') ?? [],
-    protectionHero: backupProtectionHero(report, latestRestore),
-    routineRestorePoints: restorePoints.filter((point) => point.scope === 'full' && point.source === 'automatic' && point.status === 'completed'),
-  };
 }

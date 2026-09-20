@@ -1,10 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  latestActiveDiscoverJob,
-  useDiscoverJobQuery,
-  useDiscoverJobsQuery,
-} from '@/repositories/discoverRepository';
-import { terminalJob } from '@/repositories/jobRepository';
+import { useEffect, useState } from 'react';
+import { latestActiveJob, terminalJob, useAutarkOsJobQuery, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import type { AutarkOsJob } from '@/types/jobs';
 
 type DiscoverJobTrackingOptions = {
@@ -12,63 +7,46 @@ type DiscoverJobTrackingOptions = {
   refreshDiscover: () => Promise<unknown>;
 };
 
-/**
- * Tracks durable Discover jobs independently of the current page instance.
- * A refreshed or reopened page resumes the active install or backup instead
- * of losing user-visible progress.
- */
+/** Keep identities locally; the shared job cache owns progress and terminal results. */
 export function useDiscoverJobTracking({ onInstallSubjectRecovered, refreshDiscover }: DiscoverJobTrackingOptions) {
-  const [installJob, setInstallJob] = useState<AutarkOsJob | null>(null);
-  const [backupJob, setBackupJob] = useState<AutarkOsJob | null>(null);
-  const jobsQuery = useDiscoverJobsQuery();
-  const recoveredInstallJob = useMemo(
-    () => latestActiveDiscoverJob(jobsQuery.data ?? [], ['install_app']),
-    [jobsQuery.data],
-  );
-  const recoveredBackupJob = useMemo(
-    () => latestActiveDiscoverJob(jobsQuery.data ?? [], ['backup']),
-    [jobsQuery.data],
-  );
-  const trackedInstallJob = trackedDiscoverJob(installJob, recoveredInstallJob);
-  const trackedBackupJob = trackedDiscoverJob(backupJob, recoveredBackupJob);
-  const activeInstallJobId = trackedInstallJob && !terminalJob(trackedInstallJob) ? trackedInstallJob.jobId : null;
-  const activeBackupJobId = trackedBackupJob && !terminalJob(trackedBackupJob) ? trackedBackupJob.jobId : null;
-  const installJobQuery = useDiscoverJobQuery(activeInstallJobId);
-  const backupJobQuery = useDiscoverJobQuery(activeBackupJobId);
+  const [installJobId, setInstallJobId] = useState<string | null>(null);
+  const [backupJobId, setBackupJobId] = useState<string | null>(null);
+  const jobsQuery = useAutarkOsJobsQuery();
+  const recoveredInstallJob = latestActiveJob(jobsQuery.data, ['install_app']);
+  const recoveredBackupJob = latestActiveJob(jobsQuery.data, ['backup']);
+  const installJobQuery = useAutarkOsJobQuery(installJobId ?? recoveredInstallJob?.jobId ?? null, jobsQuery.data);
+  const backupJobQuery = useAutarkOsJobQuery(backupJobId ?? recoveredBackupJob?.jobId ?? null, jobsQuery.data);
+  const installJob = installJobQuery.data ?? null;
+  const backupJob = backupJobQuery.data ?? null;
+  const activeInstallId = installJob && !terminalJob(installJob) ? installJob.jobId : recoveredInstallJob?.jobId;
+  const activeInstallSubject = installJob && !terminalJob(installJob) ? installJob.subjectId : recoveredInstallJob?.subjectId;
+  const activeBackupId = backupJob && !terminalJob(backupJob) ? backupJob.jobId : recoveredBackupJob?.jobId;
 
   useEffect(() => {
-    if (!recoveredInstallJob || (installJob && !terminalJob(installJob))) return;
-    setInstallJob(recoveredInstallJob);
-    if (recoveredInstallJob.subjectId) onInstallSubjectRecovered(recoveredInstallJob.subjectId);
-  }, [installJob, onInstallSubjectRecovered, recoveredInstallJob]);
+    if (!activeInstallId) return;
+    setInstallJobId(activeInstallId);
+    if (activeInstallSubject) onInstallSubjectRecovered(activeInstallSubject);
+  }, [activeInstallId, activeInstallSubject, onInstallSubjectRecovered]);
 
   useEffect(() => {
-    if (!recoveredBackupJob || (backupJob && !terminalJob(backupJob))) return;
-    setBackupJob(recoveredBackupJob);
-  }, [backupJob, recoveredBackupJob]);
+    if (activeBackupId) setBackupJobId(activeBackupId);
+  }, [activeBackupId]);
 
+  const completedInstallId = installJob && terminalJob(installJob) ? installJob.jobId : null;
+  const completedBackupId = backupJob && terminalJob(backupJob) ? backupJob.jobId : null;
   useEffect(() => {
-    if (!installJobQuery.data) return;
-    setInstallJob(installJobQuery.data);
-    if (terminalJob(installJobQuery.data)) void refreshDiscover();
-  }, [installJobQuery.data, refreshDiscover]);
-
-  useEffect(() => {
-    if (!backupJobQuery.data) return;
-    setBackupJob(backupJobQuery.data);
-    if (terminalJob(backupJobQuery.data)) void refreshDiscover();
-  }, [backupJobQuery.data, refreshDiscover]);
+    if (completedInstallId || completedBackupId) void refreshDiscover();
+  }, [completedInstallId, completedBackupId, refreshDiscover]);
 
   return {
     progressError: installJobQuery.error || backupJobQuery.error || jobsQuery.error,
-    retryProgress: () => Promise.all([jobsQuery.refetch(), ...(activeInstallJobId ? [installJobQuery.refetch()] : []), ...(activeBackupJobId ? [backupJobQuery.refetch()] : [])]),
+    retryProgress: () => Promise.all([jobsQuery.refetch(),
+      ...(installJobId && !jobsQuery.data?.some(job => job.jobId === installJobId) ? [installJobQuery.refetch()] : []),
+      ...(backupJobId && !jobsQuery.data?.some(job => job.jobId === backupJobId) ? [backupJobQuery.refetch()] : []),
+    ]),
     backupJob,
     installJob,
-    setBackupJob,
-    setInstallJob,
+    setBackupJob: (job: AutarkOsJob) => setBackupJobId(job.jobId),
+    setInstallJob: (job: AutarkOsJob) => setInstallJobId(job.jobId),
   };
-}
-
-export function trackedDiscoverJob(localJob: AutarkOsJob | null, recoveredJob: AutarkOsJob | null) {
-  return localJob && !terminalJob(localJob) ? localJob : recoveredJob ?? localJob;
 }

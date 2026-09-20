@@ -23,31 +23,64 @@ test('mobile Discover management links use the app ID, not its installation iden
   await expect(page.getByRole('tab', { name: 'Guide', exact: true })).toBeVisible();
 });
 
-test('the first-backup action submits the catalog app ID after installation', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const apps = await discoverFixture(page);
-  const app = apps.find((view) => view.application.relationship === 'managed')!.application;
-  app.runtime!.backupProtection = 'backup_enabled_no_restore_point';
-  const backup = app.availableActions.find((action) => action.id === 'backup')!;
-  backup.disabled = true;
-  backup.reason = 'The original Compose file is missing.';
-  let completed = false;
-  const job = () => ({ jobId: 'fixture-install', type: 'install_app', subjectId: app.id, status: completed ? 'succeeded' : 'running', currentStep: 'finish', steps: [], createdAt: '2025-01-15T12:00:00Z', updatedAt: '2025-01-15T12:00:00Z', error: null });
-  await page.route('**/api/jobs', (route) => route.fulfill({ json: [job()] }));
-  await page.route('**/api/jobs/fixture-install', (route) => {
+for (const missingFromList of [false, true]) {
+  test(`Discover follows ${missingFromList ? 'unlisted' : 'listed'} jobs through reload, completion and backup retry`, async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 960 });
+    const apps = await discoverFixture(page);
+    const app = apps.find((view) => view.application.relationship === 'managed')!.application;
+    app.runtime!.backupProtection = 'backup_enabled_no_restore_point';
+    const backup = app.availableActions.find((action) => action.id === 'backup')!;
+    backup.disabled = true;
+    backup.reason = 'The original Compose file is missing.';
+    let completed = false;
+    let listed = true;
+    let detailRequests = 0;
+    let catalogRequests = 0;
+    let backupAttempts = 0;
+    const job = () => ({ jobId: 'fixture-install', type: 'install_app', subjectId: app.id, status: completed ? 'succeeded' : 'running', currentStep: 'finish', steps: [], createdAt: '2025-01-15T12:00:00Z', updatedAt: '2025-01-15T12:00:00Z', error: null });
+    let backupJob: ReturnType<typeof job> | null = null;
+    await page.route('**/api/discover/apps', route => {
+      catalogRequests++;
+      return route.fulfill({ json: apps });
+    });
+    await page.route('**/api/jobs', (route) => route.fulfill({ json: [...(listed ? [job()] : []), ...(backupJob ? [backupJob] : [])] }));
+    await page.route('**/api/jobs/fixture-install', (route) => {
+      detailRequests++;
+      return route.fulfill({ json: job() });
+    });
+    await page.route('**/api/backups/apps/*/run', route => {
+      expect(new URL(route.request().url()).pathname).toBe(`/api/backups/apps/${app.id}/run`);
+      backupAttempts++;
+      backupJob = { ...job(), jobId: `fixture-backup-${backupAttempts}`, type: 'backup', status: backupAttempts === 1 ? 'failed' : 'running' };
+      return route.fulfill({ json: backupJob });
+    });
+    await page.goto(`/discover?detail=${app.id}`);
+    await expect(page.getByRole('heading', { name: 'Installing Vaultwarden', exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Installing Vaultwarden', exact: true })).toBeVisible();
+    listed = !missingFromList;
     completed = true;
-    return route.fulfill({ json: job() });
+    await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeDisabled();
+    expect(detailRequests > 0).toBe(missingFromList);
+    backup.disabled = false;
+    backup.reason = '';
+    // Refresh the catalog without replacing the selected job or remounting the page.
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await page.getByRole('button', { name: `Select ${app.name}`, exact: true }).click();
+    await expect(page.getByLabel('Selected Discover app', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Create first backup', exact: true }).click();
+    await expect.poll(() => backupAttempts).toBe(1);
+    await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Create first backup', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Creating backup', exact: true })).toBeDisabled();
+    backupJob!.status = 'succeeded';
+    await expect(page.getByRole('button', { name: 'Backup created', exact: true })).toBeVisible();
+    expect(backupAttempts).toBe(2);
+    expect(catalogRequests).toBeLessThan(20);
   });
-  await page.goto(`/discover?detail=${app.id}`);
-  await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeDisabled();
-  backup.disabled = false;
-  backup.reason = '';
-  completed = false;
-  await page.goto(`/discover?detail=${app.id}`);
-  const request = page.waitForRequest((request) => request.method() === 'POST' && request.url().includes('/api/backups/apps/'));
-  await page.getByRole('button', { name: 'Create first backup', exact: true }).click();
-  expect(new URL((await request).url()).pathname).toBe(`/api/backups/apps/${app.id}/run`);
-});
+}
 
 for (const width of [390, 1440]) {
   test(`${width}px Discover follows the canonical recovery action`, async ({ page }) => {

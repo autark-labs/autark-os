@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { DiscoverAPIClient } from '@/api/DiscoverAPIClient';
@@ -7,17 +8,7 @@ import type { AutarkOsJob } from '@/types/jobs';
 import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
 import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
 import { invalidateBackupQueries } from './backupRepository';
-import {
-  JOB_FAMILIES,
-  latestActiveJob,
-  useAutarkOsJobQuery,
-  useAutarkOsJobsQuery,
-} from './jobRepository';
 import { useSystemDoctorQuery } from './systemRepository';
-
-export function latestActiveDiscoverJob(jobs: AutarkOsJob[], types: string[] = JOB_FAMILIES.discover) {
-  return latestActiveJob(jobs, types) as AutarkOsJob | null;
-}
 
 export type DiscoverReadiness = {
   doctor: SystemDoctorStatus | null;
@@ -34,8 +25,6 @@ export type DiscoverInstallMutationInput = {
 export const discoverQueryKeys = {
   all: ['discover'] as const,
   apps: ['discover', 'apps'] as const,
-  jobs: ['discover', 'jobs'] as const,
-  job: (jobId: string | null) => ['discover', 'job', jobId] as const,
   preview: (appId: string | null, answers: Record<string, unknown>) => ['discover', 'preview', appId, answers] as const,
   readiness: ['discover', 'readiness'] as const,
 };
@@ -70,6 +59,12 @@ export function useDiscoverReadinessQuery() {
     refetchInterval: 30_000,
     staleTime: 30_000,
   });
+  const { refetch: refetchDoctor } = doctorQuery;
+  const { refetch: refetchReadiness } = readinessQuery;
+  const refetch = useCallback(async () => {
+    const [readiness] = await Promise.all([refetchReadiness(), refetchDoctor()]);
+    return readiness;
+  }, [refetchReadiness, refetchDoctor]);
   return {
     ...readinessQuery,
     data: {
@@ -80,10 +75,7 @@ export function useDiscoverReadinessQuery() {
     error: readinessQuery.error ?? doctorQuery.error,
     isFetching: readinessQuery.isFetching || doctorQuery.isFetching,
     isLoading: readinessQuery.isLoading || doctorQuery.isLoading,
-    refetch: async () => {
-      const [readiness] = await Promise.all([readinessQuery.refetch(), doctorQuery.refetch()]);
-      return readiness;
-    },
+    refetch,
   };
 }
 
@@ -117,14 +109,6 @@ export function useDiscoverBackupMutation() {
       void invalidateBackupQueries(queryClient);
     },
   });
-}
-
-export function useDiscoverJobQuery(jobId: string | null) {
-  return useAutarkOsJobQuery(jobId);
-}
-
-export function useDiscoverJobsQuery() {
-  return useAutarkOsJobsQuery();
 }
 
 export function invalidateDiscoverQueries(queryClient: QueryClient) {

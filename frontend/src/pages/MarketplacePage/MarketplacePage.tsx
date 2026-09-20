@@ -455,7 +455,7 @@ function MarketplacePage() {
           />
         </section>
 
-        {detailsOpen && (
+        {wideRailLayout && detailsOpen && (
           <button
             aria-label="Close app details backdrop"
             className="absolute inset-0 z-20 bg-slate-950/35 backdrop-blur-sm"
@@ -464,7 +464,7 @@ function MarketplacePage() {
           />
         )}
 
-        {selectedView && (
+        {wideRailLayout && selectedView && (
           <MarketplaceAppRail
             appView={selectedView}
             detailsOpen={detailsOpen}

@@ -58,8 +58,7 @@ test('Discover keeps details anchored to the persistent rail and reserves the sh
   assert.match(rail, /marketplacePrimaryRoute\(appView\)/);
   assert.match(rail, /<DisabledAction/);
   assert.match(page, /useDiscoverJobTracking/);
-  assert.match(jobTracking, /latestActiveDiscoverJob/);
-  assert.match(jobTracking, /useDiscoverJobQuery\(activeInstallJobId\)/);
+  assert.match(jobTracking, /useAutarkOsJobsQuery/);
 });
 
 test('Discover install confirmation uses the approved plan review and requires explicit confirmation', () => {

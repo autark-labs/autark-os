@@ -43,13 +43,15 @@ export function useAutarkOsJobsQuery() {
   });
 }
 
-export function useAutarkOsJobQuery(jobId: string | null) {
-  return useQuery<AutarkOsJob>({
+export function useAutarkOsJobQuery(jobId: string | null, listedJobs?: AutarkOsJob[]) {
+  const listed = listedJobs?.find(job => job.jobId === jobId);
+  const query = useQuery<AutarkOsJob>({
     queryKey: jobQueryKeys.job(jobId),
     queryFn: () => JobsAPIClient.get(jobId || ''),
-    enabled: Boolean(jobId),
-    refetchInterval: 1_200,
+    enabled: Boolean(jobId) && !listed,
+    refetchInterval: (query) => terminalJob(query.state.data) ? false : 1_200,
   });
+  return { ...query, data: listed ?? query.data, error: listed ? null : query.error };
 }
 
 export function setAutarkOsJobCache(queryClient: QueryClient, job?: AutarkOsJob | null) {

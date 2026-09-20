@@ -42,8 +42,8 @@ test('marketplace page reads discover data and jobs through the repository layer
   assert.match(page, /useDiscoverInstallMutation/);
   assert.match(page, /useDiscoverInstallPreviewQuery/);
   assert.match(page, /useDiscoverJobTracking/);
-  assert.match(jobTracking, /useDiscoverJobQuery/);
-  assert.match(jobTracking, /useDiscoverJobsQuery/);
+  assert.match(jobTracking, /useAutarkOsJobQuery/);
+  assert.match(jobTracking, /useAutarkOsJobsQuery/);
 
   assert.match(repository, /discoverQueryKeys/);
   assert.match(repository, /useDiscoverAppsQuery/);
@@ -52,11 +52,7 @@ test('marketplace page reads discover data and jobs through the repository layer
   assert.match(repository, /useDiscoverInstallMutation/);
   assert.match(repository, /useDiscoverBackupMutation/);
   assert.match(repository, /syncCanonicalAppMutationResult\(queryClient, job\)/);
-  assert.match(repository, /useDiscoverJobQuery/);
-  assert.match(repository, /useDiscoverJobsQuery/);
   assert.match(repository, /DiscoverAPIClient\.listApps/);
-  assert.match(repository, /useAutarkOsJobsQuery/);
-  assert.match(repository, /useAutarkOsJobQuery/);
   assert.doesNotMatch(repository, /JobsAPIClient/);
   assert.match(jobRepository, /JobsAPIClient\.list/);
   assert.match(jobRepository, /JobsAPIClient\.get/);

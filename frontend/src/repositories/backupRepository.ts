@@ -1,19 +1,14 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
-import type { BackupReport, RestorePlan } from '@/types/backup';
+import type { BackupReport, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
-import {
-  useAutarkOsJobQuery as useSharedAutarkOsJobQuery,
-  useAutarkOsJobsQuery,
-} from './jobRepository';
 import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
 
 export const backupQueryKeys = {
   all: ['backups'] as const,
-  jobs: ['backups', 'jobs'] as const,
   report: ['backups', 'report'] as const,
-  job: (jobId: string | null) => ['backups', 'job', jobId] as const,
+  plan: (point: RestorePoint | null, appId: string | null) => ['backups', 'plan', point?.id, appId, point?.verifiedAt, point?.verificationStatus] as const,
 };
 
 export type BackupReportRepositoryView = {
@@ -43,14 +38,6 @@ export function useBackupReportRepository({ paused = false }: { paused?: boolean
     report: query.data ?? null,
     updatedAt: query.dataUpdatedAt > 0 ? new Date(query.dataUpdatedAt) : null,
   };
-}
-
-export function useAutarkOsJobQuery(jobId: string | null) {
-  return useSharedAutarkOsJobQuery(jobId);
-}
-
-export function useBackupJobsQuery() {
-  return useAutarkOsJobsQuery();
 }
 
 export function useRunAppBackupMutation() {
@@ -86,9 +73,11 @@ export function useRunRoutineBackupMutation() {
   });
 }
 
-export function useRestorePlanMutation() {
-  return useMutation<RestorePlan, unknown, { restorePointId: number; appId?: string | null }>({
-    mutationFn: ({ restorePointId, appId }) => BackupAPIClient.restorePlan(restorePointId, appId),
+export function useRestorePlanQuery(point: RestorePoint | null, appId: string | null) {
+  return useQuery({
+    queryKey: backupQueryKeys.plan(point, appId),
+    queryFn: () => BackupAPIClient.restorePlan(point!.id, appId),
+    enabled: Boolean(point),
   });
 }
 
