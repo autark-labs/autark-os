@@ -53,6 +53,12 @@ recommendations and active jobs; **History** combines completed jobs with saved
 action results. One compact bottom-right popup reports the latest result without
 moving page content. Closing it does not delete the history entry. Details and job
 steps expand inside the fixed-size popover; the full Activity log remains available.
+History is one newest-first list, sorted by timestamp instants rather than strings
+or date groups. Expanded entries include the year and browser-local timezone.
+Recommendations can be dismissed without changing their underlying system state.
+The unchanged notice stays hidden in that browser across reloads, and its text is
+saved through the same History path as action results. Changed recommendations
+appear again. Browser storage holds only dismissal preferences, not History.
 
 The single popup viewport follows the active dialog/sheet's focus scope. A stable
 portal target uses the browser's manual-popover top layer to avoid modal clipping

@@ -545,8 +545,7 @@ export async function installMockApi(page: Page, scenario: FixtureScenario = 're
   const authScenario = scenario === 'auth-unclaimed' || scenario === 'auth-claimed';
   await page.addInitScript(({ now }) => {
     Date.now = () => now;
-    window.localStorage.clear();
-    window.sessionStorage.clear();
+    // Playwright isolates storage per test; preserve real reload behavior within a test.
   }, { now: Date.parse(fixedAt) });
 
   await page.route((url) => new URL(url).pathname.startsWith('/api/'), async (route) => {

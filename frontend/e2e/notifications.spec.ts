@@ -209,3 +209,92 @@ test('history waits for jobs and handles an empty result without a false all-cle
   await finishJobs!();
   await expect(page.getByText('No history yet.', { exact: true })).toBeVisible();
 });
+
+test('recommendations can be dismissed without resolving Pro, and changed notices return', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  const server = await historyServer(page);
+  let recommendation = {
+    id: 'pro-activate', severity: 'info', title: 'Autark Pro is ready to activate',
+    body: 'Activate this server when you are ready to use its Pro capabilities.',
+    primaryAction: { id: 'review-pro', label: 'Review Autark Pro', route: '/pro' }, sourceIssueIds: [],
+  };
+  await page.route('**/api/recommended-action', (route) => route.fulfill({ json: recommendation }));
+  const mutations: string[] = [];
+  page.on('request', (request) => {
+    if (request.method() !== 'GET' && request.url().includes('/api/pro')) mutations.push(request.url());
+  });
+  await page.goto('/home');
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await expect(page.getByText(recommendation.title, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeHidden();
+  await expect(page.getByText('Nothing needs your attention.', { exact: true })).toBeHidden();
+  await expect.poll(() => server.records.length).toBe(1);
+  expect(server.records[0].title).toBe(recommendation.title);
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.locator('summary').filter({ hasText: recommendation.title })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: 'Open activity: Activity', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeHidden();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.locator('summary').filter({ hasText: recommendation.title })).toBeVisible();
+  recommendation = { ...recommendation, severity: 'warning', body: 'Activation now requires your attention.' };
+  await page.reload();
+  await page.getByRole('button', { name: 'Open activity: Needs review', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Dismiss', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Review Autark Pro', exact: true }).click();
+  await expect(page).toHaveURL(/\/pro$/);
+  expect(mutations).toEqual([]);
+});
+
+test('dismissal reports unavailable browser storage and keeps failed history saves retryable', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  const server = await historyServer(page);
+  server.offline = true;
+  await page.addInitScript(() => {
+    Storage.prototype.setItem = () => { throw new Error('Storage blocked'); };
+  });
+  await page.goto('/home');
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+  await expect(page.getByText('Browser storage is unavailable.', { exact: false })).toBeVisible();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  await expect(page.getByText('Some results are only in this session.', { exact: false })).toBeVisible();
+  server.offline = false;
+  await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
+  await expect.poll(() => server.records.length).toBe(1);
+  await expect(page.getByText('Some results are only in this session.', { exact: false })).toBeHidden();
+});
+
+test('history interleaves jobs and receipts by actual time, newest first without date groups', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  const server = await historyServer(page);
+  const timestamps = [
+    '2026-09-19T13:00:00Z',
+    '2026-09-19T13:00:00.500Z',
+    '2026-09-19T09:00:00-05:00',
+    '2025-09-19T13:00:00Z',
+  ];
+  server.records.push(...timestamps.map((createdAt, id) => ({
+    id, createdAt, action: `notification:${id}`, title: `Result ${id}`, message: 'Saved result',
+    category: 'notification', level: 'info', appId: null, outcome: 'recorded', details: '',
+  })));
+  const job: AutarkOsJob = {
+    jobId: 'completed-install', type: 'install_app', subjectId: 'syncthing', status: 'succeeded',
+    steps: [], createdAt: timestamps[0], updatedAt: '2026-09-19T13:00:00.750Z',
+  };
+  await page.route('**/api/jobs', (route) => route.fulfill({ json: [job] }));
+  await page.goto('/home');
+  await page.getByRole('button', { name: /^Open activity:/ }).click();
+  await page.getByRole('tab', { name: 'History', exact: true }).click();
+  const panel = page.getByRole('tabpanel');
+  const summaries = panel.locator('summary');
+  await expect(summaries).toHaveCount(5);
+  expect(await summaries.locator('span').allTextContents()).toEqual([
+    'Result 2', 'Install completed', 'Result 1', 'Result 0', 'Result 3',
+  ]);
+  await expect(panel.getByRole('heading')).toHaveCount(0);
+  await summaries.last().click();
+  await expect(panel.getByText('Sep 19, 2025, 8:00:00 AM CDT', { exact: true })).toBeVisible();
+});

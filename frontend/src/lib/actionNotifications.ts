@@ -43,6 +43,17 @@ export function showJobNotification(job: AutarkOsJob) {
 
 export function dismissActionPopup() { toast.dismiss(resultToastId); }
 
+export function createNotificationReceipt(notification: ActionNotification, jobId?: string): NotificationReceipt {
+  return {
+    // getRandomValues also works on plain HTTP home-network connections.
+    id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join(''),
+    occurredAt: new Date().toISOString(),
+    jobId,
+    ...notification,
+    severity: notificationToastMethod(notification.severity),
+  };
+}
+
 function showNotification(notification: ActionNotification, jobId?: string, activeJob = false) {
   const method = notificationToastMethod(notification.severity);
   toast[method](notification.title, {
@@ -60,14 +71,7 @@ function showNotification(notification: ActionNotification, jobId?: string, acti
   });
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ACTION_NOTIFICATION_EVENT, {
-      detail: {
-        // getRandomValues also works on plain HTTP home-network connections.
-        id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join(''),
-        occurredAt: new Date().toISOString(),
-        jobId,
-        ...notification,
-        severity: method,
-      },
+      detail: createNotificationReceipt(notification, jobId),
     }));
   }
   return notification;

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { NotificationModalHost } from '@/components/ui/sonner';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ACTION_NOTIFICATION_EVENT, OPEN_ACTIVITY_EVENT, dismissActionPopup, showActionErrorNotification, showActionNotification, showJobNotification, type NotificationReceipt } from '@/lib/actionNotifications';
+import { ACTION_NOTIFICATION_EVENT, OPEN_ACTIVITY_EVENT, createNotificationReceipt, dismissActionPopup, showActionErrorNotification, showActionNotification, showJobNotification, type NotificationReceipt } from '@/lib/actionNotifications';
 import { actionNotificationFromJob } from '@/lib/actionNotifications.logic';
 import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
 import { formatLocalizedDateTime } from '@/lib/dateTime';
@@ -20,6 +20,7 @@ import type { AutarkOsAction } from '@/types/app';
 import type { AutarkOsJob } from '@/types/jobs';
 
 const historyQueryKey = ['activity', 'notifications'];
+const dismissedRecommendationsKey = 'autark-os:dismissed-recommendations';
 type UnsavedReceipt = NotificationReceipt & { failed?: boolean };
 const NotificationContext = createContext<ReturnType<typeof useNotificationState> | null>(null);
 
@@ -28,6 +29,14 @@ function useNotificationState() {
   const jobs = useAutarkOsJobsQuery();
   const recommendation = useRecommendedActionQuery();
   const [unsaved, setUnsaved] = useState<UnsavedReceipt[]>([]);
+  const [dismissed, setDismissed] = useState<Record<string, string>>(() => {
+    try {
+      const stored: unknown = JSON.parse(localStorage.getItem(dismissedRecommendationsKey) || '{}');
+      return stored && typeof stored === 'object' && !Array.isArray(stored)
+        ? Object.fromEntries(Object.entries(stored).filter(([, value]) => typeof value === 'string')) : {};
+    } catch { return {}; }
+  });
+  const [dismissalSessionOnly, setDismissalSessionOnly] = useState(false);
   const previousJobs = useRef(new Map<string, string>());
 
   const saveReceipt = useCallback(async (receipt: NotificationReceipt) => {
@@ -61,7 +70,21 @@ function useNotificationState() {
     }
   }, [jobs.data]);
 
-  return { jobs, recommendation, unsaved, saveReceipt };
+  function dismissRecommendation() {
+    const current = recommendation.data;
+    if (!current) return;
+    const next = { ...dismissed, [current.id]: JSON.stringify(current) };
+    setDismissed(next);
+    try {
+      localStorage.setItem(dismissedRecommendationsKey, JSON.stringify(next));
+      setDismissalSessionOnly(false);
+    } catch { setDismissalSessionOnly(true); }
+    void saveReceipt(createNotificationReceipt({
+      severity: current.severity, title: current.title, message: current.body, sticky: false,
+    }));
+  }
+
+  return { jobs, recommendation, unsaved, saveReceipt, dismissed, dismissRecommendation, dismissalSessionOnly };
 }
 
 export function AppNotificationsProvider({ children }: { children: ReactNode }) {
@@ -72,7 +95,7 @@ export function AppNotificationsProvider({ children }: { children: ReactNode }) 
 export function NotificationCenterPopover({ compact = false }: { compact?: boolean }) {
   const state = useContext(NotificationContext);
   if (!state) throw new Error('Activity requires AppNotificationsProvider');
-  const { jobs, recommendation, unsaved, saveReceipt } = state;
+  const { jobs, recommendation, unsaved, saveReceipt, dismissed, dismissRecommendation, dismissalSessionOnly } = state;
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('now');
   const [runningAction, setRunningAction] = useState(false);
@@ -86,7 +109,8 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
     staleTime: 0,
     refetchInterval: open && tab === 'history' ? 10_000 : false,
   });
-  const current = recommendation.data?.id !== 'no-action-needed' ? recommendation.data : null;
+  const current = recommendation.data?.id !== 'no-action-needed'
+    && dismissed[recommendation.data?.id ?? ''] !== JSON.stringify(recommendation.data) ? recommendation.data : null;
   const active = (jobs.data ?? []).filter((job) => !terminalJob(job));
   const unavailable = jobs.isError || recommendation.isError;
   const checking = jobs.isPending || recommendation.isPending;
@@ -132,7 +156,7 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
     ...(history.data ?? []).map((item) => ({ id: item.action, title: item.title, message: item.message, severity: item.level, at: item.createdAt, job: undefined as AutarkOsJob | undefined })),
     ...unsaved.filter((item) => !history.data?.some((saved) => saved.action === `notification:${item.id}`)).map((item) => ({ id: `notification:${item.id}`, title: item.title, message: item.message, severity: item.severity, at: item.occurredAt, job: undefined as AutarkOsJob | undefined })),
     ...(jobs.data ?? []).filter(terminalJob).map((job) => ({ ...actionNotificationFromJob(job), id: job.jobId, at: job.updatedAt, job })),
-  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 100);
+  ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 100);
 
   return <Popover modal open={open} onOpenChange={(next) => { setOpen(next); if (next) dismissActionPopup(); }}>
     <PopoverTrigger asChild>
@@ -158,15 +182,27 @@ export function NotificationCenterPopover({ compact = false }: { compact?: boole
         <TabsContent value="now" className="min-h-0 overflow-y-auto overscroll-contain">
           {checking && <p className="py-4 text-xs text-muted-foreground" role="status">Checking activity…</p>}
           {unavailable && <div role="alert" className="py-3 text-xs"><p>Current activity is unavailable. Last known status may be out of date.</p><Button size="sm" variant="ghost" disabled={jobs.isFetching || recommendation.isFetching} onClick={() => { void jobs.refetch(); void recommendation.refetch(); }}>Retry status</Button></div>}
-          {current && <section aria-label="Action needed" className="flex gap-2 py-3"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-200" /><div className="min-w-0 flex-1"><p className="text-xs font-medium">{current.title}</p><details className="mt-1 text-xs text-muted-foreground"><summary className="cursor-pointer">Details</summary><p className="my-2 leading-relaxed">{current.body}</p></details>{current.primaryAction && <Button size="sm" variant="outline" className="mt-2 text-xs" disabled={current.primaryAction.disabled || runningAction} title={current.primaryAction.reason || undefined} onClick={() => void runAction(current.primaryAction!)}>{runningAction ? 'Starting…' : current.primaryAction.label}</Button>}{current.primaryAction?.disabled && <p className="mt-1 text-xs text-muted-foreground">{current.primaryAction.reason || 'This action is currently unavailable.'}</p>}</div></section>}
+          {current && <section aria-label="Action needed" className="flex gap-2 py-3">
+            <ResultIcon severity={current.severity} />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium">{current.title}</p>
+              <details className="mt-1 text-xs text-muted-foreground"><summary className="cursor-pointer">Details</summary><p className="my-2 leading-relaxed">{current.body}</p></details>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {current.primaryAction && <Button size="sm" variant="outline" className="text-xs" disabled={current.primaryAction.disabled || runningAction} title={current.primaryAction.reason || undefined} onClick={() => void runAction(current.primaryAction!)}>{runningAction ? 'Starting…' : current.primaryAction.label}</Button>}
+                <Button size="sm" variant="ghost" className="text-xs" disabled={runningAction} onClick={dismissRecommendation}>Dismiss</Button>
+              </div>
+              {current.primaryAction?.disabled && <p className="mt-1 text-xs text-muted-foreground">{current.primaryAction.reason || 'This action is currently unavailable.'}</p>}
+            </div>
+          </section>}
+          {dismissalSessionOnly && <p role="status" className="py-2 text-xs text-muted-foreground">Browser storage is unavailable. Dismissals last until you reload.</p>}
           {active.map((job) => <div key={job.jobId} className="flex gap-2 border-t border-border py-3"><Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-primary motion-reduce:animate-none" /><div className="min-w-0"><p className="text-xs font-medium">{jobTypeLabel(job.type)}{job.subjectId ? ` · ${job.subjectId}` : ''}</p><p className="mt-1 text-xs text-muted-foreground">{job.status === 'queued' ? 'Queued' : currentJobStepText(job, 'Working')}</p><JobSteps job={job} /></div></div>)}
-          {!checking && !unavailable && !current && active.length === 0 && <p className="flex items-center gap-2 py-5 text-xs text-muted-foreground"><Check className="size-4" />Nothing needs your attention.</p>}
+          {!checking && !unavailable && !current && active.length === 0 && <p className="flex items-center gap-2 py-5 text-xs text-muted-foreground"><Check className="size-4" />{recommendation.data?.id === 'no-action-needed' ? 'Nothing needs your attention.' : 'No new notices. Dismissed notices are in History.'}</p>}
         </TabsContent>
         <TabsContent value="history" className="min-h-0 overflow-y-auto overscroll-contain">
           {(history.isPending || jobs.isPending) && <p role="status" className="py-3 text-xs text-muted-foreground">Loading history…</p>}
           {(history.isError || jobs.isError) && <div role="alert" className="py-2 text-xs"><p>History is incomplete. Showing available results.</p><Button size="sm" variant="ghost" onClick={() => { void history.refetch(); void jobs.refetch(); }}>Retry history</Button></div>}
           {unsaved.some((item) => item.failed) && <div role="alert" className="py-2 text-xs"><p>Some results are only in this session. Keep this page open until they’re saved.</p><Button size="sm" variant="ghost" onClick={() => unsaved.filter((item) => item.failed).forEach((item) => void saveReceipt(item))}>Retry saving</Button></div>}
-          {rows.map((item) => <details key={item.id} className="group border-b border-border last:border-0"><summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 py-2 text-xs [&::-webkit-details-marker]:hidden"><ResultIcon severity={item.severity} /><span className="min-w-0 flex-1">{item.title}</span><time dateTime={item.at} className="shrink-0 text-[10px] text-muted-foreground">{formatLocalizedDateTime(item.at)}</time><ChevronRight className="size-3 shrink-0 group-open:rotate-90" /></summary><div className="space-y-2 pb-3 pl-5 text-xs text-muted-foreground"><p className="break-words leading-relaxed">{item.message || item.title}</p>{item.job && <><p>{item.job.status}{item.job.subjectId ? ` · ${item.job.subjectId}` : ''}</p><JobSteps job={item.job} /></>}</div></details>)}
+          {rows.map((item) => <details key={item.id} className="group border-b border-border last:border-0"><summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 py-2 text-xs [&::-webkit-details-marker]:hidden"><ResultIcon severity={item.severity} /><span className="min-w-0 flex-1">{item.title}</span><time dateTime={item.at} className="shrink-0 text-[10px] text-muted-foreground">{formatLocalizedDateTime(item.at)}</time><ChevronRight className="size-3 shrink-0 group-open:rotate-90" /></summary><div className="space-y-2 pb-3 pl-5 text-xs text-muted-foreground"><p>{new Date(item.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'long' })}</p><p className="break-words leading-relaxed">{item.message || item.title}</p>{item.job && <><p>{item.job.status}{item.job.subjectId ? ` · ${item.job.subjectId}` : ''}</p><JobSteps job={item.job} /></>}</div></details>)}
           {!history.isPending && !jobs.isPending && !history.isError && !jobs.isError && rows.length === 0 && <p className="py-4 text-xs text-muted-foreground">No history yet.</p>}
         </TabsContent>
       </Tabs>
