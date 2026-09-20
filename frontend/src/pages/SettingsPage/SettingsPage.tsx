@@ -82,7 +82,6 @@ function SettingsPage({
     continueNavigation,
     copy,
     copied,
-    configureBackupDestination,
     doctor,
     draft,
     dirty,
@@ -156,15 +155,12 @@ function SettingsPage({
         <SettingsPanelBySection
           advancedChecks={advancedChecks}
           apps={appState.freshness.hasUsableData ? appState.applications.flatMap((application) => application.relationship === 'managed' && application.runtime ? [application.runtime] : []) : null}
-          backupDestination={state.backupDestination}
-          backupSchedule={state.backupSchedule}
           copied={copied}
           doctor={doctor}
           draft={draft}
           key={sectionId}
           metrics={state.metrics}
           onCopy={copy}
-          onConfigureBackupDestination={configureBackupDestination}
           onUpdate={updateDraft}
           requiredChecks={requiredChecks}
           sectionId={sectionId}
@@ -201,7 +197,7 @@ function SettingsPage({
           <div>
             <p className="text-xs font-black uppercase tracking-normal text-cyan-200">Settings</p>
             <h1 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">Autark-OS controls</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, managed-app defaults, backups, and advanced host details. Changes apply when you save them.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Save appliance preferences here. Backup location changes use their own Apply location action.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <SettingsFeedback dirty={dirty} loadError={loadError} saveError={saveError} onRefresh={requestRefresh} />
@@ -279,7 +275,7 @@ function SettingsPage({
         <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
           <AlertDialogHeader>
             <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">Refreshing reloads the saved appliance settings and removes the edits on this page.</AlertDialogDescription>
+            <AlertDialogDescription className="text-slate-400">Refreshing reloads saved settings and discards unsaved edits. Applied backup location changes are not undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={refreshing}>Keep editing</AlertDialogCancel>
@@ -292,7 +288,7 @@ function SettingsPage({
         <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100">
           <AlertDialogHeader>
             <AlertDialogTitle>Leave without saving?</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">Your settings edits have not been saved. Keep editing or discard them before leaving this page.</AlertDialogDescription>
+            <AlertDialogDescription className="text-slate-400">Your settings edits have not been saved. Discarding them does not undo applied backup location changes.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
@@ -304,7 +300,7 @@ function SettingsPage({
         <AlertDialogContent className="border-orange-400/30 bg-slate-950 text-slate-100 sm:!max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Save settings before closing?</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">Your changes have not been saved yet.</AlertDialogDescription>
+            <AlertDialogDescription className="text-slate-400">Your settings edits have not been saved. Discarding them does not undo applied backup location changes.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep editing</AlertDialogCancel>
@@ -416,7 +412,7 @@ function SettingsWorkbench({
         </div>
 
         <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-sky-300/15 bg-slate-950/30 px-4 py-3 sm:px-5">
-          <p className="text-xs text-sky-100/55">{saveError ? 'Save failed. Your edits are still here.' : dirty ? 'Changes apply to this appliance after saving.' : 'All appliance settings are saved.'}</p>
+          <p className="text-xs text-sky-100/55">{saveError ? 'Save failed. Your edits are still here.' : dirty ? 'Unsaved settings edits' : 'No unsaved settings'}{activeGroupId === 'backups' && <span className="mt-1 block">Backup location is applied separately.</span>}</p>
           <DisabledAction disabled={!dirty || saving} reason={saving ? 'Autark-OS is already saving these settings.' : 'Make a change before saving settings.'}>
             <ProjectPrimaryButton disabled={!dirty || saving} onClick={onSave} size="sm" type="button">{saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}{saving ? 'Saving' : 'Save changes'}</ProjectPrimaryButton>
           </DisabledAction>

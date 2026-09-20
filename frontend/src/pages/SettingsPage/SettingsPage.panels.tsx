@@ -1,7 +1,11 @@
-import { AlertTriangle, CheckCircle2, Copy, HelpCircle } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, Copy, HardDrive, HelpCircle, Loader2 } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import { apiErrorMessage } from '@/api/httpClient';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { LocalizedDateTime } from '@/components/autark-os/LocalizedDateTime';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Popover,
   PopoverContent,
@@ -22,8 +26,9 @@ import { Switch } from '@/components/ui/switch';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { useBackupReportRepository, useConfigureBackupDestinationMutation } from '@/repositories/backupRepository';
 import type { AppRuntimeView, InstallSettings } from '@/types/app';
-import type { BackupDestination, BackupSettingsSummary } from '@/types/backup';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupCheck, SystemSetupStatus } from '@/types/system';
 import type { SettingsSection } from './SettingsPage.sections';
 
@@ -79,14 +84,11 @@ type SystemPanelProps = {
 export type SettingsPanelBySectionProps = {
   advancedChecks: SystemSetupCheck[];
   apps: AppRuntimeView[] | null;
-  backupDestination: BackupDestination | null;
-  backupSchedule: BackupSettingsSummary | null;
   copied: string | null;
   doctor: SystemDoctorStatus | null;
   draft: ProjectSettings;
   metrics: SystemMetrics | null;
   onCopy: (value: string, id: string) => void;
-  onConfigureBackupDestination: (path: string) => Promise<void>;
   onUpdate: (update: Partial<ProjectSettings>) => void;
   requiredChecks: SystemSetupCheck[];
   sectionId: SettingsSection;
@@ -94,7 +96,7 @@ export type SettingsPanelBySectionProps = {
   version: ProjectVersionInfo | null;
 };
 
-export function SettingsPanelBySection({ advancedChecks, apps, backupDestination, backupSchedule, copied, doctor, draft, metrics, onConfigureBackupDestination, onCopy, onUpdate, requiredChecks, sectionId, setup, version }: SettingsPanelBySectionProps) {
+export function SettingsPanelBySection({ advancedChecks, apps, copied, doctor, draft, metrics, onCopy, onUpdate, requiredChecks, sectionId, setup, version }: SettingsPanelBySectionProps) {
   switch (sectionId) {
     case 'general':
       return <GeneralPanel draft={draft} onUpdate={onUpdate} />;
@@ -103,7 +105,7 @@ export function SettingsPanelBySection({ advancedChecks, apps, backupDestination
     case 'applications':
       return <ApplicationsPanel apps={apps} draft={draft} onUpdate={onUpdate} />;
     case 'backups':
-      return <BackupsPanel apps={apps} backupDestination={backupDestination} backupSchedule={backupSchedule} draft={draft} onConfigureBackupDestination={onConfigureBackupDestination} onUpdate={onUpdate} />;
+      return <BackupsPanel apps={apps} draft={draft} runtimeRoot={metrics?.runtimeRoot} onUpdate={onUpdate} />;
     case 'storage':
       return <StoragePanel metrics={metrics} />;
     case 'network':
@@ -166,32 +168,35 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
   );
 }
 
-function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfigureBackupDestination, onUpdate }: PanelProps & { apps: AppRuntimeView[] | null; backupDestination: BackupDestination | null; backupSchedule: BackupSettingsSummary | null; onConfigureBackupDestination: (path: string) => Promise<void> }) {
+function BackupsPanel({ apps, draft, runtimeRoot, onUpdate }: PanelProps & { apps: AppRuntimeView[] | null; runtimeRoot?: string }) {
   const protectedApps = apps?.filter((app) => app.backupProtection === 'protected_by_restore_point').length;
-  const [destinationPath, setDestinationPath] = useState(backupDestination?.configuredPath || '');
-  const [externalDestinationOpen, setExternalDestinationOpen] = useState(backupDestination?.kind === 'external');
-  const [updatingDestination, setUpdatingDestination] = useState(false);
-  useEffect(() => setDestinationPath(backupDestination?.configuredPath || ''), [backupDestination?.configuredPath]);
+  const backups = useBackupReportRepository();
+  const backupDestination = backups.report?.destination;
+  const backupSchedule = backups.report?.settings;
+  const configureDestination = useConfigureBackupDestinationMutation();
+  const [locationDraft, setLocationDraft] = useState<{ kind: string; path: string } | null>(null);
+  const restoreLocationFocus = useRef(false);
+  const localPath = runtimeRoot ? `${runtimeRoot.replace(/\/+$/, '')}/backups` : '';
   const external = backupDestination?.kind === 'external';
-  const destinationReady = backupDestination?.status === 'ready';
-
-  useEffect(() => {
-    if (external) {
-      setExternalDestinationOpen(true);
-    }
-  }, [external]);
+  const requestedPath = locationDraft?.kind === 'internal' ? localPath : locationDraft?.path.trim() || '';
+  const blockedReason = backups.error || !backupDestination ? 'Check the current backup location before changing it.'
+    : !requestedPath ? 'Choose a mounted folder, or check the local runtime path.'
+    : requestedPath === backupDestination.configuredPath && backupDestination.status === 'ready' ? 'Choose a different location before applying.' : '';
 
   async function updateDestination() {
-    setUpdatingDestination(true);
+    if (blockedReason || configureDestination.isPending) return;
     try {
-      await onConfigureBackupDestination(destinationPath.trim());
-    } finally {
-      setUpdatingDestination(false);
+      await configureDestination.mutateAsync(requestedPath);
+      restoreLocationFocus.current = true;
+      setLocationDraft(null);
+      showActionNotification({ ok: true, severity: 'success', title: 'Backup location changed', message: 'New backups will use this location. Existing backup files were not moved.' }, 'Backup location changed');
+    } catch (error) {
+      showActionErrorNotification(error, 'Backup location change could not be confirmed');
     }
   }
 
   return (
-    <SettingsGroup description="Control automatic backup behavior for all app data." title="Backups">
+    <SettingsGroup description="Schedule changes apply with Save changes. Backup location uses its own Apply location action." title="Backups">
       <SettingRow controlId="settings-automatic-backups" helpId="automaticBackupsEnabled" label="Automatic backups" note="Back up all supported app data on a schedule.">
         <Switch checked={draft.automaticBackupsEnabled} id="settings-automatic-backups" onCheckedChange={(checked) => onUpdate({ automaticBackupsEnabled: checked })} />
       </SettingRow>
@@ -204,32 +209,36 @@ function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfig
       <SettingRow controlId="settings-backup-retention" helpId="automaticBackupsEnabled" label="Retention" note="How many days automatic backups should be kept.">
         <Input className="max-w-28 border-sky-400/30 bg-slate-950 text-slate-100" id="settings-backup-retention" max={90} min={1} onChange={(event) => onUpdate({ backupRetentionDays: Number(event.target.value) })} type="number" value={draft.backupRetentionDays} />
       </SettingRow>
-      <SettingRow controlId="settings-backup-destination" helpId="automaticBackupsEnabled" label="Backup location" note="Store restore points on this device by default. An external drive adds protection if this device's runtime drive fails.">
-        <div className="grid w-full max-w-xl gap-2">
-          <p className={cn('text-xs leading-5', destinationReady ? 'text-slate-400' : 'text-amber-200')}>
-            {backupDestination?.message || 'Autark-OS has not checked a backup destination yet.'}
-          </p>
-          {backupDestination && <p className="text-xs text-slate-500">{external ? `External drive${backupDestination.mountPoint ? ` mounted at ${backupDestination.mountPoint}` : ''}.` : 'Stored on this device. It protects against app mistakes, not runtime-drive failure.'}</p>}
-          {!externalDestinationOpen && <ProjectDarkControlButton className="w-fit" onClick={() => setExternalDestinationOpen(true)} size="sm" type="button">
-            Use an external drive
-          </ProjectDarkControlButton>}
-          {externalDestinationOpen && <div className="grid gap-2 rounded-lg border border-border bg-muted/20 p-3">
-            <p className="text-sm font-medium text-foreground">External backup drive</p>
-            <p className="text-xs leading-5 text-muted-foreground">Choose a folder on a mounted drive. Autark-OS verifies that it is safe and writable before using it.</p>
-            <div className="flex flex-wrap gap-2">
-              <Input className="min-w-0 flex-1" id="settings-backup-destination" onChange={(event) => setDestinationPath(event.target.value)} placeholder="/mnt/backup-drive/autark-os-backups" value={destinationPath} />
-              <ProjectDarkControlButton disabled={!destinationPath.trim() || updatingDestination} onClick={() => void updateDestination()} size="sm" type="button">
-                {updatingDestination ? 'Checking…' : 'Use external drive'}
-              </ProjectDarkControlButton>
-            </div>
-            {!external && <ProjectDarkControlButton className="w-fit" onClick={() => setExternalDestinationOpen(false)} size="sm" type="button">
-              Keep backups on this device
-            </ProjectDarkControlButton>}
-          </div>}
-        </div>
-      </SettingRow>
-      <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={<LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule?.nextRoutineRun }} />} />
+      <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={backupSchedule ? <LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule.nextRoutineRun }} /> : backups.isLoading ? 'Checking schedule…' : 'Schedule unavailable'} />
       <ReadOnlyRow label="Apps protected" note="Installed apps with at least one completed restore point." value={apps ? `${protectedApps}/${apps.length}` : 'App information unavailable'} />
+      <section aria-label="Backup location" className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex gap-3"><HardDrive className="mt-1 size-5 text-primary" /><div><h3 className="font-semibold">Backup location</h3><p className="mt-1 text-sm">{backupDestination ? external ? 'External drive' : 'This device' : 'Location unavailable'}</p></div></div>
+          {!locationDraft && <DisabledAction disabled={!backupDestination || Boolean(backups.error)} reason="Check the current backup location before changing it.">
+            <Button ref={(button) => { if (button && restoreLocationFocus.current) { restoreLocationFocus.current = false; button.focus(); } }} variant="outline" size="sm" disabled={!backupDestination || Boolean(backups.error)} onClick={() => { configureDestination.reset(); setLocationDraft({ kind: external ? 'external' : 'internal', path: external ? backupDestination?.configuredPath || '' : '' }); }}>Manage location</Button>
+          </DisabledAction>}
+        </div>
+        <p className="text-sm text-muted-foreground">{backupDestination?.message || (backups.isLoading ? 'Checking backup location…' : 'Backup location could not be loaded.')}</p>
+        {external && <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Current folder</summary><p className="mt-2 select-text break-all font-mono text-xs">{backupDestination.configuredPath}</p></details>}
+        {Boolean(backups.error) && <p className="text-sm text-muted-foreground" role="status">Location status could not refresh. Any location shown is the last known value.</p>}
+        {(!backupDestination || Boolean(backups.error)) && <Button variant="outline" size="sm" disabled={backups.isFetching} onClick={() => void backups.refresh()}>Check location</Button>}
+        {locationDraft && <div className="space-y-4 rounded-xl border border-border bg-muted/15 p-4">
+          <div><h4 className="text-sm font-semibold">Manage location <span className="text-xs font-normal text-muted-foreground">Advanced</span></h4><p className="mt-2 text-sm text-muted-foreground">Apply location changes this immediately, separately from Save changes.</p></div>
+          <RadioGroup aria-label="New backup location" className="grid-cols-2" disabled={configureDestination.isPending} value={locationDraft.kind} onValueChange={(kind) => { configureDestination.reset(); setLocationDraft({ ...locationDraft, kind }); }}>
+            <label className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm"><RadioGroupItem value="internal" disabled={!localPath} />This device</label>
+            <label className="flex items-center gap-2 rounded-lg border border-border p-3 text-sm"><RadioGroupItem value="external" />External drive</label>
+          </RadioGroup>
+          {!localPath && <p className="text-xs text-muted-foreground">The local runtime path is unavailable. Refresh Settings before switching to this device.</p>}
+          {locationDraft.kind === 'external' && <div className="space-y-2"><label className="text-xs font-medium" htmlFor="settings-backup-destination">Folder on a mounted external drive</label><Input id="settings-backup-destination" disabled={configureDestination.isPending} value={locationDraft.path} placeholder="/mnt/backup-drive/autark-os-backups" onChange={(event) => { configureDestination.reset(); setLocationDraft({ ...locationDraft, path: event.target.value }); }} /><p className="text-xs text-muted-foreground">Autark-OS checks the drive and write access before applying.</p></div>}
+          <p className="text-sm text-muted-foreground">Only new backups use the new location. Existing backup files are not moved or deleted.{locationDraft.kind === 'internal' && ' Backups on this device do not protect against its drive failing.'}</p>
+          {configureDestination.isPending && <p className="text-xs text-muted-foreground">Closing Settings does not cancel this change.</p>}
+          {configureDestination.error && <p role="alert" className="text-sm text-destructive">{apiErrorMessage(configureDestination.error, 'The location change could not be confirmed.')} Review the current location before retrying.</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" disabled={configureDestination.isPending} onClick={() => { configureDestination.reset(); restoreLocationFocus.current = true; setLocationDraft(null); }}>Cancel location change</Button>
+            <DisabledAction disabled={Boolean(blockedReason) || configureDestination.isPending} reason={configureDestination.isPending ? 'The location is being checked and applied.' : blockedReason}><Button disabled={Boolean(blockedReason) || configureDestination.isPending} onClick={() => void updateDestination()}>{configureDestination.isPending ? <><Loader2 className="size-4 animate-spin" />Checking and applying…</> : 'Apply location'}</Button></DisabledAction>
+          </div>
+        </div>}
+      </section>
     </SettingsGroup>
   );
 }

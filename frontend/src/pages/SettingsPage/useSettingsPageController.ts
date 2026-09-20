@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { apiErrorMessage } from '@/api/httpClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
@@ -8,13 +8,11 @@ import { showActionErrorNotification, showActionNotification } from '@/lib/actio
 import { copyText } from '@/lib/copyText';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
-import type { BackupDestination, BackupSettingsSummary } from '@/types/backup';
+import { invalidateBackupQueries } from '@/repositories/backupRepository';
 import type { ProjectSettings, ProjectVersionInfo, SystemDoctorStatus, SystemMetrics, SystemSetupStatus } from '@/types/system';
 import type { SettingsGroupId } from './SettingsPage.sections';
 
 export type SettingsState = {
-  backupDestination: BackupDestination | null;
-  backupSchedule: BackupSettingsSummary | null;
   doctor: SystemDoctorStatus | null;
   metrics: SystemMetrics | null;
   projectSettings: ProjectSettings | null;
@@ -23,8 +21,6 @@ export type SettingsState = {
 };
 
 const initialSettingsState: SettingsState = {
-  backupDestination: null,
-  backupSchedule: null,
   doctor: null,
   metrics: null,
   projectSettings: null,
@@ -38,6 +34,7 @@ const initialSettingsState: SettingsState = {
  */
 export function useSettingsPageController() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { setProjectSettings } = useProjectSettings();
   const appState = useApplicationStateRepository();
   const doctorQuery = useSystemDoctorQuery();
@@ -58,20 +55,14 @@ export function useSettingsPageController() {
     else setLoading(true);
     setLoadError(null);
     try {
-      const [setup, metrics, projectSettings, version, backupReport] = await Promise.all([
+      const [setup, metrics, projectSettings, version] = await Promise.all([
         SystemAPIClient.setupStatus(),
         SystemAPIClient.metrics(),
         SystemAPIClient.settings(),
         SystemAPIClient.version(),
-        BackupAPIClient.report().catch((backupError) => {
-          console.warn('Unable to load backup destination for Settings.', backupError);
-          return null;
-        }),
       ]);
       setState((current) => ({
         ...current,
-        backupDestination: backupReport?.destination ?? null,
-        backupSchedule: backupReport?.settings ?? null,
         metrics,
         projectSettings,
         setup,
@@ -133,23 +124,6 @@ export function useSettingsPageController() {
     setDraft((current) => (current ? { ...current, ...update } : current));
   }, []);
 
-  const configureBackupDestination = useCallback(async (path: string) => {
-    try {
-      const destination = await BackupAPIClient.configureDestination(path);
-      setState((current) => ({ ...current, backupDestination: destination }));
-      await Promise.all([appState.refresh(), doctorQuery.refetch()]);
-      showActionNotification({
-        ok: true,
-        severity: 'success',
-        title: 'Backup destination updated',
-        message: destination.message,
-      }, 'Backup destination updated');
-    } catch (error) {
-      showActionErrorNotification(error, 'Backup destination could not be updated');
-      throw error;
-    }
-  }, [appState, doctorQuery]);
-
   const save = useCallback(async () => {
     if (!draft) return false;
     setSaving(true);
@@ -160,6 +134,7 @@ export function useSettingsPageController() {
       setState((current) => ({ ...current, projectSettings: saved }));
       setDraft(saved);
       setProjectSettings(saved);
+      void invalidateBackupQueries(queryClient);
       if (result.appDefaults.updatedApps > 0) {
         try {
           await appState.refresh();
@@ -182,7 +157,7 @@ export function useSettingsPageController() {
     } finally {
       setSaving(false);
     }
-  }, [appState, draft, setProjectSettings]);
+  }, [appState, draft, queryClient, setProjectSettings]);
 
   const refreshDoctor = useCallback(() => {
     void doctorQuery.refetch();
@@ -190,9 +165,10 @@ export function useSettingsPageController() {
 
   const reload = useCallback(() => {
     void load(true);
+    void invalidateBackupQueries(queryClient);
     void appState.refresh().catch(() => {});
     refreshDoctor();
-  }, [appState, load, refreshDoctor]);
+  }, [appState, load, queryClient, refreshDoctor]);
 
   const requestRefresh = useCallback(() => {
     if (dirty) {
@@ -224,7 +200,6 @@ export function useSettingsPageController() {
     continueNavigation,
     copy,
     copied,
-    configureBackupDestination,
     doctor,
     draft,
     dirty,

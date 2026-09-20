@@ -4,6 +4,10 @@ import { BackupAPIClient } from '@/api/BackupAPIClient';
 import type { BackupReport, RestorePoint } from '@/types/backup';
 import type { AutarkOsJob } from '@/types/jobs';
 import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
+import { invalidateApplicationState } from './applicationStateRepository';
+import { invalidateStorageQueries } from './storageRepository';
+import { systemQueryKeys } from './systemRepository';
+import { recommendedActionQueryKeys } from './recommendedActionRepository';
 
 export const backupQueryKeys = {
   all: ['backups'] as const,
@@ -48,6 +52,21 @@ export function useRunAppBackupMutation() {
       syncCanonicalAppMutationResult(queryClient, job);
       void invalidateBackupQueries(queryClient);
     },
+  });
+}
+
+export function useConfigureBackupDestinationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (path: string) => BackupAPIClient.configureDestination(path),
+    // Reconcile even a lost response without replacing unsaved Settings drafts.
+    onSettled: () => Promise.all([
+      invalidateBackupQueries(queryClient),
+      invalidateStorageQueries(queryClient),
+      invalidateApplicationState(queryClient),
+      queryClient.invalidateQueries({ queryKey: systemQueryKeys.all }),
+      queryClient.invalidateQueries({ queryKey: recommendedActionQueryKeys.all }),
+    ]),
   });
 }
 

@@ -112,6 +112,10 @@ public class BackupDestinationService {
             }
             return Path.of(active.configuredPath()).toAbsolutePath().normalize();
         }
+        Path internal = internalRoot();
+        if (isInside(normalized, internal)) {
+            return internal;
+        }
         for (Path previous : approvedHistory(settingsRepository.readAll())) {
             if (isInside(normalized, previous)) {
                 return previous;

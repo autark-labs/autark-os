@@ -63,6 +63,51 @@ class BackupDestinationServiceTests {
     }
 
     @Test
+    void keepsExistingArchivesReadableWhenSwitchingBetweenLocalAndExternal() throws Exception {
+        Map<String, String> settings = new HashMap<>();
+        Path external = Files.createDirectories(externalRoot().resolve("backups"));
+        BackupDestinationService service = service(settings, external);
+        Path internal = service.activeRoot();
+        Path localArchive = Files.writeString(internal.resolve("local.zip"), "local backup");
+
+        service.configure(external.toString());
+        assertThat(service.activeRoot()).isEqualTo(external);
+        assertThat(service.approvedRootForArchive(localArchive)).isEqualTo(internal);
+        assertThat(service.archiveAvailable(localArchive)).isTrue();
+        assertThat(service.archiveAvailable(internal.resolve("missing.zip"))).isFalse();
+        assertThatThrownBy(() -> service.approvedRootForArchive(internal.resolveSibling("backups-other/other.zip")))
+                .isInstanceOf(InstallationException.class);
+        assertThat(Files.readString(localArchive)).isEqualTo("local backup");
+        assertThat(external.resolve("local.zip")).doesNotExist();
+
+        Path externalArchive = Files.writeString(external.resolve("external.zip"), "external backup");
+        service.configure(internal.toString());
+        assertThat(service.current().kind()).isEqualTo("internal");
+        assertThat(service.activeRoot()).isEqualTo(internal);
+        assertThat(service.archiveAvailable(localArchive)).isTrue();
+        assertThat(service.approvedRootForArchive(externalArchive)).isEqualTo(external);
+        assertThat(service.archiveAvailable(externalArchive)).isTrue();
+        assertThat(Files.readString(externalArchive)).isEqualTo("external backup");
+        assertThat(internal.resolve("external.zip")).doesNotExist();
+        assertThatThrownBy(() -> service.approvedRootForArchive(internal.resolve("../apps/other.zip")))
+                .isInstanceOf(InstallationException.class);
+    }
+
+    @Test
+    void rejectedChangePreservesTheCurrentDestination() throws Exception {
+        Map<String, String> settings = new HashMap<>();
+        Path external = Files.createDirectories(externalRoot().resolve("backups"));
+        BackupDestinationService service = service(settings, external);
+        service.configure(external.toString());
+        Map<String, String> saved = Map.copyOf(settings);
+
+        assertThatThrownBy(() -> service.configure(tempDir.resolve("runtime/apps").toString()))
+                .isInstanceOf(InstallationException.class);
+        assertThat(settings).isEqualTo(saved);
+        assertThat(service.activeRoot()).isEqualTo(external);
+    }
+
+    @Test
     void treatsADisconnectedExternalDriveAsMissingWithoutFallingBackToInternalStorage() {
         Map<String, String> settings = new HashMap<>();
         Path missing = externalRoot().resolve("backups");
