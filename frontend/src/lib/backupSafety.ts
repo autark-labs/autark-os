@@ -4,8 +4,8 @@ const warnings = {
   restoreReplacement: 'Current app data will be replaced by the selected restore point.',
   restoreSafetyBackup: 'Autark-OS creates a safety backup of current app data before restoring.',
   restoreVerification: 'Verify this restore point before restoring if the current app data matters.',
-  storageCleanupCheckpoint: 'Autark-OS will create a safety checkpoint before removing this folder.',
-  storageCleanupScope: 'This only removes a direct child of the Autark-OS apps folder that does not match an installed app.',
+  storageCleanupCheckpoint: 'After you confirm, Autark-OS archives the declared app data, then deletes this unused folder and its contents.',
+  storageCleanupScope: 'The ZIP is kept in the backup destination’s storage-cleanup folder for manual recovery. It is not a Backups restore point and does not preserve the complete app installation. Installed app folders are left unchanged.',
 };
 
 type BackupSafetyAction = 'reinstall' | 'reset' | 'restore' | 'storage-cleanup' | string;

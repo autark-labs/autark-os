@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
@@ -114,13 +115,13 @@ public class StorageService {
                 Instant.now());
     }
 
-    public StorageModels.StorageCleanupResult cleanupOrphan(String name) {
+    public Path cleanupOrphan(String name, Consumer<Path> archiveCreated) {
         return recoveryOperations.runExclusive(
                 RecoveryOperationCoordinator.Operation.STORAGE_CLEANUP,
-                () -> cleanupOrphanUnlocked(name));
+                () -> cleanupOrphanUnlocked(name, archiveCreated));
     }
 
-    private StorageModels.StorageCleanupResult cleanupOrphanUnlocked(String name) {
+    private Path cleanupOrphanUnlocked(String name, Consumer<Path> archiveCreated) {
         String safeName = safeOrphanName(name);
         Path appsRoot = runtimeLayout.runtimeRoot().resolve("apps").toAbsolutePath().normalize();
         Path orphanPath = appsRoot.resolve(safeName).normalize();
@@ -136,8 +137,8 @@ public class StorageService {
             throw new com.autarkos.marketplace.install.InstallationException(
                     "Autark-OS will not remove this folder because its durable data placement cannot be proven. " + assessment.reason());
         }
+        boolean archived = false;
         try {
-            long removedBytes = fileOperations.directorySize(orphanPath);
             Path checkpoint = activeBackupRoot()
                     .resolve("storage-cleanup")
                     .resolve(safeName + "-before-cleanup-" + CHECKPOINT_FORMAT.format(Instant.now()) + ".zip")
@@ -145,24 +146,21 @@ public class StorageService {
                     .normalize();
             Files.createDirectories(checkpoint.getParent());
             fileOpsService.createManagedArchive(safeName, assessment.protectedPaths(), checkpoint, activeBackupRoot());
+            archived = true;
+            archiveCreated.accept(checkpoint);
             fileOperations.deleteRecursively(orphanPath);
             activityLogService.success(
                     "system",
                     "storage_cleanup",
                     "Removed unused app data",
-                    "Removed " + safeName + " after creating a safety checkpoint.",
+                    "Removed " + safeName + " after creating a manual recovery archive. This is not a Backups restore point.",
                     null);
-            return new StorageModels.StorageCleanupResult(
-                    "completed",
-                    "Removed unused app data after creating a safety checkpoint.",
-                    safeName,
-                    orphanPath.toString(),
-                    removedBytes,
-                    checkpoint.toString(),
-                    Instant.now());
+            return checkpoint;
         } catch (IOException exception) {
             activityLogService.error("system", "storage_cleanup", "Storage cleanup failed", exception.getMessage(), null, exception);
-            throw new com.autarkos.marketplace.install.InstallationException("Autark-OS could not clean up that folder.", exception);
+            throw new com.autarkos.marketplace.install.InstallationException(archived
+                    ? "The recovery archive was saved, but folder removal did not finish. Review Storage before retrying; the archive location is in Activity's job steps."
+                    : "The recovery archive could not be created. The folder was not removed. Check backup destination space and permissions before retrying.", exception);
         }
     }
 

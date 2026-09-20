@@ -470,10 +470,10 @@ function CleanupWorkspace({ onReviewOrphan, orphans, showAdvancedMetrics }: { on
   return (
     <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(17rem,0.65fr)]">
       <Surface className="p-4" tone="inset">
-        <WorkspaceHeading description="Autark-OS creates a safety checkpoint before removing unused app folders." icon={FolderSearch} title="Unused data" />
+        <WorkspaceHeading description="Review unused folders before archiving their declared app data and removing them." icon={FolderSearch} title="Unused data" />
         <div className="mt-4 grid gap-2">{orphans.length ? orphans.map((orphan) => <DetailedOrphanRow key={orphan.path} onReview={() => onReviewOrphan(orphan)} orphan={orphan} showAdvancedMetrics={showAdvancedMetrics} />) : <ProjectInset className="border-emerald-300/20 bg-emerald-400/5 text-sm text-emerald-100/75">Autark-OS did not find unused app data.</ProjectInset>}</div>
       </Surface>
-      <Surface className="p-4" tone="panel"><WorkspaceHeading description="Cleanup keeps app data safe by default." icon={ShieldCheck} title="Safe flow" /><div className="mt-4 grid gap-2"><DetailFact label="1" value="Review contents" /><DetailFact label="2" value="Create checkpoint" /><DetailFact label="3" value="Confirm cleanup" /></div></Surface>
+      <Surface className="p-4" tone="panel"><WorkspaceHeading description="Archives require manual recovery; they are not Backups restore points." icon={ShieldCheck} title="Cleanup steps" /><div className="mt-4 grid gap-2"><DetailFact label="1" value="Review and confirm" /><DetailFact label="2" value="Archive declared app data" /><DetailFact label="3" value="Remove unused folder" /></div></Surface>
     </section>
   );
 }

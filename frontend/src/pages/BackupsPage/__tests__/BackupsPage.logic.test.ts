@@ -26,12 +26,14 @@ test('activeBackupJobs recovers only in-progress backup jobs in newest order', (
     { jobId: 'verify-done', type: 'backup_verify', status: 'succeeded', updatedAt: '2026-06-20T10:02:00Z' },
     { jobId: 'restore-new', type: 'backup_restore', status: 'queued', updatedAt: '2026-06-20T10:03:00Z' },
     { jobId: 'backup-failed', type: 'backup', status: 'failed', updatedAt: '2026-06-20T10:04:00Z' },
+    { jobId: 'cleanup', type: 'storage_cleanup', status: 'running', updatedAt: '2026-06-20T10:05:00Z' },
   ];
 
   const active = activeBackupJobs(jobs);
 
-  assert.deepEqual(active.map((job) => job.jobId), ['restore-new', 'backup-old']);
-  assert.equal(selectActiveBackupJob(jobs).jobId, 'restore-new');
+  assert.deepEqual(active.map((job) => job.jobId), ['cleanup', 'restore-new', 'backup-old']);
+  assert.equal(selectActiveBackupJob(jobs).jobId, 'cleanup');
+  assert.equal(backupJobRunningId({ type: 'storage_cleanup', subjectId: 'old-app' }), 'cleanup-old-app');
   assert.equal(backupJobRunningId({ type: 'backup_restore', subjectId: '42:vaultwarden' }), 'restore-42');
   assert.equal(backupJobRunningId({ type: 'backup_verify', subjectId: '42' }), 'verify-42');
   assert.equal(backupJobRunningId({ type: 'backup', subjectId: 'vaultwarden' }), 'app-vaultwarden');
@@ -39,6 +41,9 @@ test('activeBackupJobs recovers only in-progress backup jobs in newest order', (
 });
 
 test('backup operations use one conflict matrix for durable job state', () => {
+  assert.equal(backupOperationForJob({ type: 'storage_cleanup', subjectId: 'old-app' }), 'cleanup');
+  assert.equal(backupOperationAvailability('app_backup', ['cleanup']).disabled, true);
+  assert.equal(backupOperationAvailability('restore', ['cleanup']).disabled, true);
   assert.equal(backupOperationForJob({ type: 'backup_restore', subjectId: '12:vaultwarden' }), 'restore');
   assert.equal(backupOperationForJob({ type: 'backup_verify', subjectId: '12' }), 'verify');
   assert.equal(backupOperationForJob({ type: 'backup', subjectId: '__routine__' }), 'routine_backup');

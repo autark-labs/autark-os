@@ -52,14 +52,14 @@ export function backupStatusLabel(status: string) {
   return status.replaceAll('_', ' ');
 }
 
-const BACKUP_JOB_TYPES = ['backup', 'backup_verify', 'backup_restore'];
+const BACKUP_JOB_TYPES = ['backup', 'backup_verify', 'backup_restore', 'storage_cleanup'];
 
 export type BackupOperation = 'app_backup' | 'cleanup' | 'full_backup' | 'restore' | 'routine_backup' | 'verify';
 export type BackupOperationAvailability = { disabled: boolean; reason: string };
 
 const backupOperationLabels: Record<BackupOperation, string> = {
   app_backup: 'app backup',
-  cleanup: 'backup cleanup',
+  cleanup: 'data cleanup',
   full_backup: 'full checkpoint',
   restore: 'restore',
   routine_backup: 'routine backup',
@@ -77,6 +77,7 @@ export const backupOperationConflicts: Record<BackupOperation, readonly BackupOp
 };
 
 export function backupOperationForJob(job?: Pick<AutarkOsJob, 'subjectId' | 'type'> | null): BackupOperation | null {
+  if (job?.type === 'storage_cleanup') return 'cleanup';
   if (job?.type === 'backup_restore') return 'restore';
   if (job?.type === 'backup_verify') return 'verify';
   if (job?.type !== 'backup') return null;
@@ -87,6 +88,7 @@ export function backupOperationForJob(job?: Pick<AutarkOsJob, 'subjectId' | 'typ
 
 export function backupOperationForRunningId(runningId: string | null): BackupOperation | null {
   if (!runningId) return null;
+  if (runningId.startsWith('cleanup-')) return 'cleanup';
   if (runningId.startsWith('restore-')) return 'restore';
   if (runningId.startsWith('verify-')) return 'verify';
   if (runningId === 'routine') return 'routine_backup';
@@ -124,6 +126,7 @@ export function selectActiveBackupJob(jobs: AutarkOsJob[] | null | undefined) {
  */
 export function backupJobRunningId(job?: Pick<AutarkOsJob, 'subjectId' | 'type'> | null) {
   const subjectId = job?.subjectId || '';
+  if (job?.type === 'storage_cleanup') return `cleanup-${subjectId}`;
   if (job?.type === 'backup_restore') {
     return `restore-${subjectId.split(':')[0] || subjectId}`;
   }

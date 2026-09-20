@@ -101,6 +101,8 @@ export function jobTypeLabel(type?: string | null) {
       return 'Settings change';
     case 'backup':
       return 'Backup';
+    case 'storage_cleanup':
+      return 'Storage cleanup';
     case 'backup_verify':
       return 'Backup verification';
     case 'backup_restore':

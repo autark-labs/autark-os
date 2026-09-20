@@ -13,7 +13,6 @@ test('storage details stay in the workspace while cleanup keeps its selected tar
   const page = source('src/pages/StoragePage/StoragePage.tsx');
   const workspace = source('src/pages/StoragePage/StorageCapacityRibbonWorkspace.tsx');
 
-  assert.match(page, /onReviewOrphan=\{\(orphan\) => orphan\.cleanupAllowed && setCleanupTarget\(orphan\)\}/);
   assert.match(workspace, /<Tabs className="min-h-0 flex-1 gap-0"/);
   assert.doesNotMatch(workspace, /StorageDetailsSheet/);
   assert.match(workspace, /value="cleanup"/);
@@ -33,16 +32,6 @@ test('storage app rows use live application artwork with a safe fallback', () =>
   assert.match(page, /preferredAppImageUrl/);
   assert.match(workspace, /function StorageAppIcon/);
   assert.match(workspace, /appIconUrlById/);
-});
-
-test('cleanup refreshes storage, application state, and activity surfaces after a checkpointed cleanup', () => {
-  const page = source('src/pages/StoragePage/StoragePage.tsx');
-
-  assert.match(page, /Safety checkpoint saved/);
-  assert.match(page, /invalidateApplicationState\(queryClient\)/);
-  assert.match(page, /systemQueryKeys\.summary/);
-  assert.match(page, /queryKey: \['monitoring'\]/);
-  assert.match(page, /Type `\{target\.name\}` to confirm/);
 });
 
 test('advanced technical paths use readable, selectable text', () => {

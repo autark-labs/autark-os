@@ -34,9 +34,12 @@ test('adds verification warning for unverified restore points', () => {
   assert.ok(warnings.some((warning) => /verify this restore point/i.test(warning)));
 });
 
-test('provides cleanup checklist for safety checkpoint copy', () => {
+test('cleanup promises only a manual archive before deletion, not a Backups restore point', () => {
   const checklist = backupSafetyChecklist('storage-cleanup');
 
-  assert.ok(checklist.includes('Autark-OS will create a safety checkpoint before removing this folder.'));
-  assert.ok(checklist.some((item) => /direct child/i.test(item)));
+  assert.match(checklist[0], /After you confirm.*archives.*then deletes/);
+  assert.match(checklist[1], /manual recovery/);
+  assert.match(checklist[1], /not a Backups restore point/);
+  assert.match(checklist[1], /does not preserve the complete app installation/);
+  assert.match(checklist[1], /Installed app folders are left unchanged/);
 });

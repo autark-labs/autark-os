@@ -144,7 +144,7 @@ class RecoveryOperationCoordinatorTests {
             assertRecoveryConflict(() -> backupService.restorePlan(42L, "vaultwarden"));
             assertRecoveryConflict(() -> backupService.verify(42L));
             assertRecoveryConflict(() -> backupService.restore(42L, "vaultwarden"));
-            assertRecoveryConflict(() -> storageService.cleanupOrphan("old-app"));
+            assertRecoveryConflict(() -> storageService.cleanupOrphan("old-app", archive -> {}));
             assertThat(backupService.runAutomaticIfDue()).isEmpty();
             assertThat(backupService.pruneRoutineRetention()).isZero();
 

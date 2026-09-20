@@ -295,6 +295,7 @@ public class AutarkOsJobService {
                 AutarkOsStates.JobType.REPAIR_APP,
                 AutarkOsStates.JobType.SAVE_APP_SETTINGS,
                 AutarkOsStates.JobType.BACKUP,
+                AutarkOsStates.JobType.STORAGE_CLEANUP,
                 AutarkOsStates.JobType.UNINSTALL_APP).contains(type)) {
             return "app:" + subject;
         }
@@ -438,6 +439,7 @@ public class AutarkOsJobService {
 
     private String interruptedMessage(AutarkOsJob job) {
         return switch (job.type()) {
+            case AutarkOsStates.JobType.STORAGE_CLEANUP -> "Storage cleanup was interrupted. Review the folder in Storage and any manual recovery archive in the backup destination's storage-cleanup folder before retrying. Cleanup was not automatically resumed.";
             case AutarkOsStates.JobType.INSTALL_APP -> "This app install was interrupted when Autark-OS stopped. Review My Apps, then retry the install if needed.";
             case AutarkOsStates.JobType.RECOVER_APP -> "This app recovery was interrupted when Autark-OS stopped. Autark-OS kept the safety checkpoint; review the app before starting recovery again.";
             case AutarkOsStates.JobType.SAVE_APP_SETTINGS -> "This settings change was interrupted. Autark-OS will try the saved recovery. If attention is still needed, use Repair in My Apps.";

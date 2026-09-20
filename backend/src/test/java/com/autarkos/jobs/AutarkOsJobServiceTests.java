@@ -68,6 +68,26 @@ class AutarkOsJobServiceTests {
     }
 
     @Test
+    void cleanupConflictsWithSameFolderLifecycleAndSharedBackups() {
+        var service = service();
+        var steps = List.of(AutarkOsJobStep.pending("archive", "Create recovery archive"));
+        var cleanup = service.start("storage_cleanup", "old-app", steps, () -> AutarkOsJobOutcome.succeeded("Removed"));
+        assertThat(service.start("storage_cleanup", "old-app", steps, () -> { throw new AssertionError("Duplicate"); }).jobId()).isEqualTo(cleanup.jobId());
+        for (String type : List.of("install_app", "recover_app", "backup", "uninstall_app")) {
+            assertThatThrownBy(() -> service.start(type, "old-app", steps, () -> AutarkOsJobOutcome.succeeded("Wrong")))
+                    .isInstanceOf(JobConflictException.class);
+        }
+        assertThatThrownBy(() -> service.start("backup", "__full__", steps, () -> AutarkOsJobOutcome.succeeded("Wrong")))
+                .isInstanceOf(JobConflictException.class);
+        assertThatThrownBy(() -> service.start("backup_restore", "42:all", steps, () -> AutarkOsJobOutcome.succeeded("Wrong")))
+                .isInstanceOf(JobConflictException.class);
+        service.cancel(cleanup.jobId());
+        service.start("install_app", "old-app", steps, () -> AutarkOsJobOutcome.succeeded("Installed"));
+        assertThatThrownBy(() -> service.start("storage_cleanup", "old-app", steps, () -> AutarkOsJobOutcome.succeeded("Wrong")))
+                .isInstanceOf(JobConflictException.class);
+    }
+
+    @Test
     void rejectsConflictingAppMutationsInsteadOfReturningAnUnrelatedJob() {
         AutarkOsJobService service = service();
         AutarkOsJob backup = service.start(
@@ -351,6 +371,7 @@ class AutarkOsJobServiceTests {
         AutarkOsJobService previousProcess = new AutarkOsJobService(repository, Runnable::run, false);
         AutarkOsJob queued = previousProcess.start("install_app", "vaultwarden", List.of(AutarkOsJobStep.pending("download", "Downloading app")), () -> AutarkOsJobOutcome.succeeded("Installed."));
         AutarkOsJob running = previousProcess.start("backup", "jellyfin", List.of(AutarkOsJobStep.pending("copy", "Copying app data")), () -> AutarkOsJobOutcome.succeeded("Backed up."));
+        AutarkOsJob cleanup = previousProcess.start("storage_cleanup", "old-app", List.of(AutarkOsJobStep.pending("remove", "Remove unused folder")), () -> { throw new AssertionError("Must not replay cleanup"); });
         previousProcess.recordProgress(running.jobId(), List.of(AutarkOsJobStep.running("copy", "Copying app data", "Copying app data.")));
 
         AutarkOsJobService restarted = new AutarkOsJobService(repository, Runnable::run, false);
@@ -362,6 +383,8 @@ class AutarkOsJobServiceTests {
         assertThat(interruptedRunning.status()).isEqualTo("failed");
         assertThat(interruptedRunning.steps()).extracting(AutarkOsJobStep::status).containsExactly("failed");
         assertThat(interruptedRunning.error().message()).contains("interrupted");
+        assertThat(restarted.findById(cleanup.jobId()).orElseThrow().error().message()).contains("Review", "not automatically resumed");
+        restarted.runQueuedJobsNow();
     }
 
     @Test

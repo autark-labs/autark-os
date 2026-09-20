@@ -1,5 +1,6 @@
 import { httpClient } from './httpClient';
-import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectSettingsSaveResult, ProjectVersionInfo, RecommendedAction, SetupProgress, SetupStatus, StorageCleanupResult, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
+import type { OnboardingState, OnboardingUpdateRequest, ProjectSettings, ProjectSettingsSaveResult, ProjectVersionInfo, RecommendedAction, SetupProgress, SetupStatus, StorageReport, SupportBundle, SupportLogLine, SupportSummary, SystemDoctorStatus, SystemMetrics, SystemSetupStatus, SystemSummary } from '@/types/system';
+import type { AutarkOsJob } from '@/types/jobs';
 
 export const SystemAPIClient = {
   async summary() {
@@ -73,7 +74,7 @@ export const SystemAPIClient = {
   },
 
   async cleanupOrphan(name: string) {
-    const response = await httpClient.post<StorageCleanupResult>(`/api/system/storage/orphans/${encodeURIComponent(name)}/cleanup`);
+    const response = await httpClient.post<AutarkOsJob>(`/api/system/storage/orphans/${encodeURIComponent(name)}/cleanup`);
     return response.data;
   },
 

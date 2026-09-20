@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Trash2 } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
@@ -13,25 +14,44 @@ import { Input } from '@/components/ui/input';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ExtensionSlot } from '@/extensions/ExtensionSlot';
 import { backupSafetyChecklist } from '@/lib/backupSafety';
-import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
+import { showActionErrorNotification, showActionNotification, showJobNotification } from '@/lib/actionNotifications';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import { copyText } from '@/lib/copyText';
-import { invalidateApplicationState, useApplicationStateRepository } from '@/repositories/applicationStateRepository';
-import { systemQueryKeys } from '@/repositories/systemRepository';
+import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
+import { activeJobs, JOB_FAMILIES, setAutarkOsJobCache, terminalJob, useAutarkOsJobQuery, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { useCleanupOrphanMutation, useStorageReportRepository } from '@/repositories/storageRepository';
 import type { AppStorageUsage, OrphanedStorage } from '@/types/system';
+import type { AutarkOsJob } from '@/types/jobs';
 import { StorageCapacityRibbonWorkspace } from './StorageCapacityRibbonWorkspace';
 import { formatStorageBytes } from './StoragePage.presentation';
 
 function StoragePage() {
-  const { showAdvancedMetrics } = useProjectSettings();
   const queryClient = useQueryClient();
+  const { showAdvancedMetrics } = useProjectSettings();
   const storage = useStorageReportRepository();
   const applicationState = useApplicationStateRepository();
   const cleanupOrphanMutation = useCleanupOrphanMutation();
   const [copiedPathId, setCopiedPathId] = useState<string | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<OrphanedStorage | null>(null);
   const [cleanupConfirmation, setCleanupConfirmation] = useState('');
+  const [cleanupJobId, setCleanupJobId] = useState<string | null>(null);
+  const cleanupOpener = useRef<HTMLElement | null>(null);
+  const jobs = useAutarkOsJobsQuery();
+  const activeOperations = activeJobs(jobs.data, [...JOB_FAMILIES.backup, ...JOB_FAMILIES.appLifecycle, 'storage_cleanup']);
+  const recoveredJob = activeOperations.find(job => job.type === 'storage_cleanup' && job.subjectId === cleanupTarget?.name);
+  const cleanupJobQuery = useAutarkOsJobQuery(cleanupJobId ?? recoveredJob?.jobId ?? null, jobs.data);
+  const cleanupJob = cleanupJobQuery.data && cleanupJobQuery.data.subjectId === cleanupTarget?.name ? cleanupJobQuery.data : null;
+  const recoveredJobId = recoveredJob?.jobId;
+  useEffect(() => {
+    if (recoveredJobId) setCleanupJobId(recoveredJobId);
+  }, [recoveredJobId]);
+  useEffect(() => {
+    // Keep the shared completion observer informed when a tracked job leaves the recent list.
+    if (cleanupJob && terminalJob(cleanupJob)) setAutarkOsJobCache(queryClient, cleanupJob);
+  }, [cleanupJob, queryClient]);
+  const cleanupBlockedReason = jobs.isPending || jobs.error || cleanupJobQuery.error
+    ? 'Cleanup status is unavailable. Retry status before starting another cleanup.'
+    : activeOperations.length ? 'Wait for the current app or recovery operation to finish before starting cleanup.' : '';
   const report = storage.report;
   const appIconUrlById = useMemo(() => storageAppIconUrls(
     report?.apps ?? [],
@@ -41,6 +61,7 @@ function StoragePage() {
 
   function refreshStorage() {
     void storage.refresh();
+    void jobs.refetch();
   }
 
   async function copyPath(value: string, id: string) {
@@ -55,24 +76,13 @@ function StoragePage() {
   }
 
   async function cleanupOrphan() {
-    if (!cleanupTarget || cleanupConfirmation !== cleanupTarget.name) return;
+    if (!cleanupTarget || cleanupConfirmation !== cleanupTarget.name || cleanupBlockedReason || cleanupOrphanMutation.isPending) return;
 
     try {
-      const result = await cleanupOrphanMutation.mutateAsync(cleanupTarget.name);
-      showActionNotification({
-        ok: true,
-        severity: 'success',
-        title: 'Unused data cleaned up',
-        message: `${result.message} Safety checkpoint saved at ${result.safetyCheckpointPath}.`,
-      }, 'Unused data cleaned up');
-      setCleanupTarget(null);
+      const job = await cleanupOrphanMutation.mutateAsync(cleanupTarget.name);
+      setCleanupJobId(job.jobId);
+      showJobNotification(job);
       setCleanupConfirmation('');
-      await Promise.all([
-        storage.refresh(),
-        invalidateApplicationState(queryClient),
-        queryClient.invalidateQueries({ queryKey: systemQueryKeys.summary }),
-        queryClient.invalidateQueries({ queryKey: ['monitoring'] }),
-      ]);
     } catch (cleanupError) {
       showActionErrorNotification(cleanupError, 'Unused data could not be cleaned up');
     }
@@ -100,7 +110,13 @@ function StoragePage() {
             appIconUrlById={appIconUrlById}
             onCopyPath={(value, id) => void copyPath(value, id)}
             onRefresh={refreshStorage}
-            onReviewOrphan={(orphan) => orphan.cleanupAllowed && setCleanupTarget(orphan)}
+            onReviewOrphan={(orphan) => {
+              if (!orphan.cleanupAllowed) return;
+              cleanupOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+              setCleanupJobId(null);
+              setCleanupConfirmation('');
+              setCleanupTarget(orphan);
+            }}
             refreshing={storage.isFetching}
             report={report}
             showAdvancedMetrics={showAdvancedMetrics}
@@ -114,13 +130,22 @@ function StoragePage() {
 
       <CleanupDialog
         confirmation={cleanupConfirmation}
+        blockedReason={cleanupBlockedReason}
+        job={cleanupJob}
         loading={cleanupOrphanMutation.isPending}
+        statusUnavailable={Boolean(jobs.error || cleanupJobQuery.error)}
+        onRetryStatus={() => {
+          void jobs.refetch();
+          if (cleanupJobId) void cleanupJobQuery.refetch();
+        }}
         onChange={setCleanupConfirmation}
         onClose={() => {
           setCleanupTarget(null);
           setCleanupConfirmation('');
         }}
         onConfirm={() => void cleanupOrphan()}
+        onReviewAgain={() => setCleanupJobId(null)}
+        onRestoreFocus={() => cleanupOpener.current?.focus()}
         target={cleanupTarget}
       />
     </>
@@ -142,20 +167,29 @@ function storageAppIconUrls(
   ]));
 }
 
-function CleanupDialog({ confirmation, loading, onChange, onClose, onConfirm, target }: {
+function CleanupDialog({ confirmation, blockedReason, job, loading, statusUnavailable, onRetryStatus, onChange, onClose, onConfirm, onReviewAgain, onRestoreFocus, target }: {
   confirmation: string;
+  blockedReason: string;
+  job: AutarkOsJob | null;
   loading: boolean;
+  statusUnavailable: boolean;
+  onRetryStatus: () => void;
   onChange: (value: string) => void;
   onClose: () => void;
   onConfirm: () => void;
+  onReviewAgain: () => void;
+  onRestoreFocus: () => void;
   target: OrphanedStorage | null;
 }) {
-  const canConfirm = Boolean(target && confirmation === target.name);
+  const canConfirm = Boolean(target && confirmation === target.name && !blockedReason);
   const safetyChecklist = backupSafetyChecklist('storage-cleanup');
 
   return (
     <Dialog open={Boolean(target)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-xl border-sky-400/30 bg-slate-900 text-slate-100">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto border-sky-400/30 bg-slate-900 text-slate-100 sm:max-w-xl" onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        onRestoreFocus();
+      }}>
         <DialogHeader>
           <DialogTitle>Clean up unused app data</DialogTitle>
           <DialogDescription className="text-slate-400">{safetyChecklist[0]}</DialogDescription>
@@ -166,18 +200,26 @@ function CleanupDialog({ confirmation, loading, onChange, onClose, onConfirm, ta
             <CleanupFact label="Path" value={target.path} />
             <CleanupFact label="Space to recover" value={formatStorageBytes(target.usedBytes)} />
             <div className="rounded-lg border border-orange-400/45 bg-orange-500/10 p-3 text-sm text-orange-200">{safetyChecklist[1]}</div>
-            <label className="text-sm font-semibold text-slate-300" htmlFor="cleanup-confirmation">Type `{target.name}` to confirm</label>
-            <Input className="border-slate-700 bg-slate-950 text-slate-100 focus:border-emerald-300/50" id="cleanup-confirmation" onChange={(event) => onChange(event.target.value)} value={confirmation} />
+            {job ? <JobProgress job={job} subjectLabel={target.name} /> : <>
+              <label className="text-sm font-semibold text-slate-300" htmlFor="cleanup-confirmation">Type `{target.name}` to confirm</label>
+              <Input disabled={loading} className="border-slate-700 bg-slate-950 text-slate-100 focus:border-emerald-300/50" id="cleanup-confirmation" onChange={(event) => onChange(event.target.value)} value={confirmation} />
+            </>}
+            {(loading || job && !terminalJob(job)) && <p className="text-sm text-muted-foreground">Closing does not cancel cleanup. Follow progress in Activity, even after leaving this page.</p>}
+            {statusUnavailable && <div className="text-sm text-muted-foreground" role="status">
+              <p>Cleanup status could not be refreshed. Any progress shown is the last known status.</p>
+              <ProjectDarkControlButton onClick={onRetryStatus} type="button">Retry status</ProjectDarkControlButton>
+            </div>}
           </div>
         )}
         <DialogFooter>
-          <ProjectDarkControlButton onClick={onClose} type="button">Cancel</ProjectDarkControlButton>
-          <DisabledAction disabled={!canConfirm || loading} reason={loading ? 'Autark-OS is already preparing this cleanup.' : 'Type the folder name exactly before cleanup can continue.'}>
+          <ProjectDarkControlButton onClick={onClose} type="button">{loading || job ? 'Close' : 'Cancel'}</ProjectDarkControlButton>
+          {job?.status === 'failed' && <ProjectDarkControlButton onClick={onReviewAgain} type="button">Review cleanup again</ProjectDarkControlButton>}
+          {!job && <DisabledAction disabled={!canConfirm || loading} reason={loading ? 'Autark-OS is already preparing this cleanup.' : blockedReason || 'Type the folder name exactly before cleanup can continue.'}>
             <ProjectWarningButton disabled={!canConfirm || loading} onClick={onConfirm} type="button">
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              Create checkpoint and remove
+              Archive and remove folder
             </ProjectWarningButton>
-          </DisabledAction>
+          </DisabledAction>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

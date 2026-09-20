@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
-import type { StorageCleanupResult, StorageReport } from '@/types/system';
+import type { StorageReport } from '@/types/system';
+import type { AutarkOsJob } from '@/types/jobs';
+import { syncCanonicalAppMutationResult } from './canonicalAppMutationRepository';
+import { invalidateApplicationState } from './applicationStateRepository';
+import { systemQueryKeys } from './systemRepository';
+import { terminalJob } from './jobRepository';
 
 export const storageQueryKeys = {
   all: ['storage'] as const,
@@ -37,12 +42,24 @@ export function useStorageReportRepository(): StorageReportRepositoryView {
 
 export function useCleanupOrphanMutation() {
   const queryClient = useQueryClient();
-  return useMutation<StorageCleanupResult, unknown, string>({
+  return useMutation<AutarkOsJob, unknown, string>({
     mutationFn: (name) => SystemAPIClient.cleanupOrphan(name),
-    onSuccess: () => invalidateStorageQueries(queryClient),
+    onSuccess: (job) => {
+      syncCanonicalAppMutationResult(queryClient, job);
+      if (terminalJob(job)) void invalidateStorageCleanupQueries(queryClient);
+    },
   });
 }
 
 export function invalidateStorageQueries(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: storageQueryKeys.all });
+}
+
+export function invalidateStorageCleanupQueries(queryClient: QueryClient) {
+  return Promise.all([
+    invalidateStorageQueries(queryClient),
+    invalidateApplicationState(queryClient),
+    ...[systemQueryKeys.summary, ['monitoring'], ['activity'], ['backups'], ['discover', 'readiness']]
+      .map(queryKey => queryClient.invalidateQueries({ queryKey })),
+  ]);
 }

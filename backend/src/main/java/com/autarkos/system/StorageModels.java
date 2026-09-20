@@ -31,16 +31,6 @@ public final class StorageModels {
             String cleanupBlockedReason) {
     }
 
-    public record StorageCleanupResult(
-            String status,
-            String message,
-            String removedName,
-            String removedPath,
-            long removedBytes,
-            String safetyCheckpointPath,
-            Instant completedAt) {
-    }
-
     public record StorageRecommendation(
             String id,
             String tone,

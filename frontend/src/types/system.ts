@@ -322,16 +322,6 @@ export type StorageReport = {
   checkedAt: string;
 };
 
-export type StorageCleanupResult = {
-  status: 'completed' | 'failed' | string;
-  message: string;
-  removedName: string;
-  removedPath: string;
-  removedBytes: number;
-  safetyCheckpointPath: string;
-  completedAt: string;
-};
-
 export type SupportCommand = {
   id: string;
   label: string;

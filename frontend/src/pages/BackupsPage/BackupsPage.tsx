@@ -245,7 +245,7 @@ function BackupsPage() {
       {report && (
         <ExtensionActionTarget actionId="review-backups" className="min-h-0 flex-1" routeId="backups">
           <BackupColumnNavigatorWorkspace
-          context={<ContextChip label={pageError ? 'Backup refresh paused' : progressError ? 'Progress unavailable' : currentActiveJob ? 'Backup in progress' : 'Backup status'} title="Backups / Current status" tone={pageError || progressError ? 'warning' : 'muted'}>
+          context={<ContextChip label={pageError ? 'Backup refresh paused' : progressError ? 'Progress unavailable' : currentActiveJob?.type === 'storage_cleanup' ? 'Cleanup in progress' : currentActiveJob ? 'Backup in progress' : 'Backup status'} title="Backups / Current status" tone={pageError || progressError ? 'warning' : 'muted'}>
             {pageError && <p>{pageError} Previous information remains visible.</p>}
             {Boolean(progressError) && <p>Job progress could not refresh. This does not mean the operation failed.</p>}
             {currentActiveJob && <JobProgress compact job={currentActiveJob} subjectLabel={backupSubjectLabel(currentActiveJob)} />}

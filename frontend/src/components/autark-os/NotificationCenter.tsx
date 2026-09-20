@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import { currentJobStepText, jobTypeLabel, terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { useRecommendedActionQuery } from '@/repositories/recommendedActionRepository';
+import { invalidateStorageCleanupQueries } from '@/repositories/storageRepository';
 import type { AutarkOsAction } from '@/types/app';
 import type { AutarkOsJob } from '@/types/jobs';
 
@@ -66,9 +67,12 @@ function useNotificationState() {
     for (const job of jobs.data ?? []) {
       const previous = previousJobs.current.get(job.jobId);
       previousJobs.current.set(job.jobId, job.status);
-      if ((previous === 'queued' || previous === 'running') && terminalJob(job)) showJobNotification(job);
+      if ((previous === 'queued' || previous === 'running') && terminalJob(job)) {
+        if (job.type === 'storage_cleanup') void invalidateStorageCleanupQueries(queryClient);
+        showJobNotification(job);
+      }
     }
-  }, [jobs.data]);
+  }, [jobs.data, queryClient]);
 
   function dismissRecommendation() {
     const current = recommendation.data;

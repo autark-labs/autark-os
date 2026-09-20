@@ -94,6 +94,7 @@ public final class AutarkOsStates {
         public static final String BACKUP = "backup";
         public static final String BACKUP_VERIFY = "backup_verify";
         public static final String BACKUP_RESTORE = "backup_restore";
+        public static final String STORAGE_CLEANUP = "storage_cleanup";
         public static final String UNINSTALL_APP = "uninstall_app";
         public static final String SAVE_APP_SETTINGS = "save_app_settings";
 
