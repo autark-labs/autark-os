@@ -1,8 +1,10 @@
+import type { ReactNode } from 'react';
 import { AppWindow, TriangleAlert } from 'lucide-react';
 import { Surface } from '@/components/primitives/Surface';
 import { cn } from '@/lib/utils';
 
 type AppsPageHeaderProps = {
+  children?: ReactNode;
   attentionCount: number;
   managedCount: number;
 };
@@ -12,7 +14,7 @@ const metrics = [
   { key: 'attention', label: 'Needs review', icon: TriangleAlert },
 ] as const;
 
-export function AppsPageHeader({ attentionCount, managedCount }: AppsPageHeaderProps) {
+export function AppsPageHeader({ attentionCount, managedCount, children }: AppsPageHeaderProps) {
   const values = { attention: attentionCount, managed: managedCount };
 
   return (
@@ -27,7 +29,8 @@ export function AppsPageHeader({ attentionCount, managedCount }: AppsPageHeaderP
             <p className="m-0 text-sm text-sky-100/70">Open, manage, and monitor apps installed by Autark-OS.</p>
           </div>
         </div>
-        <div className="grid shrink-0 grid-cols-2 gap-2 sm:min-w-[16rem]">
+        <div className="flex min-h-10 flex-wrap items-center justify-end gap-2">
+          {children}
           {metrics.map(({ icon: Icon, key, label }) => (
             <div
               className={cn(

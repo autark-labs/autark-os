@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { apiErrorMessage } from '@/api/httpClient';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageShell } from '@/components/layout/PageShell';
@@ -33,7 +34,6 @@ function MonitoringPage() {
   const [category, setCategory] = useState(
     searchParams.get('category') === 'pro' ? 'pro' : 'all',
   );
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const filters = useMemo(() => ({
     level: level === 'all' ? undefined : level,
@@ -42,7 +42,7 @@ function MonitoringPage() {
   }), [category, level]);
   const monitoring = useMonitoringRepository(filters);
   const diagnosticsMutation = useMonitoringDiagnosticsMutation();
-  const error = actionError ?? (monitoring.error ? apiErrorMessage(monitoring.error, 'Monitoring data could not be loaded.') : null);
+  const error = (monitoring.error ? apiErrorMessage(monitoring.error, 'Monitoring data could not be loaded.') : null);
 
   function changeCategory(value: string) {
     setCategory(value);
@@ -55,7 +55,6 @@ function MonitoringPage() {
   }
 
   async function exportDiagnostics() {
-    setActionError(null);
     try {
       const diagnostics = await diagnosticsMutation.mutateAsync(60);
       const blob = new Blob([JSON.stringify(diagnostics, null, 2)], { type: 'application/json' });
@@ -67,8 +66,9 @@ function MonitoringPage() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
+      showActionNotification({ ok: true, severity: 'success', title: 'Diagnostics exported' });
     } catch (exportError) {
-      setActionError(apiErrorMessage(exportError, 'Monitoring diagnostics could not be exported.'));
+      showActionErrorNotification(exportError, 'Monitoring diagnostics could not be exported');
     }
   }
 
@@ -84,9 +84,10 @@ function MonitoringPage() {
       contained
       contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
     >
-      {error && <MonitoringErrorState message={error} onRetry={() => void monitoring.refresh()} />}
+
       <ExtensionActionTarget actionId="review-activity" className="min-h-0 flex-1" routeId="activity">
-        <MonitoringActivityWorkspace
+        {error && !monitoring.hasUsableData ? <PageLoadError model={{ title: 'Activity is unavailable', message: error }} onRetry={() => void monitoring.refresh()} /> : <MonitoringActivityWorkspace
+          refreshError={error}
           activity={monitoring.activity}
         advancedMetrics={showAdvancedMetrics ? (
           <Suspense fallback={<MonitoringChartsFallback />}>
@@ -118,8 +119,8 @@ function MonitoringPage() {
         reliability={monitoring.reliability}
         showAdvancedMetrics={showAdvancedMetrics}
         timeZone={timeZone}
-          updatedAt={appState.updatedAt ?? monitoring.updatedAt}
-        />
+          updatedAt={monitoring.updatedAt}
+        />}
       </ExtensionActionTarget>
     </PageShell>
   );
@@ -138,8 +139,5 @@ function MonitoringChartsFallback() {
   );
 }
 
-function MonitoringErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <PageLoadError className="shrink-0 px-4 py-3" model={{ message, title: 'Monitoring data could not refresh' }} onRetry={onRetry} />;
-}
 
 export default MonitoringPage;

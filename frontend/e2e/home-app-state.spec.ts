@@ -24,7 +24,9 @@ test('Home still explains an unavailable system summary on mobile', async ({ pag
   await installMockApi(page, 'idle');
   await page.route('**/api/system-summary', (route) => route.fulfill({ status: 503, json: { message: 'Summary offline' } }));
   await page.goto('/home');
-  await expect(page.getByText('Some live Home information is unavailable: Summary offline', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Status unavailable', exact: true }).click();
+  await expect(page.getByText('Summary offline', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('region', { name: 'Your Apps' })).toBeVisible();
 });
 

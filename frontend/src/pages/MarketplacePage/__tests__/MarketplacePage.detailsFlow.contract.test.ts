@@ -62,16 +62,6 @@ test('Discover keeps details anchored to the persistent rail and reserves the sh
   assert.match(jobTracking, /useDiscoverJobQuery\(activeInstallJobId\)/);
 });
 
-test('Discover terminal install feedback can be dismissed without hiding active install progress', () => {
-  const page = source('src/pages/MarketplacePage/MarketplacePage.tsx');
-
-  assert.match(page, /const \[dismissedInstallJobId, setDismissedInstallJobId\]/);
-  assert.match(page, /dismissed=\{dismissedInstallJobId === installJob\?\.jobId\}/);
-  assert.match(page, /aria-label="Dismiss install result"/);
-  assert.match(page, /if \(dismissed \|\| !installJob \|\| installJob\.subjectId !== selectedAppId\)/);
-  assert.match(page, /if \(!terminalJob\(installJob\)\) \{/);
-});
-
 test('Discover install confirmation uses the approved plan review and requires explicit confirmation', () => {
   const wizard = source('src/pages/MarketplacePage/MarketplaceInstallWizard.tsx');
 

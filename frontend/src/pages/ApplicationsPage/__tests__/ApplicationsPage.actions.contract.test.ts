@@ -131,8 +131,6 @@ test('applications page opens canonical app review without a second observed-ser
 
   assert.match(page, /reviewApplications = useMemo\([\s\S]*application\.relationship === 'recovery_required'/);
   assert.match(page, /reviewedApplication = appState\.applications\.find[\s\S]*application\.relationship === 'blocked'/);
-  assert.match(page, /<ApplicationReviewPrompt/);
-  assert.match(page, /reviewApplications\[0\]\?\.primaryAction\.href/);
   assert.match(page, /<ApplicationReviewDialog/);
   assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);
   assert.doesNotMatch(page, /reviewNextButtonLabel|setFilter\('needs_review'\)/);

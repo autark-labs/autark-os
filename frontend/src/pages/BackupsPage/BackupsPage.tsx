@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiErrorMessage } from '@/api/httpClient';
+import { ContextChip } from '@/components/autark-os/ContextChip';
+import { Button } from '@/components/ui/button';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
@@ -48,7 +50,6 @@ function BackupsPage() {
   const [running, setRunning] = useState<string | null>(null);
   const [restoreFlow, setRestoreFlow] = useState<RestoreFlowState | null>(null);
   const [activeJob, setActiveJob] = useState<AutarkOsJob | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const restoreOriginRef = useRef<HTMLElement | null>(null);
   const restorePlanTokenRef = useRef(0);
   const backupJobsQuery = useBackupJobsQuery();
@@ -102,8 +103,13 @@ function BackupsPage() {
     : batchBackupUnavailableReason
     ? { disabled: true, reason: batchBackupUnavailableReason }
     : routineBackupOperationAvailability;
-  const pageError = error ?? (backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null);
+  const pageError = backupReport.error ? apiErrorMessage(backupReport.error, 'Backup status could not be loaded.') : null;
   const refreshBackupReport = backupReport.refresh;
+  const progressError = activeJobQuery.error || backupJobsQuery.error;
+  const refreshStatus = () => Promise.all([
+    backupReport.refresh(), backupJobsQuery.refetch(),
+    ...(currentActiveJob ? [activeJobQuery.refetch()] : []),
+  ]);
 
   useEffect(() => {
     if (!recoveredActiveJob) {
@@ -118,9 +124,6 @@ function BackupsPage() {
       void invalidateApplicationState(queryClient);
       setActiveJob(activeJobQuery.data);
       if (terminalJob(activeJobQuery.data)) {
-        if (activeJobQuery.data.status === 'failed') {
-          setError(activeJobQuery.data.error?.message || 'Backup job failed.');
-        }
         setRunning(null);
         void refreshBackupReport();
         if (activeJobQuery.data.type === 'backup_restore') {
@@ -129,19 +132,6 @@ function BackupsPage() {
       }
     }
   }, [activeJobQuery.data, queryClient, refreshBackupReport]);
-
-  useEffect(() => {
-    if (activeJobQuery.error) {
-      setError(apiErrorMessage(activeJobQuery.error, 'Backup job progress could not be refreshed.'));
-      setRunning(null);
-    }
-  }, [activeJobQuery.error]);
-
-  useEffect(() => {
-    if (backupJobsQuery.error) {
-      setError(apiErrorMessage(backupJobsQuery.error, 'Backup job status could not be refreshed.'));
-    }
-  }, [backupJobsQuery.error]);
 
   const appBackupOperationAvailability = destinationUnavailableReason
     ? { disabled: true, reason: destinationUnavailableReason }
@@ -162,20 +152,20 @@ function BackupsPage() {
     await runBackup('routine', () => runRoutineBackupMutation.mutateAsync());
   }
 
+  function acceptJob(job: AutarkOsJob) {
+    setActiveJob(job);
+    if (terminalJob(job)) setRunning(null);
+    showJobNotification(job);
+  }
+
   async function runBackup(id: string, action: () => Promise<AutarkOsJob>) {
     setRunning(id);
-    setError(null);
     try {
       const result = await action();
-      setActiveJob(result);
-      showJobNotification(result);
-      if (result.status === 'failed') {
-        setError(result.error?.message || 'Backup could not be started.');
-      }
+      acceptJob(result);
       await backupReport.refresh();
     } catch (runError) {
       const notificationMessage = apiErrorMessage(runError, 'Backup could not be started.');
-      setError(notificationMessage);
       showActionNotification({ severity: 'error', title: 'Backup could not start', message: notificationMessage }, 'Backup could not start');
       setRunning(null);
     }
@@ -212,13 +202,11 @@ function BackupsPage() {
   async function openRestore(point: RestorePoint, appId?: string | null) {
     if (restoreAvailability.disabled) return;
     rememberRestoreOrigin();
-    setError(null);
     await loadRestorePlan(point, appId || null);
   }
 
   async function openRestorePointDetails(point: RestorePoint) {
     rememberRestoreOrigin();
-    setError(null);
     setRestoreFlow({ error: null, phase: 'details', plan: null, point, targetAppId: null });
     await loadRestorePlan(point, null, 'details');
   }
@@ -258,20 +246,14 @@ function BackupsPage() {
     }
     const { point, targetAppId } = restoreFlow;
     setRunning(`restore-${point.id}`);
-    setError(null);
     setRestoreFlow((current) => current ? { ...current, error: null } : current);
     try {
       const result = await restoreBackupMutation.mutateAsync({ restorePointId: point.id, appId: targetAppId });
-      setActiveJob(result);
-      showJobNotification(result);
-      if (result.status === 'failed') {
-        setError(result.error?.message || 'Restore could not be started.');
-      }
+      acceptJob(result);
       closeRestoreFlow();
       await backupReport.refresh();
     } catch (restoreError) {
       const notificationMessage = apiErrorMessage(restoreError, 'Restore could not be completed.');
-      setError(notificationMessage);
       setRestoreFlow((current) => current ? { ...current, error: notificationMessage } : current);
       showActionNotification({ severity: 'error', title: 'Restore could not start', message: notificationMessage }, 'Restore could not start');
       setRunning(null);
@@ -281,18 +263,12 @@ function BackupsPage() {
   async function verifyRestorePoint(point: RestorePoint) {
     if (verifyAvailability.disabled) return;
     setRunning(`verify-${point.id}`);
-    setError(null);
     try {
       const result = await verifyRestorePointMutation.mutateAsync(point.id);
-      setActiveJob(result);
-      showJobNotification(result);
-      if (result.status === 'failed') {
-        setError(result.error?.message || 'Verification could not be started.');
-      }
+      acceptJob(result);
       await backupReport.refresh();
     } catch (verifyError) {
       const notificationMessage = apiErrorMessage(verifyError, 'Backup verification could not be completed.');
-      setError(notificationMessage);
       showActionNotification({ severity: 'error', title: 'Backup verification could not start', message: notificationMessage }, 'Backup verification could not start');
       setRunning(null);
     }
@@ -310,11 +286,17 @@ function BackupsPage() {
       contained
       contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
     >
-      {pageError && <BackupsErrorState message={pageError} onRetry={() => void backupReport.refresh()} />}
-      {currentActiveJob && !terminalJob(currentActiveJob) && <BackupJobBanner job={currentActiveJob} />}
+      {!report && <BackupsErrorState message={pageError || 'Backup status is unavailable.'} onRetry={() => void refreshStatus()} />}
       {report && (
         <ExtensionActionTarget actionId="review-backups" className="min-h-0 flex-1" routeId="backups">
           <BackupColumnNavigatorWorkspace
+          context={<ContextChip label={pageError ? 'Backup refresh paused' : progressError ? 'Progress unavailable' : currentActiveJob ? 'Backup in progress' : 'Backup status'} title="Backups / Current status" tone={pageError || progressError ? 'warning' : 'muted'}>
+            {pageError && <p>{pageError} Previous information remains visible.</p>}
+            {Boolean(progressError) && <p>Job progress could not refresh. This does not mean the operation failed.</p>}
+            {currentActiveJob && <JobProgress compact job={currentActiveJob} subjectLabel={backupSubjectLabel(currentActiveJob)} />}
+            {!currentActiveJob && !progressError && !pageError && <p>Backup information is up to date.</p>}
+            <Button disabled={backupReport.isFetching || activeJobQuery.isFetching || backupJobsQuery.isFetching} onClick={() => void refreshStatus()} size="sm" type="button">Check backup status</Button>
+          </ContextChip>}
           appIconUrlById={appIconUrlById}
           appBackupAvailability={appBackupOperationAvailability}
           fullBackupAvailability={fullBackupAvailability}
@@ -323,7 +305,7 @@ function BackupsPage() {
           onOpenRestoreDetails={openRestorePointDetails}
           onOpenRestorePlan={openRestore}
           onOpenSettings={() => openSettings('backups')}
-          onRefresh={() => void backupReport.refresh()}
+          onRefresh={() => void refreshStatus()}
           onRunRoutineBackup={() => void runRoutineBackup()}
           onVerifyRestorePoint={verifyRestorePoint}
           refreshing={backupReport.isFetching || activeJobQuery.isFetching}
@@ -368,14 +350,6 @@ function backupAppIconUrls(
       catalogAppImageUrl(app.appId),
     ),
   ]));
-}
-
-function BackupJobBanner({ job }: { job: AutarkOsJob }) {
-  return (
-    <div className="shrink-0 border-b border-cyan-300/30 bg-cyan-400/10 px-3 py-2">
-      <JobProgress compact job={job} subjectLabel={backupSubjectLabel(job)} />
-    </div>
-  );
 }
 
 function BackupsLoadingState() {

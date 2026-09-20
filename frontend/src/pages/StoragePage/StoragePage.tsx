@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Trash2 } from 'lucide-react';
 import { apiErrorMessage } from '@/api/httpClient';
@@ -29,28 +29,17 @@ function StoragePage() {
   const storage = useStorageReportRepository();
   const applicationState = useApplicationStateRepository();
   const cleanupOrphanMutation = useCleanupOrphanMutation();
-  const [actionError, setActionError] = useState<string | null>(null);
   const [copiedPathId, setCopiedPathId] = useState<string | null>(null);
   const [cleanupTarget, setCleanupTarget] = useState<OrphanedStorage | null>(null);
   const [cleanupConfirmation, setCleanupConfirmation] = useState('');
-  const [dismissedError, setDismissedError] = useState<string | null>(null);
   const report = storage.report;
   const appIconUrlById = useMemo(() => storageAppIconUrls(
     report?.apps ?? [],
     applicationState.applications,
   ), [applicationState.applications, report?.apps]);
-  const currentError = actionError ?? (storage.error ? apiErrorMessage(storage.error, 'Storage data could not be loaded.') : null);
-  const error = currentError === dismissedError ? null : currentError;
-
-  useEffect(() => {
-    if (!currentError) {
-      setDismissedError(null);
-    }
-  }, [currentError]);
+  const error = storage.error ? apiErrorMessage(storage.error, 'Storage data could not be loaded.') : null;
 
   function refreshStorage() {
-    setActionError(null);
-    setDismissedError(null);
     void storage.refresh();
   }
 
@@ -68,7 +57,6 @@ function StoragePage() {
   async function cleanupOrphan() {
     if (!cleanupTarget || cleanupConfirmation !== cleanupTarget.name) return;
 
-    setActionError(null);
     try {
       const result = await cleanupOrphanMutation.mutateAsync(cleanupTarget.name);
       showActionNotification({
@@ -86,8 +74,6 @@ function StoragePage() {
         queryClient.invalidateQueries({ queryKey: ['monitoring'] }),
       ]);
     } catch (cleanupError) {
-      const message = apiErrorMessage(cleanupError, 'Unused data could not be cleaned up.');
-      setActionError(message);
       showActionErrorNotification(cleanupError, 'Unused data could not be cleaned up');
     }
   }
@@ -101,7 +87,6 @@ function StoragePage() {
         contained
         contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
       >
-        {error && report && <StorageErrorState message={error} onDismiss={() => setDismissedError(error)} onRetry={refreshStorage} />}
         <ExtensionSlot
           className="shrink-0 px-3 pt-3"
           extensionId="autark-pro"
@@ -110,6 +95,7 @@ function StoragePage() {
         <ExtensionActionTarget actionId="review-storage" className="min-h-0 flex-1" routeId="storage">
           {report ? (
           <StorageCapacityRibbonWorkspace
+            refreshError={error}
             copiedPathId={copiedPathId}
             appIconUrlById={appIconUrlById}
             onCopyPath={(value, id) => void copyPath(value, id)}
@@ -121,7 +107,7 @@ function StoragePage() {
             updatedAt={storage.updatedAt}
           />
           ) : (
-            <StorageUnavailableState message={currentError} onRetry={refreshStorage} />
+            <StorageUnavailableState message={error} onRetry={refreshStorage} />
           )}
         </ExtensionActionTarget>
       </PageShell>
@@ -214,8 +200,5 @@ function StorageUnavailableState({ message, onRetry }: { message: string | null;
   return <PageLoadError className="m-auto w-full max-w-2xl" model={{ message: message || 'Autark-OS could not read storage data yet.', title: 'Storage status is unavailable' }} onRetry={onRetry} />;
 }
 
-function StorageErrorState({ message, onDismiss, onRetry }: { message: string; onDismiss: () => void; onRetry: () => void }) {
-  return <PageLoadError className="shrink-0 px-4 py-3" model={{ message, title: 'Storage data could not refresh' }} onDismiss={onDismiss} onRetry={onRetry} />;
-}
 
 export default StoragePage;

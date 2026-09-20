@@ -64,7 +64,7 @@ test('loading, empty, and error fixtures retain clear user-facing states', async
   await installMockApi(page, 'loading');
   await page.setViewportSize({ width: 768, height: 960 });
   await page.goto('/apps', { waitUntil: 'domcontentloaded' });
-  await expect(page.getByText(/Checking current app information/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Checking apps', exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
   await installMockApi(page, 'empty');

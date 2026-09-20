@@ -7,7 +7,7 @@ import { statusTone } from './extensions/NetworkPage.theme';
 import type { NetworkIssueView } from './extensions/NetworkPage.types';
 import { EmptyState, NetworkInset, NetworkPanel } from './NetworkPage.shared';
 
-export function NetworkIssuesPanel({ issues, onReviewPrivateLinks }: { issues: NetworkIssueView[]; onReviewPrivateLinks: () => void }) {
+export function NetworkIssuesPanel({ issues, onReviewPrivateLinks, onReviewServices }: { issues: NetworkIssueView[]; onReviewPrivateLinks: () => void; onReviewServices: () => void }) {
   return (
     <NetworkPanel
       description="Only items that need attention appear here."
@@ -30,8 +30,8 @@ export function NetworkIssuesPanel({ issues, onReviewPrivateLinks }: { issues: N
                 {issue.detail && <span className="mt-1 block text-xs text-sky-100/70">{issue.detail}</span>}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {issue.source === 'app' || issue.id.startsWith('stale-') ? (
-                    <ProjectPrimaryButton onClick={onReviewPrivateLinks} size="sm" type="button">
-                      Review services
+                    <ProjectPrimaryButton onClick={issue.id.startsWith('stale-') ? onReviewPrivateLinks : onReviewServices} size="sm" type="button">
+                      {issue.id.startsWith('stale-') ? 'Review unused links' : 'Review services'}
                     </ProjectPrimaryButton>
                   ) : (
                     <ProjectDarkControlButton asChild size="sm">

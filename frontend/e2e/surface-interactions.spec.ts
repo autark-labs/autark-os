@@ -62,7 +62,8 @@ test('wide view opens global popovers, app management, and the Discover dialog',
   await expectNoHorizontalOverflow(page);
 
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: /Discover activity/i }).click();
+  await page.getByRole('button', { name: /^Open activity:/i }).click();
+  await page.getByRole('tab', { name: /History/i }).click();
   await expect(page.getByText(/Vaultwarden backup verified/i)).toBeVisible();
   await page.keyboard.press('Escape');
 

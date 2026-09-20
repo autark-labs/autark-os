@@ -25,6 +25,7 @@ export type MonitoringRepositoryView = {
   activity: ActivityLog[];
   error: unknown;
   history: MonitoringHistory | null;
+  hasUsableData: boolean;
   isFetching: boolean;
   isLoading: boolean;
   metrics: SystemMetrics | null;
@@ -61,12 +62,13 @@ export function useMonitoringRepository(filters: ActivityFilters, windowMinutes 
     activity: activityQuery.data ?? [],
     error: queries.find((query) => query.error)?.error ?? null,
     history: historyQuery.data ?? null,
+    hasUsableData: queries.every((query) => query.data !== undefined),
     isFetching: queries.some((query) => query.isFetching),
     isLoading: queries.some((query) => query.isLoading),
     metrics: metricsQuery.data ?? null,
     refresh: () => invalidateMonitoringQueries(queryClient),
     reliability: reliabilityQuery.data ?? null,
-    updatedAt: latestUpdatedAt(queries.map((query) => query.dataUpdatedAt)),
+    updatedAt: oldestUpdatedAt(queries.map((query) => query.dataUpdatedAt)),
   };
 }
 
@@ -80,7 +82,7 @@ export function invalidateMonitoringQueries(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: monitoringQueryKeys.all });
 }
 
-function latestUpdatedAt(timestamps: number[]) {
-  const latest = Math.max(...timestamps);
-  return Number.isFinite(latest) && latest > 0 ? new Date(latest) : null;
+function oldestUpdatedAt(timestamps: number[]) {
+  const oldest = Math.min(...timestamps);
+  return Number.isFinite(oldest) && oldest > 0 ? new Date(oldest) : null;
 }

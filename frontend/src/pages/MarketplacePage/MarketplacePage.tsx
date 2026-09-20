@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bell, Info, RefreshCw, Sparkles, X } from 'lucide-react';
+import { Info, Sparkles } from 'lucide-react';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton } from '@/components/primitives/ProjectButtons';
-import { JobProgress } from '@/components/autark-os/JobProgress';
+import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
@@ -16,15 +16,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { apiErrorMessage } from '@/api/httpClient';
-import { showActionErrorNotification } from '@/lib/actionNotifications';
+import { showActionErrorNotification, showActionNotification, showJobNotification } from '@/lib/actionNotifications';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { cn } from '@/lib/utils';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
@@ -34,10 +27,8 @@ import {
   useDiscoverInstallMutation,
   useDiscoverInstallPreviewQuery,
   useDiscoverReadinessQuery,
-  useMarketplaceActivityQuery,
 } from '@/repositories/discoverRepository';
 import { terminalJob } from '@/repositories/jobRepository';
-import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, MarketplaceApp } from '@/types/marketplace';
@@ -45,8 +36,6 @@ import { categories, type MarketplaceStatusFilter } from './extensions/Marketpla
 import {
   START_HERE_DISMISSAL_KEY,
   defaultDiscoverAppId,
-  formatMarketplaceActivityTime,
-  marketplaceActivityTone,
   marketplaceVisibleAppViews,
   safeBasicCatalogForDiscover,
   starterCatalogForDiscover,
@@ -96,13 +85,11 @@ function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<MarketplaceStatusFilter>('all');
   const [basicCatalogMode, setBasicCatalogMode] = useState<'starter' | 'all-safe'>('starter');
-  const [marketplaceError, setMarketplaceError] = useState('');
   const [setupAnswers, setSetupAnswers] = useState<Record<string, unknown>>({});
   const [setupAnswersAppId, setSetupAnswersAppId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [installReviewOpen, setInstallReviewOpen] = useState(false);
-  const [dismissedInstallJobId, setDismissedInstallJobId] = useState<string | null>(null);
   const [duplicateAcknowledgedAppId, setDuplicateAcknowledgedAppId] = useState<string | null>(null);
   const [startHereDismissed, setStartHereDismissed] = useState(() => readStartHereDismissed());
   const detailTriggerRef = useRef<HTMLElement | null>(null);
@@ -113,15 +100,12 @@ function MarketplacePage() {
   const explicitDetailAppId = marketplaceDetailId(searchParams);
   const detailAppId = explicitDetailAppId ?? recoveryAppId;
   const appsQuery = useDiscoverAppsQuery(applicationState.freshness.hasUsableData);
-  const activityQuery = useMarketplaceActivityQuery();
   const readinessQuery = useDiscoverReadinessQuery();
   const installMutation = useDiscoverInstallMutation();
   const backupMutation = useDiscoverBackupMutation();
   const { refetch: refetchApps } = appsQuery;
-  const { refetch: refetchMarketplaceActivity } = activityQuery;
   const { refetch: refetchReadiness } = readinessQuery;
   const apps = useMemo<DiscoverAppView[]>(() => appsQuery.data ?? [], [appsQuery.data]);
-  const marketplaceActivity = activityQuery.data ?? [];
   const onboarding = readinessQuery.data?.onboarding ?? null;
   const doctor = readinessQuery.data?.doctor ?? null;
   const storage = readinessQuery.data?.storage ?? null;
@@ -159,23 +143,22 @@ function MarketplacePage() {
   const installPlan = installPreview?.technicalDetails ?? null;
   const installOptions = installPreview?.installOptions ?? null;
 
-  const discoverError = marketplaceError || (appsQuery.error ? apiErrorMessage(appsQuery.error) : '');
+  const discoverError = (appsQuery.error ? apiErrorMessage(appsQuery.error) : '');
 
   const refreshDiscover = useCallback(async () => {
     await Promise.all([
       refetchApps(),
-      refetchMarketplaceActivity(),
       refetchReadiness(),
     ]);
-  }, [refetchApps, refetchMarketplaceActivity, refetchReadiness]);
-  const handleJobError = useCallback((message: string) => setMarketplaceError(message), []);
+  }, [refetchApps, refetchReadiness]);
   const {
+    progressError,
+    retryProgress,
     backupJob,
     installJob,
     setBackupJob,
     setInstallJob,
   } = useDiscoverJobTracking({
-    onError: handleJobError,
     onInstallSubjectRecovered: setSelectedAppId,
     refreshDiscover,
   });
@@ -247,41 +230,40 @@ function MarketplacePage() {
       return;
     }
     if (!applicationState.freshness.isCurrent) {
-      setMarketplaceError('Refresh app information before reviewing or starting an install.');
+      showActionNotification({ ok: false, severity: 'warning', title: 'App information needs refreshing', message: 'Refresh app information before reviewing or starting an install.' });
       return;
     }
     const app = apps.find((candidate) => candidate.application.id === appId);
     if (mode === 'install' && appId === selectedApp?.id && installPreview && !installPreview.valid) {
-      setMarketplaceError(installPreview.blockingIssues[0]?.message || 'Finish setup choices before installing.');
+      showActionNotification({ ok: false, severity: 'warning', title: 'Check app settings', message: installPreview.blockingIssues[0]?.message || 'Finish setup choices before installing.' });
       return;
     }
     if (installJob && !terminalJob(installJob) && installJob.subjectId !== appId) {
-      setMarketplaceError(`${appNameForJob(installJob, apps)} is installing. Finish that install before starting ${app?.application.name || appId}.`);
+      showActionNotification({ ok: false, severity: 'info', title: 'An install is already running', message: `${appNameForJob(installJob, apps)} is installing. Finish that install before starting ${app?.application.name || appId}.` });
       return;
     }
     try {
-      setInstallJob(await installMutation.mutateAsync({
+      const job = await installMutation.mutateAsync({
         appId,
         answers: setupAnswers,
         options: {
           reinstall: mode !== 'install',
           duplicateAcknowledged: mode === 'install' && duplicateAcknowledgedAppId === appId,
         },
-      }));
-      setMarketplaceError('');
+      });
+      setInstallJob(job);
+      showJobNotification(job);
     } catch (error) {
-      const message = apiErrorMessage(error);
-      setMarketplaceError(message);
       showActionErrorNotification(error, 'Install could not start');
     }
   }
 
   async function createFirstBackup(appId: string) {
     try {
-      setBackupJob(await backupMutation.mutateAsync(appId));
-      setMarketplaceError('');
+      const job = await backupMutation.mutateAsync(appId);
+      setBackupJob(job);
+      showJobNotification(job);
     } catch (error) {
-      setMarketplaceError(apiErrorMessage(error, 'Backup could not be started.'));
       showActionErrorNotification(error, 'Backup could not start');
     }
   }
@@ -412,9 +394,9 @@ function MarketplacePage() {
 
   if (!selectedApp) {
     return (
-      discoverError ? (
+      discoverError || applicationState.freshness.phase === 'unavailable' ? (
         <PageShell>
-          <DiscoverErrorState message={discoverError} onRetry={refreshDiscover} title="Discover catalog could not load" />
+          <DiscoverErrorState message={discoverError || 'Current app information is unavailable. Refresh it before installing apps.'} onRetry={() => void Promise.all([applicationState.refresh(), refreshDiscover()])} title="Discover catalog could not load" />
         </PageShell>
       ) : (
         <DiscoverLoadingState />
@@ -429,10 +411,10 @@ function MarketplacePage() {
       contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
     >
       <DiscoverGuidedHeader
-        appCount={catalogApps.length}
+        error={discoverError || (progressError ? 'Job progress could not refresh. This does not mean the operation failed.' : '')}
         lastRefreshAt={lastRefreshAt}
-        marketplaceActivity={marketplaceActivity}
-        onRefresh={refreshDiscover}
+        onRefresh={() => void Promise.all([refreshDiscover(), retryProgress()])}
+        refreshing={appsQuery.isFetching}
       />
 
       <ExtensionSlot
@@ -441,14 +423,6 @@ function MarketplacePage() {
         surface="discover.insights"
       />
 
-      {discoverError && <DiscoverErrorState message={discoverError} onRetry={refreshDiscover} title="Discover action needs attention" />}
-      <InstallJobBanner
-        apps={apps}
-        dismissed={dismissedInstallJobId === installJob?.jobId}
-        installJob={installJob}
-        onDismiss={() => setDismissedInstallJobId(installJob?.jobId ?? null)}
-        selectedAppId={selectedView.application.id}
-      />
 
       <ExtensionActionTarget actionId="review-app" className="min-h-0 flex-1" routeId="discover">
         <section className="relative grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 shadow-lg shadow-slate-950/20 xl:grid-cols-[12rem_minmax(0,1fr)_19rem] xl:grid-rows-1">
@@ -573,56 +547,15 @@ function MarketplacePage() {
   );
 }
 
-function InstallJobBanner({ apps, dismissed, installJob, onDismiss, selectedAppId }: { apps: DiscoverAppView[]; dismissed: boolean; installJob: AutarkOsJob | null; onDismiss: () => void; selectedAppId: string }) {
-  if (dismissed || !installJob || installJob.subjectId !== selectedAppId) {
-    return null;
-  }
-  if (!terminalJob(installJob)) {
-    return <JobProgress job={installJob} subjectLabel={appNameForJob(installJob, apps)} />;
-  }
-  if (installJob.status === 'failed') {
-    return (
-      <div className="flex items-start justify-between gap-3 rounded-lg border border-red-400/35 bg-red-500/10 p-4 text-sm text-red-200">
-        <div>
-          <p className="font-semibold text-current">Install failed for {appNameForJob(installJob, apps)}</p>
-          <p className="mt-1">{installJob.error?.message || 'Autark-OS could not finish the install.'}</p>
-        </div>
-        <button aria-label="Dismiss install result" className="grid size-7 shrink-0 place-items-center rounded-md text-red-100/80 transition hover:bg-red-200/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200" onClick={onDismiss} type="button">
-          <X className="size-4" />
-        </button>
-      </div>
-    );
-  }
-  if (installJob.status === 'succeeded') {
-    return (
-      <div className="flex items-start justify-between gap-3 rounded-lg border border-emerald-300/35 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-        <div>
-          <p className="font-semibold text-current">{appNameForJob(installJob, apps)} is ready</p>
-          <p className="mt-1">Open the app or create a first restore point before experimenting.</p>
-        </div>
-        <button aria-label="Dismiss install result" className="grid size-7 shrink-0 place-items-center rounded-md text-emerald-100/80 transition hover:bg-emerald-200/15 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200" onClick={onDismiss} type="button">
-          <X className="size-4" />
-        </button>
-      </div>
-    );
-  }
-  return null;
-}
-
-function DiscoverGuidedHeader({
-  appCount,
-  lastRefreshAt,
-  marketplaceActivity,
-  onRefresh,
-}: {
-  appCount: number;
+function DiscoverGuidedHeader({ error, lastRefreshAt, onRefresh, refreshing }: {
+  error: string;
   lastRefreshAt: Date | null;
-  marketplaceActivity: ActivityLog[];
   onRefresh: () => void;
+  refreshing: boolean;
 }) {
   return (
     <header className="rounded-2xl border border-sky-300/15 bg-app-header-surface/90 p-3 text-slate-50 shadow-xl shadow-slate-950/20 sm:p-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
             <Sparkles className="size-5" />
@@ -630,7 +563,7 @@ function DiscoverGuidedHeader({
           <h1 className="m-0 text-3xl font-semibold tracking-tight text-white sm:text-[2.1rem]">Discover</h1>
         </div>
 
-        <div className="flex shrink-0 gap-2">
+        <div className="flex min-h-10 flex-wrap items-center gap-2">
           <Dialog>
             <DialogTrigger asChild>
           <ProjectDarkControlButton aria-label="How installs work" className="border-sky-300/15 bg-slate-950/25 text-sky-100/70 hover:border-cyan-300/30 hover:bg-slate-950/40 hover:text-white" size="icon" type="button">
@@ -656,41 +589,7 @@ function DiscoverGuidedHeader({
             </DialogContent>
           </Dialog>
 
-          <ProjectDarkControlButton aria-label="Refresh Discover" className="border-sky-300/15 bg-slate-950/25 text-sky-100/70 hover:border-cyan-300/30 hover:bg-slate-950/40 hover:text-white" onClick={onRefresh} size="icon" type="button">
-            <RefreshCw className="size-4" />
-            <span className="sr-only">Refresh Discover</span>
-          </ProjectDarkControlButton>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <ProjectDarkControlButton aria-label="Discover activity" className="border-sky-300/15 bg-slate-950/25 text-sky-100/70 hover:border-cyan-300/30 hover:bg-slate-950/40 hover:text-white" size="icon" type="button">
-                <Bell className="size-4" />
-              </ProjectDarkControlButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72 border-sky-300/20 bg-slate-900 text-slate-50 shadow-xl shadow-slate-950/30">
-              <DropdownMenuLabel>Discover activity</DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-sky-300/15" />
-              <div className="grid max-h-80 gap-2 overflow-y-auto px-2 py-1.5 text-sm">
-                <div className="rounded-md border border-sky-300/15 bg-slate-800 p-2 text-xs text-sky-100/65">
-                  {appCount} apps shown - Last checked {lastRefreshAt ? lastRefreshAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'not yet'}
-                </div>
-                {marketplaceActivity.length ? marketplaceActivity.map((event) => (
-                  <div className="rounded-md border border-sky-300/15 bg-slate-800 p-2" key={event.id}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className={cn('text-xs font-semibold uppercase tracking-wide', marketplaceActivityTone(event.level))}>{event.outcome.replace('_', ' ')}</span>
-                      <span className="text-xs text-sky-100/60">{formatMarketplaceActivityTime(event.createdAt)}</span>
-                    </div>
-                    <p className="mt-1 font-medium text-slate-50">{event.title}</p>
-                    {event.message && <p className="mt-1 line-clamp-2 text-xs leading-5 text-sky-100/60">{event.message}</p>}
-                  </div>
-                )) : (
-                  <div className="rounded-md border border-sky-300/15 bg-slate-800 p-3 text-sm text-sky-100/65">
-                    No Discover activity has been recorded yet.
-                  </div>
-                )}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <RefreshStatus error={error} onRefresh={onRefresh} refreshing={refreshing} updatedAt={lastRefreshAt} />
         </div>
       </div>
 

@@ -8,6 +8,8 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
+import { ContextChip } from '@/components/autark-os/ContextChip';
+import { Button } from '@/components/ui/button';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
 import { PageShell } from '@/components/layout/PageShell';
@@ -95,7 +97,6 @@ function SupportPage() {
     } catch (err) {
       const message = apiErrorMessage(err, 'Diagnostics could not be loaded.');
       setError(message);
-      showActionErrorNotification(err, 'Diagnostics failed');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -182,7 +183,7 @@ function SupportPage() {
       contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
     >
       <ExtensionActionTarget actionId="review-diagnostics" className="min-h-0 flex-1" routeId="diagnostics">
-        <DiagnosticsNotebook
+        {!summary ? <DiagnosticsErrorState message={error || 'Diagnostics are unavailable.'} onRetry={() => void load(true)} /> : <DiagnosticsNotebook
           activeSection={activeSection}
         bundle={state.bundle}
         bundleBusy={bundleBusy}
@@ -204,7 +205,6 @@ function SupportPage() {
         }}
         onOpenSettings={() => openSettings('advanced')}
         onRefresh={() => void load(true)}
-        onRetry={() => void load(true)}
         onSectionChange={(section) => {
           setActiveSection(section);
           if (section === 'logs') {
@@ -225,7 +225,7 @@ function SupportPage() {
         summary={summary}
         summaryRows={summaryRows}
           tailscaleCheck={tailscaleCheck?.message || summary?.tailscaleStatus || 'Unknown'}
-        />
+        />}
       </ExtensionActionTarget>
     </PageShell>
   );
@@ -250,7 +250,6 @@ type DiagnosticsNotebookProps = {
   onGenerateBundle: () => void;
   onOpenSettings: () => void;
   onRefresh: () => void;
-  onRetry: () => void;
   onSectionChange: (section: DiagnosticsNotebookSection) => void;
   onViewLogs: () => void;
   ownershipResources: ApplicationView[];
@@ -284,7 +283,6 @@ function DiagnosticsNotebook({
   onGenerateBundle,
   onOpenSettings,
   onRefresh,
-  onRetry,
   onSectionChange,
   onViewLogs,
   ownershipResources,
@@ -308,8 +306,7 @@ function DiagnosticsNotebook({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
-      <DiagnosticsNotebookHeader headline={headline} onRefresh={onRefresh} refreshing={refreshing} />
-      {error && <DiagnosticsErrorState message={error} onRetry={onRetry} />}
+      <DiagnosticsNotebookHeader error={error} headline={headline} onRefresh={onRefresh} refreshing={refreshing} />
       <DiagnosticsSignalStrip summaryRows={summaryRows} />
 
       <Tabs
@@ -371,7 +368,7 @@ function DiagnosticsNotebook({
   );
 }
 
-function DiagnosticsNotebookHeader({ headline, onRefresh, refreshing }: { headline: string; onRefresh: () => void; refreshing: boolean }) {
+function DiagnosticsNotebookHeader({ error, headline, onRefresh, refreshing }: { error: string | null; headline: string; onRefresh: () => void; refreshing: boolean }) {
   return (
     <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -385,7 +382,7 @@ function DiagnosticsNotebookHeader({ headline, onRefresh, refreshing }: { headli
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <StatusBadge tone={headline === 'Ready' ? 'success' : headline === 'Status unavailable' ? 'neutral' : 'warning'}>{headline}</StatusBadge>
+          <div className="flex h-8 w-40 justify-end">{error ? <ContextChip label="Refresh paused" title="Diagnostics / Current status"><p>{error}</p><p className="text-xs text-muted-foreground">Previous checks remain visible.</p><Button disabled={refreshing} onClick={onRefresh} size="sm" type="button">Check again</Button></ContextChip> : <StatusBadge tone={headline === 'Ready' ? 'success' : headline === 'Status unavailable' ? 'neutral' : 'warning'}>{headline}</StatusBadge>}</div>
           <DisabledAction disabled={refreshing} reason="Autark-OS is already refreshing the current health checks.">
             <button aria-label="Refresh Diagnostics" className="grid size-10 place-items-center rounded-xl border border-sky-300/15 bg-slate-950/25 text-sky-100/70 transition hover:border-cyan-300/30 hover:text-white" disabled={refreshing} onClick={onRefresh} type="button">
               <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />

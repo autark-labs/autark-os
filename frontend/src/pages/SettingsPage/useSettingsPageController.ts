@@ -233,7 +233,6 @@ export function useSettingsPageController() {
     pendingNavigation,
     refreshConfirmationOpen,
     refreshing,
-    reload,
     requestRefresh,
     save,
     saveError,

@@ -83,7 +83,7 @@ export function useAccessNetworkRepository(): AccessNetworkRepositoryView {
     setupStatus: setupQuery.data ?? null,
     tailnetDevices: devicesQuery.data ?? [],
     tailscale: tailscaleQuery.data ?? null,
-    updatedAt: latestUpdatedAt(queries.map((query) => query.dataUpdatedAt)),
+    updatedAt: oldestUpdatedAt(queries.map((query) => query.dataUpdatedAt)),
   };
 }
 
@@ -107,7 +107,7 @@ export function invalidateNetworkQueries(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: networkQueryKeys.all });
 }
 
-function latestUpdatedAt(timestamps: number[]) {
-  const latest = Math.max(...timestamps);
-  return Number.isFinite(latest) && latest > 0 ? new Date(latest) : null;
+function oldestUpdatedAt(timestamps: number[]) {
+  const oldest = Math.min(...timestamps);
+  return Number.isFinite(oldest) && oldest > 0 ? new Date(oldest) : null;
 }

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
+import { ContextChip } from '@/components/autark-os/ContextChip';
 import { Button } from '@/components/ui/button';
 import { semanticStatusVariants } from '@/components/primitives/SemanticVariants';
 import { cn } from '@/lib/utils';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 type RefreshStatusProps = {
   className?: string;
   disabled?: boolean;
+  error?: string | null;
   intervalLabel?: string;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -16,7 +18,7 @@ type RefreshStatusProps = {
   updatedAt: Date | null;
 };
 
-export function RefreshStatus({ className, disabled, intervalLabel, onRefresh, refreshing = false, showButton = true, tone = 'muted', updatedAt }: RefreshStatusProps) {
+export function RefreshStatus({ className, disabled, error, intervalLabel, onRefresh, refreshing = false, showButton = true, tone = 'muted', updatedAt }: RefreshStatusProps) {
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -24,14 +26,20 @@ export function RefreshStatus({ className, disabled, intervalLabel, onRefresh, r
     return () => window.clearInterval(interval);
   }, []);
 
-  const label = useMemo(() => formatUpdatedAt(updatedAt), [updatedAt]);
+  const label = formatUpdatedAt(updatedAt);
   const refreshDisabled = Boolean(disabled || refreshing);
   const refreshDisabledReason = refreshing ? 'Refresh is already running.' : 'Refresh is not available right now.';
   return (
     <div className={cn('flex flex-wrap items-center justify-end gap-2', className)}>
-      <div className="text-right text-xs leading-5 text-app-text-muted">
+      <div className="flex h-10 w-44 flex-col justify-center text-right text-xs leading-5 text-app-text-muted">
+        {error ? <ContextChip label={updatedAt ? 'Refresh paused' : 'Status unavailable'} title="Current status">
+          <p>{error}</p>
+          <p className="text-xs text-muted-foreground">{updatedAt ? `Last confirmed ${updatedAt.toLocaleString()}. Previous information remains visible.` : 'No confirmed information is available yet.'}</p>
+          {onRefresh && <Button disabled={refreshDisabled} onClick={onRefresh} size="sm" type="button">{refreshing ? 'Checking…' : 'Try again'}</Button>}
+        </ContextChip> : <>
         <p className="font-semibold text-app-text-secondary">{refreshing ? 'Updating now' : label}</p>
         {intervalLabel && <p>{intervalLabel}</p>}
+        </>}
       </div>
       {showButton && onRefresh && (
         <DisabledAction disabled={refreshDisabled} reason={refreshDisabledReason}>

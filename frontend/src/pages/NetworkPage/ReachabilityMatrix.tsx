@@ -169,7 +169,7 @@ export function ReachabilityMatrix({
       title="Reachability matrix"
     >
       <Tabs className="grid gap-3 xl:hidden" onValueChange={(value) => setMobileZone(value as ReachabilityZoneId)} value={mobileZone}>
-        <TabsList className="grid w-full grid-cols-2 gap-1 rounded-xl border border-sky-400/20 bg-slate-900 p-1" variant="default">
+        <TabsList className="grid w-full grid-cols-2 gap-1 rounded-xl border border-sky-400/20 bg-slate-900 p-1 group-data-horizontal/tabs:h-auto" variant="default">
           {zones.map((zone) => <TabsTrigger className="min-h-10 px-2 text-xs text-sky-100/70 data-active:bg-cyan-300/15 data-active:text-cyan-100" key={zone.id} value={zone.id}>{mobileZoneLabel(zone.id)}</TabsTrigger>)}
         </TabsList>
         {zones.map((zone) => (

@@ -18,6 +18,4 @@ test('Home is managed-only while My Apps prompts only for executable recovery', 
   assert.doesNotMatch(repository, /pinnedExternalServices/);
   assert.doesNotMatch(home, /foundServices|observedServices|pinnedExternalServices|Pinned services/);
   assert.match(applications, /reviewApplications = useMemo\([\s\S]*application\.relationship === 'recovery_required'/);
-  assert.match(applications, /<ApplicationReviewPrompt/);
-  assert.match(applications, /reviewApplications\[0\]\?\.primaryAction\.href/);
 });

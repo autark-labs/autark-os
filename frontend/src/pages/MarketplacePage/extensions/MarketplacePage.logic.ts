@@ -238,27 +238,6 @@ export function marketplaceUpdateRank(lastUpdated: string) {
   return 4;
 }
 
-export function marketplaceActivityTone(level: string) {
-  switch (level) {
-    case 'success':
-      return 'text-emerald-200';
-    case 'warning':
-      return 'text-orange-200';
-    case 'error':
-      return 'text-red-200';
-    default:
-      return 'text-cyan-200';
-  }
-}
-
-export function formatMarketplaceActivityTime(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return 'recently';
-  }
-  return parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
 export function optionsFromInstalledSettings(
   settings: {
     accessUrl?: string | null;

@@ -4,6 +4,8 @@ import { ArrowRight, Copy, Download, LoaderCircle, RefreshCw, ShieldCheck, Trash
 import { apiErrorMessage } from '@/api/httpClient';
 import type { ProStatusResponse } from '@/api/pro';
 import type { ProProductState } from '@/api/proProductState';
+import { Button } from '@/components/ui/button';
+import { ContextChip } from '@/components/autark-os/ContextChip';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageShell } from '@/components/layout/PageShell';
 import { ProjectDarkControlButton, ProjectPrimaryButton, ProjectWarningButton } from '@/components/primitives/ProjectButtons';
@@ -55,7 +57,7 @@ function ProPage() {
   const { refetch: refetchStatus } = statusQuery;
   const { refetch: refetchProduct } = productQuery;
   const [activationCode, setActivationCode] = useState('');
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [activationError, setActivationError] = useState<string | null>(null);
   const [removalOpen, setRemovalOpen] = useState(false);
   const [removalConfirmation, setRemovalConfirmation] = useState('');
   const [deactivationOpen, setDeactivationOpen] = useState(false);
@@ -91,10 +93,10 @@ function ProPage() {
     event.preventDefault();
     const code = activationCode.trim();
     if (code.length < 8) {
-      setActionError('Enter the complete one-time activation code.');
+      setActivationError('Enter the complete one-time activation code.');
       return;
     }
-    setActionError(null);
+    setActivationError(null);
     activate.mutate(code, {
       onError: (error) => handleError(error, 'Autark Pro activation failed'),
       onSuccess: () => {
@@ -107,7 +109,6 @@ function ProPage() {
   function resumeActivation() {
     const activationId = status?.activation.activationId;
     if (!activationId) return;
-    setActionError(null);
     continueActivation.mutate(activationId, {
       onError: (error) => handleError(error, 'Autark Pro activation failed'),
       onSuccess: () => notify('Autark Pro activated', 'This server verified its signed entitlement.'),
@@ -115,7 +116,6 @@ function ProPage() {
   }
 
   function refreshLicense() {
-    setActionError(null);
     refresh.mutate(undefined, {
       onError: (error) => handleError(error, 'Pro license check failed'),
       onSuccess: () => notify('Pro license checked', 'The last verified entitlement is available locally.'),
@@ -123,7 +123,6 @@ function ProPage() {
   }
 
   function installExtension() {
-    setActionError(null);
     install.mutate(undefined, {
       onError: (error) => handleError(error, 'Pro installation failed'),
       onSuccess: (job) => showActionNotification(job),
@@ -131,7 +130,6 @@ function ProPage() {
   }
 
   function checkForExtensionRelease() {
-    setActionError(null);
     checkRelease.mutate(undefined, {
       onError: (error) => handleError(error, 'Pro release check failed'),
       onSuccess: (job) => showActionNotification(job),
@@ -139,7 +137,6 @@ function ProPage() {
   }
 
   function removeExtension() {
-    setActionError(null);
     remove.mutate(removalConfirmation, {
       onError: (error) => handleError(error, 'Private extension removal failed'),
       onSuccess: (job) => {
@@ -150,7 +147,6 @@ function ProPage() {
   }
 
   function deactivatePro() {
-    setActionError(null);
     deactivate.mutate({
       acknowledgeAccountAssociationRetained: accountRetentionAcknowledged,
       acknowledgeModuleDataRetained: moduleRetentionAcknowledged,
@@ -177,8 +173,6 @@ function ProPage() {
   }
 
   function handleError(error: unknown, title: string) {
-    const message = apiErrorMessage(error, `${title}.`);
-    setActionError(message);
     showActionErrorNotification(error, title);
   }
 
@@ -186,6 +180,7 @@ function ProPage() {
   if (!status) return <UnavailableState message={apiErrorMessage(statusQuery.error, 'The local extension service did not return a status.')} onRetry={() => void statusQuery.refetch()} />;
   if (!productQuery.data) return <UnavailableState message={apiErrorMessage(productQuery.error, 'The canonical Pro state could not be loaded.')} onRetry={() => void productQuery.refetch()} />;
 
+  const refreshError = statusQuery.error || productQuery.error || moduleJob.error;
   const product = productQuery.data;
   const lifecycle = proLifecycleModel(status, product);
   const primaryAction = betaScope.proInstallationAvailable || lifecycle.primaryAction === 'review-guidance'
@@ -224,6 +219,10 @@ function ProPage() {
                   {lifecycle.canDeactivate && <ProjectDarkControlButton disabled={busy} onClick={() => setDeactivationOpen(true)} type="button"><Unplug className="size-4" />Deactivate Pro</ProjectDarkControlButton>}
                 </div>
               </div>
+              <ContextChip label={refreshError ? 'Pro refresh paused' : moduleJob.data && !terminalJob(moduleJob.data) ? 'Pro operation in progress' : lifecycle.reason ? 'Pro needs review' : 'Pro status'} title="Pro / Current status" tone={refreshError || lifecycle.reason ? 'warning' : 'muted'}>
+                {refreshError ? <><p>Pro status could not refresh. Previous information remains visible; an operation may still be running.</p><Button disabled={statusQuery.isFetching || productQuery.isFetching || moduleJob.isFetching} onClick={() => void Promise.all([statusQuery.refetch(), productQuery.refetch(), ...(status.module.jobId ? [moduleJob.refetch()] : [])])} size="sm" type="button">Check Pro status</Button></> : <p>{lifecycle.reason || lifecycle.description}</p>}
+                {moduleJob.data && <JobProgress job={moduleJob.data} subjectLabel="Private extension" />}
+              </ContextChip>
               <span className="grid size-14 place-items-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-100"><ShieldCheck className="size-7" /></span>
             </div>
           </div>
@@ -235,15 +234,12 @@ function ProPage() {
           <h2 className="text-lg font-semibold text-white">Activate this server</h2>
           <p className="mt-1 text-sm leading-6 text-slate-400">The one-time code is sent directly to the control plane and is not stored in the browser.</p>
           <form className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end" onSubmit={submitActivation}>
-            <label className="grid gap-1.5 text-sm font-medium text-white" htmlFor="pro-activation-code">Device activation code<Input autoCapitalize="characters" autoComplete="off" disabled={busy} id="pro-activation-code" maxLength={128} onChange={(event) => { setActivationCode(event.target.value); setActionError(null); }} placeholder="AUTARK-PRO-XXXX-XXXX" spellCheck={false} value={activationCode} /></label>
+            <label className="grid gap-1.5 text-sm font-medium text-white" htmlFor="pro-activation-code">Device activation code<Input autoCapitalize="characters" autoComplete="off" disabled={busy} id="pro-activation-code" aria-describedby="pro-activation-error" aria-invalid={Boolean(activationError)} maxLength={128} onChange={(event) => { setActivationCode(event.target.value); setActivationError(null); }} placeholder="AUTARK-PRO-XXXX-XXXX" spellCheck={false} value={activationCode} /><span className="min-h-5 text-xs text-destructive" id="pro-activation-error">{activationError}</span></label>
             <ProjectPrimaryButton disabled={busy || activationCode.trim().length < 8} type="submit">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}Verify this server</ProjectPrimaryButton>
           </form>
         </ProjectPanel>
       )}
 
-      {lifecycle.reason && <ProjectPanel className="border-amber-300/30 bg-amber-400/10 text-sm text-amber-100" role="status">{lifecycle.reason}</ProjectPanel>}
-      {actionError && <ProjectPanel className="border-red-400/35 bg-red-500/10 text-sm text-red-100" role="alert">{actionError}</ProjectPanel>}
-      {moduleJob.data && <JobProgress job={moduleJob.data} subjectLabel="Private extension" />}
 
       <LifecycleDetails onCopy={(value, label) => void copyLifecycleValue(value, label)} product={product} status={status} />
 

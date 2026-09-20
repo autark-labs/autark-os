@@ -32,18 +32,6 @@ test('Discover waits for a successful canonical snapshot and locks installs whil
   assert.match(repository, /enabled,/);
 });
 
-test('one canonical state notice covers the application shell and focused app-state overlays', () => {
-  const shell = source('layout/AppShell.tsx');
-  const settings = source('pages/SettingsPage/SettingsPage.tsx');
-  const notice = source('components/autark-os/ApplicationStateNotice.tsx');
-
-  assert.match(shell, /<ApplicationStateNotice/);
-  assert.match(settings, /embedded && <ApplicationStateNotice/);
-  assert.match(notice, /Current app information is unavailable/);
-  assert.match(notice, /App information may be out of date/);
-  assert.match(notice, /Refresh app information/);
-});
-
 test('app-specific empty states require a successful canonical snapshot', () => {
   const home = source('pages/OverviewPage/OverviewPage.tsx');
   const applications = source('pages/ApplicationsPage/ApplicationsPage.tsx');

@@ -13,7 +13,8 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { StatusBadge } from '@/components/autark-os/StatusBadge';
+import { ContextChip } from '@/components/autark-os/ContextChip';
+import { Button } from '@/components/ui/button';
 import { ApplicationStateNotice } from '@/components/autark-os/ApplicationStateNotice';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
@@ -91,7 +92,6 @@ function SettingsPage({
     pendingNavigation,
     refreshConfirmationOpen,
     refreshing,
-    reload,
     requestRefresh,
     save,
     saveError,
@@ -177,14 +177,12 @@ function SettingsPage({
 
   return (
     <PageShell contained={embedded} className={embedded ? 'min-h-0 flex-1 bg-app-panel' : undefined} contentClassName={embedded ? 'min-h-0 !gap-0 !overflow-hidden !p-0' : undefined}>
-      {embedded && <ApplicationStateNotice className="m-3 mb-0" />}
       {embedded ? (
         <ExtensionActionTarget actionId="review-pro" className="flex min-h-0 flex-1" routeId="settings">
           <SettingsWorkbench
           activeGroupId={activeGroupId}
           activeGroupMeta={activeGroupMeta}
           activePanelContent={activePanelContent}
-          deviceName={draft.deviceName}
           dirty={dirty}
           loadError={loadError}
           onRequestClose={requestClose}
@@ -207,7 +205,7 @@ function SettingsPage({
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Direct controls for this appliance: identity, managed-app defaults, backups, and advanced host details. Changes apply when you save them.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge tone={dirty ? 'warning' : 'success'}>{dirty ? 'Unsaved changes' : 'Saved'}</StatusBadge>
+            <SettingsFeedback dirty={dirty} loadError={loadError} saveError={saveError} onRefresh={requestRefresh} />
             <DisabledAction disabled={refreshing || saving} reason={saving ? 'Wait for the current save to finish.' : 'Settings are already refreshing.'}>
               <ProjectDarkControlButton disabled={refreshing || saving} onClick={requestRefresh} type="button">
                 <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
@@ -234,10 +232,6 @@ function SettingsPage({
           <SettingsStatusCard icon={ActiveGroupIcon} label="Selected" tone={activeGroupId === 'advanced' ? 'cyan' : 'slate'} value={activeGroupMeta.label} />
         </div>
           </Surface>
-
-          {loadError && <SettingsErrorState message={loadError} onAction={reload} title="Settings could not refresh" />}
-          {saveError && <SettingsErrorState actionLabel="Try save again" message={`${saveError} Your edits are still here.`} onAction={() => void save()} title="Settings could not save" />}
-
           <Surface as="nav" className="shrink-0 grid gap-2 p-2 sm:grid-cols-2 xl:grid-cols-4" tone="panel">
         {topLevelSettingsGroups.map((group) => {
           const groupId = group.id as SettingsGroupId;
@@ -324,11 +318,17 @@ function SettingsPage({
   );
 }
 
+function SettingsFeedback({ dirty, loadError, saveError, onRefresh }: { dirty: boolean; loadError: string | null; saveError: string | null; onRefresh: () => void }) {
+  return <ContextChip label={saveError ? 'Save failed' : loadError ? 'Refresh paused' : dirty ? 'Unsaved changes' : 'Saved'} title="Settings / Current status" tone={saveError ? 'danger' : loadError || dirty ? 'warning' : 'muted'}>
+    <p>{saveError ? `${saveError} Your edits are still here. Use Save changes to retry.` : dirty ? 'Your edits have not been saved yet.' : 'Settings are saved.'}</p>
+    {loadError && <><p>{loadError}</p><Button onClick={onRefresh} size="sm" type="button">Refresh settings</Button></>}
+  </ContextChip>;
+}
+
 function SettingsWorkbench({
   activeGroupId,
   activeGroupMeta,
   activePanelContent,
-  deviceName,
   dirty,
   loadError,
   onRequestClose,
@@ -343,7 +343,6 @@ function SettingsWorkbench({
   activeGroupId: SettingsGroupId;
   activeGroupMeta: (typeof topLevelSettingsGroups)[number];
   activePanelContent: ReactNode;
-  deviceName: string;
   dirty: boolean;
   loadError: string | null;
   onRequestClose: () => void;
@@ -395,9 +394,9 @@ function SettingsWorkbench({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-sky-300/15 bg-app-header-surface/90 px-4 py-3 sm:px-5">
-          <div className="min-w-0"><p className="truncate text-xs font-semibold text-cyan-200">{deviceName || 'Autark-OS'}</p><h1 className="mt-1 text-lg font-semibold text-white">Appliance settings</h1></div>
+          <div className="min-w-0"><ApplicationStateNotice className="max-w-40 [&>span]:max-sm:hidden [&>svg:last-child]:max-sm:hidden" /><h1 className="mt-1 text-lg font-semibold text-white">Appliance settings</h1></div>
           <div className="flex shrink-0 items-center gap-2">
-            <StatusBadge tone={dirty ? 'warning' : 'success'}>{dirty ? 'Unsaved changes' : 'Saved'}</StatusBadge>
+            <SettingsFeedback dirty={dirty} loadError={loadError} saveError={saveError} onRefresh={onRequestRefresh} />
             <DisabledAction disabled={refreshing || saving} reason={saving ? 'Wait for the current save to finish.' : 'Settings are already refreshing.'}>
               <ProjectDarkControlButton aria-label="Refresh settings" className="size-8 px-0" disabled={refreshing || saving} onClick={onRequestRefresh} size="icon-sm" type="button"><RefreshCw className={cn('size-4', refreshing && 'animate-spin')} /></ProjectDarkControlButton>
             </DisabledAction>
@@ -419,14 +418,12 @@ function SettingsWorkbench({
             <ProjectInset>
               <div className="flex items-start gap-3"><span className="grid size-9 shrink-0 place-items-center rounded-xl border border-cyan-300/25 bg-cyan-400/10 text-cyan-200"><ActiveGroupIcon className="size-4" /></span><div><p className="text-xs text-sky-100/55">Settings / {activeGroupMeta.label}</p><h2 className="mt-1 text-lg font-semibold text-white">{activeGroupMeta.label}</h2><p className="mt-1 text-sm leading-5 text-sky-100/65">{activeGroupMeta.description}</p></div></div>
             </ProjectInset>
-            {loadError && <SettingsErrorState message={loadError} onAction={onRequestRefresh} title="Settings could not refresh" />}
-            {saveError && <SettingsErrorState actionLabel="Try save again" message={`${saveError} Your edits are still here.`} onAction={onSave} title="Settings could not save" />}
             {activePanelContent}
           </div>
         </div>
 
         <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-sky-300/15 bg-slate-950/30 px-4 py-3 sm:px-5">
-          <p className="text-xs text-sky-100/55">{dirty ? 'Changes apply to this appliance after saving.' : 'All appliance settings are saved.'}</p>
+          <p className="text-xs text-sky-100/55">{saveError ? 'Save failed. Your edits are still here.' : dirty ? 'Changes apply to this appliance after saving.' : 'All appliance settings are saved.'}</p>
           <DisabledAction disabled={!dirty || saving} reason={saving ? 'Autark-OS is already saving these settings.' : 'Make a change before saving settings.'}>
             <ProjectPrimaryButton disabled={!dirty || saving} onClick={onSave} size="sm" type="button">{saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}{saving ? 'Saving' : 'Save changes'}</ProjectPrimaryButton>
           </DisabledAction>

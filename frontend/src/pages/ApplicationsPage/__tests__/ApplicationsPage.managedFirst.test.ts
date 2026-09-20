@@ -43,12 +43,9 @@ test('My Apps uses quiet status dots and compact action affordances on dark app 
 });
 
 test('My Apps prompts only for preflighted recovery while retaining direct conflict review', () => {
-  assert.match(page, /application\.operation\.kind === 'installing' && !application\.runtime/);
   assert.match(page, /<JobProgress compact job=\{job\}/);
   assert.match(page, /reviewApplications = useMemo\([\s\S]*application\.relationship === 'recovery_required'/);
   assert.match(page, /reviewedApplication = appState\.applications\.find[\s\S]*application\.relationship === 'blocked'/);
-  assert.match(page, /ApplicationReviewPrompt/);
-  assert.match(page, /reviewApplications\[0\]\?\.primaryAction\.href/);
   assert.match(page, /<ApplicationReviewDialog/);
   assert.doesNotMatch(page, /focus=service|deepLinkTarget\.kind === 'service'/);
 });

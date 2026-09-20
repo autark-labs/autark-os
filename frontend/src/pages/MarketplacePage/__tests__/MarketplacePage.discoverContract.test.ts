@@ -44,12 +44,10 @@ test('marketplace page reads discover data and jobs through the repository layer
   assert.match(page, /useDiscoverJobTracking/);
   assert.match(jobTracking, /useDiscoverJobQuery/);
   assert.match(jobTracking, /useDiscoverJobsQuery/);
-  assert.match(page, /useMarketplaceActivityQuery/);
 
   assert.match(repository, /discoverQueryKeys/);
   assert.match(repository, /useDiscoverAppsQuery/);
   assert.match(repository, /useDiscoverReadinessQuery/);
-  assert.match(repository, /useMarketplaceActivityQuery/);
   assert.match(repository, /useDiscoverInstallPreviewQuery/);
   assert.match(repository, /useDiscoverInstallMutation/);
   assert.match(repository, /useDiscoverBackupMutation/);

@@ -24,6 +24,9 @@ function OverviewPage() {
       <ExtensionActionTarget actionId="review-pro" routeId="home">
         <HomeHero
           deviceName={deviceName}
+          refreshError={summaryError}
+          onRefresh={() => void summaryQuery.refetch()}
+          refreshing={summaryQuery.isFetching}
           summaryAvailability={summaryAvailability}
           summary={summary}
         >
@@ -33,11 +36,6 @@ function OverviewPage() {
 
       <DashboardSummaryGrid metrics={systemMetrics} />
 
-      {summaryError && (
-        <div className="rounded-lg border border-amber-300/20 bg-amber-400/5 px-3 py-2 text-xs text-amber-100/80" role="status">
-          Some live Home information is unavailable: {summaryError}
-        </div>
-      )}
     </PageShell>
   );
 }

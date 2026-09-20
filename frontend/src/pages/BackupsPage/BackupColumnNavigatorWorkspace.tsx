@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -53,6 +53,7 @@ import {
 type DirectoryKey = BackupDirectoryKey;
 
 type WorkspaceProps = {
+  context: ReactNode;
   appIconUrlById: Record<string, string | null>;
   appBackupAvailability: BackupOperationAvailability;
   fullBackupAvailability: BackupOperationAvailability;
@@ -73,6 +74,7 @@ type WorkspaceProps = {
 };
 
 export function BackupColumnNavigatorWorkspace({
+  context,
   appIconUrlById,
   appBackupAvailability,
   fullBackupAvailability,
@@ -126,6 +128,7 @@ export function BackupColumnNavigatorWorkspace({
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col gap-3">
       <BackupsHeader
+        context={context}
         onOpenSettings={onOpenSettings}
         onRefresh={onRefresh}
         protectedApps={report.protectedApps}
@@ -221,6 +224,7 @@ export function BackupColumnNavigatorWorkspace({
 }
 
 function BackupsHeader({
+  context,
   onOpenSettings,
   onRefresh,
   protectedApps,
@@ -228,6 +232,7 @@ function BackupsHeader({
   totalApps,
   updatedAt,
 }: {
+  context: ReactNode;
   onOpenSettings: () => void;
   onRefresh: () => void;
   protectedApps: number;
@@ -244,7 +249,7 @@ function BackupsHeader({
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <HeaderMetric label="Protected" value={`${protectedApps}/${totalApps}`} />
-          <HeaderMetric label="Last checked" value={formatUpdatedAt(updatedAt)} />
+          <div className="w-44">{context}<p className="mt-1 text-right text-xs text-muted-foreground">Checked {formatUpdatedAt(updatedAt)}</p></div>
           <DisabledAction disabled={refreshing} reason="Backup status is already refreshing."><button aria-label="Refresh backup status" className="grid size-10 place-items-center rounded-xl border border-sky-300/15 bg-slate-950/25 text-sky-100/70 transition hover:border-cyan-300/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50" disabled={refreshing} onClick={onRefresh} type="button"><RefreshCw className={cn('size-4', refreshing && 'animate-spin')} /></button></DisabledAction>
           <button aria-label="Backup settings" className="grid size-10 place-items-center rounded-xl border border-sky-300/15 bg-slate-950/25 text-sky-100/70 transition hover:border-cyan-300/30 hover:text-white" onClick={onOpenSettings} type="button"><Settings2 className="size-4" /></button>
         </div>

@@ -55,6 +55,7 @@ type MonitoringActivityWorkspaceProps = {
   onLevelChange: (value: string) => void;
   onRefresh: () => void;
   refreshing: boolean;
+  refreshError?: string | null;
   reliability: AppReliabilitySummary | null;
   showAdvancedMetrics: boolean;
   timeZone: string;
@@ -96,6 +97,7 @@ export function MonitoringActivityWorkspace({
   onLevelChange,
   onRefresh,
   refreshing,
+  refreshError,
   reliability,
   showAdvancedMetrics,
   timeZone,
@@ -143,6 +145,7 @@ export function MonitoringActivityWorkspace({
         onRefresh={onRefresh}
         recentRepairCount={recentRepairCount}
         refreshing={refreshing}
+        refreshError={refreshError}
         reliability={reliability}
         showAdvancedMetrics={showAdvancedMetrics}
         timeZone={timeZone}
@@ -250,6 +253,7 @@ function ActivityWorkspaceHeader({
   onRefresh,
   recentRepairCount,
   refreshing,
+  refreshError,
   reliability,
   showAdvancedMetrics,
   timeZone,
@@ -262,6 +266,7 @@ function ActivityWorkspaceHeader({
   onRefresh: () => void;
   recentRepairCount: number;
   refreshing: boolean;
+  refreshError?: string | null;
   reliability: AppReliabilitySummary | null;
   showAdvancedMetrics: boolean;
   timeZone: string;
@@ -297,7 +302,7 @@ function ActivityWorkspaceHeader({
               </ProjectDarkControlButton>
             </DisabledAction>
           )}
-          <RefreshStatus className="pl-1" intervalLabel="Updates every 10s" onRefresh={onRefresh} refreshing={refreshing} showButton tone="info" updatedAt={updatedAt} />
+          <RefreshStatus error={refreshError} className="pl-1" intervalLabel="Updates every 10s" onRefresh={onRefresh} refreshing={refreshing} showButton tone="info" updatedAt={updatedAt} />
         </div>
       </div>
     </Surface>

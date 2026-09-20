@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiErrorMessage } from '@/api/httpClient';
 import {
   latestActiveDiscoverJob,
   useDiscoverJobQuery,
@@ -9,7 +8,6 @@ import { terminalJob } from '@/repositories/jobRepository';
 import type { AutarkOsJob } from '@/types/jobs';
 
 type DiscoverJobTrackingOptions = {
-  onError: (message: string) => void;
   onInstallSubjectRecovered: (appId: string) => void;
   refreshDiscover: () => Promise<unknown>;
 };
@@ -19,7 +17,7 @@ type DiscoverJobTrackingOptions = {
  * A refreshed or reopened page resumes the active install or backup instead
  * of losing user-visible progress.
  */
-export function useDiscoverJobTracking({ onError, onInstallSubjectRecovered, refreshDiscover }: DiscoverJobTrackingOptions) {
+export function useDiscoverJobTracking({ onInstallSubjectRecovered, refreshDiscover }: DiscoverJobTrackingOptions) {
   const [installJob, setInstallJob] = useState<AutarkOsJob | null>(null);
   const [backupJob, setBackupJob] = useState<AutarkOsJob | null>(null);
   const jobsQuery = useDiscoverJobsQuery();
@@ -56,20 +54,14 @@ export function useDiscoverJobTracking({ onError, onInstallSubjectRecovered, ref
   }, [installJobQuery.data, refreshDiscover]);
 
   useEffect(() => {
-    if (installJobQuery.error) onError(apiErrorMessage(installJobQuery.error, 'Install progress could not be refreshed.'));
-  }, [installJobQuery.error, onError]);
-
-  useEffect(() => {
     if (!backupJobQuery.data) return;
     setBackupJob(backupJobQuery.data);
     if (terminalJob(backupJobQuery.data)) void refreshDiscover();
   }, [backupJobQuery.data, refreshDiscover]);
 
-  useEffect(() => {
-    if (backupJobQuery.error) onError(apiErrorMessage(backupJobQuery.error, 'Backup progress could not be refreshed.'));
-  }, [backupJobQuery.error, onError]);
-
   return {
+    progressError: installJobQuery.error || backupJobQuery.error || jobsQuery.error,
+    retryProgress: () => Promise.all([jobsQuery.refetch(), ...(activeInstallJobId ? [installJobQuery.refetch()] : []), ...(activeBackupJobId ? [backupJobQuery.refetch()] : [])]),
     backupJob,
     installJob,
     setBackupJob,

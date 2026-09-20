@@ -52,6 +52,7 @@ type StorageCapacityRibbonWorkspaceProps = {
   onReviewOrphan: (orphan: OrphanedStorage) => void;
   onRefresh: () => void;
   refreshing: boolean;
+  refreshError?: string | null;
   report: StorageReport;
   showAdvancedMetrics: boolean;
   updatedAt: Date | null;
@@ -64,6 +65,7 @@ export function StorageCapacityRibbonWorkspace({
   onRefresh,
   onReviewOrphan,
   refreshing,
+  refreshError,
   report,
   showAdvancedMetrics,
   updatedAt,
@@ -103,6 +105,7 @@ export function StorageCapacityRibbonWorkspace({
         freeBytes={report.hostDisk.usableBytes}
         onRefresh={onRefresh}
         refreshing={refreshing}
+        refreshError={refreshError}
         updatedAt={updatedAt}
         usedPercent={report.hostDisk.usedPercent}
       />
@@ -165,10 +168,11 @@ function StorageWorkspaceTabTrigger({ icon: Icon, label, value }: { icon: Lucide
   return <TabsTrigger className="shrink-0 px-3 py-1.5 text-xs text-sky-100/60 data-active:bg-cyan-300/15 data-active:text-cyan-100" value={value}><Icon aria-hidden="true" className="size-3.5" />{label}</TabsTrigger>;
 }
 
-function StorageCapacityHeader({ freeBytes, onRefresh, refreshing, updatedAt, usedPercent }: {
+function StorageCapacityHeader({ freeBytes, onRefresh, refreshing, refreshError, updatedAt, usedPercent }: {
   freeBytes: number;
   onRefresh: () => void;
   refreshing: boolean;
+  refreshError?: string | null;
   updatedAt: Date | null;
   usedPercent: number;
 }) {
@@ -187,7 +191,7 @@ function StorageCapacityHeader({ freeBytes, onRefresh, refreshing, updatedAt, us
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <HeaderMetric label="Used" value={storagePercentLabel(usedPercent)} />
           <HeaderMetric label="Free" value={formatStorageBytes(freeBytes)} />
-          <RefreshStatus className="pl-1" intervalLabel="Updates every 30s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
+          <RefreshStatus error={refreshError} className="pl-1" intervalLabel="Updates every 30s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
         </div>
       </div>
     </Surface>

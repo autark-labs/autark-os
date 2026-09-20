@@ -27,12 +27,3 @@ test('settings uses one save result instead of a second app-defaults mutation', 
   assert.doesNotMatch(controller, /applyAppDefaults/);
   assert.doesNotMatch(client, /settings\/app-defaults\/apply/);
 });
-
-test('settings has distinct recoverable load and save failures', () => {
-  const page = readFileSync(resolve(here, '../SettingsPage.tsx'), 'utf8');
-
-  assert.match(page, /Settings are unavailable/);
-  assert.match(page, /Settings could not refresh/);
-  assert.match(page, /Settings could not save/);
-  assert.match(page, /Your edits are still here/);
-});

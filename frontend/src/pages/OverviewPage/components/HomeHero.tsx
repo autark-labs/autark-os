@@ -1,25 +1,32 @@
+import { ContextChip } from '@/components/autark-os/ContextChip';
+import { Button } from '@/components/ui/button';
 import type { ReactNode } from 'react';
-import { Check, CircleAlert, Clock3, Container, Network, type LucideIcon } from 'lucide-react';
+import { Clock3, Container, Network, type LucideIcon } from 'lucide-react';
 import overviewBackground from '@/assets/overviewBackground.webp';
 import type { SystemSummary } from '@/types/system';
 import type { HomeSummaryAvailability } from '../extensions/OverviewPage.systemStatus';
 
 export function HomeHero({
   deviceName,
+  refreshError,
+  onRefresh,
+  refreshing,
   children,
   summaryAvailability,
   summary,
 }: {
   children?: ReactNode;
   deviceName: string;
+  refreshError: string | null;
+  onRefresh: () => void;
+  refreshing: boolean;
   summaryAvailability: HomeSummaryAvailability;
   summary: SystemSummary | null;
 }) {
   const needsReview = Boolean(summary?.issues.length);
   const loading = summaryAvailability === 'loading';
   const unavailable = summaryAvailability === 'unavailable';
-  const statusTone = loading ? 'info' : unavailable || needsReview ? 'warning' : 'success';
-  const readyStatus = loading ? 'Checking' : unavailable ? 'Status unavailable' : needsReview ? 'Needs review' : 'System healthy';
+  const readyStatus = refreshError && summary ? 'Refresh paused' : loading ? 'Checking' : unavailable ? 'Status unavailable' : needsReview ? 'Needs review' : 'System healthy';
   const accessStatus = accessHeroStatus(summary);
 
   return (
@@ -40,7 +47,11 @@ export function HomeHero({
               {homeHeroSubtitle(summary, summaryAvailability)}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2" aria-label="Home server status">
-              <HeroStatusChip icon={statusTone === 'warning' ? CircleAlert : Check} label={readyStatus} tone={statusTone} />
+              <ContextChip label={readyStatus} title="Home / Server status" tone={refreshError || needsReview ? 'warning' : 'muted'} busy={refreshing}>
+                <p>{refreshError || (needsReview ? 'Review server health in Diagnostics.' : homeHeroSubtitle(summary, summaryAvailability))}</p>
+                {refreshError && summary && <p className="text-xs text-muted-foreground">Previous server information remains visible.</p>}
+                <Button disabled={refreshing} onClick={onRefresh} size="sm" type="button">Refresh Home</Button>
+              </ContextChip>
               {loading && <HeroStatusChip icon={Clock3} label="Updating" tone="info" />}
               {!loading && <HeroStatusChip icon={Container} label={summary?.docker.ready ? 'Docker ready' : 'Docker needs setup'} tone={summary?.docker.ready ? 'success' : 'warning'} />}
               {!loading && <HeroStatusChip icon={Network} label={accessStatus.label} tone={accessStatus.tone} />}
@@ -70,7 +81,7 @@ function HeroStatusChip({ icon: Icon, label, tone }: { icon: LucideIcon; label: 
 
 function homeHeroSubtitle(summary: SystemSummary | null, availability: HomeSummaryAvailability) {
   if (availability === 'loading' && !summary) return 'Autark-OS is checking your home server.';
-  if (availability === 'unavailable' && !summary) return 'Autark-OS could not load the current server status.';
+  if (availability === 'unavailable') return 'Autark-OS could not load the current server status.';
   if (summary?.issues.length) return 'Your server needs a quick look.';
   if (summary?.setup.complete === false) return summary.setup.summary || 'Finish setup to unlock the full Autark-OS experience.';
   return 'Your digital home is ready.';

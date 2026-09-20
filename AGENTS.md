@@ -522,7 +522,14 @@ Guidelines:
 - History uses server activity records and jobs, not browser-only storage. Saving failures must be visible and retryable; do not claim unsaved results survived a reload.
 - Do not put copied secrets, private URLs, or raw diagnostics in notification copy.
 
-Page-local red flashes are not enough.
+Current conditions use the shared A2 `ContextChip` in existing header/status space.
+Its bounded popover explains the issue and next action; closing it must not hide
+an unresolved condition. Reuse `RefreshStatus` for cached-data refresh failures.
+Do not insert page banners for mutation results or background polling.
+A failed first load replaces unavailable content with `PageLoadError`, not a
+healthy-looking empty state. Keep field validation, unsaved edits, and destructive
+consequences beside their controls. Existing Activity history owns action results;
+context chips are not a second event store.
 
 ### Make errors user-actionable
 

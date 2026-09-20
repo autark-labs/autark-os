@@ -4,6 +4,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { NotificationCenterPopover } from '@/components/autark-os/NotificationCenter';
 import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
 import { AdminSessionControl } from '@/components/autark-os/AdminSessionControl';
+import { ApplicationStateNotice } from '@/components/autark-os/ApplicationStateNotice';
 import { ThemeSelectorPopover } from '@/components/autark-os/ThemeSelectorPopover';
 import { Button } from '@/components/ui/button';
 import {
@@ -60,10 +61,7 @@ function MobileAppBar() {
 
   return (
     <div className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-sky-400/25 bg-slate-950 px-4 text-slate-50 shadow-xl shadow-slate-950/30 lg:hidden">
-      <div className="min-w-0">
-        <p className="m-0 truncate text-xs font-semibold uppercase tracking-normal text-cyan-200">Autark-OS</p>
-        <h1 className="m-0 truncate text-base font-black leading-none text-white">Appliance</h1>
-      </div>
+      <ApplicationStateNotice className="max-w-44 shrink [&>span]:max-sm:hidden [&>svg:last-child]:max-sm:hidden" />
 
       <div className="flex shrink-0 items-center gap-2">
         <NotificationCenterPopover compact />

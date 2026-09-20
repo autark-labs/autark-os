@@ -73,11 +73,13 @@ test('backup restore dialog has no serious or critical axe violations', async ({
 
 test('canonical app-state failure notices have no serious or critical axe violations', async ({ page }) => {
   await openRoute(page, '/apps', 'app-state-stale');
-  await expect(page.getByRole('alert').filter({ hasText: 'App information may be out of date' })).toBeVisible();
+  await page.getByRole('button', { name: 'App refresh paused', exact: true }).click();
+  await expect(page.getByText(/App information may be out of date/)).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page);
 
   await page.goto('/settings', { waitUntil: 'domcontentloaded' });
   const settingsDialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
-  await expect(settingsDialog.getByText('App information may be out of date', { exact: true })).toBeVisible();
+  await settingsDialog.getByRole('button', { name: 'App refresh paused', exact: true }).click();
+  await expect(page.getByText(/App information may be out of date/)).toBeVisible();
   await expectNoSeriousAccessibilityViolations(page, '[role="dialog"]');
 });

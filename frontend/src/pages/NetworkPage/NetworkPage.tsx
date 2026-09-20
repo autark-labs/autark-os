@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
-import { StatusBadge } from '@/components/autark-os/StatusBadge';
+import { ContextChip } from '@/components/autark-os/ContextChip';
+import type { ReactNode } from 'react';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectWarningButton } from '@/components/primitives/ProjectButtons';
@@ -45,7 +46,7 @@ import { NetworkAdvancedPanel } from './NetworkAdvancedPanel';
 import { NetworkDevicesPanel } from './NetworkDevicesPanel';
 import { NetworkIssuesPanel } from './NetworkIssuesPanel';
 import { ReachabilityMatrix } from './ReachabilityMatrix';
-import { AccessLine, AccessPageErrorState, AccessPageLoadingState, NetworkInset, NetworkPanel } from './NetworkPage.shared';
+import { AccessLine, AccessPageErrorState, AccessPageLoadingState } from './NetworkPage.shared';
 import {
   buildDeviceViews,
   buildNetworkIssues,
@@ -80,10 +81,10 @@ function NetworkPage() {
   const appState = useApplicationStateRepository();
   const network = useAccessNetworkRepository();
   const removeStalePrivateAccess = useRemoveStalePrivateAccessMutation();
-  const [actionError, setActionError] = useState<string | null>(null);
   const [copiedLinkKey, setCopiedLinkKey] = useState<string | null>(null);
   const [processingServiceTokens, setProcessingServiceTokens] = useState<Record<string, number>>({});
   const [pendingReachabilityByServiceId, setPendingReachabilityByServiceId] = useState<Record<string, PendingReachability>>({});
+  const [privateLinksOpen, setPrivateLinksOpen] = useState(false);
   const [staleActionLoadingId, setStaleActionLoadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [focusedServiceId, setFocusedServiceId] = useState<string | null>(null);
@@ -98,7 +99,7 @@ function NetworkPage() {
   )), [appState.applications]);
   const pageLoading = network.isLoading || appState.isLoading;
   const pageRefreshing = network.isFetching || appState.isFetching;
-  const pageError = actionError ?? (network.error ? apiErrorMessage(network.error, 'Unable to load network status.') : null);
+  const pageError = (network.error ? apiErrorMessage(network.error, 'Unable to load network status.') : null);
 
   const refreshAll = useCallback(async () => {
     await Promise.all([
@@ -159,7 +160,6 @@ function NetworkPage() {
     setProcessingServiceTokens((current) => setServiceProcessingToken(current, service.id, pendingToken));
     setPendingReachabilityByServiceId((current) => ({ ...current, [service.id]: { acknowledged: false, token: pendingToken, zone: targetZone } }));
     setFocusedServiceId(service.id);
-    setActionError(null);
     window.setTimeout(() => {
       setProcessingServiceTokens((current) => removeServiceProcessingForToken(current, service.id, pendingToken));
       setPendingReachabilityByServiceId((current) => removePendingReachabilityForToken(current, service.id, pendingToken));
@@ -179,8 +179,6 @@ function NetworkPage() {
       setPendingReachabilityByServiceId((current) => acknowledgePendingReachability(current, service.id, pendingToken));
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
-      const message = apiErrorMessage(err, 'Unable to update reachability for this service.');
-      setActionError(message);
       showActionErrorNotification(err, 'Reachability update failed');
       void appState.refresh();
     } finally {
@@ -193,14 +191,11 @@ function NetworkPage() {
 
   const removeStaleMapping = useCallback(async (port: number) => {
     setStaleActionLoadingId(`stale-${port}`);
-    setActionError(null);
     try {
       await removeStalePrivateAccess.mutateAsync(port);
       showActionNotification({ ok: true, severity: 'success', title: 'Stale private link removed', message: 'Autark-OS removed the stale Tailscale Serve entry.' }, 'Stale private link removed');
       await refreshAll();
     } catch (err) {
-      const message = apiErrorMessage(err, 'Unable to remove this stale private link.');
-      setActionError(message);
       showActionErrorNotification(err, 'Stale private link removal failed');
     } finally {
       setStaleActionLoadingId(null);
@@ -261,18 +256,20 @@ function NetworkPage() {
     >
       <ExtensionActionTarget actionId="review-access" routeId="access">
         <AccessPageHeader
+          error={pageError}
+          context={<StalePrivateLinksPanel open={privateLinksOpen} onOpenChange={setPrivateLinksOpen} loadingId={staleActionLoadingId} onRemoveStaleMapping={removeStaleMapping} reconciliation={network.reconciliation} />}
           needsReviewCount={needsReviewCount}
           onRefresh={refreshAll}
           refreshing={pageRefreshing}
           serviceCount={reachabilityServices.length}
-          updatedAt={appState.updatedAt ?? network.updatedAt}
+          updatedAt={network.updatedAt}
         />
       </ExtensionActionTarget>
 
-      {pageError && <AccessPageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />}
-
       {pageLoading ? (
         <AccessPageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
+      ) : pageError && (!network.reconciliation || !network.tailscale) ? (
+        <AccessPageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <Tabs className="flex min-h-0 flex-1 flex-col gap-3" onValueChange={handleTabChange} value={selectedTab}>
@@ -307,15 +304,10 @@ function NetworkPage() {
                   onFocusService={focusReachabilityService}
                   onMoveService={moveReachabilityService}
                 />
-                <StalePrivateLinksPanel
-                  loadingId={staleActionLoadingId}
-                  onRemoveStaleMapping={removeStaleMapping}
-                  reconciliation={network.reconciliation}
-                />
               </div>
             </TabsContent>
             <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="issues">
-              <NetworkIssuesPanel issues={issues} onReviewPrivateLinks={() => handleTabChange('matrix')} />
+              <NetworkIssuesPanel onReviewServices={() => handleTabChange('matrix')} issues={issues} onReviewPrivateLinks={() => setPrivateLinksOpen(true)} />
             </TabsContent>
             {showAdvancedMetrics && <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="devices">
               <NetworkDevicesPanel devices={devices} />
@@ -334,12 +326,16 @@ function NetworkPage() {
 }
 
 function AccessPageHeader({
+  context,
+  error,
   needsReviewCount,
   onRefresh,
   refreshing,
   serviceCount,
   updatedAt,
 }: {
+  context: ReactNode;
+  error: string | null;
   needsReviewCount: number;
   onRefresh: () => void;
   refreshing: boolean;
@@ -348,7 +344,7 @@ function AccessPageHeader({
 }) {
   return (
     <Surface as="header" className="overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
             <Network aria-hidden="true" className="size-5" />
@@ -361,7 +357,8 @@ function AccessPageHeader({
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           <AccessSummaryMetric label="Reachable services" value={serviceCount} />
           <AccessSummaryMetric attention={needsReviewCount > 0} label="Needs review" value={needsReviewCount} />
-          <RefreshStatus intervalLabel="Auto-updates every 10s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
+          {context}
+          <RefreshStatus error={error} intervalLabel="Auto-updates every 10s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
         </div>
       </div>
     </Surface>
@@ -381,32 +378,29 @@ function AccessSummaryMetric({ attention = false, label, value }: { attention?: 
 }
 
 function StalePrivateLinksPanel({
+  open,
+  onOpenChange,
   loadingId,
   onRemoveStaleMapping,
   reconciliation,
 }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   loadingId: string | null;
   onRemoveStaleMapping: (port: number) => void;
   reconciliation: PrivateAccessReconciliationReport | null;
 }) {
-  if (!reconciliation?.staleMappings?.length) {
-    return null;
-  }
+  const mappings = reconciliation?.staleMappings ?? [];
   return (
-    <NetworkPanel
-      className="mt-5 border-orange-400/45"
-      description="These private links do not match a service that currently wants Private Tailnet access."
-      title="Advanced cleanup"
-    >
-      {reconciliation.staleMappings.map((mapping) => (
-        <NetworkInset className="grid gap-3 rounded-lg border-orange-400/30 p-4 md:grid-cols-[minmax(0,1fr)_auto]" key={mapping.id}>
+    <ContextChip open={open} onOpenChange={onOpenChange} className="w-40" label={mappings.length ? `${mappings.length} unused link${mappings.length === 1 ? '' : 's'}` : 'Private links'} title="Access / Unused private links" tone={mappings.length ? 'warning' : 'muted'}>
+      <p className="text-xs text-muted-foreground">{!reconciliation ? 'Private links have not been checked yet.' : mappings.length ? 'These links no longer match an app’s private-access settings. Review each before removing it.' : 'No unused private links were found.'}</p>
+      {mappings.map((mapping) => (
+        <div className="grid gap-3 border-t border-border pt-3" key={mapping.id}>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-semibold text-slate-50">HTTPS port {mapping.servePort ?? 'unknown'}</h3>
-              <StatusBadge tone="warning">Stale private link</StatusBadge>
             </div>
-            <p className="mt-2 text-sm text-orange-100/80">{mapping.detail}</p>
-            <div className="mt-3 grid gap-2 text-sm md:grid-cols-2">
+            <div className="mt-2 grid gap-2 text-xs">
               <AccessLine label="Endpoint" value={mapping.endpoint || 'Unknown endpoint'} />
               <AccessLine label="Routes to" value={mapping.target || 'Unknown target'} />
             </div>
@@ -424,7 +418,7 @@ function StalePrivateLinksPanel({
               <AlertDialogHeader>
                 <AlertDialogTitle>Remove this stale private link?</AlertDialogTitle>
                 <AlertDialogDescription className="text-slate-400">
-                  Autark-OS will remove the Tailscale Serve entry for HTTPS port {mapping.servePort ?? 'unknown'}. Active service links should be changed from the matrix.
+                  Autark-OS will remove the Tailscale Serve entry for HTTPS port {mapping.servePort ?? 'unknown'}. This link will stop working. No app data will be deleted. Active service links should be changed from the matrix.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -435,9 +429,9 @@ function StalePrivateLinksPanel({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </NetworkInset>
+        </div>
       ))}
-    </NetworkPanel>
+    </ContextChip>
   );
 }
 

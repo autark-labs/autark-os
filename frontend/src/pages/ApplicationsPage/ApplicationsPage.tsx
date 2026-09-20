@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { ApplicationReviewPrompt } from '@/components/autark-os/ApplicationReviewPrompt';
+import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
+import { ContextChip } from '@/components/autark-os/ContextChip';
+import { Button } from '@/components/ui/button';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
@@ -50,20 +53,6 @@ import {
 } from './extensions/ApplicationsPage.presentation';
 
 type ManagedLifecycleAction = Extract<ApplicationRuntimeAction, 'start' | 'stop' | 'restart'>;
-const applicationReviewPromptDismissalKey = 'autark-os.my-apps.review-prompt-dismissed.v1';
-
-function readApplicationReviewPromptDismissal() {
-  if (typeof window === 'undefined') {
-    return '';
-  }
-
-  try {
-    return window.sessionStorage.getItem(applicationReviewPromptDismissalKey) || '';
-  } catch {
-    return '';
-  }
-}
-
 export const ApplicationsPage = () => {
   const { setViewMode, viewMode } = useProjectSettings();
   const queryClient = useQueryClient();
@@ -79,7 +68,6 @@ export const ApplicationsPage = () => {
   const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
   const [trackedAppJobIds, setTrackedAppJobIds] = useState<string[]>([]);
-  const [dismissedReviewSignature, setDismissedReviewSignature] = useState(readApplicationReviewPromptDismissal);
   const appliedDeepLinkKeyRef = useRef('');
   const railRef = useRef<HTMLDivElement | null>(null);
   const deepLinkTarget = useMemo(() => parseApplicationsDeepLink(location.search), [location.search]);
@@ -96,16 +84,12 @@ export const ApplicationsPage = () => {
       .filter((application) => application.relationship === 'recovery_required'),
     [appState.applications],
   );
-  const reviewApplicationsSignature = useMemo(
-    () => reviewApplications.map((application) => application.id).sort().join('|'),
-    [reviewApplications],
-  );
+  const installingApplications = appState.applications.filter((app) => app.operation.kind === 'installing' && !app.runtime);
   const reviewAppId = useMemo(() => new URLSearchParams(location.search).get('review'), [location.search]);
   const reviewedApplication = appState.applications.find((application) => (
     application.id === reviewAppId
     && (application.relationship === 'recovery_required' || application.relationship === 'blocked')
   )) ?? null;
-  const showApplicationReviewPrompt = Boolean(reviewApplicationsSignature && dismissedReviewSignature !== reviewApplicationsSignature);
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return items.filter((item) => {
@@ -132,19 +116,6 @@ export const ApplicationsPage = () => {
   ))), [appState.applications]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
   const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
-
-  const dismissApplicationReviewPrompt = useCallback(() => {
-    if (!reviewApplicationsSignature) {
-      return;
-    }
-
-    setDismissedReviewSignature(reviewApplicationsSignature);
-    try {
-      window.sessionStorage.setItem(applicationReviewPromptDismissalKey, reviewApplicationsSignature);
-    } catch {
-      // The in-memory state still dismisses the prompt when session storage is unavailable.
-    }
-  }, [reviewApplicationsSignature]);
 
   const focusApplicationItem = useCallback((item: ApplicationSurfaceItem, managementOpen = false) => {
     setSelectedId(item.id);
@@ -477,21 +448,20 @@ export const ApplicationsPage = () => {
       contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
     >
       <ExtensionActionTarget actionId="review-app" routeId="apps">
-        <AppsPageHeader attentionCount={attentionCount} managedCount={managedCount} />
+        <AppsPageHeader attentionCount={attentionCount} managedCount={managedCount}>
+          <ContextChip className="w-44" busy={installingApplications.length > 0} label={!appState.freshness.hasUsableData ? 'App status unavailable' : reviewApplications.length ? `${reviewApplications.length} to recover` : installingApplications.length ? `${installingApplications[0].name} installing` : attentionCount ? `${attentionCount} need review` : 'App status'} title="My Apps / Current status" tone={reviewApplications.length || attentionCount ? 'warning' : 'muted'}>
+            {reviewApplications.length > 0 && <p>Review apps from this installation before restoring management.</p>}
+            {reviewApplications.map((app) => <Button asChild key={app.id} size="sm" variant="outline"><Link to={app.primaryAction.href || `/apps?review=${encodeURIComponent(app.id)}`}>Review {app.name}</Link></Button>)}
+            {installingApplications.map((app) => {
+              const job = jobsQuery.data?.find((candidate) => candidate.jobId === app.operation.jobId);
+              return job ? <JobProgress compact job={job} key={app.id} subjectLabel={app.name} /> : <p key={app.id}>{app.name}: {app.operation.message || 'Preparing the app. Progress is also available in Activity.'}</p>;
+            })}
+            {attentionCount > 0 && <Button onClick={() => handleCollectionFilterChange(['attention'])} size="sm" type="button">Show apps needing review</Button>}
+            {!appState.freshness.hasUsableData && <p>Waiting for confirmed app information.</p>}
+            {appState.freshness.hasUsableData && !reviewApplications.length && !installingApplications.length && !attentionCount && <p>No apps need review.</p>}
+          </ContextChip>
+        </AppsPageHeader>
       </ExtensionActionTarget>
-
-      {appState.applications.filter((application) => application.operation.kind === 'installing' && !application.runtime).map((application) => {
-        const job = jobsQuery.data?.find((candidate) => candidate.jobId === application.operation.jobId);
-        return job ? <JobProgress compact job={job} key={application.id} subjectLabel={application.name} /> : null;
-      })}
-
-      {showApplicationReviewPrompt && (
-        <ApplicationReviewPrompt
-          className="gap-2 p-3"
-          model={{ count: reviewApplications.length, reviewHref: reviewApplications[0]?.primaryAction.href || '/apps' }}
-          onDismiss={dismissApplicationReviewPrompt}
-        />
-      )}
 
       <div className="grid gap-3">
         <SearchFilterBar
@@ -526,6 +496,9 @@ export const ApplicationsPage = () => {
         />
       </div>
 
+      {!appState.freshness.hasUsableData && (appState.isLoading
+        ? <PageLoadingState model={{ title: 'Checking apps', description: 'Loading current app information.' }} />
+        : <PageLoadError model={{ title: 'Current app information is unavailable', message: 'Check again to load your apps. This does not mean your apps were removed.' }} onRetry={() => void appState.refresh().catch(() => {})} />)}
       {appState.freshness.hasUsableData && (
         <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
           {viewMode === 'basic' ? (

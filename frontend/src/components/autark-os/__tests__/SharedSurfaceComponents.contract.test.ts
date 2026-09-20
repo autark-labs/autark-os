@@ -16,7 +16,6 @@ test('shared surface components provide typed accessible primitives', () => {
     'StatusBadge',
     'AppCardName',
     'CopyField',
-    'ApplicationReviewPrompt',
     'ResponsiveDetailsSheet',
     'LocalizedDateTime',
     'JobProgress',
@@ -45,7 +44,6 @@ test('shared surface components provide typed accessible primitives', () => {
   assert.match(loading, /aria-live="polite"/);
   assert.match(error, /export type PageLoadErrorModel/);
   assert.match(error, /role="alert"/);
-  assert.match(error, /autoFocus/);
   assert.match(status, /export type StatusBadgeTone/);
   assert.match(status, /<Badge/);
   assert.match(status, /statusIcon/);
@@ -123,6 +121,5 @@ test('active pages use shared surface components instead of local page state car
   assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationGuideTab.tsx'), /CopyField/);
   assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationLinksTab.tsx'), /CopyField/);
   assert.match(source('src/components/autark-os/NotificationCenter.tsx'), /useRecommendedActionQuery/);
-  assert.match(source('src/pages/ApplicationsPage/ApplicationsPage.tsx'), /ApplicationReviewPrompt/);
   assert.match(source('src/pages/OverviewPage/components/HomeDashboardPanels.tsx'), /InstalledAppsLauncher/);
 });

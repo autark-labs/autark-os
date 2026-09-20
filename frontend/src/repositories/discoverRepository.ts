@@ -1,9 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { ActivityAPIClient } from '@/api/ActivityAPIClient';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { DiscoverAPIClient } from '@/api/DiscoverAPIClient';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
-import type { ActivityLog } from '@/types/activity';
 import type { DiscoverAppView, DiscoverInstallPreview, DiscoverInstallRequestOptions } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { OnboardingState, StorageReport, SystemDoctorStatus } from '@/types/system';
@@ -35,7 +33,6 @@ export type DiscoverInstallMutationInput = {
 
 export const discoverQueryKeys = {
   all: ['discover'] as const,
-  activity: ['discover', 'activity'] as const,
   apps: ['discover', 'apps'] as const,
   jobs: ['discover', 'jobs'] as const,
   job: (jobId: string | null) => ['discover', 'job', jobId] as const,
@@ -50,15 +47,6 @@ export function useDiscoverAppsQuery(enabled = true) {
     enabled,
     refetchInterval: 30_000,
     staleTime: 10_000,
-  });
-}
-
-export function useMarketplaceActivityQuery() {
-  return useQuery<ActivityLog[]>({
-    queryKey: discoverQueryKeys.activity,
-    queryFn: () => ActivityAPIClient.recent({ category: 'marketplace', limit: 8 }),
-    refetchInterval: 30_000,
-    staleTime: 30_000,
   });
 }
 
