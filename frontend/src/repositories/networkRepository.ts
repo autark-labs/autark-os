@@ -31,6 +31,7 @@ export type AccessNetworkRepositoryView = {
   isFetching: boolean;
   isLoading: boolean;
   reconciliation: PrivateAccessReconciliationReport | null;
+  reconciliationError: unknown;
   refresh: () => Promise<void>;
   setupStatus: SystemSetupStatus | null;
   tailnetDevices: TailscaleDevice[];
@@ -38,13 +39,17 @@ export type AccessNetworkRepositoryView = {
   updatedAt: Date | null;
 };
 
-export function useAccessNetworkRepository(): AccessNetworkRepositoryView {
-  const queryClient = useQueryClient();
-  const tailscaleQuery = useQuery({
+export function useTailscaleStatusQuery() {
+  return useQuery({
     queryKey: networkQueryKeys.tailscaleStatus,
     queryFn: () => NetworkAPIClient.tailscaleStatus(),
     ...liveNetworkQueryOptions,
   });
+}
+
+export function useAccessNetworkRepository(): AccessNetworkRepositoryView {
+  const queryClient = useQueryClient();
+  const tailscaleQuery = useTailscaleStatusQuery();
   const devicesQuery = useQuery({
     queryKey: networkQueryKeys.tailscaleDevices,
     queryFn: () => NetworkAPIClient.tailscaleDevices(),
@@ -65,11 +70,7 @@ export function useAccessNetworkRepository(): AccessNetworkRepositoryView {
     queryFn: () => NetworkAPIClient.setupStatus(),
     ...setupNetworkQueryOptions,
   });
-  const reconciliationQuery = useQuery({
-    queryKey: networkQueryKeys.privateAccessReconciliation,
-    queryFn: () => NetworkAPIClient.privateAccessReconciliation(),
-    ...liveNetworkQueryOptions,
-  });
+  const reconciliationQuery = usePrivateAccessReconciliationQuery();
   const queries = [tailscaleQuery, devicesQuery, diagnosticsQuery, guideQuery, setupQuery, reconciliationQuery];
 
   return {
@@ -79,6 +80,7 @@ export function useAccessNetworkRepository(): AccessNetworkRepositoryView {
     isFetching: queries.some((query) => query.isFetching),
     isLoading: queries.some((query) => query.isLoading),
     reconciliation: reconciliationQuery.data ?? null,
+    reconciliationError: reconciliationQuery.error,
     refresh: () => invalidateNetworkQueries(queryClient),
     setupStatus: setupQuery.data ?? null,
     tailnetDevices: devicesQuery.data ?? [],

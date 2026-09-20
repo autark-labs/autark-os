@@ -219,6 +219,7 @@ export const ApplicationsPage = () => {
       return;
     }
     void invalidateApplicationState(queryClient);
+    void invalidateNetworkQueries(queryClient);
     setTrackedAppJobIds((current) => current.filter((jobId) => !completedJobs.some((job) => job.jobId === jobId)));
   }, [jobsQuery.data, queryClient, trackedAppJobIds]);
 

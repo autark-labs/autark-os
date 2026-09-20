@@ -194,13 +194,13 @@ function NetworkPage() {
     try {
       await removeStalePrivateAccess.mutateAsync(port);
       showActionNotification({ ok: true, severity: 'success', title: 'Stale private link removed', message: 'Autark-OS removed the stale Tailscale Serve entry.' }, 'Stale private link removed');
-      await refreshAll();
+      void appState.refresh().catch(() => {});
     } catch (err) {
       showActionErrorNotification(err, 'Stale private link removal failed');
     } finally {
       setStaleActionLoadingId(null);
     }
-  }, [refreshAll, removeStalePrivateAccess]);
+  }, [appState, removeStalePrivateAccess]);
 
   const handleTabChange = useCallback((tab: string) => {
     const nextTab = tab as AccessDeepLinkTab;
@@ -257,7 +257,7 @@ function NetworkPage() {
       <ExtensionActionTarget actionId="review-access" routeId="access">
         <AccessPageHeader
           error={pageError}
-          context={<StalePrivateLinksPanel open={privateLinksOpen} onOpenChange={setPrivateLinksOpen} loadingId={staleActionLoadingId} onRemoveStaleMapping={removeStaleMapping} reconciliation={network.reconciliation} />}
+          context={<StalePrivateLinksPanel open={privateLinksOpen} onOpenChange={setPrivateLinksOpen} loadingId={staleActionLoadingId} onRemoveStaleMapping={removeStaleMapping} reconciliation={network.reconciliation} error={Boolean(network.reconciliationError)} />}
           needsReviewCount={needsReviewCount}
           onRefresh={() => void refreshAll().catch(() => {})}
           refreshing={pageRefreshing}
@@ -387,16 +387,19 @@ function StalePrivateLinksPanel({
   loadingId,
   onRemoveStaleMapping,
   reconciliation,
+  error,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   loadingId: string | null;
   onRemoveStaleMapping: (port: number) => void;
   reconciliation: PrivateAccessReconciliationReport | null;
+  error: boolean;
 }) {
   const mappings = reconciliation?.staleMappings ?? [];
   return (
-    <ContextChip open={open} onOpenChange={onOpenChange} className="w-40" label={mappings.length ? `${mappings.length} unused link${mappings.length === 1 ? '' : 's'}` : 'Private links'} title="Access / Unused private links" tone={mappings.length ? 'warning' : 'muted'}>
+    <ContextChip open={open} onOpenChange={onOpenChange} className="w-40" label={error ? reconciliation ? 'Links stale' : 'Links unavailable' : mappings.length ? `${mappings.length} unused link${mappings.length === 1 ? '' : 's'}` : 'Private links'} title="Access / Unused private links" tone={error || mappings.length ? 'warning' : 'muted'}>
+      {error && <p className="text-xs text-amber-200">Private-link checks could not refresh.{reconciliation ? ' Showing the last confirmed links.' : ' Use Refresh to try again.'}</p>}
       <p className="text-xs text-muted-foreground">{!reconciliation ? 'Private links have not been checked yet.' : mappings.length ? 'These links no longer match an app’s private-access settings. Review each before removing it.' : 'No unused private links were found.'}</p>
       {mappings.map((mapping) => (
         <div className="grid gap-3 border-t border-border pt-3" key={mapping.id}>

@@ -100,7 +100,7 @@ function MobileAppBar() {
                     <p className="m-0 text-xs font-black uppercase tracking-normal text-slate-400">Private access</p>
                     <p className="m-0 mt-1 text-sm text-slate-300">Check or manage secure Tailscale access without leaving mobile navigation.</p>
                   </div>
-                  <TailscaleControlPopover align="start" check={tailscaleCheck} className="shrink-0" loading={doctorQuery.isLoading} triggerLabel="compact" />
+                  <TailscaleControlPopover align="start" check={tailscaleCheck} className="shrink-0" triggerLabel="compact" />
                 </div>
               </div>
 

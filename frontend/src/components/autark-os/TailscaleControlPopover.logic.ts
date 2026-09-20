@@ -8,26 +8,21 @@ type TailscaleStatus = {
   state?: string | null;
 };
 
-type TailscaleCheck = {
-  status?: string | null;
-};
-
 type PrivateLinkReconciliation = {
   apps?: Array<{ status?: string | null }>;
 };
 
 export function tailscaleControlView(
   status: TailscaleStatus | null | undefined,
-  check: TailscaleCheck | null | undefined,
   reconciliation: PrivateLinkReconciliation | null | undefined,
 ) {
   const mock = status?.state === 'dev' || status?.state === 'mocked_dev' || status?.message?.toLowerCase().includes('mock') || false;
   const connected = Boolean(status?.connected || mock);
-  const installed = status?.installed ?? check?.status !== 'warning';
+  const installed = Boolean(status?.installed);
   const magicDnsReady = connected && Boolean(status?.dnsName || mock);
-  const privateLinksReady = (reconciliation?.apps || []).filter((app) => app.status === 'healthy').length;
-  const httpsReady = connected && Boolean(status?.dnsName || privateLinksReady > 0 || mock);
-  const serveReady = connected && Boolean(privateLinksReady > 0 || mock);
+  const privateLinksReady = reconciliation ? (reconciliation.apps || []).filter((app) => app.status === 'healthy').length : null;
+  const httpsReady = connected && Boolean(status?.dnsName || (privateLinksReady ?? 0) > 0 || mock);
+  const serveReady = connected && Boolean((privateLinksReady ?? 0) > 0 || mock);
 
   if (mock) {
     return {
@@ -67,18 +62,22 @@ export function tailscaleControlView(
   return {
     connected: false,
     httpsReady: false,
-    label: installed ? 'Not signed in' : 'Missing',
+    label: !status ? 'Unavailable' : installed ? 'Not signed in' : 'Missing',
     magicDnsReady: false,
     mock,
     privateLinksReady,
     serveReady: false,
-    summary: 'Your apps still work on your home network. Sign in to use private links from trusted devices.',
-    title: installed ? 'Tailscale not signed in' : 'Tailscale missing',
+    summary: !status ? 'Tailscale status is unavailable. Check again to retry.' : 'Your apps still work on your home network. Sign in to use private links from trusted devices.',
+    title: !status ? 'Tailscale status unavailable' : installed ? 'Tailscale not signed in' : 'Tailscale missing',
     tone: installed ? 'amber' : 'red',
   };
 }
 
 export function tailscaleControlActions(status: TailscaleStatus | null | undefined) {
+  if (!status) return [
+    { id: 'access', label: 'Access settings', href: '/access', external: false, enabled: true },
+    { id: 'refresh', label: 'Check again', enabled: true },
+  ];
   if (status?.connected || status?.mock) {
     return [
       { id: 'admin', label: 'Manage Tailscale', href: 'https://login.tailscale.com/admin/machines', external: true, enabled: true },

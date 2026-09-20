@@ -1,6 +1,128 @@
 import { expect, test } from 'playwright/test';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage, type FixtureScenario } from './support/mockApi';
 
+test('Tailscale pending checks are not presented as unavailable', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/network/tailscale/status', async route => { await pending; await route.fallback(); });
+  await page.route('**/api/network/private-access/reconciliation', async route => { await pending; await route.fallback(); });
+  await page.goto('/home');
+  await page.getByRole('button', { name: 'Tailscale: Checking', exact: true }).click();
+  await expect(page.getByRole('dialog').getByText('Checking Tailscale', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog')).not.toContainText('unavailable');
+  release();
+  await expect(page.getByRole('dialog')).toContainText('Private links: 1 ready');
+});
+
+test('Tailscale header follows Access refresh and shares status requests', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  let connected = true;
+  let statusRequests = 0;
+  let reconciliationRequests = 0;
+  await page.route('**/api/network/tailscale/status', route => {
+    statusRequests++;
+    return route.fulfill({ json: { installed: true, connected, state: connected ? 'Running' : 'NeedsLogin', deviceName: 'fixture-server', dnsName: connected ? 'fixture.ts.net' : '', tailnetIps: [], message: '' } });
+  });
+  await page.route('**/api/network/private-access/reconciliation', route => { reconciliationRequests++; return route.fallback(); });
+  await page.goto('/access?tab=devices');
+  await expect(page.getByRole('button', { name: 'Tailscale: Signed in', exact: true })).toBeVisible();
+  await expect(page.getByText('Your devices', { exact: true })).toBeVisible();
+  const initialRequests = [statusRequests, reconciliationRequests];
+  connected = false;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByText('Connect Tailscale, then add your phone or laptop', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tailscale: Not signed in', exact: true })).toBeVisible();
+  expect(initialRequests).toEqual([1, 1]);
+  await page.getByRole('button', { name: 'Tailscale: Not signed in', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveAttribute('href', 'https://login.tailscale.com/start');
+  await page.getByRole('button', { name: 'sudo tailscale up', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('sudo tailscale up');
+  connected = true;
+  await page.getByRole('button', { name: 'Check again', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Tailscale: Signed in', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Copy hostname', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('fixture.ts.net');
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('Connect Tailscale, then add your phone or laptop', { exact: true })).toHaveCount(0);
+});
+
+test('Tailscale reconciliation failure is not reported as zero ready links', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  let failing = true;
+  await page.route('**/api/network/private-access/reconciliation', route => failing ? route.fulfill({ status: 503, json: { message: 'Link checks unavailable' } }) : route.fallback());
+  await page.goto('/access');
+  await page.getByRole('button', { name: /^Tailscale:/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('Private links: Unavailable');
+  await expect(page.getByText('0 ready', { exact: true })).toHaveCount(0);
+  failing = false;
+  await page.getByRole('button', { name: 'Check again', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Private links: 1 ready');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('heading', { name: 'Reachability matrix', exact: true })).toBeVisible();
+  failing = true;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Tailscale: Links stale', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Tailscale: Links stale', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Private links: 1 ready (last confirmed)');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Links stale', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Showing the last confirmed links.');
+  await page.keyboard.press('Escape');
+  failing = false;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Tailscale: Signed in', exact: true })).toBeVisible();
+});
+
+test('Tailscale status failure stays unknown until a successful retry', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  let failing = true;
+  await page.route('**/api/network/tailscale/status', route => failing ? route.fulfill({ status: 503, json: { message: 'Status unavailable' } }) : route.fallback());
+  await page.goto('/home');
+  await page.getByRole('button', { name: 'Tailscale: Unavailable', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Tailscale status is unavailable.');
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveCount(0);
+  failing = false;
+  await page.getByRole('button', { name: 'Check again', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Copy hostname', exact: true })).toBeEnabled();
+  await page.getByRole('link', { name: 'Access settings', exact: true }).click();
+  await expect(page).toHaveURL(/\/access/);
+});
+
+test('Tailscale stale-link removal refreshes shared counts once after confirmation', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.goto('/access');
+  const report = await page.evaluate(async () => (await fetch('/api/network/private-access/reconciliation')).json());
+  report.staleMappings = [{ id: 'stale-12443', servePort: 12443, endpoint: 'https://fixture.ts.net:12443', target: 'http://127.0.0.1:8080' }];
+  let reconciliationRequests = 0;
+  let removed = false;
+  await page.route('**/api/network/private-access/reconciliation', route => {
+    reconciliationRequests++;
+    return route.fulfill({ json: report });
+  });
+  await page.route('**/api/network/private-access/stale/12443', route => {
+    expect(route.request().method()).toBe('DELETE');
+    removed = true;
+    report.staleMappings = [];
+    // A concurrently reconciled app becomes ready in the same refreshed report.
+    report.apps.push({ ...report.apps[0], appId: 'syncthing', appName: 'Syncthing' });
+    return route.fulfill({ json: { configured: true, message: 'Link removed' } });
+  });
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('button', { name: '1 unused link', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove stale link', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('No app data will be deleted.');
+  expect(removed).toBe(false);
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Remove stale link', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('No unused private links were found.');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Access / Unused private links' })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Tailscale:/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('Private links: 2 ready');
+  expect(reconciliationRequests).toBe(2);
+});
+
 async function openReadyRoute(page: Parameters<typeof installMockApi>[0], path: string, viewport: { width: number; height: number }, scenario: FixtureScenario = 'ready') {
   await installMockApi(page, scenario);
   await page.setViewportSize(viewport);

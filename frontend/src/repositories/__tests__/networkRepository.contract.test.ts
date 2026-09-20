@@ -25,6 +25,14 @@ test('Access page data loading is owned by the network repository', () => {
   assert.match(networkRepository, /refetchInterval:\s*10_000/);
 });
 
+test('Tailscale controls share repository queries instead of owning server state', () => {
+  const controls = source('src/components/autark-os/TailscaleControlPopover.tsx');
+  assert.match(controls, /useTailscaleStatusQuery\(\)/);
+  assert.match(controls, /usePrivateAccessReconciliationQuery\(\)/);
+  assert.match(controls, /invalidateNetworkQueries\(queryClient\)/);
+  assert.doesNotMatch(controls, /NetworkAPIClient|useEffect|setStatus|setReconciliation/);
+});
+
 test('Access page private access mutations consume action results without local access projection', () => {
   const networkPage = source('src/pages/NetworkPage/NetworkPage.tsx');
 

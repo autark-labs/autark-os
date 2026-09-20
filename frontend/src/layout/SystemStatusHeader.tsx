@@ -72,7 +72,7 @@ function SystemStatusHeader() {
           <NotificationCenterPopover />
           <ThemeSelectorPopover />
           <StatusPopover loading={loading} service={dockerService} />
-          <TailscaleControlPopover check={tailscaleCheck} loading={loading} />
+          <TailscaleControlPopover check={tailscaleCheck} />
           <AdminSessionControl compact />
           <span className="hidden min-w-0 rounded-lg px-2 py-1 text-sm font-medium text-slate-400 sm:inline-flex">
             {error ? 'Status unavailable' : checkedAt}

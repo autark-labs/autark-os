@@ -3,7 +3,7 @@ import { test } from 'vitest';
 import { tailscaleControlActions, tailscaleControlView } from '../TailscaleControlPopover.logic';
 
 test('treats dev-mode Tailscale state as an informational mock even if copy changes', () => {
-  const view = tailscaleControlView({ installed: true, connected: true, state: 'dev', message: '', dnsName: 'autark-os-dev.tailnet.local' }, null, null);
+  const view = tailscaleControlView({ installed: true, connected: true, state: 'dev', message: '', dnsName: 'autark-os-dev.tailnet.local' }, null);
 
   assert.equal(view.mock, true);
   assert.equal(view.connected, true);
@@ -35,8 +35,8 @@ test('offers sign-in and setup-later controls when Tailscale is disconnected', (
   assert.equal(actions[0].href, 'https://login.tailscale.com/start');
 });
 
-test('does not treat successful setup checks as live Tailscale connection or Serve readiness', () => {
-  const view = tailscaleControlView(null, { status: 'ok' }, {
+test('does not infer live Tailscale connection or Serve readiness without status', () => {
+  const view = tailscaleControlView(null, {
     status: 'warning',
     apps: [
       {
@@ -52,7 +52,7 @@ test('does not treat successful setup checks as live Tailscale connection or Ser
   assert.equal(view.httpsReady, false);
   assert.equal(view.serveReady, false);
   assert.equal(view.privateLinksReady, 0);
-  assert.equal(view.label, 'Not signed in');
+  assert.equal(view.label, 'Unavailable');
 });
 
 test('shows Serve ready only for live verified private-link reconciliation', () => {
@@ -63,7 +63,7 @@ test('shows Serve ready only for live verified private-link reconciliation', () 
     message: 'Autark-OS is connected.',
     dnsName: 'autark-os.tailnet.ts.net',
   };
-  const desiredOnly = tailscaleControlView(status, { status: 'ok' }, {
+  const desiredOnly = tailscaleControlView(status, {
     status: 'warning',
     apps: [
       {
@@ -80,7 +80,7 @@ test('shows Serve ready only for live verified private-link reconciliation', () 
   assert.equal(desiredOnly.serveReady, false);
   assert.equal(desiredOnly.privateLinksReady, 0);
 
-  const verified = tailscaleControlView(status, { status: 'ok' }, {
+  const verified = tailscaleControlView(status, {
     status: 'healthy',
     apps: [
       {
@@ -96,4 +96,10 @@ test('shows Serve ready only for live verified private-link reconciliation', () 
   assert.equal(verified.httpsReady, true);
   assert.equal(verified.serveReady, true);
   assert.equal(verified.privateLinksReady, 1);
+});
+
+test('missing link checks are not a verified empty result and missing status does not offer sign-in', () => {
+  assert.equal(tailscaleControlView({ connected: true }, null).privateLinksReady, null);
+  assert.equal(tailscaleControlView({ connected: true }, { apps: [] }).privateLinksReady, 0);
+  assert.deepEqual(tailscaleControlActions(null).map(action => action.id), ['access', 'refresh']);
 });
