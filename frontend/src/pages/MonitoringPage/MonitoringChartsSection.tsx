@@ -37,11 +37,11 @@ type AppTrendPoint = {
 
 type MonitoringChartsSectionProps = {
   appTrendData: AppTrendPoint[];
-  categoryData: ChartPoint[];
+  categoryData: ChartPoint[] | null;
   compact?: boolean;
   history: MonitoringHistory | null;
   hostTrendData: HostTrendPoint[];
-  levelData: ChartPoint[];
+  levelData: ChartPoint[] | null;
   metrics: SystemMetrics | null;
   reliability: AppReliabilitySummary | null;
   resourceData: ResourcePoint[];
@@ -87,10 +87,10 @@ function AutarkOsMetricsPanel({
   resourceData,
 }: {
   appTrendData: AppTrendPoint[];
-  categoryData: ChartPoint[];
+  categoryData: ChartPoint[] | null;
   compact: boolean;
   history: MonitoringHistory | null;
-  levelData: ChartPoint[];
+  levelData: ChartPoint[] | null;
   reliability: AppReliabilitySummary | null;
   resourceData: ResourcePoint[];
 }) {
@@ -115,6 +115,7 @@ function AutarkOsMetricsPanel({
       <div className={cn('mt-5 grid gap-4', !compact && 'lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]')}>
         <div className="grid gap-4">
           <MonitoringInset className="p-4">
+            {reliability ? <>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold uppercase text-slate-500">App health mix</p>
@@ -134,11 +135,12 @@ function AutarkOsMetricsPanel({
               <LegendDot color="bg-orange-400" label={`${reliability?.startingApps ?? 0} starting`} />
               <LegendDot color="bg-red-400" label={`${(reliability?.needsAttentionApps ?? 0) + (reliability?.unavailableApps ?? 0)} issues`} />
             </div>
+            </> : <EmptyState title="App health is unavailable" description="Check current app issues in History and try refreshing." compact />}
           </MonitoringInset>
 
           <MonitoringInset className="p-4">
             <p className="text-xs font-bold uppercase text-slate-500">Event tone</p>
-            <ChartContainer className="mt-3 h-[190px] w-full aspect-auto" config={{ count: { label: 'Events', color: '#8b5cf6' } }}>
+            {levelData ? <ChartContainer className="mt-3 h-[190px] w-full aspect-auto" config={{ count: { label: 'Events', color: '#8b5cf6' } }}>
               <AreaChart data={levelData} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
                 <defs>
                   <linearGradient id="eventToneFill" x1="0" x2="0" y1="0" y2="1">
@@ -152,14 +154,14 @@ function AutarkOsMetricsPanel({
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Area dataKey="count" type="monotone" stroke="#a78bfa" fill="url(#eventToneFill)" strokeWidth={2} />
               </AreaChart>
-            </ChartContainer>
+            </ChartContainer> : <EmptyState title="Activity is unavailable" description="Return to History to retry loading events." compact />}
           </MonitoringInset>
         </div>
 
         <div className="grid gap-4">
           <MonitoringInset className="p-4">
             <p className="text-xs font-bold uppercase text-slate-500">Activity by area</p>
-            <ChartContainer className="mt-3 h-[220px] w-full aspect-auto" config={{ count: { label: 'Events', color: '#22d3ee' } }}>
+            {categoryData ? <ChartContainer className="mt-3 h-[220px] w-full aspect-auto" config={{ count: { label: 'Events', color: '#22d3ee' } }}>
               <BarChart data={categoryData} margin={{ left: 0, right: 8, top: 12, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tickLine={false} axisLine={false} />
@@ -167,7 +169,7 @@ function AutarkOsMetricsPanel({
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="count" fill="#22d3ee" radius={[6, 6, 0, 0]} />
               </BarChart>
-            </ChartContainer>
+            </ChartContainer> : <EmptyState title="Activity is unavailable" description="Return to History to retry loading events." compact />}
           </MonitoringInset>
 
           <MonitoringInset className="p-4">
@@ -232,7 +234,7 @@ function AutarkOsMetricsPanel({
                 </AreaChart>
               </ChartContainer>
             ) : (
-              <EmptyState title="Trend is still warming up" description="Keep Monitoring open briefly to collect enough app samples for a trend." compact />
+              <EmptyState title="Not enough app samples" description="App trends appear when enough telemetry samples have been recorded." compact />
             )}
           </MonitoringInset>
         </div>

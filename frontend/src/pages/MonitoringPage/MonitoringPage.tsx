@@ -1,51 +1,39 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import { apiErrorMessage } from '@/api/httpClient';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
+import { RefreshStatus } from '@/components/RefreshStatus';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
-import { ProjectPanel } from '@/components/primitives/Surface';
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
-import { useMonitoringDiagnosticsMutation, useMonitoringRepository } from '@/repositories/monitoringRepository';
-import {
-  buildAppTrendData,
-  buildCategoryData,
-  buildHostTrendData,
-  buildLevelData,
-  buildResourceData,
-} from './extensions/MonitoringPage.viewModels';
+import { useMonitoringDiagnosticsMutation, useMonitoringMetricsRepository, useMonitoringRepository } from '@/repositories/monitoringRepository';
+import type { ActivityLog } from '@/types/activity';
+import type { AppReliabilitySummary } from '@/types/app';
+import { buildAppTrendData, buildCategoryData, buildHostTrendData, buildLevelData, buildResourceData } from './extensions/MonitoringPage.viewModels';
 import { MonitoringActivityWorkspace } from './MonitoringActivitySections';
 
 const levelFilters = ['all', 'error', 'warning', 'success', 'info'];
-const categoryFilters = ['all', 'pro', 'install', 'health', 'repair', 'access', 'backup', 'system', 'api'];
+const categoryFilters = ['all', 'app-related', 'install', 'backup', 'repair', 'access', 'health', 'system', 'api', 'pro'];
 const MonitoringChartsSection = lazy(() => import('./MonitoringChartsSection'));
-
-const MonitoringPanel = ProjectPanel;
 
 function MonitoringPage() {
   const { settings, showAdvancedMetrics } = useProjectSettings();
   const [searchParams, setSearchParams] = useSearchParams();
-  const timeZone = settings?.timeZone || 'UTC';
-  const appState = useApplicationStateRepository();
   const [level, setLevel] = useState('all');
-  const [category, setCategory] = useState(
-    searchParams.get('category') === 'pro' ? 'pro' : 'all',
-  );
-
-  const filters = useMemo(() => ({
+  const category = categoryFilters.find(value => value === searchParams.get('category')) ?? 'all';
+  const monitoring = useMonitoringRepository({
     level: level === 'all' ? undefined : level,
-    category: category === 'all' ? undefined : category,
+    category: category === 'all' || category === 'app-related' ? undefined : category,
     limit: 120,
-  }), [category, level]);
-  const monitoring = useMonitoringRepository(filters);
+  });
   const diagnosticsMutation = useMonitoringDiagnosticsMutation();
-  const error = (monitoring.error ? apiErrorMessage(monitoring.error, 'Monitoring data could not be loaded.') : null);
+  const { activityQuery, reliabilityQuery } = monitoring;
+  const activity = (activityQuery.data ?? []).filter(event => category !== 'app-related' || Boolean(event.appId));
 
   function changeCategory(value: string) {
-    setCategory(value);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       if (value === 'all') next.delete('category');
@@ -72,72 +60,57 @@ function MonitoringPage() {
     }
   }
 
-  const categoryData = useMemo(() => buildCategoryData(monitoring.activity), [monitoring.activity]);
-  const levelData = useMemo(() => buildLevelData(monitoring.activity), [monitoring.activity]);
-  const resourceData = useMemo(() => buildResourceData(appState.telemetryByAppId), [appState.telemetryByAppId]);
-  const hostTrendData = useMemo(() => buildHostTrendData(monitoring.history?.hostSamples ?? []), [monitoring.history]);
-  const appTrendData = useMemo(() => buildAppTrendData(monitoring.history?.appSamples ?? []), [monitoring.history]);
-
   return (
-    <PageShell
-      className="xl:h-[calc(100dvh-7.25rem)] xl:min-h-0"
-      contained
-      contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden"
-    >
-
+    <PageShell className="xl:h-[calc(100dvh-7.25rem)] xl:min-h-0" contained contentClassName="gap-3 xl:h-full xl:min-h-0 xl:!overflow-hidden">
       <ExtensionActionTarget actionId="review-activity" className="min-h-0 flex-1" routeId="activity">
-        {error && !monitoring.hasUsableData ? <PageLoadError model={{ title: 'Activity is unavailable', message: error }} onRetry={() => void monitoring.refresh()} /> : <MonitoringActivityWorkspace
-          refreshError={error}
-          activity={monitoring.activity}
-        advancedMetrics={showAdvancedMetrics ? (
-          <Suspense fallback={<MonitoringChartsFallback />}>
-            <MonitoringChartsSection
-              appTrendData={appTrendData}
-              categoryData={categoryData}
-              compact
-              history={monitoring.history}
-              hostTrendData={hostTrendData}
-              levelData={levelData}
-              metrics={monitoring.metrics}
-              reliability={monitoring.reliability}
-              resourceData={resourceData}
-            />
-          </Suspense>
-        ) : null}
-        category={category}
-        categoryFilters={categoryFilters}
-        diagnosticsExporting={diagnosticsMutation.isPending}
-        isLoading={monitoring.isLoading}
-        level={level}
-        levelFilters={levelFilters}
-        metrics={monitoring.metrics}
-        onCategoryChange={changeCategory}
-        onExportDiagnostics={() => void exportDiagnostics()}
-        onLevelChange={setLevel}
-        onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()]).catch(() => {})}
-        refreshing={monitoring.isFetching || appState.isFetching}
-        reliability={monitoring.reliability}
-        showAdvancedMetrics={showAdvancedMetrics}
-        timeZone={timeZone}
-          updatedAt={monitoring.updatedAt}
-        />}
+        <MonitoringActivityWorkspace
+          activity={activity}
+          monitoring={monitoring}
+          advancedMetrics={<MonitoringMetrics activity={activityQuery.data ? activity : null} reliability={reliabilityQuery.error ? null : reliabilityQuery.data ?? null} />}
+          category={category}
+          categoryFilters={categoryFilters}
+          diagnosticsExporting={diagnosticsMutation.isPending}
+          level={level}
+          levelFilters={levelFilters}
+          onCategoryChange={changeCategory}
+          onExportDiagnostics={() => void exportDiagnostics()}
+          onLevelChange={setLevel}
+          showAdvancedMetrics={showAdvancedMetrics}
+          timeZone={settings?.timeZone || 'UTC'}
+        />
       </ExtensionActionTarget>
     </PageShell>
   );
 }
 
-function MonitoringChartsFallback() {
-  return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-      <MonitoringPanel className="min-h-[420px]">
-        <EmptyState title="Loading metrics" description="Autark-OS is preparing advanced charts." />
-      </MonitoringPanel>
-      <MonitoringPanel className="min-h-[420px]">
-        <EmptyState title="Loading instrumentation" description="Autark-OS is preparing device readings." />
-      </MonitoringPanel>
-    </div>
-  );
+function MonitoringMetrics({ activity, reliability }: { activity: ActivityLog[] | null; reliability: AppReliabilitySummary | null }) {
+  const { metricsQuery, historyQuery } = useMonitoringMetricsRepository();
+  const appState = useApplicationStateRepository();
+  const error = metricsQuery.error || historyQuery.error;
+  const refresh = () => { void Promise.all([metricsQuery.refetch(), historyQuery.refetch(), appState.refresh()]).catch(() => {}); };
+  const updatedAt = Math.min(metricsQuery.dataUpdatedAt, historyQuery.dataUpdatedAt);
+  if (error && (!metricsQuery.data || !historyQuery.data)) {
+    return <PageLoadError model={{ title: 'System metrics are unavailable', message: apiErrorMessage(error, 'Metrics could not be loaded. History is still available.') }} onRetry={refresh} />;
+  }
+  if (!metricsQuery.data || !historyQuery.data) {
+    return <EmptyState title="Loading metrics" description="Autark-OS is checking device readings and recent samples." />;
+  }
+  return <div className="space-y-3">
+    <RefreshStatus error={error ? apiErrorMessage(error, 'Metrics could not refresh.') : null} onRefresh={refresh} refreshing={metricsQuery.isFetching || historyQuery.isFetching} updatedAt={updatedAt ? new Date(updatedAt) : null} />
+    <Suspense fallback={<EmptyState title="Loading charts" description="Preparing the metrics view." />}>
+      <MonitoringChartsSection
+        appTrendData={buildAppTrendData(historyQuery.data.appSamples)}
+        categoryData={activity ? buildCategoryData(activity) : null}
+        compact
+        history={historyQuery.data}
+        hostTrendData={buildHostTrendData(historyQuery.data.hostSamples)}
+        levelData={activity ? buildLevelData(activity) : null}
+        metrics={metricsQuery.data}
+        reliability={reliability}
+        resourceData={buildResourceData(appState.telemetryByAppId)}
+      />
+    </Suspense>
+  </div>;
 }
-
 
 export default MonitoringPage;
