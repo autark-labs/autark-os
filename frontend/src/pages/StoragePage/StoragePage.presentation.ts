@@ -75,32 +75,3 @@ export function aggregateAppStorageTrend(apps: AppStorageUsage[], limit = 8) {
     .slice(-limit)
     .map(([sampledAt, usedBytes]) => ({ sampledAt, usedBytes }));
 }
-
-export function storageHeroCopy(report: StorageReport | null) {
-  if (!report) {
-    return {
-      action: 'Storage data is unavailable.',
-      summary: 'Autark-OS could not read disk usage yet. Refresh the page or check Support if this continues.',
-      title: 'Storage status is unknown',
-    };
-  }
-  if (report.status === 'critical') {
-    return {
-      action: 'Free up space before installing more apps.',
-      summary: report.summary || 'Free space is critically low. Review large apps and unused data before adding anything new.',
-      title: 'Storage needs attention now',
-    };
-  }
-  if (report.status === 'warning') {
-    return {
-      action: 'Review growth and cleanup candidates.',
-      summary: report.summary || 'There is still usable room, but storage is getting tight enough to review app data and backups.',
-      title: 'Storage is getting tight',
-    };
-  }
-  return {
-    action: 'No cleanup needed right now.',
-    summary: report.summary || 'You have plenty of room for apps, backups, and normal growth.',
-    title: 'Storage has room to grow',
-  };
-}

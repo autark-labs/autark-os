@@ -252,7 +252,7 @@ public class StorageService {
             long used = Math.max(0, total - usable);
             return new StorageModels.StorageUsage(label, path.toAbsolutePath().normalize().toString(), total, usable, used, ratioPercent(used, total));
         } catch (IOException exception) {
-            return new StorageModels.StorageUsage(label, path.toAbsolutePath().normalize().toString(), 0, 0, 0, -1);
+            return new StorageModels.StorageUsage(label, path.toAbsolutePath().normalize().toString(), -1, -1, -1, -1);
         }
     }
 
@@ -272,7 +272,7 @@ public class StorageService {
         if (currentFreeBytes < MINIMUM_INSTALL_FREE_BYTES) {
             return new InstallStorageSafety(
                     "warning",
-                    "Free space is below the recommended buffer for new installs.",
+                    currentFreeBytes < 0 ? "Free space is unavailable. Check runtime storage access before installing apps." : "Free space is below the recommended buffer for new installs.",
                     MINIMUM_INSTALL_FREE_BYTES,
                     currentFreeBytes,
                     false);
@@ -293,7 +293,9 @@ public class StorageService {
             List<StorageModels.AppStorageUsage> apps,
             BackupModels.BackupDestination backupDestination) {
         java.util.ArrayList<StorageModels.StorageRecommendation> recommendations = new java.util.ArrayList<>();
-        if ("critical".equals(status)) {
+        if (hostDisk.usedPercent() < 0) {
+            recommendations.add(new StorageModels.StorageRecommendation("disk-unavailable", "warning", "Disk usage is unavailable", "Autark-OS could not measure the host disk. Check runtime storage access, then refresh.", null));
+        } else if ("critical".equals(status)) {
             recommendations.add(new StorageModels.StorageRecommendation("disk-critical", "danger", "Free up space soon", "The host disk is critically full. Installs, backups, and app updates may fail.", "Review largest apps"));
         } else if (hostDisk.usedPercent() >= 75) {
             recommendations.add(new StorageModels.StorageRecommendation("disk-warning", "warning", "Storage is getting tight", "Autark-OS can still run, but new installs and backups may become unreliable.", "Review storage"));
@@ -319,7 +321,7 @@ public class StorageService {
         if (usedPercent >= 90) {
             return "critical";
         }
-        if (usedPercent >= 75 || orphanedCount > 0) {
+        if (usedPercent < 0 || usedPercent >= 75 || orphanedCount > 0) {
             return "warning";
         }
         return "healthy";
@@ -334,6 +336,9 @@ public class StorageService {
     }
 
     private String summary(String status, StorageModels.StorageUsage hostDisk, StorageModels.StorageUsage runtimeDisk, int orphanedCount) {
+        if (hostDisk.usedPercent() < 0) {
+            return "Autark-OS could not measure the host disk. Check runtime storage access, then refresh.";
+        }
         String base = "Autark-OS is using " + readableBytes(runtimeDisk.usedBytes()) + " on a host with " + readableBytes(hostDisk.usableBytes()) + " free.";
         if ("critical".equals(status)) {
             return base + " Free space is low enough that installs or backups may fail.";
@@ -358,7 +363,7 @@ public class StorageService {
                 "system",
                 "storage_check",
                 "Storage needs attention",
-                "Host disk usage is " + Math.round(hostDisk.usedPercent()) + "%. Orphaned app data folders: " + orphanedCount + ".",
+                (hostDisk.usedPercent() < 0 ? "Host disk usage is unavailable." : "Host disk usage is " + Math.round(hostDisk.usedPercent()) + "%.") + " Orphaned app data folders: " + orphanedCount + ".",
                 null);
     }
 
@@ -366,7 +371,7 @@ public class StorageService {
         try {
             Files.createDirectories(path);
         } catch (IOException ignored) {
-            // The report will surface missing or unreadable paths as zero-sized entries.
+            // The report will surface unavailable disk measurements.
         }
     }
 

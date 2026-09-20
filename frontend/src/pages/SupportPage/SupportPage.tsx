@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Archive, CheckCircle2, CircleAlert, ClipboardList, Copy, Download, FileText, HardDrive, LifeBuoy, ListChecks, LockKeyhole, PackageOpen, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
+import { CheckCircle2, CircleAlert, ClipboardList, Copy, Download, FileText, LifeBuoy, ListChecks, LockKeyhole, RefreshCw, Server, ShieldCheck, TerminalSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SystemAPIClient } from '@/api/SystemAPIClient';
@@ -28,8 +28,7 @@ import { useApplicationStateRepository } from '@/repositories/applicationStateRe
 import type { ApplicationView } from '@/types/applicationState';
 import type { AppRuntimeView } from '@/types/app';
 import type { SupportBundle, SupportFinding, SupportLogLine, SupportRedactionRule, SupportSummary, SystemDoctorStatus, SystemSetupStatus } from '@/types/system';
-import { diagnosticsHeadline, diagnosticsSummaryRows, productionConflictSummary } from './SupportPage.diagnosticsModel';
-import { formatDate, humanize, shortSha, summaryFromBundle } from './SupportPage.logic';
+import { formatDate, humanize, productionConflictSummary, shortSha, summaryFromBundle } from './SupportPage.logic';
 import { downloadSupportReport } from './SupportPage.supportReport';
 import { FindingCard, InfoLine, LogLine, RedactionRuleCard, RelatedLink, SectionHeader, SupportInset } from './SupportPage.components';
 
@@ -162,9 +161,7 @@ function SupportPage() {
   )), [appState.applications]);
   const findings = summary?.findings || state.bundle?.findings || [];
   const redactionRules = summary?.redactionRules || state.bundle?.redactionRules || [];
-  const summaryRows = diagnosticsSummaryRows({ summary, doctor: state.doctor, setup: state.setup, applications: appState.freshness.hasUsableData ? appState.applications : null });
-  const healthChecks = notebookHealthChecks(state.doctor, state.setup, summaryRows);
-  const headline = diagnosticsHeadline(summary, state.doctor);
+  const healthChecks = notebookHealthChecks(state.doctor, state.setup);
   const conflict = productionConflictSummary(state.setup);
   const ownershipResources = useMemo(() => evidencedApplications
     .filter((application) => application.relationship !== 'managed' && application.relationship !== 'available'), [evidencedApplications]);
@@ -193,7 +190,6 @@ function SupportPage() {
         error={error}
         findings={findings}
         healthChecks={healthChecks}
-        headline={headline}
         logs={state.logs}
         logsBusy={logsBusy}
         logsContentRef={logsContentRef}
@@ -224,7 +220,6 @@ function SupportPage() {
         setup={state.setup}
         showAdvancedMetrics={showAdvancedMetrics}
         summary={summary}
-        summaryRows={summaryRows}
           tailscaleCheck={tailscaleCheck?.message || summary?.tailscaleStatus || 'Unknown'}
         />}
       </ExtensionActionTarget>
@@ -241,7 +236,6 @@ type DiagnosticsNotebookProps = {
   error: string | null;
   findings: SupportFinding[];
   healthChecks: NotebookHealthCheck[];
-  headline: string;
   logs: SupportLogLine[];
   logsBusy: boolean;
   logsContentRef: { current: HTMLDivElement | null };
@@ -261,7 +255,6 @@ type DiagnosticsNotebookProps = {
   setup: SystemSetupStatus | null;
   showAdvancedMetrics: boolean;
   summary: SupportSummary | null;
-  summaryRows: Array<{ id: string; label: string; tone: string; value: string }>;
   tailscaleCheck: string;
 };
 
@@ -274,7 +267,6 @@ function DiagnosticsNotebook({
   error,
   findings,
   healthChecks,
-  headline,
   logs,
   logsBusy,
   logsContentRef,
@@ -294,11 +286,10 @@ function DiagnosticsNotebook({
   setup,
   showAdvancedMetrics,
   summary,
-  summaryRows,
   tailscaleCheck,
 }: DiagnosticsNotebookProps) {
   const notebookEntries: Array<{ icon: LucideIcon; id: DiagnosticsNotebookSection; label: string; tone: 'good' | 'info' | 'neutral' | 'watch' }> = [
-    { icon: ListChecks, id: 'health', label: 'Health checks', tone: headline === 'Ready' ? 'good' : 'watch' },
+    { icon: ListChecks, id: 'health', label: 'Health checks', tone: 'info' },
     { icon: ClipboardList, id: 'report', label: 'Support report', tone: 'info' },
     { icon: TerminalSquare, id: 'logs', label: 'Technical logs', tone: 'info' },
     { icon: ShieldCheck, id: 'redaction', label: 'Redaction rules', tone: 'good' },
@@ -307,8 +298,7 @@ function DiagnosticsNotebook({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
-      <DiagnosticsNotebookHeader error={error} headline={headline} onRefresh={onRefresh} refreshing={refreshing} />
-      <DiagnosticsSignalStrip summaryRows={summaryRows} />
+      <DiagnosticsNotebookHeader error={error} onRefresh={onRefresh} refreshing={refreshing} />
 
       <Tabs
         className="min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-sky-300/20 bg-slate-900 xl:grid xl:grid-cols-[13rem_minmax(0,1fr)_17rem]"
@@ -369,7 +359,7 @@ function DiagnosticsNotebook({
   );
 }
 
-function DiagnosticsNotebookHeader({ error, headline, onRefresh, refreshing }: { error: string | null; headline: string; onRefresh: () => void; refreshing: boolean }) {
+function DiagnosticsNotebookHeader({ error, onRefresh, refreshing }: { error: string | null; onRefresh: () => void; refreshing: boolean }) {
   return (
     <Surface as="header" className="shrink-0 overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
       <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
@@ -383,7 +373,7 @@ function DiagnosticsNotebookHeader({ error, headline, onRefresh, refreshing }: {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <div className="flex h-8 w-40 justify-end">{error ? <ContextChip label="Refresh paused" title="Diagnostics / Current status"><p>{error}</p><p className="text-xs text-muted-foreground">Previous checks remain visible.</p><Button disabled={refreshing} onClick={onRefresh} size="sm" type="button">Check again</Button></ContextChip> : <StatusBadge tone={headline === 'Ready' ? 'success' : headline === 'Status unavailable' ? 'neutral' : 'warning'}>{headline}</StatusBadge>}</div>
+          <div className="flex h-8 w-40 justify-end">{error && <ContextChip label="Refresh paused" title="Diagnostics / Current status"><p>{error}</p><p className="text-xs text-muted-foreground">Previous checks remain visible.</p><Button disabled={refreshing} onClick={onRefresh} size="sm" type="button">Check again</Button></ContextChip>}</div>
           <DisabledAction disabled={refreshing} reason="Autark-OS is already refreshing the current health checks.">
             <button aria-label="Refresh Diagnostics" className="grid size-10 place-items-center rounded-xl border border-sky-300/15 bg-slate-950/25 text-sky-100/70 transition hover:border-cyan-300/30 hover:text-white" disabled={refreshing} onClick={onRefresh} type="button">
               <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
@@ -392,24 +382,6 @@ function DiagnosticsNotebookHeader({ error, headline, onRefresh, refreshing }: {
         </div>
       </div>
     </Surface>
-  );
-}
-
-function DiagnosticsSignalStrip({ summaryRows }: { summaryRows: Array<{ id: string; label: string; tone: string; value: string }> }) {
-  return (
-    <section className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-5" aria-label="System summary">
-      {summaryRows.map((row) => <DiagnosticsSignalCell key={row.id} row={row} />)}
-    </section>
-  );
-}
-
-function DiagnosticsSignalCell({ row }: { row: { id: string; label: string; tone: string; value: string } }) {
-  const Icon = diagnosticsSignalIcon(row.id);
-  return (
-    <div className={cn('flex min-w-0 items-center gap-2 rounded-xl border px-3 py-2.5', diagnosticsToneClasses(row.tone))}>
-      <Icon aria-hidden="true" className="size-4 shrink-0" />
-      <span className="min-w-0"><span className="block text-[0.68rem] text-current/65">{row.label}</span><span className="block truncate text-xs font-semibold text-white">{row.value}</span></span>
-    </div>
   );
 }
 
@@ -437,12 +409,12 @@ function HealthChecksWorkspace({ conflict, findings, healthChecks }: { conflict:
         </div>
       )}
       <div className="grid gap-2">
-        {healthChecks.map((check) => <NotebookHealthCheckRow check={check} key={`${check.label}-${check.status}`} />)}
+        {healthChecks.length ? healthChecks.map((check) => <NotebookHealthCheckRow check={check} key={`${check.label}-${check.status}`} />) : <p className="text-sm text-muted-foreground">Health checks are unavailable. Refresh to try again.</p>}
       </div>
       <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3">
         <div className="flex items-center gap-2"><LifeBuoy aria-hidden="true" className="size-4 text-cyan-200" /><div><p className="text-sm font-semibold text-white">Recommended next steps</p><p className="mt-0.5 text-xs text-sky-100/60">Findings lead to the page that owns the fix.</p></div></div>
         <div className="mt-3 grid gap-2">
-          {findings.length ? findings.map((finding) => <FindingCard finding={finding} key={finding.id} />) : <SupportInset className="border-emerald-300/20 bg-emerald-500/10 text-sm text-emerald-100">No support findings need attention right now.</SupportInset>}
+          {findings.length ? findings.map((finding) => <FindingCard finding={finding} key={finding.id} />) : <SupportInset className="text-sm text-muted-foreground">No support findings reported.</SupportInset>}
         </div>
       </section>
     </div>
@@ -549,22 +521,13 @@ function NotebookEvidence({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between gap-2 text-xs text-sky-100/60"><span>{label}</span><span className="text-right font-semibold text-white">{value}</span></div>;
 }
 
-function notebookHealthChecks(doctor: SystemDoctorStatus | null, setup: SystemSetupStatus | null, summaryRows: Array<{ label: string; tone: string; value: string }>): NotebookHealthCheck[] {
+function notebookHealthChecks(doctor: SystemDoctorStatus | null, setup: SystemSetupStatus | null): NotebookHealthCheck[] {
   const checks = doctor?.checks?.length ? doctor.checks : setup?.checks || [];
-  if (checks.length) {
-    return checks.map((check) => ({
-      detail: check.detail || check.message || 'No additional detail is available.',
-      label: check.label,
-      status: notebookCheckStatus(check.status),
-      tone: notebookStatusTone(check.status),
-    }));
-  }
-
-  return summaryRows.map((row) => ({
-    detail: `Current ${row.label.toLowerCase()} status from Autark-OS.`,
-    label: row.label,
-    status: row.value,
-    tone: row.tone === 'success' ? 'success' : row.tone === 'warning' ? 'warning' : 'neutral',
+  return checks.map((check) => ({
+    detail: check.detail || check.message || 'No additional detail is available.',
+    label: check.label,
+    status: notebookCheckStatus(check.status),
+    tone: notebookStatusTone(check.status),
   }));
 }
 
@@ -579,20 +542,6 @@ function notebookStatusTone(status: string): NotebookHealthCheck['tone'] {
   if (status === 'ok' || status === 'ready') return 'success';
   if (status === 'warning' || status === 'needs_attention') return 'warning';
   return 'neutral';
-}
-
-function diagnosticsSignalIcon(id: string): LucideIcon {
-  if (id === 'apps') return PackageOpen;
-  if (id === 'tailscale') return LockKeyhole;
-  if (id === 'backups') return Archive;
-  if (id === 'storage') return HardDrive;
-  return Server;
-}
-
-function diagnosticsToneClasses(tone: string) {
-  if (tone === 'success') return 'border-emerald-300/20 bg-emerald-400/5 text-emerald-100';
-  if (tone === 'warning') return 'border-amber-300/20 bg-amber-400/5 text-amber-100';
-  return 'border-sky-300/15 bg-slate-900 text-cyan-100';
 }
 
 function notebookIconClasses(tone: 'good' | 'info' | 'neutral' | 'watch') {

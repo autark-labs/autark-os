@@ -50,6 +50,27 @@ class StorageServiceTests {
     Path tempDir;
 
     @Test
+    void failedDiskMeasurementIsUnavailableRatherThanHealthyOrFull() throws Exception {
+        AutarkOsRuntimeProperties properties = new AutarkOsRuntimeProperties();
+        properties.setRuntimeRoot(tempDir.resolve("valid-runtime").toString());
+        StorageService service = storageService(new RuntimeLayout(properties));
+        Path blocker = tempDir.resolve("not-a-directory");
+        Files.writeString(blocker, "blocks the runtime path");
+        properties.setRuntimeRoot(blocker.resolve("runtime").toString());
+
+        StorageModels.StorageReport report = service.report();
+
+        assertThat(report.status()).isEqualTo("warning");
+        assertThat(report.hostDisk().usedPercent()).isEqualTo(-1);
+        assertThat(report.hostDisk().usableBytes()).isEqualTo(-1);
+        assertThat(report.recommendations().getFirst().id()).isEqualTo("disk-unavailable");
+        assertThat(report.recommendations()).noneMatch(item -> item.id().equals("disk-healthy"));
+        assertThat(report.summary()).contains("could not measure").doesNotContain("0 B free");
+        assertThat(report.installSafety().installAllowed()).isFalse();
+        assertThat(report.installSafety().message()).contains("unavailable");
+    }
+
+    @Test
     void reportOnlyIncludesCanonicalManagedApps() throws Exception {
         RuntimeLayout layout = runtimeLayout(tempDir.resolve("runtime"));
         Files.createDirectories(layout.appRoot("homepage"));

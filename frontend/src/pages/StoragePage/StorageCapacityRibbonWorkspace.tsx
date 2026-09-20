@@ -11,7 +11,6 @@ import {
   Database,
   FolderSearch,
   HardDrive,
-  Info,
   LineChart,
   PackageOpen,
   ShieldCheck,
@@ -35,7 +34,6 @@ import {
   capacitySegments,
   formatStorageBytes,
   storageGrowthLabel,
-  storageHeroCopy,
   storagePercentLabel,
   weeklyAppGrowth,
 } from './StoragePage.presentation';
@@ -74,8 +72,6 @@ export function StorageCapacityRibbonWorkspace({
   const appDataBytes = appStorageTotal(report);
   const appsWithBackupsOn = report.apps.filter((app) => app.backupEnabled).length;
   const largestApps = report.apps.slice(0, 3);
-  const firstOrphan = report.orphanedData[0] ?? null;
-  const hero = storageHeroCopy(report);
   const route = useMemo(
     () => parseStorageWorkspaceRoute(searchParams, report.apps, showAdvancedMetrics),
     [report.apps, searchParams, showAdvancedMetrics],
@@ -110,7 +106,7 @@ export function StorageCapacityRibbonWorkspace({
         usedPercent={report.hostDisk.usedPercent}
       />
 
-      <CapacityReadout appDataBytes={appDataBytes} appsWithBackupsOn={appsWithBackupsOn} report={report} summary={hero.summary} />
+      <CapacityReadout appDataBytes={appDataBytes} appsWithBackupsOn={appsWithBackupsOn} report={report} />
 
       <Tabs className="min-h-0 flex-1 gap-0" onValueChange={(value) => selectTab(value as StorageWorkspaceTab)} value={workspaceTab}>
         <Surface className="flex min-h-0 flex-1 flex-col overflow-hidden border-sky-300/20 bg-slate-900" tone="panel">
@@ -128,7 +124,7 @@ export function StorageCapacityRibbonWorkspace({
             <section className="grid min-h-full gap-3 xl:grid-cols-[minmax(18rem,1fr)_minmax(17rem,0.8fr)_17rem]">
               <GrowthPanel apps={report.apps} status={report.status} weeklyGrowthBytes={weeklyAppGrowth(report)} />
               <SpaceDriversPanel appIconUrlById={appIconUrlById} apps={largestApps} onSelectApp={selectApp} totalApps={report.apps.length} />
-              <AttentionPanel firstOrphan={firstOrphan} onOpenCleanup={() => selectTab('cleanup')} report={report} />
+              <AttentionPanel onOpenCleanup={() => selectTab('cleanup')} report={report} />
             </section>
           </TabsContent>
 
@@ -207,11 +203,10 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function CapacityReadout({ appDataBytes, appsWithBackupsOn, report, summary }: {
+function CapacityReadout({ appDataBytes, appsWithBackupsOn, report }: {
   appDataBytes: number;
   appsWithBackupsOn: number;
   report: StorageReport;
-  summary: string;
 }) {
   const externalBackups = report.backupDestination?.kind === 'external';
   const backupStatus = report.backupDestination?.status ?? 'unknown';
@@ -221,7 +216,7 @@ function CapacityReadout({ appDataBytes, appsWithBackupsOn, report, summary }: {
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-white">{report.headline || 'Storage position'}</p>
-          <p className="mt-0.5 max-w-2xl text-xs text-sky-100/60">{summary}</p>
+          <p className="mt-0.5 max-w-2xl text-xs text-sky-100/60">{report.summary}</p>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-sky-100/60">
           <CapacityValue label="app data" value={formatStorageBytes(appDataBytes)} />
@@ -370,61 +365,15 @@ function SpaceDriverRow({ app, iconUrl, onClick }: { app: AppStorageUsage; iconU
   );
 }
 
-function AttentionPanel({ firstOrphan, onOpenCleanup, report }: {
-  firstOrphan: OrphanedStorage | null;
-  onOpenCleanup: () => void;
-  report: StorageReport;
-}) {
-  const recommendations = report.recommendations;
-  const recommendation = recommendations.find((item) => item.tone !== 'success') ?? recommendations[0] ?? null;
-
-  if (firstOrphan) {
-    return (
-      <Surface className="self-start border-amber-300/20 bg-amber-400/5 p-4" tone="panel">
-        <div className="flex items-start gap-2">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-amber-300/25 bg-amber-400/10 text-amber-100"><Trash2 aria-hidden="true" className="size-4" /></span>
-          <div>
-            <p className="text-sm font-semibold text-white">One safe review</p>
-            <p className="mt-1 text-xs leading-5 text-amber-100/75">{formatStorageBytes(firstOrphan.usedBytes)} can be reclaimed after review.</p>
-          </div>
-        </div>
-        <p className="mt-3 truncate text-xs font-semibold text-amber-50" title={firstOrphan.name}>{firstOrphan.name}</p>
-        <ProjectWarningButton className="mt-4 w-full" onClick={onOpenCleanup} type="button">
-          Review cleanup <ChevronRight aria-hidden="true" className="size-3.5" />
-        </ProjectWarningButton>
-      </Surface>
-    );
-  }
-
-  const needsAttention = report.status === 'warning' || report.status === 'critical' || Boolean(recommendation);
+function AttentionPanel({ onOpenCleanup, report }: { onOpenCleanup: () => void; report: StorageReport }) {
   return (
-    <Surface className={cn('self-start p-4', needsAttention ? 'border-amber-300/20 bg-amber-400/5' : 'border-emerald-300/20 bg-emerald-400/5')} tone="panel">
-      <div className="flex items-start gap-2">
-        <span className={cn('grid size-8 shrink-0 place-items-center rounded-lg border', needsAttention ? 'border-amber-300/25 bg-amber-400/10 text-amber-100' : 'border-emerald-300/25 bg-emerald-400/10 text-emerald-100')}>
-          {needsAttention ? <CircleAlert aria-hidden="true" className="size-4" /> : <CheckCircle2 aria-hidden="true" className="size-4" />}
-        </span>
-        <div>
-          <p className="text-sm font-semibold text-white">{needsAttention ? recommendation?.title || 'Storage needs review' : 'Storage looks good'}</p>
-          <p className={cn('mt-1 text-xs leading-5', needsAttention ? 'text-amber-100/75' : 'text-emerald-100/75')}>{recommendation?.message || 'Autark-OS did not find unused app folders or an urgent capacity issue.'}</p>
-        </div>
+    <Surface className="self-start p-4" tone="panel">
+      <h2 className="text-sm font-semibold text-white">Storage recommendations</h2>
+      <div className="mt-3 grid gap-2">
+        {report.recommendations.length ? report.recommendations.map((recommendation) => <RecommendationRow key={recommendation.id} recommendation={recommendation} />) : <p className="text-sm text-muted-foreground">No recommendations reported.</p>}
       </div>
-      <div className="mt-4 grid gap-2">
-        <AttentionFact icon={Archive} label="Backup data" value={`${formatStorageBytes(report.backupStorage.usedBytes)} · ${report.backupDestination?.kind === 'external' ? 'external drive' : 'this device'}`} />
-        <AttentionFact icon={PackageOpen} label="Managed apps" value={`${report.apps.length} tracked`} />
-        <AttentionFact icon={Info} label="Status" value={needsAttention ? 'Review recommended' : 'No action needed'} />
-      </div>
-      {recommendations.length > 1 && <div className="mt-3 grid gap-2">{recommendations.filter((item) => item !== recommendation).map((item) => <RecommendationRow key={item.id} recommendation={item} />)}</div>}
       <ProjectDarkControlButton className="mt-4 w-full" onClick={onOpenCleanup} type="button">Open cleanup workspace <ChevronRight aria-hidden="true" className="size-3.5" /></ProjectDarkControlButton>
     </Surface>
-  );
-}
-
-function AttentionFact({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return (
-    <ProjectInset className="grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] gap-x-2 border-sky-300/15 bg-slate-950/30 px-3 py-2">
-      <Icon aria-hidden="true" className="mt-0.5 size-3.5 text-sky-100/65" />
-      <span className="min-w-0"><span className="block text-[0.68rem] text-slate-400">{label}</span><span className="block truncate text-xs font-semibold text-white" title={value}>{value}</span></span>
-    </ProjectInset>
   );
 }
 
@@ -579,6 +528,7 @@ function signedBytes(value: number) {
 }
 
 function usageTone(value: number): SemanticStatusTone {
+  if (!Number.isFinite(value) || value < 0) return 'neutral';
   if (value >= 90) return 'danger';
   if (value >= 75) return 'warning';
   return 'success';

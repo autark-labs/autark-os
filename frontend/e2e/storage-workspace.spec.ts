@@ -1,6 +1,51 @@
 import { expect, test } from 'playwright/test';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage } from './support/mockApi';
 
+test('Storage preserves recommendation severity and priority over blocked cleanup', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.goto('/storage');
+  const report = await page.evaluate(async () => (await fetch('/api/system/storage')).json());
+  report.status = 'healthy';
+  report.orphanedData = [];
+  report.recommendations = [{ id: 'disk-healthy', tone: 'success', title: 'Storage looks healthy', message: 'Enough space remains.', actionLabel: null }];
+  await page.route('**/api/system/storage', route => route.fulfill({ json: report }));
+  await page.reload();
+  await expect(page.getByText('Storage looks healthy', { exact: true }).locator('..')).toHaveClass(/bg-app-status-success-surface/);
+  await expect(page.getByText('Review recommended', { exact: true })).toHaveCount(0);
+  report.status = 'critical';
+  report.orphanedData = [{ name: 'blocked-folder', path: '/fixture/blocked', usedBytes: 8000, cleanupAllowed: false, cleanupBlockedReason: 'A running container uses this folder.' }];
+  report.recommendations = [
+    { id: 'disk-critical', tone: 'danger', title: 'Free up space soon', message: 'The host disk is critically full.', actionLabel: 'Review largest apps' },
+    { id: 'orphaned-data', tone: 'warning', title: 'Unused app data found', message: 'Review folders before cleanup.', actionLabel: 'Review unused data' },
+  ];
+  await page.reload();
+  const capacity = page.getByText('Free up space soon', { exact: true });
+  await expect(capacity.locator('..')).toHaveClass(/bg-app-status-danger-surface/);
+  expect((await capacity.boundingBox())!.y).toBeLessThan((await page.getByText('Unused app data found', { exact: true }).boundingBox())!.y);
+  await expect(page.getByText(/can be reclaimed after review/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Open cleanup workspace', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Review', exact: true })).toBeDisabled();
+  await expect(page.getByText(/Cleanup blocked: A running container/)).toBeVisible();
+});
+
+test('Storage measurement failure stays unavailable in capacity and advanced details', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.goto('/storage');
+  const report = await page.evaluate(async () => (await fetch('/api/system/storage')).json());
+  report.status = 'warning';
+  report.headline = 'Storage has a few notes';
+  report.summary = 'Autark-OS could not measure the host disk. Check runtime storage access, then refresh.';
+  Object.assign(report.hostDisk, { usedPercent: -1, totalBytes: -1, usedBytes: -1, usableBytes: -1 });
+  report.recommendations = [{ id: 'disk-unavailable', tone: 'warning', title: 'Disk usage is unavailable', message: report.summary, actionLabel: null }];
+  await page.route('**/api/system/storage', route => route.fulfill({ json: report }));
+  await page.reload();
+  await expect(page.getByText('Disk usage is unavailable', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Advanced', exact: true }).click();
+  const host = page.getByText('Host disk', { exact: true }).locator('../../..');
+  await expect(host.getByText('Unknown', { exact: true })).toHaveClass(/bg-app-status-muted-surface/);
+  await expect(host.getByText('Unavailable', { exact: true })).toHaveCount(3);
+});
+
 test('checkpointed cleanup refreshes the cached Home summary before its polling interval', async ({ page }) => {
   await installMockApi(page, 'idle');
   await page.goto('/home');

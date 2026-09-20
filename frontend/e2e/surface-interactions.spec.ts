@@ -1,6 +1,34 @@
 import { expect, test } from 'playwright/test';
 import { expectNoHorizontalOverflow, installMockApi, stabilizePage, type FixtureScenario } from './support/mockApi';
 
+test('Diagnostics uses structured checks and backend findings without inventing backup protection', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.goto('/diagnostics');
+  const [summary, doctor] = await page.evaluate(async () => Promise.all(['/api/system/support/summary', '/api/system/doctor'].map(async path => (await fetch(path)).json())));
+  summary.findings = [{ id: 'domain-backups', area: 'Backups', severity: 'warning', title: 'Backups need attention', message: 'The backup destination cannot be written.', actionLabel: 'Open Backups', route: '/backups' }];
+  doctor.status = 'needs_attention';
+  doctor.checks = [{ id: 'tailscale', label: 'Tailscale', status: 'warning', message: 'Tailscale is not connected.' }];
+  await page.route('**/api/system/support/summary', route => route.fulfill({ json: summary }));
+  await page.route('**/api/system/doctor', route => route.fulfill({ json: doctor }));
+  await page.reload();
+  const health = page.getByRole('tabpanel', { name: 'Health checks' });
+  await expect(page.getByRole('region', { name: 'System summary', exact: true })).toHaveCount(0);
+  await expect(health.getByText('Needs review', { exact: true })).toHaveClass(/text-amber/);
+  await expect(health.getByText('Tailscale is not connected.', { exact: true })).toBeVisible();
+  await expect(health.getByText('Backups need attention', { exact: true })).toBeVisible();
+  await expect(health.getByText('No restore point yet', { exact: true })).toHaveCount(0);
+  await health.getByRole('link', { name: 'Open Backups', exact: true }).click();
+  await expect(page).toHaveURL(/\/backups$/);
+  await expect(page.getByText('Vaultwarden with a deliberately long self-hosted service name', { exact: true }).first()).toBeVisible();
+  summary.findings = [];
+  doctor.checks = [{ id: 'tailscale', label: 'Tailscale', status: 'neutral', message: 'Tailscale status unavailable.' }];
+  await page.goto('/diagnostics');
+  await expect(health.getByText('Unknown', { exact: true })).not.toHaveClass(/emerald/);
+  await expect(health.getByText('No support findings reported.', { exact: true })).toBeVisible();
+  await expect(health).not.toContainText('No restore point yet');
+  await expect(health).not.toContainText('Protected');
+});
+
 test('Tailscale pending checks are not presented as unavailable', async ({ page }) => {
   await installMockApi(page, 'idle');
   let release!: () => void;
@@ -190,7 +218,7 @@ test('wide view opens global popovers, app management, and the Discover dialog',
   await page.keyboard.press('Escape');
 
   await openReadyRoute(page, '/storage', { width: 1280, height: 960 });
-  await page.getByRole('button', { name: /^Review cleanup$/i }).click();
+  await page.getByRole('button', { name: 'Open cleanup workspace', exact: true }).click();
   await expect(page.getByRole('tab', { name: /^Cleanup$/i })).toHaveAttribute('aria-selected', 'true');
   await page.getByRole('button', { name: /^Review$/i }).click();
   await expect(page.getByRole('dialog')).toContainText(/Clean up unused app data/i);

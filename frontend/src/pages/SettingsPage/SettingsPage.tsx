@@ -192,7 +192,6 @@ function SettingsPage({
           refreshing={refreshing}
           saveError={saveError}
           saving={saving}
-            setupHeadline={state.setup?.headline}
           />
         </ExtensionActionTarget>
       ) : (
@@ -338,7 +337,6 @@ function SettingsWorkbench({
   refreshing,
   saveError,
   saving,
-  setupHeadline,
 }: {
   activeGroupId: SettingsGroupId;
   activeGroupMeta: (typeof topLevelSettingsGroups)[number];
@@ -352,7 +350,6 @@ function SettingsWorkbench({
   refreshing: boolean;
   saveError: string | null;
   saving: boolean;
-  setupHeadline?: string;
 }) {
   const ActiveGroupIcon = groupIcons[activeGroupId];
 
@@ -386,10 +383,6 @@ function SettingsWorkbench({
             );
           })}
         </nav>
-        <div className="mt-auto rounded-xl border border-emerald-300/15 bg-emerald-400/5 p-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-100"><CheckCircle2 className="size-3.5" />Appliance ready</div>
-          <p className="mt-1 text-[0.68rem] leading-4 text-emerald-100/65">{setupHeadline || 'Core services and private access are healthy.'}</p>
-        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

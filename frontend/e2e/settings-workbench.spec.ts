@@ -1,6 +1,18 @@
 import { expect, test, type Locator } from 'playwright/test';
 import { installMockApi, stabilizePage } from './support/mockApi';
 
+test('Settings does not claim appliance readiness when setup needs attention', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.goto('/home');
+  const setup = await page.evaluate(async () => (await fetch('/api/system/setup-status')).json());
+  await page.route('**/api/system/setup-status', route => route.fulfill({ json: { ...setup, status: 'ready_with_notes', headline: 'Tailscale needs sign-in' } }));
+  await page.getByRole('button', { name: 'Open settings' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
+  await expect(dialog.getByRole('textbox', { name: /^Device name/ })).toBeVisible();
+  await expect(dialog.getByText('Appliance ready', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('Core services and private access are healthy.', { exact: true })).toHaveCount(0);
+});
+
 async function openSettings(page: Parameters<typeof installMockApi>[0]) {
   await installMockApi(page, 'ready');
   await page.setViewportSize({ width: 1440, height: 1000 });

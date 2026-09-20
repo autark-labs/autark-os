@@ -1,4 +1,4 @@
-import type { SupportBundle, SupportSummary } from '@/types/system';
+import type { SupportBundle, SupportSummary, SystemSetupStatus } from '@/types/system';
 
 export function summaryFromBundle(bundle: SupportBundle): SupportSummary {
   return {
@@ -34,4 +34,24 @@ export function shortSha(value: string) {
 
 export function humanize(value: string) {
   return value.replace(/[-_]/g, ' ');
+}
+
+export function productionConflictSummary(setup: SystemSetupStatus | null | undefined) {
+  const report = setup?.existingInstall;
+  const hasDevelopmentResources = setup?.devMode && report?.developmentInstanceAllowed && (report?.resources || []).length > 0;
+  if (!report?.conflict && !hasDevelopmentResources) {
+    return null;
+  }
+  if (setup?.devMode || report.developmentInstanceAllowed) {
+    return {
+      tone: 'info',
+      title: 'Development instance detected',
+      message: report.summary || 'This development instance is isolated from production.',
+    };
+  }
+  return {
+    tone: 'warning',
+    title: 'Existing Autark-OS install found',
+    message: report.summary || 'Review found apps before creating another production instance.',
+  };
 }
