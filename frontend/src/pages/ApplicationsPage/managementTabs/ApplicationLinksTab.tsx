@@ -14,10 +14,13 @@ export function ApplicationLinksTab({ item }: { item: ApplicationSurfaceItem }) 
   return (
     <div className="grid gap-4">
       <section className="grid gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3">
-        <LiveLinkRow icon={ExternalLink} label="Open" value={item.links.primaryUrl} />
-        <LiveLinkRow icon={KeyRound} label="Private" value={item.links.privateUrl} />
-        <LiveLinkRow icon={Server} label="Local" value={item.links.localUrl} />
-        <LiveLinkRow icon={Link2} label="Backend" value={item.links.backendTargetUrl} />
+        <LiveLinkRow icon={ExternalLink} label="Preferred" value={item.links.primaryUrl} />
+        <details className="space-y-3">
+          <summary className="cursor-pointer text-sm text-muted-foreground">Other addresses</summary>
+          <LiveLinkRow icon={KeyRound} label="Private" value={item.links.privateUrl} />
+          <LiveLinkRow icon={Server} label="Local" value={item.links.localUrl} />
+          <LiveLinkRow icon={Link2} label="Backend" value={item.links.backendTargetUrl} />
+        </details>
       </section>
 
       <section className="grid gap-2 sm:grid-cols-2">

@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 import {
   Dialog,
@@ -8,7 +8,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -17,47 +16,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { DestructiveActionPlan } from '../extensions/ApplicationsPage.destructiveActions';
 
-type DestructiveActionDialogCommonProps = {
-  className?: string;
-  triggerLabel: string;
-};
-
-type EnabledDestructiveActionDialogProps = DestructiveActionDialogCommonProps & {
-  disabledReason?: null;
+type DestructiveActionDialogProps = {
   loadPlan: () => Promise<DestructiveActionPlan>;
-  onActionStarted?: () => void;
   runAction: () => Promise<unknown>;
+  onClose: () => void;
+  onReturnFocus: () => void;
 };
 
-type DisabledDestructiveActionDialogProps = DestructiveActionDialogCommonProps & {
-  disabledReason: string;
-  loadPlan?: never;
-  onActionStarted?: never;
-  runAction?: never;
-};
-
-type DestructiveActionDialogProps = EnabledDestructiveActionDialogProps | DisabledDestructiveActionDialogProps;
-
-export function DestructiveActionDialog(props: DestructiveActionDialogProps) {
-  if (typeof props.disabledReason === 'string') {
-    return (
-      <div className="grid justify-items-end gap-1">
-        <Button className={props.className} disabled size="sm" type="button" variant="outline">
-          <AlertTriangle data-icon="inline-start" />
-          {props.triggerLabel}
-        </Button>
-        <p className="max-w-48 text-right text-xs leading-5 text-red-100/70">{props.disabledReason}</p>
-      </div>
-    );
-  }
-
-  return <EnabledDestructiveActionDialog {...props} />;
-}
-
-function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, runAction, triggerLabel }: EnabledDestructiveActionDialogProps) {
-  const [open, setOpen] = useState(false);
+export function DestructiveActionDialog({ loadPlan, runAction, onClose, onReturnFocus }: DestructiveActionDialogProps) {
   const [plan, setPlan] = useState<DestructiveActionPlan | null>(null);
-  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState(true);
   const [planError, setPlanError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -68,26 +36,13 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
   const confirmationMatches = !plan?.requiresTextConfirmation || confirmationText === plan.requiresTextConfirmation;
   const canRun = Boolean(plan) && !blocked && !loadingPlan && !running && confirmationMatches;
 
-  async function handleOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen);
-    if (!nextOpen) {
-      setConfirmationText('');
-      setActionError(null);
-      return;
-    }
-    if (plan || loadingPlan) {
-      return;
-    }
-    setLoadingPlan(true);
-    setPlanError(null);
-    try {
-      setPlan(await loadPlan());
-    } catch {
-      setPlanError('Autark-OS could not load the safety plan. Try again before making changes.');
-    } finally {
-      setLoadingPlan(false);
-    }
-  }
+  useEffect(() => {
+    let active = true;
+    void loadPlan().then((result) => { if (active) setPlan(result); })
+      .catch(() => { if (active) setPlanError('Autark-OS could not load the safety plan. Close and try again before making changes.'); })
+      .finally(() => { if (active) setLoadingPlan(false); });
+    return () => { active = false; };
+  }, [loadPlan]);
 
   async function confirmAction(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -98,9 +53,7 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
     setActionError(null);
     try {
       await runAction();
-      onActionStarted?.();
-      setOpen(false);
-      setConfirmationText('');
+      onClose();
     } catch {
       setActionError('Autark-OS could not start this action. The app was not changed.');
     } finally {
@@ -109,14 +62,8 @@ function EnabledDestructiveActionDialog({ className, loadPlan, onActionStarted, 
   }
 
   return (
-    <Dialog onOpenChange={handleOpenChange} open={open}>
-      <DialogTrigger asChild>
-        <Button className={className} size="sm" type="button" variant="outline">
-          <AlertTriangle data-icon="inline-start" />
-          {triggerLabel}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto bg-slate-950 text-slate-50 sm:max-w-2xl">
+    <Dialog open onOpenChange={(open) => !open && !running && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto bg-slate-950 text-slate-50 sm:max-w-2xl" onCloseAutoFocus={(event) => { event.preventDefault(); onReturnFocus(); }}>
         <DialogHeader>
           <DialogTitle>{plan?.title ?? 'Review safety plan'}</DialogTitle>
           <DialogDescription>

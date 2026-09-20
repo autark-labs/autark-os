@@ -7,13 +7,12 @@ type BasicApplicationsViewProps = {
   emptyState: ApplicationEmptyState;
   items: ApplicationSurfaceItem[];
   actionLoadingByItemId?: Record<string, ApplicationRuntimeAction | null | undefined>;
-  managementOpen: boolean;
   onAction: (item: ApplicationSurfaceItem, actionId: string) => void;
   onSelect: (id: string) => void;
   selectedId?: string;
 };
 
-export function BasicApplicationsView({ actionLoadingByItemId, emptyState, items, managementOpen, onAction, onSelect, selectedId }: BasicApplicationsViewProps) {
+export function BasicApplicationsView({ actionLoadingByItemId, emptyState, items, onAction, onSelect, selectedId }: BasicApplicationsViewProps) {
   if (!items.length) {
     return <ApplicationsEmptyState emptyState={emptyState} />;
   }
@@ -26,14 +25,12 @@ export function BasicApplicationsView({ actionLoadingByItemId, emptyState, items
             key={item.id}
             item={item}
             actionLoading={actionLoadingByItemId?.[item.id]}
-            managementOpen={managementOpen}
             onAction={onAction}
             onSelect={onSelect}
             selected={selectedId === item.id}
           />
         ))}
       </div>
-      {managementOpen && <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 bg-slate-950/15 backdrop-blur-[1px]" />}
     </section>
   );
 }

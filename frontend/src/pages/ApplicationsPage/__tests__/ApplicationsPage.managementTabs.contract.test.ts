@@ -83,7 +83,7 @@ test('applications page settings tab uses a guarded batch form for app settings'
   assert.doesNotMatch(page, /values\.tailscaleEnabled !== app\.settings\?\.tailscaleEnabled/);
   assert.doesNotMatch(page, /appWithOptimisticPrivateAccess/);
   assert.doesNotMatch(settings, /name="tailscaleEnabled"/);
-  assert.match(page, /window\.confirm\('Discard unsaved app settings\?'\)/);
+  assert.match(page, /Discard unsaved app settings\?/);
 });
 
 test('applications page settings tab uses real controls and confirm-before-save planning', () => {
@@ -133,10 +133,10 @@ test('applications page management panel uses canonical runtime data instead of 
 
   assert.match(panel, /item\.runtime\.composeProject/);
   assert.match(panel, /item\.runtime\.runtimePath/);
-  assert.match(panel, /item\.runtime\.version/);
+  assert.match(source('src/pages/ApplicationsPage/managementTabs/ApplicationTelemetryTab.tsx'), /item\.runtime\.version/);
   assert.match(panel, /item\.runtime\.image/);
   assert.match(panel, /item\.runtime\.recentEvents/);
-  assert.match(panel, /formatRuntimeTimestamp/);
+  assert.match(panel, /LocalizedDateTime/);
   assert.match(panel, /Copy details/);
   assert.doesNotMatch(panel, /Copy the compact app state, runtime path, access links, and last event for troubleshooting\./);
   assert.match(page, /invalidateApplicationState\(queryClient\)/);

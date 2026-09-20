@@ -18,27 +18,11 @@ test('applications page does not silently fall back to the first visible item', 
   assert.match(page, /selectedItemIsVisible/);
 });
 
-test('details rail renders the selected item even when grid visibility is changing', () => {
+test('management dialog renders the selected item even when grid visibility is changing', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
   assert.doesNotMatch(page, /item=\{selectedItemIsVisible \? selectedItem : null\}/);
   assert.match(page, /item=\{selectedItem\}/);
-});
-
-test('management outside click listener runs in capture phase before child stopPropagation', () => {
-  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-
-  assert.match(page, /document\.addEventListener\('pointerdown', handlePointerDown, true\)/);
-  assert.match(page, /document\.removeEventListener\('pointerdown', handlePointerDown, true\)/);
-});
-
-test('management drawer is masked and borderless while it is collapsed', () => {
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
-
-  assert.match(rail, /w-\[64rem\] overflow-hidden/);
-  assert.match(rail, /right-\[calc\(22rem-1px\)\]/);
-  assert.match(rail, /border-transparent shadow-none/);
-  assert.match(rail, /transition-transform duration-300/);
 });
 
 test('applications page keeps app focus in the route and clears it when management closes', () => {
@@ -46,9 +30,9 @@ test('applications page keeps app focus in the route and clears it when manageme
 
   assert.match(page, /const navigate = useNavigate\(\)/);
   assert.match(page, /applicationDeepLinkForSurfaceItem/);
-  assert.match(page, /navigate\(applicationDeepLinkForSurfaceItem\(item, \{ panel: managementOpen \? 'manage' : null \}\), \{ replace: true \}\)/);
+  assert.match(page, /navigate\(applicationDeepLinkForSurfaceItem\(item, \{ panel: 'manage' \}\), \{ replace: true \}\)/);
   assert.match(page, /navigate\('\/apps', \{ replace: true \}\)/);
   assert.doesNotMatch(page, /setSelectedId|setManagementOpen/);
   assert.match(page, /onSelect=\{handleSelectItem\}/);
-  assert.match(page, /onManagementOpenChange=\{handleManagementOpenChange\}/);
+  assert.match(page, /<Dialog open=\{Boolean\(selectedItem\)\}/);
 });

@@ -107,7 +107,7 @@ test('Home and My Apps keep the same managed app visible across runtime states',
   await expect(page.getByRole('region', { name: 'Your Apps' }).getByText(application.name, { exact: true })).toBeVisible();
 });
 
-test('canonical Open agrees across Home, app grid/list/rail/guide, and Discover', async ({ page }) => {
+test('canonical Open agrees across Home, app grid/list/management/guide, and Discover', async ({ page }) => {
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1440, height: 960 });
   await installMockApi(page, 'idle');
@@ -144,11 +144,10 @@ test('canonical Open agrees across Home, app grid/list/rail/guide, and Discover'
       await assertOpen(page.getByRole('main').last());
     }
     await page.goto('/apps?focus=managed%3Avaultwarden');
-    await expect(page.getByRole('button', { name: 'Manage app', exact: true })).toBeVisible();
-    await assertOpen(page.getByRole('main').last());
-    await page.getByRole('button', { name: 'Manage app', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: /Vaultwarden/ })).toBeVisible();
+    await assertOpen(page.getByRole('dialog'));
     await page.getByRole('tab', { name: 'Guide', exact: true }).click();
-    await assertOpen(page.getByRole('tabpanel', { name: 'Guide', exact: true }));
+    await assertOpen(page.getByRole('dialog'));
     await page.goto('/discover');
     await expect(page.getByRole('button', { name: 'Select Vaultwarden', exact: true })).toBeVisible();
     await assertOpen(page.getByRole('main').last());

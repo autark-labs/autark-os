@@ -44,9 +44,8 @@ test('app management keeps its background inert without serious or critical axe 
   const manageApp = page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i });
   await expect(manageApp).toBeVisible();
   await manageApp.click();
-  await page.getByRole('button', { name: /^Manage app$/i }).click();
-  await expect(page.getByText(/^Management$/i)).toBeVisible();
-  await expect(page.locator('div[data-slot="table-container"]')).toHaveAttribute('inert', '');
+  await expect(page.getByRole('dialog', { name: /Vaultwarden/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'My Apps', exact: true })).toHaveCount(0);
   await expectNoSeriousAccessibilityViolations(page);
 });
 

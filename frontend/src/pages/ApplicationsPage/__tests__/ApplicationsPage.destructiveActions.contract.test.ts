@@ -27,7 +27,6 @@ test('applications page destructive actions use a shared plan-confirm-run dialog
   assert.match(dialog, /Dialog/);
   assert.match(dialog, /loadPlan/);
   assert.match(dialog, /runAction/);
-  assert.match(dialog, /disabledReason/);
   assert.match(dialog, /requiresTextConfirmation/);
   assert.match(dialog, /blockedReasons/);
   assert.match(dialog, /warnings/);
@@ -38,7 +37,7 @@ test('applications page destructive actions use a shared plan-confirm-run dialog
   assert.match(dialog, /<DialogClose asChild>/);
 
   assert.match(panel, /DestructiveActionDialog/);
-  assert.match(panel, /disabledReason/);
+  assert.match(panel, /uninstallReason/);
   assert.doesNotMatch(panel, /<AlertDialog/);
   assert.doesNotMatch(dialog, /AlertDialog/);
   assert.doesNotMatch(panel, /This wireframe keeps data by default/);
@@ -57,7 +56,7 @@ test('applications page uninstall uses real plan and job-backed action wiring', 
   assert.match(types, /onRunUninstall: \(id: string\) => Promise<void>/);
 
   assert.match(page, /mapUninstallPlanToDestructiveActionPlan/);
-  assert.match(page, /loadUninstallPlan\(appId: string\)/);
+  assert.match(page, /loadUninstallPlan = useCallback/);
   assert.match(page, /InstalledAppsAPIClient\.uninstallPlan\(appId\)/);
   assert.match(page, /runUninstall\(appId: string\)/);
   assert.match(page, /InstalledAppsAPIClient\.uninstall\(appId\)/);
@@ -66,9 +65,9 @@ test('applications page uninstall uses real plan and job-backed action wiring', 
   assert.match(page, /showActionNotification\(job\)/);
   assert.doesNotMatch(page, /Uninstall review opened just now/);
 
-  assert.match(panel, /loadPlan=\{\(\) => actions\.onLoadUninstallPlan\(item\.id\)\}/);
+  assert.match(panel, /loadPlan=\{loadUninstallPlan\}/);
   assert.match(panel, /runAction=\{\(\) => actions\.onRunUninstall\(item\.id\)\}/);
-  assert.match(panel, /disabledReason=\{uninstallDisabledReason\}/);
+  assert.match(panel, /disabled=\{Boolean\(uninstallReason\)\}/);
   assert.match(panel, /operationBlocksManagement\(item\.operation\)/);
   assert.doesNotMatch(panel, /A safety plan is required before uninstall can run/);
 });

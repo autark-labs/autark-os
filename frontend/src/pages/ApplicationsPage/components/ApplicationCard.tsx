@@ -1,7 +1,6 @@
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ExternalLink, MoreVertical } from 'lucide-react';
-import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card } from '@/components/ui/card';
@@ -16,48 +15,32 @@ import type { ApplicationRuntimeAction, ApplicationSurfaceItem } from '../extens
 export function ApplicationCard({
   actionLoading,
   item,
-  managementOpen,
   onAction,
   onSelect,
   selected,
 }: {
   actionLoading?: ApplicationRuntimeAction | null;
   item: ApplicationSurfaceItem;
-  managementOpen: boolean;
   onAction: (item: ApplicationSurfaceItem, actionId: string) => void;
   onSelect: (id: string) => void;
   selected: boolean;
 }) {
-  const cardRef = useRef<HTMLDivElement | null>(null);
   const manageHref = applicationDeepLinkForSurfaceItem(item, { panel: 'manage' });
   const actions = cardActions(item, actionLoading);
 
-  useEffect(() => {
-    const card = cardRef.current;
-    if (!card) return;
-    if (managementOpen) {
-      card.setAttribute('inert', '');
-    } else {
-      card.removeAttribute('inert');
-    }
-  }, [managementOpen]);
 
   return (
     <Card
-      aria-hidden={managementOpen}
       className={cn(
         'group/app-card relative h-56 w-48 overflow-hidden rounded-xl border border-sky-200/20 bg-app-card-harbor !gap-0 !py-0 text-slate-50 shadow-lg shadow-slate-950/20 ring-0 transition duration-200',
-        !managementOpen && 'cursor-pointer hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-app-card-harbor-hover hover:shadow-xl hover:shadow-cyan-950/30',
-        managementOpen && 'pointer-events-none cursor-default',
+        'cursor-pointer hover:-translate-y-0.5 hover:border-cyan-200/50 hover:bg-app-card-harbor-hover hover:shadow-xl hover:shadow-cyan-950/30',
         selected && 'z-10 border-cyan-100/85 shadow-xl shadow-cyan-200/20 ring-1 ring-cyan-100/55',
       )}
-      ref={cardRef}
       size="sm"
     >
       <button
         aria-label={`Manage ${item.name}`}
         className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300/80"
-        disabled={managementOpen}
         onClick={() => onSelect(item.id)}
         type="button"
       >
@@ -93,7 +76,6 @@ export function ApplicationCard({
                     <button
                       aria-label={`${item.name} actions`}
                       className="inline-flex size-5.5 items-center justify-center rounded-md text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
-                      disabled={managementOpen}
                       onClick={(event) => event.stopPropagation()}
                       type="button"
                     >
@@ -138,13 +120,13 @@ export function ApplicationCard({
             onSelect={() => onSelect(item.id)}
             selectAriaLabel={`Select ${item.name}`}
           />
-          <p className="m-0 truncate text-xs text-slate-400">{item.category || 'App'}</p>
+          <p className="m-0 truncate text-xs text-slate-300">{item.category || 'App'}</p>
           <div className="mt-auto flex items-center justify-between gap-2 border-t border-sky-300/10 pt-2 text-[0.7rem] font-medium">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className={cn('size-1.5 shrink-0 rounded-full', runtimeTone(item))} />
               <span className={cn(readinessTextTone(item))}>{statusLabel(item)}</span>
             </span>
-            <span className="truncate text-slate-200/65">{item.relationship === 'managed' ? `${item.access}` : item.access}</span>
+            <span className="truncate text-slate-200">{item.access}</span>
           </div>
         </div>
       </div>

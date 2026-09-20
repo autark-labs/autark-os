@@ -7,6 +7,8 @@ import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
 import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
 import { ContextChip } from '@/components/autark-os/ContextChip';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { JobProgress } from '@/components/autark-os/JobProgress';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
@@ -22,7 +24,7 @@ import { invalidateBackupQueries } from '@/repositories/backupRepository';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import { terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
 import { invalidateNetworkQueries } from '@/repositories/networkRepository';
-import { ApplicationDetailsRail } from './ApplicationDetailsRail';
+import { ApplicationManagementPanel } from './ApplicationManagementPanel';
 import { ApplicationReviewDialog } from './ApplicationReviewDialog';
 import { BasicApplicationsView } from './BasicApplicationsView';
 import { AdvancedApplicationsView } from './AdvancedApplicationsView';
@@ -67,7 +69,8 @@ export const ApplicationsPage = () => {
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
   const [trackedAppJobIds, setTrackedAppJobIds] = useState<string[]>([]);
   const appliedDeepLinkKeyRef = useRef('');
-  const railRef = useRef<HTMLDivElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const discardFocusRef = useRef<HTMLElement | null>(null);
   const deepLinkTarget = useMemo(() => parseApplicationsDeepLink(location.search), [location.search]);
 
   const items = useMemo(() => (
@@ -105,7 +108,6 @@ export const ApplicationsPage = () => {
   }, [collectionFilters, items, query]);
 
   const selectedItem = findApplicationDeepLinkTarget(items, deepLinkTarget) ?? null;
-  const managementOpen = Boolean(selectedItem && deepLinkTarget.panel === 'manage');
   const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
   const managedCount = managedItems.length;
   const attentionCount = items.filter((item) => item.issues.length > 0 || ['degraded', 'missing', 'unknown'].includes(item.state)).length;
@@ -117,17 +119,11 @@ export const ApplicationsPage = () => {
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     const next = parseApplicationsDeepLink(nextLocation.search);
     return selectedHasUnsavedSettings && (currentLocation.pathname !== nextLocation.pathname
-      || next.id !== deepLinkTarget.id || next.kind !== deepLinkTarget.kind || next.panel !== 'manage');
+      || next.id !== deepLinkTarget.id || next.kind !== deepLinkTarget.kind);
   });
 
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return;
-    if (window.confirm('Discard unsaved app settings?')) blocker.proceed();
-    else blocker.reset();
-  }, [blocker]);
-
-  const focusApplicationItem = useCallback((item: ApplicationSurfaceItem, managementOpen = false) => {
-    navigate(applicationDeepLinkForSurfaceItem(item, { panel: managementOpen ? 'manage' : null }), { replace: true });
+  const focusApplicationItem = useCallback((item: ApplicationSurfaceItem) => {
+    navigate(applicationDeepLinkForSurfaceItem(item, { panel: 'manage' }), { replace: true });
   }, [navigate]);
 
   const handleSelectItem = useCallback((id: string) => {
@@ -138,21 +134,8 @@ export const ApplicationsPage = () => {
   }, [focusApplicationItem, visibleItems]);
 
   const closeManagement = useCallback(() => {
-    if (selectedItem) {
-      navigate(applicationDeepLinkForSurfaceItem(selectedItem), { replace: true });
-    }
-  }, [navigate, selectedItem]);
-
-  const handleManagementOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      closeManagement();
-      return;
-    }
-    if (selectedItem) {
-      focusApplicationItem(selectedItem, true);
-      return;
-    }
-  }, [closeManagement, focusApplicationItem, selectedItem]);
+    navigate('/apps', { replace: true });
+  }, [navigate]);
 
   const handleCollectionFilterChange = useCallback((nextFilters: string[]) => {
     const normalizedFilters = nextFilters.filter((filter): filter is ApplicationCollectionFilter => (
@@ -185,30 +168,6 @@ export const ApplicationsPage = () => {
     }
     appliedDeepLinkKeyRef.current = deepLinkTarget.key;
   }, [deepLinkTarget, items, navigate]);
-
-  useEffect(() => {
-    if (!managementOpen) {
-      return undefined;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && railRef.current?.contains(target)) {
-        return;
-      }
-      if (target instanceof HTMLElement && target.closest('a, [role="dialog"], [role="alertdialog"], [data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"], [data-radix-popper-content-wrapper]')) {
-        return;
-      }
-
-      event.preventDefault();
-      closeManagement();
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown, true);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown, true);
-    };
-  }, [closeManagement, managementOpen]);
 
   useEffect(() => {
     if (!trackedAppJobIds.length) {
@@ -342,10 +301,10 @@ export const ApplicationsPage = () => {
     }
   }
 
-  async function loadUninstallPlan(appId: string) {
+  const loadUninstallPlan = useCallback(async (appId: string) => {
     const plan = await InstalledAppsAPIClient.uninstallPlan(appId);
     return mapUninstallPlanToDestructiveActionPlan(plan);
-  }
+  }, []);
 
   async function runUninstall(appId: string) {
     try {
@@ -368,30 +327,12 @@ export const ApplicationsPage = () => {
   }, []);
   const handleCreateBackup = (id: string) => void runBackup(id);
 
-  const handleRunNextAction = (id: string) => {
-    const item = items.find((candidate) => candidate.id === id);
-    if (item?.nextAction?.id === 'start_app') {
-      void runManagedAction(item.sourceId || item.id, 'start');
-      return;
-    }
-    if (item?.nextAction?.id === 'create_backup') {
-      void runBackup(item.sourceId || item.id);
-      return;
-    }
-
-    if (item) {
-      focusApplicationItem(item, true);
-    }
-    void invalidateApplicationState(queryClient);
-  };
-
   const actions = {
     onCreateBackup: handleCreateBackup,
     onDirtyChange: handleDirtyChange,
     onLoadUninstallPlan: loadUninstallPlan,
     onRepair: handleRepair,
     onRestart: handleRestart,
-    onRunNextAction: handleRunNextAction,
     onRunUninstall: runUninstall,
     onSaveSettings: saveApplicationSettings,
     onSettingsPlanRequest: requestSettingsPlan,
@@ -468,13 +409,12 @@ export const ApplicationsPage = () => {
       </div>
 
       <ApplicationStateContent>
-        <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="grid min-h-0 flex-1 overflow-hidden">
           {layout === 'grid' ? (
             <BasicApplicationsView
               actionLoadingByItemId={actionLoadingByAppId}
               emptyState={emptyState}
               items={visibleItems}
-              managementOpen={managementOpen}
               onAction={handleCardAction}
               onSelect={handleSelectItem}
               selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
@@ -486,25 +426,58 @@ export const ApplicationsPage = () => {
                 actionLoadingByItemId={actionLoadingByAppId}
                 emptyState={emptyState}
                 items={visibleItems}
-                managementOpen={managementOpen}
                 onSelect={handleSelectItem}
                 selectedId={selectedItemIsVisible ? selectedItem?.id : undefined}
               />
             </div>
           )}
 
-          <ApplicationDetailsRail
-            key={selectedItem?.id ?? 'unselected'}
-            actions={actions}
-            actionLoadingByItemId={actionLoadingByAppId}
-            item={selectedItem}
-            managementOpen={managementOpen}
-            onManagementOpenChange={handleManagementOpenChange}
-            settingsLoadingByItemId={settingsLoadingByAppId}
-            ref={railRef}
-          />
         </section>
+        <Dialog open={Boolean(selectedItem)} onOpenChange={(open) => !open && closeManagement()}>
+          <DialogContent
+            className="flex h-[min(42rem,calc(100dvh-3rem))] w-[calc(100%-3rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+            onOpenAutoFocus={() => { returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              const target = returnFocusRef.current;
+              if (target?.isConnected && target !== document.body) target.focus();
+              else document.querySelector<HTMLInputElement>('[aria-label="Search managed apps"]')?.focus();
+            }}
+          >
+            {selectedItem && <ApplicationManagementPanel
+              key={selectedItem.id}
+              actions={actions}
+              item={selectedItem}
+              loadingAction={actionLoadingByAppId[selectedItem.id]}
+              settingsLoadingAction={settingsLoadingByAppId[selectedItem.id]}
+              tabValue={deepLinkTarget.tab ?? 'overview'}
+              onTabValueChange={(tab) => navigate(applicationDeepLinkForSurfaceItem(selectedItem, { panel: 'manage', tab }), { replace: true })}
+            />}
+          </DialogContent>
+        </Dialog>
       </ApplicationStateContent>
+
+      <AlertDialog open={blocker.state === 'blocked'} onOpenChange={(open) => !open && blocker.state === 'blocked' && blocker.reset()}>
+        <AlertDialogContent
+          onOpenAutoFocus={() => { discardFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (discardFocusRef.current?.isConnected) discardFocusRef.current.focus();
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsaved app settings?</AlertDialogTitle>
+            <AlertDialogDescription>Your changes have not been saved. Keep editing or discard them to continue.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction onClick={(event) => {
+              event.preventDefault();
+              if (blocker.state === 'blocked') blocker.proceed();
+            }}>Discard changes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ApplicationReviewDialog
         application={reviewedApplication}

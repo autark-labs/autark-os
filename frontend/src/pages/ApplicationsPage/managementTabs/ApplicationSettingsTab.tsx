@@ -145,7 +145,8 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
 
   return (
     <TooltipProvider>
-      <form className="grid gap-4" onSubmit={(event) => void prepareSave(event)}>
+      <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => void prepareSave(event)}>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
         {!editable && (
           <Alert className="border-sky-400/20 bg-slate-900 text-sky-50">
             <AlertTriangle />
@@ -208,7 +209,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
                 inputId="private-network-access"
                 label="Private network"
               />
-              <FieldDescription className="text-sky-100/60">{privateNetwork.description}</FieldDescription>
+              <FieldDescription className="text-sky-100/60">{privateNetwork.description} Changes apply immediately.</FieldDescription>
               {item.settings.privateAccessUrl && (
                 <p className="truncate font-mono text-xs text-sky-50/80">{item.settings.privateAccessUrl}</p>
               )}
@@ -255,7 +256,8 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
           </div>
         </FieldSet>
 
-        <div className="flex flex-col gap-2 rounded-xl border border-sky-400/20 bg-slate-800 p-3 sm:flex-row sm:items-center sm:justify-between">
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-4 border-t border-border px-6 py-4">
           <div className="min-w-0">
             <p className="text-sm font-medium text-white">{isDirty ? 'Unsaved changes' : 'Settings are current'}</p>
             <p className="mt-1 text-xs leading-5 text-sky-100/60">

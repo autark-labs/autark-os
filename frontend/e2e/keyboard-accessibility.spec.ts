@@ -22,12 +22,15 @@ test('setup, app management, and Access controls work with the keyboard', async 
   await selectApp.focus();
   await expect(selectApp).toBeFocused();
   await page.keyboard.press('Enter');
-  const manageApp = page.getByRole('button', { name: /^Manage app$/i });
-  await expect(manageApp).toBeVisible();
-  await manageApp.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByText(/^Management$/i)).toBeVisible();
-  await expect(page.locator('div[data-slot="card"][inert]').filter({ hasText: /Vaultwarden with a deliberately long/i })).toHaveCount(1);
+  const dialog = page.getByRole('dialog', { name: /Vaultwarden/ });
+  await expect(dialog).toBeVisible();
+  for (let index = 0; index < 15; index++) {
+    await page.keyboard.press('Tab');
+    expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(selectApp).toBeFocused();
 
   await openRoute(page, '/access');
   const reviewService = page.getByRole('button', { name: /Review Vaultwarden.*Private/i });

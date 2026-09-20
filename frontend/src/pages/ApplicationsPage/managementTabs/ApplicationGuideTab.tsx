@@ -1,8 +1,6 @@
-import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
-import { ExternalLink, KeyRound, ListChecks, QrCode, Sparkles } from 'lucide-react';
+import { KeyRound, ListChecks, QrCode, Sparkles } from 'lucide-react';
 import { CopyField } from '@/components/autark-os/CopyField';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
-import { Button } from '@/components/ui/button';
 import type { ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
 export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) {
@@ -38,14 +36,6 @@ export function ApplicationGuideTab({ item }: { item: ApplicationSurfaceItem }) 
           <MetadataBadge className="w-fit">{setupGuide?.automation || usageGuide?.kind || item.relationship}</MetadataBadge>
         </div>
 
-        {item.href && (
-          <Button asChild className="w-fit bg-cyan-300 text-slate-950 hover:bg-cyan-200">
-            <AppBrowserLink href={item.href} rel="noreferrer" target="_blank">
-              <ExternalLink data-icon="inline-start" />
-              {usageGuide?.openUrlLabel || usageGuide?.primaryAction || 'Open app'}
-            </AppBrowserLink>
-          </Button>
-        )}
       </section>
 
       {(copyableFields.length > 0 || generatedValues.length > 0 || usageValues.length > 0) && (

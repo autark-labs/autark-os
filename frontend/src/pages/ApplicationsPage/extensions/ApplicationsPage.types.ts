@@ -21,7 +21,7 @@ export type AppOperationState =
   };
 
 export type ApplicationNextAction = {
-  id: 'create_backup' | 'review_found_service' | 'review_issue' | 'start_app';
+  id: 'create_backup' | 'review_issue' | 'start_app';
   label: string;
   description: string;
 };
@@ -54,9 +54,6 @@ export type ApplicationSurfaceItem = {
   links: ApplicationLinksView;
   settings: ApplicationSettingsView;
   runtime: ApplicationRuntimeDetailsView;
-  userStatus?: string;
-  userStatusDescription?: string;
-  userStatusLabel?: string;
 };
 
 export type ApplicationActionHandlers = {
@@ -65,7 +62,6 @@ export type ApplicationActionHandlers = {
   onLoadUninstallPlan: (id: string) => Promise<DestructiveActionPlan>;
   onRepair: (id: string) => void;
   onRestart: (id: string) => void;
-  onRunNextAction: (id: string) => void;
   onRunUninstall: (id: string) => Promise<void>;
   onSaveSettings: (id: string, values: ApplicationSettingsFormValues) => Promise<void>;
   onSettingsPlanRequest: (id: string, values: ApplicationSettingsFormValues) => Promise<ApplicationSettingsImpact | null>;

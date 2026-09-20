@@ -7,6 +7,9 @@ for (const type of ['backup_restore', 'uninstall_app']) {
     test.setTimeout(45_000);
     await page.setViewportSize({ width: 1440, height: 960 });
     await installMockApi(page, 'idle');
+    await page.route('**/api/apps/vaultwarden/uninstall-plan', route => route.fulfill({ json: {
+      appName: 'Vaultwarden', headline: 'Remove the app; preserve its data.', willStop: ['Vaultwarden'], willKeep: ['App data'], needsConfirmation: [],
+    } }));
     let status = 'running';
     const label = type === 'backup_restore' ? 'Restore failed' : 'Uninstall failed';
     const job = () => ({ jobId: 'operation-test', type, subjectId: type === 'backup_restore' ? '42:vaultwarden' : 'vaultwarden',
@@ -31,20 +34,18 @@ for (const type of ['backup_restore', 'uninstall_app']) {
     status = 'failed';
     await expect(page.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i }).click();
-    await page.getByRole('button', { name: /^Manage app$/i }).click();
-    await page.getByRole('tab', { name: 'Recovery', exact: true }).click();
-    const recovery = page.getByRole('tabpanel', { name: 'Recovery', exact: true });
-    await expect(recovery.getByText(label, { exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    const recovery = page.getByRole('tabpanel', { name: 'Overview', exact: true });
+    await expect(recovery).toContainText('The backup destination is unavailable.');
     await expect(recovery.getByRole('button', { name: 'Start again', exact: true })).toHaveCount(0);
     await expect(recovery.getByRole('button', { name: 'Stop app', exact: true })).toHaveCount(0);
     if (type === 'backup_restore') {
       await recovery.getByRole('link', { name: 'Review backups and restore plan' }).click();
       await expect(page).toHaveURL(/\/backups\?app=vaultwarden/);
     } else {
-      await recovery.getByRole('button', { name: 'Review app management' }).click();
-      const managementTabs = page.getByRole('tablist').filter({ has: page.getByRole('tab', { name: 'Recovery', exact: true }) });
-      await expect(managementTabs.getByRole('tab', { name: 'Overview', exact: true })).toHaveAttribute('aria-selected', 'true');
-      await expect(page.getByText('Uninstall', { exact: true })).toBeVisible();
+      await recovery.getByRole('button', { name: 'Review uninstall plan' }).click();
+      await expect(page.getByRole('dialog', { name: /^Uninstall / })).toBeVisible();
+      await page.getByRole('dialog', { name: /^Uninstall / }).getByRole('button', { name: 'Cancel', exact: true }).click();
     }
     status = 'succeeded';
     await page.goto('/apps');

@@ -17,7 +17,6 @@ test('My Apps renders only canonical managed applications', () => {
   assert.match(page, /<AdvancedApplicationsView[\s\S]*items=\{visibleItems\}/);
   assert.match(card, /<AppArtwork/);
   assert.match(card, /h-56 w-48/);
-  assert.match(card, /card\.setAttribute\('inert', ''\)/);
   assert.match(card, /<AppCardName/);
   assert.match(advancedView, /<AppCardName/);
   assert.match(advancedView, /table-fixed/);
@@ -26,7 +25,6 @@ test('My Apps renders only canonical managed applications', () => {
   assert.match(advancedView, /min-w-\[41rem\]/);
   assert.match(advancedView, /<col className="w-36" \/>[\s\S]*<col className="w-28" \/>[\s\S]*<col className="w-24" \/>[\s\S]*<col className="w-20" \/>/);
   assert.doesNotMatch(advancedView, /min-w-\[74rem\]/);
-  assert.match(page, /lg:grid-cols-\[minmax\(0,1fr\)_19rem\]/);
   assert.doesNotMatch(advancedView, /Recent activity/);
   assert.match(advancedView, /<RelationshipBadge \/>/);
   assert.match(header, /title="My Apps"/);

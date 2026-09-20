@@ -13,7 +13,7 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
   const operations = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.operations.ts');
   const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
 
   assert.match(page, /InstalledAppsAPIClient\.runAction\(appId, action\)/);
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, data\)/);
@@ -29,8 +29,8 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   assert.doesNotMatch(operations, /AutarkOsJob|operationFromJob/);
   assert.match(advanced, /actionLoadingByItemId/);
   assert.match(advanced, /runtimeActionDisabled\(item, action, loadingAction\)/);
-  assert.match(rail, /actionLoadingByItemId/);
-  assert.match(rail, /runtimeActionDisabled\(item, action, loadingAction\)/);
+  assert.match(panel, /loadingAction/);
+  assert.match(panel, /runtimeActionDisabled\(item, id, loadingAction\)/);
 });
 
 test('My Apps exposes only managed applications and no linked-service controls', () => {
@@ -45,32 +45,18 @@ test('My Apps exposes only managed applications and no linked-service controls',
   assert.doesNotMatch(types, /onPinObservedService|onUnpinObservedService|onMatchObservedService/);
 });
 
-test('applications page exposes a red recovery tab for failed app operations', () => {
+test('failed operations offer contextual recovery without another tab', () => {
   const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
   const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
-  const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
-
-  assert.match(panel, /const recoveryNeeded = item\.operation\.kind === 'failed'/);
   assert.match(panel, /ApplicationRecoveryTab/);
-  assert.match(panel, /value="recovery"/);
-  assert.doesNotMatch(panel, /ExpandedOperationStatus/);
-
-  assert.match(recovery, /Start again/);
-  assert.match(recovery, /Edit settings/);
-  assert.match(recovery, /Stop app/);
-  assert.match(recovery, /Review recent activity/);
+  assert.doesNotMatch(panel, /value="recovery"/);
+  assert.match(recovery, /recoveryForOperation/);
   assert.match(recovery, /item\.operation\.message/);
-  assert.match(recovery, /item\.runtime\.recentEvents/);
-
-  assert.match(rail, /Open recovery/);
-  assert.match(rail, /onManagementOpenChange\(true\)/);
-  assert.match(settings, /operationBlocksManagement\(item\.operation\)/);
 });
 
 test('applications page runs repair only from canonical available actions', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
   const api = source('src/api/InstalledAppsAPIClient.ts');
   const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
@@ -81,19 +67,16 @@ test('applications page runs repair only from canonical available actions', () =
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /showActionNotification\(job\)/);
 
-  assert.match(rail, /const repairAction = item\.availableActions\.find\(\(action\) => action\.id === 'repair'\)/);
-  assert.match(rail, /repairAction &&/);
-  assert.match(rail, /actions\.onRepair\(item\.id\)/);
-  assert.doesNotMatch(rail, /item\.attentionState !== 'none' \|\| item\.nextAction/);
+  assert.match(panel, /item.availableActions.some/);
+  assert.match(panel, /actions.onRepair/);
+  assert.doesNotMatch(panel, /item\.attentionState !== 'none' \|\| item\.nextAction/);
 
-  assert.match(recovery, /const repairAction = item\.availableActions\.find\(\(action\) => action\.id === 'repair'\)/);
-  assert.match(recovery, /Run repair/);
-  assert.match(recovery, /actions\.onRepair\(item\.id\)/);
+  assert.doesNotMatch(recovery, /onRepair/);
 });
 
 test('applications page starts app backup jobs from real backup actions', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
   const types = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.types.ts');
 
@@ -107,23 +90,16 @@ test('applications page starts app backup jobs from real backup actions', () => 
   assert.match(page, /showActionNotification\(job\)/);
   assert.doesNotMatch(page, /const handleCreateBackup = \(id: string\) => \{[\s\S]*setManagementOpen\(true\);[\s\S]*invalidateApplicationState\(queryClient\);[\s\S]*\};/);
 
-  assert.match(rail, /actions\.onCreateBackup\(item\.id\)/);
+  assert.match(panel, /actions\.onCreateBackup/);
   assert.match(advanced, /actions\.onCreateBackup\(item\.id\)/);
 });
 
-test('applications page only exposes concrete next actions from the rail', () => {
-  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
-
-  assert.match(page, /item\?\.nextAction\?\.id === 'start_app'/);
-  assert.match(page, /item\?\.nextAction\?\.id === 'create_backup'/);
-  assert.match(page, /void runBackup\(item\.sourceId \|\| item\.id\)/);
-  assert.match(page, /focusApplicationItem\(item, true\)/);
-
-  assert.match(rail, /nextActionButtonLabel\(item\.nextAction\.id\)/);
-  assert.match(rail, /Create backup/);
-  assert.match(rail, /Review/);
-  assert.doesNotMatch(rail, />\s*Run\s*</);
+test('overview mutation shortcuts use the same canonical availability as the menu', () => {
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
+  assert.match(panel, /runtimeActionDisabled\(item, nextRuntimeAction, loadingAction\)/);
+  assert.match(panel, /runtimeActionDisabledReason\(item, nextRuntimeAction, loadingAction\)/);
+  assert.match(panel, /actions\.onStart\(item\.id\)/);
+  assert.match(panel, /actions\.onCreateBackup\(item\.id\)/);
 });
 
 test('applications page opens canonical app review without a second observed-service route', () => {
@@ -168,7 +144,7 @@ test('applications page changes private network access as a standalone settings 
   assert.match(page, /invalidateNetworkQueries\(queryClient\)/);
   assert.doesNotMatch(page, /repairPrivateAccess\(appId\)/);
 
-  assert.match(panel, /onSetPrivateNetworkAccess/);
+  assert.match(panel, /<ApplicationSettingsTab actions=\{actions\}/);
   assert.match(settings, /loadingAction === 'private_access'/);
   assert.match(settings, /actions\.onSetPrivateNetworkAccess\(item\.id, checked\)/);
   assert.match(settings, /Private network/);
@@ -180,9 +156,7 @@ test('applications page surfaces backup-aware safety warnings around risky flows
   const recovery = source('src/pages/ApplicationsPage/managementTabs/ApplicationRecoveryTab.tsx');
   const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
 
-  assert.match(panel, /backupSafetyMessage\(item\)/);
   assert.match(panel, /No verified backup/);
-  assert.match(recovery, /backupSafetyMessage\(item\)/);
   assert.match(recovery, /Repair preserves data/);
   assert.match(settings, /item\.backup !== 'Protected'/);
   assert.match(settings, /No verified restore point/);
@@ -190,19 +164,18 @@ test('applications page surfaces backup-aware safety warnings around risky flows
 
 test('applications page finish pass removes placeholders and explains disabled runtime controls', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
   const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
 
-  for (const file of [page, rail, advanced, basic]) {
+  for (const file of [page, panel, advanced, basic]) {
     assert.doesNotMatch(file, /Lorem ipsum|Lorem ipsum dolor sit amet/);
   }
 
-  assert.match(rail, /DisabledAction/);
+  assert.match(panel, /DisabledAction/);
   assert.match(advanced, /DisabledAction/);
-  assert.match(rail, /runtimeActionDisabledReason\(item, action, loadingAction\)/);
+  assert.match(panel, /runtimeActionDisabledReason\(item, id, loadingAction\)/);
   assert.match(advanced, /runtimeActionDisabledReason\(item, action, loadingAction\)/);
-  assert.match(rail, /reason=\{disabledReason\(/);
   assert.match(advanced, /reason=\{disabledReason\(/);
 });
 
@@ -210,7 +183,7 @@ test('applications page has managed-app empty states and compact recent activity
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
   const basic = source('src/pages/ApplicationsPage/BasicApplicationsView.tsx');
   const advanced = source('src/pages/ApplicationsPage/AdvancedApplicationsView.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
+  const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
   const presentation = source('src/pages/ApplicationsPage/extensions/ApplicationsPage.presentation.ts');
 
   assert.match(page, /emptyStateForApplicationCollection\(collectionFilters, query\)/);
@@ -220,12 +193,11 @@ test('applications page has managed-app empty states and compact recent activity
   assert.match(basic, /emptyState: ApplicationEmptyState/);
   assert.match(advanced, /emptyState: ApplicationEmptyState/);
 
-  assert.match(rail, /RecentActivitySummary/);
-  assert.match(rail, /Last action/);
-  assert.match(rail, /item\.lastEvent/);
+  assert.match(panel, /Latest activity/);
+  assert.match(panel, /item\.lastEvent/);
 });
 
-test('applications page advanced tab can copy compact support details', () => {
+test('applications page diagnostics can copy compact support details', () => {
   const panel = source('src/pages/ApplicationsPage/ApplicationManagementPanel.tsx');
 
   assert.match(panel, /Support details/);

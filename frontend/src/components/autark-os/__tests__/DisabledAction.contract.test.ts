@@ -26,7 +26,7 @@ test('active user-facing surfaces use shared disabled action reasons', () => {
     'src/components/autark-os/TailscaleControlPopover.tsx',
     'src/pages/AdminSecurityGate.tsx',
     'src/pages/ApplicationsPage/AdvancedApplicationsView.tsx',
-    'src/pages/ApplicationsPage/ApplicationDetailsRail.tsx',
+    'src/pages/ApplicationsPage/ApplicationManagementPanel.tsx',
     'src/pages/BackupsPage/BackupsPage.components.tsx',
     'src/pages/BackupsPage/BackupColumnNavigatorWorkspace.tsx',
     'src/pages/MarketplacePage/MarketplaceAppDetail.tsx',
