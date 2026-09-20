@@ -114,7 +114,7 @@ function MonitoringPage() {
         onCategoryChange={changeCategory}
         onExportDiagnostics={() => void exportDiagnostics()}
         onLevelChange={setLevel}
-        onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()])}
+        onRefresh={() => void Promise.all([monitoring.refresh(), appState.refresh()]).catch(() => {})}
         refreshing={monitoring.isFetching || appState.isFetching}
         reliability={monitoring.reliability}
         showAdvancedMetrics={showAdvancedMetrics}

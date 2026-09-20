@@ -4,6 +4,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'rec
 import { ProjectInlineEmptyState as EmptyState } from '@/components/primitives/EmptyState';
 import { ProjectInset, ProjectPanel } from '@/components/primitives/Surface';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
+import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import type { AppReliabilitySummary } from '@/types/app';
@@ -172,8 +173,9 @@ function AutarkOsMetricsPanel({
           <MonitoringInset className="p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-bold uppercase text-slate-500">Managed app resources</p>
-              <span className="text-xs text-slate-500">{resourceData.length ? 'Current top apps' : 'No current sample'}</span>
+              {resourceData.length > 0 && <span className="text-xs text-slate-500">Latest confirmed samples</span>}
             </div>
+            <ApplicationStateContent>
             {resourceData.length ? (
               <ChartContainer
                 className="mt-3 h-[220px] w-full aspect-auto"
@@ -194,6 +196,7 @@ function AutarkOsMetricsPanel({
             ) : (
               <EmptyState title="No app resource samples" description="App CPU and memory charts appear after telemetry is collected." compact />
             )}
+            </ApplicationStateContent>
           </MonitoringInset>
 
           <MonitoringInset className="p-4">

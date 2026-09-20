@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { ApplicationStateAPIClient } from '@/api/ApplicationStateAPIClient';
 import type { ApplicationState, ApplicationStateFreshness, ApplicationView } from '@/types/applicationState';
 import {
@@ -29,9 +29,6 @@ export type ApplicationStateRepositoryView = {
   applications: ApplicationView[];
   freshness: ApplicationStateFreshness;
   healthByAppId: Record<string, AppHealthSnapshot>;
-  lastError: string | null;
-  refreshStatus: string;
-  stale: boolean;
   telemetryByAppId: Record<string, AppTelemetry>;
   updatedAt: Date | null;
 };
@@ -48,14 +45,6 @@ export function useApplicationStateQuery() {
   });
 }
 
-export function useRefreshApplicationStateMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: () => ApplicationStateAPIClient.refresh(),
-    onSuccess: (state) => setApplicationStateCache(queryClient, state),
-  });
-}
-
 export function useApplicationStateRepository(): ApplicationStateRepositoryView & {
   applicationState: ApplicationState | undefined;
   error: unknown;
@@ -64,9 +53,9 @@ export function useApplicationStateRepository(): ApplicationStateRepositoryView 
   refresh: () => Promise<ApplicationState | undefined>;
 } {
   const query = useApplicationStateQuery();
-  const refreshMutation = useRefreshApplicationStateMutation();
+  const queryClient = useQueryClient();
   const state = query.data;
-  const error = refreshMutation.error ?? query.error;
+  const error = query.error;
   const freshness = applicationStateFreshness(state, { transportError: error });
   return {
     accessByAppId: accessByAppId(state),
@@ -75,12 +64,17 @@ export function useApplicationStateRepository(): ApplicationStateRepositoryView 
     error,
     freshness,
     healthByAppId: healthByAppId(state),
-    isFetching: query.isFetching || refreshMutation.isPending,
+    isFetching: query.isFetching,
     isLoading: query.isLoading,
-    lastError: state?.lastError?.trim() || null,
-    refreshStatus: state?.refreshStatus || (state ? 'unknown' : 'stale'),
-    refresh: async () => refreshMutation.mutateAsync(),
-    stale: state?.stale ?? !state,
+    refresh: async () => {
+      await queryClient.cancelQueries({ queryKey: applicationStateQueryKey });
+      return queryClient.fetchQuery({
+        queryKey: applicationStateQueryKey,
+        queryFn: () => ApplicationStateAPIClient.refresh(),
+        staleTime: 0,
+        retry: false,
+      });
+    },
     telemetryByAppId: telemetryByAppId(state),
     updatedAt: applicationStateUpdatedAt(state),
   };

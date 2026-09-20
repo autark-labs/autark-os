@@ -3,6 +3,7 @@ import { apiErrorMessage } from '@/api/httpClient';
 import { HomeHero } from './components/HomeHero';
 import { DashboardSummaryGrid, InstalledAppsLauncher } from './components/HomeDashboardPanels';
 import { PageShell } from '@/components/layout/PageShell';
+import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { useApplicationStateRepository } from '@/repositories/applicationStateRepository';
 import { useSystemSummaryQuery } from '@/repositories/systemRepository';
@@ -30,7 +31,7 @@ function OverviewPage() {
           summaryAvailability={summaryAvailability}
           summary={summary}
         >
-          {appState.freshness.hasUsableData && <InstalledAppsLauncher apps={apps} />}
+          <ApplicationStateContent><InstalledAppsLauncher apps={apps} /></ApplicationStateContent>
         </HomeHero>
       </ExtensionActionTarget>
 

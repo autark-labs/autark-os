@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { RefreshStatus } from '@/components/RefreshStatus';
 import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ContextChip } from '@/components/autark-os/ContextChip';
+import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
 import type { ReactNode } from 'react';
 import { PageShell } from '@/components/layout/PageShell';
 import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
@@ -97,7 +98,6 @@ function NetworkPage() {
   const apps = useMemo(() => appState.applications.flatMap((application) => (
     application.relationship === 'managed' && application.runtime ? [application.runtime] : []
   )), [appState.applications]);
-  const pageLoading = network.isLoading || appState.isLoading;
   const pageRefreshing = network.isFetching || appState.isFetching;
   const pageError = (network.error ? apiErrorMessage(network.error, 'Unable to load network status.') : null);
 
@@ -180,7 +180,7 @@ function NetworkPage() {
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'Reachability update failed');
-      void appState.refresh();
+      void appState.refresh().catch(() => {});
     } finally {
       if (!succeeded) {
         setProcessingServiceTokens((current) => removeServiceProcessingForToken(current, service.id, pendingToken));
@@ -259,17 +259,17 @@ function NetworkPage() {
           error={pageError}
           context={<StalePrivateLinksPanel open={privateLinksOpen} onOpenChange={setPrivateLinksOpen} loadingId={staleActionLoadingId} onRemoveStaleMapping={removeStaleMapping} reconciliation={network.reconciliation} />}
           needsReviewCount={needsReviewCount}
-          onRefresh={refreshAll}
+          onRefresh={() => void refreshAll().catch(() => {})}
           refreshing={pageRefreshing}
-          serviceCount={reachabilityServices.length}
+          serviceCount={appState.freshness.hasUsableData ? reachabilityServices.length : null}
           updatedAt={network.updatedAt}
         />
       </ExtensionActionTarget>
 
-      {pageLoading ? (
+      {network.isLoading ? (
         <AccessPageLoadingState label="Loading Access" sublabel="Checking private app links, local links, and Tailscale status." />
       ) : pageError && (!network.reconciliation || !network.tailscale) ? (
-        <AccessPageErrorState message={pageError} onRetry={refreshAll} title="Access status could not load" />
+        <AccessPageErrorState message={pageError} onRetry={() => void refreshAll().catch(() => {})} title="Access status could not load" />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3">
           <Tabs className="flex min-h-0 flex-1 flex-col gap-3" onValueChange={handleTabChange} value={selectedTab}>
@@ -293,6 +293,7 @@ function NetworkPage() {
               searchValue={query}
             />
             <TabsContent className="m-0 min-h-0 flex-1 overflow-hidden" value="matrix">
+              <ApplicationStateContent>
               <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pr-1">
                 <ReachabilityMatrix
                   className="min-h-[32rem] xl:min-h-0 xl:flex-1"
@@ -305,6 +306,7 @@ function NetworkPage() {
                   onMoveService={moveReachabilityService}
                 />
               </div>
+              </ApplicationStateContent>
             </TabsContent>
             <TabsContent className="m-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" value="issues">
               <NetworkIssuesPanel onReviewServices={() => handleTabChange('matrix')} issues={issues} onReviewPrivateLinks={() => setPrivateLinksOpen(true)} />
@@ -339,7 +341,7 @@ function AccessPageHeader({
   needsReviewCount: number;
   onRefresh: () => void;
   refreshing: boolean;
-  serviceCount: number;
+  serviceCount: number | null;
   updatedAt: Date | null;
 }) {
   return (
@@ -367,13 +369,13 @@ function AccessPageHeader({
   );
 }
 
-function AccessSummaryMetric({ attention = false, label, value }: { attention?: boolean; label: string; value: number }) {
+function AccessSummaryMetric({ attention = false, label, value }: { attention?: boolean; label: string; value: number | null }) {
   return (
     <div className={cn(
       'min-w-28 rounded-xl border border-sky-300/15 bg-slate-950/25 px-3 py-2 text-right',
       attention && 'border-amber-300/30 bg-amber-400/5',
     )}>
-      <p className={cn('text-lg font-semibold leading-none text-white', attention && 'text-amber-100')}>{value}</p>
+      <p className={cn('text-lg font-semibold leading-none text-white', attention && 'text-amber-100')}>{value ?? 'Unavailable'}</p>
       <p className="mt-1 text-[0.68rem] text-slate-400">{label}</p>
     </div>
   );

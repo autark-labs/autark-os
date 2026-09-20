@@ -396,7 +396,7 @@ function MarketplacePage() {
     return (
       discoverError || applicationState.freshness.phase === 'unavailable' ? (
         <PageShell>
-          <DiscoverErrorState message={discoverError || 'Current app information is unavailable. Refresh it before installing apps.'} onRetry={() => void Promise.all([applicationState.refresh(), refreshDiscover()])} title="Discover catalog could not load" />
+          <DiscoverErrorState message={discoverError || 'Current app information is unavailable. Refresh it before installing apps.'} onRetry={() => void Promise.all([applicationState.refresh(), refreshDiscover()]).catch(() => {})} title="Discover catalog could not load" />
         </PageShell>
       ) : (
         <DiscoverLoadingState />
@@ -413,7 +413,7 @@ function MarketplacePage() {
       <DiscoverGuidedHeader
         error={discoverError || (progressError ? 'Job progress could not refresh. This does not mean the operation failed.' : '')}
         lastRefreshAt={lastRefreshAt}
-        onRefresh={() => void Promise.all([refreshDiscover(), retryProgress()])}
+        onRefresh={() => void Promise.all([applicationState.refresh(), refreshDiscover(), retryProgress()]).catch(() => {})}
         refreshing={appsQuery.isFetching}
       />
 

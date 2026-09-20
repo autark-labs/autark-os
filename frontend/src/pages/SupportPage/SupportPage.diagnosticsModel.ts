@@ -19,17 +19,14 @@ export function diagnosticsHeadline(summary: SupportSummary | null | undefined, 
   return needsAttention ? 'Needs attention' : 'Ready';
 }
 
-/**
- * @param {{ summary?: any, doctor?: any, setup?: any, applications?: any[] }} params
- */
 export function diagnosticsSummaryRows({
   summary,
   doctor,
   setup,
-  applications = [],
+  applications,
 }: {
   doctor?: SystemDoctorStatus | null;
-  applications?: ApplicationView[];
+  applications?: ApplicationView[] | null;
   setup?: SystemSetupStatus | null;
   summary?: SupportSummary | null;
 }) {
@@ -74,8 +71,8 @@ function statusRow(label: string, value: string | null | undefined, unavailable 
   return { label, value: value || 'Unknown', tone };
 }
 
-function appRow(applications: ApplicationView[], unavailable = false): DiagnosticsSummaryRow {
-  if (unavailable) {
+function appRow(applications: ApplicationView[] | null | undefined, unavailable = false): DiagnosticsSummaryRow {
+  if (unavailable || !applications) {
     return { label: 'Apps', value: 'Status unavailable', tone: 'warning' };
   }
   const recoveryAvailable = applications.filter((application) => application.relationship === 'recovery_required').length;

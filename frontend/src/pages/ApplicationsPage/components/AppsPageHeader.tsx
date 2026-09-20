@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 
 type AppsPageHeaderProps = {
   children?: ReactNode;
-  attentionCount: number;
-  managedCount: number;
+  attentionCount: number | null;
+  managedCount: number | null;
 };
 
 const metrics = [
@@ -36,7 +36,7 @@ export function AppsPageHeader({ attentionCount, managedCount, children }: AppsP
               <div
                 className={cn(
                   'flex min-w-0 items-center gap-2 rounded-xl border border-sky-300/15 bg-slate-950/25 px-2.5 py-2',
-                  key === 'attention' && attentionCount > 0 && 'border-amber-300/30 bg-amber-400/5',
+                  key === 'attention' && attentionCount !== null && attentionCount > 0 && 'border-amber-300/30 bg-amber-400/5',
                 )}
                 key={key}
               >
@@ -47,7 +47,7 @@ export function AppsPageHeader({ attentionCount, managedCount, children }: AppsP
                   <Icon aria-hidden="true" className="size-3.5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-lg font-semibold leading-none text-white">{values[key]}</span>
+                  <span className="block text-lg font-semibold leading-none text-white">{values[key] ?? 'Unavailable'}</span>
                   <span className="mt-1 block truncate text-[0.68rem] text-slate-400">{label}</span>
                 </span>
               </div>

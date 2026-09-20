@@ -78,7 +78,7 @@ type SystemPanelProps = {
 
 export type SettingsPanelBySectionProps = {
   advancedChecks: SystemSetupCheck[];
-  apps: AppRuntimeView[];
+  apps: AppRuntimeView[] | null;
   backupDestination: BackupDestination | null;
   backupSchedule: BackupSettingsSummary | null;
   copied: string | null;
@@ -166,8 +166,8 @@ function StoragePanel({ metrics }: { metrics: SystemMetrics | null }) {
   );
 }
 
-function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfigureBackupDestination, onUpdate }: PanelProps & { apps: AppRuntimeView[]; backupDestination: BackupDestination | null; backupSchedule: BackupSettingsSummary | null; onConfigureBackupDestination: (path: string) => Promise<void> }) {
-  const protectedApps = apps.filter((app) => app.backupProtection === 'protected_by_restore_point').length;
+function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfigureBackupDestination, onUpdate }: PanelProps & { apps: AppRuntimeView[] | null; backupDestination: BackupDestination | null; backupSchedule: BackupSettingsSummary | null; onConfigureBackupDestination: (path: string) => Promise<void> }) {
+  const protectedApps = apps?.filter((app) => app.backupProtection === 'protected_by_restore_point').length;
   const [destinationPath, setDestinationPath] = useState(backupDestination?.configuredPath || '');
   const [externalDestinationOpen, setExternalDestinationOpen] = useState(backupDestination?.kind === 'external');
   const [updatingDestination, setUpdatingDestination] = useState(false);
@@ -229,19 +229,19 @@ function BackupsPanel({ apps, backupDestination, backupSchedule, draft, onConfig
         </div>
       </SettingRow>
       <ReadOnlyRow label="Next scheduled backup" note={`Shown in ${draft.timeZone}.`} value={<LocalizedDateTime model={{ empty: 'Not scheduled', timeZone: draft.timeZone, value: backupSchedule?.nextRoutineRun }} />} />
-      <ReadOnlyRow label="Apps protected" note="Installed apps with at least one completed restore point." value={`${protectedApps}/${apps.length}`} />
+      <ReadOnlyRow label="Apps protected" note="Installed apps with at least one completed restore point." value={apps ? `${protectedApps}/${apps.length}` : 'App information unavailable'} />
     </SettingsGroup>
   );
 }
 
-function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRuntimeView[] }) {
-  const autoRepairApps = apps.filter((app) => settingsForApp(app).autoRepairEnabled ?? true).length;
+function ApplicationsPanel({ apps, draft, onUpdate }: PanelProps & { apps: AppRuntimeView[] | null }) {
+  const autoRepairApps = apps?.filter((app) => settingsForApp(app).autoRepairEnabled ?? true).length;
   return (
     <SettingsGroup description="Configure app defaults and automatic management." title="Applications">
       <SettingRow controlId="settings-automatic-repair" helpId="automaticRepairEnabled" label="Automatic fixes" note="Allow Autark-OS to try safe repairs when apps become unhealthy.">
         <Switch checked={draft.automaticRepairEnabled} id="settings-automatic-repair" onCheckedChange={(checked) => onUpdate({ automaticRepairEnabled: checked })} />
       </SettingRow>
-      <ReadOnlyRow label="Repair coverage" note="Installed apps currently allowing automatic fixes." value={`${autoRepairApps}/${apps.length}`} />
+      <ReadOnlyRow label="Repair coverage" note="Installed apps currently allowing automatic fixes." value={apps ? `${autoRepairApps}/${apps.length}` : 'App information unavailable'} />
       <ReadOnlyRow label="Startup grace" note="Newly started apps get time to boot before warnings appear." value="Enabled" />
     </SettingsGroup>
   );
@@ -258,12 +258,12 @@ function SecurityPanel({ setup }: { setup: SystemSetupStatus | null }) {
   );
 }
 
-function RemoteAccessPanel({ apps, setup }: { apps: AppRuntimeView[]; setup: SystemSetupStatus | null }) {
-  const privateApps = apps.filter((app) => app.settings?.tailscaleEnabled || app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private').length;
+function RemoteAccessPanel({ apps, setup }: { apps: AppRuntimeView[] | null; setup: SystemSetupStatus | null }) {
+  const privateApps = apps?.filter((app) => app.settings?.tailscaleEnabled || app.desiredAccess?.mode === 'private' || app.desiredAccess?.mode === 'local-and-private').length;
   return (
     <SettingsGroup description="Configure secure access from your private devices." title="Remote Access">
       <ReadOnlyRow label="Tailscale status" note="Private links require a connected Tailscale device." value={setup?.tailscaleVersion || 'Not detected'} />
-      <ReadOnlyRow label="Private apps" note="Apps currently marked for private access." value={`${privateApps}`} />
+      <ReadOnlyRow label="Private apps" note="Apps currently marked for private access." value={apps ? `${privateApps}` : 'App information unavailable'} />
     </SettingsGroup>
   );
 }

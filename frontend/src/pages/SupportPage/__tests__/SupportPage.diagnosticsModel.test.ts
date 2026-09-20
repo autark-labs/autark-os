@@ -40,6 +40,12 @@ test('Diagnostics summary includes apps found on the server without treating own
   });
 });
 
+test('available host diagnostics do not imply an available app inventory', () => {
+  const doctor = { checks: [] };
+  assert.equal(diagnosticsSummaryRows({ doctor }).find(row => row.id === 'apps')?.value, 'Status unavailable');
+  assert.equal(diagnosticsSummaryRows({ doctor, applications: [] }).find(row => row.id === 'apps')?.value, 'Ready');
+});
+
 test('Diagnostics summary surfaces app repair state from canonical managed apps', () => {
   const rows = diagnosticsSummaryRows({
     summary: { dockerStatus: 'Ready', tailscaleStatus: 'Ready', findings: [] },

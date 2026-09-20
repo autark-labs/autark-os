@@ -4,8 +4,7 @@ import { Link, useBlocker, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
-import { PageLoadError } from '@/components/autark-os/PageLoadError';
-import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
+import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
 import { ContextChip } from '@/components/autark-os/ContextChip';
 import { Button } from '@/components/ui/button';
 import { JobProgress } from '@/components/autark-os/JobProgress';
@@ -416,7 +415,7 @@ export const ApplicationsPage = () => {
       contentClassName="gap-3 lg:h-full lg:min-h-0 lg:!overflow-hidden"
     >
       <ExtensionActionTarget actionId="review-app" routeId="apps">
-        <AppsPageHeader attentionCount={attentionCount} managedCount={managedCount}>
+        <AppsPageHeader attentionCount={appState.freshness.hasUsableData ? attentionCount : null} managedCount={appState.freshness.hasUsableData ? managedCount : null}>
           <ContextChip className="w-44" busy={installingApplications.length > 0} label={!appState.freshness.hasUsableData ? 'App status unavailable' : reviewApplications.length ? `${reviewApplications.length} to recover` : installingApplications.length ? `${installingApplications[0].name} installing` : attentionCount ? `${attentionCount} need review` : 'App status'} title="My Apps / Current status" tone={reviewApplications.length || attentionCount ? 'warning' : 'muted'}>
             {reviewApplications.length > 0 && <p>Review apps from this installation before restoring management.</p>}
             {reviewApplications.map((app) => <Button asChild key={app.id} size="sm" variant="outline"><Link to={app.primaryAction.href || `/apps?review=${encodeURIComponent(app.id)}`}>Review {app.name}</Link></Button>)}
@@ -464,10 +463,7 @@ export const ApplicationsPage = () => {
         />
       </div>
 
-      {!appState.freshness.hasUsableData && (appState.isLoading
-        ? <PageLoadingState model={{ title: 'Checking apps', description: 'Loading current app information.' }} />
-        : <PageLoadError model={{ title: 'Current app information is unavailable', message: 'Check again to load your apps. This does not mean your apps were removed.' }} onRetry={() => void appState.refresh().catch(() => {})} />)}
-      {appState.freshness.hasUsableData && (
+      <ApplicationStateContent>
         <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
           {viewMode === 'basic' ? (
             <BasicApplicationsView
@@ -504,7 +500,7 @@ export const ApplicationsPage = () => {
             ref={railRef}
           />
         </section>
-      )}
+      </ApplicationStateContent>
 
       <ApplicationReviewDialog
         application={reviewedApplication}

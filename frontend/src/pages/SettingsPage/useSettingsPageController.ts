@@ -190,8 +190,9 @@ export function useSettingsPageController() {
 
   const reload = useCallback(() => {
     void load(true);
+    void appState.refresh().catch(() => {});
     refreshDoctor();
-  }, [load, refreshDoctor]);
+  }, [appState, load, refreshDoctor]);
 
   const requestRefresh = useCallback(() => {
     if (dirty) {

@@ -9,6 +9,7 @@ import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { MetadataBadge } from '@/components/autark-os/MetadataBadge';
 import { StatusBadge, type StatusBadgeTone } from '@/components/autark-os/StatusBadge';
 import { ContextChip } from '@/components/autark-os/ContextChip';
+import { ApplicationStateContent } from '@/components/autark-os/ApplicationStateNotice';
 import { Button } from '@/components/ui/button';
 import { PageLoadError } from '@/components/autark-os/PageLoadError';
 import { PageLoadingState } from '@/components/autark-os/PageLoadingState';
@@ -161,7 +162,7 @@ function SupportPage() {
   )), [appState.applications]);
   const findings = summary?.findings || state.bundle?.findings || [];
   const redactionRules = summary?.redactionRules || state.bundle?.redactionRules || [];
-  const summaryRows = diagnosticsSummaryRows({ summary, doctor: state.doctor, setup: state.setup, applications: appState.applications });
+  const summaryRows = diagnosticsSummaryRows({ summary, doctor: state.doctor, setup: state.setup, applications: appState.freshness.hasUsableData ? appState.applications : null });
   const healthChecks = notebookHealthChecks(state.doctor, state.setup, summaryRows);
   const headline = diagnosticsHeadline(summary, state.doctor);
   const conflict = productionConflictSummary(state.setup);
@@ -172,7 +173,7 @@ function SupportPage() {
   const repairResources = useMemo(() => managedApps.filter((app) => hasRepairDetail(app)), [managedApps]);
   const tailscaleCheck = state.setup?.checks?.find((check) => check.id === 'tailscale');
 
-  if (loading || appState.isLoading) {
+  if (loading) {
     return <DiagnosticsLoadingState />;
   }
 
@@ -204,7 +205,7 @@ function SupportPage() {
           void generateBundle();
         }}
         onOpenSettings={() => openSettings('advanced')}
-        onRefresh={() => void load(true)}
+        onRefresh={() => void Promise.all([load(true), appState.refresh()]).catch(() => {})}
         onSectionChange={(section) => {
           setActiveSection(section);
           if (section === 'logs') {
@@ -217,7 +218,7 @@ function SupportPage() {
         }}
         ownershipResources={ownershipResources}
         redactionRules={redactionRules}
-        refreshing={refreshing}
+        refreshing={refreshing || appState.isFetching}
         repairResources={repairResources}
         setLogsOpen={setLogsOpen}
         setup={state.setup}
@@ -511,9 +512,11 @@ function SystemDetailsWorkspace({ dockerResources, onOpenSettings, ownershipReso
         <div><p className="text-xs font-semibold uppercase tracking-wide text-sky-100/55">Instance</p><div className="mt-2 grid gap-2 text-sm"><InfoLine label="Name" value={setup?.instanceSlug || 'Unknown'} /><InfoLine label="ID" value={setup?.instanceId || 'Unknown'} /><InfoLine label="Mode" value={setup?.devMode ? 'Development' : 'Production'} /><InfoLine label="Profiles" value={setup?.activeProfiles || 'default'} /></div></div>
         <div><p className="text-xs font-semibold uppercase tracking-wide text-sky-100/55">Version</p><div className="mt-2 grid gap-2 text-sm"><InfoLine label="Version" value={summary?.version?.version || 'Unknown'} /><InfoLine label="Build" value={summary?.version?.buildSha ? shortSha(summary.version.buildSha) : 'Unknown'} /><InfoLine label="Generated" value={formatDate(summary?.checkedAt)} /></div></div>
       </section>
+      <ApplicationStateContent>
       <AdvancedSection defaultOpen={false} icon={Server} title="App ownership details">{ownershipResources.length ? ownershipResources.map((application) => <ResourceLine application={application} key={application.id} />) : <p className="text-sm text-slate-400">No apps require ownership review.</p>}</AdvancedSection>
       <AdvancedSection defaultOpen={repairResources.length > 0} icon={ShieldCheck} title="App repair details">{repairResources.length ? repairResources.map((app) => <RepairLine app={app} key={app.appId} />) : <p className="text-sm text-slate-400">No app repair attempts or remediation states are currently visible.</p>}</AdvancedSection>
       <AdvancedSection defaultOpen={false} icon={FileText} title="Docker resources">{dockerResources.length ? dockerResources.map((application) => <ResourceLine application={application} key={application.id} technical />) : <p className="text-sm text-slate-400">No matching Docker evidence is present in the app inventory.</p>}</AdvancedSection>
+      </ApplicationStateContent>
       <AdvancedSection defaultOpen={false} icon={LockKeyhole} title="Tailscale details"><div className="grid gap-3 md:grid-cols-2"><InfoLine label="Tailscale" value={tailscaleCheck} /><InfoLine label="Version" value={setup?.tailscaleVersion || 'Unknown'} /><InfoLine label="Instance" value={setup?.instanceSlug || 'Unknown'} /></div></AdvancedSection>
       <section className="rounded-xl border border-sky-300/15 bg-slate-950/25 p-3"><SectionHeader compact icon={LifeBuoy} title="Related pages" description="Focused views for common support tasks." /><div className="mt-3 grid gap-2 sm:grid-cols-2"><RelatedLink onClick={onOpenSettings} title="Settings" detail="Host setup checks and appliance runtime checks." /><RelatedLink to="/apps" title="My Apps" detail="Review apps that need recovery or conflict resolution." /><RelatedLink to="/access" title="Access" detail="Tailscale, private links, and home network issues." />{showAdvancedMetrics && <RelatedLink to="/activity" title="Activity Log" detail="Detailed system events for advanced troubleshooting." />}</div></section>
     </div>
