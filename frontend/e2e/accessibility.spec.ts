@@ -34,8 +34,8 @@ test('setup flow has no serious or critical axe violations', async ({ page }) =>
 test('home and active job announcement have no serious or critical axe violations', async ({ page }) => {
   await openRoute(page, '/home');
   await expect(page.getByText(/Your Apps/i).first()).toBeVisible();
-  await page.getByRole('button', { name: /Backup in progress/i }).click();
-  await expect(page.locator('section[aria-live="polite"][aria-atomic="true"]')).toContainText(/Backup/i);
+  await page.getByRole('button', { name: /^Open activity:/i }).click();
+  await expect(page.getByRole('tabpanel', { name: /^Now/i })).toContainText(/Backup/i);
   await expectNoSeriousAccessibilityViolations(page);
 });
 

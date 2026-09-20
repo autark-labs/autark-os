@@ -24,7 +24,7 @@ export function CopyTextButton({ className, label, onResult, value }: CopyTextBu
     onResult?.(result);
     if (result.ok) {
       setCopied(true);
-      showActionNotification({ ok: true, severity: 'success', title: `${label} copied`, message: value }, `${label} copied`);
+      showActionNotification({ ok: true, severity: 'success', title: `${label} copied`, message: 'Ready to paste.' }, `${label} copied`);
       window.setTimeout(() => setCopied(false), 1600);
       return;
     }

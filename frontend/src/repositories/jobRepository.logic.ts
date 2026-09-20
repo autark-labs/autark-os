@@ -114,6 +114,8 @@ export function jobTypeLabel(type?: string | null) {
       return 'Restart';
     case 'uninstall_app':
       return 'Uninstall';
+    case 'pro_module_change':
+      return 'Pro extension change';
     default:
       return 'Autark-OS task';
   }

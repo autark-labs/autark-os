@@ -3,6 +3,7 @@ import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { NotificationModalHost } from "@/components/ui/sonner"
 import { blockingOverlayClassName, blockingSurfaceMotionClassName } from "@/components/ui/blocking-overlay"
 
 function AlertDialog({
@@ -45,6 +46,7 @@ AlertDialogOverlay.displayName = "AlertDialogOverlay"
 
 function AlertDialogContent({
   className,
+  children,
   size = "default",
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
@@ -62,7 +64,10 @@ function AlertDialogContent({
           className
         )}
         {...props}
-      />
+      >
+        {children}
+        <NotificationModalHost />
+      </AlertDialogPrimitive.Content>
     </AlertDialogPortal>
   )
 }

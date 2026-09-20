@@ -3,9 +3,15 @@ package com.autarkos.activity;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 @RestController
 @RequestMapping("/api/activity")
@@ -15,6 +21,17 @@ public class ActivityController {
 
     public ActivityController(ActivityLogService activityLogService) {
         this.activityLogService = activityLogService;
+    }
+
+    public record NotificationRequest(
+            @NotBlank @Pattern(regexp = "[a-zA-Z0-9-]{1,64}") String id,
+            @NotBlank @Pattern(regexp = "success|info|warning|error") String severity,
+            @NotBlank @Size(max = 160) String title,
+            @Size(max = 2000) String message) { }
+
+    @PostMapping("/notifications")
+    public ActivityLog notification(@Valid @RequestBody NotificationRequest notification) {
+        return activityLogService.notification(notification);
     }
 
     @GetMapping

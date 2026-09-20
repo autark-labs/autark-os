@@ -1,4 +1,4 @@
-import { queuedJobText } from '../repositories/jobRepository.logic';
+import { jobTypeLabel as jobOperationLabel, queuedJobText } from '../repositories/jobRepository.logic';
 import axios from 'axios';
 
 const TERMINAL_ERROR_STATUSES = new Set(['failed', 'error']);
@@ -8,7 +8,6 @@ type ActionNotificationSeverity = 'success' | 'info' | 'warning' | 'error' | 'cr
 
 type ActionNotificationResult = {
   message?: string | null;
-  nextAction?: unknown;
   ok?: boolean;
   severity?: ActionNotificationSeverity | null;
   status?: string | null;
@@ -47,7 +46,6 @@ export function actionNotificationFromResult(result: ActionNotificationResult = 
     title,
     message,
     sticky: severity === 'warning' || severity === 'error' || severity === 'critical',
-    nextAction: result.nextAction || null,
   };
 }
 
@@ -58,7 +56,6 @@ export function actionNotificationFromError(error: unknown, fallbackTitle = 'Act
     title: fallbackTitle,
     message,
     sticky: true,
-    nextAction: { label: 'Review diagnostics', href: '/diagnostics' },
   };
 }
 
@@ -68,20 +65,22 @@ export function actionNotificationFromJob(job: ActionNotificationJob = {}) {
   const failed = status === 'failed';
   const succeeded = status === 'succeeded';
   const queued = status === 'queued';
-  const title = `${jobOperationLabel(type)} ${failed ? 'failed' : succeeded ? 'completed' : queued ? 'queued' : 'started'}`;
+  const cancelled = status === 'cancelled';
+  const title = `${jobOperationLabel(type)} ${failed ? 'failed' : succeeded ? 'completed' : cancelled ? 'cancelled' : queued ? 'queued' : 'started'}`;
   const step = currentStep(job);
   const message = failed
     ? job.error?.message || `${jobOperationLabel(type)} could not finish.`
-    : queued
+    : cancelled ? 'The queued operation was cancelled.' : queued
       ? queuedJobText(job)
-      : step?.message || step?.label || jobSubjectMessage(job);
+      : step?.message || step?.label || (succeeded
+        ? `${jobOperationLabel(type)}${job.subjectId ? ` for ${job.subjectId}` : ''} completed.`
+        : jobSubjectMessage(job));
   const severity = failed ? 'error' : succeeded ? 'success' : 'info';
   return {
     severity,
     title,
     message,
     sticky: failed,
-    nextAction: failed ? { label: 'Review diagnostics', href: '/diagnostics' } : null,
   };
 }
 
@@ -113,26 +112,6 @@ export function notificationToastMethod(severity: ActionNotificationSeverity) {
   if (severity === 'info') return 'info';
   if (severity === 'warning') return 'warning';
   return 'error';
-}
-
-function jobOperationLabel(type: string | null | undefined) {
-  switch (type) {
-    case 'backup':
-      return 'Backup';
-    case 'backup_verify':
-      return 'Backup verification';
-    case 'backup_restore':
-    case 'restore':
-      return 'Restore';
-    case 'install_app':
-      return 'Install';
-    case 'repair_app':
-      return 'Repair';
-    case 'save_app_settings':
-      return 'Settings change';
-    default:
-      return 'Autark-OS task';
-  }
 }
 
 function currentStep(job: ActionNotificationJob) {

@@ -120,9 +120,6 @@ function BackupsPage() {
       if (terminalJob(activeJobQuery.data)) {
         if (activeJobQuery.data.status === 'failed') {
           setError(activeJobQuery.data.error?.message || 'Backup job failed.');
-          showJobNotification(activeJobQuery.data);
-        } else if (activeJobQuery.data.status === 'succeeded') {
-          showJobNotification(activeJobQuery.data);
         }
         setRunning(null);
         void refreshBackupReport();

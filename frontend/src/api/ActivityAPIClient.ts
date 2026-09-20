@@ -2,6 +2,10 @@ import { httpClient } from './httpClient';
 import type { ActivityFilters, ActivityLog } from '@/types/activity';
 
 export const ActivityAPIClient = {
+  async recordNotification(notification: { id: string; severity: string; title: string; message?: string }) {
+    const response = await httpClient.post<ActivityLog>('/api/activity/notifications', notification);
+    return response.data;
+  },
   async recent(filters: ActivityFilters = {}) {
     const response = await httpClient.get<ActivityLog[]>('/api/activity', {
       params: {

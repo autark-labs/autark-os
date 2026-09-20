@@ -28,7 +28,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { showActionNotification } from '@/lib/actionNotifications';
 import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
 import {
   currentJobStepText,
@@ -58,7 +57,6 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
   const [localError, setLocalError] = useState<string | null>(null);
   const preparedAppId = useRef<string | null>(null);
   const loadedPlanAppId = useRef<string | null>(null);
-  const notifiedJob = useRef<string | null>(null);
   const currentApplication = application ?? reviewedApplication;
   const activeRecoveryJobId = recoveryJob && !terminalJob(recoveryJob) ? recoveryJob.jobId : null;
   const recoveryJobQuery = useAutarkOsJobQuery(activeRecoveryJobId);
@@ -71,7 +69,6 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
     setPlan(null);
     setRecoveryJob(null);
     setLocalError(null);
-    notifiedJob.current = null;
   }, [application]);
 
   const loadPlan = useCallback(async () => {
@@ -110,20 +107,6 @@ export function ApplicationReviewDialog({ application, onOpenChange, onRefresh, 
     if (!activeJob) return;
     setRecoveryJob(activeJob);
   }, [currentApplication?.id, jobsQuery.data, open, recoveryJob]);
-
-  useEffect(() => {
-    if (!recoveryJob || !terminalJob(recoveryJob) || notifiedJob.current === recoveryJob.jobId) return;
-    notifiedJob.current = recoveryJob.jobId;
-    const succeeded = recoveryJob.status === 'succeeded';
-    showActionNotification({
-      ok: succeeded,
-      severity: succeeded ? 'success' : 'error',
-      title: succeeded ? 'App recovery completed' : 'App recovery needs attention',
-      message: succeeded
-        ? `${currentApplication?.name || 'The app'} is fully managed. Its lifecycle controls are ready.`
-        : recoveryJob.error?.message || 'Autark-OS left the app runtime unchanged and did not restore the registration.',
-    }, succeeded ? 'App recovery completed' : 'App recovery failed');
-  }, [currentApplication?.name, recoveryJob]);
 
   async function runRecovery() {
     const appId = currentApplication?.id;

@@ -52,23 +52,6 @@ export function useAutarkOsJobQuery(jobId: string | null) {
   });
 }
 
-export function useActiveAutarkOsJob(types: string[] = []) {
-  const jobsQuery = useAutarkOsJobsQuery();
-  const activeJob = latestActiveJob(jobsQuery.data ?? [], types) as AutarkOsJob | null;
-  return {
-    ...jobsQuery,
-    activeJob,
-    activeJobs: activeJobs(jobsQuery.data ?? [], types) as AutarkOsJob[],
-  };
-}
-
-export function useGlobalActiveAutarkOsJob() {
-  return useActiveAutarkOsJob([
-    ...JOB_FAMILIES.appLifecycle,
-    ...JOB_FAMILIES.backup,
-  ]);
-}
-
 export function setAutarkOsJobCache(queryClient: QueryClient, job?: AutarkOsJob | null) {
   if (!job) {
     return;

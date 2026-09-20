@@ -17,7 +17,7 @@ import { ADMIN_SESSION_EXPIRED_EVENT, clearLegacyAdminToken, markAdminSessionAct
 import { RouteLoadErrorBoundary } from './components/autark-os/RouteLoadErrorBoundary';
 import AdminSecurityGate from './pages/AdminSecurityGate';
 import OnboardingWizard from './pages/OnboardingPage/OnboardingWizard';
-import { Toaster } from './components/ui/sonner';
+import { NotificationHostProvider, Toaster } from './components/ui/sonner';
 
 const ApplicationsPage = lazy(() => import('./pages/ApplicationsPage/ApplicationsPage').then((module) => ({ default: module.ApplicationsPage })));
 const BackupsPage = lazy(() => import('./pages/BackupsPage/BackupsPage'));
@@ -87,8 +87,10 @@ function BootstrapUnavailableScreen({ message, onRetry }: { message: string; onR
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
-      <Toaster closeButton position="top-right" richColors />
+      <NotificationHostProvider>
+        <AppContent />
+        <Toaster closeButton position="bottom-right" visibleToasts={1} />
+      </NotificationHostProvider>
     </ThemeProvider>
   );
 }

@@ -64,6 +64,7 @@ public class ApiActivityInterceptor implements HandlerInterceptor {
             default -> false;
         };
         return exception == null
+                && !request.getRequestURI().equals("/api/activity/notifications")
                 && request.getRequestURI().startsWith("/api/")
                 && mutationMethod
                 && response.getStatus() >= 200
@@ -75,7 +76,7 @@ public class ApiActivityInterceptor implements HandlerInterceptor {
         if (!path.startsWith("/api/")) {
             return false;
         }
-        if (path.equals("/api/health") || path.equals("/api/activity")) {
+        if (path.equals("/api/health") || path.equals("/api/activity") || path.equals("/api/activity/notifications")) {
             return false;
         }
         if (response.getStatus() >= 400) {

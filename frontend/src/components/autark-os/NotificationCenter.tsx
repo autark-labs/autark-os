@@ -1,248 +1,186 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Bell, CheckCircle2, CircleAlert, Info, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Bell, Check, ChevronRight, CircleAlert, Info, Loader2, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ActivityAPIClient } from '@/api/ActivityAPIClient';
 import { httpClient } from '@/api/httpClient';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { ACTION_NOTIFICATION_EVENT, showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
-import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
-import { recommendedActionQueryKeys, useRecommendedActionQuery } from '@/repositories/recommendedActionRepository';
-import type { AutarkOsAction } from '@/types/app';
-import type { RecommendedAction } from '@/types/system';
+import { NotificationModalHost } from '@/components/ui/sonner';
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ACTION_NOTIFICATION_EVENT, OPEN_ACTIVITY_EVENT, dismissActionPopup, showActionErrorNotification, showActionNotification, showJobNotification, type NotificationReceipt } from '@/lib/actionNotifications';
+import { actionNotificationFromJob } from '@/lib/actionNotifications.logic';
 import { appBrowserAccessReason } from '@/lib/appBrowserAccess';
+import { formatLocalizedDateTime } from '@/lib/dateTime';
+import { cn } from '@/lib/utils';
+import { syncCanonicalAppMutationResult } from '@/repositories/canonicalAppMutationRepository';
+import { currentJobStepText, jobTypeLabel, terminalJob, useAutarkOsJobsQuery } from '@/repositories/jobRepository';
+import { useRecommendedActionQuery } from '@/repositories/recommendedActionRepository';
+import type { AutarkOsAction } from '@/types/app';
+import type { AutarkOsJob } from '@/types/jobs';
 
-const dismissedRecommendationsStorageKey = 'autark-os.dismissed-recommendations.v1';
-const maxHistory = 20;
+const historyQueryKey = ['activity', 'notifications'];
+type UnsavedReceipt = NotificationReceipt & { failed?: boolean };
+const NotificationContext = createContext<ReturnType<typeof useNotificationState> | null>(null);
 
-type SessionNotification = {
-  id: string;
-  message?: string;
-  occurredAt: string;
-  severity: string;
-  title: string;
-};
-
-type NotificationCenterValue = {
-  clearHistory: () => void;
-  currentRecommendation: RecommendedAction | null;
-  dismissCurrentRecommendation: () => void;
-  history: SessionNotification[];
-  recommendationStatus: 'pending' | 'error' | 'success';
-  refreshingRecommendations: boolean;
-  refreshRecommendations: () => void;
-  runAction: (action: AutarkOsAction) => Promise<void>;
-  runningActionId: string | null;
-};
-
-const NotificationCenterContext = createContext<NotificationCenterValue | null>(null);
-
-export function AppNotificationsProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
+function useNotificationState() {
   const queryClient = useQueryClient();
-  const recommendationQuery = useRecommendedActionQuery();
-  const { status: recommendationStatus, isFetching: refreshingRecommendations, refetch: refreshRecommendations } = recommendationQuery;
-  const [dismissedIds, setDismissedIds] = useState<string[]>(readDismissedRecommendationIds);
-  const [history, setHistory] = useState<SessionNotification[]>([]);
-  const [runningActionId, setRunningActionId] = useState<string | null>(null);
+  const jobs = useAutarkOsJobsQuery();
+  const recommendation = useRecommendedActionQuery();
+  const [unsaved, setUnsaved] = useState<UnsavedReceipt[]>([]);
+  const previousJobs = useRef(new Map<string, string>());
+
+  const saveReceipt = useCallback(async (receipt: NotificationReceipt) => {
+    setUnsaved((current) => [{ ...receipt, failed: false }, ...current.filter((item) => item.id !== receipt.id)]);
+    try {
+      await ActivityAPIClient.recordNotification({
+        id: receipt.id, severity: receipt.severity, title: receipt.title.slice(0, 160), message: receipt.message?.slice(0, 2000),
+      });
+      await queryClient.invalidateQueries({ queryKey: historyQueryKey });
+      setUnsaved((current) => current.filter((item) => item.id !== receipt.id));
+    } catch {
+      // Keep offline feedback visible, without retry loops or recursive error notifications.
+      setUnsaved((current) => current.map((item) => item.id === receipt.id ? { ...item, failed: true } : item));
+    }
+  }, [queryClient]);
 
   useEffect(() => {
-    const addNotification = (event: Event) => {
-      const detail = (event as CustomEvent<SessionNotification>).detail;
-      if (!detail?.id || !detail.title) return;
-      setHistory((current) => [detail, ...current.filter((item) => item.id !== detail.id)].slice(0, maxHistory));
+    const receive = (event: Event) => {
+      const receipt = (event as CustomEvent<NotificationReceipt>).detail;
+      if (receipt?.id && !receipt.jobId && receipt.persist !== false) void saveReceipt(receipt);
     };
-    window.addEventListener(ACTION_NOTIFICATION_EVENT, addNotification);
-    return () => window.removeEventListener(ACTION_NOTIFICATION_EVENT, addNotification);
+    window.addEventListener(ACTION_NOTIFICATION_EVENT, receive);
+    return () => window.removeEventListener(ACTION_NOTIFICATION_EVENT, receive);
+  }, [saveReceipt]);
+
+  useEffect(() => {
+    for (const job of jobs.data ?? []) {
+      const previous = previousJobs.current.get(job.jobId);
+      previousJobs.current.set(job.jobId, job.status);
+      if ((previous === 'queued' || previous === 'running') && terminalJob(job)) showJobNotification(job);
+    }
+  }, [jobs.data]);
+
+  return { jobs, recommendation, unsaved, saveReceipt };
+}
+
+export function AppNotificationsProvider({ children }: { children: ReactNode }) {
+  const state = useNotificationState();
+  return <NotificationContext.Provider value={state}>{children}</NotificationContext.Provider>;
+}
+
+export function NotificationCenterPopover({ compact = false }: { compact?: boolean }) {
+  const state = useContext(NotificationContext);
+  if (!state) throw new Error('Activity requires AppNotificationsProvider');
+  const { jobs, recommendation, unsaved, saveReceipt } = state;
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState('now');
+  const [runningAction, setRunningAction] = useState(false);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const history = useQuery({
+    queryKey: historyQueryKey,
+    queryFn: () => ActivityAPIClient.recent({ category: 'notification', limit: 100 }),
+    enabled: open && tab === 'history',
+    staleTime: 0,
+    refetchInterval: open && tab === 'history' ? 10_000 : false,
+  });
+  const current = recommendation.data?.id !== 'no-action-needed' ? recommendation.data : null;
+  const active = (jobs.data ?? []).filter((job) => !terminalJob(job));
+  const unavailable = jobs.isError || recommendation.isError;
+  const checking = jobs.isPending || recommendation.isPending;
+  const summary = unavailable ? 'Status unavailable' : checking ? 'Checking' : current ? 'Needs review' : active.length ? `${active.length} running` : 'Activity';
+  const Icon = unavailable || current ? CircleAlert : active.length ? Loader2 : Bell;
+
+  useEffect(() => {
+    const showHistory = (event: Event) => {
+      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setTab((event as CustomEvent<{ tab: string }>).detail?.tab || 'history');
+      setOpen(true);
+      dismissActionPopup();
+    };
+    window.addEventListener(OPEN_ACTIVITY_EVENT, showHistory);
+    return () => window.removeEventListener(OPEN_ACTIVITY_EVENT, showHistory);
   }, []);
 
-  const currentRecommendation = useMemo(() => {
-    const recommendation = recommendationQuery.data ?? null;
-    if (!recommendation || recommendation.id === 'no-action-needed' || dismissedIds.includes(recommendation.id)) {
-      return null;
-    }
-    return recommendation;
-  }, [dismissedIds, recommendationQuery.data]);
-
-  const dismissCurrentRecommendation = useCallback(() => {
-    if (!currentRecommendation) return;
-    setDismissedIds((current) => {
-      const next = current.includes(currentRecommendation.id) ? current : [...current, currentRecommendation.id];
-      window.sessionStorage.setItem(dismissedRecommendationsStorageKey, JSON.stringify(next));
-      return next;
-    });
-  }, [currentRecommendation]);
-
-  const runAction = useCallback(async (action: AutarkOsAction) => {
-    if (action.disabled || runningActionId === action.id) return;
-    if (action.route) {
-      navigate(action.route);
-      return;
-    }
+  async function runAction(action: AutarkOsAction) {
+    if (action.disabled || runningAction) return;
+    if (action.route) { navigate(action.route); setOpen(false); return; }
     if (!action.href) return;
-    const method = action.method?.toUpperCase();
-    if (!method || method === 'GET') {
+    if (!action.method || action.method.toUpperCase() === 'GET') {
       if (action.href.startsWith('http')) {
         const reason = appBrowserAccessReason(action.href);
-        if (reason) {
-          showActionNotification({ ok: false, severity: 'info', title: 'Open on this server', message: reason }, 'Open on this server');
-          return;
-        }
+        if (reason) { showActionNotification({ severity: 'info', title: 'Open on this server', message: reason }); return; }
         window.open(action.href, '_blank', 'noopener,noreferrer');
-      } else {
-        navigate(action.href);
-      }
+      } else navigate(action.href);
+      setOpen(false);
       return;
     }
-    if (action.confirmationRequired && !window.confirm(`Continue with ${action.label}?`)) {
-      return;
-    }
-    setRunningActionId(action.id);
+    if (action.confirmationRequired && !window.confirm(`Continue with ${action.label}?`)) return;
+    setRunningAction(true);
     try {
-      const response = await httpClient.request({ method, url: action.href });
+      const response = await httpClient.request({ method: action.method, url: action.href });
       syncCanonicalAppMutationResult(queryClient, response.data);
-      showActionNotification(response.data ?? {
-        ok: true,
-        severity: 'success',
-        title: `${action.label} started`,
-        message: 'Autark-OS started this action.',
-      }, `${action.label} started`);
-      await queryClient.invalidateQueries({ queryKey: recommendedActionQueryKeys.all });
-    } catch (error) {
-      showActionErrorNotification(error, `${action.label} could not start`);
-    } finally {
-      setRunningActionId(null);
-    }
-  }, [navigate, queryClient, runningActionId]);
-
-  const value = useMemo<NotificationCenterValue>(() => ({
-    clearHistory: () => setHistory([]),
-    currentRecommendation,
-    dismissCurrentRecommendation,
-    history,
-    recommendationStatus,
-    refreshingRecommendations,
-    refreshRecommendations,
-    runAction,
-    runningActionId,
-  }), [currentRecommendation, dismissCurrentRecommendation, history, recommendationStatus, refreshingRecommendations, refreshRecommendations, runAction, runningActionId]);
-
-  return <NotificationCenterContext.Provider value={value}>{children}</NotificationCenterContext.Provider>;
-}
-
-export function useAppNotifications() {
-  const context = useContext(NotificationCenterContext);
-  if (!context) throw new Error('useAppNotifications must be used within AppNotificationsProvider');
-  return context;
-}
-
-export function NotificationCenterPopover({ className }: { className?: string }) {
-  const {
-    clearHistory,
-    currentRecommendation,
-    dismissCurrentRecommendation,
-    history,
-    recommendationStatus,
-    refreshingRecommendations,
-    refreshRecommendations,
-    runAction,
-    runningActionId,
-  } = useAppNotifications();
-  const count = (currentRecommendation ? 1 : 0) + history.length;
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button aria-label={`Open notifications${count ? ` (${count})` : ''}`} className={cn('relative h-8 border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white', className)} size="icon-sm" type="button" variant="outline">
-          <Bell className="size-4" />
-          {count > 0 && <span className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-orange-500 text-[0.62rem] font-black text-white">{Math.min(count, 9)}</span>}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(92vw,26rem)] gap-3 border-sky-400/25 bg-slate-950 p-3 text-slate-50">
-        <PopoverHeader>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <PopoverTitle className="text-sm text-white">Notifications</PopoverTitle>
-              <PopoverDescription className="text-xs text-slate-400">Current attention and this session’s activity.</PopoverDescription>
-            </div>
-            {history.length > 0 && <Button className="h-7 px-2 text-xs" onClick={clearHistory} size="sm" variant="ghost">Clear history</Button>}
-          </div>
-        </PopoverHeader>
-
-        {recommendationStatus === 'error' && (
-          <div className="space-y-2 rounded-lg border border-border bg-muted p-3 text-sm text-foreground" role="alert">
-            <p>Recommendations are unavailable. {currentRecommendation ? 'Showing the last known recommendation.' : 'Try again to check what needs attention.'}</p>
-            <Button disabled={refreshingRecommendations} onClick={() => refreshRecommendations()} size="sm" variant="outline">Retry recommendations</Button>
-          </div>
-        )}
-
-        {currentRecommendation && (
-          <section className={cn('rounded-lg border p-3', recommendationTone(currentRecommendation.severity))} aria-label="Action needed">
-            <div className="flex items-start gap-3">
-              <CircleAlert className="mt-0.5 size-4 shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-white">{currentRecommendation.title}</p>
-                <p className="mt-1 text-xs leading-5 text-current/80">{currentRecommendation.body}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {currentRecommendation.primaryAction && <NotificationActionButton action={currentRecommendation.primaryAction} onRun={runAction} running={runningActionId === currentRecommendation.primaryAction.id} />}
-                  <Button aria-label="Dismiss current recommendation" className="h-8 px-2 text-xs" onClick={dismissCurrentRecommendation} size="sm" type="button" variant="outline">
-                    <X className="size-3.5" />
-                    Dismiss
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-          {history.map((item) => <HistoryItem item={item} key={item.id} />)}
-          {!currentRecommendation && history.length === 0 && recommendationStatus !== 'error' && <p className="rounded-lg border border-sky-400/20 bg-slate-900 p-3 text-xs text-slate-400">{recommendationStatus === 'pending' ? 'Checking recommendations…' : 'Nothing needs your attention right now.'}</p>}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function NotificationActionButton({ action, onRun, running }: { action: AutarkOsAction; onRun: (action: AutarkOsAction) => Promise<void>; running: boolean }) {
-  return (
-    <Button disabled={action.disabled || running} onClick={() => void onRun(action)} size="sm" type="button" variant="default">
-      {running ? 'Starting…' : action.label}
-    </Button>
-  );
-}
-
-function HistoryItem({ item }: { item: SessionNotification }) {
-  const Icon = item.severity === 'success' ? CheckCircle2 : item.severity === 'info' ? Info : CircleAlert;
-  return (
-    <div className={cn('flex gap-2 rounded-lg border p-2.5 text-xs', historyTone(item.severity))}>
-      <Icon className="mt-0.5 size-3.5 shrink-0" />
-      <div className="min-w-0">
-        <p className="font-semibold text-white">{item.title}</p>
-        {item.message && <p className="mt-0.5 leading-5 text-current/80">{item.message}</p>}
-      </div>
-    </div>
-  );
-}
-
-function readDismissedRecommendationIds() {
-  try {
-    const parsed = JSON.parse(window.sessionStorage.getItem(dismissedRecommendationsStorageKey) || '[]');
-    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
-  } catch {
-    return [];
+      showActionNotification(response.data ?? { title: `${action.label} finished` });
+      await recommendation.refetch();
+    } catch (error) { showActionErrorNotification(error, `${action.label} could not start`); }
+    finally { setRunningAction(false); }
   }
+
+  const rows = [
+    ...(history.data ?? []).map((item) => ({ id: item.action, title: item.title, message: item.message, severity: item.level, at: item.createdAt, job: undefined as AutarkOsJob | undefined })),
+    ...unsaved.filter((item) => !history.data?.some((saved) => saved.action === `notification:${item.id}`)).map((item) => ({ id: `notification:${item.id}`, title: item.title, message: item.message, severity: item.severity, at: item.occurredAt, job: undefined as AutarkOsJob | undefined })),
+    ...(jobs.data ?? []).filter(terminalJob).map((job) => ({ ...actionNotificationFromJob(job), id: job.jobId, at: job.updatedAt, job })),
+  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 100);
+
+  return <Popover modal open={open} onOpenChange={(next) => { setOpen(next); if (next) dismissActionPopup(); }}>
+    <PopoverTrigger asChild>
+      <Button aria-label={`Open activity: ${summary}`} variant="outline" className={cn('h-8 gap-2 text-xs', compact ? 'w-8 px-0' : 'w-36 justify-start', (unavailable || current) && 'text-amber-600 dark:text-amber-200')}>
+        <Icon className={cn('size-4 shrink-0', active.length > 0 && !unavailable && !current && 'animate-spin motion-reduce:animate-none')} />
+        <span className={compact ? 'sr-only' : 'truncate'}>{summary}</span>
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent aria-label="Activity" align="end" collisionPadding={12} sideOffset={10} onCloseAutoFocus={(event) => {
+      if (returnFocus.current?.isConnected) {
+        event.preventDefault();
+        returnFocus.current.focus();
+      }
+      returnFocus.current = null;
+    }} className="flex h-[min(332px,var(--radix-popover-content-available-height))] w-[min(380px,calc(100vw-24px))] gap-1 overflow-hidden p-3">
+      <NotificationModalHost />
+      <div className="flex shrink-0 items-center justify-between"><PopoverTitle>Activity</PopoverTitle><Button aria-label="Close activity" variant="ghost" size="icon-sm" onClick={() => setOpen(false)}><X /></Button></div>
+      <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-0">
+        <TabsList variant="line" className="w-full justify-start border-b border-border pb-1">
+          <TabsTrigger value="now" className="flex-none px-3 text-xs aria-selected:text-primary [&[aria-selected=false]::after]:opacity-0">Now{active.length > 0 ? ` · ${active.length}` : ''}</TabsTrigger>
+          <TabsTrigger value="history" className="flex-none px-3 text-xs aria-selected:text-primary [&[aria-selected=false]::after]:opacity-0">History</TabsTrigger>
+        </TabsList>
+        <TabsContent value="now" className="min-h-0 overflow-y-auto overscroll-contain">
+          {checking && <p className="py-4 text-xs text-muted-foreground" role="status">Checking activity…</p>}
+          {unavailable && <div role="alert" className="py-3 text-xs"><p>Current activity is unavailable. Last known status may be out of date.</p><Button size="sm" variant="ghost" disabled={jobs.isFetching || recommendation.isFetching} onClick={() => { void jobs.refetch(); void recommendation.refetch(); }}>Retry status</Button></div>}
+          {current && <section aria-label="Action needed" className="flex gap-2 py-3"><CircleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-200" /><div className="min-w-0 flex-1"><p className="text-xs font-medium">{current.title}</p><details className="mt-1 text-xs text-muted-foreground"><summary className="cursor-pointer">Details</summary><p className="my-2 leading-relaxed">{current.body}</p></details>{current.primaryAction && <Button size="sm" variant="outline" className="mt-2 text-xs" disabled={current.primaryAction.disabled || runningAction} title={current.primaryAction.reason || undefined} onClick={() => void runAction(current.primaryAction!)}>{runningAction ? 'Starting…' : current.primaryAction.label}</Button>}{current.primaryAction?.disabled && <p className="mt-1 text-xs text-muted-foreground">{current.primaryAction.reason || 'This action is currently unavailable.'}</p>}</div></section>}
+          {active.map((job) => <div key={job.jobId} className="flex gap-2 border-t border-border py-3"><Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-primary motion-reduce:animate-none" /><div className="min-w-0"><p className="text-xs font-medium">{jobTypeLabel(job.type)}{job.subjectId ? ` · ${job.subjectId}` : ''}</p><p className="mt-1 text-xs text-muted-foreground">{job.status === 'queued' ? 'Queued' : currentJobStepText(job, 'Working')}</p><JobSteps job={job} /></div></div>)}
+          {!checking && !unavailable && !current && active.length === 0 && <p className="flex items-center gap-2 py-5 text-xs text-muted-foreground"><Check className="size-4" />Nothing needs your attention.</p>}
+        </TabsContent>
+        <TabsContent value="history" className="min-h-0 overflow-y-auto overscroll-contain">
+          {(history.isPending || jobs.isPending) && <p role="status" className="py-3 text-xs text-muted-foreground">Loading history…</p>}
+          {(history.isError || jobs.isError) && <div role="alert" className="py-2 text-xs"><p>History is incomplete. Showing available results.</p><Button size="sm" variant="ghost" onClick={() => { void history.refetch(); void jobs.refetch(); }}>Retry history</Button></div>}
+          {unsaved.some((item) => item.failed) && <div role="alert" className="py-2 text-xs"><p>Some results are only in this session. Keep this page open until they’re saved.</p><Button size="sm" variant="ghost" onClick={() => unsaved.filter((item) => item.failed).forEach((item) => void saveReceipt(item))}>Retry saving</Button></div>}
+          {rows.map((item) => <details key={item.id} className="group border-b border-border last:border-0"><summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 py-2 text-xs [&::-webkit-details-marker]:hidden"><ResultIcon severity={item.severity} /><span className="min-w-0 flex-1">{item.title}</span><time dateTime={item.at} className="shrink-0 text-[10px] text-muted-foreground">{formatLocalizedDateTime(item.at)}</time><ChevronRight className="size-3 shrink-0 group-open:rotate-90" /></summary><div className="space-y-2 pb-3 pl-5 text-xs text-muted-foreground"><p className="break-words leading-relaxed">{item.message || item.title}</p>{item.job && <><p>{item.job.status}{item.job.subjectId ? ` · ${item.job.subjectId}` : ''}</p><JobSteps job={item.job} /></>}</div></details>)}
+          {!history.isPending && !jobs.isPending && !history.isError && !jobs.isError && rows.length === 0 && <p className="py-4 text-xs text-muted-foreground">No history yet.</p>}
+        </TabsContent>
+      </Tabs>
+      <div className="flex shrink-0 items-center justify-between border-t border-border pt-2 text-[10px] text-muted-foreground"><span>Dismissed popups stay in History.</span><Link to="/activity" onClick={() => setOpen(false)} className="underline underline-offset-2">Activity log</Link></div>
+    </PopoverContent>
+  </Popover>;
 }
 
-function recommendationTone(severity: string) {
-  if (severity === 'critical') return 'border-red-400/35 bg-red-500/10 text-red-200';
-  if (severity === 'warning') return 'border-orange-400/40 bg-orange-500/10 text-orange-100';
-  return 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100';
+function ResultIcon({ severity }: { severity: string }) {
+  const Icon = severity === 'success' ? Check : severity === 'info' ? Info : CircleAlert;
+  return <Icon role="img" aria-label={severity} className={cn('size-3.5 shrink-0', severity === 'success' ? 'text-emerald-600 dark:text-emerald-300' : severity === 'info' ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-200')} />;
 }
 
-function historyTone(severity: string) {
-  if (severity === 'success') return 'border-emerald-300/25 bg-emerald-500/10 text-emerald-100';
-  if (severity === 'info') return 'border-cyan-300/25 bg-cyan-400/10 text-cyan-100';
-  return 'border-orange-400/35 bg-orange-500/10 text-orange-100';
+function JobSteps({ job }: { job: AutarkOsJob }) {
+  if (!job.steps.length) return null;
+  return <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Steps</summary><ol className="mt-2 space-y-2">{job.steps.map((step) => <li key={step.id}>{step.label} · {step.status}{step.message && <p className="mt-1 break-words">{step.message}</p>}</li>)}</ol></details>;
 }

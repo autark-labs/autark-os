@@ -16,6 +16,18 @@ import org.springframework.context.ApplicationEventPublisher;
 class ApiActivityInterceptorTests {
 
     @Test
+    void notificationPersistenceDoesNotGenerateDuplicateActivityOrMutationEvents() {
+        var activity = mock(ActivityLogService.class);
+        var events = mock(ApplicationEventPublisher.class);
+        var interceptor = new ApiActivityInterceptor(activity, events);
+        var request = new MockHttpServletRequest("POST", "/api/activity/notifications");
+        var response = new MockHttpServletResponse();
+        interceptor.preHandle(request, response, new Object());
+        interceptor.afterCompletion(request, response, new Object(), null);
+        verifyNoInteractions(activity, events);
+    }
+
+    @Test
     void ignoresSuccessfulGetPolling() {
         ActivityLogService activity = mock(ActivityLogService.class);
         ApplicationEventPublisher events =

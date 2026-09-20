@@ -32,9 +32,9 @@ test('the app shell owns canonical recommendations through the notification cent
   assert.match(repository, /SystemAPIClient\.recommendedAction/);
   assert.doesNotMatch(repository, /dismissRecommendedAction/);
   assert.match(component, /useRecommendedActionQuery/);
-  assert.match(component, /sessionStorage/);
+  assert.doesNotMatch(component, /sessionStorage|Dismiss current recommendation/);
   assert.match(component, /no-action-needed/);
-  assert.match(component, /Dismiss current recommendation/);
+  assert.match(component, /ActivityAPIClient\.recordNotification/);
 });
 
 test('recommended actions never render a generic unavailable button', () => {
@@ -47,8 +47,8 @@ test('recommended actions never render a generic unavailable button', () => {
 test('notification-center actions use their declared HTTP method instead of navigating to mutation URLs', () => {
   const component = source('src/components/autark-os/NotificationCenter.tsx');
 
-  assert.match(component, /const method = action\.method\?\.toUpperCase\(\)/);
-  assert.match(component, /httpClient\.request\(\{ method, url: action\.href \}\)/);
+  assert.match(component, /action\.method\.toUpperCase\(\) === 'GET'/);
+  assert.match(component, /httpClient\.request\(\{ method: action\.method, url: action\.href \}\)/);
   assert.match(component, /syncCanonicalAppMutationResult/);
   assert.doesNotMatch(component, /<a[^>]*href=\{action\.href\}/);
 });

@@ -109,7 +109,7 @@ test('applications page settings tab uses real controls and confirm-before-save 
 
 test('settings feedback does not claim that a paused app was restarted', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  assert.match(page, /title: 'Settings change started'/);
+  assert.match(page, /showActionNotification\(updatedApp\)/);
   assert.doesNotMatch(page, /Settings saved and restart requested/);
   assert.match(page, /void invalidateApplicationState\(queryClient\);\s*showActionErrorNotification\(err, 'Settings update failed'\)/);
   assert.doesNotMatch(page, /setRuntimeAppInApplicationStateCache/);

@@ -16,15 +16,15 @@ test('Home metrics do not advertise clickability unless an action exists', () =>
   assert.doesNotMatch(cards, /className=\{cn\('grid gap-4', className\)\} interactive>/);
 });
 
-test('global notification center owns session-local recommendation dismissal', () => {
+test('global activity keeps canonical recommendations separate from dismissible results', () => {
   const page = source('pages/OverviewPage/OverviewPage.tsx');
   const notificationCenter = source('components/autark-os/NotificationCenter.tsx');
   const repository = source('repositories/recommendedActionRepository.ts');
   const client = source('api/SystemAPIClient.ts');
 
   assert.doesNotMatch(page, /RecommendedActionCard/);
-  assert.match(notificationCenter, /sessionStorage/);
-  assert.match(notificationCenter, /Dismiss current recommendation/);
+  assert.doesNotMatch(notificationCenter, /sessionStorage|Dismiss current recommendation/);
+  assert.match(notificationCenter, /dismissActionPopup/);
   assert.match(repository, /SystemAPIClient\.recommendedAction/);
   assert.doesNotMatch(client, /recommended-action\/\$\{encodeURIComponent\(actionId\)\}\/dismiss/);
 });

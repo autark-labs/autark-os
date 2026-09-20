@@ -67,7 +67,7 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
       return;
     }
     setCopied(true);
-    showActionNotification({ ok: true, severity: 'success', title: 'Hostname copied', message: hostname }, 'Hostname copied');
+    showActionNotification({ ok: true, severity: 'success', title: 'Hostname copied', message: 'Ready to paste.' }, 'Hostname copied');
     window.setTimeout(() => setCopied(false), 1600);
   }
 
@@ -78,7 +78,7 @@ export function TailscaleControlPopover({ align = 'end', check = null, className
       showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
       return;
     }
-    showActionNotification({ ok: true, severity: 'success', title: 'Tailscale command copied', message: command }, 'Tailscale command copied');
+    showActionNotification({ ok: true, severity: 'success', title: 'Tailscale command copied', message: 'Ready to paste.' }, 'Tailscale command copied');
   }
 
   return (

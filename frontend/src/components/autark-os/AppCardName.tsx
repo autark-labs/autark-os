@@ -46,7 +46,7 @@ export function AppCardName({ className, name, onSelect, selectAriaLabel }: AppC
     }
 
     setCopied(true);
-    showActionNotification({ ok: true, severity: 'success', title: 'App name copied', message: name }, 'App name copied');
+    showActionNotification({ ok: true, severity: 'success', title: 'App name copied', message: 'Ready to paste.' }, 'App name copied');
     if (resetCopiedTimerRef.current) {
       window.clearTimeout(resetCopiedTimerRef.current);
     }

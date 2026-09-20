@@ -24,9 +24,9 @@ export function AdminSessionControl({ className, compact = false }: AdminSession
     setBusy(true);
     try {
       await AdminSecurityAPIClient.logout();
-      showActionNotification({ ok: true, severity: 'success', title: 'Logged out of Autark-OS' });
+      showActionNotification({ ok: true, severity: 'success', title: 'Logged out of Autark-OS', persist: false });
     } catch {
-      showActionNotification({ ok: true, severity: 'info', title: 'Browser session ended' });
+      showActionNotification({ ok: true, severity: 'info', title: 'Browser session ended', persist: false });
     } finally {
       notifyAdminLogout();
       setBusy(false);

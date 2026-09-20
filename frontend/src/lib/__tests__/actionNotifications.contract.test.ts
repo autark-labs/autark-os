@@ -16,7 +16,6 @@ test('story 9 pages route mutation feedback through shared action notification h
     'src/pages/SettingsPage/useSettingsPageController.ts',
     'src/pages/StoragePage/StoragePage.tsx',
     'src/pages/SupportPage/SupportPage.tsx',
-    'src/pages/ApplicationsPage/ApplicationReviewDialog.tsx',
   ];
 
   for (const relativePath of mutationSurfaces) {
@@ -25,6 +24,11 @@ test('story 9 pages route mutation feedback through shared action notification h
     assert.doesNotMatch(fileSource, /from 'sonner'/, `${relativePath} should not directly import sonner`);
     assert.doesNotMatch(fileSource, /toast\.(success|info|warning|error)\(/, `${relativePath} should not call sonner directly`);
   }
+});
+
+test('recovery completion feedback belongs to the global job observer', () => {
+  assert.doesNotMatch(source('src/pages/ApplicationsPage/ApplicationReviewDialog.tsx'), /show(Action|Job)Notification/);
+  assert.doesNotMatch(source('src/layout/SystemStatusHeader.tsx'), /GlobalJobPopover|useGlobalActiveAutarkOsJob/);
 });
 
 test('story 9 removes duplicate local success banners for settings and cleanup mutations', () => {

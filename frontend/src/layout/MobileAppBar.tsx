@@ -1,4 +1,4 @@
-import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House, LayoutGrid, Loader2, Menu, Settings, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Archive, CheckCircle2, CircleAlert, Compass, Database, House, LayoutGrid, Menu, Settings, ShieldCheck, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { NotificationCenterPopover } from '@/components/autark-os/NotificationCenter';
@@ -18,7 +18,6 @@ import {
 import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { useSettingsDialog } from '@/contexts/SettingsDialogContext';
 import { cn } from '@/lib/utils';
-import { jobTypeLabel, useGlobalActiveAutarkOsJob } from '@/repositories/jobRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
 import { navigationGroups } from './navigationModel';
 
@@ -52,14 +51,12 @@ function MobileAppBar() {
   const { viewMode } = useProjectSettings();
   const { openSettings } = useSettingsDialog();
   const doctorQuery = useSystemDoctorQuery();
-  const activeJobQuery = useGlobalActiveAutarkOsJob();
   const navGroups = navigationGroups(viewMode) as NavGroup[];
-  const activeJob = activeJobQuery.activeJob;
   const checks = doctorQuery.data?.checks ?? [];
   const tailscaleCheck = checks.find((check) => check.id === 'tailscale') ?? null;
   const issueCount = checks.filter((check) => check.status !== 'ok').length;
-  const statusLabel = activeJob ? 'Working' : doctorQuery.isLoading ? 'Checking' : issueCount ? 'Needs attention' : 'Ready';
-  const statusTone = activeJob ? 'info' : issueCount ? 'warning' : 'success';
+  const statusLabel = doctorQuery.isError ? 'Status unavailable' : doctorQuery.isLoading ? 'Checking' : issueCount ? 'Needs attention' : 'Ready';
+  const statusTone = doctorQuery.isError || issueCount ? 'warning' : 'success';
 
   return (
     <div className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-3 border-b border-sky-400/25 bg-slate-950 px-4 text-slate-50 shadow-xl shadow-slate-950/30 lg:hidden">
@@ -69,7 +66,7 @@ function MobileAppBar() {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        <NotificationCenterPopover />
+        <NotificationCenterPopover compact />
         <Button aria-label="Open settings" className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white" onClick={() => openSettings()} size="sm" type="button" variant="outline">
           <Settings className="size-4" />
         </Button>
@@ -77,26 +74,25 @@ function MobileAppBar() {
         <Sheet>
           <SheetTrigger asChild>
             <Button aria-label="Open system status" className="border-sky-400/30 bg-slate-900 text-sky-50 hover:bg-slate-800 hover:text-white" size="sm" type="button" variant="outline">
-              {activeJob ? <Loader2 className="size-4 animate-spin" /> : statusTone === 'success' ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}
+              {statusTone === 'success' ? <CheckCircle2 className="size-4" /> : <CircleAlert className="size-4" />}
               <span className="sr-only">Status</span>
             </Button>
           </SheetTrigger>
           <SheetContent className="w-[min(92vw,22rem)] overflow-y-auto border-sky-400/25 bg-slate-950 p-0 text-slate-50" side="right">
             <SheetHeader className="border-b border-sky-400/25 p-4">
               <SheetTitle className="text-white">System status</SheetTitle>
-              <SheetDescription>Autark-OS health and active work.</SheetDescription>
+              <SheetDescription>Autark-OS health and private access.</SheetDescription>
             </SheetHeader>
             <div className="grid gap-4 p-4">
               <div className={cn(
                 'rounded-xl border p-3',
                 statusTone === 'success' && 'border-cyan-300/35 bg-cyan-400/10',
                 statusTone === 'warning' && 'border-orange-400/35 bg-orange-500/10',
-                statusTone === 'info' && 'border-cyan-300/35 bg-cyan-400/10',
               )}>
                 <p className="m-0 text-xs font-black uppercase tracking-normal text-slate-400">Current state</p>
                 <p className="m-0 mt-1 text-base font-black text-white">{statusLabel}</p>
                 <p className="m-0 mt-1 text-sm text-slate-300">
-                  {activeJob ? `${jobTypeLabel(activeJob.type)} is in progress.` : issueCount ? `${issueCount} setup check${issueCount === 1 ? '' : 's'} need attention.` : 'Autark-OS is ready for core app flows.'}
+                  {doctorQuery.isError ? 'Current health could not be checked.' : doctorQuery.isLoading ? 'Checking this server.' : issueCount ? `${issueCount} setup check${issueCount === 1 ? '' : 's'} need attention.` : 'Autark-OS is ready for core app flows.'}
                 </p>
               </div>
 

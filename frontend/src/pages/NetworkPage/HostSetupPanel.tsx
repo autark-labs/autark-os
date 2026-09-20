@@ -18,7 +18,7 @@ export function HostSetupPanel({ setup }: { setup: SystemSetupStatus | null }) {
       return;
     }
     setCopied(id);
-    showActionNotification({ ok: true, severity: 'success', title: 'Command copied', message: value }, 'Command copied');
+    showActionNotification({ ok: true, severity: 'success', title: 'Command copied', message: 'Ready to paste.' }, 'Command copied');
     window.setTimeout(() => setCopied((current) => current === id ? null : current), 1500);
   }
 

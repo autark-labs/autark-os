@@ -20,7 +20,7 @@ test('applications page starts lifecycle jobs and re-pulls canonical app state',
   assert.match(page, /actionLoadingByAppId/);
   assert.match(page, /useAutarkOsJobsQuery\(\)/);
   assert.doesNotMatch(page, /operationStateForItem|operationForItem/);
-  assert.match(page, /showActionNotification\(\{[\s\S]*App action started/);
+  assert.match(page, /showActionNotification\(data\)/);
   assert.match(page, /showActionErrorNotification\(err, 'App action failed'\)/);
   assert.doesNotMatch(page, /setRuntimeAppStatusInApplicationStateCache/);
   assert.doesNotMatch(page, /setRuntimeAppInApplicationStateCache\(queryClient, data\.app\)/);
@@ -79,7 +79,7 @@ test('applications page runs repair only from canonical available actions', () =
   assert.ok(api.includes('post<AutarkOsJob>(`/api/apps/${appId}/repair`)'));
   assert.match(page, /InstalledAppsAPIClient\.repair\(appId\)/);
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
-  assert.match(page, /title: 'Repair started'/);
+  assert.match(page, /showActionNotification\(job\)/);
 
   assert.match(rail, /const repairAction = item\.availableActions\.find\(\(action\) => action\.id === 'repair'\)/);
   assert.match(rail, /repairAction &&/);
@@ -104,7 +104,7 @@ test('applications page starts app backup jobs from real backup actions', () => 
   assert.match(page, /setAppActionLoading\(appId, 'backup'\)/);
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /invalidateBackupQueries\(queryClient\)/);
-  assert.match(page, /title: 'Backup started'/);
+  assert.match(page, /showActionNotification\(job\)/);
   assert.doesNotMatch(page, /const handleCreateBackup = \(id: string\) => \{[\s\S]*setManagementOpen\(true\);[\s\S]*invalidateApplicationState\(queryClient\);[\s\S]*\};/);
 
   assert.match(rail, /actions\.onCreateBackup\(item\.id\)/);

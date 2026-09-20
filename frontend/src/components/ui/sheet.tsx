@@ -3,6 +3,7 @@ import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { NotificationModalHost } from "@/components/ui/sonner"
 import { blockingOverlayClassName, blockingSurfaceMotionClassName } from "@/components/ui/blocking-overlay"
 import { XIcon } from "lucide-react"
 
@@ -72,6 +73,7 @@ function SheetContent({
         {...props}
       >
         {children}
+        <NotificationModalHost />
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button

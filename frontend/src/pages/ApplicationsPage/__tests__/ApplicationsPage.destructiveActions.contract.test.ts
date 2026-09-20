@@ -63,7 +63,7 @@ test('applications page uninstall uses real plan and job-backed action wiring', 
   assert.match(page, /InstalledAppsAPIClient\.uninstall\(appId\)/);
   assert.match(page, /syncCanonicalAppMutationResult\(queryClient, job\)/);
   assert.match(page, /setTrackedAppJobIds/);
-  assert.match(page, /showActionNotification\(\{\s*ok: true,\s*severity: 'info',\s*title: 'Uninstall started'/);
+  assert.match(page, /showActionNotification\(job\)/);
   assert.doesNotMatch(page, /Uninstall review opened just now/);
 
   assert.match(panel, /loadPlan=\{\(\) => actions\.onLoadUninstallPlan\(item\.id\)\}/);

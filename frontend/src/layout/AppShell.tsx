@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { cn } from '@/lib/utils';
 import MobileAppBar from './MobileAppBar';
 import Sidebar from './Sidebar';
@@ -8,8 +8,16 @@ import { AppNotificationsProvider } from '@/components/autark-os/NotificationCen
 import { ApplicationStateNotice } from '@/components/autark-os/ApplicationStateNotice';
 
 const sidebarCollapsedStorageKey = 'autark-os.sidebarCollapsed';
+const desktopQuery = '(min-width: 1024px)';
+function subscribeDesktop(callback: () => void) {
+  const media = window.matchMedia(desktopQuery);
+  media.addEventListener('change', callback);
+  return () => media.removeEventListener('change', callback);
+}
 
 function AppShell() {
+  // Mount one header so Activity has one popover and keyboard focus owner.
+  const desktop = useSyncExternalStore(subscribeDesktop, () => window.matchMedia(desktopQuery).matches, () => false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -31,13 +39,13 @@ function AppShell() {
         'grid min-h-screen grid-cols-1 bg-slate-950 text-slate-50 transition-[grid-template-columns] duration-300',
         sidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[210px_minmax(0,1fr)]',
       )}>
-        <MobileAppBar />
+        {!desktop && <MobileAppBar />}
         <div className="hidden lg:block">
           <Sidebar collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
         </div>
         <main className="min-w-0 bg-slate-800">
           <div className="sticky top-0 z-40 hidden lg:block">
-            <SystemStatusHeader />
+            {desktop && <SystemStatusHeader />}
           </div>
           <div className="p-4 md:p-5 2xl:px-6">
             <ApplicationStateNotice className="mb-3" />

@@ -511,14 +511,16 @@ The plan should explain:
 
 ### Use global notifications for action feedback
 
-Actions should show a sticky top notification or toast that persists across navigation when appropriate.
+Use the shared action-notification helper: one compact bottom-right result popup and the header Activity control. Activity → Now shows canonical recommendations and active jobs; History retrieves saved results and completed jobs. Dismissing a popup must not delete history. Do not add separate global job spinners, notification centers, or popup stacks.
 
 Guidelines:
 
 - Success: short and auto-dismissable.
 - Info: short and dismissable.
 - Warning/error: sticky until dismissed.
-- Long-running action: persistent progress notification or job card.
+- Long-running action: progress in Activity → Now, using the existing durable jobs.
+- History uses server activity records and jobs, not browser-only storage. Saving failures must be visible and retryable; do not claim unsaved results survived a reload.
+- Do not put copied secrets, private URLs, or raw diagnostics in notification copy.
 
 Page-local red flashes are not enough.
 

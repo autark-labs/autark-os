@@ -125,7 +125,7 @@ export function useSettingsPageController() {
       return;
     }
     setCopied(id);
-    showActionNotification({ ok: true, severity: 'success', title: 'Command copied', message: value }, 'Command copied');
+    showActionNotification({ ok: true, severity: 'success', title: 'Command copied', message: 'Ready to paste.' }, 'Command copied');
     window.setTimeout(() => setCopied(null), 1600);
   }, []);
 

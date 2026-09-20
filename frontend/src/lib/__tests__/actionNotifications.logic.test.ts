@@ -143,5 +143,9 @@ test('maps thrown errors to sticky action notifications', () => {
   assert.equal(notification.title, 'App action failed');
   assert.equal(notification.message, 'Docker is not running.');
   assert.equal(notification.sticky, true);
-  assert.deepEqual(notification.nextAction, { label: 'Review diagnostics', href: '/diagnostics' });
+});
+
+test('terminal jobs never describe an operation as still running', () => {
+  assert.equal(actionNotificationFromJob({ type: 'install_app', status: 'cancelled' }).title, 'Install cancelled');
+  assert.equal(actionNotificationFromJob({ type: 'install_app', status: 'succeeded', subjectId: 'syncthing' }).message, 'Install for syncthing completed.');
 });

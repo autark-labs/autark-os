@@ -44,7 +44,6 @@ import type {
 import {
   emptyStateForApplicationCollection,
   matchesCollectionFilters,
-  appActionLabel,
   settingsFromFormValues,
   settingsImpactFromPlan,
   type ApplicationCollectionFilter,
@@ -299,12 +298,7 @@ export const ApplicationsPage = () => {
       const data = await InstalledAppsAPIClient.runAction(appId, action);
       syncCanonicalAppMutationResult(queryClient, data);
       setTrackedAppJobIds((current) => current.includes(data.jobId) ? current : [...current, data.jobId]);
-      showActionNotification({
-        ok: true,
-        severity: 'info',
-        title: 'App action started',
-        message: `${appActionLabel(action)} is running. Autark-OS will keep showing progress until the app reports its real state.`,
-      });
+      showActionNotification(data);
     } catch (err) {
       showActionErrorNotification(err, 'App action failed');
     } finally {
@@ -319,12 +313,7 @@ export const ApplicationsPage = () => {
       const job = await InstalledAppsAPIClient.repair(appId);
       syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
-      showActionNotification({
-        ok: true,
-        severity: 'info',
-        title: 'Repair started',
-        message: 'Autark-OS is repairing this app and will keep showing progress until the app reports its real state.',
-      });
+      showActionNotification(job);
     } catch (err) {
       showActionErrorNotification(err, 'Repair could not start');
     } finally {
@@ -339,12 +328,7 @@ export const ApplicationsPage = () => {
       const job = await BackupAPIClient.run(appId);
       syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
-      showActionNotification({
-        ok: true,
-        severity: 'info',
-        title: 'Backup started',
-        message: 'Autark-OS is creating a restore point for this app and will keep showing progress here.',
-      });
+      showActionNotification(job);
       void invalidateBackupQueries(queryClient);
     } catch (err) {
       showActionErrorNotification(err, 'Backup could not start');
@@ -388,12 +372,7 @@ export const ApplicationsPage = () => {
       syncCanonicalAppMutationResult(queryClient, updatedApp);
       setTrackedAppJobIds((current) => current.includes(updatedApp.jobId) ? current : [...current, updatedApp.jobId]);
 
-      showActionNotification({
-        ok: true,
-        severity: 'info',
-        title: 'Settings change started',
-        message: 'Autark-OS will report the result when the change or recovery finishes.',
-      });
+      showActionNotification(updatedApp);
       setSettingsDirtyByAppId((current) => ({ ...current, [appId]: false }));
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
@@ -433,12 +412,7 @@ export const ApplicationsPage = () => {
       const job = await InstalledAppsAPIClient.uninstall(appId);
       syncCanonicalAppMutationResult(queryClient, job);
       setTrackedAppJobIds((current) => current.includes(job.jobId) ? current : [...current, job.jobId]);
-      showActionNotification({
-        ok: true,
-        severity: 'info',
-        title: 'Uninstall started',
-        message: 'Autark-OS is removing this app safely and keeping it visible until the job finishes.',
-      });
+      showActionNotification(job);
     } catch (err) {
       showActionErrorNotification(err, 'Uninstall could not start');
       throw err;

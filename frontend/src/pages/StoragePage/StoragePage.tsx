@@ -61,7 +61,7 @@ function StoragePage() {
       return;
     }
     setCopiedPathId(id);
-    showActionNotification({ ok: true, severity: 'success', title: 'Path copied', message: value }, 'Path copied');
+    showActionNotification({ ok: true, severity: 'success', title: 'Path copied', message: 'Ready to paste.' }, 'Path copied');
     window.setTimeout(() => setCopiedPathId(null), 1600);
   }
 

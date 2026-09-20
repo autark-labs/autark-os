@@ -12,7 +12,7 @@ import com.autarkos.activity.ActivityLog;
  * <p>This policy is deliberately kept outside {@link SystemSupportService} so log formatting,
  * activity snapshots, and future support exports cannot drift into separate redaction rules.
  */
-final class SupportDataRedactor {
+public final class SupportDataRedactor {
 
     private static final Pattern SECRET_ASSIGNMENT = Pattern.compile("(?i)(password|passwd|token|secret|session|cookie|setup[_-]?code|api[_-]?key|auth|credential)(\\s*[=:]\\s*)([^\\s,;]+)");
     private static final Pattern JSON_SECRET = Pattern.compile("(?i)(\"(?:password|passwd|token|secret|session|cookie|setup[_-]?code|api[_-]?key|auth(?:orization)?|credential)\"\\s*:\\s*\")([^\"]+)(\")");
@@ -27,7 +27,7 @@ final class SupportDataRedactor {
     private static final Pattern TAILSCALE_DNS = Pattern.compile("(?i)(https?://)?[a-z0-9-]+\\.[a-z0-9-]+\\.ts\\.net(:\\d+)?");
     private static final Pattern TAILSCALE_IP = Pattern.compile("\\b100\\.(6[4-9]|[7-9]\\d|1[01]\\d|12[0-7])\\.\\d{1,3}\\.\\d{1,3}\\b");
 
-    String redact(String value) {
+    public String redact(String value) {
         if (value == null || value.isBlank()) {
             return "";
         }

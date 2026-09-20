@@ -1,8 +1,7 @@
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
 import { useMemo } from 'react';
-import { Boxes, CheckCircle2, CircleAlert, ExternalLink, Loader2 } from 'lucide-react';
+import { Boxes, CheckCircle2, CircleAlert, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { JobProgress } from '@/components/autark-os/JobProgress';
 import { AdminSessionControl } from '@/components/autark-os/AdminSessionControl';
 import { NotificationCenterPopover } from '@/components/autark-os/NotificationCenter';
 import { TailscaleControlPopover } from '@/components/autark-os/TailscaleControlPopover';
@@ -17,9 +16,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { jobTypeLabel, useGlobalActiveAutarkOsJob } from '@/repositories/jobRepository';
 import { useSystemDoctorQuery } from '@/repositories/systemRepository';
-import type { AutarkOsJob } from '@/types/jobs';
 import type { SystemSetupCheck } from '@/types/system';
 
 type HeaderService = {
@@ -40,9 +37,7 @@ type HeaderService = {
 
 function SystemStatusHeader() {
   const doctorQuery = useSystemDoctorQuery();
-  const activeJobQuery = useGlobalActiveAutarkOsJob();
   const doctor = doctorQuery.data ?? null;
-  const activeJob = activeJobQuery.activeJob;
   const loading = doctorQuery.isLoading;
   const error = doctorQuery.error;
 
@@ -75,7 +70,6 @@ function SystemStatusHeader() {
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
-          {activeJob && <GlobalJobPopover job={activeJob} />}
           <NotificationCenterPopover />
           <ThemeSelectorPopover />
           <StatusPopover loading={loading} service={dockerService} />
@@ -87,35 +81,6 @@ function SystemStatusHeader() {
         </div>
       </div>
     </header>
-  );
-}
-
-function GlobalJobPopover({ job }: { job: AutarkOsJob }) {
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label={`${jobTypeLabel(job.type)} in progress`}
-          className="h-8 gap-2 rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-2.5 text-xs text-cyan-200 shadow-sm shadow-cyan-950/20 hover:bg-cyan-400/15"
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <Loader2 className="size-3.5 animate-spin" />
-          <span className="hidden font-semibold sm:inline">Working</span>
-          <span className="font-semibold">{jobTypeLabel(job.type)}</span>
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(92vw,24rem)] gap-3 border-sky-400/25 bg-slate-950 p-3 text-slate-50 shadow-xl shadow-slate-950/30">
-        <PopoverHeader>
-          <PopoverTitle className="text-sm">Autark-OS is working</PopoverTitle>
-          <PopoverDescription className="text-xs text-slate-400">
-            This progress follows you while you move around the app.
-          </PopoverDescription>
-        </PopoverHeader>
-        <JobProgress job={job} subjectLabel={job.subjectId || undefined} />
-      </PopoverContent>
-    </Popover>
   );
 }
 

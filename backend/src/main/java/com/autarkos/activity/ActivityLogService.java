@@ -20,6 +20,15 @@ public class ActivityLogService {
     private final ActivityLogRepository repository;
     private final ApplicationEventPublisher events;
 
+    public ActivityLog notification(ActivityController.NotificationRequest notification) {
+        String key = "notification:" + notification.id();
+        var redactor = new com.autarkos.system.SupportDataRedactor();
+        return activityLog(repository.findByEventKey(key).orElseGet(() -> repository.save(new ActivityLogEntity(
+                notification.severity(), "notification", key,
+                redactor.redact(notification.title()), redactor.redact(notification.message()), null,
+                "error".equals(notification.severity()) ? "failed" : "recorded", "", Instant.now().toString(), key))));
+    }
+
     public ActivityLogService(ActivityLogRepository repository) {
         this(repository, event -> {
         });

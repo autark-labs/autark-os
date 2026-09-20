@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { NotificationModalHost } from "@/components/ui/sonner"
 import { blockingOverlayClassName, blockingSurfaceMotionClassName } from "@/components/ui/blocking-overlay"
 import { XIcon } from "lucide-react"
 
@@ -72,6 +73,7 @@ function DialogContent({
         {...props}
       >
         {children}
+        <NotificationModalHost />
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button

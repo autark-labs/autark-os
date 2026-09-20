@@ -126,7 +126,7 @@ function ProPage() {
     setActionError(null);
     install.mutate(undefined, {
       onError: (error) => handleError(error, 'Pro installation failed'),
-      onSuccess: () => notify('Pro installation queued', 'Autark-OS will verify and health-check the assigned private release.'),
+      onSuccess: (job) => showActionNotification(job),
     });
   }
 
@@ -134,7 +134,7 @@ function ProPage() {
     setActionError(null);
     checkRelease.mutate(undefined, {
       onError: (error) => handleError(error, 'Pro release check failed'),
-      onSuccess: () => notify('Pro release check queued', 'Autark-OS will verify the assigned signed release before installation.'),
+      onSuccess: (job) => showActionNotification(job),
     });
   }
 
@@ -142,9 +142,9 @@ function ProPage() {
     setActionError(null);
     remove.mutate(removalConfirmation, {
       onError: (error) => handleError(error, 'Private extension removal failed'),
-      onSuccess: () => {
+      onSuccess: (job) => {
         closeRemoval();
-        notify('Private extension removal queued', 'Autark-OS will stop and remove the private extension safely. Community Edition remains available.');
+        showActionNotification(job);
       },
     });
   }

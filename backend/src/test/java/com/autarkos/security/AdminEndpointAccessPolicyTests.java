@@ -12,6 +12,8 @@ class AdminEndpointAccessPolicyTests {
 
     @Test
     void classifiesPublicLocalAndAuthenticatedContractsExplicitly() {
+        assertThat(policy.accessMode("POST", "/api/activity/notifications")).isEqualTo(AccessMode.AUTHENTICATED);
+        assertThat(policy.accessMode("GET", "/api/activity")).isEqualTo(AccessMode.AUTHENTICATED);
         assertThat(policy.accessMode("GET", "/api/health")).isEqualTo(AccessMode.PUBLIC);
         assertThat(policy.accessMode("GET", "/api/admin/security/status")).isEqualTo(AccessMode.PUBLIC);
         assertThat(policy.accessMode("GET", "/api/system/version")).isEqualTo(AccessMode.PUBLIC);

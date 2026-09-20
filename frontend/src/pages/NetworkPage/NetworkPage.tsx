@@ -142,7 +142,7 @@ function NetworkPage() {
       showActionNotification({ ok: false, severity: 'warning', title: 'Copy unavailable', message: result.message }, 'Copy unavailable');
       return;
     }
-    showActionNotification({ ok: true, severity: 'success', title: 'Link copied', message: url }, 'Link copied');
+    showActionNotification({ ok: true, severity: 'success', title: 'Link copied', message: 'Ready to paste.' }, 'Link copied');
     const copiedKey = `${appId}:${linkKind}`;
     setCopiedLinkKey(copiedKey);
     window.setTimeout(() => setCopiedLinkKey((current) => current === copiedKey ? null : current), 1600);
@@ -173,14 +173,7 @@ function NetworkPage() {
       } else {
         const updated = await InstalledAppsAPIClient.updateSettings(app.appId, settingsForReachabilityZone(app, targetZone));
         syncCanonicalAppMutationResult(queryClient, updated);
-        showActionNotification({
-          ok: true,
-          severity: 'info',
-          title: `${app.appName} access change started`,
-          message: targetZone === 'lan'
-            ? 'Autark-OS is applying home-network reachability. Follow the job for the result.'
-            : 'Autark-OS is applying server-only reachability. Follow the job for the result.',
-        }, 'Access updated');
+        showActionNotification(updated);
         succeeded = true;
       }
       setPendingReachabilityByServiceId((current) => acknowledgePendingReachability(current, service.id, pendingToken));

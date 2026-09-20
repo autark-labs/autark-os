@@ -46,6 +46,33 @@ Docker/runtime observation is the source for whether an app is actually ready.
 SQLite stores Autark-OS ownership, jobs, plans, activity, and recovery metadata;
 it must not be used to claim that an absent container is running.
 
+## Action Feedback
+
+The header **Activity** control has two views: **Now** renders canonical
+recommendations and active jobs; **History** combines completed jobs with saved
+action results. One compact bottom-right popup reports the latest result without
+moving page content. Closing it does not delete the history entry. Details and job
+steps expand inside the fixed-size popover; the full Activity log remains available.
+
+The single popup viewport follows the active dialog/sheet's focus scope. A stable
+portal target uses the browser's manual-popover top layer to avoid modal clipping
+without covering its confirmation buttons. Opening Activity pauses the underlying
+modal through Radix and returns focus without discarding form edits. Do not mount
+separate Toasters in individual dialogs.
+
+Ordinary action results are redacted and saved through the authenticated
+`POST /api/activity/notifications` endpoint into the existing activity table.
+Client receipt IDs make retries idempotent. Job notifications reuse durable job
+records rather than creating a second history entry. Saving notification feedback
+does not trigger another application refresh or mutation event. Logout feedback
+is transient because the administrator session has already ended.
+
+The popover shows up to 100 recent results, not an unlimited archive. Saved
+receipts follow existing activity retention (30 days for routine results, 180 for
+warnings/errors). If saving fails, the result stays in the current session with a
+retry action; unsaved results cannot survive closing or reloading the browser.
+Page-local error treatments are unchanged in this notification pass.
+
 ## Boundaries
 
 - **Core is local-first.** It works without a cloud service, native mobile app,
