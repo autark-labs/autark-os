@@ -13,7 +13,6 @@ import { ExtensionActionTarget } from '@/extensions/ExtensionActionTarget';
 import { SearchFilterBar } from '@/components/primitives/SearchFilterBar';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { useProjectSettings } from '@/contexts/ProjectSettingsContext';
 import { showActionErrorNotification, showActionNotification } from '@/lib/actionNotifications';
 import {
   invalidateApplicationState,
@@ -52,8 +51,10 @@ import {
 } from './extensions/ApplicationsPage.presentation';
 
 type ManagedLifecycleAction = Extract<ApplicationRuntimeAction, 'start' | 'stop' | 'restart'>;
+const appLayoutStorageKey = 'autark-os.appsLayout';
+
 export const ApplicationsPage = () => {
-  const { setViewMode, viewMode } = useProjectSettings();
+  const [layout, setLayout] = useState<'grid' | 'list'>(() => window.localStorage.getItem(appLayoutStorageKey) === 'list' ? 'list' : 'grid');
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -440,17 +441,19 @@ export const ApplicationsPage = () => {
               <ToggleGroup
                 aria-label="App view"
                 onValueChange={(value) => {
-                  if (value === 'basic' || value === 'advanced') setViewMode(value);
+                  if (value !== 'grid' && value !== 'list') return;
+                  setLayout(value);
+                  window.localStorage.setItem(appLayoutStorageKey, value);
                 }}
                 size="sm"
                 type="single"
-                value={viewMode}
+                value={layout}
                 variant="outline"
               >
-                <ToggleGroupItem aria-label="Grid view" className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="basic">
+                <ToggleGroupItem aria-label="Grid view" className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="grid">
                   <LayoutGrid className="size-4" />
                 </ToggleGroupItem>
-                <ToggleGroupItem aria-label="List view" className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="advanced">
+                <ToggleGroupItem aria-label="List view" className="border-sky-400/40 bg-slate-800 text-sky-50 data-[state=on]:bg-cyan-300 data-[state=on]:text-slate-950" value="list">
                   <List className="size-4" />
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -466,7 +469,7 @@ export const ApplicationsPage = () => {
 
       <ApplicationStateContent>
         <section className="grid min-h-0 flex-1 items-stretch gap-3 overflow-hidden lg:grid-cols-[minmax(0,1fr)_19rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
-          {viewMode === 'basic' ? (
+          {layout === 'grid' ? (
             <BasicApplicationsView
               actionLoadingByItemId={actionLoadingByAppId}
               emptyState={emptyState}
