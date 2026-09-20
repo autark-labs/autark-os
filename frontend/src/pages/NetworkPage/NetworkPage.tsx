@@ -344,8 +344,8 @@ function AccessPageHeader({
 }) {
   return (
     <Surface as="header" className="overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
             <Network aria-hidden="true" className="size-5" />
           </span>
@@ -354,9 +354,11 @@ function AccessPageHeader({
             <p className="m-0 text-sm text-sky-100/70">Private links, home-network access, and service reachability.</p>
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <AccessSummaryMetric label="Reachable services" value={serviceCount} />
-          <AccessSummaryMetric attention={needsReviewCount > 0} label="Needs review" value={needsReviewCount} />
+        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-2">
+            <AccessSummaryMetric label="Reachable services" value={serviceCount} />
+            <AccessSummaryMetric attention={needsReviewCount > 0} label="Needs review" value={needsReviewCount} />
+          </div>
           {context}
           <RefreshStatus error={error} intervalLabel="Auto-updates every 10s" onRefresh={onRefresh} refreshing={refreshing} tone="info" updatedAt={updatedAt} />
         </div>

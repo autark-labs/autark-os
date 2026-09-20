@@ -30,8 +30,8 @@ export function RefreshStatus({ className, disabled, error, intervalLabel, onRef
   const refreshDisabled = Boolean(disabled || refreshing);
   const refreshDisabledReason = refreshing ? 'Refresh is already running.' : 'Refresh is not available right now.';
   return (
-    <div className={cn('flex flex-wrap items-center justify-end gap-2', className)}>
-      <div className="flex h-10 w-44 flex-col justify-center text-right text-xs leading-5 text-app-text-muted">
+    <div className={cn('flex max-w-full items-center justify-end gap-2', className)}>
+      <div className="flex h-10 w-44 min-w-0 flex-col justify-center text-right text-xs leading-5 text-app-text-muted">
         {error ? <ContextChip label={updatedAt ? 'Refresh paused' : 'Status unavailable'} title="Current status">
           <p>{error}</p>
           <p className="text-xs text-muted-foreground">{updatedAt ? `Last confirmed ${updatedAt.toLocaleString()}. Previous information remains visible.` : 'No confirmed information is available yet.'}</p>

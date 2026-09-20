@@ -19,8 +19,8 @@ export function AppsPageHeader({ attentionCount, managedCount, children }: AppsP
 
   return (
     <Surface as="header" className="overflow-hidden border-sky-300/15 bg-app-header-surface/90 shadow-xl shadow-slate-950/20" tone="panel">
-      <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
           <span className="hidden size-10 shrink-0 place-items-center rounded-xl border border-cyan-300/35 bg-cyan-400/10 text-cyan-200 sm:grid">
             <AppWindow aria-hidden="true" className="size-5" />
           </span>
@@ -29,28 +29,30 @@ export function AppsPageHeader({ attentionCount, managedCount, children }: AppsP
             <p className="m-0 text-sm text-sky-100/70">Open, manage, and monitor apps installed by Autark-OS.</p>
           </div>
         </div>
-        <div className="flex min-h-10 flex-wrap items-center justify-end gap-2">
+        <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
           {children}
-          {metrics.map(({ icon: Icon, key, label }) => (
-            <div
-              className={cn(
-                'flex min-w-0 items-center gap-2 rounded-xl border border-sky-300/15 bg-slate-950/25 px-2.5 py-2',
-                key === 'attention' && attentionCount > 0 && 'border-amber-300/30 bg-amber-400/5',
-              )}
-              key={key}
-            >
-              <span className={cn(
-                'grid size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200',
-                key === 'attention' && 'border-amber-300/15 bg-amber-400/10 text-amber-200',
-              )}>
-                <Icon aria-hidden="true" className="size-3.5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-lg font-semibold leading-none text-white">{values[key]}</span>
-                <span className="mt-1 block truncate text-[0.68rem] text-slate-400">{label}</span>
-              </span>
-            </div>
-          ))}
+          <div className="flex items-center gap-2">
+            {metrics.map(({ icon: Icon, key, label }) => (
+              <div
+                className={cn(
+                  'flex min-w-0 items-center gap-2 rounded-xl border border-sky-300/15 bg-slate-950/25 px-2.5 py-2',
+                  key === 'attention' && attentionCount > 0 && 'border-amber-300/30 bg-amber-400/5',
+                )}
+                key={key}
+              >
+                <span className={cn(
+                  'hidden size-8 shrink-0 place-items-center rounded-lg border border-cyan-300/15 bg-cyan-400/10 text-cyan-200 sm:grid',
+                  key === 'attention' && 'border-amber-300/15 bg-amber-400/10 text-amber-200',
+                )}>
+                  <Icon aria-hidden="true" className="size-3.5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-lg font-semibold leading-none text-white">{values[key]}</span>
+                  <span className="mt-1 block truncate text-[0.68rem] text-slate-400">{label}</span>
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </Surface>

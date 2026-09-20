@@ -2,6 +2,44 @@ import { expect, test } from 'playwright/test';
 import type { DiscoverAppView } from '../src/types/discover';
 import { expectNoHorizontalOverflow, installMockApi } from './support/mockApi';
 
+for (const width of [320, 390, 640, 768, 1024, 1280, 1440]) {
+  test(`${width}px page headers keep internal rows together without clipping`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    await installMockApi(page, 'ready');
+    for (const [route, title, metrics] of [
+      ['/apps', 'My Apps', ['Managed apps', 'Needs review']],
+      ['/access', 'Access', ['Reachable services', 'Needs review']],
+      ['/backups', 'Backups', ['Protected']],
+    ] as const) {
+      await page.goto(route);
+      const heading = page.getByRole('heading', { name: title, exact: true });
+      await expect(heading).toBeVisible();
+      const header = heading.locator('xpath=ancestor::header');
+      const bounds = (await header.boundingBox())!;
+      for (const element of [heading, ...await header.getByRole('button').all(), ...metrics.map(label => header.getByText(label, { exact: true }))]) {
+        const box = (await element.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+        expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+        expect(await element.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+      }
+      if (metrics.length === 2) {
+        const first = (await header.getByText(metrics[0], { exact: true }).boundingBox())!;
+        const second = (await header.getByText(metrics[1], { exact: true }).boundingBox())!;
+        expect(second.y).toBe(first.y);
+        expect(second.x).toBeGreaterThan(first.x + first.width);
+      }
+      if (route === '/access') {
+        const refresh = (await header.getByRole('button', { name: 'Refresh', exact: true }).boundingBox())!;
+        const status = (await header.getByText('Auto-updates every 10s', { exact: true }).boundingBox())!;
+        expect(refresh.y).toBeLessThan(status.y + status.height);
+        expect(status.y).toBeLessThan(refresh.y + refresh.height);
+      }
+      await expectNoHorizontalOverflow(page);
+    }
+  });
+}
+
 for (const width of [320, 390, 1024, 1440]) {
   test(`${width}px unused-link disclosure leaves the matrix stable and requires confirmation`, async ({ page }) => {
     await page.setViewportSize({ width, height: 960 });
