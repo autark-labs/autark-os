@@ -1,4 +1,5 @@
 import type { DestructiveActionPlan } from './ApplicationsPage.destructiveActions';
+import type { ApplicationAction } from '@/types/applicationState';
 import type { AppEvent, AppHealthSnapshot, AppSetupGuide, AppTelemetry, AppUsageGuide, ApplicationRuntimeState, AutarkOsIssue } from '@/types/app';
 
 export type ApplicationRuntimeAction = 'start' | 'stop' | 'restart' | 'repair' | 'backup';
@@ -30,14 +31,6 @@ export type ApplicationEmptyState = {
   description: string;
 };
 
-export type ApplicationAvailableAction = {
-  id: string;
-  label: string;
-  href?: string | null;
-  disabled?: boolean;
-  reason?: string | null;
-};
-
 export type ApplicationSurfaceItem = {
   id: string;
   sourceId?: string;
@@ -51,7 +44,7 @@ export type ApplicationSurfaceItem = {
   issues: AutarkOsIssue[];
   access: 'Open' | 'Private' | 'Local only' | 'No link';
   backup: 'Protected' | 'Needs backup' | 'Not managed';
-  availableActions: ApplicationAvailableAction[];
+  availableActions: ApplicationAction[];
   catalogAppId?: string | null;
   nextAction?: ApplicationNextAction;
   description: string;

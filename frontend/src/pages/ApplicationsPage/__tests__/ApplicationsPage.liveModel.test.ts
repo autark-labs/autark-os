@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import { buildApplicationSurfaceItems } from '../extensions/ApplicationsPage.liveModel';
 import type { AppRuntimeView } from '@/types/app';
+import type { ApplicationView } from '@/types/applicationState';
 
 test('unknown managed runtime state does not render as ready', () => {
   const app = {
@@ -37,7 +38,7 @@ test('managed cards use the catalog icon when a runtime image is a Docker refere
   assert.equal(item.iconUrl, '/app-images/vaultwarden.svg');
 });
 
-function application(runtime: AppRuntimeView) {
+function application(runtime: AppRuntimeView): ApplicationView {
   return {
     id: runtime.appId, name: runtime.appName, category: runtime.category, image: '/app-images/vaultwarden.svg',
     summary: '', description: '', relationship: 'managed' as const, catalogAvailability: 'installable', appInstanceId: runtime.appId,
@@ -47,6 +48,18 @@ function application(runtime: AppRuntimeView) {
     availableActions: [], runtime, evidence: null,
   };
 }
+
+test('surface actions retain the canonical contract and never launch from a raw runtime URL', () => {
+  const app = application({ appId: 'vaultwarden', appName: 'Vaultwarden', state: 'ready', accessUrl: 'http://raw.example:8080' } as AppRuntimeView);
+  const settings = { id: 'settings', label: 'Settings', kind: 'action', method: 'PUT', href: '/api/apps/vaultwarden/settings', disabled: true, reason: 'The original Compose file is missing.' };
+  app.availableActions = [settings];
+  let [item] = buildApplicationSurfaceItems({ applications: [app] });
+  assert.deepEqual(item.availableActions, [settings]);
+  assert.equal(item.href, undefined);
+  app.availableActions.push({ id: 'open', label: 'Open', kind: 'external', method: null, href: 'https://canonical.example', disabled: false, reason: '' });
+  [item] = buildApplicationSurfaceItems({ applications: [app] });
+  assert.equal(item.href, 'https://canonical.example');
+});
 
 test('registration appearing during install retains its busy operation', () => {
   const runtime = { appId: 'syncthing', appName: 'Syncthing', state: 'starting', backupProtection: 'backup_disabled' } as AppRuntimeView;

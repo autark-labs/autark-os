@@ -17,6 +17,7 @@ import {
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import type { ApplicationView } from '@/types/applicationState';
+import { applicationOpenUrl } from '@/repositories/applicationStateRepository.logic';
 import type { HomeSystemMetric } from '../extensions/OverviewPage.systemStatus';
 import { managedAppIconUrl } from '../extensions/OverviewPage.appTiles';
 import { applicationDeepLinkForManagedApp } from '../../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
@@ -46,7 +47,7 @@ export function InstalledAppsLauncher({ apps }: { apps: ApplicationView[] }) {
 }
 
 function InstalledAppCard({ app, index }: { app: ApplicationView; index: number }) {
-  const openUrl = app.availableActions.find((action) => action.id === 'open' && !action.disabled)?.href;
+  const openUrl = applicationOpenUrl(app);
   const launchLabel = `${openUrl ? 'Open' : 'Manage'} ${app.name}`;
   const detailRoute = applicationDeepLinkForManagedApp(app.id, { panel: 'manage' });
   const iconUrl = managedAppIconUrl(app.runtime) || app.image;

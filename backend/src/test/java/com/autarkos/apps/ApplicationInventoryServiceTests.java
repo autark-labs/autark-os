@@ -83,8 +83,50 @@ class ApplicationInventoryServiceTests {
         var view = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", privateUrl)), Map.of())
                 .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
         assertThat(view.runtime().accessRoute().privateLinkStatus()).isEqualTo("verified");
-        assertThat(view.availableActions()).anySatisfy(action -> assertThat(action.href()).isEqualTo(privateUrl));
+        assertThat(view.availableActions()).contains(new ApplicationAction("open", "Open", "external", privateUrl, null, false, ""));
+        assertThat(view.availableActions()).contains(new ApplicationAction("backup", "Create backup", "action", "/api/backups/apps/syncthing/run", "POST", false, ""));
         assertThat(repository.findAppById("syncthing").orElseThrow().accessUrl()).isEqualTo("http://localhost:18384");
+
+        var stopped = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", privateUrl, ApplicationRuntimeState.STOPPED)), Map.of())
+                .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
+        assertThat(stopped.availableActions()).extracting(ApplicationAction::id).doesNotContain("open", "stop").contains("start");
+        assertThat(stopped.availableActions()).contains(new ApplicationAction("start", "Start", "action", "/api/apps/syncthing/start", "POST", false, ""));
+
+        var busy = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", privateUrl)),
+                Map.of("syncthing", com.autarkos.api.AppOperationView.running("backing_up", "Creating backup", "backup-1", "Copying data", "Copying data")))
+                .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
+        assertThat(busy.availableActions()).isEmpty();
+    }
+
+    @Test
+    void composeLossAfterAttestationDisablesSettingsWithTheActualPutContract() throws Exception {
+        var repository = installedRepository();
+        var installed = new InstalledApp("syncthing", "Syncthing", "Ready", runtimeRoot.resolve("apps/syncthing").toString(),
+                "autarkos_autark-os_syncthing", "http://localhost:18384", Instant.now());
+        repository.save(installed);
+        repository.saveOwnershipMetadata(new RuntimeModels.InstalledAppOwnershipMetadata(
+                "syncthing", "instance", "syncthing", "current-instance", installed.runtimePath(),
+                "installed", "owned", Instant.now(), Instant.now()));
+        var attestation = managedApps(repository);
+        var result = attestation.attest(repository.findAppById("syncthing").orElseThrow());
+        assertThat(result.managed()).isTrue();
+        var snapshot = mock(ManagedAppAttestationService.class);
+        when(snapshot.attest(org.mockito.ArgumentMatchers.<InstalledApp>any())).thenAnswer(invocation ->
+                invocation.getArgument(0) == null ? attestation.attest((InstalledApp) null) : result);
+        Files.delete(runtimeRoot.resolve("apps/syncthing/compose.yaml"));
+        var service = new ApplicationInventoryService(catalogService(), repository, snapshot, recovery());
+        var view = service.apps(List.of(), List.of(runtime("syncthing", "Syncthing", "http://localhost:18384")), Map.of())
+                .stream().filter(application -> application.id().equals("syncthing")).findFirst().orElseThrow();
+        assertThat(view.availableActions()).filteredOn(action -> action.id().equals("settings")).singleElement().satisfies(action -> {
+            assertThat(action.kind()).isEqualTo("action");
+            assertThat(action.method()).isEqualTo("PUT");
+            assertThat(action.href()).isEqualTo("/api/apps/syncthing/settings");
+            assertThat(action.disabled()).isTrue();
+            assertThat(action.reason()).contains("Compose file is missing");
+        });
+        assertThat(view.availableActions()).filteredOn(action -> List.of("backup", "restart").contains(action.id()))
+                .allSatisfy(action -> assertThat(action.disabled()).isTrue());
+        assertThat(attestation.attest(installed).managed()).isFalse();
     }
 
     @Test
@@ -404,8 +446,12 @@ class ApplicationInventoryServiceTests {
     }
 
     private AppRuntimeView runtime(String appId, String name, String accessUrl) {
+        return runtime(appId, name, accessUrl, ApplicationRuntimeState.READY);
+    }
+
+    private AppRuntimeView runtime(String appId, String name, String accessUrl, ApplicationRuntimeState state) {
         return new AppRuntimeView(
-                appId, name, "Apps", name + " app", "1.0.0", "", ApplicationRuntimeState.READY,
+                appId, name, "Apps", name + " app", "1.0.0", "", state,
                 runtimeRoot.resolve("apps").resolve(appId).toString(), "autark-os-" + appId, accessUrl,
                 new com.autarkos.marketplace.install.models.AccessModels.AppAccessRoute(
                         accessUrl, "http://localhost:18384", accessUrl.startsWith("https") ? accessUrl : null,

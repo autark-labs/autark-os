@@ -188,7 +188,11 @@ const managedApplication = {
   id: 'vaultwarden', name: runtimeApp.appName, category: 'Security', image: '', summary: 'Private password vault', description: 'Private password vault',
   relationship: 'managed', catalogAvailability: 'installable', appInstanceId: runtimeApp.appInstanceId, runtimeState: 'running', ownershipState: 'owned_managed', accessState: 'private_ready', backupState: 'protected_by_restore_point', issues: [],
   relationshipLabel: 'Installed', relationshipDescription: 'Managed by this Autark-OS installation.', statusTone: 'success', cardTone: 'success',
-  primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden&panel=manage', method: null, disabled: false, reason: '' }, availableActions: [{ id: 'open', label: 'Open', kind: 'external', href: runtimeApp.accessRoute.privateUrl, method: null, disabled: false, reason: '' }], runtime: runtimeApp, evidence: null,
+  primaryAction: { id: 'manage', label: 'Manage', kind: 'route', href: '/apps?focus=managed%3Avaultwarden&panel=manage', method: null, disabled: false, reason: '' },
+  availableActions: [
+    { id: 'open', label: 'Open', kind: 'external', href: runtimeApp.accessRoute.privateUrl, method: null, disabled: false, reason: '' },
+    ...['stop', 'restart', 'backup'].map((id) => ({ id, label: id === 'stop' ? 'Pause' : id === 'backup' ? 'Create backup' : 'Restart', kind: 'action', href: id === 'backup' ? '/api/backups/apps/vaultwarden/run' : `/api/apps/vaultwarden/${id}`, method: 'POST', disabled: false, reason: '' })),
+  ], runtime: runtimeApp, evidence: null,
 };
 
 const immichApplication = {

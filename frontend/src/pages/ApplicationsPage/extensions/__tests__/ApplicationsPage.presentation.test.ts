@@ -91,7 +91,7 @@ describe('My Apps presentation helpers', () => {
       }],
     });
 
-    expect(item.href).toBe('http://localhost:8090');
+    expect(item.href).toBeUndefined();
     expect(item.links.primaryUrl).toBe('http://localhost:8090');
     expect(item.links.privateUrl).toBeUndefined();
     expect(item.settings.privateAccessUrl).toBeUndefined();

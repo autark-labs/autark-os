@@ -17,7 +17,7 @@ test('mobile Discover management links use the app ID, not its installation iden
   expect(app.appInstanceId).not.toBe(app.id);
   await page.goto(`/discover?detail=${app.id}`);
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('link', { name: 'View in My Apps', exact: true })).toHaveAttribute('href', '/apps?focus=managed%3Avaultwarden');
+  await expect(dialog.getByRole('link', { name: 'View in My Apps', exact: true })).toHaveAttribute('href', '/apps?focus=managed%3Avaultwarden&panel=manage');
   await dialog.getByRole('link', { name: 'Manage in My Apps', exact: true }).click();
   await expect(page).toHaveURL(/\/apps\?focus=managed%3Avaultwarden&panel=manage$/);
   await expect(page.getByRole('tab', { name: 'Guide', exact: true })).toBeVisible();
@@ -28,6 +28,9 @@ test('the first-backup action submits the catalog app ID after installation', as
   const apps = await discoverFixture(page);
   const app = apps.find((view) => view.application.relationship === 'managed')!.application;
   app.runtime!.backupProtection = 'backup_enabled_no_restore_point';
+  const backup = app.availableActions.find((action) => action.id === 'backup')!;
+  backup.disabled = true;
+  backup.reason = 'The original Compose file is missing.';
   let completed = false;
   const job = () => ({ jobId: 'fixture-install', type: 'install_app', subjectId: app.id, status: completed ? 'succeeded' : 'running', currentStep: 'finish', steps: [], createdAt: '2025-01-15T12:00:00Z', updatedAt: '2025-01-15T12:00:00Z', error: null });
   await page.route('**/api/jobs', (route) => route.fulfill({ json: [job()] }));
@@ -35,6 +38,11 @@ test('the first-backup action submits the catalog app ID after installation', as
     completed = true;
     return route.fulfill({ json: job() });
   });
+  await page.goto(`/discover?detail=${app.id}`);
+  await expect(page.getByRole('button', { name: 'Create first backup', exact: true })).toBeDisabled();
+  backup.disabled = false;
+  backup.reason = '';
+  completed = false;
   await page.goto(`/discover?detail=${app.id}`);
   const request = page.waitForRequest((request) => request.method() === 'POST' && request.url().includes('/api/backups/apps/'));
   await page.getByRole('button', { name: 'Create first backup', exact: true }).click();

@@ -55,7 +55,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   const editable = item.settings.canEdit && !settingsRestriction.disabled;
   const { autoRepairEnabled, backupEnabled, backupFrequency, backupRetention, expectedLocalPort } = item.settings;
   // Parent dirty-state updates and runtime polling replace the item object.
-  // Only changed persisted form values should reset a draft, not object identity.
+  // Reconcile changed persisted values through RHF without replacing dirty fields.
   const initialValues = useMemo(() => ({
     autoRepairEnabled,
     backupEnabled,
@@ -73,7 +73,8 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
     handleSubmit,
     reset,
   } = useForm<ApplicationSettingsFormValues>({
-    defaultValues: initialValues,
+    values: initialValues,
+    resetOptions: { keepDirtyValues: true },
   });
   const values = useWatch({ control }) as ApplicationSettingsFormValues;
   const planning = loadingAction === 'planning';
@@ -83,18 +84,12 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
   const busy = planning || saving || accessChanging || operationBusy;
   const privateNetwork = privateNetworkStatus(item, accessChanging);
 
-  useEffect(() => {
-    reset(initialValues);
-    setPendingImpact(null);
-    setPendingValues(null);
-    setPlanError(null);
-  }, [item.id, initialValues, reset]);
-
   const onDirtyChange = actions.onDirtyChange;
   useEffect(() => {
     onDirtyChange(item.id, isDirty);
-    return () => onDirtyChange(item.id, false);
   }, [onDirtyChange, isDirty, item.id]);
+
+  useEffect(() => () => onDirtyChange(item.id, false), [onDirtyChange, item.id]);
 
   useEffect(() => {
     if (!isDirty) {
@@ -138,7 +133,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
 
     try {
       await actions.onSaveSettings(item.id, pendingValues);
-      reset(pendingValues);
+      reset(pendingValues, { keepDirtyValues: false });
       setPendingImpact(null);
       setPendingValues(null);
       setConfirmOpen(false);
@@ -276,7 +271,7 @@ export function ApplicationSettingsTab({ actions, item, loadingAction }: Applica
               className="border-sky-400/40 bg-slate-900 text-sky-50 hover:bg-slate-700"
               disabled={!isDirty || busy}
               onClick={() => {
-                reset(initialValues);
+                reset(initialValues, { keepDirtyValues: false });
                 setPendingImpact(null);
                 setPendingValues(null);
                 setPlanError(null);

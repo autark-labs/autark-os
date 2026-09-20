@@ -1,4 +1,5 @@
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
+import { applicationOpenUrl } from '@/repositories/applicationStateRepository.logic';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Archive, CheckCircle2, Clock3, Loader2, Settings2, TriangleAlert } from 'lucide-react';
@@ -18,9 +19,6 @@ import type { ApplicationView } from '@/types/applicationState';
 import type { DiscoverAppView, DiscoverInstallPreview, DiscoverSetupSchema } from '@/types/discover';
 import type { AutarkOsJob } from '@/types/jobs';
 import type { InstallOptions, InstallPlan, MarketplaceApp } from '@/types/marketplace';
-import {
-  applicationDeepLinkForManagedApp,
-} from '../ApplicationsPage/extensions/ApplicationsPage.deepLinks';
 import { InstallWizard } from './MarketplaceInstallWizard';
 import { MarketplaceAppDetailsCard } from './MarketplaceAppInformation';
 import { AppImage, marketplaceStatusTone, SupportBadge } from './MarketplacePage.shared';
@@ -62,8 +60,7 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
     application.relationship === 'recovery_required' || application.relationship === 'blocked'
   );
   const canInstallSecondCopy = application.availableActions.some((action) => action.id === 'install_copy' && !action.disabled);
-  const installedAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.id) : '/apps';
-  const manageInstalledAppHref = installedApp ? applicationDeepLinkForManagedApp(installedApp.id, { panel: 'manage' }) : '/apps';
+  const manageInstalledAppHref = installedApp ? marketplacePrimaryRoute({ application: installedApp }) : null;
   const reviewExistingHref = needsExistingServiceReview ? marketplacePrimaryRoute(appView) : null;
   const installDisabled = installing || installLocked || !setupReady;
   const installDisabledReason = installing
@@ -102,8 +99,8 @@ export function MarketplaceAppDetail({ app, appView, backupJob, hasAppSettings, 
 
         <div className={cn('grid gap-2', hasAppSettings && 'sm:grid-cols-[minmax(0,1fr)_auto]')}>
           {isInstalled ? (
-            <ProjectPrimaryButton asChild>
-              <Link to={installedAppHref}>
+            manageInstalledAppHref && <ProjectPrimaryButton asChild>
+              <Link to={manageInstalledAppHref}>
                 <CheckCircle2 className="size-4" />
                 View in My Apps
               </Link>
@@ -331,7 +328,8 @@ function RecoveryInstallNotice({ disabled, mode: _mode, onReinstallCurrent }: { 
   );
 }
 
-function InstalledAppNotice({ app, manageHref }: { app: ApplicationView | null; manageHref: string }) {
+function InstalledAppNotice({ app, manageHref }: { app: ApplicationView | null; manageHref: string | null }) {
+  const openUrl = applicationOpenUrl(app);
   if (!app) {
     return null;
   }
@@ -343,14 +341,14 @@ function InstalledAppNotice({ app, manageHref }: { app: ApplicationView | null; 
           <h4 className="font-bold text-slate-50">Already installed</h4>
           <p className="mt-1 text-sm text-slate-300">{app.name} is already managed by Autark-OS. Use My Apps for day-to-day settings, repairs, and app status.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {app.runtime?.accessUrl && (
+            {openUrl && (
               <ProjectPrimaryButton asChild size="sm">
-                <AppBrowserLink href={app.runtime.accessUrl} rel="noreferrer" target="_blank">Open app</AppBrowserLink>
+                <AppBrowserLink href={openUrl} rel="noreferrer" target="_blank">Open app</AppBrowserLink>
               </ProjectPrimaryButton>
             )}
-            <ProjectDarkControlButton asChild size="sm">
+            {manageHref && <ProjectDarkControlButton asChild size="sm">
               <Link to={manageHref}>Manage in My Apps</Link>
-            </ProjectDarkControlButton>
+            </ProjectDarkControlButton>}
           </div>
         </div>
       </div>
@@ -374,6 +372,11 @@ function InlineInstallStatus({
   onCreateBackup: (appId: string) => Promise<void>;
 }) {
   if (job) {
+    const openUrl = applicationOpenUrl(installedApp);
+    const manageHref = installedApp ? marketplacePrimaryRoute({ application: installedApp }) : null;
+    const backupAction = installedApp?.availableActions.find((action) => action.id === 'backup');
+    const backupPending = Boolean(backupJob && !terminalJob(backupJob));
+    const backupDisabled = !backupAction || backupAction.disabled || backupAction.kind !== 'action' || backupAction.method !== 'POST' || backupPending;
     const active = !terminalJob(job);
     const queued = job.status === 'queued';
     const running = active && !queued;
@@ -384,30 +387,30 @@ function InlineInstallStatus({
         <div className="flex items-start gap-3">
           {queued ? <Clock3 className="mt-0.5 size-5 text-cyan-200" /> : running ? <Loader2 className="mt-0.5 size-5 animate-spin text-cyan-200" /> : succeeded ? <CheckCircle2 className="mt-0.5 size-5 text-emerald-200" /> : <TriangleAlert className="mt-0.5 size-5 text-red-200" />}
           <div className="min-w-0 flex-1">
-            <h4 className="font-bold text-slate-50">{succeeded ? `${app.name} is ready` : failed ? `${app.name} did not finish installing` : queued ? `${app.name} is waiting to install` : `Installing ${app.name}`}</h4>
+            <h4 className="font-bold text-slate-50">{succeeded ? `${app.name} installation completed` : failed ? `${app.name} did not finish installing` : queued ? `${app.name} is waiting to install` : `Installing ${app.name}`}</h4>
             <p className={cn('mt-1 text-sm', succeeded ? 'text-emerald-200' : failed ? 'text-red-200' : 'text-cyan-200')}>
-              {succeeded ? 'Open the app now, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Autark-OS stopped before making this app available.' : queued ? queuedJobText(job, app.name) : currentJobStepText(job, 'Autark-OS is working on this job.')}
+              {succeeded ? 'Use My Apps for current app status, or create a first restore point before changing settings.' : failed ? job.error?.message || 'Autark-OS stopped before making this app available.' : queued ? queuedJobText(job, app.name) : currentJobStepText(job, 'Autark-OS is working on this job.')}
             </p>
             {active && <JobProgress className="mt-4" job={job} subjectLabel={app.name} />}
             <JobStepList job={job} />
             {succeeded && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {installedApp?.runtime?.accessUrl && (
+                {openUrl && (
                   <ProjectPrimaryButton asChild size="sm">
-                    <AppBrowserLink href={installedApp.runtime.accessUrl} rel="noreferrer" target="_blank">Open {app.name}</AppBrowserLink>
+                    <AppBrowserLink href={openUrl} rel="noreferrer" target="_blank">Open {app.name}</AppBrowserLink>
                   </ProjectPrimaryButton>
                 )}
                 {installedApp && shouldOfferFirstBackup(installedApp) && (
-                  <DisabledAction disabled={backupJob ? !terminalJob(backupJob) : false} reason="Autark-OS is already creating the first backup for this app.">
-                    <ProjectDarkControlButton disabled={backupJob ? !terminalJob(backupJob) : false} onClick={() => onCreateBackup(installedApp.id)} size="sm" type="button">
-                      {backupJob && !terminalJob(backupJob) ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
-                      {backupJob?.status === 'succeeded' ? 'Backup created' : backupJob && !terminalJob(backupJob) ? 'Creating backup' : 'Create first backup'}
+                  <DisabledAction disabled={backupDisabled} reason={backupAction?.reason || (backupPending ? 'Autark-OS is already creating the first backup for this app.' : 'Backup is not available for this app right now.')}>
+                    <ProjectDarkControlButton disabled={backupDisabled} onClick={() => onCreateBackup(installedApp.id)} size="sm" type="button">
+                      {backupPending ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
+                      {backupJob?.status === 'succeeded' ? 'Backup created' : backupPending ? 'Creating backup' : 'Create first backup'}
                     </ProjectDarkControlButton>
                   </DisabledAction>
                 )}
-                <ProjectDarkControlButton asChild size="sm">
-                  <Link to={applicationDeepLinkForManagedApp(installedApp?.id || app.id)}>View in My Apps</Link>
-                </ProjectDarkControlButton>
+                {manageHref && <ProjectDarkControlButton asChild size="sm">
+                  <Link to={manageHref}>View in My Apps</Link>
+                </ProjectDarkControlButton>}
               </div>
             )}
             {failed && (

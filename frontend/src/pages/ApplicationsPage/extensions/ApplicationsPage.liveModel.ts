@@ -1,5 +1,6 @@
 import type { AppHealthSnapshot, AppRuntimeView, AppTelemetry } from '@/types/app';
 import type { ApplicationView } from '@/types/applicationState';
+import { applicationOpenUrl } from '@/repositories/applicationStateRepository.logic';
 import { catalogAppImageUrl, preferredAppImageUrl } from '@/lib/appImage';
 import type {
   AppOperationState,
@@ -27,17 +28,11 @@ function managedAppSurfaceItem(application: ApplicationView & { runtime: AppRunt
 
   return {
     access: accessLabel(application, app),
-    availableActions: application.availableActions.map((action) => ({
-      id: action.id,
-      label: action.label,
-      href: action.href,
-      disabled: action.disabled,
-      reason: action.reason,
-    })),
+    availableActions: application.availableActions,
     backup,
     category: app.category || 'App',
     description: app.description || app.category || 'Managed app',
-    href: primaryOpenUrl(app),
+    href: applicationOpenUrl(application),
     iconUrl: preferredAppImageUrl(app.image, catalogAppImageUrl(app.appId)) || undefined,
     id: app.appId,
     relationship: 'managed',

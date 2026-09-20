@@ -1,13 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
 import {
-  accessByAppId, applications, applicationStateFreshness, applicationStateUpdatedAt,
+  accessByAppId, applications, applicationOpenUrl, applicationStateFreshness, applicationStateUpdatedAt,
   catalogAppIsManaged, healthByAppId, managedApplications, telemetryByAppId,
 } from '../applicationStateRepository.logic';
 import type { AppRuntimeView } from '@/types/app';
 import type { ApplicationState, ApplicationView } from '@/types/applicationState';
 
 const updatedAt = '2026-06-21T12:00:00Z';
+
+test('Open requires an enabled external action, never an arbitrary action URL', () => {
+  assert.equal(applicationOpenUrl(null), undefined);
+  assert.equal(applicationOpenUrl({ availableActions: [] }), undefined);
+  for (const kind of ['external', 'route', 'action', 'disabled']) {
+    for (const disabled of [true, false]) {
+      const action = { id: 'open', label: 'Open', kind, href: 'https://app.example', method: null, disabled, reason: '' };
+      assert.equal(applicationOpenUrl({ availableActions: [action] }), kind === 'external' && !disabled ? action.href : undefined);
+    }
+  }
+});
 
 test('freshness distinguishes initial, current, refreshing, and failed snapshots', () => {
   assert.equal(applicationStateFreshness(state({ updatedAt: null, stale: true, refreshStatus: 'stale' })).phase, 'checking');

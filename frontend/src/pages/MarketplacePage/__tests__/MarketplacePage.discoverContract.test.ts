@@ -66,7 +66,6 @@ test('marketplace page reads discover data and jobs through the repository layer
 test('marketplace detail sends installed apps to My Apps and found resources to recovery review', () => {
   const detail = source('MarketplaceAppDetail.tsx');
 
-  assert.match(detail, /applicationDeepLinkForManagedApp/);
   assert.doesNotMatch(detail, /applicationDeepLinkForObservedService|applicationRouteWithManagementPanel/);
   assert.match(detail, /marketplacePrimaryRoute\(appView\)/);
   assert.doesNotMatch(detail, /installedApp\??\.appInstanceId/);

@@ -195,10 +195,10 @@ public class ApplicationInventoryService {
             actions.replaceAll(action -> List.of("start", "restart").contains(action.id())
                     ? post(action.id(), action.label(), action.href(), true, missingCompose)
                     : action);
-            actions.add(post("settings", "Settings", "/api/apps/" + runtime.appId() + "/settings", true, missingCompose));
-            actions.add(post("backup", "Backup", "/api/backups/apps/" + runtime.appId() + "/run", true,
-                    "A normal app backup is unavailable because its runtime folder is missing. Use archive-first uninstall to preserve the container writable layer."));
+            actions.add(new ApplicationAction("settings", "Settings", "action", "/api/apps/" + runtime.appId() + "/settings", "PUT", true, missingCompose));
         }
+        actions.add(post("backup", "Create backup", "/api/backups/apps/" + runtime.appId() + "/run", !composeAvailable,
+                composeAvailable ? "" : "A normal app backup is unavailable because its runtime folder is missing. Use archive-first uninstall to preserve the container writable layer."));
         if (runtime.state() == ApplicationRuntimeState.DEGRADED || runtime.state() == ApplicationRuntimeState.MISSING) {
             actions.add(post("repair", "Repair", "/api/apps/" + runtime.appId() + "/repair", !composeAvailable, composeAvailable ? "" : missingCompose));
         }

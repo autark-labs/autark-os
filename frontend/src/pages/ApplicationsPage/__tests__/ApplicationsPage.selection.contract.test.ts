@@ -14,7 +14,7 @@ test('applications page does not silently fall back to the first visible item', 
 
   assert.doesNotMatch(page, /visibleItems\.find\(\(item\) => item\.id === selectedId\) \?\? visibleItems\[0\]/);
   assert.doesNotMatch(page, /setSelectedId\(items\[0\]\.id\)/);
-  assert.match(page, /selectedItem = items\.find\(\(item\) => item\.id === selectedId\) \?\? null/);
+  assert.match(page, /selectedItem = findApplicationDeepLinkTarget\(items, deepLinkTarget\) \?\? null/);
   assert.match(page, /selectedItemIsVisible/);
 });
 
@@ -23,18 +23,6 @@ test('details rail renders the selected item even when grid visibility is changi
 
   assert.doesNotMatch(page, /item=\{selectedItemIsVisible \? selectedItem : null\}/);
   assert.match(page, /item=\{selectedItem\}/);
-});
-
-test('deep-link selection can reapply after selected item temporarily disappears', () => {
-  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-
-  assert.match(page, /appliedDeepLinkKeyRef\.current = '';\s+setSelectedId\(''\);/);
-});
-
-test('stale selected apps collapse management instead of leaving an empty expanded rail', () => {
-  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-
-  assert.match(page, /if \(!items\.some\(\(item\) => item\.id === selectedId\)\) \{\s+clearApplicationFocus\(\);\s+\}/);
 });
 
 test('management outside click listener runs in capture phase before child stopPropagation', () => {
@@ -53,12 +41,6 @@ test('management drawer is masked and borderless while it is collapsed', () => {
   assert.match(rail, /transition-transform duration-300/);
 });
 
-test('empty selection is not cleared after a deep-link effect schedules a real selection', () => {
-  const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-
-  assert.match(page, /if \(!selectedId\) {\s+return;\s+}/);
-});
-
 test('applications page keeps app focus in the route and clears it when management closes', () => {
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
 
@@ -66,7 +48,7 @@ test('applications page keeps app focus in the route and clears it when manageme
   assert.match(page, /applicationDeepLinkForSurfaceItem/);
   assert.match(page, /navigate\(applicationDeepLinkForSurfaceItem\(item, \{ panel: managementOpen \? 'manage' : null \}\), \{ replace: true \}\)/);
   assert.match(page, /navigate\('\/apps', \{ replace: true \}\)/);
-  assert.match(page, /setManagementOpen\(deepLinkTarget\.panel === 'manage'\)/);
+  assert.doesNotMatch(page, /setSelectedId|setManagementOpen/);
   assert.match(page, /onSelect=\{handleSelectItem\}/);
   assert.match(page, /onManagementOpenChange=\{handleManagementOpenChange\}/);
 });

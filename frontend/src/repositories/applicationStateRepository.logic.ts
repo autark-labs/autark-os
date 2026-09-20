@@ -16,6 +16,10 @@ export function managedApplications(state?: ApplicationState | null): Applicatio
   return applications(state).filter((application) => application.relationship === 'managed' && application.runtime);
 }
 
+export function applicationOpenUrl(application?: Pick<ApplicationView, 'availableActions'> | null): string | undefined {
+  return application?.availableActions.find((action) => action.id === 'open' && action.kind === 'external' && !action.disabled)?.href || undefined;
+}
+
 export function applicationStateUpdatedAt(state?: ApplicationState | null) {
   if (!state?.updatedAt) {
     return null;

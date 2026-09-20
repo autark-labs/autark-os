@@ -105,7 +105,7 @@ export function ApplicationManagementPanel({
             <ApplicationGuideTab item={item} />
           </TabsContent>
 
-          <TabsContent className="grid gap-4" value="settings">
+          <TabsContent className="grid gap-4 data-[state=inactive]:hidden" forceMount value="settings">
             <ApplicationSettingsTab actions={actions} item={item} loadingAction={settingsLoadingAction} />
           </TabsContent>
 

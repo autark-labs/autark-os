@@ -12,7 +12,7 @@ test('My Apps basic cards use the compact homepage launcher treatment', async ({
   const manageButton = page.getByRole('button', { name: /Manage Vaultwarden with a deliberately long/i });
   await expect(manageButton).toBeVisible();
   await page.getByRole('button', { name: /Vaultwarden with a deliberately long.*actions/i }).click();
-  await expect(page.getByRole('menuitem', { name: /Restart app/i })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Restart', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   const appCard = manageButton.locator('..');
   await appCard.getByText('Vaultwarden with a deliberately long self-hosted service name', { exact: true }).hover();

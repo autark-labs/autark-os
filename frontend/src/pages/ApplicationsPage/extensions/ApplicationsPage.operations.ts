@@ -22,7 +22,8 @@ export function runtimeActionDisabled(
   action: ApplicationRuntimeAction,
   loadingAction: ApplicationRuntimeAction | null,
 ) {
-  return runtimeControlsDisabled(item.operation, loadingAction) || applicationActionRestriction(item, action).disabled;
+  return runtimeControlsDisabled(item.operation, loadingAction)
+    || !item.availableActions.some((candidate) => candidate.id === action && candidate.kind === 'action' && candidate.method === 'POST' && !candidate.disabled);
 }
 
 export function runtimeActionDisabledReason(
@@ -36,6 +37,7 @@ export function runtimeActionDisabledReason(
   if (item.operation.kind !== 'idle' && item.operation.kind !== 'failed') {
     return item.operation.currentStep || `${item.operation.label} is currently running for ${item.name}.`;
   }
+  if (runtimeActionDisabled(item, action, loadingAction)) return `This action is unavailable for ${item.name}.`;
   return 'This runtime control is currently available.';
 }
 

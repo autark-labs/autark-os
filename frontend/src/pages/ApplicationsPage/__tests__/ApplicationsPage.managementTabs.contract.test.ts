@@ -61,7 +61,6 @@ test('applications page splits settings and links management tabs into focused c
 test('applications page settings tab uses a guarded batch form for app settings', () => {
   const pkg = source('package.json');
   const page = source('src/pages/ApplicationsPage/ApplicationsPage.tsx');
-  const rail = source('src/pages/ApplicationsPage/ApplicationDetailsRail.tsx');
   const settings = source('src/pages/ApplicationsPage/managementTabs/ApplicationSettingsTab.tsx');
 
   assert.match(pkg, /"react-hook-form"/);
@@ -85,7 +84,6 @@ test('applications page settings tab uses a guarded batch form for app settings'
   assert.doesNotMatch(page, /appWithOptimisticPrivateAccess/);
   assert.doesNotMatch(settings, /name="tailscaleEnabled"/);
   assert.match(page, /window\.confirm\('Discard unsaved app settings\?'\)/);
-  assert.match(rail, /canCloseManagement/);
 });
 
 test('applications page settings tab uses real controls and confirm-before-save planning', () => {

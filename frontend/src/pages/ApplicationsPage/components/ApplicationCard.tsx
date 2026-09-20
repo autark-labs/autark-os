@@ -1,4 +1,5 @@
 import { AppBrowserLink } from '@/components/autark-os/AppBrowserLink';
+import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { ExternalLink, MoreVertical } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
@@ -12,14 +13,6 @@ import { applicationDeepLinkForSurfaceItem } from '../extensions/ApplicationsPag
 import { runtimeActionDisabled, runtimeActionDisabledReason } from '../extensions/ApplicationsPage.operations';
 import type { ApplicationRuntimeAction, ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
 
-type CardAction = {
-  disabled?: boolean;
-  href?: string | null;
-  id: string;
-  label: string;
-  reason?: string | null;
-};
-
 export function ApplicationCard({
   actionLoading,
   item,
@@ -31,7 +24,7 @@ export function ApplicationCard({
   actionLoading?: ApplicationRuntimeAction | null;
   item: ApplicationSurfaceItem;
   managementOpen: boolean;
-  onAction?: (item: ApplicationSurfaceItem, actionId: string) => void;
+  onAction: (item: ApplicationSurfaceItem, actionId: string) => void;
   onSelect: (id: string) => void;
   selected: boolean;
 }) {
@@ -111,19 +104,23 @@ export function ApplicationCard({
                 <DropdownMenuContent align="end" className="min-w-44 border-sky-300/20 bg-app-surface text-slate-100" onClick={(event) => event.stopPropagation()}>
                   <DropdownMenuLabel className="text-xs text-slate-400">{item.name}</DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-sky-300/10" />
-                  {actions.map((action) => action.href ? (
+                  {actions.map((action) => !action.disabled && action.href && action.kind === 'route' ? (
                     <DropdownMenuItem asChild key={action.id}>
-                      <AppBrowserLink href={action.href} rel="noreferrer" target={action.href.startsWith('/') ? undefined : '_blank'}>{action.label}</AppBrowserLink>
+                      <Link to={action.href}>{action.label}</Link>
+                    </DropdownMenuItem>
+                  ) : !action.disabled && action.href && action.kind === 'external' ? (
+                    <DropdownMenuItem asChild key={action.id}>
+                      <AppBrowserLink href={action.href} rel="noreferrer" target="_blank">{action.label}</AppBrowserLink>
                     </DropdownMenuItem>
                   ) : (
-                    <DropdownMenuItem
-                      disabled={action.disabled}
-                      key={action.id}
-                      onSelect={() => onAction?.(item, action.id)}
-                      title={action.reason || undefined}
-                    >
-                      {action.label}
-                    </DropdownMenuItem>
+                    <DisabledAction className="block" disabled={action.disabled} key={action.id} reason={action.reason}>
+                      <DropdownMenuItem
+                        disabled={action.disabled}
+                        onSelect={() => onAction(item, action.id)}
+                      >
+                        {action.label}
+                      </DropdownMenuItem>
+                    </DisabledAction>
                   ))}
                   <DropdownMenuSeparator className="bg-sky-300/10" />
                   <DropdownMenuItem asChild>
@@ -155,46 +152,18 @@ export function ApplicationCard({
   );
 }
 
-function cardActions(item: ApplicationSurfaceItem, actionLoading: ApplicationRuntimeAction | null | undefined): CardAction[] {
-  const known = new Map(item.availableActions.map((action) => [action.id, action]));
-  const actions: CardAction[] = [];
-
-  if (item.relationship === 'managed') {
-    const lifecycleActions: ApplicationRuntimeAction[] = item.state === 'stopped'
-      ? ['start', 'restart', 'backup', 'repair']
-      : ['stop', 'restart', 'backup', 'repair'];
-    lifecycleActions.forEach((id) => {
-      const action = known.get(id);
-      const disabled = runtimeActionDisabled(item, id, actionLoading ?? null);
-      actions.push({
-        disabled,
-        id,
-        label: action?.label || lifecycleLabel(id),
-        reason: disabled ? runtimeActionDisabledReason(item, id, actionLoading ?? null) : action?.reason,
-      });
-    });
-  }
-
-  item.availableActions.forEach((action) => {
-    if (!actions.some((candidate) => candidate.id === action.id)) {
-      actions.push({
-        ...action,
-        href: action.href || (action.id === 'open' ? item.href : undefined),
-        disabled: action.disabled || (!action.href && action.id !== 'open'),
-        reason: action.reason || (!action.href && action.id !== 'open' ? 'Open the app details to complete this action.' : undefined),
-      });
+function cardActions(item: ApplicationSurfaceItem, actionLoading: ApplicationRuntimeAction | null | undefined) {
+  return item.availableActions.map((action) => {
+    if (action.kind === 'action' && action.method === 'POST' && ['start', 'stop', 'restart', 'backup', 'repair'].includes(action.id)) {
+      const id = action.id as ApplicationRuntimeAction;
+      return { ...action, disabled: runtimeActionDisabled(item, id, actionLoading ?? null), reason: runtimeActionDisabledReason(item, id, actionLoading ?? null) };
     }
+    return {
+      ...action,
+      disabled: action.disabled || !action.href || !['route', 'external'].includes(action.kind),
+      reason: action.reason || 'Open the app details to complete this action.',
+    };
   });
-
-  return actions;
-}
-
-function lifecycleLabel(action: ApplicationRuntimeAction) {
-  if (action === 'start') return 'Start app';
-  if (action === 'stop') return 'Pause app';
-  if (action === 'restart') return 'Restart app';
-  if (action === 'backup') return 'Create backup';
-  return 'Repair app';
 }
 
 function statusLabel(item: ApplicationSurfaceItem) {

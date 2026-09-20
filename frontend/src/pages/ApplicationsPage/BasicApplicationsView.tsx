@@ -8,7 +8,7 @@ type BasicApplicationsViewProps = {
   items: ApplicationSurfaceItem[];
   actionLoadingByItemId?: Record<string, ApplicationRuntimeAction | null | undefined>;
   managementOpen: boolean;
-  onAction?: (item: ApplicationSurfaceItem, actionId: string) => void;
+  onAction: (item: ApplicationSurfaceItem, actionId: string) => void;
   onSelect: (id: string) => void;
   selectedId?: string;
 };

@@ -4,7 +4,7 @@ import { DisabledAction } from '@/components/autark-os/DisabledAction';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import type { ApplicationActionHandlers, ApplicationSurfaceItem } from '../extensions/ApplicationsPage.types';
-import { applicationActionRestriction } from '../extensions/ApplicationsPage.operations';
+import { applicationActionRestriction, runtimeActionDisabled, runtimeActionDisabledReason } from '../extensions/ApplicationsPage.operations';
 
 type ApplicationRecoveryTabProps = {
   actions: Pick<ApplicationActionHandlers, 'onRepair' | 'onStart' | 'onStop' | 'onRestart'>;
@@ -19,8 +19,9 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings, onReview
   }
 
   const repairAction = item.availableActions.find((action) => action.id === 'repair');
-  const start = applicationActionRestriction(item, 'start');
-  const stop = applicationActionRestriction(item, 'stop');
+  const repairDisabled = runtimeActionDisabled(item, 'repair', null);
+  const start = { disabled: runtimeActionDisabled(item, 'start', null), reason: runtimeActionDisabledReason(item, 'start', null) };
+  const stop = { disabled: runtimeActionDisabled(item, 'stop', null), reason: runtimeActionDisabledReason(item, 'stop', null) };
   const settings = applicationActionRestriction(item, 'settings');
   const operationRecovery = recoveryForOperation(item.operation.jobType);
   const recovery = operationRecovery ?? explainFailure(item.operation.message);
@@ -65,8 +66,8 @@ export function ApplicationRecoveryTab({ actions, item, onEditSettings, onReview
         )
       ) : <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {repairAction && (
-          <DisabledAction disabled={Boolean(repairAction.disabled)} reason={repairAction.reason || 'Repair is not available for this app right now.'}>
-            <Button className="bg-red-100 text-red-950 hover:bg-white" disabled={repairAction.disabled} onClick={() => actions.onRepair(item.id)} title={repairAction.reason || undefined} type="button">
+          <DisabledAction disabled={repairDisabled} reason={runtimeActionDisabledReason(item, 'repair', null)}>
+            <Button className="bg-red-100 text-red-950 hover:bg-white" disabled={repairDisabled} onClick={() => actions.onRepair(item.id)} title={repairAction.reason || undefined} type="button">
               <Wrench data-icon="inline-start" />
               Run repair
             </Button>

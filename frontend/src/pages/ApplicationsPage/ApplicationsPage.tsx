@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useBlocker, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, List } from 'lucide-react';
 import { BackupAPIClient } from '@/api/BackupAPIClient';
 import { InstalledAppsAPIClient } from '@/api/InstalledAppsAPIClient';
@@ -62,8 +62,6 @@ export const ApplicationsPage = () => {
   const jobsQuery = useAutarkOsJobsQuery();
   const [query, setQuery] = useState('');
   const [collectionFilters, setCollectionFilters] = useState<ApplicationCollectionFilter[]>([]);
-  const [managementOpen, setManagementOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState('');
   const [actionLoadingByAppId, setActionLoadingByAppId] = useState<Record<string, ApplicationRuntimeAction | null>>({});
   const [settingsLoadingByAppId, setSettingsLoadingByAppId] = useState<Record<string, ApplicationSettingsAction | null>>({});
   const [settingsDirtyByAppId, setSettingsDirtyByAppId] = useState<Record<string, boolean>>({});
@@ -106,7 +104,8 @@ export const ApplicationsPage = () => {
     });
   }, [collectionFilters, items, query]);
 
-  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
+  const selectedItem = findApplicationDeepLinkTarget(items, deepLinkTarget) ?? null;
+  const managementOpen = Boolean(selectedItem && deepLinkTarget.panel === 'manage');
   const selectedItemIsVisible = Boolean(selectedItem && visibleItems.some((item) => item.id === selectedItem.id));
   const managedCount = managedItems.length;
   const attentionCount = items.filter((item) => item.issues.length > 0 || ['degraded', 'missing', 'unknown'].includes(item.state)).length;
@@ -115,11 +114,19 @@ export const ApplicationsPage = () => {
     application.relationship === 'managed' && application.runtime ? [[application.id, application.runtime] as const] : []
   ))), [appState.applications]);
   const selectedHasUnsavedSettings = Boolean(selectedItem && settingsDirtyByAppId[selectedItem.id]);
-  const canCloseManagement = useCallback(() => !selectedHasUnsavedSettings || window.confirm('Discard unsaved app settings?'), [selectedHasUnsavedSettings]);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    const next = parseApplicationsDeepLink(nextLocation.search);
+    return selectedHasUnsavedSettings && (currentLocation.pathname !== nextLocation.pathname
+      || next.id !== deepLinkTarget.id || next.kind !== deepLinkTarget.kind || next.panel !== 'manage');
+  });
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    if (window.confirm('Discard unsaved app settings?')) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
 
   const focusApplicationItem = useCallback((item: ApplicationSurfaceItem, managementOpen = false) => {
-    setSelectedId(item.id);
-    setManagementOpen(managementOpen);
     navigate(applicationDeepLinkForSurfaceItem(item, { panel: managementOpen ? 'manage' : null }), { replace: true });
   }, [navigate]);
 
@@ -130,15 +137,7 @@ export const ApplicationsPage = () => {
     }
   }, [focusApplicationItem, visibleItems]);
 
-  const clearApplicationFocus = useCallback(() => {
-    appliedDeepLinkKeyRef.current = '';
-    setSelectedId('');
-    setManagementOpen(false);
-    navigate('/apps', { replace: true });
-  }, [navigate]);
-
   const closeManagement = useCallback(() => {
-    setManagementOpen(false);
     if (selectedItem) {
       navigate(applicationDeepLinkForSurfaceItem(selectedItem), { replace: true });
     }
@@ -153,7 +152,6 @@ export const ApplicationsPage = () => {
       focusApplicationItem(selectedItem, true);
       return;
     }
-    setManagementOpen(true);
   }, [closeManagement, focusApplicationItem, selectedItem]);
 
   const handleCollectionFilterChange = useCallback((nextFilters: string[]) => {
@@ -161,15 +159,8 @@ export const ApplicationsPage = () => {
       filter === 'managed' || filter === 'attention'
     ));
 
-    if (selectedItem && !matchesCollectionFilters(selectedItem, normalizedFilters)) {
-      if (!canCloseManagement()) {
-        return;
-      }
-      clearApplicationFocus();
-    }
-
     setCollectionFilters(normalizedFilters);
-  }, [canCloseManagement, clearApplicationFocus, selectedItem]);
+  }, []);
 
   useEffect(() => {
     if (!deepLinkTarget.kind || !deepLinkTarget.id) {
@@ -187,34 +178,13 @@ export const ApplicationsPage = () => {
       return;
     }
 
-    if (!canCloseManagement()) {
-      return;
-    }
-
     setQuery('');
     const requiredFilter = filterForApplicationDeepLinkTarget(targetItem);
     if (requiredFilter === 'managed') {
       setCollectionFilters((current) => current.length === 0 || current.includes(requiredFilter) ? current : [...current, requiredFilter]);
     }
-    setSelectedId(targetItem.id);
-    setManagementOpen(deepLinkTarget.panel === 'manage');
     appliedDeepLinkKeyRef.current = deepLinkTarget.key;
-  }, [canCloseManagement, deepLinkTarget, items, navigate]);
-
-  useEffect(() => {
-    if (!selectedId) {
-      return;
-    }
-
-    if (!items.length) {
-      clearApplicationFocus();
-      return;
-    }
-
-    if (!items.some((item) => item.id === selectedId)) {
-      clearApplicationFocus();
-    }
-  }, [clearApplicationFocus, items, selectedId]);
+  }, [deepLinkTarget, items, navigate]);
 
   useEffect(() => {
     if (!managementOpen) {
@@ -226,20 +196,19 @@ export const ApplicationsPage = () => {
       if (target instanceof Node && railRef.current?.contains(target)) {
         return;
       }
-      if (target instanceof HTMLElement && target.closest('[data-slot="dialog-content"], [data-slot="dialog-overlay"]')) {
+      if (target instanceof HTMLElement && target.closest('a, [role="dialog"], [role="alertdialog"], [data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"], [data-radix-popper-content-wrapper]')) {
         return;
       }
 
-      if (canCloseManagement()) {
-        closeManagement();
-      }
+      event.preventDefault();
+      closeManagement();
     };
 
     document.addEventListener('pointerdown', handlePointerDown, true);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown, true);
     };
-  }, [canCloseManagement, closeManagement, managementOpen]);
+  }, [closeManagement, managementOpen]);
 
   useEffect(() => {
     if (!trackedAppJobIds.length) {
@@ -344,7 +313,6 @@ export const ApplicationsPage = () => {
       setTrackedAppJobIds((current) => current.includes(updatedApp.jobId) ? current : [...current, updatedApp.jobId]);
 
       showActionNotification(updatedApp);
-      setSettingsDirtyByAppId((current) => ({ ...current, [appId]: false }));
       void invalidateNetworkQueries(queryClient);
     } catch (err) {
       void invalidateApplicationState(queryClient);
@@ -526,11 +494,11 @@ export const ApplicationsPage = () => {
           )}
 
           <ApplicationDetailsRail
+            key={selectedItem?.id ?? 'unselected'}
             actions={actions}
             actionLoadingByItemId={actionLoadingByAppId}
             item={selectedItem}
             managementOpen={managementOpen}
-            canCloseManagement={canCloseManagement}
             onManagementOpenChange={handleManagementOpenChange}
             settingsLoadingByItemId={settingsLoadingByAppId}
             ref={railRef}

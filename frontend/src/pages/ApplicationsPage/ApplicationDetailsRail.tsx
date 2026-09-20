@@ -23,7 +23,6 @@ import type { ApplicationActionHandlers, ApplicationNextAction, ApplicationRunti
 type ApplicationDetailsRailProps = {
   actions: ApplicationActionHandlers;
   actionLoadingByItemId: Record<string, ApplicationRuntimeAction | null | undefined>;
-  canCloseManagement: () => boolean;
   item: ApplicationSurfaceItem | null;
   managementOpen: boolean;
   onManagementOpenChange: (open: boolean) => void;
@@ -33,17 +32,16 @@ type ApplicationDetailsRailProps = {
 type RailView = 'overview' | 'attention';
 
 export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDetailsRailProps>(function ApplicationDetailsRail(
-  { actions, actionLoadingByItemId, canCloseManagement, item, managementOpen, onManagementOpenChange, settingsLoadingByItemId },
+  { actions, actionLoadingByItemId, item, managementOpen, onManagementOpenChange, settingsLoadingByItemId },
   ref,
 ) {
-  const [managementTab, setManagementTab] = useState('overview');
+  const [managementTab, setManagementTab] = useState(item?.operation.kind === 'failed' ? 'recovery' : 'overview');
   const [railView, setRailView] = useState<RailView>('overview');
   const managementDrawerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    setManagementTab(item?.operation.kind === 'failed' ? 'recovery' : 'overview');
-    setRailView('overview');
-  }, [item?.id, item?.operation.kind]);
+    if (managementTab === 'recovery' && item?.operation.kind !== 'failed') setManagementTab('overview');
+  }, [managementTab, item?.operation.kind]);
 
   useEffect(() => {
     const drawer = managementDrawerRef.current;
@@ -79,14 +77,14 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
               <p className="text-sm font-semibold text-white">Management</p>
               <p className="text-xs leading-5 text-sky-100/60">Focused controls, settings, links, and diagnostics for the selected item.</p>
             </div>
-            <ApplicationManagementPanel
+            {managementOpen && <ApplicationManagementPanel
               actions={actions}
               item={item}
               onTabValueChange={setManagementTab}
               settingsLoadingAction={settingsLoadingByItemId[item.id] ?? null}
               tabValue={managementTab}
               variant="rail"
-            />
+            />}
           </section>
         </div>
       )}
@@ -124,12 +122,7 @@ export const ApplicationDetailsRail = forwardRef<HTMLDivElement, ApplicationDeta
                   !item.href && 'col-span-2',
                   managementOpen && 'border-cyan-300 bg-cyan-300 text-slate-950 hover:bg-cyan-200 hover:text-slate-950',
                 )}
-                onClick={() => {
-                  if (managementOpen && !canCloseManagement()) {
-                    return;
-                  }
-                  onManagementOpenChange(!managementOpen);
-                }}
+                onClick={() => onManagementOpenChange(!managementOpen)}
                 size="sm"
                 type="button"
                 variant="outline"

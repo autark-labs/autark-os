@@ -20,11 +20,13 @@ test('backend action restrictions provide disabled reasons', () => {
   const item = {
     name: 'Vaultwarden',
     operation: { kind: 'idle' as const },
-    availableActions: [{ id: 'start', label: 'Start', disabled: true, reason: 'The original Compose file is missing.' }],
+    availableActions: [{ id: 'start', label: 'Start', kind: 'action', method: 'POST', href: '/api/apps/vaultwarden/start', disabled: true, reason: 'The original Compose file is missing.' }],
   };
   assert.deepEqual(applicationActionRestriction(item, 'start'), { disabled: true, reason: 'The original Compose file is missing.' });
   assert.equal(runtimeActionDisabled(item, 'start', null), true);
   assert.equal(runtimeActionDisabledReason(item, 'start', null), 'The original Compose file is missing.');
+  assert.equal(runtimeActionDisabled(item, 'stop', null), true);
+  item.availableActions.push({ id: 'stop', label: 'Pause', kind: 'action', method: 'POST', href: '/api/apps/vaultwarden/stop', disabled: false, reason: '' });
   assert.equal(runtimeActionDisabled(item, 'stop', null), false);
 });
 
