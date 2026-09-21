@@ -42,7 +42,7 @@ for (const entry of [
   test(`Settings opens one workbench at ${entry.section} from ${entry.path}`, async ({ page }) => {
     await installMockApi(page, 'ready');
     await page.goto(entry.path);
-    if (entry.path === '/diagnostics') await page.getByRole('tab', { name: 'System details', exact: true }).click();
+    if (entry.path === '/diagnostics') await page.getByRole('button', { name: 'System details', exact: true }).click();
     if (entry.button) await page.getByRole('button', { name: entry.button, exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Autark-OS settings' });
     await expect(dialog).toHaveCount(1);

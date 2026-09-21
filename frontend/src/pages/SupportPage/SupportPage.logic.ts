@@ -1,24 +1,4 @@
-import type { SupportBundle, SupportSummary, SystemSetupStatus } from '@/types/system';
-
-export function summaryFromBundle(bundle: SupportBundle): SupportSummary {
-  return {
-    status: bundle.status,
-    headline: bundle.headline,
-    summary: bundle.summary,
-    redacted: bundle.redacted,
-    backendHealth: bundle.backendHealth,
-    dockerStatus: bundle.dockerStatus,
-    tailscaleStatus: bundle.tailscaleStatus,
-    serviceStatus: bundle.serviceStatus,
-    version: bundle.version,
-    recentFailures: bundle.recentFailureCount,
-    findings: bundle.findings,
-    unifiedIssues: [],
-    redactionRules: bundle.redactionRules,
-    commands: bundle.commands,
-    checkedAt: bundle.generatedAt,
-  };
-}
+import type { SystemSetupStatus } from '@/types/system';
 
 export function formatDate(value?: string) {
   if (!value) return 'not yet';

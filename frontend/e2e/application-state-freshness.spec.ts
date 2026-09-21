@@ -132,7 +132,7 @@ test('Diagnostics keeps independent support tools but does not claim missing app
   await page.route(/\/api\/application-state(?:\?.*)?$/, route => route.fulfill({ status: 503, json: { message: 'Inventory unavailable' } }));
   await page.goto('/diagnostics');
   await expect(page.getByRole('region', { name: 'System summary', exact: true })).toHaveCount(0);
-  await page.getByRole('tab', { name: 'System details', exact: true }).click();
+  await page.getByRole('button', { name: 'System details', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Current app information is unavailable');
   await expect(page.getByText('No apps require ownership review.', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Tailscale details', { exact: true })).toBeVisible();

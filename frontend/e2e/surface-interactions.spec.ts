@@ -15,7 +15,8 @@ test('Diagnostics uses structured checks and backend findings without inventing 
   await expect(page.getByRole('region', { name: 'System summary', exact: true })).toHaveCount(0);
   await expect(health.getByText('Needs review', { exact: true })).toHaveClass(/text-amber/);
   await expect(health.getByText('Tailscale is not connected.', { exact: true })).toBeVisible();
-  await expect(health.getByText('Backups need attention', { exact: true })).toBeVisible();
+  await expect(health.getByText('Backups need attention', { exact: false })).toBeVisible();
+  await expect(health.getByText('warning:', { exact: true })).toBeVisible();
   await expect(health.getByText('No restore point yet', { exact: true })).toHaveCount(0);
   await health.getByRole('link', { name: 'Open Backups', exact: true }).click();
   await expect(page).toHaveURL(/\/backups$/);
@@ -27,7 +28,166 @@ test('Diagnostics uses structured checks and backend findings without inventing 
   await expect(health.getByText('No support findings reported.', { exact: true })).toBeVisible();
   await expect(health).not.toContainText('No restore point yet');
   await expect(health).not.toContainText('Protected');
+
+  // The three task tabs use the framework's horizontal keyboard navigation.
+  const healthTab = page.getByRole('tab', { name: 'Health checks', exact: true });
+  const reportTab = page.getByRole('tab', { name: 'Support report', exact: true });
+  await expect(page.getByRole('tablist')).toHaveAttribute('aria-orientation', 'horizontal');
+  await healthTab.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(reportTab).toBeFocused();
+  await expect(page.getByRole('tabpanel', { name: 'Support report', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowLeft');
+  await expect(healthTab).toBeFocused();
+  await expect(health).toBeVisible();
 });
+
+test('Diagnostics keeps generated reports as snapshots with independent copy and download', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  let finishReport!: () => void;
+  const pending = new Promise<void>(resolve => { finishReport = resolve; });
+  let failing = false;
+  let requests = 0;
+  const text = 'Support snapshot\nRuntime: [home-path-redacted]/runtime';
+  await page.route('**/api/system/support/bundle', async route => {
+    requests++;
+    await pending;
+    await route.fulfill(failing ? { status: 503, json: { message: 'Report temporarily unavailable. Try generating again.' } } : { json: { bundleText: text, generatedAt: '2026-09-20T12:00:00Z', redactionRules: [{ id: 'paths', label: 'Home paths', description: 'User identity is masked.' }], findings: [{ title: 'Report-only finding' }] } });
+  });
+  await page.goto('/diagnostics');
+  await page.getByRole('tab', { name: 'Support report', exact: true }).click();
+  await expect(page.getByText('No report generated yet.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download report', exact: true })).toHaveCount(0);
+  expect(requests).toBe(0);
+  await page.getByRole('button', { name: 'Generate report', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Generating…', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Generating…', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => requests).toBe(1);
+  await page.getByRole('tab', { name: 'Health checks', exact: true }).click();
+  finishReport();
+  await expect(page.getByText('Support report ready', { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Health checks', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('Report-only finding', { exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Support report', exact: true }).click();
+  await expect(page.getByLabel('Report preview', { exact: true })).toHaveText(text);
+  await expect(page.getByText(/^Snapshot · Generated/)).toContainText('2026');
+  await page.getByRole('button', { name: 'Copy report', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+  const downloadEvent = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download report', exact: true }).click();
+  const download = await downloadEvent;
+  expect(download.suggestedFilename()).toBe('autark-os-support-report-2026-09-20T12-00-00Z.txt');
+  const stream = await download.createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  expect(Buffer.concat(chunks).toString()).toBe(text);
+  await page.getByRole('button', { name: 'What gets redacted?', exact: true }).click();
+  await expect(page.getByText('User identity is masked.', { exact: true })).toBeVisible();
+  failing = true;
+  await page.getByRole('button', { name: 'Regenerate report', exact: true }).click();
+  await expect(page.getByText('Support report failed', { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel('Report preview', { exact: true })).toHaveText(text);
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await expect(page.getByLabel('Report preview', { exact: true })).toHaveText(text);
+  expect(requests).toBe(2);
+  failing = false;
+  await page.getByRole('button', { name: 'Regenerate report', exact: true }).click();
+  await expect.poll(() => requests).toBe(3);
+  await expect(page.getByRole('button', { name: 'Regenerate report', exact: true })).toBeEnabled();
+  // Clipboard failure keeps manual selection and download available.
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: () => Promise.reject(new Error('denied')) } });
+    document.execCommand = () => false;
+  });
+  await page.getByRole('button', { name: 'Copy report', exact: true }).click();
+  await expect(page.getByText('Copy unavailable', { exact: true }).first()).toBeVisible();
+  await expect(page.getByLabel('Report preview', { exact: true })).toHaveCSS('user-select', 'text');
+  await expect(page.getByRole('button', { name: 'Download report', exact: true })).toBeEnabled();
+});
+
+test('Diagnostics refresh failures preserve checks and logs, and setup findings open Advanced settings', async ({ page }) => {
+  await installMockApi(page, 'idle');
+  let failing = true;
+  let finishLoad!: () => void;
+  const pending = new Promise<void>(resolve => { finishLoad = resolve; });
+  await page.route('**/api/system/support/summary', async route => {
+    await pending;
+    if (failing) return route.fulfill({ status: 503, json: { message: 'Diagnostics offline' } });
+    return route.fallback();
+  });
+  await page.goto('/diagnostics');
+  await expect(page.getByText('Loading diagnostics', { exact: true })).toBeVisible();
+  finishLoad();
+  await expect(page.getByRole('alert')).toContainText('Diagnostics offline');
+  await expect(page.getByRole('tablist', { name: 'Diagnostics sections' })).toHaveCount(0);
+  failing = false;
+  await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  const health = page.getByRole('tabpanel', { name: 'Health checks', exact: true });
+  await expect(health).toBeVisible();
+  const oldChecks = await health.innerText();
+  failing = true;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('button', { name: 'Checks stale', exact: true }).click();
+  await expect(page.getByText('Previous checks remain visible.', { exact: false })).toBeVisible();
+  await expect(health).toHaveText(oldChecks, { useInnerText: true });
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Checks stale', exact: true })).toBeFocused();
+  failing = false;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Checks stale', exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Technical logs', exact: true }).click();
+  const logs = page.getByRole('region', { name: 'Redacted logs' });
+  await expect(logs).toContainText('Fixture log');
+  await page.route('**/api/system/support/logs?*', route => route.fulfill({ status: 503, json: { message: 'Logs offline. Try Refresh logs again.' } }));
+  await page.getByRole('button', { name: 'Refresh logs', exact: true }).click();
+  await expect(page.getByText('Logs could not load', { exact: true }).first()).toBeVisible();
+  await expect(logs).toContainText('Fixture log');
+  await page.route('**/api/system/support/logs?*', route => route.fulfill({ json: [] }));
+  await page.getByRole('button', { name: 'Refresh logs', exact: true }).click();
+  await expect(logs).toContainText('No logs were available.');
+  await expect(page.getByRole('button', { name: 'Refresh logs', exact: true })).toBeFocused();
+  await page.route('**/api/system/support/logs?*', route => route.fulfill({ json: [{ line: 'Latest redacted event', level: 'info', redacted: true }] }));
+  await page.getByRole('button', { name: 'Refresh logs', exact: true }).click();
+  await expect(logs).toContainText('Latest redacted event');
+  const summary = await page.evaluate(async () => (await fetch('/api/system/support/summary')).json());
+  summary.findings = [{ id: 'docker', title: 'Docker unavailable', message: 'Review host setup.', severity: 'error', area: 'Setup', route: '/settings', actionLabel: 'Install Docker' }];
+  await page.route('**/api/system/support/summary', route => route.fulfill({ json: summary }));
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await page.getByRole('tab', { name: 'Health checks', exact: true }).click();
+  await expect(health.getByText('error:', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Open host settings', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: 'Autark-OS settings' });
+  await expect(settings.getByRole('heading', { name: 'Advanced', exact: true }).first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Open host settings', exact: true })).toBeFocused();
+});
+
+for (const width of [1024, 1280, 1440]) {
+  test(`Diagnostics task workspaces fit ${width}px without duplicate controls`, async ({ page }) => {
+    await installMockApi(page, 'idle');
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/diagnostics');
+    await expect(page.getByRole('tablist', { name: 'Diagnostics sections' }).getByRole('tab')).toHaveCount(3);
+    await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toHaveCount(1);
+    await expect(page.getByText('Diagnostics tools', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'System details', exact: true }).click();
+    for (const title of ['App ownership details', 'Docker resources', 'Tailscale details']) {
+      await page.getByRole('button', { name: title, exact: true }).click();
+    }
+    await expectNoHorizontalOverflow(page);
+    await page.getByRole('tab', { name: 'Support report', exact: true }).click();
+    await page.getByRole('button', { name: 'Generate report', exact: true }).click();
+    await expect(page.getByLabel('Report preview', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'What gets redacted?', exact: true }).click();
+    await expectNoHorizontalOverflow(page);
+    await page.getByRole('tab', { name: 'Technical logs', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Redacted logs' })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+}
 
 test('Tailscale pending checks are not presented as unavailable', async ({ page }) => {
   await installMockApi(page, 'idle');

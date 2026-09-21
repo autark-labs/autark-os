@@ -467,7 +467,7 @@ public class SystemSupportService {
     }
 
     private String bundleText(SupportContext context, String headline, String summary, SystemMetrics metrics, List<ActivityLog> recentActivity, List<ActivityLog> recentFailures, List<SupportModels.SupportLogLine> logs) {
-        return """
+        return redact("""
                 Autark-OS Support Bundle
                 Generated: %s
                 Redaction: enabled
@@ -539,7 +539,7 @@ public class SystemSupportService {
                 redactionRuleText(context.redactionRules()),
                 activityText(recentFailures),
                 activityText(recentActivity),
-                logs.stream().map(SupportModels.SupportLogLine::line).collect(Collectors.joining("\n")));
+                logs.stream().map(SupportModels.SupportLogLine::line).collect(Collectors.joining("\n"))));
     }
 
     private String domainSummaryText(List<SupportModels.SupportDomainSummary> summaries) {

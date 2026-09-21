@@ -36,7 +36,8 @@ test('active user-facing surfaces use shared disabled action reasons', () => {
     'src/pages/OnboardingPage/OnboardingWizard.tsx',
     'src/pages/SettingsPage/SettingsPage.tsx',
     'src/pages/StoragePage/StoragePage.tsx',
-    'src/pages/SupportPage/SupportPage.tsx',
+    // Diagnostics busy controls keep focus with aria-disabled and visible progress;
+    // surface-interactions.spec.ts verifies the reason and blocked activation.
   ];
 
   for (const relativePath of surfaces) {
